@@ -25,6 +25,7 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
         organizationById?: Org | null;
         orgCountByTenant?: number;
         tenantId?: string;
+        existingLinkedOrg?: (Org & { linkedWorkId?: string | null }) | null;
     }) {
         const queryLog: QueryRecord[] = [];
 
@@ -47,6 +48,11 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             findBySlug: jest.fn().mockResolvedValue(null),
             findByTenantId: jest.fn().mockResolvedValue([]),
             countByTenantId: jest.fn().mockResolvedValue(opts.orgCountByTenant ?? 0),
+            // EW-665 (Phase 13) — idempotency guard in
+            // createOrganizationFromCompanyWork looks up an existing Org by
+            // its backing Work id. Default to "none linked yet"; tests that
+            // exercise the re-fire path override this per-case.
+            findByLinkedWorkId: jest.fn().mockResolvedValue(opts.existingLinkedOrg ?? null),
             update: jest.fn().mockResolvedValue(undefined),
         };
 
@@ -747,6 +753,35 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             await expect(
                 service.createOrganizationFromCompanyWork('u-1', { id: 'w-x', name: '' }),
             ).rejects.toBeInstanceOf(ConflictException);
+        });
+
+        it('EW-665 Phase 13: is idempotent on linkedWorkId — returns the existing Org without creating a new one', async () => {
+            const existing = {
+                id: 'o-existing',
+                tenantId: 't-1',
+                slug: 'acme',
+                displayName: 'Acme Inc.',
+                linkedWorkId: 'w-42',
+            };
+            const { service, organizationRepository, tenantBootstrap } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: 'o-existing' },
+                existingLinkedOrg: existing,
+            });
+
+            const org = (await service.createOrganizationFromCompanyWork('u-1', {
+                id: 'w-42',
+                name: 'acme-website',
+                companyName: 'Acme Inc.',
+            })) as unknown as { id: string; linkedWorkId: string | null };
+
+            // Returned the pre-existing Org, NOT a freshly-minted 'o-new'.
+            expect(org.id).toBe('o-existing');
+            expect(org.linkedWorkId).toBe('w-42');
+            expect(organizationRepository.findByLinkedWorkId).toHaveBeenCalledWith('w-42');
+            // Short-circuited before touching the create path — Tenant
+            // bootstrap (the first side-effect of createOrganization) is
+            // never reached.
+            expect(tenantBootstrap.ensureTenant).not.toHaveBeenCalled();
         });
     });
 });

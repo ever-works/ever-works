@@ -35,6 +35,43 @@ import { WorkDeployment } from './work-deployment.entity';
 import { WorkMember } from './work-member.entity';
 import type { WorkKbConfig } from './kb-types';
 
+/**
+ * EW-665 (Tenants & Organizations Phase 13) — Work "kind" discriminator.
+ *
+ *   - `'default'` — every Work that exists today (directories, websites,
+ *     landing pages, etc.). The column default, so every pre-Phase-13
+ *     row backfills to it.
+ *   - `'company'` — a Work registered through the Company chip /
+ *     Register-Company flow ([spec.md §5.4](../../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)).
+ *     When such a Work transitions to `status = 'registered'`, a
+ *     `work.status.changed` event fires and the
+ *     `WorkRegisteredListener` (API layer) spawns the backing
+ *     `Organization` via `OrganizationService.createOrganizationFromCompanyWork`.
+ *
+ * String union + `varchar(32)` mirrors the `TemplateKind` convention on
+ * `template.entity.ts` — keeps the value space open without churning a
+ * Postgres enum type on every new member.
+ */
+export type WorkKind = 'default' | 'company';
+
+/**
+ * EW-665 (Tenants & Organizations Phase 13) — Work lifecycle status.
+ *
+ * The platform had no Work-level lifecycle status before this phase
+ * (generation / deployment / schedule each have their own independent
+ * status columns — `generateStatus`, `deploymentState`,
+ * `scheduledStatus` — none of which represent the Work as a whole).
+ *
+ *   - `'active'` — the column default. Every existing row backfills to
+ *     it so behavior is unchanged (a Work that exists is "live").
+ *   - `'draft'` — created-but-not-yet-finalized (e.g. a Company Work
+ *     before its registration completes).
+ *   - `'registered'` — the inflection point for Company Works: the
+ *     transition into this state is what fires the Org-create lifecycle.
+ *   - `'archived'` — soft-retired; reserved for a future archive flow.
+ */
+export type WorkStatus = 'draft' | 'active' | 'registered' | 'archived';
+
 @Entity({ name: 'works' })
 export class Work {
     @PrimaryGeneratedColumn('uuid')
@@ -91,6 +128,25 @@ export class Work {
 
     @Column({ default: false })
     organization: boolean;
+
+    /**
+     * EW-665 (Tenants & Organizations Phase 13) — Work "kind"
+     * discriminator. `'default'` for every Work that exists today;
+     * `'company'` for Works created via the Register-Company flow. See
+     * the `WorkKind` type above. `varchar(32)` mirrors `TemplateKind`.
+     */
+    @Column({ type: 'varchar', length: 32, default: 'default' })
+    kind: WorkKind;
+
+    /**
+     * EW-665 (Tenants & Organizations Phase 13) — Work lifecycle status.
+     * Defaults to `'active'` so every existing row is treated as live
+     * (no behavior change). The `'draft' → 'registered'` transition on a
+     * `kind = 'company'` Work is what fires the `work.status.changed`
+     * event that spawns the backing Organization. See `WorkStatus` above.
+     */
+    @Column({ type: 'varchar', length: 32, default: 'active' })
+    status: WorkStatus;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A tenant scope.
     // organizationId already exists from earlier work (below); tenantId

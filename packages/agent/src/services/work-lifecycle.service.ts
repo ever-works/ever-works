@@ -12,6 +12,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import {
     WorkCreatedEvent,
+    WorkStatusChangedEvent,
     WorksConfigSyncRequestedEvent,
     type WorkCreatedPlatformActor,
 } from '@src/events';
@@ -22,7 +23,7 @@ import { WebsiteUpdateService } from '@src/generators/website-generator/website-
 import { CreateWorkDto } from '@src/dto/create-work.dto';
 import { UpdateWorkDto } from '@src/dto';
 import { DeleteWorkDto, DeleteWorkResponseDto } from '@src/items-generator/dto';
-import { Work } from '@src/entities/work.entity';
+import { Work, type WorkKind, type WorkStatus } from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import { WorkOwnershipService } from './work-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
@@ -370,6 +371,102 @@ export class WorkLifecycleService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating work');
         }
+    }
+
+    /**
+     * EW-665 (Tenants & Organizations Phase 13) — create a lightweight
+     * "Company" Work row WITHOUT the heavy repo/git side-effects that
+     * `createWork` triggers.
+     *
+     * A Company Work is a registration record, not a directory/website,
+     * so it has no data repo to provision. We persist a minimal row
+     * (`kind = 'company'`, the caller-chosen initial `status`) directly
+     * via the repository, bypassing the data/markdown/website generators.
+     *
+     * Returns the persisted Work. The caller is expected to follow up
+     * with `transitionStatus(work.id, 'registered')` once registration
+     * completes (or pass `status: 'registered'` directly when the
+     * registration is already done, e.g. the manual-completion path).
+     *
+     * Emitting the `work.status.changed` event is deliberately NOT done
+     * here — `createWork`-style "created" emission is a separate concern,
+     * and the Org-spawning listener keys off the status TRANSITION, not
+     * the create. Callers drive the transition explicitly so the flow
+     * stays observable + testable.
+     */
+    async createCompanyWork(
+        user: User,
+        params: {
+            name: string;
+            slug: string;
+            description?: string;
+            companyName?: string | null;
+            companyWebsite?: string | null;
+            status?: WorkStatus;
+        },
+    ): Promise<Work> {
+        const workData: Partial<Work> = {
+            slug: params.slug,
+            name: params.name,
+            description: params.description ?? params.name,
+            userId: user.id,
+            kind: 'company',
+            status: params.status ?? 'draft',
+            companyName: params.companyName ?? params.name,
+            companyWebsite: params.companyWebsite ?? null,
+        };
+
+        try {
+            return await this.workRepository.create(workData, user);
+        } catch (error) {
+            rethrowAsNormalized(error, this.logger, 'creating company work');
+        }
+    }
+
+    /**
+     * EW-665 (Tenants & Organizations Phase 13) — transition a Work's
+     * lifecycle `status` and emit `work.status.changed` when (and only
+     * when) the status actually changes.
+     *
+     * This is the single choke-point for Work-status mutations introduced
+     * by Phase 13 — `status` is a brand-new column, so there was no
+     * pre-existing update path to fold into. The Register-Company flow
+     * drives a Company Work into `'registered'` through here, which fires
+     * the event that the API-layer `WorkRegisteredListener` turns into an
+     * `Organization`.
+     *
+     * No-op (no save, no emit) when the Work is already at `newStatus`,
+     * so re-running a transition is idempotent and never double-fires the
+     * downstream listener.
+     */
+    async transitionStatus(workId: string, newStatus: WorkStatus): Promise<Work> {
+        const work = await this.workRepository.findById(workId);
+        if (!work) {
+            throw new NotFoundException({ status: 'error', message: 'Work not found' });
+        }
+
+        const previousStatus: WorkStatus = work.status;
+        if (previousStatus === newStatus) {
+            // Idempotent no-op: same status in → same status out, no event.
+            return work;
+        }
+
+        const updated = await this.workRepository.update(workId, { status: newStatus });
+        if (!updated) {
+            throw new NotFoundException({ status: 'error', message: 'Work not found' });
+        }
+
+        // Fire-and-forget the status-change notification. The Org-spawning
+        // listener catches its own errors (detached handler — see
+        // `WorkRegisteredListener`), so a failure there cannot turn this
+        // transition into a request failure.
+        const kind: WorkKind = updated.kind ?? 'default';
+        this.eventEmitter.emit(
+            WorkStatusChangedEvent.EVENT_NAME,
+            new WorkStatusChangedEvent(workId, updated.userId, kind, previousStatus, newStatus),
+        );
+
+        return updated;
     }
 
     /**

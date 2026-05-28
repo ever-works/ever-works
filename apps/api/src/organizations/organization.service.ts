@@ -601,6 +601,13 @@ export class OrganizationService {
      * Use this whenever a caller has a real `Work` row to link.
      * Otherwise prefer `registerCompany` which is the chip-driven
      * manual-completion path.
+     *
+     * **Idempotent on `linkedWorkId` (EW-665 Phase 13):** if an
+     * Organization already points at this Work (e.g. the
+     * `work.status.changed` listener re-fired, or the Register-Company
+     * controller already linked the Work), the existing Org is returned
+     * unchanged rather than creating a duplicate. This keeps the
+     * event-driven listener safe to invoke more than once.
      */
     async createOrganizationFromCompanyWork(
         userId: string,
@@ -616,6 +623,18 @@ export class OrganizationService {
         if (!displayName) {
             throw new ConflictException('Work has no usable name for Organization creation');
         }
+
+        // Idempotency guard: never spawn a second Org for the same backing
+        // Work. The listener can fire more than once (detached handlers,
+        // retries, double-transition) so this is the safe re-entry point.
+        const existing = await this.organizationRepository.findByLinkedWorkId(work.id);
+        if (existing) {
+            this.logger.log(
+                `Organization ${existing.id} already linked to Work ${work.id}; skipping duplicate create`,
+            );
+            return existing;
+        }
+
         return this.registerCompany(userId, {
             name: displayName,
             countryCode: params?.countryCode ?? null,

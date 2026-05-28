@@ -7,6 +7,7 @@ import {
     type DeploymentEventPayload,
 } from './deployment.events';
 import { WorkCreatedEvent } from './work-created.event';
+import { WorkStatusChangedEvent } from './work-status-changed.event';
 import { WorkGenerationCompletedEvent } from './work-generation-completed.event';
 import {
     WorksConfigSyncRequestedEvent,
@@ -111,6 +112,22 @@ describe('agent/events submodule', () => {
         it('captures work as a readonly positional arg', () => {
             const evt = new WorkCreatedEvent(fakeWork);
             expect(evt.work).toBe(fakeWork);
+        });
+    });
+
+    describe('WorkStatusChangedEvent (EW-665 Phase 13)', () => {
+        it('has the documented EVENT_NAME', () => {
+            expect(WorkStatusChangedEvent.EVENT_NAME).toBe('work.status.changed');
+        });
+
+        it('captures workId / userId / kind / previousStatus / newStatus positionally', () => {
+            const evt = new WorkStatusChangedEvent('w1', 'u1', 'company', 'draft', 'registered');
+            expect(evt.workId).toBe('w1');
+            expect(evt.userId).toBe('u1');
+            expect(evt.kind).toBe('company');
+            expect(evt.previousStatus).toBe('draft');
+            expect(evt.newStatus).toBe('registered');
+            expect(evt).toBeInstanceOf(BaseEvent);
         });
     });
 
@@ -259,6 +276,7 @@ describe('agent/events submodule', () => {
 
         it('re-exports every published event class', () => {
             expect(eventsBarrel.WorkCreatedEvent).toBe(WorkCreatedEvent);
+            expect(eventsBarrel.WorkStatusChangedEvent).toBe(WorkStatusChangedEvent);
             expect(eventsBarrel.WorkGenerationCompletedEvent).toBe(WorkGenerationCompletedEvent);
             expect(eventsBarrel.WorksConfigSyncRequestedEvent).toBe(WorksConfigSyncRequestedEvent);
             expect(eventsBarrel.WorksConfigSyncFailedEvent).toBe(WorksConfigSyncFailedEvent);
@@ -278,6 +296,7 @@ describe('agent/events submodule', () => {
                     'DeploymentDispatchedEvent',
                     'DeploymentFailedEvent',
                     'WorkCreatedEvent',
+                    'WorkStatusChangedEvent',
                     'WorkGenerationCompletedEvent',
                     'WorksConfigSyncFailedEvent',
                     'WorksConfigSyncRequestedEvent',

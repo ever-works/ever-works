@@ -17,7 +17,9 @@ import type {
     OrganizationResponse,
     UpgradeFromAccountResponse,
 } from '@ever-works/contracts/api';
-import type { Organization } from '@ever-works/agent/entities';
+import type { Organization, User } from '@ever-works/agent/entities';
+import { WorkLifecycleService } from '@ever-works/agent/services';
+import { UsernameAllocatorService } from '../users/services/username-allocator.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -47,7 +49,15 @@ import { RegisterCompanyDto } from './dto/register-company.dto';
 @ApiBearerAuth('JWT-auth')
 @Controller('api/organizations')
 export class OrganizationsController {
-    constructor(private readonly organizationService: OrganizationService) {}
+    constructor(
+        private readonly organizationService: OrganizationService,
+        // EW-665 (Phase 13) — the Register-Company flow now lands a backing
+        // Company `Work` and drives it through the `→ registered` lifecycle
+        // transition, so the data model is consistent with §5.4 (one Work
+        // of type Company backs each registered Org).
+        private readonly workLifecycle: WorkLifecycleService,
+        private readonly usernameAllocator: UsernameAllocatorService,
+    ) {}
 
     @Post()
     @ApiOperation({
@@ -70,21 +80,52 @@ export class OrganizationsController {
 
     @Post('register-company')
     @ApiOperation({
-        summary: 'Register a Company (Phase 10 — Company chip)',
+        summary: 'Register a Company (Phase 10 chip → Phase 13 Work lifecycle)',
         description:
-            "EW-662: Registers a Company via the manual-completion path ([spec.md §5.4](../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)). Creates an Organization with `registrationProvider = 'manual'` and `registrationStatus = 'registered'` directly — the Stripe Atlas SDK integration is deferred. Lazy-creates the Tenant + backfills `tenantId` the same way `POST /api/organizations` does.",
+            "EW-662 / EW-665: Registers a Company via the manual-completion path ([spec.md §5.4](../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)). Phase 13 lands a backing Work of `kind = 'company'`, links it to the Organization, then transitions the Work to `status = 'registered'` (firing the `work.status.changed` lifecycle event). The Organization is created with `registrationProvider = 'manual'` and `registrationStatus = 'registered'` — the Stripe Atlas SDK integration is deferred. Lazy-creates the Tenant + backfills `tenantId` the same way `POST /api/organizations` does.",
     })
     @ApiResponse({ status: 201, description: 'Company registered + Organization created' })
     async registerCompany(
         @Req() req: { user: { userId: string } },
         @Body() dto: RegisterCompanyDto,
     ): Promise<OrganizationResponse> {
-        const org = await this.organizationService.registerCompany(req.user.userId, {
+        const userId = req.user.userId;
+        const countryCode = dto.countryCode?.toUpperCase() ?? null;
+
+        // EW-665 (Phase 13) step 1 — land a backing Company Work in DRAFT.
+        // This is a lightweight registration record (no data/website repo
+        // provisioning), so it goes through `createCompanyWork` rather than
+        // the heavy `createWork` path. A short random suffix keeps the
+        // per-user Work slug unique without a lookup loop.
+        const workSlug = `${this.usernameAllocator.normalize(dto.name)}-${Date.now().toString(36)}`;
+        const work = await this.workLifecycle.createCompanyWork({ id: userId } as User, {
+            name: dto.name,
+            slug: workSlug,
+            companyName: dto.legalName ?? dto.name,
+            status: 'draft',
+        });
+
+        // Step 2 — create the Organization linked to the backing Work. This
+        // is the working Phase 10 `registerCompany` path, now threading
+        // `linkedWorkId` so `organizations.linkedWorkId` points at the Work
+        // (spec §5.4 step 4). Keeping this direct create is the lower-risk
+        // half of "approach (a)" — the Org is created here deterministically.
+        const org = await this.organizationService.registerCompany(userId, {
             name: dto.name,
             legalName: dto.legalName,
-            countryCode: dto.countryCode?.toUpperCase() ?? null,
+            countryCode,
             slugOverride: dto.slug,
+            linkedWorkId: work.id,
         });
+
+        // Step 3 — drive the Work through the lifecycle transition that
+        // fires `work.status.changed`. `WorkRegisteredListener` reacts, but
+        // its `createOrganizationFromCompanyWork` is idempotent on
+        // `linkedWorkId` so it finds the Org created in step 2 and no-ops —
+        // no duplicate Org. The transition is still the canonical hook the
+        // future Stripe-Atlas / manual-completion paths will reuse.
+        await this.workLifecycle.transitionStatus(work.id, 'registered');
+
         return this.toResponse(org);
     }
 

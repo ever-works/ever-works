@@ -52,6 +52,7 @@ describe('WorkLifecycleService', () => {
             create: jest.fn(),
             update: jest.fn().mockResolvedValue(undefined),
             updateGenerateStatus: jest.fn(),
+            findById: jest.fn(),
         };
         dataGenerator = {
             getItems: jest.fn(),
@@ -400,5 +401,101 @@ describe('WorkLifecycleService', () => {
         expect(work.websiteTemplateId).toBe('classic');
         expect(work.websiteTemplateLastCommit).toBe('abc123');
         expect(work.websiteTemplateLastError).toBe('old error');
+    });
+
+    describe('transitionStatus (EW-665 Phase 13)', () => {
+        it('updates status, saves, and emits work.status.changed with the right payload', async () => {
+            const work = { id: 'w-1', userId: 'u1', kind: 'company', status: 'draft' } as any;
+            workRepository.findById.mockResolvedValue(work);
+            workRepository.update.mockResolvedValue({ ...work, status: 'registered' });
+
+            const result = await service.transitionStatus('w-1', 'registered');
+
+            expect(workRepository.update).toHaveBeenCalledWith('w-1', { status: 'registered' });
+            expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+            const [eventName, payload] = eventEmitter.emit.mock.calls[0];
+            expect(eventName).toBe('work.status.changed');
+            expect(payload).toMatchObject({
+                workId: 'w-1',
+                userId: 'u1',
+                kind: 'company',
+                previousStatus: 'draft',
+                newStatus: 'registered',
+            });
+            expect(result.status).toBe('registered');
+        });
+
+        it('is a no-op (no update, no emit) when the status is unchanged', async () => {
+            const work = { id: 'w-1', userId: 'u1', kind: 'company', status: 'registered' } as any;
+            workRepository.findById.mockResolvedValue(work);
+
+            const result = await service.transitionStatus('w-1', 'registered');
+
+            expect(workRepository.update).not.toHaveBeenCalled();
+            expect(eventEmitter.emit).not.toHaveBeenCalled();
+            expect(result).toBe(work);
+        });
+
+        it('defaults kind to "default" in the payload when the Work has none', async () => {
+            const work = { id: 'w-2', userId: 'u1', status: 'active' } as any;
+            workRepository.findById.mockResolvedValue(work);
+            workRepository.update.mockResolvedValue({ ...work, status: 'archived' });
+
+            await service.transitionStatus('w-2', 'archived');
+
+            const [, payload] = eventEmitter.emit.mock.calls[0];
+            expect(payload).toMatchObject({ kind: 'default', newStatus: 'archived' });
+        });
+
+        it('throws NotFoundException when the Work does not exist', async () => {
+            workRepository.findById.mockResolvedValue(null);
+            await expect(service.transitionStatus('missing', 'registered')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(eventEmitter.emit).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('createCompanyWork (EW-665 Phase 13)', () => {
+        it('persists a kind=company Work with the chosen status, no repo side-effects', async () => {
+            const persisted = {
+                id: 'w-9',
+                kind: 'company',
+                status: 'draft',
+                name: 'Acme',
+            } as any;
+            workRepository.create.mockResolvedValue(persisted);
+
+            const result = await service.createCompanyWork(user, {
+                name: 'Acme',
+                slug: 'acme-abc',
+                companyName: 'Acme Inc.',
+                status: 'draft',
+            });
+
+            expect(workRepository.create).toHaveBeenCalledTimes(1);
+            const [dto] = workRepository.create.mock.calls[0];
+            expect(dto).toMatchObject({
+                kind: 'company',
+                status: 'draft',
+                slug: 'acme-abc',
+                name: 'Acme',
+                companyName: 'Acme Inc.',
+                userId: user.id,
+            });
+            // No generator/git side-effects for a registration record.
+            expect(dataGenerator.getItems).not.toHaveBeenCalled();
+            expect(result).toBe(persisted);
+        });
+
+        it('defaults status to draft when omitted', async () => {
+            workRepository.create.mockResolvedValue({ id: 'w-10' } as any);
+
+            await service.createCompanyWork(user, { name: 'Globex', slug: 'globex-1' });
+
+            const [dto] = workRepository.create.mock.calls[0];
+            expect(dto.status).toBe('draft');
+            expect(dto.kind).toBe('company');
+        });
     });
 });
