@@ -77,9 +77,7 @@ import { README } from './readme.js';
  * their accounts once via Composio's hosted flow, and the platform runs
  * tools against `composio.user_id` (defaulted to the Ever Works user id).
  */
-export class ComposioPlugin
-	implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ISkillsProviderPlugin
-{
+export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ISkillsProviderPlugin {
 	readonly id = 'composio';
 	readonly name = 'Composio Integrations';
 	readonly version = '1.0.0';
@@ -310,9 +308,7 @@ export class ComposioPlugin
 			});
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			(this.context?.logger ?? console).warn(
-				`Composio skills-provider: failed to load catalog — ${message}`
-			);
+			(this.context?.logger ?? console).warn(`Composio skills-provider: failed to load catalog — ${message}`);
 			return [];
 		}
 	}

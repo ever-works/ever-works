@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ComposioPlugin } from '../composio.plugin.js';
-import {
-	buildSkillCatalogEntries,
-	diffSkillCatalogVersions,
-	filterSkillCatalog
-} from '../skills-provider.js';
+import { buildSkillCatalogEntries, diffSkillCatalogVersions, filterSkillCatalog } from '../skills-provider.js';
 import type { SkillCatalogEntry } from '@ever-works/plugin';
 
 function jsonResponse(body: unknown): Response {
@@ -73,9 +69,7 @@ describe('buildSkillCatalogEntries', () => {
 	});
 
 	it('returns empty when the user has no ACTIVE connections', async () => {
-		const fetchImpl = mockFetchAccounts([
-			{ id: 'ca_1', status: 'INITIATED', toolkit: { slug: 'GMAIL' } }
-		]);
+		const fetchImpl = mockFetchAccounts([{ id: 'ca_1', status: 'INITIATED', toolkit: { slug: 'GMAIL' } }]);
 		const entries = await buildSkillCatalogEntries({
 			apiKey: 'k',
 			defaultUserId: 'user-1',
@@ -144,9 +138,7 @@ describe('diffSkillCatalogVersions', () => {
 			}
 		];
 		const result = diffSkillCatalogVersions(entries, { 'composio-gmail': '0.9.0' });
-		expect(result.updated).toEqual([
-			{ slug: 'composio-gmail', oldVersion: '0.9.0', newVersion: '1.0.0' }
-		]);
+		expect(result.updated).toEqual([{ slug: 'composio-gmail', oldVersion: '0.9.0', newVersion: '1.0.0' }]);
 	});
 
 	it('ignores entries the user does not have installed', () => {

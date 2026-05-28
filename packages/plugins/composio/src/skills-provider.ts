@@ -116,10 +116,7 @@ export function filterSkillCatalog(
 	if (options.search) {
 		const q = options.search.toLowerCase();
 		filtered = filtered.filter(
-			(e) =>
-				e.slug.includes(q) ||
-				e.title.toLowerCase().includes(q) ||
-				e.description.toLowerCase().includes(q)
+			(e) => e.slug.includes(q) || e.title.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)
 		);
 	}
 	if (options.tags && options.tags.length > 0) {
