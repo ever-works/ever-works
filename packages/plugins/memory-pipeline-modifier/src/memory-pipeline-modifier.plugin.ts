@@ -296,7 +296,6 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 	async rollback(context: IPipelineContext, error: Error): Promise<void> {
 		const settings = this.resolveSettings(context);
 		if (settings.enabled !== true) return;
-		if (settings.saveSummary === false) return;
 
 		const execContext = (context as ContextBag).__memoryModifierExecContext as StepExecutionContext | undefined;
 		const memoryFacade = execContext?.agentMemoryFacade;
@@ -304,7 +303,17 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 		if (!memoryFacade) {
 			// fetch-context didn't run, or the modifier was disabled when
-			// it did. Either way there's no facade to call.
+			// it did. Either way there's no facade to call (and so nothing
+			// was opened that needs closing).
+			return;
+		}
+
+		// When the failure digest is disabled we still MUST close any
+		// session this modifier opened during fetch-context — otherwise a
+		// failed/cancelled run with `saveSummary: false` leaks the session
+		// (Codex P2 on PR #1113).
+		if (settings.saveSummary === false) {
+			await this.closeSelfOpenedSession(context as ContextBag, memoryFacade, logger);
 			return;
 		}
 
@@ -393,7 +402,10 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		try {
 			const work = (context as { work?: { id?: string; slug?: string } }).work;
 			const session = await memoryFacade.openSession(
-				{ source: this.id, workId: work?.id, workSlug: work?.slug },
+				// Open in the SAME project namespace the fetch/save/rollback
+				// calls use (`work.slug ?? work.id`) so the session row and
+				// its memory entries live together (Codex P2 on PR #1113).
+				{ projectId: work?.slug ?? work?.id, source: this.id, workId: work?.id, workSlug: work?.slug },
 				// Bound facade ignores its facadeOptions — pass placeholder.
 				{ userId: 'bound', workId: 'bound' }
 			);

@@ -529,6 +529,25 @@ describe('MemoryPipelineModifierPlugin', () => {
 			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-4', expect.anything());
 		});
 
+		it('closes the self-opened session on rollback even when saveSummary is disabled', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-5',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			const context = makeContext({
+				stepSettings: { 'memory-pipeline-modifier': { enabled: true, saveSummary: false } }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			await plugin.rollback(context, new Error('boom'));
+			// saveSummary off → no failure digest persisted, but the session
+			// we opened in fetch-context must still be closed.
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-5', expect.anything());
+		});
+
 		it('does NOT open or close a session when the orchestrator supplies one', async () => {
 			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
 			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-o' });
