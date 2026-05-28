@@ -188,22 +188,23 @@ export class EmailFacadeService extends BaseFacadeService {
         options: EmailFacadeSendOptions,
     ): Promise<IEmailOutboundPlugin> {
         if (options.addressId && this.emailAddresses) {
-            const address = await this.emailAddresses.findOne({ where: { id: options.addressId } });
+            const address = await this.emailAddresses.findById(options.addressId);
             if (address?.pluginId) {
                 const plugin = this.getOutboundPluginByIdSafe(address.pluginId);
                 if (plugin) return plugin;
             }
         }
-        if (options.agentId && this.agentAssignments) {
-            const assignments = await this.agentAssignments.find({
-                where: { agentId: options.agentId, direction: 'outbound' },
-                order: { priority: 'ASC' },
-                relations: ['emailAddress'],
-            });
+        if (options.agentId && this.agentAssignments && this.emailAddresses) {
+            // findByAgent returns assignments ordered by priority asc;
+            // resolve each to its backing address to read the pluginId.
+            const assignments = await this.agentAssignments.findByAgent(
+                options.agentId,
+                'outbound',
+            );
             for (const assignment of assignments) {
-                const pluginId = assignment.emailAddress?.pluginId;
-                if (pluginId) {
-                    const plugin = this.getOutboundPluginByIdSafe(pluginId);
+                const address = await this.emailAddresses.findById(assignment.emailAddressId);
+                if (address?.pluginId) {
+                    const plugin = this.getOutboundPluginByIdSafe(address.pluginId);
                     if (plugin) return plugin;
                 }
             }
@@ -279,29 +280,27 @@ export class EmailFacadeService extends BaseFacadeService {
         options: EmailFacadeSendOptions,
     ): Promise<void> {
         if (!this.emailMessages || !options.userId || !options.addressId) return;
-        await this.emailMessages.save(
-            this.emailMessages.create({
-                userId: options.userId,
-                agentId: options.agentId ?? null,
-                taskId: options.taskId ?? null,
-                conversationId: null,
-                emailAddressId: options.addressId,
-                direction: 'outbound',
-                pluginId: result.provider,
-                providerMessageId: result.providerMessageId,
-                from: wire.from,
-                toAddresses: [...wire.to],
-                ccAddresses: wire.cc ? [...wire.cc] : null,
-                bccAddresses: wire.bcc ? [...wire.bcc] : null,
-                subject: wire.subject,
-                bodyText: wire.bodyText,
-                bodyHtml: wire.bodyHtml ?? null,
-                metadata: input.metadata ? { ...input.metadata } : null,
-                messageRef: input.messageRef ?? null,
-                sentAt: new Date(),
-                deliveryStatus: 'accepted',
-            }),
-        );
+        await this.emailMessages.save({
+            userId: options.userId,
+            agentId: options.agentId ?? null,
+            taskId: options.taskId ?? null,
+            conversationId: null,
+            emailAddressId: options.addressId,
+            direction: 'outbound',
+            pluginId: result.provider,
+            providerMessageId: result.providerMessageId,
+            from: wire.from,
+            toAddresses: [...wire.to],
+            ccAddresses: wire.cc ? [...wire.cc] : null,
+            bccAddresses: wire.bcc ? [...wire.bcc] : null,
+            subject: wire.subject,
+            bodyText: wire.bodyText,
+            bodyHtml: wire.bodyHtml ?? null,
+            metadata: input.metadata ? { ...input.metadata } : null,
+            messageRef: input.messageRef ?? null,
+            sentAt: new Date(),
+            deliveryStatus: 'accepted',
+        } as Parameters<typeof this.emailMessages.save>[0]);
     }
 
     private async recordUsage(

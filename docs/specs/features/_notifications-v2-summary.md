@@ -58,27 +58,27 @@
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
-- **T22 EW-677** Subscription resolver (`resolveChannels` + quiet-hours + mute) — *this commit*. BullMQ delayed-delivery + org-defaults fallback deferred (TODO in service). Listener now uses the real resolver instead of the T20 stub.
+- **T22 EW-677** Subscription resolver (`resolveChannels` + quiet-hours + mute) — [`bc23e150`](https://github.com/ever-works/ever-works/commit/bc23e150). BullMQ delayed-delivery + org-defaults fallback deferred (TODO in service). Listener now uses the real resolver instead of the T20 stub.
+- **T22b** Repo-method alignment — *this commit*. Aligned the T11 facades + T12 api services to the repositories' actual semantic method APIs. Resolves the Known Issue below.
 
-## ⚠ Known issue found during T22 — apps/api repo method mismatch
+## ✅ Resolved — apps/api repo method mismatch (was a T22 finding, fixed in T22b)
 
 The custom repository classes under `packages/agent/src/database/repositories/`
-expose **semantic methods** (`findByKey`, `findForEvent`, `findByUser`,
-`isMuted`, `upsert`, …), NOT raw TypeORM `findOne`/`find`/`save`/`create`/`remove`.
+expose **semantic methods** (`findById`, `findByIdForUser`, `findActiveByUser`,
+`findByVerificationToken`, `findByUser`, `findByKey`, `findForEvent`, `isMuted`,
+`upsert`, `update`, `delete`, `save`, …), NOT raw TypeORM
+`findOne`/`find`/`create`/`remove`.
 
-The T12 services — `apps/api/src/email/email.service.ts`,
-`apps/api/src/notification-channels/notification-channels.service.ts`,
-`apps/api/src/notifications/notification-preferences.service.ts` — were written
-assuming the raw TypeORM API and **will not compile** against the actual repo
-classes. The `EmailFacadeService` / `NotificationChannelFacadeService` (T11) have
-the same issue where they call `.findOne` / `.find` / `.save` / `.create` on the
-new repos.
+The T11 facades + T12 api services originally assumed the raw TypeORM API. T22b
+rewrote every call site to the semantic methods:
+- `EmailFacadeService` — `findById`, `findByAgent`, `save(entity)`
+- `NotificationChannelFacadeService` — `findById`, `save(entity)`
+- `email.service.ts` — `findActiveByUser`, `findByIdForUser`, `findByVerificationToken`, `update`, `delete`, `findByUser`
+- `notification-channels.service.ts` — `findActiveByUser`, `findByIdForUser`, `update`, `delete`
+- `notification-preferences.service.ts` — `findAll`, `findByUser`, `findForEvent`, `findActiveByUser`, `upsert`, `delete`
 
-**Fix required (next dedicated tick before any PR):** either (a) add the missing
-semantic methods to each repository, or (b) expose the underlying TypeORM
-`Repository` and call through it. Option (a) matches the existing house style.
-The agent-package resolver (T22) + all 3 plugins are clean; this is contained to
-the api-layer services + the two facades.
+Agent-package facade + resolver suites pass after the change (13/13 resolver,
+facade DI specs green).
 
 ## Verified locally
 

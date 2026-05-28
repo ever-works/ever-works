@@ -163,7 +163,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                 error: 'channels repository not injected',
             };
         }
-        const channel = await this.channels.findOne({ where: { id: channelId } });
+        const channel = await this.channels.findById(channelId);
         if (!channel) {
             return {
                 channelId,
@@ -268,18 +268,16 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
     ): Promise<void> {
         if (!this.deliveryLog) return;
         try {
-            await this.deliveryLog.save(
-                this.deliveryLog.create({
-                    channelId,
-                    messageRef,
-                    eventType: eventType ?? null,
-                    status,
-                    providerMessageId: result?.providerMessageId ?? null,
-                    errorMessage: errorMessage ?? null,
-                    attemptCount: 1,
-                    deliveredAt: result?.deliveredAt ?? null,
-                }),
-            );
+            await this.deliveryLog.save({
+                channelId,
+                messageRef,
+                eventType: eventType ?? null,
+                status,
+                providerMessageId: result?.providerMessageId ?? null,
+                errorMessage: errorMessage ?? null,
+                attemptCount: 1,
+                deliveredAt: result?.deliveredAt ?? null,
+            } as Parameters<typeof this.deliveryLog.save>[0]);
         } catch (err) {
             this.logger.warn(`delivery log persist failed: ${String(err)}`);
         }

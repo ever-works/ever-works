@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import {
     TenantEmailAddressRepository,
@@ -36,15 +36,12 @@ export class EmailService {
     ) {}
 
     async listAddresses(userId: string, direction?: EmailAddressDirection): Promise<TenantEmailAddress[]> {
-        return this.addresses.find({
-            where: { userId, ...(direction ? { direction } : {}) },
-            order: { createdAt: 'DESC' },
-        });
+        return this.addresses.findActiveByUser(userId, direction);
     }
 
     async createAddress(userId: string, input: CreateEmailAddressInput): Promise<TenantEmailAddress> {
         const verificationToken = randomBytes(24).toString('base64url');
-        const created = this.addresses.create({
+        return this.addresses.save({
             userId,
             address: input.address,
             direction: input.direction,
@@ -53,8 +50,7 @@ export class EmailService {
             defaultForReplies: input.defaultForReplies ?? false,
             verified: false,
             verificationToken,
-        });
-        return this.addresses.save(created);
+        } as TenantEmailAddress);
     }
 
     async updateAddress(
@@ -62,16 +58,18 @@ export class EmailService {
         id: string,
         input: UpdateEmailAddressInput,
     ): Promise<TenantEmailAddress> {
-        const row = await this.findOwnedOrThrow(userId, id);
-        if (input.providerSettings) row.providerSettings = input.providerSettings;
-        if (typeof input.defaultForReplies === 'boolean') row.defaultForReplies = input.defaultForReplies;
-        if (typeof input.disabled === 'boolean') row.disabledAt = input.disabled ? new Date() : null;
-        return this.addresses.save(row);
+        await this.findOwnedOrThrow(userId, id);
+        const patch: Partial<TenantEmailAddress> = {};
+        if (input.providerSettings) patch.providerSettings = input.providerSettings;
+        if (typeof input.defaultForReplies === 'boolean') patch.defaultForReplies = input.defaultForReplies;
+        if (typeof input.disabled === 'boolean') patch.disabledAt = input.disabled ? new Date() : null;
+        await this.addresses.update(id, patch);
+        return this.findOwnedOrThrow(userId, id);
     }
 
     async deleteAddress(userId: string, id: string): Promise<void> {
-        const row = await this.findOwnedOrThrow(userId, id);
-        await this.addresses.remove(row);
+        await this.findOwnedOrThrow(userId, id);
+        await this.addresses.delete(id, userId);
     }
 
     /**
@@ -86,11 +84,9 @@ export class EmailService {
     }
 
     async confirmVerification(token: string): Promise<{ verified: boolean }> {
-        const row = await this.addresses.findOne({ where: { verificationToken: token } });
+        const row = await this.addresses.findByVerificationToken(token);
         if (!row) return { verified: false };
-        row.verified = true;
-        row.verificationToken = null;
-        await this.addresses.save(row);
+        await this.addresses.update(row.id, { verified: true, verificationToken: null });
         return { verified: true };
     }
 
@@ -100,18 +96,16 @@ export class EmailService {
         limit = 50,
         offset = 0,
     ): Promise<unknown[]> {
-        return this.messages.find({
-            where: { userId, agentId },
-            order: { createdAt: 'DESC' },
-            take: Math.min(limit, 100),
-            skip: offset,
+        return this.messages.findByUser(userId, {
+            agentId,
+            limit: Math.min(limit, 100),
+            offset,
         });
     }
 
     private async findOwnedOrThrow(userId: string, id: string): Promise<TenantEmailAddress> {
-        const row = await this.addresses.findOne({ where: { id } });
+        const row = await this.addresses.findByIdForUser(id, userId);
         if (!row) throw new NotFoundException('Email address not found');
-        if (row.userId !== userId) throw new ForbiddenException('Not authorized');
         return row;
     }
 }

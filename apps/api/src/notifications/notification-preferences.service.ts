@@ -35,14 +35,17 @@ export class NotificationPreferencesService {
     ) {}
 
     async listEventTypes(): Promise<NotificationEventType[]> {
-        return this.eventTypes.find({ order: { category: 'ASC', key: 'ASC' } });
+        const all = await this.eventTypes.findAll();
+        return [...all].sort(
+            (a, b) => a.category.localeCompare(b.category) || a.key.localeCompare(b.key),
+        );
     }
 
     async getPreferences(userId: string): Promise<PreferencesView> {
         const [subs, pref, muteRows] = await Promise.all([
-            this.subscriptions.find({ where: { userId } }),
-            this.preferences.findOne({ where: { userId } }),
-            this.mutes.find({ where: { userId } }),
+            this.subscriptions.findByUser(userId),
+            this.preferences.findByUser(userId),
+            this.mutes.findActiveByUser(userId),
         ]);
         return {
             subscriptions: subs,
@@ -56,14 +59,11 @@ export class NotificationPreferencesService {
         eventTypeKey: string,
         channelIds: string[],
     ): Promise<UserNotificationSubscription> {
-        const existing = await this.subscriptions.findOne({ where: { userId, eventTypeKey } });
-        if (existing) {
-            existing.channelIds = channelIds;
-            return this.subscriptions.save(existing);
-        }
-        return this.subscriptions.save(
-            this.subscriptions.create({ userId, eventTypeKey, channelIds }),
-        );
+        await this.subscriptions.upsert(userId, eventTypeKey, channelIds);
+        return (await this.subscriptions.findForEvent(
+            userId,
+            eventTypeKey,
+        )) as UserNotificationSubscription;
     }
 
     async setQuietHours(
@@ -72,16 +72,7 @@ export class NotificationPreferencesService {
         quietHoursEnd: string | null,
         timezone: string | null,
     ): Promise<UserNotificationPreference> {
-        const existing = await this.preferences.findOne({ where: { userId } });
-        if (existing) {
-            existing.quietHoursStart = quietHoursStart;
-            existing.quietHoursEnd = quietHoursEnd;
-            existing.timezone = timezone;
-            return this.preferences.save(existing);
-        }
-        return this.preferences.save(
-            this.preferences.create({ userId, quietHoursStart, quietHoursEnd, timezone }),
-        );
+        return this.preferences.upsert(userId, { quietHoursStart, quietHoursEnd, timezone });
     }
 
     async muteCategory(
@@ -89,18 +80,11 @@ export class NotificationPreferencesService {
         category: string,
         mutedUntil: Date | null,
     ): Promise<{ category: string; mutedUntil: Date | null }> {
-        const existing = await this.mutes.findOne({ where: { userId, category } });
-        if (existing) {
-            existing.mutedUntil = mutedUntil;
-            await this.mutes.save(existing);
-        } else {
-            await this.mutes.save(this.mutes.create({ userId, category, mutedUntil }));
-        }
+        await this.mutes.upsert(userId, category, mutedUntil);
         return { category, mutedUntil };
     }
 
     async unmuteCategory(userId: string, category: string): Promise<void> {
-        const existing = await this.mutes.findOne({ where: { userId, category } });
-        if (existing) await this.mutes.remove(existing);
+        await this.mutes.delete(userId, category);
     }
 }
