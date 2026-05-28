@@ -10,7 +10,6 @@ const mockRemember = vi.fn();
 const mockSmartSearch = vi.fn();
 const mockContext = vi.fn();
 const mockForget = vi.fn();
-const mockListSessions = vi.fn();
 
 vi.mock('../agentmemory-client.js', () => ({
 	AgentmemoryClient: vi.fn().mockImplementation(() => ({
@@ -21,8 +20,7 @@ vi.mock('../agentmemory-client.js', () => ({
 		remember: mockRemember,
 		smartSearch: mockSmartSearch,
 		context: mockContext,
-		forget: mockForget,
-		listSessions: mockListSessions
+		forget: mockForget
 	}))
 }));
 
@@ -61,6 +59,11 @@ describe('AgentmemoryPlugin', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// Clear env vars the plugin reads as last-resort fallback, so
+		// tests don't accidentally inherit them from the runner.
+		delete process.env.AGENTMEMORY_BASE_URL;
+		delete process.env.AGENTMEMORY_API_KEY;
+		delete process.env.AGENTMEMORY_PROJECT;
 		plugin = new AgentmemoryPlugin();
 	});
 
@@ -75,13 +78,16 @@ describe('AgentmemoryPlugin', () => {
 			expect(plugin.providerName).toBe('agentmemory');
 		});
 
-		it('exposes a JSON Schema with baseUrl + apiKey + envVar fallbacks', () => {
+		it('exposes a JSON Schema with baseUrl + apiKey (NOT x-envVar-locked)', () => {
 			const schema = plugin.settingsSchema;
 			const props = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
 			expect(props.baseUrl).toBeDefined();
-			expect(props.baseUrl['x-envVar']).toBe('AGENTMEMORY_BASE_URL');
 			expect(props.apiKey['x-secret']).toBe(true);
-			expect(props.apiKey['x-envVar']).toBe('AGENTMEMORY_API_KEY');
+			// x-envVar makes the field env-only / unsettable via the
+			// admin UI (Codex P2 on PR #1073). We fall back to env
+			// vars manually instead.
+			expect(props.baseUrl['x-envVar']).toBeUndefined();
+			expect(props.apiKey['x-envVar']).toBeUndefined();
 		});
 
 		it('declares itself the default for agent-memory in its manifest', () => {
@@ -112,6 +118,12 @@ describe('AgentmemoryPlugin', () => {
 			expect(result.valid).toBe(false);
 			expect(result.errors?.[0].path).toBe('timeoutMs');
 		});
+
+		it('rejects too-large timeout (schema maximum is 120 000)', async () => {
+			const result = await plugin.validateSettings({ timeoutMs: 9_999_999 });
+			expect(result.valid).toBe(false);
+			expect(result.errors?.[0].path).toBe('timeoutMs');
+		});
 	});
 
 	describe('validateConnection', () => {
@@ -131,29 +143,25 @@ describe('AgentmemoryPlugin', () => {
 	});
 
 	describe('saveMemory', () => {
-		it('routes to /observe when a sessionId is present', async () => {
-			mockObserve.mockResolvedValueOnce({ id: 'obs-1', createdAt: '2026-01-01T00:00:00Z' });
+		it('always routes to /remember and never /observe (observe is reserved for hook capture)', async () => {
+			mockRemember.mockResolvedValueOnce({ id: 'mem-1', createdAt: '2026-01-01T00:00:00Z' });
 			const record = await plugin.saveMemory({
-				content: 'fixed the bug',
+				content: 'fact',
 				sessionId: 'sess-9',
 				settings: {}
 			});
-			expect(mockObserve).toHaveBeenCalledWith(
-				expect.objectContaining({ content: 'fixed the bug', sessionId: 'sess-9' })
+			expect(mockRemember).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: 'fact',
+					sessionId: 'sess-9',
+					project: 'ever-works'
+				})
 			);
-			expect(mockRemember).not.toHaveBeenCalled();
-			expect(record.id).toBe('obs-1');
-		});
-
-		it('routes to /remember when no session is open', async () => {
-			mockRemember.mockResolvedValueOnce({ id: 'mem-1', createdAt: '2026-01-01T00:00:00Z' });
-			const record = await plugin.saveMemory({ content: 'fact', settings: {} });
-			expect(mockRemember).toHaveBeenCalled();
 			expect(mockObserve).not.toHaveBeenCalled();
 			expect(record.id).toBe('mem-1');
 		});
 
-		it('passes through tags / metadata / projectId verbatim', async () => {
+		it('sends the required `project` field on /remember (mapped from projectId setting)', async () => {
 			mockRemember.mockResolvedValueOnce({ id: 'm', createdAt: 'now' });
 			await plugin.saveMemory({
 				content: 'X',
@@ -164,11 +172,16 @@ describe('AgentmemoryPlugin', () => {
 			});
 			expect(mockRemember).toHaveBeenCalledWith(
 				expect.objectContaining({
+					project: 'proj-A',
 					tags: ['bug'],
-					metadata: { file: 'a.ts' },
-					projectId: 'proj-A'
+					metadata: { file: 'a.ts' }
 				})
 			);
+		});
+
+		it('throws when the server response is missing the required id field (no silent empty-string id)', async () => {
+			mockRemember.mockResolvedValueOnce({ content: 'no id here', createdAt: 'now' });
+			await expect(plugin.saveMemory({ content: 'X', settings: {} })).rejects.toThrow(/without an id field/);
 		});
 	});
 
@@ -187,10 +200,13 @@ describe('AgentmemoryPlugin', () => {
 			expect(result.summary).toBe('summary-text');
 		});
 
-		it('honours the limit when provided', async () => {
+		it('maps `limit` to the server-required `topK` field', async () => {
 			mockSmartSearch.mockResolvedValueOnce({ results: [] });
 			await plugin.searchMemory({ query: 'q', limit: 25, settings: {} });
-			expect(mockSmartSearch).toHaveBeenCalledWith(expect.objectContaining({ limit: 25 }));
+			expect(mockSmartSearch).toHaveBeenCalledWith(
+				expect.objectContaining({ topK: 25, query: 'q', project: 'ever-works' })
+			);
+			expect(mockSmartSearch).toHaveBeenCalledWith(expect.not.objectContaining({ limit: 25 }));
 		});
 	});
 
@@ -200,6 +216,76 @@ describe('AgentmemoryPlugin', () => {
 			const ctx = await plugin.buildContext({ settings: {} });
 			expect(ctx.content).toBe('context-text');
 			expect(ctx.approxTokens).toBe(42);
+		});
+
+		it('maps `maxTokens` to the server-required `tokenBudget` field', async () => {
+			mockContext.mockResolvedValueOnce({ content: 'c' });
+			await plugin.buildContext({ maxTokens: 2000, settings: {} });
+			expect(mockContext).toHaveBeenCalledWith(
+				expect.objectContaining({ tokenBudget: 2000, project: 'ever-works' })
+			);
+		});
+	});
+
+	describe('deleteEntry', () => {
+		it('sends `{ project, filter: { id } }` matching the upstream /forget contract', async () => {
+			mockForget.mockResolvedValueOnce(undefined);
+			await plugin.deleteEntry('mem-42', {});
+			expect(mockForget).toHaveBeenCalledWith({
+				project: 'ever-works',
+				filter: { id: 'mem-42' }
+			});
+		});
+
+		it('refuses an empty id rather than sending an empty filter (which would mass-delete)', async () => {
+			await expect(plugin.deleteEntry('', {})).rejects.toThrow(/missing id/);
+			expect(mockForget).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('openSession / closeSession', () => {
+		it('openSession sends the required `project` field', async () => {
+			mockSessionStart.mockResolvedValueOnce({ id: 'sess-1', startedAt: '2026-01-01T00:00:00Z' });
+			await plugin.openSession({ projectId: 'proj-X', settings: {} });
+			expect(mockSessionStart).toHaveBeenCalledWith(expect.objectContaining({ project: 'proj-X' }));
+		});
+
+		it('closeSession sends `{ project, sessionId }`', async () => {
+			mockSessionEnd.mockResolvedValueOnce(undefined);
+			await plugin.closeSession('sess-9', {});
+			expect(mockSessionEnd).toHaveBeenCalledWith({
+				project: 'ever-works',
+				sessionId: 'sess-9'
+			});
+		});
+
+		it('throws when the server returns a session without an id', async () => {
+			mockSessionStart.mockResolvedValueOnce({ startedAt: 'now' });
+			await expect(plugin.openSession({ settings: {} })).rejects.toThrow(/without an id field/);
+		});
+	});
+
+	describe('env-var fallback', () => {
+		it('reads AGENTMEMORY_BASE_URL when settings.baseUrl is empty', async () => {
+			process.env.AGENTMEMORY_BASE_URL = 'http://envvar.example:9999';
+			mockHealth.mockResolvedValueOnce({ ok: true });
+			const result = await plugin.validateConnection({});
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('http://envvar.example:9999');
+		});
+
+		it('reads AGENTMEMORY_PROJECT when settings.projectId is empty', async () => {
+			process.env.AGENTMEMORY_PROJECT = 'env-proj';
+			mockRemember.mockResolvedValueOnce({ id: 'mem-1', createdAt: 'now' });
+			await plugin.saveMemory({ content: 'X', settings: {} });
+			expect(mockRemember).toHaveBeenCalledWith(expect.objectContaining({ project: 'env-proj' }));
+		});
+
+		it('user setting wins over env var', async () => {
+			process.env.AGENTMEMORY_PROJECT = 'env-proj';
+			mockRemember.mockResolvedValueOnce({ id: 'mem-1', createdAt: 'now' });
+			await plugin.saveMemory({ content: 'X', projectId: 'user-proj', settings: {} });
+			expect(mockRemember).toHaveBeenCalledWith(expect.objectContaining({ project: 'user-proj' }));
 		});
 	});
 

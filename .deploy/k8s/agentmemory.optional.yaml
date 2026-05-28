@@ -5,14 +5,30 @@
 # This manifest spins up a `agentmemory` REST server alongside the platform
 # inside the same cluster. It is intentionally NOT included from any of the
 # environment manifests (`k8s-manifest.{dev,stage,prod}.yaml`) — operators
-# opt in by applying this file manually:
+# opt in by applying this file manually.
 #
-#   kubectl apply -f .deploy/k8s/agentmemory.optional.yaml -n ever-works
+# The Secret block below uses a shell-style `$AGENTMEMORY_SECRET`
+# placeholder — `kubectl apply` does NOT expand shell variables, so applying
+# this file verbatim would store the literal string "$AGENTMEMORY_SECRET"
+# as the bearer token (everyone with cluster access could then read /
+# write to the memory store with that publicly-known value).
 #
-# The `@ever-works/agentmemory-plugin` then needs a single setting:
+# Apply with envsubst (or via Kustomize / Helm):
+#
+#   export AGENTMEMORY_SECRET="$(openssl rand -hex 32)"  # one-time
+#   envsubst < .deploy/k8s/agentmemory.optional.yaml \
+#     | kubectl apply -n ever-works -f -
+#
+# Or replace this Secret with a `secretGenerator` in a kustomization.yaml
+# that reads the token from a literal source or external secret store
+# (sealed-secrets, external-secrets-operator, etc.) — that's the
+# recommended path for production.
+#
+# Once the Secret is applied, the `@ever-works/agentmemory-plugin` needs:
 #   baseUrl = http://agentmemory.ever-works.svc.cluster.local:3111
+#   apiKey  = <the same value you put in $AGENTMEMORY_SECRET>
 # (set either in the plugin's admin settings or via the `AGENTMEMORY_BASE_URL`
-# env var on the API deployment).
+# / `AGENTMEMORY_API_KEY` env vars on the API deployment).
 #
 # Operators who prefer the hosted SaaS — or who already run `agentmemory`
 # externally — should SKIP this manifest and point the plugin at the
@@ -63,7 +79,13 @@ stringData:
   # The agentmemory server treats this as the Bearer token clients must
   # send in Authorization. The `@ever-works/agentmemory-plugin` reads
   # the same value from its `apiKey` setting (or `AGENTMEMORY_API_KEY`).
-  AGENTMEMORY_SECRET: "$AGENTMEMORY_SECRET"
+  #
+  # `$AGENTMEMORY_SECRET` is a shell-style placeholder — it is NOT
+  # expanded by `kubectl apply`. Use `envsubst < this-file | kubectl
+  # apply -f -` (or a Kustomize secretGenerator / external-secrets
+  # operator) so the real token is never committed. See the header
+  # comment for the full procedure.
+  AGENTMEMORY_SECRET: '$AGENTMEMORY_SECRET'
 
 ---
 apiVersion: apps/v1

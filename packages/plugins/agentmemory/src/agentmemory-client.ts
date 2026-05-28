@@ -95,6 +95,9 @@ export class AgentmemoryClient {
 
 	private async request<T>(path: string, options: AgentmemoryClientRequestOptions): Promise<T> {
 		const url = buildUrl(this.baseUrl, path, options.query);
+		// `const` here matches the activepieces / anthropic plugin
+		// convention and the repo's eslint `prefer-const` rule — the
+		// reference is never rebound, only properties are added below.
 		const headers: Record<string, string> = { Accept: 'application/json' };
 		if (this.apiKey) {
 			headers['Authorization'] = `Bearer ${this.apiKey}`;
