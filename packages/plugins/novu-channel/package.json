@@ -20,7 +20,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -44,7 +46,10 @@
 			"name": "Novu",
 			"version": "1.0.0",
 			"category": "notification-channel",
-			"capabilities": ["notification-channel", "notification-channel-novu"],
+			"capabilities": [
+				"notification-channel",
+				"notification-channel-novu"
+			],
 			"description": "Delegate notifications to a Novu workflow (meta-router across Novu's own multi-channel steps).",
 			"settings": {
 				"type": "object",

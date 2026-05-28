@@ -13,7 +13,7 @@
 - Channel registry consumed by this spec: [`../notification-channels/spec.md`](../notification-channels/spec.md)
 - Email as a channel: [`../email-providers/spec.md`](../email-providers/spec.md)
 
-> **Scope of this document:** add a **user-configurable preferences matrix** that decides *which* events trigger delivery to *which* channels for *which* user. Today (notifications v1) every relevant user gets every notification, in-app only. This spec extends that with per-event-type per-channel opt-in/opt-out plus mute, quiet hours, and category-level controls. The existing notifications v1 surface keeps working as the **default delivery channel** when no preferences are set.
+> **Scope of this document:** add a **user-configurable preferences matrix** that decides _which_ events trigger delivery to _which_ channels for _which_ user. Today (notifications v1) every relevant user gets every notification, in-app only. This spec extends that with per-event-type per-channel opt-in/opt-out plus mute, quiet hours, and category-level controls. The existing notifications v1 surface keeps working as the **default delivery channel** when no preferences are set.
 >
 > **Hard rule (additive only):** the v1 producer convenience methods (`notifyAiCreditsDepleted`, `notifyAiProviderError`, …) continue to emit in-app notifications. This spec adds a fanout layer on top: when producers emit, the subscription resolver decides which channels (beyond in-app) the user has opted into for that event type.
 
@@ -21,13 +21,13 @@
 
 ## 1. Personas + use cases
 
-| Persona | Use case                                                                                                                              |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| User    | "I want 'AI credits depleted' on email + Telegram, but 'New version available' only in-app."                                          |
-| User    | Sets quiet hours 22:00–07:00 (local timezone) — non-urgent events queue until 07:00; `urgent: true` events bypass.                    |
-| User    | Mutes the entire `subscription` category for 7 days while on vacation.                                                                |
-| Operator| Defines a per-organisation default subscription map; new users inherit until they customise.                                          |
-| Admin   | Registers a new event type from a plugin; the user-facing preferences UI picks it up automatically without code changes.              |
+| Persona  | Use case                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------ |
+| User     | "I want 'AI credits depleted' on email + Telegram, but 'New version available' only in-app."                             |
+| User     | Sets quiet hours 22:00–07:00 (local timezone) — non-urgent events queue until 07:00; `urgent: true` events bypass.       |
+| User     | Mutes the entire `subscription` category for 7 days while on vacation.                                                   |
+| Operator | Defines a per-organisation default subscription map; new users inherit until they customise.                             |
+| Admin    | Registers a new event type from a plugin; the user-facing preferences UI picks it up automatically without code changes. |
 
 ---
 
@@ -57,13 +57,13 @@ Event types live in a registry, not as ad-hoc strings, so the UI can render them
 
 ```typescript
 interface NotificationEventType {
-  key: string;                    // 'ai_credits_depleted', 'work_generation_finished', …
-  category: string;               // matches NotificationCategory: 'ai_credits' | 'subscription' | 'generation' | 'system' | 'security' | 'work' | 'agent'
-  title: string;                  // human-readable
-  description: string;            // 1-2 sentences for the UI
-  urgent: boolean;                // true → bypass quiet hours
-  defaultChannels: readonly string[];  // ['in-app'] today; can be ['in-app', 'email'] for transactional events
-  source: 'core' | 'plugin';      // plugin-contributed events get prefix `plugin:<pluginId>:`
+	key: string; // 'ai_credits_depleted', 'work_generation_finished', …
+	category: string; // matches NotificationCategory: 'ai_credits' | 'subscription' | 'generation' | 'system' | 'security' | 'work' | 'agent'
+	title: string; // human-readable
+	description: string; // 1-2 sentences for the UI
+	urgent: boolean; // true → bypass quiet hours
+	defaultChannels: readonly string[]; // ['in-app'] today; can be ['in-app', 'email'] for transactional events
+	source: 'core' | 'plugin'; // plugin-contributed events get prefix `plugin:<pluginId>:`
 }
 ```
 
@@ -71,11 +71,9 @@ Bootstrap registry seeded from existing v1 notification dedup keys + a small exp
 
 ```json
 {
-  "id": "stripe",
-  "name": "Stripe",
-  "events": [
-    { "key": "stripe_invoice_paid", "category": "subscription", "urgent": false }
-  ]
+	"id": "stripe",
+	"name": "Stripe",
+	"events": [{ "key": "stripe_invoice_paid", "category": "subscription", "urgent": false }]
 }
 ```
 

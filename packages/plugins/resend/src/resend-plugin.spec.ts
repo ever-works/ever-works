@@ -18,7 +18,7 @@ describe('ResendPlugin', () => {
 		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 			ok: true,
 			status: 200,
-			json: async () => ({ id: 'rs-abc-123' }),
+			json: async () => ({ id: 'rs-abc-123' })
 		} as Response);
 
 		const result = await plugin.sendEmail(
@@ -27,9 +27,9 @@ describe('ResendPlugin', () => {
 				to: ['b@example.com'],
 				subject: 'hi',
 				bodyText: 'hi',
-				messageRef: 'ref-1',
+				messageRef: 'ref-1'
 			},
-			{ userId: 'user-1' },
+			{ userId: 'user-1' }
 		);
 
 		expect(result.providerMessageId).toBe('rs-abc-123');
@@ -44,7 +44,7 @@ describe('ResendPlugin', () => {
 		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 			ok: false,
 			status: 422,
-			json: async () => ({ error: { statusCode: 422, message: 'Invalid sender' } }),
+			json: async () => ({ error: { statusCode: 422, message: 'Invalid sender' } })
 		} as Response);
 
 		await expect(
@@ -54,10 +54,10 @@ describe('ResendPlugin', () => {
 					to: ['b@example.com'],
 					subject: 'hi',
 					bodyText: 'hi',
-					messageRef: 'ref-err',
+					messageRef: 'ref-err'
 				},
-				{ userId: 'u' },
-			),
+				{ userId: 'u' }
+			)
 		).rejects.toThrow(/Resend send failed/);
 	});
 
@@ -65,7 +65,7 @@ describe('ResendPlugin', () => {
 		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 			ok: true,
 			status: 200,
-			json: async () => ({ id: 'rs-cache' }),
+			json: async () => ({ id: 'rs-cache' })
 		} as Response);
 
 		const input = {
@@ -73,7 +73,7 @@ describe('ResendPlugin', () => {
 			to: ['b@example.com'],
 			subject: 'hi',
 			bodyText: 'hi',
-			messageRef: 'ref-cache',
+			messageRef: 'ref-cache'
 		};
 		await plugin.sendEmail(input, { userId: 'u' });
 		await plugin.sendEmail(input, { userId: 'u' });

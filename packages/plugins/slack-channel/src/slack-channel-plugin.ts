@@ -7,7 +7,7 @@ import type {
 	ChannelVerification,
 	ChannelShape,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -37,15 +37,15 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
-		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_SLACK,
+		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_SLACK
 	] as const;
 	readonly shape: ChannelShape = 'broadcast';
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
 			defaultUsername: { type: 'string' },
-			defaultIconEmoji: { type: 'string' },
-		},
+			defaultIconEmoji: { type: 'string' }
+		}
 	};
 
 	async onLoad(): Promise<void> {
@@ -58,10 +58,7 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 
 	private readonly idempotencyCache = new Map<string, ChannelSendResult>();
 
-	async verifyTarget(
-		config: ChannelTargetConfig,
-		_options: ChannelOptions,
-	): Promise<ChannelVerification> {
+	async verifyTarget(config: ChannelTargetConfig, _options: ChannelOptions): Promise<ChannelVerification> {
 		const url = config.webhookUrl;
 		if (typeof url !== 'string' || url.length === 0) {
 			return { valid: false, message: 'webhookUrl is required' };
@@ -72,7 +69,7 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 		if (!url.startsWith(SLACK_WEBHOOK_PREFIX)) {
 			return {
 				valid: false,
-				message: `Slack webhook URL must start with ${SLACK_WEBHOOK_PREFIX}`,
+				message: `Slack webhook URL must start with ${SLACK_WEBHOOK_PREFIX}`
 			};
 		}
 		return { valid: true, details: { kind: 'incoming-webhook' } };
@@ -85,14 +82,10 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 		const config = payload.target ?? {};
 		const webhookUrl = getWebhookUrl(config);
 		const username =
-			(typeof options.settings?.defaultUsername === 'string'
-				? options.settings.defaultUsername
-				: undefined) ??
+			(typeof options.settings?.defaultUsername === 'string' ? options.settings.defaultUsername : undefined) ??
 			(typeof config.username === 'string' ? (config.username as string) : undefined);
 		const iconEmoji =
-			(typeof options.settings?.defaultIconEmoji === 'string'
-				? options.settings.defaultIconEmoji
-				: undefined) ??
+			(typeof options.settings?.defaultIconEmoji === 'string' ? options.settings.defaultIconEmoji : undefined) ??
 			(typeof config.iconEmoji === 'string' ? (config.iconEmoji as string) : undefined);
 
 		const body: Record<string, unknown> = { text: payload.text };
@@ -105,7 +98,7 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 		const response = await fetch(webhookUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
+			body: JSON.stringify(body)
 		});
 
 		if (!response.ok) {
@@ -116,7 +109,7 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 		const result: ChannelSendResult = {
 			provider: this.id,
 			providerMessageId: `slack-${payload.messageRef}`,
-			deliveredAt: new Date(),
+			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);
 		if (this.idempotencyCache.size > 500) {

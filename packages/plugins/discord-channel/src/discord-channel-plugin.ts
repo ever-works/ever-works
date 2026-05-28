@@ -7,7 +7,7 @@ import type {
 	ChannelVerification,
 	ChannelShape,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -32,15 +32,15 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
-		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_DISCORD,
+		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_DISCORD
 	] as const;
 	readonly shape: ChannelShape = 'broadcast';
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
 			defaultUsername: { type: 'string' },
-			defaultAvatarUrl: { type: 'string' },
-		},
+			defaultAvatarUrl: { type: 'string' }
+		}
 	};
 
 	async onLoad(): Promise<void> {
@@ -53,10 +53,7 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 
 	private readonly idempotencyCache = new Map<string, ChannelSendResult>();
 
-	async verifyTarget(
-		config: ChannelTargetConfig,
-		_options: ChannelOptions,
-	): Promise<ChannelVerification> {
+	async verifyTarget(config: ChannelTargetConfig, _options: ChannelOptions): Promise<ChannelVerification> {
 		try {
 			const url = getWebhookUrl(config);
 			// Discord webhook URLs return 200 with the webhook metadata on GET.
@@ -64,18 +61,18 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 			if (!response.ok) {
 				return {
 					valid: false,
-					message: `Discord webhook returned ${response.status}`,
+					message: `Discord webhook returned ${response.status}`
 				};
 			}
 			const data = (await response.json()) as { id?: string; channel_id?: string; name?: string };
 			return {
 				valid: true,
-				details: { id: data.id, channelId: data.channel_id, name: data.name },
+				details: { id: data.id, channelId: data.channel_id, name: data.name }
 			};
 		} catch (err) {
 			return {
 				valid: false,
-				message: err instanceof Error ? err.message : String(err),
+				message: err instanceof Error ? err.message : String(err)
 			};
 		}
 	}
@@ -87,20 +84,16 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 		const config = payload.target ?? {};
 		const webhookUrl = getWebhookUrl(config);
 		const username =
-			(typeof options.settings?.defaultUsername === 'string'
-				? options.settings.defaultUsername
-				: undefined) ??
+			(typeof options.settings?.defaultUsername === 'string' ? options.settings.defaultUsername : undefined) ??
 			(typeof config.username === 'string' ? (config.username as string) : undefined);
 		const avatarUrl =
-			(typeof options.settings?.defaultAvatarUrl === 'string'
-				? options.settings.defaultAvatarUrl
-				: undefined) ??
+			(typeof options.settings?.defaultAvatarUrl === 'string' ? options.settings.defaultAvatarUrl : undefined) ??
 			(typeof config.avatarUrl === 'string' ? (config.avatarUrl as string) : undefined);
 
 		const body: Record<string, unknown> = {
 			content: payload.text,
 			username,
-			avatar_url: avatarUrl,
+			avatar_url: avatarUrl
 		};
 		if (payload.rich?.kind === 'discord-embeds') {
 			body.embeds = payload.rich.payload;
@@ -111,7 +104,7 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 		const response = await fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
+			body: JSON.stringify(body)
 		});
 
 		if (!response.ok) {
@@ -122,7 +115,7 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 		const result: ChannelSendResult = {
 			provider: this.id,
 			providerMessageId: data.id ?? `discord-${payload.messageRef}`,
-			deliveredAt: new Date(),
+			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);
 		if (this.idempotencyCache.size > 500) {

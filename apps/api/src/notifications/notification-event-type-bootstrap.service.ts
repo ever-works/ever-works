@@ -77,7 +77,10 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
  */
 function readManifestEvents(registered: unknown): readonly PluginNotificationEvent[] {
     if (!registered || typeof registered !== 'object') return [];
-    const r = registered as { manifest?: { events?: unknown }; plugin?: { manifest?: { events?: unknown } } };
+    const r = registered as {
+        manifest?: { events?: unknown };
+        plugin?: { manifest?: { events?: unknown } };
+    };
     const raw = r.manifest?.events ?? r.plugin?.manifest?.events;
     if (!Array.isArray(raw)) return [];
     return raw.filter((entry): entry is PluginNotificationEvent => {

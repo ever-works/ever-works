@@ -7,7 +7,7 @@ import type {
 	ChannelVerification,
 	ChannelShape,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -58,14 +58,14 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
-		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_WHATSAPP,
+		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_WHATSAPP
 	] as const;
 	readonly shape: ChannelShape = 'direct';
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			apiVersion: { type: 'string' },
-		},
+			apiVersion: { type: 'string' }
+		}
 	};
 
 	async onLoad(): Promise<void> {
@@ -83,10 +83,7 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 		return typeof v === 'string' && v.length > 0 ? v : DEFAULT_API_VERSION;
 	}
 
-	async verifyTarget(
-		config: ChannelTargetConfig,
-		options: ChannelOptions,
-	): Promise<ChannelVerification> {
+	async verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification> {
 		const accessToken = config.accessToken;
 		const phoneNumberId = config.phoneNumberId;
 		if (typeof accessToken !== 'string' || accessToken.length === 0) {
@@ -99,10 +96,10 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 			return { valid: false, message: 'to (recipient) is required' };
 		}
 		try {
-			const response = await fetch(
-				`${GRAPH_API_BASE}/${this.apiVersion(options)}/${phoneNumberId}`,
-				{ method: 'GET', headers: { Authorization: `Bearer ${accessToken}` } },
-			);
+			const response = await fetch(`${GRAPH_API_BASE}/${this.apiVersion(options)}/${phoneNumberId}`, {
+				method: 'GET',
+				headers: { Authorization: `Bearer ${accessToken}` }
+			});
 			const data = (await response.json()) as {
 				id?: string;
 				display_phone_number?: string;
@@ -111,12 +108,12 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 			if (!response.ok || data.error) {
 				return {
 					valid: false,
-					message: `WhatsApp number check failed: ${data.error?.message ?? response.status}`,
+					message: `WhatsApp number check failed: ${data.error?.message ?? response.status}`
 				};
 			}
 			return {
 				valid: true,
-				details: { phoneNumberId: data.id, displayPhoneNumber: data.display_phone_number },
+				details: { phoneNumberId: data.id, displayPhoneNumber: data.display_phone_number }
 			};
 		} catch (err) {
 			return { valid: false, message: err instanceof Error ? err.message : String(err) };
@@ -135,37 +132,34 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 						messaging_product: 'whatsapp',
 						to,
 						type: 'template',
-						template: payload.rich.payload,
+						template: payload.rich.payload
 					}
 				: {
 						messaging_product: 'whatsapp',
 						to,
 						type: 'text',
-						text: { body: payload.text },
+						text: { body: payload.text }
 					};
 
-		const response = await fetch(
-			`${GRAPH_API_BASE}/${this.apiVersion(options)}/${phoneNumberId}/messages`,
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${accessToken}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(body),
+		const response = await fetch(`${GRAPH_API_BASE}/${this.apiVersion(options)}/${phoneNumberId}/messages`, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${accessToken}`,
+				'Content-Type': 'application/json'
 			},
-		);
+			body: JSON.stringify(body)
+		});
 		const data = (await response.json()) as WhatsappSendResponse;
 		if (!response.ok || data.error || !data.messages?.length) {
 			throw new Error(
-				`WhatsApp send failed (${response.status}): ${data.error?.message ?? 'no message id returned'}`,
+				`WhatsApp send failed (${response.status}): ${data.error?.message ?? 'no message id returned'}`
 			);
 		}
 
 		const result: ChannelSendResult = {
 			provider: this.id,
 			providerMessageId: data.messages[0].id,
-			deliveredAt: new Date(),
+			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);
 		if (this.idempotencyCache.size > 500) {

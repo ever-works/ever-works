@@ -50,7 +50,10 @@ export class NotificationPreferencesService {
         return {
             subscriptions: subs,
             preference: pref ?? null,
-            mutes: muteRows.map((m) => ({ category: m.category, mutedUntil: m.mutedUntil ?? null })),
+            mutes: muteRows.map((m) => ({
+                category: m.category,
+                mutedUntil: m.mutedUntil ?? null,
+            })),
         };
     }
 

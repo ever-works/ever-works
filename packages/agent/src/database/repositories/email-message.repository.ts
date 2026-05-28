@@ -52,14 +52,15 @@ export class EmailMessageRepository {
         userId: string,
         options: EmailMessageQueryOptions = {},
     ): Promise<EmailMessage[]> {
-        const qb = this.repository
-            .createQueryBuilder('m')
-            .where('m.userId = :userId', { userId });
-        if (options.direction) qb.andWhere('m.direction = :direction', { direction: options.direction });
+        const qb = this.repository.createQueryBuilder('m').where('m.userId = :userId', { userId });
+        if (options.direction)
+            qb.andWhere('m.direction = :direction', { direction: options.direction });
         if (options.agentId) qb.andWhere('m.agentId = :agentId', { agentId: options.agentId });
         if (options.taskId) qb.andWhere('m.taskId = :taskId', { taskId: options.taskId });
         if (options.conversationId)
-            qb.andWhere('m.conversationId = :conversationId', { conversationId: options.conversationId });
+            qb.andWhere('m.conversationId = :conversationId', {
+                conversationId: options.conversationId,
+            });
         if (options.emailAddressId)
             qb.andWhere('m.emailAddressId = :emailAddressId', {
                 emailAddressId: options.emailAddressId,
@@ -70,10 +71,7 @@ export class EmailMessageRepository {
         return qb.getMany();
     }
 
-    async updateDeliveryStatus(
-        id: string,
-        deliveryStatus: string,
-    ): Promise<void> {
+    async updateDeliveryStatus(id: string, deliveryStatus: string): Promise<void> {
         await this.repository.update({ id }, { deliveryStatus });
     }
 }

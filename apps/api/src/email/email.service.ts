@@ -46,11 +46,17 @@ export class EmailService {
         private readonly emailFacade: EmailFacadeService,
     ) {}
 
-    async listAddresses(userId: string, direction?: EmailAddressDirection): Promise<TenantEmailAddress[]> {
+    async listAddresses(
+        userId: string,
+        direction?: EmailAddressDirection,
+    ): Promise<TenantEmailAddress[]> {
         return this.addresses.findActiveByUser(userId, direction);
     }
 
-    async createAddress(userId: string, input: CreateEmailAddressInput): Promise<TenantEmailAddress> {
+    async createAddress(
+        userId: string,
+        input: CreateEmailAddressInput,
+    ): Promise<TenantEmailAddress> {
         const verificationToken = randomBytes(24).toString('base64url');
         return this.addresses.save({
             userId,
@@ -72,8 +78,10 @@ export class EmailService {
         await this.findOwnedOrThrow(userId, id);
         const patch: Partial<TenantEmailAddress> = {};
         if (input.providerSettings) patch.providerSettings = input.providerSettings;
-        if (typeof input.defaultForReplies === 'boolean') patch.defaultForReplies = input.defaultForReplies;
-        if (typeof input.disabled === 'boolean') patch.disabledAt = input.disabled ? new Date() : null;
+        if (typeof input.defaultForReplies === 'boolean')
+            patch.defaultForReplies = input.defaultForReplies;
+        if (typeof input.disabled === 'boolean')
+            patch.disabledAt = input.disabled ? new Date() : null;
         await this.addresses.update(id, patch);
         return this.findOwnedOrThrow(userId, id);
     }

@@ -37,8 +37,9 @@ export class UserNotificationCategoryMuteRepository {
         const existing = await this.repository.findOne({ where: { userId, category } });
         if (existing) {
             await this.repository.update({ id: existing.id }, { mutedUntil: mutedUntil ?? null });
-            return (await this.repository.findOne({ where: { id: existing.id } })) as
-                UserNotificationCategoryMute;
+            return (await this.repository.findOne({
+                where: { id: existing.id },
+            })) as UserNotificationCategoryMute;
         }
         return this.repository.save(
             this.repository.create({ userId, category, mutedUntil: mutedUntil ?? null }),

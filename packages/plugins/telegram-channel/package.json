@@ -20,7 +20,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -44,7 +46,10 @@
 			"name": "Telegram",
 			"version": "1.0.0",
 			"category": "notification-channel",
-			"capabilities": ["notification-channel", "notification-channel-telegram"],
+			"capabilities": [
+				"notification-channel",
+				"notification-channel-telegram"
+			],
 			"description": "Send notifications to a Telegram chat via the Bot API (MarkdownV2 supported).",
 			"settings": {
 				"type": "object",

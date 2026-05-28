@@ -20,7 +20,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -44,7 +46,10 @@
 			"name": "WhatsApp",
 			"version": "1.0.0",
 			"category": "notification-channel",
-			"capabilities": ["notification-channel", "notification-channel-whatsapp"],
+			"capabilities": [
+				"notification-channel",
+				"notification-channel-whatsapp"
+			],
 			"description": "Send notifications to a WhatsApp number via the WhatsApp Business Cloud API (template + in-window text).",
 			"settings": {
 				"type": "object",

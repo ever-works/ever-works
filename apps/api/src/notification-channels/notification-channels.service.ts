@@ -49,7 +49,8 @@ export class NotificationChannelsService {
         const patch: Partial<NotificationChannel> = {};
         if (input.name) patch.name = input.name;
         if (input.targetConfig) patch.targetConfig = input.targetConfig;
-        if (typeof input.disabled === 'boolean') patch.disabledAt = input.disabled ? new Date() : null;
+        if (typeof input.disabled === 'boolean')
+            patch.disabledAt = input.disabled ? new Date() : null;
         await this.channels.update(id, patch);
         return this.findOwnedOrThrow(userId, id);
     }

@@ -9,7 +9,7 @@ import type {
 	EmailAttachment,
 	EmailDeliveryEvent,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -71,19 +71,16 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 	readonly name = 'Postmark';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'email-provider';
-	readonly capabilities = [
-		PLUGIN_CAPABILITIES.EMAIL_OUTBOUND,
-		PLUGIN_CAPABILITIES.EMAIL_INBOUND,
-	] as const;
+	readonly capabilities = [PLUGIN_CAPABILITIES.EMAIL_OUTBOUND, PLUGIN_CAPABILITIES.EMAIL_INBOUND] as const;
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
 			apiKey: { type: 'string', 'x-secret': true, 'x-envVar': 'POSTMARK_API_KEY' },
 			defaultSenderDomain: { type: 'string' },
 			inboundWebhookSecret: { type: 'string', 'x-secret': true, 'x-envVar': 'POSTMARK_INBOUND_SECRET' },
-			inboundStreamId: { type: 'string' },
+			inboundStreamId: { type: 'string' }
 		},
-		required: ['apiKey'],
+		required: ['apiKey']
 	};
 
 	async onLoad(): Promise<void> {
@@ -116,8 +113,8 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 				Name: a.filename,
 				Content: a.content,
 				ContentType: a.mimeType,
-				ContentID: a.cid,
-			})),
+				ContentID: a.cid
+			}))
 		};
 
 		const response = await fetch(`${POSTMARK_API_BASE}/email`, {
@@ -125,22 +122,22 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 			headers: {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
-				'X-Postmark-Server-Token': apiKey,
+				'X-Postmark-Server-Token': apiKey
 			},
-			body: JSON.stringify(body),
+			body: JSON.stringify(body)
 		});
 
 		const data = (await response.json()) as PostmarkSendResponse;
 		if (!response.ok || data.ErrorCode !== 0) {
 			throw new Error(
-				`Postmark send failed (${response.status} / ${data.ErrorCode}): ${data.Message ?? 'unknown error'}`,
+				`Postmark send failed (${response.status} / ${data.ErrorCode}): ${data.Message ?? 'unknown error'}`
 			);
 		}
 		const result: EmailSendResult = {
 			provider: this.id,
 			providerMessageId: data.MessageID,
 			accepted: [...input.to],
-			rejected: [],
+			rejected: []
 		};
 		this.idempotencyCache.set(input.messageRef, result);
 		// Bounded cache — drop oldest if > 500 entries.
@@ -160,15 +157,11 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		return {
 			address,
 			verificationToken,
-			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
 		};
 	}
 
-	verifyWebhookSignature(
-		_rawBody: Buffer,
-		headers: Readonly<Record<string, string>>,
-		options: EmailOptions,
-	): void {
+	verifyWebhookSignature(_rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void {
 		const expected = resolveInboundSecret(options);
 		if (!expected) return; // No secret configured — accept (operator opt-in to signature checking).
 		// Postmark uses Basic Auth for inbound webhooks. Compare the
@@ -187,7 +180,7 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 	async parseInboundWebhook(
 		rawBody: Buffer,
 		_headers: Readonly<Record<string, string>>,
-		_options: EmailOptions,
+		_options: EmailOptions
 	): Promise<EmailInboundMessage> {
 		const payload = JSON.parse(rawBody.toString('utf8')) as PostmarkInboundPayload;
 		const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [payload.To] : []);
@@ -196,7 +189,7 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 				filename: a.Name,
 				mimeType: a.ContentType,
 				content: a.Content,
-				cid: a.ContentID,
+				cid: a.ContentID
 			})) ?? [];
 		return {
 			provider: this.id,
@@ -211,15 +204,15 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 			metadata: {
 				spamScore: payload.SpamScore ?? null,
 				headers: payload.Headers ?? [],
-				fromName: payload.FromName ?? null,
-			},
+				fromName: payload.FromName ?? null
+			}
 		};
 	}
 
 	async parseEventWebhook(
 		rawBody: Buffer,
 		_headers: Readonly<Record<string, string>>,
-		_options: EmailOptions,
+		_options: EmailOptions
 	): Promise<readonly EmailDeliveryEvent[]> {
 		const payload = JSON.parse(rawBody.toString('utf8')) as {
 			readonly RecordType?: string;
@@ -233,7 +226,7 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 			Bounce: 'bounced',
 			SpamComplaint: 'complained',
 			Open: 'opened',
-			Click: 'clicked',
+			Click: 'clicked'
 		};
 		const type = typeMap[payload.RecordType ?? ''] ?? 'delivered';
 		return [
@@ -243,8 +236,8 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 				type,
 				recipient: payload.Recipient,
 				occurredAt: new Date(payload.DeliveredAt ?? payload.ReceivedAt ?? Date.now()),
-				raw: payload as unknown as Readonly<Record<string, unknown>>,
-			},
+				raw: payload as unknown as Readonly<Record<string, unknown>>
+			}
 		];
 	}
 }

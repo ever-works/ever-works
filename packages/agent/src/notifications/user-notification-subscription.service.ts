@@ -63,7 +63,11 @@ export class UserNotificationSubscriptionService {
             return ['in-app'];
         }
 
-        let channels = await this.loadInitialChannels(userId, eventTypeKey, eventType.defaultChannels);
+        let channels = await this.loadInitialChannels(
+            userId,
+            eventTypeKey,
+            eventType.defaultChannels,
+        );
 
         // Category mute (drops non-in-app). `isMuted` already accounts
         // for mutedUntil expiry semantics.

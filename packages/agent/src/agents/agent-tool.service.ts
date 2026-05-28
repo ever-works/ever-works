@@ -602,9 +602,7 @@ export class AgentToolService {
         };
     }
 
-    private buildSendEmailTool(
-        agent: Agent,
-    ): AgentToolDescriptor<
+    private buildSendEmailTool(agent: Agent): AgentToolDescriptor<
         {
             to: string[];
             subject: string;
@@ -675,9 +673,7 @@ export class AgentToolService {
         };
     }
 
-    private buildMessageAgentTool(
-        agent: Agent,
-    ): AgentToolDescriptor<
+    private buildMessageAgentTool(agent: Agent): AgentToolDescriptor<
         {
             targetAgentId: string;
             subject: string;
@@ -722,7 +718,9 @@ export class AgentToolService {
                     return { error: 'body is required.' };
                 }
                 if (typeof this.emailFacade?.messageAgent !== 'function') {
-                    return { error: 'messageAgent is not supported by the configured email adapter.' };
+                    return {
+                        error: 'messageAgent is not supported by the configured email adapter.',
+                    };
                 }
                 try {
                     return await this.emailFacade.messageAgent({
@@ -753,7 +751,7 @@ export class AgentToolService {
                     channelId: {
                         type: 'string',
                         description:
-                            'The notification_channels id to deliver to (one of the agent user\'s enabled channels).',
+                            "The notification_channels id to deliver to (one of the agent user's enabled channels).",
                     },
                     text: { type: 'string', description: 'Plain-text message body.' },
                 },

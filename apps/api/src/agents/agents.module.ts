@@ -405,17 +405,22 @@ import { AgentsController } from './agents.controller';
         // into a conversation thread on arrival.
         {
             provide: AGENT_EMAIL_FACADE,
-            inject: [
-                EmailService,
-                AgentEmailAssignmentRepository,
-                TenantEmailAddressRepository,
-            ],
+            inject: [EmailService, AgentEmailAssignmentRepository, TenantEmailAddressRepository],
             useFactory: (
                 email: EmailService,
                 assignments: AgentEmailAssignmentRepository,
                 addresses: TenantEmailAddressRepository,
             ): AgentEmailFacade => ({
-                async sendEmail({ userId, agentId, to, cc, subject, bodyText, bodyHtml, fromAddressId }) {
+                async sendEmail({
+                    userId,
+                    agentId,
+                    to,
+                    cc,
+                    subject,
+                    bodyText,
+                    bodyHtml,
+                    fromAddressId,
+                }) {
                     const result = await email.sendMessage(userId, {
                         agentId,
                         to: [...to],

@@ -6,25 +6,25 @@
 
 ## Commits (in order)
 
-| Tick | SHA | Scope |
-|------|------|-------|
-| T2 | [`96b1f77c`](https://github.com/ever-works/ever-works/commit/96b1f77c) | docs(email-providers): extend spec v1.1 |
-| T3 | [`1da09749`](https://github.com/ever-works/ever-works/commit/1da09749) | docs(email-providers): plan + tasks |
-| T4 | [`db723688`](https://github.com/ever-works/ever-works/commit/db723688) | docs(notification-channels): spec + plan + tasks |
-| T5 | [`e4cbec9f`](https://github.com/ever-works/ever-works/commit/e4cbec9f) | docs(event-subscriptions): spec + plan + tasks |
-| T6 | [`b04fbb5f`](https://github.com/ever-works/ever-works/commit/b04fbb5f) | docs(agent-inbox-ui): spec + plan + tasks |
-| T7+ | [`308adb3a`](https://github.com/ever-works/ever-works/commit/308adb3a) | docs: state-of-play note (deleted in T19) |
-| T9 | [`2f2ca1a3`](https://github.com/ever-works/ever-works/commit/2f2ca1a3) | feat: plugin capabilities + base interfaces |
-| T10 | [`42f621b2`](https://github.com/ever-works/ever-works/commit/42f621b2) | feat: 11 entities + AddNotificationsV2Tables migration |
-| T11 | [`69a4529c`](https://github.com/ever-works/ever-works/commit/69a4529c) | feat: Email + NotificationChannel facade services |
-| T12 | [`8f4c9577`](https://github.com/ever-works/ever-works/commit/8f4c9577) | feat: 3 REST controllers + webhook routes |
-| T13 | [`32bf2abe`](https://github.com/ever-works/ever-works/commit/32bf2abe) | feat(plugin/postmark): outbound + inbound reference impl |
-| T14 | [`5aac75e4`](https://github.com/ever-works/ever-works/commit/5aac75e4) | feat(plugin/resend): outbound-only impl |
-| T15 | [`9273f8c0`](https://github.com/ever-works/ever-works/commit/9273f8c0) | feat(plugin/discord-channel): webhook-based channel impl |
-| T16 | [`57ca4cec`](https://github.com/ever-works/ever-works/commit/57ca4cec) | feat: react-email registry + 2 templates |
-| T17 | [`dc5347a3`](https://github.com/ever-works/ever-works/commit/dc5347a3) | feat(agent-inbox-ui): 4 web routes + components + API clients |
-| T18 | [`b89c1546`](https://github.com/ever-works/ever-works/commit/b89c1546) | test: IPlugin compliance + 18/18 plugin tests green |
-| T18 | [`33810fe1`](https://github.com/ever-works/ever-works/commit/33810fe1) | chore: pnpm-lock.yaml updated for new plugins |
+| Tick | SHA                                                                    | Scope                                                         |
+| ---- | ---------------------------------------------------------------------- | ------------------------------------------------------------- |
+| T2   | [`96b1f77c`](https://github.com/ever-works/ever-works/commit/96b1f77c) | docs(email-providers): extend spec v1.1                       |
+| T3   | [`1da09749`](https://github.com/ever-works/ever-works/commit/1da09749) | docs(email-providers): plan + tasks                           |
+| T4   | [`db723688`](https://github.com/ever-works/ever-works/commit/db723688) | docs(notification-channels): spec + plan + tasks              |
+| T5   | [`e4cbec9f`](https://github.com/ever-works/ever-works/commit/e4cbec9f) | docs(event-subscriptions): spec + plan + tasks                |
+| T6   | [`b04fbb5f`](https://github.com/ever-works/ever-works/commit/b04fbb5f) | docs(agent-inbox-ui): spec + plan + tasks                     |
+| T7+  | [`308adb3a`](https://github.com/ever-works/ever-works/commit/308adb3a) | docs: state-of-play note (deleted in T19)                     |
+| T9   | [`2f2ca1a3`](https://github.com/ever-works/ever-works/commit/2f2ca1a3) | feat: plugin capabilities + base interfaces                   |
+| T10  | [`42f621b2`](https://github.com/ever-works/ever-works/commit/42f621b2) | feat: 11 entities + AddNotificationsV2Tables migration        |
+| T11  | [`69a4529c`](https://github.com/ever-works/ever-works/commit/69a4529c) | feat: Email + NotificationChannel facade services             |
+| T12  | [`8f4c9577`](https://github.com/ever-works/ever-works/commit/8f4c9577) | feat: 3 REST controllers + webhook routes                     |
+| T13  | [`32bf2abe`](https://github.com/ever-works/ever-works/commit/32bf2abe) | feat(plugin/postmark): outbound + inbound reference impl      |
+| T14  | [`5aac75e4`](https://github.com/ever-works/ever-works/commit/5aac75e4) | feat(plugin/resend): outbound-only impl                       |
+| T15  | [`9273f8c0`](https://github.com/ever-works/ever-works/commit/9273f8c0) | feat(plugin/discord-channel): webhook-based channel impl      |
+| T16  | [`57ca4cec`](https://github.com/ever-works/ever-works/commit/57ca4cec) | feat: react-email registry + 2 templates                      |
+| T17  | [`dc5347a3`](https://github.com/ever-works/ever-works/commit/dc5347a3) | feat(agent-inbox-ui): 4 web routes + components + API clients |
+| T18  | [`b89c1546`](https://github.com/ever-works/ever-works/commit/b89c1546) | test: IPlugin compliance + 18/18 plugin tests green           |
+| T18  | [`33810fe1`](https://github.com/ever-works/ever-works/commit/33810fe1) | chore: pnpm-lock.yaml updated for new plugins                 |
 
 ## JIRA state
 
@@ -74,8 +74,8 @@ _(none — every epic + child ticket is implemented)_
 - **T33 EW-681** Inbox client hook — [`c545720e`](https://github.com/ever-works/ever-works/commit/c545720e). `useAgentInbox(agentId)` (module-store + useSyncExternalStore, exposes messages/isLoading/error/mutate) + BFF proxy `apps/web/src/app/api/email/messages/route.ts`. No SWR (not an apps/web dep — mirrors use-organizations.ts).
 - **T34 EW-681** SSE inbox stream — [`73be2295`](https://github.com/ever-works/ever-works/commit/73be2295). Poll-based `GET /api/email/messages/stream` (diffs new inbound rows, heartbeat, cleanup; declared before `messages/:id`) + BFF stream proxy + `useInboxStream(agentId, onMessage)` hook (EventSource → calls `mutate`, 30s poll fallback).
 - **T35 EW-681** i18n strings — [`a3fbbe9a`](https://github.com/ever-works/ever-works/commit/a3fbbe9a). Added the `notifications-v2` namespace to `apps/web/messages/en.json` (emails / channels / preferences / inbox / detail / composer sub-trees) covering the T17/T31/T32 surface labels. Additive (+103 lines).
-- **T36 EW-681** Playwright E2E smoke — *this commit*. `apps/web/e2e/notifications-v2-inbox.spec.ts` — settings-page render checks + API-contract round-trips (email address CRUD, channel CRUD, seeded event-types, inbox-list shape) using the existing `helpers/api` register-user pattern. Completes EW-681.
-- **T37** Loop termination — *this commit*. Final summary regen; `/loop` cron job cancelled via `CronDelete`. All 4 epics + 16 child tickets implemented.
+- **T36 EW-681** Playwright E2E smoke — _this commit_. `apps/web/e2e/notifications-v2-inbox.spec.ts` — settings-page render checks + API-contract round-trips (email address CRUD, channel CRUD, seeded event-types, inbox-list shape) using the existing `helpers/api` register-user pattern. Completes EW-681.
+- **T37** Loop termination — _this commit_. Final summary regen; `/loop` cron job cancelled via `CronDelete`. All 4 epics + 16 child tickets implemented.
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
@@ -94,6 +94,7 @@ expose **semantic methods** (`findById`, `findByIdForUser`, `findActiveByUser`,
 
 The T11 facades + T12 api services originally assumed the raw TypeORM API. T22b
 rewrote every call site to the semantic methods:
+
 - `EmailFacadeService` — `findById`, `findByAgent`, `save(entity)`
 - `NotificationChannelFacadeService` — `findById`, `save(entity)`
 - `email.service.ts` — `findActiveByUser`, `findByIdForUser`, `findByVerificationToken`, `update`, `delete`, `findByUser`

@@ -174,10 +174,7 @@ export interface IEmailOutboundPlugin extends IPlugin {
 	 * Async-iterate delivery / engagement events. Plugins that can't
 	 * surface this (e.g. SMTP-only) MAY return an empty iterator.
 	 */
-	listDeliveryEvents?(
-		filter: EmailEventFilter,
-		options: EmailOptions,
-	): AsyncGenerator<EmailDeliveryEvent>;
+	listDeliveryEvents?(filter: EmailEventFilter, options: EmailOptions): AsyncGenerator<EmailDeliveryEvent>;
 
 	/**
 	 * Optional per-send pricing. Returned cost is attributed to
@@ -202,7 +199,7 @@ export interface IEmailInboundPlugin extends IPlugin {
 	parseInboundWebhook(
 		rawBody: Buffer,
 		headers: Readonly<Record<string, string>>,
-		options: EmailOptions,
+		options: EmailOptions
 	): Promise<EmailInboundMessage>;
 
 	/**
@@ -210,11 +207,7 @@ export interface IEmailInboundPlugin extends IPlugin {
 	 * signature mismatch — the controller catches and 401s with
 	 * empty body (don't leak which secret is wrong).
 	 */
-	verifyWebhookSignature(
-		rawBody: Buffer,
-		headers: Readonly<Record<string, string>>,
-		options: EmailOptions,
-	): void;
+	verifyWebhookSignature(rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void;
 
 	/**
 	 * Optional: decode a provider's delivery-event webhook (separate
@@ -225,7 +218,7 @@ export interface IEmailInboundPlugin extends IPlugin {
 	parseEventWebhook?(
 		rawBody: Buffer,
 		headers: Readonly<Record<string, string>>,
-		options: EmailOptions,
+		options: EmailOptions
 	): Promise<readonly EmailDeliveryEvent[]>;
 }
 

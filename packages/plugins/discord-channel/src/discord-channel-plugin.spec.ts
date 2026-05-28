@@ -19,12 +19,9 @@ describe('DiscordChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ id: 'wh-1', channel_id: 'ch-1', name: 'Ops' }),
+				json: async () => ({ id: 'wh-1', channel_id: 'ch-1', name: 'Ops' })
 			} as Response);
-			const result = await plugin.verifyTarget(
-				{ webhookUrl: 'https://discord.com/api/webhooks/1/abc' },
-				{},
-			);
+			const result = await plugin.verifyTarget({ webhookUrl: 'https://discord.com/api/webhooks/1/abc' }, {});
 			expect(result.valid).toBe(true);
 			expect(result.details).toEqual({ id: 'wh-1', channelId: 'ch-1', name: 'Ops' });
 		});
@@ -33,12 +30,9 @@ describe('DiscordChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 404,
-				json: async () => ({}),
+				json: async () => ({})
 			} as Response);
-			const result = await plugin.verifyTarget(
-				{ webhookUrl: 'https://discord.com/api/webhooks/x/y' },
-				{},
-			);
+			const result = await plugin.verifyTarget({ webhookUrl: 'https://discord.com/api/webhooks/x/y' }, {});
 			expect(result.valid).toBe(false);
 			expect(result.message).toMatch(/404/);
 		});
@@ -55,7 +49,7 @@ describe('DiscordChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ id: 'msg-123' }),
+				json: async () => ({ id: 'msg-123' })
 			} as Response);
 			const result = await plugin.send(
 				{
@@ -63,9 +57,9 @@ describe('DiscordChannelPlugin', () => {
 					rich: { kind: 'discord-embeds', payload: [{ title: 'Test' }] },
 					messageRef: 'ref-1',
 					attribution: { userId: 'user-1' },
-					target: { webhookUrl: 'https://discord.com/api/webhooks/1/abc' },
+					target: { webhookUrl: 'https://discord.com/api/webhooks/1/abc' }
 				},
-				{},
+				{}
 			);
 			expect(result.providerMessageId).toBe('msg-123');
 			const [url, init] = fetchMock.mock.calls[0];
@@ -80,7 +74,7 @@ describe('DiscordChannelPlugin', () => {
 				ok: false,
 				status: 400,
 				text: async () => 'Bad webhook',
-				json: async () => ({}),
+				json: async () => ({})
 			} as Response);
 			await expect(
 				plugin.send(
@@ -88,10 +82,10 @@ describe('DiscordChannelPlugin', () => {
 						text: 'x',
 						messageRef: 'ref-err',
 						attribution: { userId: 'u' },
-						target: { webhookUrl: 'https://discord.com/api/webhooks/x/y' },
+						target: { webhookUrl: 'https://discord.com/api/webhooks/x/y' }
 					},
-					{},
-				),
+					{}
+				)
 			).rejects.toThrow(/Discord webhook failed/);
 		});
 
@@ -99,13 +93,13 @@ describe('DiscordChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 200,
-				json: async () => ({ id: 'msg-cache' }),
+				json: async () => ({ id: 'msg-cache' })
 			} as Response);
 			const input = {
 				text: 'x',
 				messageRef: 'ref-cache',
 				attribution: { userId: 'u' },
-				target: { webhookUrl: 'https://discord.com/api/webhooks/x/y' },
+				target: { webhookUrl: 'https://discord.com/api/webhooks/x/y' }
 			};
 			await plugin.send(input, {});
 			await plugin.send(input, {});

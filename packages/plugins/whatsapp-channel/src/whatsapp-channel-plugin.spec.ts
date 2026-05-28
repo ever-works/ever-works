@@ -20,7 +20,7 @@ describe('WhatsappChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ id: '111', display_phone_number: '+1 555 123 4567' }),
+				json: async () => ({ id: '111', display_phone_number: '+1 555 123 4567' })
 			} as Response);
 			const res = await plugin.verifyTarget(target, {});
 			expect(res.valid).toBe(true);
@@ -31,7 +31,7 @@ describe('WhatsappChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 401,
-				json: async () => ({ error: { message: 'Invalid OAuth access token' } }),
+				json: async () => ({ error: { message: 'Invalid OAuth access token' } })
 			} as Response);
 			const res = await plugin.verifyTarget(target, {});
 			expect(res.valid).toBe(false);
@@ -41,9 +41,7 @@ describe('WhatsappChannelPlugin', () => {
 		it('requires accessToken + phoneNumberId + to', async () => {
 			expect((await plugin.verifyTarget({ phoneNumberId: '1', to: 'x' }, {})).valid).toBe(false);
 			expect((await plugin.verifyTarget({ accessToken: 't', to: 'x' }, {})).valid).toBe(false);
-			expect((await plugin.verifyTarget({ accessToken: 't', phoneNumberId: '1' }, {})).valid).toBe(
-				false,
-			);
+			expect((await plugin.verifyTarget({ accessToken: 't', phoneNumberId: '1' }, {})).valid).toBe(false);
 		});
 	});
 
@@ -52,11 +50,11 @@ describe('WhatsappChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ messages: [{ id: 'wamid.ABC' }] }),
+				json: async () => ({ messages: [{ id: 'wamid.ABC' }] })
 			} as Response);
 			const res = await plugin.send(
 				{ text: 'order shipped', messageRef: 'ref-1', attribution: { userId: 'u1' }, target },
-				{},
+				{}
 			);
 			expect(res.providerMessageId).toBe('wamid.ABC');
 			const [url, init] = fetchMock.mock.calls[0];
@@ -71,20 +69,20 @@ describe('WhatsappChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ messages: [{ id: 'wamid.TPL' }] }),
+				json: async () => ({ messages: [{ id: 'wamid.TPL' }] })
 			} as Response);
 			await plugin.send(
 				{
 					text: 'fallback',
 					rich: {
 						kind: 'whatsapp-template',
-						payload: { name: 'order_update', language: { code: 'en_US' } },
+						payload: { name: 'order_update', language: { code: 'en_US' } }
 					},
 					messageRef: 'ref-tpl',
 					attribution: { userId: 'u1' },
-					target,
+					target
 				},
-				{},
+				{}
 			);
 			const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
 			expect(body.type).toBe('template');
@@ -96,13 +94,10 @@ describe('WhatsappChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 400,
-				json: async () => ({ error: { message: 'recipient not in allowed list', code: 131030 } }),
+				json: async () => ({ error: { message: 'recipient not in allowed list', code: 131030 } })
 			} as Response);
 			await expect(
-				plugin.send(
-					{ text: 'x', messageRef: 'ref-err', attribution: { userId: 'u1' }, target },
-					{},
-				),
+				plugin.send({ text: 'x', messageRef: 'ref-err', attribution: { userId: 'u1' }, target }, {})
 			).rejects.toThrow(/WhatsApp send failed/);
 		});
 
@@ -110,7 +105,7 @@ describe('WhatsappChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 200,
-				json: async () => ({ messages: [{ id: 'wamid.CACHE' }] }),
+				json: async () => ({ messages: [{ id: 'wamid.CACHE' }] })
 			} as Response);
 			const input = { text: 'x', messageRef: 'ref-cache', attribution: { userId: 'u1' }, target };
 			await plugin.send(input, {});

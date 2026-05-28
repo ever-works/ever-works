@@ -388,7 +388,11 @@ describe('AgentToolService.resolveAllowedTools', () => {
         });
 
         it('invoke validates input + forwards a valid call', async () => {
-            const facade = { notifyChannel: jest.fn().mockResolvedValue({ status: 'delivered', providerMessageId: 'm-1' }) };
+            const facade = {
+                notifyChannel: jest
+                    .fn()
+                    .mockResolvedValue({ status: 'delivered', providerMessageId: 'm-1' }),
+            };
             const tools = wire(facade).resolveAllowedTools(
                 makeAgent({
                     permissions: { ...makeAgent().permissions, canCallExternalTools: true },
@@ -396,7 +400,10 @@ describe('AgentToolService.resolveAllowedTools', () => {
             );
             const tool = tools.find((t) => t.name === 'notifyChannel')!;
 
-            const bad = (await tool.invoke({ channelId: '', text: 'x' } as any)) as Record<string, unknown>;
+            const bad = (await tool.invoke({ channelId: '', text: 'x' } as any)) as Record<
+                string,
+                unknown
+            >;
             expect('error' in bad).toBe(true);
             expect(facade.notifyChannel).not.toHaveBeenCalled();
 

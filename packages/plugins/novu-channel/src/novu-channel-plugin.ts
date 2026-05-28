@@ -7,7 +7,7 @@ import type {
 	ChannelVerification,
 	ChannelShape,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -57,14 +57,14 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
-		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_NOVU,
+		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_NOVU
 	] as const;
 	readonly shape: ChannelShape = 'workflow';
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			apiBase: { type: 'string' },
-		},
+			apiBase: { type: 'string' }
+		}
 	};
 
 	async onLoad(): Promise<void> {
@@ -79,15 +79,10 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 
 	private apiBase(options: ChannelOptions): string {
 		const base = options.settings?.apiBase;
-		return typeof base === 'string' && base.length > 0
-			? base.replace(/\/+$/, '')
-			: DEFAULT_NOVU_API_BASE;
+		return typeof base === 'string' && base.length > 0 ? base.replace(/\/+$/, '') : DEFAULT_NOVU_API_BASE;
 	}
 
-	async verifyTarget(
-		config: ChannelTargetConfig,
-		options: ChannelOptions,
-	): Promise<ChannelVerification> {
+	async verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification> {
 		const apiKey = config.apiKey;
 		if (typeof apiKey !== 'string' || apiKey.length === 0) {
 			return { valid: false, message: 'apiKey is required' };
@@ -101,13 +96,13 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 		try {
 			const response = await fetch(`${this.apiBase(options)}/v1/environments/me`, {
 				method: 'GET',
-				headers: { Authorization: `ApiKey ${apiKey}` },
+				headers: { Authorization: `ApiKey ${apiKey}` }
 			});
 			if (!response.ok) {
 				const data = (await response.json().catch(() => ({}))) as { message?: string };
 				return {
 					valid: false,
-					message: `Novu API key check failed: ${data.message ?? response.status}`,
+					message: `Novu API key check failed: ${data.message ?? response.status}`
 				};
 			}
 			const data = (await response.json().catch(() => ({}))) as {
@@ -135,25 +130,23 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 			headers: {
 				Authorization: `ApiKey ${apiKey}`,
 				'Content-Type': 'application/json',
-				'Idempotency-Key': payload.messageRef,
+				'Idempotency-Key': payload.messageRef
 			},
 			body: JSON.stringify({
 				name: workflowId,
 				to: { subscriberId },
-				payload: triggerPayload,
-			}),
+				payload: triggerPayload
+			})
 		});
 		const data = (await response.json().catch(() => ({}))) as NovuTriggerResponse;
 		if (!response.ok || !data.data?.transactionId) {
-			throw new Error(
-				`Novu trigger failed (${response.status}): ${data.message ?? 'no transactionId returned'}`,
-			);
+			throw new Error(`Novu trigger failed (${response.status}): ${data.message ?? 'no transactionId returned'}`);
 		}
 
 		const result: ChannelSendResult = {
 			provider: this.id,
 			providerMessageId: data.data.transactionId,
-			deliveredAt: new Date(),
+			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);
 		if (this.idempotencyCache.size > 500) {

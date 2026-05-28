@@ -1,11 +1,4 @@
-import {
-    Column,
-    CreateDateColumn,
-    Entity,
-    Index,
-    PrimaryColumn,
-    UpdateDateColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 /**
  * Notifications v2 — Event Subscriptions.
@@ -52,7 +45,7 @@ export class NotificationEventType {
     urgent: boolean;
 
     /** e.g. `['in-app']` or `['in-app', 'email']`. */
-    @Column({ type: 'simple-json', default: () => "'[\"in-app\"]'" })
+    @Column({ type: 'simple-json', default: () => '\'["in-app"]\'' })
     defaultChannels: string[];
 
     @Column({ type: 'varchar', length: 16, default: 'core' })

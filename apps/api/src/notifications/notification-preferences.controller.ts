@@ -44,7 +44,9 @@ export class NotificationPreferencesController {
     }
 
     @Get('preferences')
-    @ApiOperation({ summary: 'Get my notification preferences (subscriptions + quiet hours + mutes)' })
+    @ApiOperation({
+        summary: 'Get my notification preferences (subscriptions + quiet hours + mutes)',
+    })
     async getPreferences(@CurrentUser() auth: AuthenticatedUser) {
         return this.service.getPreferences(auth.userId);
     }
@@ -87,7 +89,10 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
-    async unmuteCategory(@CurrentUser() auth: AuthenticatedUser, @Param('category') category: string) {
+    async unmuteCategory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('category') category: string,
+    ) {
         await this.service.unmuteCategory(auth.userId, category);
     }
 }

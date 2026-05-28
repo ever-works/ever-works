@@ -29,10 +29,7 @@ export class EmailConversationRepository {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findByThreadKey(
-        agentId: string,
-        threadKey: string,
-    ): Promise<EmailConversation | null> {
+    async findByThreadKey(agentId: string, threadKey: string): Promise<EmailConversation | null> {
         return this.repository.findOne({ where: { agentId, threadKey } });
     }
 

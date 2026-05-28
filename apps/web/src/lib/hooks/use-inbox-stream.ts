@@ -33,7 +33,9 @@ export function useInboxStream(agentId: string, onMessage: () => void): void {
         }
 
         try {
-            source = new EventSource(`/api/email/messages/stream?agentId=${encodeURIComponent(agentId)}`);
+            source = new EventSource(
+                `/api/email/messages/stream?agentId=${encodeURIComponent(agentId)}`,
+            );
             source.addEventListener('message', () => onMessage());
             source.onerror = () => {
                 // Connection dropped — close it and degrade to polling.

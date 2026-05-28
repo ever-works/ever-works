@@ -1,10 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type {
-    NotificationEventType,
-    PreferencesView,
-} from '@/lib/api/notification-preferences';
+import type { NotificationEventType, PreferencesView } from '@/lib/api/notification-preferences';
 import type { NotificationChannel } from '@/lib/api/notification-channels';
 
 interface Props {
@@ -74,7 +71,8 @@ export function NotificationPreferencesSettings({
                 </thead>
                 <tbody>
                     {initialEventTypes.map((event) => {
-                        const enabled = subsByEvent.get(event.key) ?? new Set(event.defaultChannels);
+                        const enabled =
+                            subsByEvent.get(event.key) ?? new Set(event.defaultChannels);
                         return (
                             <tr key={event.key} className="border-b">
                                 <td className="py-2">

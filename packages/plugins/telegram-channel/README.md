@@ -8,15 +8,15 @@ Telegram notification channel for the Ever Works platform.
 
 ## Settings (channel-level `targetConfig`)
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `botToken` | Yes | Bot token from @BotFather |
-| `chatId` | Yes | Destination chat id |
+| Key        | Required | Description               |
+| ---------- | -------- | ------------------------- |
+| `botToken` | Yes      | Bot token from @BotFather |
+| `chatId`   | Yes      | Destination chat id       |
 
 ## Plugin-level settings (tenant default)
 
-| Key | Description |
-|-----|-------------|
+| Key                   | Description                        |
+| --------------------- | ---------------------------------- |
 | `disableNotification` | Send silently (no sound/vibration) |
 
 ## Finding your chat id

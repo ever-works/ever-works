@@ -63,14 +63,16 @@ describe('NotificationChannelFacadeService', () => {
             async () => ['in-app'],
             { userId: 'user-1' },
         );
-        expect(results).toEqual([
-            { channelId: 'in-app', pluginId: 'in-app', status: 'delivered' },
-        ]);
+        expect(results).toEqual([{ channelId: 'in-app', pluginId: 'in-app', status: 'delivered' }]);
     });
 
     it('fails verifyTarget when no plugin matches', async () => {
         await expect(
-            facade.verifyTarget('discord-channel', { webhookUrl: 'https://x' }, { userId: 'user-1' }),
+            facade.verifyTarget(
+                'discord-channel',
+                { webhookUrl: 'https://x' },
+                { userId: 'user-1' },
+            ),
         ).rejects.toBeInstanceOf(NotificationChannelFacadeError);
     });
 });

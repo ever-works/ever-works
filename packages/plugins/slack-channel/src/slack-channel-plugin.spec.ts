@@ -16,10 +16,7 @@ describe('SlackChannelPlugin', () => {
 
 	describe('verifyTarget', () => {
 		it('accepts a well-formed Slack webhook URL', async () => {
-			const res = await plugin.verifyTarget(
-				{ webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
-				{},
-			);
+			const res = await plugin.verifyTarget({ webhookUrl: 'https://hooks.slack.com/services/T/B/x' }, {});
 			expect(res.valid).toBe(true);
 		});
 
@@ -41,7 +38,7 @@ describe('SlackChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				text: async () => 'ok',
+				text: async () => 'ok'
 			} as Response);
 			const res = await plugin.send(
 				{
@@ -49,9 +46,9 @@ describe('SlackChannelPlugin', () => {
 					rich: { kind: 'slack-blocks', payload: [{ type: 'section' }] },
 					messageRef: 'ref-1',
 					attribution: { userId: 'u1' },
-					target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
+					target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' }
 				},
-				{},
+				{}
 			);
 			expect(res.providerMessageId).toBe('slack-ref-1');
 			const [, init] = fetchMock.mock.calls[0];
@@ -65,7 +62,7 @@ describe('SlackChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 400,
-				text: async () => 'invalid_payload',
+				text: async () => 'invalid_payload'
 			} as Response);
 			await expect(
 				plugin.send(
@@ -73,10 +70,10 @@ describe('SlackChannelPlugin', () => {
 						text: 'x',
 						messageRef: 'ref-err',
 						attribution: { userId: 'u1' },
-						target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
+						target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' }
 					},
-					{},
-				),
+					{}
+				)
 			).rejects.toThrow(/Slack webhook failed/);
 		});
 
@@ -84,13 +81,13 @@ describe('SlackChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 200,
-				text: async () => 'ok',
+				text: async () => 'ok'
 			} as Response);
 			const input = {
 				text: 'x',
 				messageRef: 'ref-cache',
 				attribution: { userId: 'u1' },
-				target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' },
+				target: { webhookUrl: 'https://hooks.slack.com/services/T/B/x' }
 			};
 			await plugin.send(input, {});
 			await plugin.send(input, {});

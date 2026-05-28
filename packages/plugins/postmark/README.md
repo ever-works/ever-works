@@ -9,12 +9,12 @@ Postmark email provider for the Ever Works platform.
 
 ## Settings
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiKey` | Yes | Postmark Server API token |
-| `defaultSenderDomain` | No | Default `From` domain |
-| `inboundWebhookSecret` | No | Basic-Auth secret for inbound webhook verification |
-| `inboundStreamId` | No | Specific inbound stream id |
+| Key                    | Required | Description                                        |
+| ---------------------- | -------- | -------------------------------------------------- |
+| `apiKey`               | Yes      | Postmark Server API token                          |
+| `defaultSenderDomain`  | No       | Default `From` domain                              |
+| `inboundWebhookSecret` | No       | Basic-Auth secret for inbound webhook verification |
+| `inboundStreamId`      | No       | Specific inbound stream id                         |
 
 Env-var fallbacks: `POSTMARK_API_KEY`, `POSTMARK_INBOUND_SECRET`.
 

@@ -49,7 +49,13 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'tenant_email_addresses',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'userId', type: 'uuid', isNullable: false },
                     { name: 'address', type: 'varchar', length: '254', isNullable: false },
                     { name: 'direction', type: 'varchar', length: '16', isNullable: false },
@@ -57,7 +63,12 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'providerSettings', type: 'jsonb', isNullable: false },
                     { name: 'verified', type: 'boolean', default: false, isNullable: false },
                     { name: 'verificationToken', type: 'varchar', length: '64', isNullable: true },
-                    { name: 'defaultForReplies', type: 'boolean', default: false, isNullable: false },
+                    {
+                        name: 'defaultForReplies',
+                        type: 'boolean',
+                        default: false,
+                        isNullable: false,
+                    },
                     { name: 'disabledAt', type: 'timestamp', isNullable: true },
                     { name: 'tenantId', type: 'uuid', isNullable: true },
                     { name: 'organizationId', type: 'uuid', isNullable: true },
@@ -65,10 +76,19 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_tenant_email_address_user_direction', columnNames: ['userId', 'address', 'direction'], isUnique: true },
+                    {
+                        name: 'uq_tenant_email_address_user_direction',
+                        columnNames: ['userId', 'address', 'direction'],
+                        isUnique: true,
+                    },
                     { name: 'idx_tenant_email_address_plugin', columnNames: ['pluginId'] },
                 ],
             }),
@@ -79,21 +99,50 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'agent_email_assignments',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'agentId', type: 'uuid', isNullable: false },
                     { name: 'emailAddressId', type: 'uuid', isNullable: false },
                     { name: 'direction', type: 'varchar', length: '16', isNullable: false },
                     { name: 'priority', type: 'int', default: 100, isNullable: false },
-                    { name: 'dispatchMode', type: 'varchar', length: '16', default: "'task-spawn'", isNullable: false },
+                    {
+                        name: 'dispatchMode',
+                        type: 'varchar',
+                        length: '16',
+                        default: "'task-spawn'",
+                        isNullable: false,
+                    },
                     { name: 'createdAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['agentId'], referencedTableName: 'agents', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
-                    { columnNames: ['emailAddressId'], referencedTableName: 'tenant_email_addresses', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['agentId'],
+                        referencedTableName: 'agents',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
+                    {
+                        columnNames: ['emailAddressId'],
+                        referencedTableName: 'tenant_email_addresses',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_agent_email_assignment', columnNames: ['agentId', 'emailAddressId', 'direction'], isUnique: true },
-                    { name: 'idx_agent_email_assignment_email_direction', columnNames: ['emailAddressId', 'direction'] },
+                    {
+                        name: 'uq_agent_email_assignment',
+                        columnNames: ['agentId', 'emailAddressId', 'direction'],
+                        isUnique: true,
+                    },
+                    {
+                        name: 'idx_agent_email_assignment_email_direction',
+                        columnNames: ['emailAddressId', 'direction'],
+                    },
                 ],
             }),
             true,
@@ -103,7 +152,13 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'email_conversations',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'agentId', type: 'uuid', isNullable: false },
                     { name: 'threadKey', type: 'varchar', length: '200', isNullable: false },
                     { name: 'participants', type: 'jsonb', isNullable: false },
@@ -114,10 +169,19 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['agentId'], referencedTableName: 'agents', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['agentId'],
+                        referencedTableName: 'agents',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_email_conversation_agent_thread', columnNames: ['agentId', 'threadKey'], isUnique: true },
+                    {
+                        name: 'uq_email_conversation_agent_thread',
+                        columnNames: ['agentId', 'threadKey'],
+                        isUnique: true,
+                    },
                 ],
             }),
             true,
@@ -127,7 +191,13 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'email_messages',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'userId', type: 'uuid', isNullable: false },
                     { name: 'agentId', type: 'uuid', isNullable: true },
                     { name: 'taskId', type: 'uuid', isNullable: true },
@@ -153,16 +223,47 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'createdAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
-                    { columnNames: ['emailAddressId'], referencedTableName: 'tenant_email_addresses', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
-                    { columnNames: ['conversationId'], referencedTableName: 'email_conversations', referencedColumnNames: ['id'], onDelete: 'SET NULL' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
+                    {
+                        columnNames: ['emailAddressId'],
+                        referencedTableName: 'tenant_email_addresses',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
+                    {
+                        columnNames: ['conversationId'],
+                        referencedTableName: 'email_conversations',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'SET NULL',
+                    },
                 ],
                 indices: [
-                    { name: 'idx_email_messages_user_agent_created', columnNames: ['userId', 'agentId', 'createdAt'] },
-                    { name: 'idx_email_messages_task_created', columnNames: ['taskId', 'createdAt'] },
-                    { name: 'idx_email_messages_conversation_created', columnNames: ['conversationId', 'createdAt'] },
-                    { name: 'idx_email_messages_address_created', columnNames: ['emailAddressId', 'createdAt'] },
-                    { name: 'uq_email_messages_provider_message', columnNames: ['pluginId', 'providerMessageId'], isUnique: true },
+                    {
+                        name: 'idx_email_messages_user_agent_created',
+                        columnNames: ['userId', 'agentId', 'createdAt'],
+                    },
+                    {
+                        name: 'idx_email_messages_task_created',
+                        columnNames: ['taskId', 'createdAt'],
+                    },
+                    {
+                        name: 'idx_email_messages_conversation_created',
+                        columnNames: ['conversationId', 'createdAt'],
+                    },
+                    {
+                        name: 'idx_email_messages_address_created',
+                        columnNames: ['emailAddressId', 'createdAt'],
+                    },
+                    {
+                        name: 'uq_email_messages_provider_message',
+                        columnNames: ['pluginId', 'providerMessageId'],
+                        isUnique: true,
+                    },
                 ],
             }),
             true,
@@ -176,7 +277,13 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'notification_channels',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'userId', type: 'uuid', isNullable: false },
                     { name: 'pluginId', type: 'varchar', length: '64', isNullable: false },
                     { name: 'name', type: 'varchar', length: '120', isNullable: false },
@@ -189,10 +296,19 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_notification_channel', columnNames: ['userId', 'pluginId', 'name'], isUnique: true },
+                    {
+                        name: 'uq_notification_channel',
+                        columnNames: ['userId', 'pluginId', 'name'],
+                        isUnique: true,
+                    },
                     { name: 'idx_notification_channel_plugin', columnNames: ['pluginId'] },
                 ],
             }),
@@ -203,7 +319,13 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'notification_channel_delivery_log',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'channelId', type: 'uuid', isNullable: false },
                     { name: 'messageRef', type: 'varchar', length: '120', isNullable: false },
                     { name: 'eventType', type: 'varchar', length: '120', isNullable: true },
@@ -217,7 +339,12 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'createdAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['channelId'], referencedTableName: 'notification_channels', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['channelId'],
+                        referencedTableName: 'notification_channels',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
                     { name: 'idx_ncdl_channel_created', columnNames: ['channelId', 'createdAt'] },
@@ -235,13 +362,30 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'notification_event_types',
                 columns: [
-                    { name: 'key', type: 'varchar', length: '120', isPrimary: true, isNullable: false },
+                    {
+                        name: 'key',
+                        type: 'varchar',
+                        length: '120',
+                        isPrimary: true,
+                        isNullable: false,
+                    },
                     { name: 'category', type: 'varchar', length: '64', isNullable: false },
                     { name: 'title', type: 'varchar', length: '200', isNullable: false },
                     { name: 'description', type: 'text', isNullable: false },
                     { name: 'urgent', type: 'boolean', default: false, isNullable: false },
-                    { name: 'defaultChannels', type: 'jsonb', default: `'["in-app"]'::jsonb`, isNullable: false },
-                    { name: 'source', type: 'varchar', length: '16', default: "'core'", isNullable: false },
+                    {
+                        name: 'defaultChannels',
+                        type: 'jsonb',
+                        default: `'["in-app"]'::jsonb`,
+                        isNullable: false,
+                    },
+                    {
+                        name: 'source',
+                        type: 'varchar',
+                        length: '16',
+                        default: "'core'",
+                        isNullable: false,
+                    },
                     { name: 'pluginId', type: 'varchar', length: '64', isNullable: true },
                     { name: 'createdAt', type: 'timestamp', default: 'now()', isNullable: false },
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
@@ -257,17 +401,32 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'user_notification_subscriptions',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'userId', type: 'uuid', isNullable: false },
                     { name: 'eventTypeKey', type: 'varchar', length: '120', isNullable: false },
                     { name: 'channelIds', type: 'jsonb', isNullable: false },
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_user_notification_subscription', columnNames: ['userId', 'eventTypeKey'], isUnique: true },
+                    {
+                        name: 'uq_user_notification_subscription',
+                        columnNames: ['userId', 'eventTypeKey'],
+                        isUnique: true,
+                    },
                 ],
             }),
             true,
@@ -284,7 +443,12 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
             }),
             true,
@@ -294,17 +458,32 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             new Table({
                 name: 'user_notification_category_mutes',
                 columns: [
-                    { name: 'id', type: 'uuid', isPrimary: true, generationStrategy: 'uuid', default: 'uuid_generate_v4()' },
+                    {
+                        name: 'id',
+                        type: 'uuid',
+                        isPrimary: true,
+                        generationStrategy: 'uuid',
+                        default: 'uuid_generate_v4()',
+                    },
                     { name: 'userId', type: 'uuid', isNullable: false },
                     { name: 'category', type: 'varchar', length: '64', isNullable: false },
                     { name: 'mutedUntil', type: 'timestamp', isNullable: true },
                     { name: 'createdAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['userId'], referencedTableName: 'users', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['userId'],
+                        referencedTableName: 'users',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
                 indices: [
-                    { name: 'uq_user_notification_category_mute', columnNames: ['userId', 'category'], isUnique: true },
+                    {
+                        name: 'uq_user_notification_category_mute',
+                        columnNames: ['userId', 'category'],
+                        isUnique: true,
+                    },
                 ],
             }),
             true,
@@ -319,7 +498,12 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
                     { name: 'updatedAt', type: 'timestamp', default: 'now()', isNullable: false },
                 ],
                 foreignKeys: [
-                    { columnNames: ['organizationId'], referencedTableName: 'organizations', referencedColumnNames: ['id'], onDelete: 'CASCADE' },
+                    {
+                        columnNames: ['organizationId'],
+                        referencedTableName: 'organizations',
+                        referencedColumnNames: ['id'],
+                        onDelete: 'CASCADE',
+                    },
                 ],
             }),
             true,
@@ -364,7 +548,10 @@ export class AddNotificationsV2Tables1780000000000 implements MigrationInterface
             );
             await queryRunner.createIndex(
                 tableName,
-                new TableIndex({ name: `idx_${tableName}_organization_id`, columnNames: ['organizationId'] }),
+                new TableIndex({
+                    name: `idx_${tableName}_organization_id`,
+                    columnNames: ['organizationId'],
+                }),
             );
         }
     }

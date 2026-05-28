@@ -70,9 +70,10 @@ describe('UserNotificationSubscriptionService', () => {
         subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'channel-1'] });
         preferences.findByUser.mockResolvedValue(null);
         mutes.isMuted.mockResolvedValue(false);
-        await expect(
-            service.resolveChannels('u', 'work_generation_finished'),
-        ).resolves.toEqual(['in-app', 'channel-1']);
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+            'channel-1',
+        ]);
     });
 
     it('drops non-in-app channels when category is muted', async () => {
@@ -85,9 +86,9 @@ describe('UserNotificationSubscriptionService', () => {
         subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'channel-1'] });
         mutes.isMuted.mockResolvedValue(true);
         preferences.findByUser.mockResolvedValue(null);
-        await expect(
-            service.resolveChannels('u', 'work_generation_finished'),
-        ).resolves.toEqual(['in-app']);
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+        ]);
     });
 
     it('expired category mute does NOT filter channels', async () => {
@@ -102,9 +103,10 @@ describe('UserNotificationSubscriptionService', () => {
         // mute reports false.
         mutes.isMuted.mockResolvedValue(false);
         preferences.findByUser.mockResolvedValue(null);
-        await expect(
-            service.resolveChannels('u', 'work_generation_finished'),
-        ).resolves.toEqual(['in-app', 'channel-1']);
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+            'channel-1',
+        ]);
     });
 
     it('urgent events bypass quiet hours', async () => {
@@ -142,9 +144,9 @@ describe('UserNotificationSubscriptionService', () => {
             quietHoursEnd: '23:59:59',
             timezone: 'UTC',
         });
-        await expect(
-            service.resolveChannels('u', 'work_generation_finished'),
-        ).resolves.toEqual(['in-app']);
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+        ]);
     });
 });
 

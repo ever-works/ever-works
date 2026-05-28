@@ -8,16 +8,16 @@ WhatsApp notification channel for the Ever Works platform.
 
 ## Settings (channel-level `targetConfig`)
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `accessToken` | Yes | Meta system-user access token |
-| `phoneNumberId` | Yes | WhatsApp Business phone-number id |
-| `to` | Yes | Recipient phone (E.164, e.g. `+15551234567`) |
+| Key             | Required | Description                                  |
+| --------------- | -------- | -------------------------------------------- |
+| `accessToken`   | Yes      | Meta system-user access token                |
+| `phoneNumberId` | Yes      | WhatsApp Business phone-number id            |
+| `to`            | Yes      | Recipient phone (E.164, e.g. `+15551234567`) |
 
 ## Plugin-level settings (tenant default)
 
-| Key | Description |
-|-----|-------------|
+| Key          | Description                             |
+| ------------ | --------------------------------------- |
 | `apiVersion` | Graph API version (defaults to `v21.0`) |
 
 ## 24-hour window rule

@@ -8,10 +8,10 @@ Resend email provider for the Ever Works platform (outbound only).
 
 ## Settings
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiKey` | Yes | Resend API key |
-| `defaultSenderDomain` | No | Default `from` domain |
+| Key                   | Required | Description           |
+| --------------------- | -------- | --------------------- |
+| `apiKey`              | Yes      | Resend API key        |
+| `defaultSenderDomain` | No       | Default `from` domain |
 
 Env-var fallback: `RESEND_API_KEY`.
 

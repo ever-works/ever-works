@@ -14,7 +14,7 @@
 - Plugin registry: `packages/agent/src/plugins/services/plugin-registry.service.ts`
 - AI provider plugin pattern (mirror): `packages/agent/src/facades/ai.facade.ts`
 
-> **Scope of this document:** define a generic Notification Channel plugin contract that covers Discord, Slack, Telegram, WhatsApp, Novu (meta-router) and future chat-style channels. The existing in-app `notifications` v1 surface keeps working unchanged; it now coexists as **one channel among many**, addressable by the same fan-out router this spec defines. Email is its own surface (it has tenant-managed addresses + inbound webhooks) and is covered separately by [`email-providers`](../email-providers/spec.md). Per-user *which-channel-when* preferences live in [`event-subscriptions`](../event-subscriptions/spec.md).
+> **Scope of this document:** define a generic Notification Channel plugin contract that covers Discord, Slack, Telegram, WhatsApp, Novu (meta-router) and future chat-style channels. The existing in-app `notifications` v1 surface keeps working unchanged; it now coexists as **one channel among many**, addressable by the same fan-out router this spec defines. Email is its own surface (it has tenant-managed addresses + inbound webhooks) and is covered separately by [`email-providers`](../email-providers/spec.md). Per-user _which-channel-when_ preferences live in [`event-subscriptions`](../event-subscriptions/spec.md).
 >
 > **Hard rule (additive only):** the in-app notification panel keeps rendering the same notifications it does today. Channels add **additional** delivery surfaces, not replacements.
 
@@ -22,13 +22,13 @@
 
 ## 1. Personas + use cases
 
-| Persona  | Use case                                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator | Connects a Discord workspace via webhook; subscribes "Work generation finished" events so the team channel pings on every success.    |
-| User     | Adds personal Telegram bot; routes "AI credits depleted" alerts to Telegram only (silences email + in-app for that event).            |
-| Operator | Enables Novu as a meta-router; all platform events flow through Novu's workflow engine for advanced batching + DND windows.            |
-| Operator | A channel provider has an outage. Fanout to remaining configured channels continues; failed channel queues for retry.                  |
-| Agent    | Posts a status update via `notifyChannel` tool descriptor — pings the user on whatever channel(s) they've configured for that event.   |
+| Persona  | Use case                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Operator | Connects a Discord workspace via webhook; subscribes "Work generation finished" events so the team channel pings on every success.   |
+| User     | Adds personal Telegram bot; routes "AI credits depleted" alerts to Telegram only (silences email + in-app for that event).           |
+| Operator | Enables Novu as a meta-router; all platform events flow through Novu's workflow engine for advanced batching + DND windows.          |
+| Operator | A channel provider has an outage. Fanout to remaining configured channels continues; failed channel queues for retry.                |
+| Agent    | Posts a status update via `notifyChannel` tool descriptor — pings the user on whatever channel(s) they've configured for that event. |
 
 ---
 
@@ -72,34 +72,37 @@ Plus a generic umbrella for plugin discovery: `PLUGIN_CAPABILITIES.NOTIFICATION_
 
 ```typescript
 interface INotificationChannelPlugin extends IPlugin {
-  /** Channel-shape: 'broadcast' (Discord/Slack channels) | 'direct' (Telegram/WhatsApp DMs) | 'workflow' (Novu) */
-  readonly shape: 'broadcast' | 'direct' | 'workflow';
+	/** Channel-shape: 'broadcast' (Discord/Slack channels) | 'direct' (Telegram/WhatsApp DMs) | 'workflow' (Novu) */
+	readonly shape: 'broadcast' | 'direct' | 'workflow';
 
-  /** Validate the per-tenant connection config (webhook URL, bot token, …). */
-  verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification>;
+	/** Validate the per-tenant connection config (webhook URL, bot token, …). */
+	verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification>;
 
-  /** Deliver one notification payload. MUST be idempotent on payload.messageRef. */
-  send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult>;
+	/** Deliver one notification payload. MUST be idempotent on payload.messageRef. */
+	send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult>;
 
-  /** Optional: surface delivery events (read receipts, click-throughs) if the channel supports them. */
-  listDeliveryEvents?(filter: ChannelEventFilter, options: ChannelOptions): AsyncGenerator<ChannelDeliveryEvent>;
+	/** Optional: surface delivery events (read receipts, click-throughs) if the channel supports them. */
+	listDeliveryEvents?(filter: ChannelEventFilter, options: ChannelOptions): AsyncGenerator<ChannelDeliveryEvent>;
 }
 
 interface ChannelSendInput {
-  /** Plain-text fallback (always set). */
-  text: string;
-  /** Channel-specific rich content (Discord embeds, Slack blocks, Telegram MarkdownV2, …). */
-  rich?: { kind: 'discord-embeds' | 'slack-blocks' | 'telegram-markdown' | 'whatsapp-template' | 'novu-payload'; payload: unknown };
-  /** Idempotency key (required). */
-  messageRef: string;
-  /** Source attribution for spend rollups. */
-  attribution: { userId: string; agentId?: string; taskId?: string; eventType?: string };
+	/** Plain-text fallback (always set). */
+	text: string;
+	/** Channel-specific rich content (Discord embeds, Slack blocks, Telegram MarkdownV2, …). */
+	rich?: {
+		kind: 'discord-embeds' | 'slack-blocks' | 'telegram-markdown' | 'whatsapp-template' | 'novu-payload';
+		payload: unknown;
+	};
+	/** Idempotency key (required). */
+	messageRef: string;
+	/** Source attribution for spend rollups. */
+	attribution: { userId: string; agentId?: string; taskId?: string; eventType?: string };
 }
 
 interface ChannelSendResult {
-  provider: string;
-  providerMessageId: string;
-  deliveredAt?: Date;
+	provider: string;
+	providerMessageId: string;
+	deliveredAt?: Date;
 }
 ```
 
@@ -172,13 +175,13 @@ Same signature-verification + rate-limit treatment as the email webhooks.
 
 ## 6. Providers — initial list
 
-| Plugin             | Shape       | Auth                                | Notes                                                  |
-| ------------------ | ----------- | ----------------------------------- | ------------------------------------------------------ |
-| `discord-channel`  | broadcast   | Webhook URL (preferred) or bot token | Webhook is simpler; bot token enables interactivity   |
-| `slack-channel`    | broadcast   | Incoming Webhook URL or bot token   | Block Kit for rich content                             |
-| `telegram-channel` | direct      | Bot token + chat id                 | One channel per chat; ChatId discovery via /start ping |
-| `whatsapp-channel` | direct      | WhatsApp Business API credentials   | Template-only outbound (24h window rule)               |
-| `novu-channel`     | workflow    | Novu API key + workflow id          | Delegates to Novu's own multi-channel workflows        |
+| Plugin             | Shape     | Auth                                 | Notes                                                  |
+| ------------------ | --------- | ------------------------------------ | ------------------------------------------------------ |
+| `discord-channel`  | broadcast | Webhook URL (preferred) or bot token | Webhook is simpler; bot token enables interactivity    |
+| `slack-channel`    | broadcast | Incoming Webhook URL or bot token    | Block Kit for rich content                             |
+| `telegram-channel` | direct    | Bot token + chat id                  | One channel per chat; ChatId discovery via /start ping |
+| `whatsapp-channel` | direct    | WhatsApp Business API credentials    | Template-only outbound (24h window rule)               |
+| `novu-channel`     | workflow  | Novu API key + workflow id           | Delegates to Novu's own multi-channel workflows        |
 
 The in-app channel is built-in (no plugin package).
 

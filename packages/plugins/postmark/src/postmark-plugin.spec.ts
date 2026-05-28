@@ -19,7 +19,7 @@ describe('PostmarkPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ MessageID: 'pm-123', ErrorCode: 0 }),
+				json: async () => ({ MessageID: 'pm-123', ErrorCode: 0 })
 			} as Response);
 
 			const result = await plugin.sendEmail(
@@ -28,16 +28,16 @@ describe('PostmarkPlugin', () => {
 					to: ['b@example.com'],
 					subject: 'hi',
 					bodyText: 'hi',
-					messageRef: 'ref-1',
+					messageRef: 'ref-1'
 				},
-				{ userId: 'user-1' },
+				{ userId: 'user-1' }
 			);
 
 			expect(result.providerMessageId).toBe('pm-123');
 			expect(result.accepted).toEqual(['b@example.com']);
 			expect(fetchMock).toHaveBeenCalledWith(
 				'https://api.postmarkapp.com/email',
-				expect.objectContaining({ method: 'POST' }),
+				expect.objectContaining({ method: 'POST' })
 			);
 			fetchMock.mockRestore();
 		});
@@ -46,7 +46,7 @@ describe('PostmarkPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 422,
-				json: async () => ({ MessageID: '', ErrorCode: 405, Message: 'Invalid sender' }),
+				json: async () => ({ MessageID: '', ErrorCode: 405, Message: 'Invalid sender' })
 			} as Response);
 
 			await expect(
@@ -56,10 +56,10 @@ describe('PostmarkPlugin', () => {
 						to: ['b@example.com'],
 						subject: 'hi',
 						bodyText: 'hi',
-						messageRef: 'ref-2',
+						messageRef: 'ref-2'
 					},
-					{ userId: 'user-1' },
-				),
+					{ userId: 'user-1' }
+				)
 			).rejects.toThrow(/Postmark send failed/);
 		});
 
@@ -67,7 +67,7 @@ describe('PostmarkPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 200,
-				json: async () => ({ MessageID: 'pm-cache', ErrorCode: 0 }),
+				json: async () => ({ MessageID: 'pm-cache', ErrorCode: 0 })
 			} as Response);
 
 			const input = {
@@ -75,7 +75,7 @@ describe('PostmarkPlugin', () => {
 				to: ['b@example.com'],
 				subject: 'hi',
 				bodyText: 'hi',
-				messageRef: 'ref-cache',
+				messageRef: 'ref-cache'
 			};
 			const r1 = await plugin.sendEmail(input, { userId: 'u' });
 			const r2 = await plugin.sendEmail(input, { userId: 'u' });
@@ -97,13 +97,9 @@ describe('PostmarkPlugin', () => {
 				HtmlBody: '<p>html body</p>',
 				Date: '2026-05-28T10:00:00Z',
 				Headers: [{ Name: 'X-Test', Value: 'yes' }],
-				SpamScore: 0.1,
+				SpamScore: 0.1
 			};
-			const result = await plugin.parseInboundWebhook(
-				Buffer.from(JSON.stringify(payload)),
-				{},
-				{},
-			);
+			const result = await plugin.parseInboundWebhook(Buffer.from(JSON.stringify(payload)), {}, {});
 			expect(result.providerMessageId).toBe('pm-inbound-1');
 			expect(result.from).toBe('sender@example.com');
 			expect(result.to).toEqual(['inbox@acme.com']);
@@ -119,15 +115,13 @@ describe('PostmarkPlugin', () => {
 				plugin.verifyWebhookSignature(
 					Buffer.from(''),
 					{ authorization: 'Basic xxx' },
-					{ settings: { inboundWebhookSecret: 'super-secret' } },
-				),
+					{ settings: { inboundWebhookSecret: 'super-secret' } }
+				)
 			).toThrow(/signature mismatch/);
 		});
 
 		it('accepts when no secret configured', () => {
-			expect(() =>
-				plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} }),
-			).not.toThrow();
+			expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
 		});
 	});
 });

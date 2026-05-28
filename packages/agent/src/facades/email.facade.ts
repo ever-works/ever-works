@@ -1,9 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import {
-    PLUGIN_CAPABILITIES,
-    type FacadeOptions,
-    type IPlugin,
-} from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, type FacadeOptions, type IPlugin } from '@ever-works/plugin';
 import {
     isEmailOutboundPlugin,
     isEmailInboundPlugin,

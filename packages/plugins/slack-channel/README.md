@@ -8,17 +8,17 @@ Slack notification channel for the Ever Works platform.
 
 ## Settings (channel-level `targetConfig`)
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `webhookUrl` | Yes | Slack incoming webhook URL (`https://hooks.slack.com/...`) |
-| `username` | No | Override sender username for this channel |
-| `iconEmoji` | No | Override sender icon emoji for this channel |
+| Key          | Required | Description                                                |
+| ------------ | -------- | ---------------------------------------------------------- |
+| `webhookUrl` | Yes      | Slack incoming webhook URL (`https://hooks.slack.com/...`) |
+| `username`   | No       | Override sender username for this channel                  |
+| `iconEmoji`  | No       | Override sender icon emoji for this channel                |
 
 ## Plugin-level settings (tenant default)
 
-| Key | Description |
-|-----|-------------|
-| `defaultUsername` | Fallback username |
+| Key                | Description                               |
+| ------------------ | ----------------------------------------- |
+| `defaultUsername`  | Fallback username                         |
 | `defaultIconEmoji` | Fallback icon emoji (e.g. `:robot_face:`) |
 
 Slack incoming webhooks return the literal `ok` on success (no message id), so `providerMessageId` is synthesized from the idempotency key.

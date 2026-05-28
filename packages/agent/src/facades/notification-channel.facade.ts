@@ -1,8 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import {
-    PLUGIN_CAPABILITIES,
-    type FacadeOptions,
-} from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, type FacadeOptions } from '@ever-works/plugin';
 import {
     isNotificationChannelPlugin,
     type INotificationChannelPlugin,
@@ -93,10 +90,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         userId: string,
         eventType: string,
         payload: NotificationChannelFanoutInput,
-        resolveChannelIds: (
-            userId: string,
-            eventType: string,
-        ) => Promise<readonly string[]>,
+        resolveChannelIds: (userId: string, eventType: string) => Promise<readonly string[]>,
         options: FacadeOptions,
     ): Promise<readonly NotificationChannelFanoutResult[]> {
         const channelIds = await resolveChannelIds(userId, eventType);

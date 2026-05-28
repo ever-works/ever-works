@@ -20,7 +20,7 @@ describe('NovuChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ data: { name: 'Development', _id: 'env-1' } }),
+				json: async () => ({ data: { name: 'Development', _id: 'env-1' } })
 			} as Response);
 			const res = await plugin.verifyTarget(target, {});
 			expect(res.valid).toBe(true);
@@ -31,7 +31,7 @@ describe('NovuChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 401,
-				json: async () => ({ message: 'API Key not found' }),
+				json: async () => ({ message: 'API Key not found' })
 			} as Response);
 			const res = await plugin.verifyTarget(target, {});
 			expect(res.valid).toBe(false);
@@ -39,9 +39,7 @@ describe('NovuChannelPlugin', () => {
 		});
 
 		it('requires apiKey + workflowId + subscriberId', async () => {
-			expect((await plugin.verifyTarget({ workflowId: 'w', subscriberId: 's' }, {})).valid).toBe(
-				false,
-			);
+			expect((await plugin.verifyTarget({ workflowId: 'w', subscriberId: 's' }, {})).valid).toBe(false);
 			expect((await plugin.verifyTarget({ apiKey: 'k', subscriberId: 's' }, {})).valid).toBe(false);
 			expect((await plugin.verifyTarget({ apiKey: 'k', workflowId: 'w' }, {})).valid).toBe(false);
 		});
@@ -52,11 +50,11 @@ describe('NovuChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 201,
-				json: async () => ({ data: { transactionId: 'txn-1', acknowledged: true } }),
+				json: async () => ({ data: { transactionId: 'txn-1', acknowledged: true } })
 			} as Response);
 			const res = await plugin.send(
 				{ text: 'hello', messageRef: 'ref-1', attribution: { userId: 'u1' }, target },
-				{},
+				{}
 			);
 			expect(res.providerMessageId).toBe('txn-1');
 			const [url, init] = fetchMock.mock.calls[0];
@@ -72,7 +70,7 @@ describe('NovuChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 201,
-				json: async () => ({ data: { transactionId: 'txn-2' } }),
+				json: async () => ({ data: { transactionId: 'txn-2' } })
 			} as Response);
 			await plugin.send(
 				{
@@ -80,9 +78,9 @@ describe('NovuChannelPlugin', () => {
 					rich: { kind: 'novu-payload', payload: { ctaUrl: 'https://x', count: 3 } },
 					messageRef: 'ref-rich',
 					attribution: { userId: 'u1' },
-					target,
+					target
 				},
-				{},
+				{}
 			);
 			const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
 			expect(body.payload).toMatchObject({ text: 'base', ctaUrl: 'https://x', count: 3 });
@@ -93,11 +91,11 @@ describe('NovuChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 201,
-				json: async () => ({ data: { transactionId: 'txn-3' } }),
+				json: async () => ({ data: { transactionId: 'txn-3' } })
 			} as Response);
 			await plugin.send(
 				{ text: 'x', messageRef: 'ref-eu', attribution: { userId: 'u1' }, target },
-				{ settings: { apiBase: 'https://eu.api.novu.co/' } },
+				{ settings: { apiBase: 'https://eu.api.novu.co/' } }
 			);
 			expect(fetchMock.mock.calls[0][0]).toBe('https://eu.api.novu.co/v1/events/trigger');
 			fetchMock.mockRestore();
@@ -107,13 +105,10 @@ describe('NovuChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 400,
-				json: async () => ({ message: 'workflow not found' }),
+				json: async () => ({ message: 'workflow not found' })
 			} as Response);
 			await expect(
-				plugin.send(
-					{ text: 'x', messageRef: 'ref-err', attribution: { userId: 'u1' }, target },
-					{},
-				),
+				plugin.send({ text: 'x', messageRef: 'ref-err', attribution: { userId: 'u1' }, target }, {})
 			).rejects.toThrow(/Novu trigger failed/);
 		});
 
@@ -121,7 +116,7 @@ describe('NovuChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 201,
-				json: async () => ({ data: { transactionId: 'txn-cache' } }),
+				json: async () => ({ data: { transactionId: 'txn-cache' } })
 			} as Response);
 			const input = { text: 'x', messageRef: 'ref-cache', attribution: { userId: 'u1' }, target };
 			await plugin.send(input, {});

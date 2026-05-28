@@ -20,7 +20,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -44,7 +46,10 @@
 			"name": "Postmark",
 			"version": "1.0.0",
 			"category": "email-provider",
-			"capabilities": ["email-outbound", "email-inbound"],
+			"capabilities": [
+				"email-outbound",
+				"email-inbound"
+			],
 			"description": "Send + receive email through Postmark Server API + Inbound Streams.",
 			"settings": {
 				"type": "object",
@@ -70,7 +75,9 @@
 						"title": "Inbound stream id (optional)"
 					}
 				},
-				"required": ["apiKey"]
+				"required": [
+					"apiKey"
+				]
 			}
 		}
 	}

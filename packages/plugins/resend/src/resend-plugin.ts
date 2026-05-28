@@ -5,7 +5,7 @@ import type {
 	EmailOptions,
 	EmailVerification,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -39,9 +39,9 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 		type: 'object',
 		properties: {
 			apiKey: { type: 'string', 'x-secret': true, 'x-envVar': 'RESEND_API_KEY' },
-			defaultSenderDomain: { type: 'string' },
+			defaultSenderDomain: { type: 'string' }
 		},
-		required: ['apiKey'],
+		required: ['apiKey']
 	};
 
 	async onLoad(): Promise<void> {
@@ -69,14 +69,12 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 			text: input.bodyText,
 			html: input.bodyHtml,
 			reply_to: input.replyTo,
-			tags: input.metadata
-				? Object.entries(input.metadata).map(([name, value]) => ({ name, value }))
-				: undefined,
+			tags: input.metadata ? Object.entries(input.metadata).map(([name, value]) => ({ name, value })) : undefined,
 			attachments: input.attachments?.map((a) => ({
 				filename: a.filename,
 				content: a.content,
-				content_type: a.mimeType,
-			})),
+				content_type: a.mimeType
+			}))
 		};
 
 		const response = await fetch(`${RESEND_API_BASE}/emails`, {
@@ -85,22 +83,20 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 				Accept: 'application/json',
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${apiKey}`,
-				'Idempotency-Key': input.messageRef,
+				'Idempotency-Key': input.messageRef
 			},
-			body: JSON.stringify(body),
+			body: JSON.stringify(body)
 		});
 
 		const data = (await response.json()) as ResendSendResponse;
 		if (!response.ok || data.error) {
-			throw new Error(
-				`Resend send failed (${response.status}): ${data.error?.message ?? 'unknown error'}`,
-			);
+			throw new Error(`Resend send failed (${response.status}): ${data.error?.message ?? 'unknown error'}`);
 		}
 		const result: EmailSendResult = {
 			provider: this.id,
 			providerMessageId: data.id ?? `resend-${input.messageRef}`,
 			accepted: [...input.to],
-			rejected: [],
+			rejected: []
 		};
 		this.idempotencyCache.set(input.messageRef, result);
 		if (this.idempotencyCache.size > 500) {
@@ -118,7 +114,7 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 		return {
 			address,
 			verificationToken,
-			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+			expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
 		};
 	}
 }

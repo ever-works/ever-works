@@ -4,11 +4,7 @@ import { AgentInboxPanel } from '@/components/agents/AgentInboxPanel';
 /**
  * EW-650 / EW-680 — Per-Agent inbox tab page.
  */
-export default async function AgentInboxPage({
-    params,
-}: {
-    params: Promise<{ id: string }>;
-}) {
+export default async function AgentInboxPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
     let messages: Awaited<ReturnType<typeof emailAddressesAPI.listMessagesForAgent>> = [];
     try {

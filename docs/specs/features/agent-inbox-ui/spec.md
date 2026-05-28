@@ -16,31 +16,31 @@
 
 > **Scope of this document:** the **web app** surfaces for per-Agent inboxes — list view, message detail, composer with React-Email preview, and the tenant-level Address Management wizard. The backend (entities, plugin contract, send mechanics) lives in [`email-providers`](../email-providers/spec.md); this spec owns only what users see and click.
 >
-> **Hard rule (additive only):** no existing agent-detail tab or settings page is removed. The Inbox tab + the Notification Channels settings page are *added* alongside.
+> **Hard rule (additive only):** no existing agent-detail tab or settings page is removed. The Inbox tab + the Notification Channels settings page are _added_ alongside.
 
 ---
 
 ## 1. Personas + use cases
 
-| Persona  | Use case                                                                                                                                  |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Operator | Opens Agent "Support Triage" → Inbox tab → sees recent inbound emails, can click into a message and read the full thread.                 |
+| Persona  | Use case                                                                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Operator | Opens Agent "Support Triage" → Inbox tab → sees recent inbound emails, can click into a message and read the full thread.                  |
 | Operator | Compose a one-off email from the Agent's outbound address using the rich composer; pick a React-Email template and preview before sending. |
-| Operator | Manage tenant email addresses under Settings → Integrations → Emails — add Postmark address, verify, assign to one or more Agents.        |
-| Operator | Manage tenant notification channels under Settings → Integrations → Channels — add Discord webhook, test, assign for which events.        |
+| Operator | Manage tenant email addresses under Settings → Integrations → Emails — add Postmark address, verify, assign to one or more Agents.         |
+| Operator | Manage tenant notification channels under Settings → Integrations → Channels — add Discord webhook, test, assign for which events.         |
 
 ---
 
 ## 2. Routes + page map
 
-| Route                                                              | Owns                                                                            |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `/settings/integrations/emails`                                    | Tenant email addresses (list + add wizard) — consumed from `email-providers`.   |
-| `/settings/integrations/channels`                                  | Tenant notification channels — consumed from `notification-channels`.           |
-| `/agents/[id]` → new "Inbox" tab                                   | Per-Agent inbox: assigned addresses, inbound + outbound message list.           |
-| `/agents/[id]/inbox/[messageId]`                                   | Per-message detail (full body, thread context if conversation mode).            |
-| `/agents/[id]/inbox/compose`                                       | New-message composer (React-Email preview pane on the right).                   |
-| `/settings/notifications`                                          | Event-subscriptions matrix — consumed from `event-subscriptions`.               |
+| Route                             | Owns                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| `/settings/integrations/emails`   | Tenant email addresses (list + add wizard) — consumed from `email-providers`. |
+| `/settings/integrations/channels` | Tenant notification channels — consumed from `notification-channels`.         |
+| `/agents/[id]` → new "Inbox" tab  | Per-Agent inbox: assigned addresses, inbound + outbound message list.         |
+| `/agents/[id]/inbox/[messageId]`  | Per-message detail (full body, thread context if conversation mode).          |
+| `/agents/[id]/inbox/compose`      | New-message composer (React-Email preview pane on the right).                 |
+| `/settings/notifications`         | Event-subscriptions matrix — consumed from `event-subscriptions`.             |
 
 ---
 
@@ -88,7 +88,7 @@ Mirrors spec §2.1 of [`email-providers`](../email-providers/spec.md):
 ## 4. Data flow
 
 ```
-UI -- SWR hook --> GET /api/email/messages?agentId=X&direction=inbound -- 
+UI -- SWR hook --> GET /api/email/messages?agentId=X&direction=inbound --
    <-- 50 rows + pagination cursor
 
 User clicks "Send"

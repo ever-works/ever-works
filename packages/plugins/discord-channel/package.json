@@ -20,7 +20,9 @@
 			"require": "./dist/index.cjs"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -44,7 +46,10 @@
 			"name": "Discord",
 			"version": "1.0.0",
 			"category": "notification-channel",
-			"capabilities": ["notification-channel", "notification-channel-discord"],
+			"capabilities": [
+				"notification-channel",
+				"notification-channel-discord"
+			],
 			"description": "Post notifications to a Discord channel via webhook (preferred) or bot token.",
 			"settings": {
 				"type": "object",

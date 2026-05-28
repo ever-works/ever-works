@@ -19,7 +19,7 @@ describe('TelegramChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ ok: true, result: { id: 42, username: ' everworks_bot' } }),
+				json: async () => ({ ok: true, result: { id: 42, username: ' everworks_bot' } })
 			} as Response);
 			const res = await plugin.verifyTarget({ botToken: 'tok', chatId: '123' }, {});
 			expect(res.valid).toBe(true);
@@ -30,7 +30,7 @@ describe('TelegramChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 401,
-				json: async () => ({ ok: false, description: 'Unauthorized' }),
+				json: async () => ({ ok: false, description: 'Unauthorized' })
 			} as Response);
 			const res = await plugin.verifyTarget({ botToken: 'bad', chatId: '123' }, {});
 			expect(res.valid).toBe(false);
@@ -48,16 +48,16 @@ describe('TelegramChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 555 } }),
+				json: async () => ({ ok: true, result: { message_id: 555 } })
 			} as Response);
 			const res = await plugin.send(
 				{
 					text: 'deploy done',
 					messageRef: 'ref-1',
 					attribution: { userId: 'u1' },
-					target: { botToken: 'tok', chatId: '123' },
+					target: { botToken: 'tok', chatId: '123' }
 				},
-				{},
+				{}
 			);
 			expect(res.providerMessageId).toBe('555');
 			const [url, init] = fetchMock.mock.calls[0];
@@ -72,7 +72,7 @@ describe('TelegramChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: true,
 				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 1 } }),
+				json: async () => ({ ok: true, result: { message_id: 1 } })
 			} as Response);
 			await plugin.send(
 				{
@@ -80,9 +80,9 @@ describe('TelegramChannelPlugin', () => {
 					rich: { kind: 'telegram-markdown', payload: '*bold*' },
 					messageRef: 'ref-md',
 					attribution: { userId: 'u1' },
-					target: { botToken: 'tok', chatId: '123' },
+					target: { botToken: 'tok', chatId: '123' }
 				},
-				{},
+				{}
 			);
 			const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
 			expect(body.parse_mode).toBe('MarkdownV2');
@@ -94,7 +94,7 @@ describe('TelegramChannelPlugin', () => {
 			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
 				ok: false,
 				status: 400,
-				json: async () => ({ ok: false, error_code: 400, description: 'chat not found' }),
+				json: async () => ({ ok: false, error_code: 400, description: 'chat not found' })
 			} as Response);
 			await expect(
 				plugin.send(
@@ -102,10 +102,10 @@ describe('TelegramChannelPlugin', () => {
 						text: 'x',
 						messageRef: 'ref-err',
 						attribution: { userId: 'u1' },
-						target: { botToken: 'tok', chatId: 'bad' },
+						target: { botToken: 'tok', chatId: 'bad' }
 					},
-					{},
-				),
+					{}
+				)
 			).rejects.toThrow(/Telegram sendMessage failed/);
 		});
 
@@ -113,13 +113,13 @@ describe('TelegramChannelPlugin', () => {
 			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
 				ok: true,
 				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 9 } }),
+				json: async () => ({ ok: true, result: { message_id: 9 } })
 			} as Response);
 			const input = {
 				text: 'x',
 				messageRef: 'ref-cache',
 				attribution: { userId: 'u1' },
-				target: { botToken: 'tok', chatId: '123' },
+				target: { botToken: 'tok', chatId: '123' }
 			};
 			await plugin.send(input, {});
 			await plugin.send(input, {});

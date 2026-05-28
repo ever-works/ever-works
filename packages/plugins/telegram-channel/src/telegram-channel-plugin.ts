@@ -7,7 +7,7 @@ import type {
 	ChannelVerification,
 	ChannelShape,
 	PluginCategory,
-	JsonSchema,
+	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -58,14 +58,14 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
-		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_TELEGRAM,
+		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_TELEGRAM
 	] as const;
 	readonly shape: ChannelShape = 'direct';
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			disableNotification: { type: 'boolean' },
-		},
+			disableNotification: { type: 'boolean' }
+		}
 	};
 
 	async onLoad(): Promise<void> {
@@ -78,10 +78,7 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 
 	private readonly idempotencyCache = new Map<string, ChannelSendResult>();
 
-	async verifyTarget(
-		config: ChannelTargetConfig,
-		_options: ChannelOptions,
-	): Promise<ChannelVerification> {
+	async verifyTarget(config: ChannelTargetConfig, _options: ChannelOptions): Promise<ChannelVerification> {
 		const botToken = config.botToken;
 		const chatId = config.chatId;
 		if (typeof botToken !== 'string' || botToken.length === 0) {
@@ -92,18 +89,18 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 		}
 		try {
 			const response = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/getMe`, {
-				method: 'GET',
+				method: 'GET'
 			});
 			const data = (await response.json()) as TelegramGetMeResponse;
 			if (!response.ok || !data.ok) {
 				return {
 					valid: false,
-					message: `Telegram getMe failed: ${data.description ?? response.status}`,
+					message: `Telegram getMe failed: ${data.description ?? response.status}`
 				};
 			}
 			return {
 				valid: true,
-				details: { botId: data.result?.id, username: data.result?.username },
+				details: { botId: data.result?.id, username: data.result?.username }
 			};
 		} catch (err) {
 			return { valid: false, message: err instanceof Error ? err.message : String(err) };
@@ -122,7 +119,7 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 
 		const body: Record<string, unknown> = {
 			chat_id: chatId,
-			text: payload.rich?.kind === 'telegram-markdown' ? payload.rich.payload : payload.text,
+			text: payload.rich?.kind === 'telegram-markdown' ? payload.rich.payload : payload.text
 		};
 		if (payload.rich?.kind === 'telegram-markdown') {
 			body.parse_mode = 'MarkdownV2';
@@ -134,19 +131,19 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 		const response = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body),
+			body: JSON.stringify(body)
 		});
 		const data = (await response.json()) as TelegramSendResponse;
 		if (!response.ok || !data.ok) {
 			throw new Error(
-				`Telegram sendMessage failed (${response.status} / ${data.error_code ?? '?'}): ${data.description ?? 'unknown error'}`,
+				`Telegram sendMessage failed (${response.status} / ${data.error_code ?? '?'}): ${data.description ?? 'unknown error'}`
 			);
 		}
 
 		const result: ChannelSendResult = {
 			provider: this.id,
 			providerMessageId: String(data.result?.message_id ?? `telegram-${payload.messageRef}`),
-			deliveredAt: new Date(),
+			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);
 		if (this.idempotencyCache.size > 500) {

@@ -156,10 +156,7 @@ export interface INotificationChannelPlugin extends IPlugin {
 	 * reachable, bot token has post permissions, novu workflow
 	 * exists). Called by the "Test" button + the add-wizard step 3.
 	 */
-	verifyTarget(
-		config: ChannelTargetConfig,
-		options: ChannelOptions,
-	): Promise<ChannelVerification>;
+	verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification>;
 
 	/**
 	 * Deliver one notification payload. MUST be idempotent on
@@ -171,10 +168,7 @@ export interface INotificationChannelPlugin extends IPlugin {
 	 * Optional: surface delivery events. Plugins that can't observe
 	 * them (e.g. plain Discord webhook) MAY omit this.
 	 */
-	listDeliveryEvents?(
-		filter: ChannelEventFilter,
-		options: ChannelOptions,
-	): AsyncGenerator<ChannelDeliveryEvent>;
+	listDeliveryEvents?(filter: ChannelEventFilter, options: ChannelOptions): AsyncGenerator<ChannelDeliveryEvent>;
 
 	/**
 	 * Optional per-send pricing for spend roll-ups. Most chat
@@ -188,8 +182,6 @@ export interface INotificationChannelPlugin extends IPlugin {
  * Type guard — narrow an `IPlugin` to `INotificationChannelPlugin`
  * via the umbrella capability declaration.
  */
-export function isNotificationChannelPlugin(
-	plugin: IPlugin,
-): plugin is INotificationChannelPlugin {
+export function isNotificationChannelPlugin(plugin: IPlugin): plugin is INotificationChannelPlugin {
 	return plugin.capabilities.includes('notification-channel');
 }

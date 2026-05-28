@@ -41,7 +41,9 @@ describe('DefaultInboundEmailDispatcher', () => {
             save: jest.fn().mockResolvedValue({ id: 'conv-1' }),
             touchLastMessageAt: jest.fn().mockResolvedValue(undefined),
         };
-        taskSpawner = { spawnTaskForInboundEmail: jest.fn().mockResolvedValue({ taskId: 'task-1' }) };
+        taskSpawner = {
+            spawnTaskForInboundEmail: jest.fn().mockResolvedValue({ taskId: 'task-1' }),
+        };
 
         const providers: any[] = [
             DefaultInboundEmailDispatcher,
@@ -121,7 +123,10 @@ describe('DefaultInboundEmailDispatcher', () => {
             emailMessageId: 'msg-1',
         });
         expect(conversations.save).toHaveBeenCalledTimes(1);
-        expect(conversations.touchLastMessageAt).toHaveBeenCalledWith('conv-1', basePayload.receivedAt);
+        expect(conversations.touchLastMessageAt).toHaveBeenCalledWith(
+            'conv-1',
+            basePayload.receivedAt,
+        );
         expect(taskSpawner?.spawnTaskForInboundEmail).not.toHaveBeenCalled();
     });
 

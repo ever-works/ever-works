@@ -8,16 +8,16 @@ Novu notification channel (workflow meta-router) for the Ever Works platform.
 
 ## Settings (channel-level `targetConfig`)
 
-| Key | Required | Description |
-|-----|----------|-------------|
-| `apiKey` | Yes | Novu API key (environment-scoped) |
-| `workflowId` | Yes | Novu workflow trigger identifier (the `name` field) |
-| `subscriberId` | Yes | Novu subscriber to deliver to |
+| Key            | Required | Description                                         |
+| -------------- | -------- | --------------------------------------------------- |
+| `apiKey`       | Yes      | Novu API key (environment-scoped)                   |
+| `workflowId`   | Yes      | Novu workflow trigger identifier (the `name` field) |
+| `subscriberId` | Yes      | Novu subscriber to deliver to                       |
 
 ## Plugin-level settings (tenant default)
 
-| Key | Description |
-|-----|-------------|
+| Key       | Description                                                                                                        |
+| --------- | ------------------------------------------------------------------------------------------------------------------ |
 | `apiBase` | Novu API base — defaults to `https://api.novu.co`; set for self-hosted or the EU region (`https://eu.api.novu.co`) |
 
 The `text` plus any `novu-payload` rich content is merged into the trigger
