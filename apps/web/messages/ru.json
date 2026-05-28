@@ -1554,7 +1554,7 @@
                 "overview": "Обзор",
                 "activity": "Активность",
                 "items": "Элементы",
-                "generator": "Генератор",
+                "generator": "Worker",
                 "schedule": "Расписание",
                 "history": "История",
                 "comparisons": "Сравнения",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Генерация не начата",
                     "description": "Начните генерацию элементов для заполнения работы содержимым.",
-                    "action": "Начать генерацию"
+                    "action": "Начать Work"
                 },
                 "generating": {
                     "title": "Генерация выполняется",
@@ -1769,12 +1769,12 @@
                     "title": "Генерация не удалась",
                     "description": "Во время генерации произошла ошибка.",
                     "withWarnings": "Генерация завершилась ошибками:",
-                    "retry": "Повторить генерацию"
+                    "retry": "Повторить Work"
                 },
                 "cancelled": {
                     "title": "Генерация отменена",
                     "description": "Предыдущая генерация была остановлена до завершения.",
-                    "restart": "Перезапустить генерацию"
+                    "restart": "Перезапустить Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Детали конфигурации",
-                "initialPrompt": "Начальный промпт генерации",
+                "initialPrompt": "Начальный промпт Worker",
                 "companyDetails": "Информация о компании",
                 "companyName": "Название компании",
                 "companyWebsite": "Сайт",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Генерировать",
+                    "generate": "Work",
                     "schedule": "Расписание",
                     "history": "История",
                     "comparisons": "Сравнения",
-                    "navigationLabel": "Вкладки генератора"
+                    "navigationLabel": "Вкладки Worker"
                 },
                 "regenerationWarning": "Предупреждение о регенерации",
                 "regenerationWarningDescription": "Эта работа уже сгенерирована. Запуск новой генерации заменит существующие элементы.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Не удалось загрузить конфигурацию формы",
                 "selectOption": "Выберите вариант",
                 "workName": "Имя работы",
-                "generationPrompt": "Промпт генерации",
+                "generationPrompt": "Промпт Worker",
                 "modelOverride": "Переопределение модели ИИ",
                 "modelOverridePlaceholder": "например, openai/gpt-4.1 или openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Необязательно. По умолчанию используется импортированная или предыдущая модель, если вы не переопределите её здесь.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Будьте конкретны относительно типа контента, который хотите сгенерировать",
                 "repositoryDescription": "Описание репозитория",
                 "repositoryPlaceholder": "Краткое описание репозитория (необязательно)",
-                "startGeneration": "Запустить генерацию",
+                "startGeneration": "Запустить Work",
                 "regenerateItems": "Регенерировать элементы",
                 "updateItems": "Запустить генерацию",
                 "recreateWork": "Пересоздать директорию",
@@ -4702,7 +4702,7 @@
             "work": "Работа",
             "overview": "Обзор",
             "items": "Элементы",
-            "generator": "Генератор",
+            "generator": "Worker",
             "settings": "Настройки",
             "deploy": "Развернуть",
             "members": "Участники",

@@ -1554,7 +1554,7 @@
                 "overview": "概要",
                 "activity": "アクティビティ",
                 "items": "アイテム",
-                "generator": "ジェネレーター",
+                "generator": "Worker",
                 "schedule": "スケジュール",
                 "history": "履歴",
                 "comparisons": "比較",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "生成未開始",
                     "description": "ワークにコンテンツを格納するためにアイテムの生成を開始してください。",
-                    "action": "生成を開始"
+                    "action": "Work を開始"
                 },
                 "generating": {
                     "title": "生成中",
@@ -1769,12 +1769,12 @@
                     "title": "生成エラー",
                     "description": "生成中にエラーが発生しました。",
                     "withWarnings": "エラーで生成に失敗:",
-                    "retry": "生成を再試行"
+                    "retry": "Work を再試行"
                 },
                 "cancelled": {
                     "title": "生成キャンセル",
                     "description": "前の生成が完了前に停止されました。",
-                    "restart": "生成を再開"
+                    "restart": "Work を再開"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "設定詳細",
-                "initialPrompt": "初期生成プロンプト",
+                "initialPrompt": "初期 Worker プロンプト",
                 "companyDetails": "会社情報",
                 "companyName": "会社名",
                 "companyWebsite": "ウェブサイト",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "生成",
+                    "generate": "Work",
                     "schedule": "スケジュール",
                     "history": "履歴",
                     "comparisons": "比較",
-                    "navigationLabel": "ジェネレーター タブ"
+                    "navigationLabel": "Worker タブ"
                 },
                 "regenerationWarning": "再生成の警告",
                 "regenerationWarningDescription": "このワークはすでに生成されています。新規生成を開始すると、既存のアイテムが置き換えられます。",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "フォーム構成の読み込みに失敗しました",
                 "selectOption": "オプションを選択",
                 "workName": "ワーク名",
-                "generationPrompt": "生成プロンプト",
+                "generationPrompt": "Worker プロンプト",
                 "modelOverride": "AI モデル上書き",
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
                 "repositoryDescription": "リポジトリの説明",
                 "repositoryPlaceholder": "リポジトリの簡単な説明（オプション）",
-                "startGeneration": "生成を開始",
+                "startGeneration": "Work を開始",
                 "regenerateItems": "アイテムを再生成",
                 "updateItems": "生成を実行",
                 "recreateWork": "ワークを再作成",
@@ -4702,7 +4702,7 @@
             "work": "ワーク",
             "overview": "概要",
             "items": "アイテム",
-            "generator": "ジェネレーター",
+            "generator": "Worker",
             "settings": "設定",
             "deploy": "デプロイ",
             "members": "メンバー",

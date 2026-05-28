@@ -1554,7 +1554,7 @@
                 "overview": "Aperçu",
                 "activity": "Activité",
                 "items": "Éléments",
-                "generator": "Générateur",
+                "generator": "Worker",
                 "schedule": "Programmation",
                 "history": "Historique",
                 "comparisons": "Comparaisons",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Génération non démarrée",
                     "description": "Commencez à générer des éléments pour votre travail afin de le peupler de contenu.",
-                    "action": "Démarrer la génération"
+                    "action": "Démarrer le Work"
                 },
                 "generating": {
                     "title": "Génération en cours",
@@ -1769,12 +1769,12 @@
                     "title": "Échec de la génération",
                     "description": "Une erreur s'est produite pendant la génération.",
                     "withWarnings": "Échec de la génération avec erreurs :",
-                    "retry": "Relancer la génération"
+                    "retry": "Relancer le Work"
                 },
                 "cancelled": {
                     "title": "Génération annulée",
                     "description": "La génération précédente a été arrêtée avant achèvement.",
-                    "restart": "Redémarrer la génération"
+                    "restart": "Redémarrer le Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Détails de configuration",
-                "initialPrompt": "Invite initiale de génération",
+                "initialPrompt": "Invite initiale du Worker",
                 "companyDetails": "Informations sur l'entreprise",
                 "companyName": "Nom de l'entreprise",
                 "companyWebsite": "Site web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Générer",
+                    "generate": "Work",
                     "schedule": "Planification",
                     "history": "Historique",
                     "comparisons": "Comparaisons",
-                    "navigationLabel": "Onglets du générateur"
+                    "navigationLabel": "Onglets Worker"
                 },
                 "regenerationWarning": "Avertissement de régénération",
                 "regenerationWarningDescription": "Ce travail a déjà été généré. Lancer une nouvelle génération remplacera les éléments existants.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Échec du chargement de la configuration du formulaire",
                 "selectOption": "Sélectionner une option",
                 "workName": "Nom du travail",
-                "generationPrompt": "Prompt de génération",
+                "generationPrompt": "Prompt du Worker",
                 "modelOverride": "Remplacement du modèle IA",
                 "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optionnel. Utilise par défaut le modèle importé ou précédent, sauf si vous le remplacez ici.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Soyez précis sur le type de contenu que vous souhaitez générer",
                 "repositoryDescription": "Description du dépôt",
                 "repositoryPlaceholder": "Brève description du dépôt (optionnel)",
-                "startGeneration": "Démarrer la génération",
+                "startGeneration": "Démarrer le Work",
                 "regenerateItems": "Régénérer les éléments",
                 "updateItems": "Exécuter la génération",
                 "recreateWork": "Recréer le travail",
@@ -4638,7 +4638,7 @@
             "work": "Travail",
             "overview": "Aperçu",
             "items": "Éléments",
-            "generator": "Générateur",
+            "generator": "Worker",
             "settings": "Paramètres",
             "deploy": "Déployer",
             "members": "Membres",

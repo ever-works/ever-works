@@ -1554,7 +1554,7 @@
                 "overview": "概览",
                 "activity": "活动",
                 "items": "项目",
-                "generator": "生成器",
+                "generator": "Worker",
                 "schedule": "计划",
                 "history": "历史记录",
                 "comparisons": "比较",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "生成未开始",
                     "description": "启动生成项目以用内容填充您的作品。",
-                    "action": "开始生成"
+                    "action": "开始 Work"
                 },
                 "generating": {
                     "title": "生成中",
@@ -1769,12 +1769,12 @@
                     "title": "生成失败",
                     "description": "生成过程中发生错误。",
                     "withWarnings": "生成失败，错误如下：",
-                    "retry": "重试生成"
+                    "retry": "重试 Work"
                 },
                 "cancelled": {
                     "title": "生成已取消",
                     "description": "先前的生成在完成前被停止。",
-                    "restart": "重新启动生成"
+                    "restart": "重新启动 Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "配置详情",
-                "initialPrompt": "初始生成提示",
+                "initialPrompt": "初始 Worker 提示",
                 "companyDetails": "公司信息",
                 "companyName": "公司名称",
                 "companyWebsite": "网站",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "生成",
+                    "generate": "Work",
                     "schedule": "计划",
                     "history": "历史",
                     "comparisons": "比较",
-                    "navigationLabel": "生成器选项卡"
+                    "navigationLabel": "Worker 选项卡"
                 },
                 "regenerationWarning": "重新生成警告",
                 "regenerationWarningDescription": "此作品已生成。启动新生成将替换现有项目。",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "加载表单配置失败",
                 "selectOption": "选择选项",
                 "workName": "作品名称",
-                "generationPrompt": "生成提示",
+                "generationPrompt": "Worker 提示",
                 "modelOverride": "AI 模型覆盖",
                 "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "具体说明您想要生成的内容类型",
                 "repositoryDescription": "仓库描述",
                 "repositoryPlaceholder": "仓库的简要描述（可选）",
-                "startGeneration": "开始生成",
+                "startGeneration": "开始 Work",
                 "regenerateItems": "重新生成项目",
                 "updateItems": "运行生成",
                 "recreateWork": "重新创建作品",
@@ -4702,7 +4702,7 @@
             "work": "作品",
             "overview": "概览",
             "items": "项目",
-            "generator": "生成器",
+            "generator": "Worker",
             "settings": "设置",
             "deploy": "部署",
             "members": "成员",

@@ -1554,7 +1554,7 @@
                 "overview": "نظرة عامة",
                 "activity": "النشاط",
                 "items": "العناصر",
-                "generator": "مولد",
+                "generator": "Worker",
                 "schedule": "جدولة",
                 "history": "سجل",
                 "comparisons": "مقارنات",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "لم يبدأ التوليد",
                     "description": "ابدأ في توليد العناصر لعملك لملئه بالمحتوى.",
-                    "action": "بدء التوليد"
+                    "action": "بدء الـWork"
                 },
                 "generating": {
                     "title": "التوليد قيد التقدم",
@@ -1769,12 +1769,12 @@
                     "title": "فشل التوليد",
                     "description": "حدث خطأ أثناء التوليد.",
                     "withWarnings": "فشل التوليد مع أخطاء:",
-                    "retry": "إعادة محاولة التوليد"
+                    "retry": "إعادة محاولة الـWork"
                 },
                 "cancelled": {
                     "title": "تم إلغاء التوليد",
                     "description": "تم إيقاف التوليد السابق قبل الاكتمال.",
-                    "restart": "إعادة تشغيل التوليد"
+                    "restart": "إعادة تشغيل الـWork"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "تفاصيل التهيئة",
-                "initialPrompt": "موجه التوليد الأولي",
+                "initialPrompt": "موجه الـWorker الأولي",
                 "companyDetails": "معلومات الشركة",
                 "companyName": "اسم الشركة",
                 "companyWebsite": "الموقع الإلكتروني",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "توليد",
+                    "generate": "Work",
                     "schedule": "جدولة",
                     "history": "التاريخ",
                     "comparisons": "المقارنات",
-                    "navigationLabel": "تبويبات المولد"
+                    "navigationLabel": "تبويبات Worker"
                 },
                 "regenerationWarning": "تحذير إعادة التوليد",
                 "regenerationWarningDescription": "تم توليد هذا المجلد بالفعل. بدء توليد جديد سيستبدل العناصر الموجودة.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "فشل في تحميل تكوين النموذج",
                 "selectOption": "اختر خيارًا",
                 "workName": "اسم المجلد",
-                "generationPrompt": "موجه التوليد",
+                "generationPrompt": "موجه الـWorker",
                 "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
                 "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "كن محددًا بشأن نوع المحتوى الذي تريد توليده",
                 "repositoryDescription": "وصف المستودع",
                 "repositoryPlaceholder": "وصف موجز للمستودع (اختياري)",
-                "startGeneration": "بدء التوليد",
+                "startGeneration": "بدء الـWork",
                 "regenerateItems": "إعادة توليد العناصر",
                 "updateItems": "تشغيل التوليد",
                 "recreateWork": "إعادة إنشاء المجلد",
@@ -4638,7 +4638,7 @@
             "work": "العمل",
             "overview": "نظرة عامة",
             "items": "العناصر",
-            "generator": "المولد",
+            "generator": "Worker",
             "settings": "الإعدادات",
             "deploy": "النشر",
             "members": "الأعضاء",

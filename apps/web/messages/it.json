@@ -1554,7 +1554,7 @@
                 "overview": "Panoramica",
                 "activity": "Attività",
                 "items": "Elementi",
-                "generator": "Generatore",
+                "generator": "Worker",
                 "schedule": "Programmazione",
                 "history": "Cronologia",
                 "comparisons": "Confronti",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generazione non avviata",
                     "description": "Avvia la generazione degli elementi per popolare la lavori con contenuti.",
-                    "action": "Avvia generazione"
+                    "action": "Avvia Work"
                 },
                 "generating": {
                     "title": "Generazione in corso",
@@ -1769,12 +1769,12 @@
                     "title": "Generazione fallita",
                     "description": "Si è verificato un errore durante la generazione.",
                     "withWarnings": "Generazione fallita con errori:",
-                    "retry": "Riprova generazione"
+                    "retry": "Riprova Work"
                 },
                 "cancelled": {
                     "title": "Generazione annullata",
                     "description": "La generazione precedente è stata fermata prima del completamento.",
-                    "restart": "Riavvia generazione"
+                    "restart": "Riavvia Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Dettagli configurazione",
-                "initialPrompt": "Prompt iniziale generazione",
+                "initialPrompt": "Prompt iniziale del Worker",
                 "companyDetails": "Informazioni azienda",
                 "companyName": "Nome azienda",
                 "companyWebsite": "Sito web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Genera",
+                    "generate": "Work",
                     "schedule": "Programma",
                     "history": "Cronologia",
                     "comparisons": "Confronti",
-                    "navigationLabel": "Schede Generatore"
+                    "navigationLabel": "Schede Worker"
                 },
                 "regenerationWarning": "Avviso di Rigenerazione",
                 "regenerationWarningDescription": "Questa lavori è già stata generata. Avviare una nuova generazione sostituirà gli elementi esistenti.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Impossibile caricare la configurazione del modulo",
                 "selectOption": "Seleziona un'opzione",
                 "workName": "Nome Lavori",
-                "generationPrompt": "Prompt di Generazione",
+                "generationPrompt": "Prompt del Worker",
                 "modelOverride": "Sovrascrittura modello AI",
                 "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Sii specifico sul tipo di contenuto che vuoi generare",
                 "repositoryDescription": "Descrizione Repository",
                 "repositoryPlaceholder": "Breve descrizione del repository (opzionale)",
-                "startGeneration": "Avvia Generazione",
+                "startGeneration": "Avvia Work",
                 "regenerateItems": "Rigenera Elementi",
                 "updateItems": "Esegui Generazione",
                 "recreateWork": "Ricarica Lavori",
@@ -4702,7 +4702,7 @@
             "work": "Lavori",
             "overview": "Panoramica",
             "items": "Elementi",
-            "generator": "Generatore",
+            "generator": "Worker",
             "settings": "Impostazioni",
             "deploy": "Distribuisci",
             "members": "Membri",

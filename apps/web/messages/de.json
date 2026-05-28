@@ -1554,7 +1554,7 @@
                 "overview": "Übersicht",
                 "activity": "Aktivität",
                 "items": "Elemente",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Zeitplan",
                 "history": "Verlauf",
                 "comparisons": "Vergleiche",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generierung nicht gestartet",
                     "description": "Starten Sie die Generierung von Elementen für Ihr Werk, um es mit Inhalten zu füllen.",
-                    "action": "Generierung starten"
+                    "action": "Work starten"
                 },
                 "generating": {
                     "title": "Generierung läuft",
@@ -1769,12 +1769,12 @@
                     "title": "Generierung fehlgeschlagen",
                     "description": "Während der Generierung ist ein Fehler aufgetreten.",
                     "withWarnings": "Generierung mit Fehlern fehlgeschlagen:",
-                    "retry": "Generierung wiederholen"
+                    "retry": "Work wiederholen"
                 },
                 "cancelled": {
                     "title": "Generierung abgebrochen",
                     "description": "Die vorherige Generierung wurde vor Abschluss gestoppt.",
-                    "restart": "Generierung neu starten"
+                    "restart": "Work neu starten"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Konfigurationsdetails",
-                "initialPrompt": "Anfänglicher Generierungsprompt",
+                "initialPrompt": "Anfänglicher Worker-Prompt",
                 "companyDetails": "Firmeninformationen",
                 "companyName": "Firmenname",
                 "companyWebsite": "Website",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Generieren",
+                    "generate": "Work",
                     "schedule": "Zeitplan",
                     "history": "Verlauf",
                     "comparisons": "Vergleiche",
-                    "navigationLabel": "Generator-Registerkarten"
+                    "navigationLabel": "Worker-Registerkarten"
                 },
                 "regenerationWarning": "Regenerierungswarnung",
                 "regenerationWarningDescription": "Dieses Werk wurde bereits generiert. Das Starten einer neuen Generierung ersetzt bestehende Elemente.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Fehler beim Laden der Formular-Konfiguration",
                 "selectOption": "Option auswählen",
                 "workName": "Ordnername",
-                "generationPrompt": "Generierungs-Prompt",
+                "generationPrompt": "Worker-Prompt",
                 "modelOverride": "KI-Modell überschreiben",
                 "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optional. Verwendet standardmäßig das importierte oder vorherige Modell, es sei denn, Sie überschreiben es hier.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Seien Sie spezifisch bezüglich des Typs von Inhalt, den Sie generieren möchten",
                 "repositoryDescription": "Repository-Beschreibung",
                 "repositoryPlaceholder": "Kurze Beschreibung des Repositories (optional)",
-                "startGeneration": "Generierung starten",
+                "startGeneration": "Work starten",
                 "regenerateItems": "Elemente neu generieren",
                 "updateItems": "Generierung ausführen",
                 "recreateWork": "Ordner neu erstellen",
@@ -4638,7 +4638,7 @@
             "work": "Werk",
             "overview": "Übersicht",
             "items": "Einträge",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Einstellungen",
             "deploy": "Bereitstellen",
             "members": "Mitglieder",

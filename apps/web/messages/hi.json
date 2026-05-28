@@ -1554,7 +1554,7 @@
                 "overview": "अवलोकन",
                 "activity": "गतिविधि",
                 "items": "आइटम",
-                "generator": "जनरेटर",
+                "generator": "Worker",
                 "schedule": "अनुसूची",
                 "history": "इतिहास",
                 "comparisons": "तुलनाएँ",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "उत्पत्ति आरंभ नहीं हुई",
                     "description": "अपनी कार्य को सामग्री से भरने के लिए आइटम उत्पन्न करना आरंभ करें।",
-                    "action": "उत्पत्ति आरंभ करें"
+                    "action": "Work आरंभ करें"
                 },
                 "generating": {
                     "title": "उत्पत्ति प्रगति पर",
@@ -1769,12 +1769,12 @@
                     "title": "उत्पत्ति विफल",
                     "description": "उत्पत्ति के दौरान त्रुटि हुई।",
                     "withWarnings": "त्रुटियों के साथ उत्पत्ति विफल:",
-                    "retry": "उत्पत्ति पुनः प्रयास करें"
+                    "retry": "Work पुनः प्रयास करें"
                 },
                 "cancelled": {
                     "title": "उत्पत्ति रद्द",
                     "description": "पिछली उत्पत्ति पूर्ण होने से पहले रोक दी गई थी।",
-                    "restart": "उत्पत्ति पुनः आरंभ करें"
+                    "restart": "Work पुनः आरंभ करें"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "कॉन्फ़िगरेशन विवरण",
-                "initialPrompt": "आरंभिक उत्पत्ति प्रॉम्प्ट",
+                "initialPrompt": "आरंभिक Worker प्रॉम्प्ट",
                 "companyDetails": "कंपनी जानकारी",
                 "companyName": "कंपनी नाम",
                 "companyWebsite": "वेबसाइट",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "उत्पन्न करें",
+                    "generate": "Work",
                     "schedule": "शेड्यूल",
                     "history": "इतिहास",
                     "comparisons": "तुलनाएँ",
-                    "navigationLabel": "जनरेटर टैब"
+                    "navigationLabel": "Worker टैब"
                 },
                 "regenerationWarning": "पुनःउत्पादन चेतावनी",
                 "regenerationWarningDescription": "इस कार्य को पहले ही उत्पन्न किया जा चुका है। नया उत्पादन शुरू करने से मौजूदा आइटम प्रतिस्थापित हो जाएँगे।",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "फ़ॉर्म कॉन्फ़िगरेशन लोड करने में विफल",
                 "selectOption": "एक विकल्प चुनें",
                 "workName": "कार्य का नाम",
-                "generationPrompt": "उत्पादन प्रॉम्प्ट",
+                "generationPrompt": "Worker प्रॉम्प्ट",
                 "modelOverride": "एआई मॉडल ओवरराइड",
                 "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "वैकल्पिक। डिफ़ॉल्ट रूप से आयातित या पिछला मॉडल उपयोग किया जाता है जब तक कि आप इसे यहाँ ओवरराइड न करें।",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "उत्पन्न करने वाले कंटेंट के प्रकार के बारे में विशिष्ट रहें",
                 "repositoryDescription": "रीपॉजिटरी विवरण",
                 "repositoryPlaceholder": "रीपॉजिटरी का संक्षिप्त विवरण (वैकल्पिक)",
-                "startGeneration": "उत्पादन शुरू करें",
+                "startGeneration": "Work शुरू करें",
                 "regenerateItems": "आइटम पुनःउत्पन्न करें",
                 "updateItems": "उत्पादन चलाएँ",
                 "recreateWork": "कार्य पुनःबनाएँ",
@@ -4702,7 +4702,7 @@
             "work": "कार्य",
             "overview": "अवलोकन",
             "items": "आइटम्स",
-            "generator": "जनरेटर",
+            "generator": "Worker",
             "settings": "सेटिंग्स",
             "deploy": "डिप्लॉय करें",
             "members": "सदस्य",

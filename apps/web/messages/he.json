@@ -1554,7 +1554,7 @@
                 "overview": "סקירה כללית",
                 "activity": "פעילות",
                 "items": "פריטים",
-                "generator": "מחולל",
+                "generator": "Worker",
                 "schedule": "לוח זמנים",
                 "history": "היסטוריה",
                 "comparisons": "השוואות",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "יצירה לא התחילה",
                     "description": "התחל לייצר פריטים לעבודה שלך כדי לאכלס אותה בתוכן.",
-                    "action": "התחל יצירה"
+                    "action": "התחל Work"
                 },
                 "generating": {
                     "title": "יצירה בתהליך",
@@ -1769,12 +1769,12 @@
                     "title": "יצירה נכשלה",
                     "description": "אירעה שגיאה במהלך היצירה.",
                     "withWarnings": "יצירה נכשלה עם שגיאות:",
-                    "retry": "נסה יצירה שוב"
+                    "retry": "נסה Work שוב"
                 },
                 "cancelled": {
                     "title": "יצירה בוטלה",
                     "description": "היצירה הקודמת הופסקה לפני השלמה.",
-                    "restart": "התחל יצירה מחדש"
+                    "restart": "התחל Work מחדש"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "פרטי הגדרה",
-                "initialPrompt": "טקסט פתיחה ליצירה",
+                "initialPrompt": "טקסט פתיחה ל-Worker",
                 "companyDetails": "מידע על החברה",
                 "companyName": "שם חברה",
                 "companyWebsite": "אתר",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "יצירה",
+                    "generate": "Work",
                     "schedule": "לוח זמנים",
                     "history": "היסטוריה",
                     "comparisons": "השוואות",
-                    "navigationLabel": "לשוניות יצירה"
+                    "navigationLabel": "לשוניות Worker"
                 },
                 "regenerationWarning": "אזהרת יצירה מחדש",
                 "regenerationWarningDescription": "תיקייה זו כבר נוצרה. התחלת יצירה חדשה תחליף את הפריטים הקיימים.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "נכשל בטעינת הגדרת הטופס",
                 "selectOption": "בחר אפשרות",
                 "workName": "שם תיקייה",
-                "generationPrompt": "הנחיית יצירה",
+                "generationPrompt": "הנחיית Worker",
                 "modelOverride": "עקיפת מודל AI",
                 "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "אופציונלי. משתמש במודל המיובא או הקודם כברירת מחדל אלא אם תעקוף אותו כאן.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "היה ספציפי לגבי סוג התוכן שברצונך לייצר",
                 "repositoryDescription": "תיאור מאגר",
                 "repositoryPlaceholder": "תיאור קצר של המאגר (אופציונלי)",
-                "startGeneration": "התחל יצירה",
+                "startGeneration": "התחל Work",
                 "regenerateItems": "צור מחדש פריטים",
                 "updateItems": "הרץ יצירה",
                 "recreateWork": "צור מחדש תיקייה",
@@ -4638,7 +4638,7 @@
             "work": "עבודה",
             "overview": "סקירה כללית",
             "items": "פריטים",
-            "generator": "מחולל",
+            "generator": "Worker",
             "settings": "הגדרות",
             "deploy": "פרס",
             "members": "חברים",

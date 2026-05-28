@@ -1554,7 +1554,7 @@
                 "overview": "Resumen",
                 "activity": "Actividad",
                 "items": "Elementos",
-                "generator": "Generador",
+                "generator": "Worker",
                 "schedule": "Programación",
                 "history": "Historial",
                 "comparisons": "Comparaciones",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generación no iniciada",
                     "description": "Inicia la generación de elementos para tu trabajo para poblarlo con contenido.",
-                    "action": "Iniciar generación"
+                    "action": "Iniciar Work"
                 },
                 "generating": {
                     "title": "Generación en progreso",
@@ -1769,12 +1769,12 @@
                     "title": "Generación fallida",
                     "description": "Ocurrió un error durante la generación.",
                     "withWarnings": "Generación fallida con errores:",
-                    "retry": "Reintentar generación"
+                    "retry": "Reintentar Work"
                 },
                 "cancelled": {
                     "title": "Generación cancelada",
                     "description": "La generación anterior se detuvo antes de completarse.",
-                    "restart": "Reiniciar generación"
+                    "restart": "Reiniciar Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Detalles de configuración",
-                "initialPrompt": "Prompt inicial de generación",
+                "initialPrompt": "Prompt inicial de Worker",
                 "companyDetails": "Información de la empresa",
                 "companyName": "Nombre de la empresa",
                 "companyWebsite": "Sitio web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Generar",
+                    "generate": "Work",
                     "schedule": "Programar",
                     "history": "Historial",
                     "comparisons": "Comparaciones",
-                    "navigationLabel": "Pestañas del generador"
+                    "navigationLabel": "Pestañas de Worker"
                 },
                 "regenerationWarning": "Advertencia de regeneración",
                 "regenerationWarningDescription": "Este trabajo ya ha sido generado. Iniciar una nueva generación reemplazará los elementos existentes.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Error al cargar la configuración del formulario",
                 "selectOption": "Selecciona una opción",
                 "workName": "Nombre del trabajo",
-                "generationPrompt": "Prompt de generación",
+                "generationPrompt": "Prompt de Worker",
                 "modelOverride": "Anulación de modelo de IA",
                 "modelOverridePlaceholder": "p. ej. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcional. Utiliza el modelo importado o anterior por defecto a menos que lo sobrescribas aquí.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Sé específico sobre el tipo de contenido que deseas generar",
                 "repositoryDescription": "Descripción del repositorio",
                 "repositoryPlaceholder": "Breve descripción del repositorio (opcional)",
-                "startGeneration": "Iniciar generación",
+                "startGeneration": "Iniciar Work",
                 "regenerateItems": "Regenerar elementos",
                 "updateItems": "Ejecutar generación",
                 "recreateWork": "Recrear trabajo",
@@ -4638,7 +4638,7 @@
             "work": "Trabajo",
             "overview": "Resumen",
             "items": "Elementos",
-            "generator": "Generador",
+            "generator": "Worker",
             "settings": "Configuración",
             "deploy": "Implementar",
             "members": "Miembros",

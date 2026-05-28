@@ -1554,7 +1554,7 @@
                 "overview": "Огляд",
                 "activity": "Активність",
                 "items": "Елементи",
-                "generator": "Генератор",
+                "generator": "Worker",
                 "schedule": "Розклад",
                 "history": "Історія",
                 "comparisons": "Порівняння",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Генерацію не розпочато",
                     "description": "Розпочніть генерацію елементів для вашого роботау, щоб заповнити його вмістом.",
-                    "action": "Розпочати генерацію"
+                    "action": "Розпочати Work"
                 },
                 "generating": {
                     "title": "Генерація триває",
@@ -1769,12 +1769,12 @@
                     "title": "Генерацію не вдалося завершити",
                     "description": "Під час генерації сталася помилка.",
                     "withWarnings": "Генерацію не вдалося завершити з помилками:",
-                    "retry": "Повторити генерацію"
+                    "retry": "Повторити Work"
                 },
                 "cancelled": {
                     "title": "Генерацію скасовано",
                     "description": "Попередню генерацію зупинено перед завершенням.",
-                    "restart": "Перезапустити генерацію"
+                    "restart": "Перезапустити Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Деталі конфігурації",
-                "initialPrompt": "Початковий запит генерації",
+                "initialPrompt": "Початковий запит Worker",
                 "companyDetails": "Інформація про компанію",
                 "companyName": "Назва компанії",
                 "companyWebsite": "Вебсайт",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Генерувати",
+                    "generate": "Work",
                     "schedule": "Розклад",
                     "history": "Історія",
                     "comparisons": "Порівняння",
-                    "navigationLabel": "Вкладки генератора"
+                    "navigationLabel": "Вкладки Worker"
                 },
                 "regenerationWarning": "Попередження про регенерацію",
                 "regenerationWarningDescription": "Цей робота уже згенеровано. Запуск нової генерації замінить існуючі елементи.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Не вдалося завантажити конфігурацію форми",
                 "selectOption": "Виберіть опцію",
                 "workName": "Назва роботау",
-                "generationPrompt": "Запит генерації",
+                "generationPrompt": "Запит Worker",
                 "modelOverride": "Перевизначення моделі ШІ",
                 "modelOverridePlaceholder": "наприклад openai/gpt-4.1 або openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Необов’язково. За замовчуванням використовує імпортовану або попередню модель, доки ви не перевизначите її тут.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Будьте конкретними щодо типу контенту, який ви хочете згенерувати",
                 "repositoryDescription": "Опис репозиторію",
                 "repositoryPlaceholder": "Короткий опис репозиторію (необов'язково)",
-                "startGeneration": "Розпочати генерацію",
+                "startGeneration": "Розпочати Work",
                 "regenerateItems": "Регенерувати елементи",
                 "updateItems": "Запустити генерацію",
                 "recreateWork": "Перестворити робота",
@@ -4702,7 +4702,7 @@
             "work": "Робота",
             "overview": "Огляд",
             "items": "Елементи",
-            "generator": "Генератор",
+            "generator": "Worker",
             "settings": "Налаштування",
             "deploy": "Розгорнути",
             "members": "Учасники",

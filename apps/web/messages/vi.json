@@ -1554,7 +1554,7 @@
                 "overview": "Tổng quan",
                 "activity": "Hoạt động",
                 "items": "Mục",
-                "generator": "Trình tạo",
+                "generator": "Worker",
                 "schedule": "Lịch trình",
                 "history": "Lịch sử",
                 "comparisons": "So sánh",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Chưa bắt đầu tạo",
                     "description": "Bắt đầu tạo mục cho công việc của bạn để điền nội dung.",
-                    "action": "Bắt đầu tạo"
+                    "action": "Bắt đầu Work"
                 },
                 "generating": {
                     "title": "Đang tạo",
@@ -1769,12 +1769,12 @@
                     "title": "Tạo thất bại",
                     "description": "Có lỗi xảy ra trong quá trình tạo.",
                     "withWarnings": "Tạo thất bại kèm lỗi:",
-                    "retry": "Thử lại tạo"
+                    "retry": "Thử lại Work"
                 },
                 "cancelled": {
                     "title": "Tạo đã hủy",
                     "description": "Lần tạo trước đã bị dừng trước khi hoàn tất.",
-                    "restart": "Khởi động lại tạo"
+                    "restart": "Khởi động lại Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Chi tiết cấu hình",
-                "initialPrompt": "Lời nhắc tạo ban đầu",
+                "initialPrompt": "Lời nhắc Worker ban đầu",
                 "companyDetails": "Thông tin công ty",
                 "companyName": "Tên công ty",
                 "companyWebsite": "Trang web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Tạo",
+                    "generate": "Work",
                     "schedule": "Lập lịch",
                     "history": "Lịch sử",
                     "comparisons": "So sánh",
-                    "navigationLabel": "Tab Trình tạo"
+                    "navigationLabel": "Tab Worker"
                 },
                 "regenerationWarning": "Cảnh báo Tái tạo",
                 "regenerationWarningDescription": "Công việc này đã được tạo. Bắt đầu tạo mới sẽ thay thế các mục hiện có.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Không thể tải cấu hình biểu mẫu",
                 "selectOption": "Chọn một tùy chọn",
                 "workName": "Tên Công việc",
-                "generationPrompt": "Prompt Tạo",
+                "generationPrompt": "Prompt Worker",
                 "modelOverride": "Ghi đè mô hình AI",
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
                 "repositoryDescription": "Mô tả Kho",
                 "repositoryPlaceholder": "Mô tả ngắn gọn về kho (tùy chọn)",
-                "startGeneration": "Bắt đầu Tạo",
+                "startGeneration": "Bắt đầu Work",
                 "regenerateItems": "Tái tạo Mục",
                 "updateItems": "Chạy Tạo",
                 "recreateWork": "Tái tạo Công việc",
@@ -4702,7 +4702,7 @@
             "work": "Công việc",
             "overview": "Tổng quan",
             "items": "Mục",
-            "generator": "Trình tạo",
+            "generator": "Worker",
             "settings": "Cài đặt",
             "deploy": "Triển khai",
             "members": "Thành viên",

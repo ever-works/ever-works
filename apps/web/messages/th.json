@@ -1554,7 +1554,7 @@
                 "overview": "ภาพรวม",
                 "activity": "กิจกรรม",
                 "items": "รายการ",
-                "generator": "เครื่องสร้าง",
+                "generator": "Worker",
                 "schedule": "กำหนดการ",
                 "history": "ประวัติ",
                 "comparisons": "การเปรียบเทียบ",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "ยังไม่เริ่มการสร้าง",
                     "description": "เริ่มสร้างรายการสำหรับงานของคุณเพื่อเติมเนื้อหา",
-                    "action": "เริ่มการสร้าง"
+                    "action": "เริ่ม Work"
                 },
                 "generating": {
                     "title": "กำลังสร้าง",
@@ -1769,12 +1769,12 @@
                     "title": "การสร้างล้มเหลว",
                     "description": "เกิดข้อผิดพลาดระหว่างการสร้าง",
                     "withWarnings": "การสร้างล้มเหลวพร้อมข้อผิดพลาด:",
-                    "retry": "ลองสร้างใหม่"
+                    "retry": "ลอง Work ใหม่"
                 },
                 "cancelled": {
                     "title": "ยกเลิกการสร้าง",
                     "description": "การสร้างก่อนหน้าถูกหยุดก่อนเสร็จสิ้น",
-                    "restart": "เริ่มการสร้างใหม่"
+                    "restart": "เริ่ม Work ใหม่"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "รายละเอียดการตั้งค่า",
-                "initialPrompt": "พรอมต์การสร้างเริ่มต้น",
+                "initialPrompt": "พรอมต์ Worker เริ่มต้น",
                 "companyDetails": "ข้อมูลบริษัท",
                 "companyName": "ชื่อบริษัท",
                 "companyWebsite": "เว็บไซต์",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "สร้าง",
+                    "generate": "Work",
                     "schedule": "กำหนดการ",
                     "history": "ประวัติ",
                     "comparisons": "การเปรียบเทียบ",
-                    "navigationLabel": "แท็บเครื่องมือสร้าง"
+                    "navigationLabel": "แท็บ Worker"
                 },
                 "regenerationWarning": "คำเตือนการสร้างใหม่",
                 "regenerationWarningDescription": "งานนี้ถูกสร้างแล้ว การเริ่มสร้างใหม่จะแทนที่รายการที่มีอยู่",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "ไม่สามารถโหลดการตั้งค่าฟอร์มได้",
                 "selectOption": "เลือกตัวเลือก",
                 "workName": "ชื่องาน",
-                "generationPrompt": "พรอมต์การสร้าง",
+                "generationPrompt": "พรอมต์ Worker",
                 "modelOverride": "แทนที่โมเดล AI",
                 "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "ระบุรายละเอียดเกี่ยวกับประเภทเนื้อหาที่ต้องการสร้าง",
                 "repositoryDescription": "คำอธิบายคลัง",
                 "repositoryPlaceholder": "คำอธิบายสั้น ๆ ของคลัง (ไม่บังคับ)",
-                "startGeneration": "เริ่มสร้าง",
+                "startGeneration": "เริ่ม Work",
                 "regenerateItems": "สร้างรายการใหม่",
                 "updateItems": "เรียกใช้การสร้าง",
                 "recreateWork": "สร้างงานใหม่",
@@ -4702,7 +4702,7 @@
             "work": "งาน",
             "overview": "ภาพรวม",
             "items": "รายการ",
-            "generator": "ตัวสร้าง",
+            "generator": "Worker",
             "settings": "การตั้งค่า",
             "deploy": "เผยแพร่",
             "members": "สมาชิก",

@@ -1554,7 +1554,7 @@
                 "overview": "Overzicht",
                 "activity": "Activiteit",
                 "items": "Items",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Planning",
                 "history": "Geschiedenis",
                 "comparisons": "Vergelijkingen",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generatie nog niet gestart",
                     "description": "Start met genereren van items voor uw map om deze met inhoud te vullen.",
-                    "action": "Generatie starten"
+                    "action": "Work starten"
                 },
                 "generating": {
                     "title": "Generatie bezig",
@@ -1769,12 +1769,12 @@
                     "title": "Generatie mislukt",
                     "description": "Er is een fout opgetreden tijdens de generatie.",
                     "withWarnings": "Generatie mislukt met fouten:",
-                    "retry": "Generatie opnieuw proberen"
+                    "retry": "Work opnieuw proberen"
                 },
                 "cancelled": {
                     "title": "Generatie geannuleerd",
                     "description": "De vorige generatie is gestopt voordat deze voltooid was.",
-                    "restart": "Generatie herstarten"
+                    "restart": "Work herstarten"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Configuratiedetails",
-                "initialPrompt": "Initiële generatieprompt",
+                "initialPrompt": "Initiële Worker-prompt",
                 "companyDetails": "Bedrijfsgegevens",
                 "companyName": "Bedrijfsnaam",
                 "companyWebsite": "Website",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Genereren",
+                    "generate": "Work",
                     "schedule": "Schema",
                     "history": "Geschiedenis",
                     "comparisons": "Vergelijkingen",
-                    "navigationLabel": "Generator-tabbladen"
+                    "navigationLabel": "Worker-tabbladen"
                 },
                 "regenerationWarning": "Waarschuwing hergeneratie",
                 "regenerationWarningDescription": "Deze map is al gegenereerd. Het starten van een nieuwe generatie zal bestaande items vervangen.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Kon formulierconfiguratie niet laden",
                 "selectOption": "Selecteer een optie",
                 "workName": "Mapnaam",
-                "generationPrompt": "Generatieprompt",
+                "generationPrompt": "Worker-prompt",
                 "modelOverride": "AI-model overschrijven",
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optioneel. Gebruikt standaard het geïmporteerde of vorige model, tenzij je het hier overschrijft.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Wees specifiek over het type content dat je wilt genereren",
                 "repositoryDescription": "Repository-beschrijving",
                 "repositoryPlaceholder": "Korte beschrijving van de repository (optioneel)",
-                "startGeneration": "Generatie starten",
+                "startGeneration": "Work starten",
                 "regenerateItems": "Items opnieuw genereren",
                 "updateItems": "Generatie uitvoeren",
                 "recreateWork": "Map opnieuw aanmaken",
@@ -4702,7 +4702,7 @@
             "work": "Werk",
             "overview": "Overzicht",
             "items": "Items",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Instellingen",
             "deploy": "Deployen",
             "members": "Leden",
