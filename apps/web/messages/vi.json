@@ -1554,7 +1554,7 @@
                 "overview": "Tổng quan",
                 "activity": "Hoạt động",
                 "items": "Mục",
-                "generator": "Trình tạo",
+                "generator": "Worker",
                 "schedule": "Lịch trình",
                 "history": "Lịch sử",
                 "comparisons": "So sánh",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Chưa bắt đầu tạo",
                     "description": "Bắt đầu tạo mục cho công việc của bạn để điền nội dung.",
-                    "action": "Bắt đầu tạo"
+                    "action": "Bắt đầu Work"
                 },
                 "generating": {
                     "title": "Đang tạo",
@@ -1769,12 +1769,12 @@
                     "title": "Tạo thất bại",
                     "description": "Có lỗi xảy ra trong quá trình tạo.",
                     "withWarnings": "Tạo thất bại kèm lỗi:",
-                    "retry": "Thử lại tạo"
+                    "retry": "Thử lại Work"
                 },
                 "cancelled": {
                     "title": "Tạo đã hủy",
                     "description": "Lần tạo trước đã bị dừng trước khi hoàn tất.",
-                    "restart": "Khởi động lại tạo"
+                    "restart": "Khởi động lại Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Chi tiết cấu hình",
-                "initialPrompt": "Lời nhắc tạo ban đầu",
+                "initialPrompt": "Lời nhắc Worker ban đầu",
                 "companyDetails": "Thông tin công ty",
                 "companyName": "Tên công ty",
                 "companyWebsite": "Trang web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Tạo",
+                    "generate": "Work",
                     "schedule": "Lập lịch",
                     "history": "Lịch sử",
                     "comparisons": "So sánh",
-                    "navigationLabel": "Tab Trình tạo"
+                    "navigationLabel": "Tab Worker"
                 },
                 "regenerationWarning": "Cảnh báo Tái tạo",
                 "regenerationWarningDescription": "Công việc này đã được tạo. Bắt đầu tạo mới sẽ thay thế các mục hiện có.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Không thể tải cấu hình biểu mẫu",
                 "selectOption": "Chọn một tùy chọn",
                 "workName": "Tên Công việc",
-                "generationPrompt": "Prompt Tạo",
+                "generationPrompt": "Prompt Worker",
                 "modelOverride": "Ghi đè mô hình AI",
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Hãy cụ thể về loại nội dung bạn muốn tạo",
                 "repositoryDescription": "Mô tả Kho",
                 "repositoryPlaceholder": "Mô tả ngắn gọn về kho (tùy chọn)",
-                "startGeneration": "Bắt đầu Tạo",
+                "startGeneration": "Bắt đầu Work",
                 "regenerateItems": "Tái tạo Mục",
                 "updateItems": "Chạy Tạo",
                 "recreateWork": "Tái tạo Công việc",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "Một Mục tiêu liên tục mà Agent tiếp tục làm việc - tạo ra các Ý tưởng theo lịch trình hoặc một lần.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "Một trang một trang tập trung - danh sách chờ, ra mắt sản phẩm, đăng ký webinar, thu thập khách hàng tiềm năng.",
                 "blog": "Một blog với danh mục, RSS, làm nổi bật mã và nội dung sẵn sàng SEO.",
                 "directory": "Một trang web thư mục được biên tập với tìm kiếm, bộ lọc và dữ liệu cấu trúc hóa mục.",
-                "awesome-repo": "Kho awesome-list - chỉ mục markdown, liên kết được phân loại và metadata có thể làm mới."
+                "awesome-repo": "Kho awesome-list - chỉ mục markdown, liên kết được phân loại và metadata có thể làm mới.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Tạo",
@@ -4597,7 +4599,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4702,7 +4717,7 @@
             "work": "Công việc",
             "overview": "Tổng quan",
             "items": "Mục",
-            "generator": "Trình tạo",
+            "generator": "Worker",
             "settings": "Cài đặt",
             "deploy": "Triển khai",
             "members": "Thành viên",
@@ -4928,6 +4943,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

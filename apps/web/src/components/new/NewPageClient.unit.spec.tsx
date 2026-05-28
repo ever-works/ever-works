@@ -55,12 +55,16 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
 }
 
 describe('NewPageClient (chat-open + canvas-route on submit)', () => {
-    it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
+    it('renders all 10 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Company', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
             container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
-        expect(chipButtons).toHaveLength(9);
+        // EW-662 Phase 10 — `company` joined the live chip set so the
+        // total is now 10. `store` stays as an inert "Soon" chip
+        // (a `button[role="option"]` without `aria-selected` — filtered
+        // out by the selector above).
+        expect(chipButtons).toHaveLength(10);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
             'dashboard.newPage.chips.mission',
@@ -72,6 +76,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             'dashboard.newPage.chips.blog',
             'dashboard.newPage.chips.directory',
             'dashboard.newPage.chips.awesome-repo',
+            'dashboard.newPage.chips.company',
         ]);
     });
 

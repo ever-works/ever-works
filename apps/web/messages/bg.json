@@ -1554,7 +1554,7 @@
                 "overview": "Преглед",
                 "activity": "Активност",
                 "items": "Елементи",
-                "generator": "Генератор",
+                "generator": "Worker",
                 "schedule": "График",
                 "history": "История",
                 "comparisons": "Сравнения",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Генериране не е започнато",
                     "description": "Стартирай генериране на елементи за твоята работа, за да я запълниш със съдържание.",
-                    "action": "Стартирай генериране"
+                    "action": "Стартирай Work"
                 },
                 "generating": {
                     "title": "Генериране в ход",
@@ -1769,12 +1769,12 @@
                     "title": "Генерирането неуспешно",
                     "description": "Грешка по време на генериране.",
                     "withWarnings": "Генерирането завърши с грешки:",
-                    "retry": "Опитай отново генериране"
+                    "retry": "Опитай отново Work"
                 },
                 "cancelled": {
                     "title": "Генерирането отменено",
                     "description": "Предишното генериране беше спрено преди завършване.",
-                    "restart": "Рестартирай генериране"
+                    "restart": "Рестартирай Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Детайли на конфигурацията",
-                "initialPrompt": "Първоначална подсказка за генериране",
+                "initialPrompt": "Първоначална подсказка за Worker",
                 "companyDetails": "Информация за компанията",
                 "companyName": "Име на компанията",
                 "companyWebsite": "Уебсайт",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Генериране",
+                    "generate": "Work",
                     "schedule": "График",
                     "history": "История",
                     "comparisons": "Сравнения",
-                    "navigationLabel": "Разделители на генератора"
+                    "navigationLabel": "Раздели на Worker"
                 },
                 "regenerationWarning": "Предупреждение за регенериране",
                 "regenerationWarningDescription": "Тази работа вече е генерирана. Стартирането на нова генерация ще замени съществуващите елементи.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Неуспешно зареждане на конфигурацията на формата",
                 "selectOption": "Изберете опция",
                 "workName": "Име на работата",
-                "generationPrompt": "Подсказка за генериране",
+                "generationPrompt": "Подсказка за Worker",
                 "modelOverride": "Презаписване на AI модел",
                 "modelOverridePlaceholder": "нпр. openai/gpt-4.1 или openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Не задължително. По подразбиране използва импортирания или предишния модел, освен ако не го презапишете тук.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Бъдете конкретни относно типа съдържание, което искате да генерирате",
                 "repositoryDescription": "Описание на репозиторията",
                 "repositoryPlaceholder": "Кратко описание на репозиторията (по избор)",
-                "startGeneration": "Започни генериране",
+                "startGeneration": "Започни Work",
                 "regenerateItems": "Регенерирай елементи",
                 "updateItems": "Изпълни генериране",
                 "recreateWork": "Създай отново работата",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "Текуща Цел, с която Агентът продължава да работи — генерира Идеи по график или еднократно.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "Фокусирана едностранична страница — списъци с чакащи, пускане на продукти, записване за уебинар, улавяне на лидове.",
                 "blog": "Блог с категории, RSS, подсветка на код и SEO-готово съдържание.",
                 "directory": "Куриран сайт с директория, с търсене, филтри и структурирани данни за елементи.",
-                "awesome-repo": "Awesome-list репозитори — markdown индекс, категоризирани линкове и освежаеми метаданни."
+                "awesome-repo": "Awesome-list репозитори — markdown индекс, категоризирани линкове и освежаеми метаданни.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Създай",
@@ -4533,7 +4535,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4638,7 +4653,7 @@
             "work": "Работа",
             "overview": "Преглед",
             "items": "Елементи",
-            "generator": "Генератор",
+            "generator": "Worker",
             "settings": "Настройки",
             "deploy": "Разположи",
             "members": "Членове",
@@ -4864,6 +4879,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {
