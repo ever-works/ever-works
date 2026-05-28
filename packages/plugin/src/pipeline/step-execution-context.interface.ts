@@ -6,6 +6,7 @@ import type { IContentExtractorFacade } from '../facades/content-extractor-facad
 import type { IDataSourceFacade } from '../facades/data-source-facade.interface.js';
 import type { IPromptFacade } from '../facades/prompt-facade.interface.js';
 import type { IKbToolsFacade } from '../facades/kb-tools-facade.interface.js';
+import type { IAgentMemoryStepFacade } from '../facades/agent-memory-facade.interface.js';
 import type { WorkReference, UserReference } from './generation-context.interface.js';
 
 /**
@@ -126,4 +127,15 @@ export interface StepExecutionContext {
 	 * here, the row-36c orchestrator call site populates it.
 	 */
 	readonly kbTools?: IKbToolsFacade;
+
+	/**
+	 * Agent-memory facade (PR follow-up to #1073). When present, pipeline
+	 * steps that opt in (e.g. the `memory-pipeline-modifier` plugin) can
+	 * fetch persistent context at the start of a run and save observations
+	 * at the end. Optional so OSS builds without the `agentmemory` plugin
+	 * installed — or operators who haven't enabled it for the Work —
+	 * keep constructing `execContext` identically. Callers are
+	 * responsible for null-checking before use.
+	 */
+	readonly agentMemoryFacade?: IAgentMemoryStepFacade;
 }

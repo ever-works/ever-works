@@ -1,0 +1,78 @@
+import { Test } from '@nestjs/testing';
+import {
+    NotificationChannelFacadeService,
+    NotificationChannelFacadeError,
+} from '../notification-channel.facade';
+import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
+
+/**
+ * EW-672 / T11 — NotificationChannelFacadeService construction + fan-out
+ * coverage. Per-plugin behaviour (Discord/Slack/Telegram/…) lives in
+ * each plugin package's Vitest suite.
+ */
+describe('NotificationChannelFacadeService', () => {
+    let registry: jest.Mocked<PluginRegistryService>;
+    let settings: jest.Mocked<PluginSettingsService>;
+    let facade: NotificationChannelFacadeService;
+
+    beforeEach(async () => {
+        registry = {
+            getByCapability: jest.fn().mockReturnValue([]),
+        } as unknown as jest.Mocked<PluginRegistryService>;
+        settings = {
+            getResolvedSettings: jest.fn().mockResolvedValue({}),
+        } as unknown as jest.Mocked<PluginSettingsService>;
+
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                NotificationChannelFacadeService,
+                { provide: PluginRegistryService, useValue: registry },
+                { provide: PluginSettingsService, useValue: settings },
+            ],
+        }).compile();
+
+        facade = moduleRef.get(NotificationChannelFacadeService);
+    });
+
+    it('constructs with required deps only', () => {
+        expect(facade).toBeInstanceOf(NotificationChannelFacadeService);
+    });
+
+    it('reports unconfigured when no channel providers are registered', () => {
+        expect(facade.isConfigured()).toBe(false);
+        expect(registry.getByCapability).toHaveBeenCalledWith('notification-channel');
+    });
+
+    it('returns empty array when no channels resolve for the user', async () => {
+        const results = await facade.send(
+            'user-1',
+            'work_generation_finished',
+            { text: 'done', messageRef: 'ref-1' },
+            async () => [],
+            { userId: 'user-1' },
+        );
+        expect(results).toEqual([]);
+    });
+
+    it('treats the in-app sentinel channel as a no-op delivered', async () => {
+        const results = await facade.send(
+            'user-1',
+            'work_generation_finished',
+            { text: 'done', messageRef: 'ref-1' },
+            async () => ['in-app'],
+            { userId: 'user-1' },
+        );
+        expect(results).toEqual([{ channelId: 'in-app', pluginId: 'in-app', status: 'delivered' }]);
+    });
+
+    it('fails verifyTarget when no plugin matches', async () => {
+        await expect(
+            facade.verifyTarget(
+                'discord-channel',
+                { webhookUrl: 'https://x' },
+                { userId: 'user-1' },
+            ),
+        ).rejects.toBeInstanceOf(NotificationChannelFacadeError);
+    });
+});

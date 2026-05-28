@@ -841,6 +841,19 @@ Pipeline plugin that triggers Zapier actions during work generation. Lets you wi
 
 See [Zapier Plugin](./zapier-plugin.md) for setup. Refer to `packages/plugins/zapier/src/` for the current settings schema.
 
+### Composio Integrations
+
+Pipeline plugin that executes Composio tools during work generation. Gives Ever Works access to 500+ third-party app integrations (Gmail, Slack, GitHub, Notion, Linear, Salesforce, …) with OAuth brokered per user by Composio.
+
+| Field              | Value                              |
+| ------------------ | ---------------------------------- |
+| Plugin ID          | `composio`                         |
+| Configuration Mode | `user-required`                    |
+| Auto Enable        | No                                 |
+| Capabilities       | `pipeline`, `form-schema-provider` |
+
+See [Composio Plugin](./composio-plugin.md) for setup. Refer to `packages/plugins/composio/src/` for the current settings schema.
+
 ## Prompt Management
 
 ### Langfuse

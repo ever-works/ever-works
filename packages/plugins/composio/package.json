@@ -1,0 +1,69 @@
+{
+	"name": "@ever-works/composio-plugin",
+	"version": "1.0.0",
+	"description": "Composio Integration Plugin - Brokers OAuth and tool execution across 500+ apps via composio.dev",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "composio",
+			"name": "Composio Integrations",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "Pipeline plugin that executes Composio tools across 500+ third-party apps (Gmail, Slack, GitHub, Notion, Linear, Salesforce, …) during Work generation. Composio brokers OAuth so each user connects their own accounts once and the platform reuses them.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "public",
+			"selectableProviderCategories": [
+				"screenshot"
+			]
+		}
+	}
+}

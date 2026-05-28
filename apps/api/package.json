@@ -54,6 +54,8 @@
         "@nestjs/swagger": "^11.2.5",
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.1",
+        "@react-email/components": "^0.0.36",
+        "@react-email/render": "^1.1.4",
         "@scalar/nestjs-api-reference": "^1.1.6",
         "axios": "^1.15.2",
         "bcrypt": "^6.0.0",

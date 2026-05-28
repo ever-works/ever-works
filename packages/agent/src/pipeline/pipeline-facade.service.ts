@@ -32,6 +32,15 @@ import type {
     EnabledDataSource,
     FacadeOptions,
     IKbToolsFacade,
+    IAgentMemoryStepFacade,
+    AgentMemorySaveFacadeInput,
+    AgentMemorySearchFacadeInput,
+    AgentMemoryContextFacadeInput,
+    AgentMemoryListSessionsFacadeInput,
+    AgentMemorySession,
+    AgentMemoryRecord,
+    AgentMemorySearchResponse,
+    AgentMemoryContext,
 } from '@ever-works/plugin';
 import type { KbContextBundleData } from '@ever-works/contracts';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -40,6 +49,7 @@ import { ScreenshotFacadeService } from '../facades/screenshot.facade';
 import { ContentExtractorFacadeService } from '../facades/content-extractor.facade';
 import { DataSourceFacadeService } from '../facades/data-source.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
+import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 
 /**
  * Context for binding facades to a specific work/user.
@@ -75,6 +85,7 @@ export class PipelineFacadeService {
         private readonly contentExtractorFacade: ContentExtractorFacadeService,
         private readonly promptFacade: PromptFacadeService,
         @Optional() private readonly dataSourceFacade?: DataSourceFacadeService,
+        @Optional() private readonly agentMemoryFacade?: AgentMemoryFacadeService,
     ) {}
 
     /**
@@ -128,12 +139,51 @@ export class PipelineFacadeService {
             contentExtractorFacade: this.createBoundContentExtractorFacade(facadeContext),
             dataSourceFacade: this.createBoundDataSourceFacade(facadeContext),
             promptFacade: this.createBoundPromptFacade(facadeContext),
+            agentMemoryFacade: this.createBoundAgentMemoryFacade(facadeContext),
             logger: stepLogger,
             work,
             user: work.user,
             signal,
             kbContext,
             kbTools,
+        };
+    }
+
+    private createBoundAgentMemoryFacade(
+        ctx: FacadeBindingContext,
+    ): IAgentMemoryStepFacade | undefined {
+        if (!this.agentMemoryFacade) return undefined;
+        const facade = this.agentMemoryFacade;
+        const boundOptions: FacadeOptions = {
+            workId: ctx.workId,
+            userId: ctx.userId,
+        };
+        return {
+            openSession: (
+                metadata: Record<string, unknown> | undefined,
+                _facadeOptions: FacadeOptions,
+            ): Promise<AgentMemorySession> => facade.openSession(metadata, boundOptions),
+            closeSession: (sessionId: string, _facadeOptions: FacadeOptions): Promise<void> =>
+                facade.closeSession(sessionId, boundOptions),
+            saveMemory: (
+                input: AgentMemorySaveFacadeInput,
+                _facadeOptions: FacadeOptions,
+            ): Promise<AgentMemoryRecord> => facade.saveMemory(input, boundOptions),
+            searchMemory: (
+                input: AgentMemorySearchFacadeInput,
+                _facadeOptions: FacadeOptions,
+            ): Promise<AgentMemorySearchResponse> => facade.searchMemory(input, boundOptions),
+            buildContext: (
+                input: AgentMemoryContextFacadeInput,
+                _facadeOptions: FacadeOptions,
+            ): Promise<AgentMemoryContext> => facade.buildContext(input, boundOptions),
+            deleteEntry: (id: string, _facadeOptions: FacadeOptions): Promise<void> =>
+                facade.deleteEntry(id, boundOptions),
+            listSessions: (
+                options: AgentMemoryListSessionsFacadeInput | undefined,
+                _facadeOptions: FacadeOptions,
+            ): Promise<readonly AgentMemorySession[]> => facade.listSessions(options, boundOptions),
+            isConfigured: (): boolean => facade.isConfigured(),
         };
     }
 
