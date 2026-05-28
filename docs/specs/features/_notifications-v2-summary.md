@@ -43,12 +43,13 @@
 
 ### Partially done
 
+- **EW-675** Notification channel plugins (2nd batch) — WhatsApp done (T29). Novu (T30) pending.
 - **EW-680** Per-Agent inbox tab + components — list view done (T17); message detail page (T31) + composer page (T32) pending.
 - **EW-681** SWR hooks + SSE + i18n + E2E — API clients done (T17); SWR client hooks (T33) + SSE stream (T34) + i18n (T35) + Playwright E2E (T36) pending.
 
 ### Not started
 
-- **EW-675** WhatsApp + Novu channel plugins (T29 + T30)
+_(none — all remaining items are in "Partially done" above)_
 
 ### Done since the original Phase-1 cut
 
@@ -64,7 +65,8 @@
 - **T25 EW-670** Agent inbound-email dispatcher — [`b70a8634`](https://github.com/ever-works/ever-works/commit/b70a8634). `AGENT_INBOUND_EMAIL_DISPATCHER` token + `DefaultInboundEmailDispatcher` (task-spawn + conversation modes), `INBOUND_EMAIL_TASK_SPAWNER` optional adapter, `deriveThreadKey` helper, `findByAddress` repo method, inbound-webhook wiring. 8 new unit tests.
 - **T26 EW-673** Agent `notifyChannel` tool — [`54d5c396`](https://github.com/ever-works/ever-works/commit/54d5c396). New `AGENT_NOTIFY_CHANNEL_FACADE` token + contract; `buildNotifyChannelTool` gated on `canCallExternalTools` + facade presence, invoke-time channel-ownership enforcement. Completes EW-673. 4 new unit tests.
 - **T27 EW-674** Slack channel plugin — [`889c6e15`](https://github.com/ever-works/ever-works/commit/889c6e15). `packages/plugins/slack-channel/` incoming-webhook + Block Kit, mirrors Discord. type-check clean, 7/7 Vitest.
-- **T28 EW-674** Telegram channel plugin — *this commit*. `packages/plugins/telegram-channel/` Bot API sendMessage (direct shape), MarkdownV2 support, getMe verifyTarget. type-check clean, 8/8 Vitest. Completes EW-674.
+- **T28 EW-674** Telegram channel plugin — [`6f9abf89`](https://github.com/ever-works/ever-works/commit/6f9abf89). `packages/plugins/telegram-channel/` Bot API sendMessage (direct shape), MarkdownV2 support, getMe verifyTarget. type-check clean, 8/8 Vitest. Completes EW-674.
+- **T29 EW-675** WhatsApp channel plugin — *this commit*. `packages/plugins/whatsapp-channel/` Cloud API send (text + template, direct shape), 24h-window note, phone-number-id verifyTarget. type-check clean, 8/8 Vitest.
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
