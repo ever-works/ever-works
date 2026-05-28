@@ -10,7 +10,8 @@ import {
     type WebsiteTemplateOption,
 } from '@/lib/api';
 import { redirect } from 'next/navigation';
-import NewWorkClient, { type CreationMode } from './new-work-client';
+import NewWorkClient, { ALL_WORK_KIND_CHIP_VALUES, type CreationMode } from './new-work-client';
+import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -124,6 +125,14 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
         }
     }
 
+    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
+    // Fail-open: no PostHog config / errors / missing flags → everything
+    // enabled. The current user id is the flag distinct id so per-user /
+    // percentage rollouts work; falls back to 'anonymous' otherwise.
+    const disabledKinds = Array.from(
+        await getDisabledWorkKinds(ALL_WORK_KIND_CHIP_VALUES, user.id),
+    );
+
     return (
         <NewWorkClient
             user={user!}
@@ -136,6 +145,7 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             initialMode={initialMode}
             initialPrompt={initialPrompt}
             initialKind={initialKind}
+            disabledKinds={disabledKinds}
         />
     );
 }

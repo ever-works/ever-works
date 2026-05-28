@@ -76,6 +76,19 @@ const CHIP_ORDER: ChipType[] = [
     'awesome-repo',
 ];
 
+/**
+ * Every chip value whose availability is gated by a `works-<value>`
+ * PostHog feature flag (fail-open — see
+ * `@/lib/feature-flags/work-kinds`). Includes the live chips plus the
+ * baseline coming-soon `store`/`company` so the server page can resolve
+ * one flag set covering the whole catalog.
+ */
+export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store' | 'company'> = [
+    ...CHIP_ORDER,
+    'store',
+    'company',
+];
+
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,
     idea: Lightbulb,
@@ -158,6 +171,13 @@ export interface NewPageClientProps {
     initialType?: ChipType | null;
     initialPrompt?: string;
     initialTemplateId?: string;
+    /**
+     * Work-kind chip values whose `works-<value>` PostHog flag resolved
+     * to an explicit `false`. Evaluated server-side and passed down (the
+     * web app keeps `posthog-js` out of the client bundle). Defaults to
+     * `[]` → everything enabled (fail-open).
+     */
+    disabledKinds?: string[];
 }
 
 const CHIP_INTENT_LABEL: Record<ChipType, string> = {
@@ -194,6 +214,7 @@ export function NewPageClient({
     initialType = 'mission',
     initialPrompt,
     initialTemplateId,
+    disabledKinds = [],
 }: NewPageClientProps) {
     const t = useTranslations('dashboard.newPage');
     const router = useRouter();
@@ -343,17 +364,25 @@ export function NewPageClient({
     // Full chip catalog. `store` + `company` are inert "Soon" chips,
     // appended after the live chips so they sit at the end of the
     // horizontal scroll the way the marketing site does it.
+    // `comingSoon` is the union of the hardcoded baseline (store/company)
+    // and any chip whose `works-<value>` PostHog flag resolved to an
+    // explicit `false` server-side. Missing/undefined flags stay enabled.
+    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
     const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store' | 'company'>>>(
         () => [
             ...CHIP_ORDER.map((c) => ({
                 value: c,
                 label: t(`chips.${c}`),
                 Icon: CHIP_ICONS[c],
+                comingSoon: disabledSet.has(c),
             })),
+            // `store` + `company` are hardcoded coming-soon baseline —
+            // `comingSoon = hardcoded || disabledSet.has(value)` collapses
+            // to `true` here regardless of the flag.
             { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
             { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
         ],
-        [t],
+        [t, disabledSet],
     );
 
     return (

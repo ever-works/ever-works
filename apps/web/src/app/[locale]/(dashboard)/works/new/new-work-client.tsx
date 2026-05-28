@@ -47,6 +47,18 @@ const WORK_KIND_ORDER: InitialWorkKind[] = [
     'awesome-repo',
 ];
 
+/**
+ * Every work-kind chip value gated by a `works-<value>` PostHog flag
+ * (fail-open — see `@/lib/feature-flags/work-kinds`). Live kinds plus the
+ * baseline coming-soon `store`/`company` so the server page resolves one
+ * flag set covering the whole catalog.
+ */
+export const ALL_WORK_KIND_CHIP_VALUES: ReadonlyArray<InitialWorkKind | 'store' | 'company'> = [
+    ...WORK_KIND_ORDER,
+    'store',
+    'company',
+];
+
 const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     website: Globe,
     'landing-page': Files,
@@ -101,6 +113,12 @@ interface NewWorkClientProps {
     initialMode?: CreationMode | null;
     initialPrompt?: string;
     initialKind?: InitialWorkKind | null;
+    /**
+     * Work-kind chip values whose `works-<value>` PostHog flag resolved
+     * to an explicit `false` (evaluated server-side). Defaults to `[]` →
+     * everything enabled (fail-open).
+     */
+    disabledKinds?: string[];
 }
 
 export default function NewWorkClient({
@@ -114,6 +132,7 @@ export default function NewWorkClient({
     initialMode = null,
     initialPrompt,
     initialKind = null,
+    disabledKinds = [],
 }: NewWorkClientProps) {
     const [creationMode, setCreationMode] = useState<CreationMode | null>(
         proposal ? 'ai' : initialMode,
@@ -160,17 +179,23 @@ export default function NewWorkClient({
     // chips (roadmap, not shipped) appended after the live kinds so they
     // match the marketing site's chip catalog without breaking the
     // existing /works/new kind picker behavior.
+    // `comingSoon` is the union of the hardcoded baseline (store/company)
+    // and any kind whose `works-<value>` PostHog flag resolved to an
+    // explicit `false` server-side. Missing/undefined flags stay enabled.
+    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
     const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
         () => [
             ...WORK_KIND_ORDER.map((k) => ({
                 value: k,
                 label: t(`kinds.${k}`),
                 Icon: WORK_KIND_ICONS[k],
+                comingSoon: disabledSet.has(k),
             })),
+            // `store` + `company` are hardcoded coming-soon baseline.
             { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
             { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
         ],
-        [t],
+        [t, disabledSet],
     );
 
     const submitPrompt = () => {

@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { NewPageClient, type ChipType } from '@/components/new';
+import { NewPageClient, ALL_NEW_CHIP_VALUES, type ChipType } from '@/components/new';
 import { templatesAPI } from '@/lib/api/templates';
 import { missionsAPI } from '@/lib/api/missions';
+import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.newPage');
@@ -74,11 +75,18 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
         }
     }
 
+    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
+    // Fail-open: no PostHog config / errors / missing flags → everything
+    // enabled. No cheap user id is available on this page, so we evaluate
+    // against the 'anonymous' distinct id (fine for global on/off flags).
+    const disabledKinds = Array.from(await getDisabledWorkKinds(ALL_NEW_CHIP_VALUES));
+
     return (
         <NewPageClient
             initialType={initialType}
             initialPrompt={initialPrompt}
             initialTemplateId={initialTemplateId}
+            disabledKinds={disabledKinds}
         />
     );
 }
