@@ -117,4 +117,28 @@ describe('OrganizationsController.registerCompany (EW-665 Phase 13)', () => {
 
         expect(order).toEqual(['createWork', 'registerCompany', 'transition']);
     });
+
+    it('rejects a whitespace-only name BEFORE creating any Work (Codex P2)', async () => {
+        const { controller, workLifecycle, organizationService } = makeController();
+
+        await expect(
+            controller.registerCompany({ user: { userId: 'u-1' } }, { name: '   ' } as never),
+        ).rejects.toThrow();
+
+        // No orphan Work / Org created for the invalid name.
+        expect(workLifecycle.createCompanyWork).not.toHaveBeenCalled();
+        expect(organizationService.registerCompany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a name longer than 200 chars before creating any Work', async () => {
+        const { controller, workLifecycle } = makeController();
+
+        await expect(
+            controller.registerCompany({ user: { userId: 'u-1' } }, {
+                name: 'x'.repeat(201),
+            } as never),
+        ).rejects.toThrow();
+
+        expect(workLifecycle.createCompanyWork).not.toHaveBeenCalled();
+    });
 });

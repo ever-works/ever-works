@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Get,
@@ -91,6 +92,20 @@ export class OrganizationsController {
     ): Promise<OrganizationResponse> {
         const userId = req.user.userId;
         const countryCode = dto.countryCode?.toUpperCase() ?? null;
+
+        // Prevalidate the name BEFORE creating the backing Work. The DTO's
+        // @Length(1, 200) counts whitespace, so a whitespace-only name
+        // passes validation but then `OrganizationService.registerCompany`
+        // rejects the trimmed-empty name in step 2 — leaving an orphan
+        // draft Work behind. Trim-check here so an invalid name fails
+        // before any row is created. (Codex P2 on PR #1075.)
+        const trimmedName = dto.name?.trim();
+        if (!trimmedName) {
+            throw new BadRequestException('Company name is required');
+        }
+        if (trimmedName.length > 200) {
+            throw new BadRequestException('Company name exceeds 200 characters');
+        }
 
         // EW-665 (Phase 13) step 1 — land a backing Company Work in DRAFT.
         // This is a lightweight registration record (no data/website repo

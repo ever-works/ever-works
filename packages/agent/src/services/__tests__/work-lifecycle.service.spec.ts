@@ -483,6 +483,10 @@ describe('WorkLifecycleService', () => {
                 companyName: 'Acme Inc.',
                 userId: user.id,
             });
+            // EW-665: deployProvider must be null so the Ever Works
+            // Deploy quota counter (WHERE deployProvider = 'ever-works')
+            // never counts a registration-only Company Work. (Codex P2.)
+            expect(dto.deployProvider).toBeNull();
             // No generator/git side-effects for a registration record.
             expect(dataGenerator.getItems).not.toHaveBeenCalled();
             expect(result).toBe(persisted);

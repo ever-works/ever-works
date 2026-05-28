@@ -414,6 +414,16 @@ export class WorkLifecycleService {
             status: params.status ?? 'draft',
             companyName: params.companyName ?? params.name,
             companyWebsite: params.companyWebsite ?? null,
+            // A Company Work is a registration record, NOT a deployable
+            // website. `deployProvider` defaults to 'ever-works', and
+            // `WorkRepository.countActiveByDeployProvider(userId,
+            // 'ever-works')` counts every non-archived/deleted row with
+            // that provider against the user's Ever Works Deploy quota.
+            // Leaving the default would let registered companies eat the
+            // deploy cap and block real website creation. Set it to null
+            // so the `WHERE deployProvider = 'ever-works'` quota query
+            // never matches these rows. (Codex P2 on PR #1075.)
+            deployProvider: null,
         };
 
         try {

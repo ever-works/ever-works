@@ -104,7 +104,11 @@ export class Work {
     storageProvider: string; // 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git'
 
     @Column({ default: 'ever-works', nullable: true })
-    deployProvider?: string; // 'ever-works' | 'vercel' | 'k8s' | 'netlify' | ...
+    // `| null` (the column is already `nullable: true`): Company Works
+    // (EW-665) explicitly set this to null so they're excluded from the
+    // Ever Works Deploy quota counter. Widening the TS type to match the
+    // DB nullability — no schema change.
+    deployProvider?: string | null; // 'ever-works' | 'vercel' | 'k8s' | null (company) | ...
 
     @Column({ nullable: true })
     website: string;
