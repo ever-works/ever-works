@@ -55,7 +55,7 @@
 
 ### Partially done (this loop)
 
-- **EW-670** Agent integration — `sendEmail` tool done (T23). Still pending: `messageAgent` tool (T24), `AGENT_INBOUND_EMAIL_DISPATCHER` token + dispatcher (T25).
+- **EW-670** Agent integration — `sendEmail` tool (T23) + `messageAgent` tool (T24) done. Still pending: `AGENT_INBOUND_EMAIL_DISPATCHER` token + dispatcher (T25).
 
 ### Newly done (this overnight cron loop)
 
@@ -63,7 +63,8 @@
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
 - **T22 EW-677** Subscription resolver (`resolveChannels` + quiet-hours + mute) — [`bc23e150`](https://github.com/ever-works/ever-works/commit/bc23e150). BullMQ delayed-delivery + org-defaults fallback deferred (TODO in service). Listener now uses the real resolver instead of the T20 stub.
 - **T22b** Repo-method alignment — [`49953380`](https://github.com/ever-works/ever-works/commit/49953380). Aligned the T11 facades + T12 api services to the repositories' actual semantic method APIs.
-- **T23 EW-670** Agent `sendEmail` tool descriptor — *this commit*. New `AGENT_EMAIL_FACADE` token + `AgentEmailFacade` contract (mirrors AGENT_GIT_FACADE), `buildSendEmailTool` gated on `canCallExternalTools` + facade presence; ≥1-outbound-assignment enforced at invoke time. 4 new unit tests (13/13 agent-tool suite green).
+- **T23 EW-670** Agent `sendEmail` tool descriptor — [`594e5f06`](https://github.com/ever-works/ever-works/commit/594e5f06). New `AGENT_EMAIL_FACADE` token + `AgentEmailFacade` contract (mirrors AGENT_GIT_FACADE), `buildSendEmailTool` gated on `canCallExternalTools` + facade presence; ≥1-outbound-assignment enforced at invoke time. 4 new unit tests.
+- **T24 EW-670** Agent `messageAgent` tool descriptor — [`9ec6b31d`](https://github.com/ever-works/ever-works/commit/9ec6b31d). Peer-to-peer verb (spec §12.4) gated on `canCallExternalTools` + facade implementing the optional `messageAgent` method; invoke rejects self-messaging + empty fields. 3 new unit tests (16/16 agent-tool suite green).
 
 ## ✅ Resolved — apps/api repo method mismatch (was a T22 finding, fixed in T22b)
 
