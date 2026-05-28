@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import { renderTemplate } from './templates/render';
 import {
     TenantEmailAddressRepository,
     AgentEmailAssignmentRepository,
@@ -22,13 +23,22 @@ export interface UpdateEmailAddressInput {
     readonly disabled?: boolean;
 }
 
+/** A React-Email template handle (rendered server-side via @ever-works/email-templates). */
+export interface EmailTemplateRef {
+    readonly slug: string;
+    readonly props: Record<string, unknown>;
+}
+
 export interface SendMessageInput {
     readonly agentId: string;
     readonly to: string[];
     readonly subject: string;
-    readonly bodyText: string;
+    /** Plain-text body. Optional when `template` is supplied (rendered then). */
+    readonly bodyText?: string;
     readonly cc?: string[];
     readonly bodyHtml?: string;
+    /** Render a registered React-Email template into bodyHtml + text on send. */
+    readonly template?: EmailTemplateRef;
     /** Specific tenant address to send from; defaults to the agent's primary outbound. */
     readonly fromAddressId?: string;
 }
@@ -145,6 +155,19 @@ export class EmailService {
             throw new NotFoundException('Agent has no outbound email address assigned');
         }
 
+        // Render a React-Email template (server-side) into HTML + text
+        // when supplied; otherwise use the caller-provided bodies.
+        let bodyText = input.bodyText ?? '';
+        let bodyHtml = input.bodyHtml;
+        if (input.template) {
+            const rendered = await renderTemplate(input.template.slug, input.template.props);
+            bodyText = rendered.text;
+            bodyHtml = rendered.html;
+        }
+        if (!bodyText && !bodyHtml) {
+            throw new BadRequestException('Email requires bodyText, bodyHtml, or a template');
+        }
+
         const messageRef = `compose-${input.agentId}-${Date.now()}`;
         const result = await this.emailFacade.send(
             {
@@ -152,8 +175,8 @@ export class EmailService {
                 to: input.to,
                 cc: input.cc,
                 subject: input.subject,
-                bodyText: input.bodyText,
-                bodyHtml: input.bodyHtml,
+                bodyText,
+                bodyHtml,
                 messageRef,
             },
             { userId, agentId: input.agentId, addressId: address.id },
