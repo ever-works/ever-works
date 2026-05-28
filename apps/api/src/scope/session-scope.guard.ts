@@ -65,37 +65,46 @@ export class SessionScopeGuard implements CanActivate {
             return true;
         }
 
-        const scope = this.scopeContext.getScope();
-        if (scope.tenantId !== null) {
-            // A slug already resolved a scope (Phase 7 middleware, or a
-            // slug-prefixed route). Nothing to fall back to.
-            return true;
-        }
-
         const req = context.switchToHttp().getRequest<{
-            user?: { userId?: string };
+            user?: { userId?: string; tenantId?: string | null };
         }>();
         const user = req.user;
         if (!user?.userId) {
-            // Unauthenticated request — nothing to seed.
+            // Unauthenticated request — nothing to hydrate or seed.
             return true;
         }
 
-        // One extra findById per authenticated legacy-route request (slug
-        // routes short-circuit above). `AuthenticatedUser` doesn't carry
-        // tenantId / lastScopeOrganizationId, so we read the row here.
+        // Load the user's Tenant. `AuthenticatedUser` doesn't carry
+        // tenantId (the auth layer never sets it), so we read it here —
+        // ONE indexed PK lookup per authenticated request.
+        //
+        // We hydrate on BOTH legacy AND slug-prefixed routes, not just
+        // legacy: the next guard (`ScopeOwnershipGuard`) authorizes by
+        // comparing `req.user.tenantId` against the resolved
+        // `scope.tenantId`. If we only hydrated on legacy routes, every
+        // authenticated slug-prefixed request would 403 — `user.tenantId`
+        // would be undefined while the slug resolved a real scope.
+        // (Codex + Greptile P1 on PR #1074.)
         const dbUser = await this.userRepository.findById(user.userId);
         const tenantId = dbUser?.tenantId ?? null;
-        if (tenantId === null) {
-            // User never created an Org → no Tenant → leave EMPTY_SCOPE.
-            return true;
-        }
 
-        this.scopeContext.setScope({
-            tenantId,
-            organizationId: dbUser?.lastScopeOrganizationId ?? null,
-        });
-        this.logger.debug(`Seeded session scope for user ${user.userId}: tenantId=${tenantId}`);
+        // Hydrate req.user unconditionally so the field is always defined
+        // (not ambiguously undefined) by the time the ownership guard
+        // reads it.
+        user.tenantId = tenantId;
+
+        // Seed the default scope ONLY on legacy routes (no slug resolved
+        // a scope). Slug routes keep the middleware-resolved scope; the
+        // ownership guard then verifies it belongs to this user's
+        // hydrated tenant.
+        const scope = this.scopeContext.getScope();
+        if (scope.tenantId === null && tenantId !== null) {
+            this.scopeContext.setScope({
+                tenantId,
+                organizationId: dbUser?.lastScopeOrganizationId ?? null,
+            });
+            this.logger.debug(`Seeded session scope for user ${user.userId}: tenantId=${tenantId}`);
+        }
 
         return true;
     }

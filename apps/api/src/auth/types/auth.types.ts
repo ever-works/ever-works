@@ -41,6 +41,12 @@ export interface AuthenticatedUser {
     // EW-617 G2: downstream services can gate behavior on this flag
     // (e.g. quotas, claim-account UI nag, OAuth restrictions).
     isAnonymous?: boolean;
+    // EW-664 (Phase 12): NOT populated by the auth layer — hydrated at
+    // request time by `SessionScopeGuard` (which already loads the user
+    // row) so `ScopeOwnershipGuard` can authorize the resolved scope
+    // against the user's real Tenant. `undefined` until that guard runs;
+    // `null` for users not yet upgraded to a Tenant.
+    tenantId?: string | null;
 }
 
 export interface TokenResponse {
