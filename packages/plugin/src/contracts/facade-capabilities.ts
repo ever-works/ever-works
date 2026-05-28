@@ -29,7 +29,14 @@ export const PLUGIN_CAPABILITIES = {
 	// category for external task trackers. "Ever Works Task Tracker"
 	// is the first-party default. Community plugins (Linear / Jira /
 	// GitHub Issues) implement the same contract.
-	TASK_TRACKER: 'task-tracker'
+	TASK_TRACKER: 'task-tracker',
+	// Pluggable persistent memory for AI coding / generation agents.
+	// First-party implementation: `@ever-works/agentmemory-plugin`
+	// (talks to the `agentmemory` standalone Node server on :3111 —
+	// runs locally OR hosted via a configurable `baseUrl` + bearer
+	// token). Community plugins (mem0, zep, langmem) implement the
+	// same `IAgentMemoryPlugin` contract.
+	AGENT_MEMORY: 'agent-memory'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];
