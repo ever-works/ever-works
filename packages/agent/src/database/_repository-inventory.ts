@@ -31,22 +31,33 @@
 
 import type { Type } from '@nestjs/common';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
+import { AgentEmailAssignmentRepository } from './repositories/agent-email-assignment.repository';
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
+import { EmailConversationRepository } from './repositories/email-conversation.repository';
+import { EmailMessageRepository } from './repositories/email-message.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
+import { NotificationChannelDeliveryLogRepository } from './repositories/notification-channel-delivery-log.repository';
+import { NotificationChannelRepository } from './repositories/notification-channel.repository';
+import { NotificationEventTypeRepository } from './repositories/notification-event-type.repository';
 import { NotificationRepository } from './repositories/notification.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
+import { OrganizationNotificationDefaultRepository } from './repositories/organization-notification-default.repository';
 import { OrganizationRepository } from './repositories/organization.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { TemplateRepository } from './repositories/template.repository';
+import { TenantEmailAddressRepository } from './repositories/tenant-email-address.repository';
 import { TenantRepository } from './repositories/tenant.repository';
 import { UsageLedgerRepository } from './repositories/usage-ledger.repository';
+import { UserNotificationCategoryMuteRepository } from './repositories/user-notification-category-mute.repository';
+import { UserNotificationPreferenceRepository } from './repositories/user-notification-preference.repository';
+import { UserNotificationSubscriptionRepository } from './repositories/user-notification-subscription.repository';
 import { UserRepository } from './repositories/user.repository';
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
@@ -65,22 +76,33 @@ import { WorkScheduleRepository } from './repositories/work-schedule.repository'
 
 export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ActivityLogRepository,
+    AgentEmailAssignmentRepository,
     ApiKeyRepository,
     AuthAccountRepository,
     ConversationRepository,
+    EmailConversationRepository,
+    EmailMessageRepository,
     GitHubAppInstallationRepoRepository,
     GitHubAppInstallationRepository,
     GitHubAppUserLinkRepository,
+    NotificationChannelDeliveryLogRepository,
+    NotificationChannelRepository,
+    NotificationEventTypeRepository,
     NotificationRepository,
     OnboardingRequestRepository,
+    OrganizationNotificationDefaultRepository,
     OrganizationRepository,
     PluginUsageRepository,
     RefreshTokenRepository,
     SubscriptionPlanRepository,
     TemplateCustomizationRepository,
     TemplateRepository,
+    TenantEmailAddressRepository,
     TenantRepository,
     UsageLedgerRepository,
+    UserNotificationCategoryMuteRepository,
+    UserNotificationPreferenceRepository,
+    UserNotificationSubscriptionRepository,
     UserRepository,
     UserSubscriptionRepository,
     UserTemplatePreferenceRepository,
