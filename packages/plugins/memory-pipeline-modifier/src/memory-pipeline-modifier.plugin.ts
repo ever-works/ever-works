@@ -253,7 +253,7 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		(context as ContextBag).__memoryModifierExecContext = execContext;
 
 		if (stepId === FETCH_CONTEXT_STEP_ID) {
-			return await this.runFetchContext(context as ContextBag, memoryFacade, settings, logger, execContext);
+			return await this.runFetchContext(context as ContextBag, memoryFacade, settings, logger);
 		}
 		if (stepId === SAVE_MEMORY_STEP_ID) {
 			return await this.runSaveMemory(context as ContextBag, memoryFacade, settings, logger);
@@ -338,8 +338,7 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		context: ContextBag,
 		memoryFacade: IAgentMemoryStepFacade,
 		settings: MemoryPipelineModifierSettings,
-		logger: { log(msg: string, ...args: unknown[]): void; warn(msg: string, ...args: unknown[]): void },
-		_execContext: StepExecutionContext | undefined
+		logger: { log(msg: string, ...args: unknown[]): void; warn(msg: string, ...args: unknown[]): void }
 	): Promise<IPipelineContext> {
 		try {
 			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
@@ -473,7 +472,10 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		work: { id?: string; slug?: string } | undefined,
 		isCancellation: boolean
 	): readonly string[] {
-		const tags: string[] = ['pipeline-run', isCancellation ? 'cancelled' : 'failed'];
+		// `let` because we push into this — matches the team's "const
+		// for non-mutated values" rule (greptile P2 on PR #1082).
+		// eslint-disable-next-line prefer-const
+		let tags: string[] = ['pipeline-run', isCancellation ? 'cancelled' : 'failed'];
 		if (work?.slug) tags.push(`work:${work.slug}`);
 		else if (work?.id) tags.push(`work-id:${work.id}`);
 		return tags;

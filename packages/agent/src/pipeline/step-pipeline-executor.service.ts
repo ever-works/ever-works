@@ -378,7 +378,10 @@ export class StepPipelineExecutorService {
         context: IPipelineContext,
         error: Error,
     ): Promise<void> {
-        const modifierIds = new Set<string>();
+        // `let` because we mutate via `.add()` — matches the team's
+        // "const for non-mutated values" rule (greptile P2 on PR #1082).
+        // eslint-disable-next-line prefer-const
+        let modifierIds = new Set<string>();
         for (const executor of pipeline.executorMap.values()) {
             if (executor.type === 'plugin') {
                 modifierIds.add(executor.pluginId);
