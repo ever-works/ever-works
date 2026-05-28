@@ -15,6 +15,9 @@ import { SkillsFacadeService } from '../skills.facade';
 import { TasksFacadeService } from '../tasks.facade';
 // EW-N (agentmemory plugin) — pluggable persistent memory facade.
 import { AgentMemoryFacadeService } from '../agent-memory.facade';
+// Notifications v2 (EW-650 + EW-663) — email + notification-channel facades.
+import { EmailFacadeService } from '../email.facade';
+import { NotificationChannelFacadeService } from '../notification-channel.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -42,6 +45,9 @@ describe('FacadesModule + barrel re-exports', () => {
         TasksFacadeService,
         // EW-N — Agent-Memory facade (default plugin: agentmemory REST :3111).
         AgentMemoryFacadeService,
+        // Notifications v2 (EW-650 + EW-663) — email + multi-channel notifications.
+        EmailFacadeService,
+        NotificationChannelFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -107,6 +113,10 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.SkillsFacadeService).toBe(SkillsFacadeService);
             expect(facadesBarrel.TasksFacadeService).toBe(TasksFacadeService);
             expect(facadesBarrel.AgentMemoryFacadeService).toBe(AgentMemoryFacadeService);
+            expect(facadesBarrel.EmailFacadeService).toBe(EmailFacadeService);
+            expect(facadesBarrel.NotificationChannelFacadeService).toBe(
+                NotificationChannelFacadeService,
+            );
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -137,6 +147,9 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.NoDeployProviderError).toBe('function');
             expect(typeof facadesBarrel.DeployProviderNotFoundError).toBe('function');
             expect(typeof facadesBarrel.NoDeployCredentialsError).toBe('function');
+            // Notifications v2 — email + notification-channel.
+            expect(typeof facadesBarrel.EmailFacadeError).toBe('function');
+            expect(typeof facadesBarrel.NotificationChannelFacadeError).toBe('function');
         });
 
         it('re-exports the shared FacadeError + base classes (NoProviderError / ProviderNotFoundError)', () => {
@@ -199,6 +212,11 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Agent-Memory facade (default plugin: agentmemory REST :3111).
                     'AgentMemoryFacadeError',
                     'AgentMemoryFacadeService',
+                    // Notifications v2 (EW-650 + EW-663) — email + notification channels.
+                    'EmailFacadeError',
+                    'EmailFacadeService',
+                    'NotificationChannelFacadeError',
+                    'NotificationChannelFacadeService',
                 ].sort(),
             );
         });

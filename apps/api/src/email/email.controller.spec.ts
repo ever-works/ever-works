@@ -1,3 +1,19 @@
+// Stub the agent subpaths + auth barrel so their transitive
+// `@ever-works/agent/database` → `database.config.ts` (which imports the
+// api-only `@src/config` alias) is never pulled into this controller test.
+jest.mock('@ever-works/agent/facades', () => ({
+    EmailFacadeService: class EmailFacadeService {},
+}));
+jest.mock('@ever-works/agent/notifications', () => ({
+    AGENT_INBOUND_EMAIL_DISPATCHER: 'AGENT_INBOUND_EMAIL_DISPATCHER',
+}));
+jest.mock('@ever-works/agent/database', () => ({}));
+jest.mock('../auth', () => ({
+    CurrentUser: () => () => undefined,
+    Public: () => () => undefined,
+    AuthSessionGuard: class AuthSessionGuard {},
+}));
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
