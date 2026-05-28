@@ -7,6 +7,7 @@ describe('PipelineFacadeService', () => {
     let contentExtractorFacade: any;
     let promptFacade: any;
     let dataSourceFacade: any;
+    let agentMemoryFacade: any;
     let service: PipelineFacadeService;
 
     function makeWork(overrides: any = {}) {
@@ -57,6 +58,16 @@ describe('PipelineFacadeService', () => {
             getEnabledSources: jest.fn().mockResolvedValue([]),
             isConfigured: jest.fn().mockReturnValue(true),
         };
+        agentMemoryFacade = {
+            openSession: jest.fn().mockResolvedValue({ id: 's1', startedAt: 'now' }),
+            closeSession: jest.fn().mockResolvedValue(undefined),
+            saveMemory: jest.fn().mockResolvedValue({ id: 'm1', createdAt: 'now', content: 'x' }),
+            searchMemory: jest.fn().mockResolvedValue({ results: [] }),
+            buildContext: jest.fn().mockResolvedValue({ content: 'c' }),
+            deleteEntry: jest.fn().mockResolvedValue(undefined),
+            listSessions: jest.fn().mockResolvedValue([]),
+            isConfigured: jest.fn().mockReturnValue(true),
+        };
 
         service = new PipelineFacadeService(
             aiFacade,
@@ -65,6 +76,7 @@ describe('PipelineFacadeService', () => {
             contentExtractorFacade,
             promptFacade,
             dataSourceFacade,
+            agentMemoryFacade,
         );
     });
 
@@ -119,6 +131,37 @@ describe('PipelineFacadeService', () => {
         it('omits kbContext when not provided (carrier stays undefined)', () => {
             const ctx = service.createStepExecutionContext(makeWork() as any);
             expect(ctx.kbContext).toBeUndefined();
+        });
+
+        // Agent-memory facade carrier — wired in the agentmemory follow-up PR.
+        it('exposes a bound agentMemoryFacade when AgentMemoryFacadeService is injected', () => {
+            const ctx = service.createStepExecutionContext(makeWork() as any);
+            expect(ctx.agentMemoryFacade).toBeDefined();
+            // Bound facade should pre-fill workId/userId — caller passes a
+            // placeholder facadeOptions and the underlying service receives
+            // the real ids.
+            ctx.agentMemoryFacade?.saveMemory(
+                { content: 'hi' },
+                { userId: 'IGNORED', workId: 'IGNORED' },
+            );
+            expect(agentMemoryFacade.saveMemory).toHaveBeenCalledWith(
+                { content: 'hi' },
+                expect.objectContaining({ userId: 'u1', workId: 'w1' }),
+            );
+        });
+
+        it('omits agentMemoryFacade when AgentMemoryFacadeService is not injected (Optional)', () => {
+            const standaloneService = new PipelineFacadeService(
+                aiFacade,
+                searchFacade,
+                screenshotFacade,
+                contentExtractorFacade,
+                promptFacade,
+                dataSourceFacade,
+                undefined,
+            );
+            const ctx = standaloneService.createStepExecutionContext(makeWork() as any);
+            expect(ctx.agentMemoryFacade).toBeUndefined();
         });
 
         it('forwards the provided kbContext bundle into the StepExecutionContext', () => {

@@ -210,6 +210,34 @@ export class PluginRegistryService {
             .filter((p): p is RegisteredPlugin => p !== undefined);
     }
 
+    /**
+     * Notifications v2 (EW-650) — convenience discovery for the
+     * EmailFacadeService. Returns every loaded plugin that declares
+     * the EMAIL_OUTBOUND capability.
+     */
+    getOutboundEmailProviders(): RegisteredPlugin[] {
+        return this.getByCapability('email-outbound').filter((p) => p.state === 'loaded');
+    }
+
+    /**
+     * Notifications v2 (EW-650) — convenience discovery for the
+     * email inbound webhook controller. Returns every loaded plugin
+     * that declares the EMAIL_INBOUND capability.
+     */
+    getInboundEmailProviders(): RegisteredPlugin[] {
+        return this.getByCapability('email-inbound').filter((p) => p.state === 'loaded');
+    }
+
+    /**
+     * Notifications v2 (sibling of EW-650) — convenience discovery
+     * for the NotificationChannelFacadeService. Returns every loaded
+     * plugin that declares the umbrella NOTIFICATION_CHANNEL
+     * capability (Discord / Slack / Telegram / WhatsApp / Novu / …).
+     */
+    getNotificationChannelProviders(): RegisteredPlugin[] {
+        return this.getByCapability('notification-channel').filter((p) => p.state === 'loaded');
+    }
+
     /** Returns first ready plugin with this capability in defaultForCapabilities */
     getDefaultForCapability(capability: string): RegisteredPlugin | undefined {
         const plugins = this.getByCapability(capability);

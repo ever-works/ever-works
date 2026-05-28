@@ -17,7 +17,12 @@ export const PLUGIN_CATEGORIES = [
 	'theme',
 	// EW-637 — pluggable object storage backends (local-fs, S3, MinIO, GitHub).
 	// See packages/plugin/src/contracts/capabilities/storage.interface.ts.
-	'storage'
+	'storage',
+	// Notifications v2 (EW-650 + EW-663) — email + chat-channel providers.
+	// See `capabilities/email-provider.interface.ts` and
+	// `capabilities/notification-channel.interface.ts`.
+	'email-provider',
+	'notification-channel'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
@@ -236,4 +241,34 @@ export interface PluginManifest {
 	readonly targetPipelines?: readonly string[];
 	/** UI behavior hints for the frontend. Drives plugin-specific UI without hardcoding IDs. */
 	readonly uiHints?: PluginUiHints;
+	/**
+	 * Notifications v2 (EW-664 / EW-676) — events this plugin emits.
+	 * Picked up at plugin-load time by the platform's
+	 * `notification_event_types` registry so the Settings →
+	 * Notifications preference matrix can render them without a
+	 * platform redeploy. Keys are namespaced server-side as
+	 * `<pluginId>:<key>` to prevent collision with core event keys.
+	 */
+	readonly events?: readonly PluginNotificationEvent[];
+}
+
+/**
+ * A plugin-declared notification event type. Each entry results in one
+ * `notification_event_types` row keyed by `<pluginId>:<key>`.
+ *
+ * See `docs/specs/features/event-subscriptions/spec.md` §3.
+ */
+export interface PluginNotificationEvent {
+	/** Short event key, scoped to the plugin (e.g. `invoice_paid`). */
+	readonly key: string;
+	/** Notification category (see `NotificationCategory`). */
+	readonly category: string;
+	/** Human-readable title rendered in the preferences UI. */
+	readonly title: string;
+	/** 1-2 sentence description. */
+	readonly description: string;
+	/** `true` → bypass per-user quiet hours. */
+	readonly urgent?: boolean;
+	/** Channels enabled by default for new users. Defaults to `['in-app']`. */
+	readonly defaultChannels?: readonly string[];
 }

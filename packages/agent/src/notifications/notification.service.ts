@@ -1,4 +1,5 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationRepository } from '@src/database/repositories/notification.repository';
 import {
     Notification,
@@ -8,11 +9,51 @@ import {
     NotificationCategory,
 } from '@src/entities';
 
+/**
+ * Notifications v2 (EW-664 / EW-678) — payload emitted on
+ * `notifications-v2.fanout-requested` after every in-app producer
+ * call. The api layer's `NotificationFanoutListener` consumes this and
+ * delegates to `NotificationChannelFacadeService` for the multi-channel
+ * fanout. Keeping the listener in the api layer avoids pulling the
+ * channel-facade + subscription-resolver deps into the agent package.
+ */
+export interface NotificationFanoutEvent {
+    readonly userId: string;
+    readonly eventKey: string;
+    readonly title: string;
+    readonly message: string;
+    readonly actionUrl?: string;
+    readonly actionLabel?: string;
+    readonly urgent: boolean;
+}
+
+export const NOTIFICATION_FANOUT_EVENT = 'notifications-v2.fanout-requested';
+
 @Injectable()
 export class NotificationService {
     private readonly logger = new Logger(NotificationService.name);
 
-    constructor(private readonly repository: NotificationRepository) {}
+    constructor(
+        private readonly repository: NotificationRepository,
+        @Optional() private readonly eventEmitter?: EventEmitter2,
+    ) {}
+
+    /**
+     * Emit the multi-channel fanout event. No-op when EventEmitter2 isn't
+     * wired (e.g. in v1 unit tests that don't import EventEmitterModule).
+     * Producer methods invoke this AFTER successfully writing the in-app
+     * row so a fanout failure can never block the v1 path.
+     */
+    private async dispatchFanout(payload: NotificationFanoutEvent): Promise<void> {
+        if (!this.eventEmitter) return;
+        try {
+            this.eventEmitter.emit(NOTIFICATION_FANOUT_EVENT, payload);
+        } catch (err) {
+            this.logger.warn(
+                `Notifications v2 fanout emission failed for user=${payload.userId} event=${payload.eventKey}: ${String(err)}`,
+            );
+        }
+    }
 
     /**
      * Create a new notification for a user.
@@ -182,6 +223,17 @@ export class NotificationService {
             isPersistent: true,
             deduplicationKey: `ai_credits_depleted_${provider.toLowerCase()}`,
         });
+        await this.dispatchFanout({
+            userId,
+            eventKey: 'ai_credits_depleted',
+            title: 'AI Credits Depleted',
+            message:
+                errorMessage ||
+                `Your ${provider} credits have been exhausted. Please add more credits to continue.`,
+            actionUrl: '/settings',
+            actionLabel: 'Add Credits',
+            urgent: true,
+        });
     }
 
     async notifyAiProviderError(
@@ -198,6 +250,15 @@ export class NotificationService {
             actionUrl: '/settings',
             actionLabel: 'Check Settings',
             deduplicationKey: `ai_provider_error_${provider.toLowerCase()}`,
+        });
+        await this.dispatchFanout({
+            userId,
+            eventKey: 'ai_provider_error',
+            title: 'AI Provider Error',
+            message: `Error with ${provider}: ${errorMessage}`,
+            actionUrl: '/settings',
+            actionLabel: 'Check Settings',
+            urgent: false,
         });
     }
 
@@ -218,6 +279,15 @@ export class NotificationService {
             metadata: { workId, workName },
             deduplicationKey: `generation_error_${workId}`,
         });
+        await this.dispatchFanout({
+            userId,
+            eventKey: 'generation_error',
+            title: 'Generation Failed',
+            message: `Generation for "${workName}" failed: ${errorMessage}`,
+            actionUrl: `/works/${workId}`,
+            actionLabel: 'View Work',
+            urgent: false,
+        });
     }
 
     async notifySchedulePaused(
@@ -236,6 +306,15 @@ export class NotificationService {
             actionLabel: 'View Schedule',
             metadata: { workId, workName },
             deduplicationKey: `schedule_paused_${workId}`,
+        });
+        await this.dispatchFanout({
+            userId,
+            eventKey: 'schedule_paused',
+            title: 'Schedule Paused',
+            message: `Scheduled updates for "${workName}" paused: ${reason}`,
+            actionUrl: `/works/${workId}/generator/schedule`,
+            actionLabel: 'View Schedule',
+            urgent: false,
         });
     }
 
@@ -294,6 +373,15 @@ export class NotificationService {
             actionLabel: 'Reconnect',
             isPersistent: true,
             deduplicationKey: `git_auth_expired_${provider.toLowerCase()}`,
+        });
+        await this.dispatchFanout({
+            userId,
+            eventKey: 'git_auth_expired',
+            title: 'Git Authentication Expired',
+            message: `Your ${provider} authentication has expired. Please reconnect.`,
+            actionUrl: '/settings/oauth',
+            actionLabel: 'Reconnect',
+            urgent: true,
         });
     }
 

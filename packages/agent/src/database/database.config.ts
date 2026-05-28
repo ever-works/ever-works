@@ -71,6 +71,18 @@ import {
     MissionAttachment,
     WorkProposalAttachment,
     AgentAttachment,
+    // Notifications v2 (EW-650 + siblings)
+    TenantEmailAddress,
+    AgentEmailAssignment,
+    EmailConversation,
+    EmailMessage,
+    NotificationChannel,
+    NotificationChannelDeliveryLog,
+    NotificationEventType,
+    UserNotificationSubscription,
+    UserNotificationPreference,
+    UserNotificationCategoryMute,
+    OrganizationNotificationDefault,
 } from '../entities';
 import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
@@ -185,6 +197,18 @@ export const ENTITIES = [
     WorkPluginEntity,
     // Account transfer entities
     UserSyncConfig,
+    // Notifications v2 (EW-650 + siblings)
+    TenantEmailAddress,
+    AgentEmailAssignment,
+    EmailConversation,
+    EmailMessage,
+    NotificationChannel,
+    NotificationChannelDeliveryLog,
+    NotificationEventType,
+    UserNotificationSubscription,
+    UserNotificationPreference,
+    UserNotificationCategoryMute,
+    OrganizationNotificationDefault,
 ];
 
 /**
