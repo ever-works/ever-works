@@ -201,4 +201,42 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
         // No direct router navigation yet — the upgrade dialog owns the next step.
         expect(routerPushMock).not.toHaveBeenCalled();
     });
+
+    /**
+     * Regression — when the org-list GET errored, `organizations` is `[]`
+     * but unreliable, so the user must NOT be treated as first-org (which
+     * would route into upgrade-from-account → 409 for 2nd+ orgs). A
+     * successful register navigates straight to the dashboard instead.
+     * (Greptile P2 on PR #1077.)
+     */
+    it('does not misclassify as first-org when the org-list fetch errored', async () => {
+        __seedOrganizationsStoreForTests({
+            data: [],
+            isLoading: false,
+            error: new Error('GET /api/organizations failed'),
+        });
+        const newOrg = org({ id: 'o-3', slug: 'initech', displayName: 'Initech' });
+        vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+            const u = String(url);
+            if (u === '/api/organizations/register-company' && init?.method === 'POST') {
+                return new Response(JSON.stringify(newOrg), { status: 201 });
+            }
+            return new Response(JSON.stringify([newOrg]), { status: 200 });
+        });
+
+        const onOpenChange = vi.fn();
+        render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
+
+        fireEvent.change(screen.getByTestId('register-company-name'), {
+            target: { value: 'Initech' },
+        });
+        fireEvent.click(screen.getByTestId('register-company-submit'));
+
+        await waitFor(() => {
+            expect(onOpenChange).toHaveBeenCalledWith(false);
+            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+        });
+        // The upgrade dialog (first-org path) must NOT appear.
+        expect(screen.queryByText('organizations.upgrade.title')).toBeNull();
+    });
 });

@@ -53,7 +53,7 @@ export interface RegisterCompanyDialogProps {
 export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDialogProps) {
     const t = useTranslations('organizations.registerCompany');
     const router = useRouter();
-    const { organizations, isLoading, mutate } = useOrganizations();
+    const { organizations, isLoading, error: orgsError, mutate } = useOrganizations();
 
     const [name, setName] = useState('');
     const [countryCode, setCountryCode] = useState('');
@@ -118,7 +118,12 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
             return;
         }
         setSubmitError(null);
-        wasFirstOrgRef.current = organizations.length === 0;
+        // Only treat this as the user's first Org when we have a CONFIRMED
+        // empty list. If the org-list GET errored, `organizations` is still
+        // `[]` but unreliable — defaulting to not-first-org sends the user to
+        // the dashboard (recoverable) rather than into upgrade-from-account,
+        // which 409s for 2nd+ orgs. (Greptile P2 on PR #1077.)
+        wasFirstOrgRef.current = !orgsError && organizations.length === 0;
         setIsSubmitting(true);
 
         try {
@@ -170,6 +175,7 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
     }, [
         isSubmitting,
         isLoading,
+        orgsError,
         name,
         countryCode,
         organizations.length,
@@ -250,7 +256,7 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                             </Button>
                             <Button
                                 onClick={handleSubmit}
-                                loading={isSubmitting || isLoading}
+                                loading={isSubmitting}
                                 disabled={isSubmitting || isLoading || name.trim().length === 0}
                                 data-testid="register-company-submit"
                             >
