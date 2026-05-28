@@ -39,6 +39,17 @@ import {
  * NotificationFanoutListener (replacing its thin stub resolver). The
  * v1 NotificationService.create path remains untouched.
  */
+/**
+ * Outcome of {@link UserNotificationSubscriptionService.resolvePlan}.
+ * `immediate` channels deliver now; `deferred` channels are held until
+ * `deferUntil` (end of the user's quiet-hours window, ISO-8601).
+ */
+export interface ResolvedChannelPlan {
+    immediate: string[];
+    deferred: string[];
+    deferUntil?: string;
+}
+
 @Injectable()
 export class UserNotificationSubscriptionService {
     private readonly logger = new Logger(UserNotificationSubscriptionService.name);
@@ -57,10 +68,24 @@ export class UserNotificationSubscriptionService {
      * the user can review).
      */
     async resolveChannels(userId: string, eventTypeKey: string): Promise<string[]> {
+        const plan = await this.resolvePlan(userId, eventTypeKey);
+        return plan.immediate;
+    }
+
+    /**
+     * Deferral-aware resolution. `immediate` always carries `'in-app'`
+     * (unless muted). For a non-urgent event inside the user's quiet
+     * hours, non-in-app channels move to `deferred` with `deferUntil`
+     * set to the end-of-window instant (ISO) — the producer enqueues
+     * them on the Trigger.dev delivery task with that `delay` instead of
+     * dropping them. Muted categories are silenced (dropped, NOT
+     * deferred) — a mute means "don't tell me", not "tell me later".
+     */
+    async resolvePlan(userId: string, eventTypeKey: string): Promise<ResolvedChannelPlan> {
         const eventType = await this.eventTypes.findByKey(eventTypeKey);
         if (!eventType) {
             this.logger.debug(`Unknown event type ${eventTypeKey}; defaulting to in-app only`);
-            return ['in-app'];
+            return { immediate: ['in-app'], deferred: [] };
         }
 
         let channels = await this.loadInitialChannels(
@@ -78,25 +103,26 @@ export class UserNotificationSubscriptionService {
             }
         }
 
-        // Quiet hours (drops non-in-app for non-urgent events)
+        // Quiet hours: defer (not drop) non-in-app channels for non-urgent
+        // events so they fire at end-of-window.
         if (this.preferences && !eventType.urgent && channels.some((c) => c !== 'in-app')) {
             const pref = await this.preferences.findByUser(userId);
             if (pref?.quietHoursStart && pref?.quietHoursEnd) {
-                const inQuietWindow = isWithinQuietHours(
-                    new Date(),
-                    pref.quietHoursStart,
-                    pref.quietHoursEnd,
-                    pref.timezone ?? 'UTC',
-                );
-                if (inQuietWindow) {
-                    channels = channels.filter((c) => c === 'in-app');
-                    // TODO(EW-677 v2): enqueue non-in-app channels via
-                    // BullMQ delayed job so they fire at end-of-window.
+                const now = new Date();
+                const timeZone = pref.timezone ?? 'UTC';
+                if (isWithinQuietHours(now, pref.quietHoursStart, pref.quietHoursEnd, timeZone)) {
+                    const deferred = channels.filter((c) => c !== 'in-app');
+                    const immediate = channels.filter((c) => c === 'in-app');
+                    return {
+                        immediate,
+                        deferred,
+                        deferUntil: quietHoursEndIso(now, pref.quietHoursEnd, timeZone),
+                    };
                 }
             }
         }
 
-        return channels;
+        return { immediate: channels, deferred: [] };
     }
 
     private async loadInitialChannels(
@@ -163,4 +189,39 @@ function toMinutes(hms: string): number {
     const [h, m, s] = hms.split(':').map((n) => Number.parseInt(n, 10) || 0);
     // Hour 24 (midnight as end-of-day) is allowed in some libs.
     return (h % 24) * 60 + (m % 60) + (s >= 30 ? 1 : 0);
+}
+
+/**
+ * The next instant (ISO-8601) at which the user's quiet-hours window
+ * ends, computed from `now` + the wall-clock minutes until `quietEnd`
+ * in the user's timezone. Used as the Trigger.dev `delay` target for
+ * deferred channels. Assumes the caller has already confirmed `now` is
+ * within the window. DST transitions inside the window may shift the
+ * fire time by ±1h — acceptable for a "fire after quiet hours" signal.
+ */
+export function quietHoursEndIso(now: Date, quietEnd: string, timeZone: string): string {
+    let delayMinutes: number;
+    try {
+        const formatter = new Intl.DateTimeFormat('en-GB', {
+            timeZone,
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
+        const parts = formatter.formatToParts(now);
+        const get = (type: Intl.DateTimeFormatPartTypes) =>
+            parts.find((p) => p.type === type)?.value ?? '00';
+        const nowMinutes = toMinutes(`${get('hour')}:${get('minute')}:${get('second')}`);
+        const endMinutes = toMinutes(quietEnd);
+        const diff = (((endMinutes - nowMinutes) % 1440) + 1440) % 1440;
+        // diff === 0 means now is exactly at the boundary — push a full
+        // day rather than firing instantly (shouldn't happen for an
+        // in-window check, but keeps the delay strictly positive).
+        delayMinutes = diff === 0 ? 1440 : diff;
+    } catch {
+        // Fall back to a 1h defer so a bad timezone never drops the send.
+        delayMinutes = 60;
+    }
+    return new Date(now.getTime() + delayMinutes * 60_000).toISOString();
 }

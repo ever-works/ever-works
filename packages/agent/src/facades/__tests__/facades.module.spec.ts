@@ -217,6 +217,7 @@ describe('FacadesModule + barrel re-exports', () => {
                     'EmailFacadeService',
                     'NotificationChannelFacadeError',
                     'NotificationChannelFacadeService',
+                    'NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER',
                 ].sort(),
             );
         });

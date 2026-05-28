@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PLUGIN_CAPABILITIES, type FacadeOptions } from '@ever-works/plugin';
 import {
     isNotificationChannelPlugin,
@@ -37,9 +37,54 @@ export interface NotificationChannelFanoutInput {
 export interface NotificationChannelFanoutResult {
     readonly channelId: string;
     readonly pluginId: string;
-    readonly status: 'delivered' | 'failed';
+    /** `queued` = handed to the Trigger.dev delivery task (async outcome). */
+    readonly status: 'delivered' | 'failed' | 'queued';
     readonly providerMessageId?: string;
     readonly error?: string;
+}
+
+/**
+ * Payload handed to the Trigger.dev `notification-channel-delivery`
+ * dispatcher. The Trigger task calls back into
+ * `deliverToChannelOrThrow` (via the trigger-internal RPC) to perform
+ * the actual single attempt under the task's retry policy.
+ */
+export interface NotificationChannelDeliveryPayload {
+    readonly channelId: string;
+    readonly text: string;
+    readonly rich?: ChannelRichPayload;
+    readonly messageRef: string;
+    readonly eventType?: string;
+    readonly options: FacadeOptions;
+    /**
+     * ISO-8601 timestamp. When set, the dispatcher schedules the run
+     * with a Trigger.dev `delay` so it fires then (quiet-hours deferral).
+     */
+    readonly deferUntil?: string;
+}
+
+/**
+ * Producer-side hand-off to Trigger.dev. Bound in apps/api to an
+ * adapter over `TriggerService.dispatchNotificationChannelDelivery`;
+ * left UNBOUND in dev / when Trigger is disabled, in which case the
+ * facade delivers in-process (synchronous fallback).
+ */
+export interface NotificationChannelDeliveryDispatcher {
+    enqueue(payload: NotificationChannelDeliveryPayload): Promise<{ runId: string | null }>;
+}
+
+export const NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER =
+    'NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER' as const;
+
+/**
+ * A channel to fan out to, optionally deferred. `deferUntil` (ISO-8601)
+ * is set for channels held by quiet hours — the facade enqueues them on
+ * the Trigger.dev delivery task with that `delay`. Plain strings (no
+ * deferral) are accepted too for back-compat with simple resolvers.
+ */
+export interface ResolvedChannelTarget {
+    channelId: string;
+    deferUntil?: string;
 }
 
 /**
@@ -60,9 +105,11 @@ export interface NotificationChannelFanoutResult {
  * - Persists a `notification_channel_delivery_log` row (idempotent on `messageRef`).
  * - Emits a `PluginUsageEvent` with `capability='notification_channel'`.
  *
- * Per-channel retry uses BullMQ (queue `notification-channel-retry`, 3
- * attempts exp-backoff, 24h dead-letter) — wired in T12 with the
- * controller layer.
+ * Per-channel retry uses the Trigger.dev `notification-channel-delivery`
+ * task (exponential-backoff `retry` policy; quiet-hours deferral via the
+ * run `delay`). Event fanout enqueues through the optional
+ * {@link NotificationChannelDeliveryDispatcher}; when it's unbound
+ * (dev / Trigger disabled) the facade delivers in-process as a fallback.
  */
 @Injectable()
 export class NotificationChannelFacadeService extends BaseFacadeService {
@@ -76,6 +123,9 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         @Optional() private readonly channels?: NotificationChannelRepository,
         @Optional() private readonly deliveryLog?: NotificationChannelDeliveryLogRepository,
         @Optional() private readonly pluginUsageService?: PluginUsageService,
+        @Optional()
+        @Inject(NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER)
+        private readonly deliveryDispatcher?: NotificationChannelDeliveryDispatcher,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -90,20 +140,83 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         userId: string,
         eventType: string,
         payload: NotificationChannelFanoutInput,
-        resolveChannelIds: (userId: string, eventType: string) => Promise<readonly string[]>,
+        resolveChannelIds: (
+            userId: string,
+            eventType: string,
+        ) => Promise<readonly (string | ResolvedChannelTarget)[]>,
         options: FacadeOptions,
     ): Promise<readonly NotificationChannelFanoutResult[]> {
-        const channelIds = await resolveChannelIds(userId, eventType);
-        if (channelIds.length === 0) {
+        const resolved = await resolveChannelIds(userId, eventType);
+        if (resolved.length === 0) {
             this.logger.debug(`No channels resolved for user=${userId} event=${eventType}`);
             return [];
         }
+        const scopedOptions: FacadeOptions = { ...options, userId };
         const attempts = await Promise.all(
-            channelIds.map((channelId) =>
-                this.sendOne(channelId, payload, { ...options, userId }, eventType),
-            ),
+            resolved.map((target) => {
+                const { channelId, deferUntil } =
+                    typeof target === 'string'
+                        ? { channelId: target, deferUntil: undefined }
+                        : target;
+                return this.dispatchOrSend(
+                    channelId,
+                    payload,
+                    scopedOptions,
+                    eventType,
+                    deferUntil,
+                );
+            }),
         );
         return attempts;
+    }
+
+    /**
+     * Route one channel to the Trigger.dev delivery task when a
+     * dispatcher is bound (async, retry-backed); otherwise deliver
+     * in-process (fallback). `in-app` always stays inline — it's a
+     * no-op sentinel handled by notifications v1.
+     */
+    private async dispatchOrSend(
+        channelId: string,
+        payload: NotificationChannelFanoutInput,
+        options: FacadeOptions,
+        eventType?: string,
+        deferUntil?: string,
+    ): Promise<NotificationChannelFanoutResult> {
+        if (channelId !== 'in-app' && this.deliveryDispatcher) {
+            try {
+                const { runId } = await this.deliveryDispatcher.enqueue({
+                    channelId,
+                    text: payload.text,
+                    rich: payload.rich,
+                    messageRef: payload.messageRef,
+                    eventType,
+                    options,
+                    deferUntil,
+                });
+                // A null runId means Trigger.dev is disabled / didn't
+                // enqueue — fall through to in-process delivery so the
+                // notification isn't silently lost. Only a real run id
+                // means the delivery is genuinely queued.
+                if (runId) {
+                    return {
+                        channelId,
+                        pluginId: 'queued',
+                        status: 'queued',
+                        providerMessageId: runId,
+                    };
+                }
+            } catch (err) {
+                // Enqueue failed — fall back to an in-process attempt so the
+                // notification isn't silently lost.
+                this.logger.warn(
+                    `channel ${channelId} enqueue failed, delivering in-process: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+        return this.sendOne(channelId, payload, options, eventType);
     }
 
     /**
@@ -136,6 +249,32 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
             taskId: options.taskId,
             settings,
         });
+    }
+
+    /**
+     * Single delivery attempt that THROWS on failure. This is the
+     * primitive the Trigger.dev `notification-channel-delivery` task
+     * calls (via the trigger-internal RPC) so its `retry` policy re-runs
+     * the attempt on failure — whereas `send()`'s parallel fanout uses
+     * `sendOne` directly, which swallows per-channel failures so one bad
+     * channel doesn't sink its siblings. On terminal retry-exhaustion
+     * the delivery-log row left by `sendOne` is the dead-letter.
+     */
+    async deliverToChannelOrThrow(
+        channelId: string,
+        payload: NotificationChannelFanoutInput,
+        options: FacadeOptions,
+        eventType?: string,
+    ): Promise<NotificationChannelFanoutResult> {
+        const result = await this.sendOne(channelId, payload, options, eventType);
+        if (result.status === 'failed') {
+            throw new NotificationChannelFacadeError(
+                result.error ?? 'channel delivery failed',
+                'deliverToChannelOrThrow',
+                result.pluginId,
+            );
+        }
+        return result;
     }
 
     private async sendOne(
