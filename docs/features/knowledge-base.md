@@ -72,7 +72,7 @@ Agents never read the binary original — they read the clean extract.
 
 The KB is exposed over REST, the [MCP server](./mcp-server.md) (`kb.list`, `kb.read`, `kb.search`, `kb.create`, `kb.update`, `kb.upload`), and the CLI (`ever works kb …`), so external Claude / GPT / Gemini sessions and scripts can read and write it with the same access controls.
 
-> **Built-in, with room to extend.** Memory, wiki, and knowledge management ship _inside_ Ever Works as first-class features rather than something you bolt on. Where you want to connect an external knowledge or memory system (for example, an OpenHuman-style memory/wiki layer), that arrives as a plugin alongside these built-ins — additive, never a replacement.
+> **Built-in, with room to extend.** Memory, wiki, and knowledge management ship _inside_ Ever Works as first-class features rather than something you bolt on. Where you want to connect an external knowledge or memory system, that arrives as a plugin alongside these built-ins — additive, never a replacement.
 
 ## See also
 
