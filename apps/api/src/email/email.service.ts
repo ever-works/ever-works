@@ -148,7 +148,10 @@ export class EmailService {
         } else {
             const assignment = await this.assignments.findPrimaryOutboundForAgent(input.agentId);
             if (assignment) {
-                address = await this.addresses.findById(assignment.emailAddressId);
+                // Codex P1 (PR #1085): scope the resolved address to the caller. Otherwise
+                // an authenticated user who knows another user's agentId could send from
+                // that user's outbound address.
+                address = await this.addresses.findByIdForUser(assignment.emailAddressId, userId);
             }
         }
         if (!address) {
