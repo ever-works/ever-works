@@ -103,11 +103,14 @@ export class Work {
     @Column({ default: 'user-github' })
     storageProvider: string; // 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git'
 
-    @Column({ default: 'ever-works', nullable: true })
-    // `| null` (the column is already `nullable: true`): Company Works
-    // (EW-665) explicitly set this to null so they're excluded from the
-    // Ever Works Deploy quota counter. Widening the TS type to match the
-    // DB nullability — no schema change.
+    // Explicit `type: 'varchar'` is REQUIRED now that the TS type is a
+    // `string | null` union: without it TypeORM's reflect-metadata
+    // infers the column type as `Object`, which better-sqlite3 (the
+    // test/CLI adapter) rejects with DataTypeNotSupportedError. The
+    // `| null` itself exists because Company Works (EW-665) set this to
+    // null to stay out of the Ever Works Deploy quota counter. Still no
+    // schema change — the column was already `nullable: true` varchar.
+    @Column({ type: 'varchar', default: 'ever-works', nullable: true })
     deployProvider?: string | null; // 'ever-works' | 'vercel' | 'k8s' | null (company) | ...
 
     @Column({ nullable: true })
