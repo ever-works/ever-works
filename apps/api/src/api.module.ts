@@ -23,6 +23,7 @@ import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.m
 import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
 import { ComposioApiModule } from './plugins/composio/composio.module';
+import { ComposioTriggersModule } from './plugins/composio-triggers/composio-triggers.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeviceAuthModule } from './plugins-capabilities/device-auth/device-auth.module';
@@ -106,6 +107,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         }),
         PluginsModule,
         ComposioApiModule,
+        ComposioTriggersModule,
         GitProviderModule,
         OAuthModule,
         DeviceAuthModule,
