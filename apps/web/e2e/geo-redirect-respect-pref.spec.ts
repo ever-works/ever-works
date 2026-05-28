@@ -1,60 +1,89 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Geo-redirect respect preference — pass 20. When a user explicitly
- * picks `/es/` in the URL, an `Accept-Language: en-US` header sent
- * by the browser should NOT cause the server to redirect to `/en/`.
- * URL locale > Accept-Language hint.
+ * Locale preference — explicit URL beats Accept-Language. When a user
+ * explicitly picks `/es/login` in the URL, an `Accept-Language: en-US`
+ * header sent by the browser should NOT cause the server to flip them
+ * to English. URL-stated locale > Accept-Language hint.
+ *
+ * PR #1052 switched next-intl from `localePrefix: 'always'` to
+ * `'never'`, so `/<locale>/<path>` is now a legacy bookmark shape that
+ * 307-redirects to the unprefixed `/<path>` AND seeds the
+ * `NEXT_LOCALE` cookie with the explicit locale (only if the visitor
+ * doesn't already have a cookie preference). The "URL locale wins"
+ * contract survives the cutover via the cookie; the URL bar just no
+ * longer carries the locale segment.
  */
 
 test.describe('Locale preference — explicit URL beats Accept-Language', () => {
-    test('GET /es/login with Accept-Language: en-US returns Spanish-locale response', async ({
+    test('GET /es/login with Accept-Language: en-US lands on /login with NEXT_LOCALE=es', async ({
         page,
         baseURL,
+        context,
     }) => {
-        // Tell the browser context to send Accept-Language: en-US.
+        // Clean slate — no pre-existing locale preference cookie.
+        await context.clearCookies();
         await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
+
         const res = await page.goto(`${baseURL || 'http://localhost:3000'}/es/login`, {
             waitUntil: 'domcontentloaded',
         });
-        // 200 — not 3xx redirect to /en/.
         expect(
             res?.status() ?? 0,
             `/es/login status: ${res?.status() ?? 'no-response'}`,
         ).toBeLessThan(500);
-        // After load, URL should still be /es/ (not redirected to
-        // /en/).
+
+        // URL bar drops the locale segment (PR #1052) — the explicit
+        // locale survives in the `NEXT_LOCALE` cookie set by the legacy
+        // redirect (proxy.ts).
         const finalUrl = page.url();
-        expect(finalUrl, `/es/login redirected to ${finalUrl} despite explicit URL locale`).toMatch(
-            /\/es\//,
-        );
-        // html lang should reflect Spanish.
+        expect(
+            finalUrl,
+            `/es/login should redirect to unprefixed /login (PR #1052) — got ${finalUrl}`,
+        ).toMatch(/\/login(\?|$|#)/);
+
+        const cookies = await context.cookies();
+        const nextLocale = cookies.find((c) => c.name === 'NEXT_LOCALE');
+        expect(
+            nextLocale?.value,
+            'NEXT_LOCALE cookie should be seeded with the explicit URL locale',
+        ).toBe('es');
+
+        // html lang should reflect Spanish — soft signal (server may
+        // default back to en for missing translations).
         const lang = await page.locator('html').getAttribute('lang');
-        if (lang) {
-            // Acceptable: lang starts with es. Some servers may default
-            // back to en for missing translations — that's a soft
-            // signal, not a hard fail.
-            if (!lang.toLowerCase().startsWith('es')) {
-                test.info().annotations.push({
-                    type: 'informational',
-                    description: `/es/login has lang="${lang}" — Spanish translations may be missing`,
-                });
-            }
+        if (lang && !lang.toLowerCase().startsWith('es')) {
+            test.info().annotations.push({
+                type: 'informational',
+                description: `/es/login has lang="${lang}" — Spanish translations may be missing`,
+            });
         }
     });
 
-    test('GET /en/login with Accept-Language: es-ES still loads English', async ({
+    test('GET /en/login with Accept-Language: es-ES lands on /login with NEXT_LOCALE=en', async ({
         page,
         baseURL,
+        context,
     }) => {
+        await context.clearCookies();
         await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-ES,es;q=0.9' });
+
         const res = await page.goto(`${baseURL || 'http://localhost:3000'}/en/login`, {
             waitUntil: 'domcontentloaded',
         });
         expect(res?.status() ?? 0).toBeLessThan(500);
+
         const finalUrl = page.url();
-        expect(finalUrl, `/en/login redirected to ${finalUrl} despite explicit URL locale`).toMatch(
-            /\/en\//,
-        );
+        expect(
+            finalUrl,
+            `/en/login should redirect to unprefixed /login (PR #1052) — got ${finalUrl}`,
+        ).toMatch(/\/login(\?|$|#)/);
+
+        const cookies = await context.cookies();
+        const nextLocale = cookies.find((c) => c.name === 'NEXT_LOCALE');
+        expect(
+            nextLocale?.value,
+            'NEXT_LOCALE cookie should be seeded with the explicit URL locale',
+        ).toBe('en');
     });
 });

@@ -142,9 +142,13 @@ test.describe('Magic-link login UI — EW-633', () => {
         await page.goto(pathAndQuery);
 
         // On success the redeem server action redirects to the
-        // dashboard. The dashboard route is the locale-prefixed root
-        // ("/" plus the locale prefix next-intl adds).
-        await page.waitForURL(/\/(en|fr|[a-z]{2})\/?$/, { timeout: 30_000 });
+        // dashboard. PR #1052 (`localePrefix: 'never'`) dropped the
+        // URL-level locale prefix — the dashboard route is now the
+        // unprefixed root `/`. Legacy `/en/` URLs still 307-redirect
+        // to `/`, so accept both shapes during the rollout.
+        await page.waitForURL(/^https?:\/\/[^/]+(?:\/(en|fr|[a-z]{2}))?\/?(\?|#|$)/, {
+            timeout: 30_000,
+        });
         expect(page.url()).not.toContain('/login');
     });
 
