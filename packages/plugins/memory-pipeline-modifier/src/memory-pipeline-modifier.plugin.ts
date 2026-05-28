@@ -315,7 +315,7 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 			const summary = this.buildFailureSummary(work, items, error, isCancellation);
 			const tags = this.buildFailureTags(work, isCancellation);
-			const sessionId = execContext?.memorySessionId;
+			const sessionId = this.resolveSessionId(context as ContextBag);
 
 			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
 				{
@@ -344,6 +344,96 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			// Do not rethrow — the host executor catches and demotes
 			// rollback errors, but defending here too keeps the
 			// invariant local.
+		} finally {
+			// Close the per-run session we opened (no-op when the session
+			// was supplied by an orchestrator, which owns its lifecycle).
+			await this.closeSelfOpenedSession(context as ContextBag, memoryFacade, logger);
+		}
+	}
+
+	// ── session lifecycle ──────────────────────────────────────────────
+
+	/**
+	 * Resolve the agent-memory session id to associate this run's
+	 * reads/writes with, WITHOUT opening a new one:
+	 *
+	 *   1. An orchestrator-supplied session (`execContext.memorySessionId`,
+	 *      forwarded by the pipeline executor from
+	 *      `PipelineExecutionOptions.memorySessionId`) always wins — the
+	 *      caller owns that session's lifecycle, so we never close it.
+	 *   2. Otherwise a session this modifier opened earlier in the same
+	 *      run (stashed on the context bag by `ensureSessionId`).
+	 *
+	 * Returns `undefined` when neither exists yet.
+	 */
+	private resolveSessionId(context: ContextBag): string | undefined {
+		const execContext = context.__memoryModifierExecContext as StepExecutionContext | undefined;
+		if (execContext?.memorySessionId) return execContext.memorySessionId;
+		return context.__memoryModifierSessionId as string | undefined;
+	}
+
+	/**
+	 * Resolve an existing session id or, when none is supplied by an
+	 * orchestrator, open a per-run session of our own so that the
+	 * fetch-context read, the save digest, and any failure rollback all
+	 * land on the SAME `agent_memory_sessions` row. Called from the
+	 * first-position fetch step so the session exists for the whole run.
+	 *
+	 * Best-effort: a failure to open is swallowed (memory must never crash
+	 * the host pipeline) and the run continues session-less.
+	 */
+	private async ensureSessionId(
+		context: ContextBag,
+		memoryFacade: IAgentMemoryStepFacade,
+		logger: { log(msg: string, ...args: unknown[]): void; warn(msg: string, ...args: unknown[]): void }
+	): Promise<string | undefined> {
+		const existing = this.resolveSessionId(context);
+		if (existing) return existing;
+
+		try {
+			const work = (context as { work?: { id?: string; slug?: string } }).work;
+			const session = await memoryFacade.openSession(
+				{ source: this.id, workId: work?.id, workSlug: work?.slug },
+				// Bound facade ignores its facadeOptions — pass placeholder.
+				{ userId: 'bound', workId: 'bound' }
+			);
+			if (session?.id) {
+				context.__memoryModifierSessionId = session.id;
+				context.__memoryModifierSessionSelfOpened = true;
+				logger.log(`memory-session: opened session ${session.id} for Work "${work?.slug ?? work?.id ?? '?'}"`);
+				return session.id;
+			}
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			logger.warn(`memory-session: failed to open session — ${message}`);
+		}
+		return undefined;
+	}
+
+	/**
+	 * Close the session this modifier opened, exactly once, at the end of
+	 * the run (success digest, save-disabled exit, or failure rollback).
+	 * No-ops when the session was supplied by an orchestrator (it owns the
+	 * lifecycle) or when we never opened one. Best-effort.
+	 */
+	private async closeSelfOpenedSession(
+		context: ContextBag,
+		memoryFacade: IAgentMemoryStepFacade,
+		logger: { log(msg: string, ...args: unknown[]): void; warn(msg: string, ...args: unknown[]): void }
+	): Promise<void> {
+		if (context.__memoryModifierSessionSelfOpened !== true) return;
+		const sessionId = context.__memoryModifierSessionId as string | undefined;
+		// Flip the flag first so a concurrent/repeated terminal step can't
+		// double-close.
+		context.__memoryModifierSessionSelfOpened = false;
+		if (!sessionId) return;
+
+		try {
+			await memoryFacade.closeSession(sessionId, { userId: 'bound', workId: 'bound' });
+			logger.log(`memory-session: closed session ${sessionId}`);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			logger.warn(`memory-session: failed to close session ${sessionId} — ${message}`);
 		}
 	}
 
@@ -359,14 +449,13 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
 			const request = (context as { request?: { prompt?: string } }).request;
 
-			// Honour a session id supplied by the orchestrator (e.g.
-			// AgentRunService opens a session per agent run and propagates
-			// it via StepExecutionContext.memorySessionId). When absent —
-			// the usual case for plain Work-generation pipelines — the
-			// backend associates the record with no specific session.
-			const sessionId = (context as ContextBag).__memoryModifierExecContext
-				? ((context as ContextBag).__memoryModifierExecContext as StepExecutionContext).memorySessionId
-				: undefined;
+			// Associate this read with the run's session. Honour an
+			// orchestrator-supplied session id (e.g. an agent run that
+			// triggers a pipeline, forwarded via
+			// StepExecutionContext.memorySessionId); otherwise open a
+			// per-run session of our own so the fetch read, the save
+			// digest, and any failure rollback all share one session row.
+			const sessionId = await this.ensureSessionId(context, memoryFacade, logger);
 
 			const ctx: AgentMemoryContext = await memoryFacade.buildContext(
 				{
@@ -407,6 +496,7 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 	): Promise<IPipelineContext> {
 		if (settings.saveSummary === false) {
 			logger.log('memory-save: saveSummary disabled — skipping');
+			await this.closeSelfOpenedSession(context, memoryFacade, logger);
 			return context;
 		}
 
@@ -420,9 +510,7 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			// unreachable at this step's call site.
 			const summary = this.buildSummary(work, items);
 			const tags = this.buildTags(work);
-			const sessionId = (context as ContextBag).__memoryModifierExecContext
-				? ((context as ContextBag).__memoryModifierExecContext as StepExecutionContext).memorySessionId
-				: undefined;
+			const sessionId = this.resolveSessionId(context);
 
 			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
 				{
@@ -441,10 +529,12 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			);
 
 			logger.log(`memory-save: saved observation ${record.id} for Work "${work?.slug ?? work?.id ?? '?'}"`);
+			await this.closeSelfOpenedSession(context, memoryFacade, logger);
 			return context;
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			logger.warn(`memory-save: failed to save observation — ${message}`);
+			await this.closeSelfOpenedSession(context, memoryFacade, logger);
 			return context;
 		}
 	}
