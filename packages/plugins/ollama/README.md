@@ -44,6 +44,7 @@ When selected as the AI provider, Ever Works routes content generation, conversa
 - **Simple Tasks Model** — handles tags, short descriptions, and quick classifications.
 - **Standard Tasks Model** — handles listings, summaries, and content reformatting.
 - **Complex Tasks Model** — handles full page generation and multi-step analysis.
+- **Embedding Model** — model used for semantic-search embeddings (e.g. `nomic-embed-text`); only needed if you use KB search.
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 
