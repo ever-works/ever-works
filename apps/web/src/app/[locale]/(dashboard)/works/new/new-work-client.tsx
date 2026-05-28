@@ -170,19 +170,32 @@ export default function NewWorkClient({
         return selected?.connectionInfo?.connected ?? false;
     }, [selectedProviderId, providers]);
 
+    // `store` + `company` are inert "Soon" chips (roadmap, not shipped).
+    // `comingSoon` is the union of that hardcoded baseline and any kind
+    // whose `works-<value>` PostHog flag resolved to an explicit `false`
+    // server-side. Missing/undefined flags stay enabled.
+    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
+
+    // Effective selection — derived during render so a flag-disabled kind
+    // is never the active selection (no effect/setState round-trip; see
+    // the project's "derive state, don't store it in an effect" rule). If
+    // the raw `selectedKind` is disabled, fall back to the first live kind
+    // (or `website` only if every kind is disabled — degenerate config).
+    // Everything that reads/acts on the selection uses `effectiveKind`, so
+    // a disabled kind can never be submitted or handed off.
+    const effectiveKind: InitialWorkKind = disabledSet.has(selectedKind)
+        ? (WORK_KIND_ORDER.find((k) => !disabledSet.has(k)) ?? 'website')
+        : selectedKind;
+
     const placeholderExamples = useMemo(
-        () => PLACEHOLDERS_BY_KIND[selectedKind] ?? PLACEHOLDERS_BY_KIND.website,
-        [selectedKind],
+        () => PLACEHOLDERS_BY_KIND[effectiveKind] ?? PLACEHOLDERS_BY_KIND.website,
+        [effectiveKind],
     );
 
     // Full work-kind chip catalog. `store` + `company` are inert "Soon"
     // chips (roadmap, not shipped) appended after the live kinds so they
     // match the marketing site's chip catalog without breaking the
     // existing /works/new kind picker behavior.
-    // `comingSoon` is the union of the hardcoded baseline (store/company)
-    // and any kind whose `works-<value>` PostHog flag resolved to an
-    // explicit `false` server-side. Missing/undefined flags stay enabled.
-    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
     const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
         () => [
             ...WORK_KIND_ORDER.map((k) => ({
@@ -212,7 +225,7 @@ export default function NewWorkClient({
         // re-prompted to confirm the same text twice.
         startSubmit(() => {
             startFromPrompt(description, {
-                intent: WORK_KIND_INTENT_LABEL[selectedKind],
+                intent: WORK_KIND_INTENT_LABEL[effectiveKind],
                 attachments: buildAttachmentRefs(attachments),
             });
             setPrompt('');
@@ -251,7 +264,7 @@ export default function NewWorkClient({
                         <div className="space-y-2">
                             <PromptChipsRow
                                 chips={workKindChips}
-                                value={selectedKind}
+                                value={effectiveKind}
                                 onChange={(next) => {
                                     // `store` and `company` are inert "Soon"
                                     // chips and never get emitted — narrow
@@ -266,7 +279,7 @@ export default function NewWorkClient({
                                 testIdPrefix="new-work-kind"
                             />
                             <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
-                                {t(`kindDescriptions.${selectedKind}`)}
+                                {t(`kindDescriptions.${effectiveKind}`)}
                             </p>
                         </div>
                     }
@@ -393,7 +406,7 @@ export default function NewWorkClient({
                         websiteTemplates={websiteTemplates}
                         proposal={proposal ?? undefined}
                         initialPrompt={initialPrompt}
-                        initialKind={selectedKind || initialKind || undefined}
+                        initialKind={effectiveKind || initialKind || undefined}
                     />
                 )}
                 {creationMode === 'import' && (

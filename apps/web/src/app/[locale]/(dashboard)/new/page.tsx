@@ -60,6 +60,22 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
         initialType = missions.length > 0 ? 'idea' : 'mission';
     }
 
+    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
+    // Fail-open: no PostHog config / errors / missing flags → everything
+    // enabled. No cheap user id is available on this page, so we evaluate
+    // against the 'anonymous' distinct id (fine for global on/off flags).
+    const disabledSet = await getDisabledWorkKinds(ALL_NEW_CHIP_VALUES);
+    const disabledKinds = Array.from(disabledSet);
+
+    // A kind disabled by a feature flag must not be preselectable via the
+    // `?type=` URL handoff — otherwise a user could deep-link a "Soon"
+    // chip into the selected/auto-start state and submit it. If the
+    // resolved kind is disabled, drop it back to the safe default
+    // (Mission, which is never flag-gated here).
+    if (disabledSet.has(initialType)) {
+        initialType = 'mission';
+    }
+
     let initialPrompt: string | undefined;
     let initialTemplateId: string | undefined;
     const templateIdRaw = (params?.template ?? '').trim();
@@ -74,12 +90,6 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
             initialPrompt = description.length > 0 ? `${tpl.name}\n\n${description}` : tpl.name;
         }
     }
-
-    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
-    // Fail-open: no PostHog config / errors / missing flags → everything
-    // enabled. No cheap user id is available on this page, so we evaluate
-    // against the 'anonymous' distinct id (fine for global on/off flags).
-    const disabledKinds = Array.from(await getDisabledWorkKinds(ALL_NEW_CHIP_VALUES));
 
     return (
         <NewPageClient

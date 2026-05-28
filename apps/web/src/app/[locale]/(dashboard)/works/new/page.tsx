@@ -129,9 +129,15 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
     // Fail-open: no PostHog config / errors / missing flags → everything
     // enabled. The current user id is the flag distinct id so per-user /
     // percentage rollouts work; falls back to 'anonymous' otherwise.
-    const disabledKinds = Array.from(
-        await getDisabledWorkKinds(ALL_WORK_KIND_CHIP_VALUES, user.id),
-    );
+    const disabledSet = await getDisabledWorkKinds(ALL_WORK_KIND_CHIP_VALUES, user.id);
+    const disabledKinds = Array.from(disabledSet);
+
+    // A kind disabled by a feature flag must not be preselectable via the
+    // `?kind=` URL handoff — otherwise a user could deep-link a "Soon"
+    // chip into the selected state and submit it. If the resolved kind is
+    // disabled, drop it back to the default (null → client defaults to
+    // its own first live kind).
+    const safeInitialKind = initialKind && disabledSet.has(initialKind) ? null : initialKind;
 
     return (
         <NewWorkClient
@@ -144,7 +150,7 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             proposal={proposal}
             initialMode={initialMode}
             initialPrompt={initialPrompt}
-            initialKind={initialKind}
+            initialKind={safeInitialKind}
             disabledKinds={disabledKinds}
         />
     );

@@ -243,6 +243,20 @@ export function NewPageClient({
         setChatOpen?.(false);
     }, [setChatOpen]);
 
+    // Set of chip values whose `works-<value>` flag resolved to false
+    // server-side. A disabled chip must never be the active selection
+    // (and thus never submittable).
+    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
+
+    // Effective selection — derived during render so a disabled chip is
+    // never the active selection (no effect/setState round-trip; see the
+    // project's "derive state, don't store it in an effect" rule). If the
+    // raw `selectedChip` is flag-disabled, fall back to the safe default
+    // (`mission` is never flag-gated here). Everything that reads/acts on
+    // the selection uses `effectiveChip`, so a disabled kind can never be
+    // submitted or handed off.
+    const effectiveChip: ChipType = disabledSet.has(selectedChip) ? 'mission' : selectedChip;
+
     const submit = () => {
         const description = prompt.trim();
         if (description.length < 10) {
@@ -267,7 +281,7 @@ export function NewPageClient({
             // non-template Mission creation. Just open the panel so
             // the user can iterate manually if they want, but don't
             // dispatch a message.
-            if (selectedChip === 'mission' && initialTemplateId) {
+            if (effectiveChip === 'mission' && initialTemplateId) {
                 try {
                     const mission = await createMissionAction({
                         description,
@@ -319,7 +333,7 @@ export function NewPageClient({
             // currentPageUrl context tells it where the user is, and
             // the intent prefix narrows it further.
             startFromPrompt(description, {
-                intent: CHIP_INTENT_LABEL[selectedChip],
+                intent: CHIP_INTENT_LABEL[effectiveChip],
                 attachments: buildAttachmentRefs(attachments),
             });
 
@@ -327,16 +341,16 @@ export function NewPageClient({
             // page does NOT pre-fill the prompt — the user already
             // sent it, chat is the live channel from here on. The
             // canvas is for optional manual editing of the entity.
-            if (selectedChip === 'mission') {
+            if (effectiveChip === 'mission') {
                 router.push(ROUTES.DASHBOARD_MISSIONS);
                 return;
             }
-            if (selectedChip === 'idea') {
+            if (effectiveChip === 'idea') {
                 router.push(ROUTES.DASHBOARD_IDEAS);
                 return;
             }
-            const canvasRoute = CHIP_TO_CANVAS_ROUTE[selectedChip];
-            const workKind = CHIP_TO_WORK_KIND[selectedChip];
+            const canvasRoute = CHIP_TO_CANVAS_ROUTE[effectiveChip];
+            const workKind = CHIP_TO_WORK_KIND[effectiveChip];
             if (canvasRoute && workKind) {
                 // Work canvases need `mode=ai` so /works/new skips its
                 // own composer entry view and renders the form. They
@@ -357,8 +371,8 @@ export function NewPageClient({
     // Per-chip placeholder cycle. New reference on each chip flip
     // resets the typewriter inside PromptComposer.
     const placeholderExamples = useMemo(
-        () => PLACEHOLDERS_BY_CHIP[selectedChip] ?? PLACEHOLDERS_BY_CHIP.mission,
-        [selectedChip],
+        () => PLACEHOLDERS_BY_CHIP[effectiveChip] ?? PLACEHOLDERS_BY_CHIP.mission,
+        [effectiveChip],
     );
 
     // Full chip catalog. `store` + `company` are inert "Soon" chips,
@@ -367,7 +381,6 @@ export function NewPageClient({
     // `comingSoon` is the union of the hardcoded baseline (store/company)
     // and any chip whose `works-<value>` PostHog flag resolved to an
     // explicit `false` server-side. Missing/undefined flags stay enabled.
-    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
     const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store' | 'company'>>>(
         () => [
             ...CHIP_ORDER.map((c) => ({
@@ -413,7 +426,7 @@ export function NewPageClient({
                     <div className="space-y-2">
                         <PromptChipsRow
                             chips={allChips}
-                            value={selectedChip}
+                            value={effectiveChip}
                             onChange={(next) => {
                                 // `store` and `company` are inert, so the
                                 // chips row never emits them — narrow back
@@ -427,7 +440,7 @@ export function NewPageClient({
                             testIdPrefix="new-chip"
                         />
                         <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
-                            {t(`chipDescriptions.${selectedChip}`)}
+                            {t(`chipDescriptions.${effectiveChip}`)}
                         </p>
                     </div>
                 }
