@@ -375,4 +375,79 @@ describe('MemoryPipelineModifierPlugin', () => {
 			expect(result.errors?.[0].path).toBe('maxContextTokens');
 		});
 	});
+
+	// Item #18 — `memorySessionId` plumbing from the orchestrator
+	// (e.g. AgentRunService) through StepExecutionContext into the
+	// modifier's buildContext / saveMemory / rollback paths.
+	describe('memorySessionId propagation from execContext', () => {
+		function makeExecContextWithSession(sessionId?: string): StepExecutionContext {
+			return {
+				agentMemoryFacade: memoryFacade,
+				logger,
+				work: { id: 'work-1', slug: 'best-react-tools', name: 'Best React Tools', user: { id: 'u-1' } },
+				...(sessionId ? { memorySessionId: sessionId } : {})
+			} as unknown as StepExecutionContext;
+		}
+
+		it('threads execContext.memorySessionId into buildContext on the fetch step', async () => {
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({
+				content: 'prior notes',
+				approxTokens: 42
+			});
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: {
+					stepId: FETCH_CONTEXT_STEP_ID,
+					execContext: makeExecContextWithSession('sess-orchestrator-1')
+				}
+			});
+			expect(memoryFacade.buildContext).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-orchestrator-1' }),
+				expect.anything()
+			);
+		});
+
+		it('omits sessionId from buildContext when execContext does not carry one', async () => {
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({
+				content: 'prior notes',
+				approxTokens: 42
+			});
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContextWithSession() }
+			});
+			const buildArg = (memoryFacade.buildContext as ReturnType<typeof vi.fn>).mock.calls[0][0];
+			expect(buildArg).not.toHaveProperty('sessionId');
+		});
+
+		it('threads execContext.memorySessionId into saveMemory on the save step', async () => {
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-1' });
+			const context = makeContext();
+			// Prime the stash so the save step's lookup works.
+			(context as Record<string, unknown>).__memoryModifierExecContext =
+				makeExecContextWithSession('sess-orchestrator-2');
+			await plugin.execute(context, {
+				settings: {
+					stepId: SAVE_MEMORY_STEP_ID,
+					execContext: makeExecContextWithSession('sess-orchestrator-2')
+				}
+			});
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-orchestrator-2' }),
+				expect.anything()
+			);
+		});
+
+		it('threads execContext.memorySessionId into rollback saveMemory', async () => {
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-rb-1' });
+			const context = makeContext();
+			(context as Record<string, unknown>).__memoryModifierExecContext =
+				makeExecContextWithSession('sess-orchestrator-3');
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-orchestrator-3' }),
+				expect.anything()
+			);
+		});
+	});
 });
