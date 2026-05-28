@@ -63,7 +63,7 @@ isn't present yet.
   inside the isolated task process, returning the result through the existing
   job result channel.
 - **Given** a plugin was enabled on one API replica, **when** a later request
-  for it is routed to a *different* replica (or the worker) that has not yet
+  for it is routed to a _different_ replica (or the worker) that has not yet
   installed it, **then** that node lazily installs it on first use and serves the
   request — no restart or shared volume required.
 - **Given** a fresh pod / new replica in dynamic mode, **when** it boots,
@@ -210,18 +210,18 @@ Compatibility:
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept | Description |
-| ---------------- | ----------- |
-| Distribution mode | Platform setting selecting `bundled` (all in image) vs `dynamic` (core in image, rest from registry). |
-| Core plugin | A plugin always shipped in the image and present in both modes (every `systemPlugin`, incl. `local-fs` as the boot default storage). Distributable storage (`aws-s3`/`minio`/`github-storage`) is NOT core. |
-| Runtime plugin store | A writable directory on a node (default `/app/plugins`) where pulled plugins are written so Node can `import()` them — per-replica, reconciled on boot; not external infrastructure. |
-| Distributable plugin | A plugin published to a registry and installable at runtime in dynamic mode. |
-| Plugin registry | The npm source(s) plugins are published to and pulled from — public npm + GitHub Packages, configurable. |
-| Plugin catalog | The listable set of distributable plugins (manifest summaries) shown in the UI before install. |
-| Install state | Lifecycle of a plugin's presence on a node: available → installing → installed / error (distinct from enabled). |
-| Plugin allowlist | Admin-managed set of non-first-party packages permitted for runtime install, with version/integrity pinning. |
-| Boot reconcile | Start-up routine that makes a node's plugin store match the DB record of installed/enabled plugins. |
-| Execution location | Where a capability call runs: in-process (short) vs job runtime (long-running). |
+| Entity / concept     | Description                                                                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Distribution mode    | Platform setting selecting `bundled` (all in image) vs `dynamic` (core in image, rest from registry).                                                                                                       |
+| Core plugin          | A plugin always shipped in the image and present in both modes (every `systemPlugin`, incl. `local-fs` as the boot default storage). Distributable storage (`aws-s3`/`minio`/`github-storage`) is NOT core. |
+| Runtime plugin store | A writable directory on a node (default `/app/plugins`) where pulled plugins are written so Node can `import()` them — per-replica, reconciled on boot; not external infrastructure.                        |
+| Distributable plugin | A plugin published to a registry and installable at runtime in dynamic mode.                                                                                                                                |
+| Plugin registry      | The npm source(s) plugins are published to and pulled from — public npm + GitHub Packages, configurable.                                                                                                    |
+| Plugin catalog       | The listable set of distributable plugins (manifest summaries) shown in the UI before install.                                                                                                              |
+| Install state        | Lifecycle of a plugin's presence on a node: available → installing → installed / error (distinct from enabled).                                                                                             |
+| Plugin allowlist     | Admin-managed set of non-first-party packages permitted for runtime install, with version/integrity pinning.                                                                                                |
+| Boot reconcile       | Start-up routine that makes a node's plugin store match the DB record of installed/enabled plugins.                                                                                                         |
+| Execution location   | Where a capability call runs: in-process (short) vs job runtime (long-running).                                                                                                                             |
 
 ## 6. Out of Scope
 
@@ -265,18 +265,18 @@ Compatibility:
 All initial open questions were resolved with @evereq on 2026-05-28:
 
 - **Default mode** — `bundled` everywhere (hosted SaaS and self-host alike);
-  `dynamic` is strictly opt-in. *(Resolved: bundled default.)*
+  `dynamic` is strictly opt-in. _(Resolved: bundled default.)_
 - **Multi-replica plugin store** — per-replica ephemeral store + boot reconcile;
   **no shared RWX volume required**. A shared PVC is an optional optimization,
-  not a prerequisite. *(Resolved: per-replica reconcile.)*
+  not a prerequisite. _(Resolved: per-replica reconcile.)_
 - **Disable retention** — keep installed files on disable; **no garbage
-  collection** in v1. *(Resolved: keep installed.)*
+  collection** in v1. _(Resolved: keep installed.)_
 - **API storage plugins** — **remove** the API's hard imports of `aws-s3`,
   `minio`, `github-storage` and make them **distributable**; resolve storage via
-  the capability facade; keep `local-fs` as the core default. *(Resolved:
-  decouple + distributable.)*
+  the capability facade; keep `local-fs` as the core default. _(Resolved:
+  decouple + distributable.)_
 - **Allowlist administration** — **both** env/config and an admin API.
-  *(Resolved: both surfaces.)*
+  _(Resolved: both surfaces.)_
 
 ## 9. Constitution Gates
 

@@ -63,16 +63,16 @@ the new pieces inert.
 
 ## 2. Tech Choices
 
-| Concern | Choice | Rationale |
-| ------- | ------ | --------- |
-| Distribution flag | `config` constant + env (`PLUGIN_DISTRIBUTION_MODE`) | Matches `apps/api/src/config/constants.ts` lazy-fn + `FEATURE_*` pattern; fail-fast validation. |
-| Core vs distributable | New `distribution` manifest field in `everworks.plugin` | Declared on the plugin, not hard-coded (FR-3). Default derived from `systemPlugin`. |
-| Publish | **Changesets** → npm + GitHub Packages | Independent per-plugin versioning (FR-7); no platform release coupling; mirrors `publish-cli.yml` auth pattern. |
-| Runtime fetch | `npm`/`pnpm` programmatic install (pinned exact version, `--no-save`) into the store, then `import()` | Reuses Node module resolution + integrity; loader already scans `node_modules/@ever-works` and `./plugins`. |
-| Integrity | npm package integrity (sha512) + first-party npm provenance | No bespoke signing in v1; verify-before-load (FR-10). |
-| Persistence | TypeORM columns on `PluginEntity` + new `PluginAllowlistEntity` | Existing pattern in `packages/agent/src/plugins`. |
-| Long-running execution | Pluggable job runtime (Trigger.dev today) | Principle IV; isolation comes "for free" inside the task process. Depends on EW-683. |
-| Store location | `PLUGIN_INSTALL_DIR` (default `/app/plugins`); k8s writable volume | API root FS is writable today (`readOnlyRootFilesystem: false`); per-replica reconcile avoids requiring RWX. |
+| Concern                | Choice                                                                                                | Rationale                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Distribution flag      | `config` constant + env (`PLUGIN_DISTRIBUTION_MODE`)                                                  | Matches `apps/api/src/config/constants.ts` lazy-fn + `FEATURE_*` pattern; fail-fast validation.                 |
+| Core vs distributable  | New `distribution` manifest field in `everworks.plugin`                                               | Declared on the plugin, not hard-coded (FR-3). Default derived from `systemPlugin`.                             |
+| Publish                | **Changesets** → npm + GitHub Packages                                                                | Independent per-plugin versioning (FR-7); no platform release coupling; mirrors `publish-cli.yml` auth pattern. |
+| Runtime fetch          | `npm`/`pnpm` programmatic install (pinned exact version, `--no-save`) into the store, then `import()` | Reuses Node module resolution + integrity; loader already scans `node_modules/@ever-works` and `./plugins`.     |
+| Integrity              | npm package integrity (sha512) + first-party npm provenance                                           | No bespoke signing in v1; verify-before-load (FR-10).                                                           |
+| Persistence            | TypeORM columns on `PluginEntity` + new `PluginAllowlistEntity`                                       | Existing pattern in `packages/agent/src/plugins`.                                                               |
+| Long-running execution | Pluggable job runtime (Trigger.dev today)                                                             | Principle IV; isolation comes "for free" inside the task process. Depends on EW-683.                            |
+| Store location         | `PLUGIN_INSTALL_DIR` (default `/app/plugins`); k8s writable volume                                    | API root FS is writable today (`readOnlyRootFilesystem: false`); per-replica reconcile avoids requiring RWX.    |
 
 ## 3. Data Model
 
@@ -111,13 +111,13 @@ source of truth.
 ```ts
 @Entity('plugin_allowlist')
 export class PluginAllowlistEntity {
-    @PrimaryGeneratedColumn('uuid') id: string;
-    @Column({ type: 'varchar', unique: true }) packageName: string; // npm name
-    @Column({ type: 'varchar' }) versionRange: string;             // pinned/semver
-    @Column({ type: 'varchar', nullable: true }) integrity?: string;
-    @Column({ type: 'varchar', default: 'npm' }) source: 'npm' | 'github-packages';
-    @Column({ type: 'boolean', default: true }) enabled: boolean;
-    @CreateDateColumn() createdAt: Date;
+	@PrimaryGeneratedColumn('uuid') id: string;
+	@Column({ type: 'varchar', unique: true }) packageName: string; // npm name
+	@Column({ type: 'varchar' }) versionRange: string; // pinned/semver
+	@Column({ type: 'varchar', nullable: true }) integrity?: string;
+	@Column({ type: 'varchar', default: 'npm' }) source: 'npm' | 'github-packages';
+	@Column({ type: 'boolean', default: true }) enabled: boolean;
+	@CreateDateColumn() createdAt: Date;
 }
 ```
 
@@ -141,14 +141,14 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 
 ## 4. API Surface
 
-| Method | Endpoint | Description | Status |
-| ------ | -------- | ----------- | ------ |
-| `GET` | `/plugins/catalog` | List distributable plugins available from the registry (manifest summaries), with install state. | New |
-| `POST` | `/plugins/:pluginId/install` | Install (resolve+verify+load) a distributable plugin without enabling. | New |
-| `POST` | `/plugins/:pluginId/enable` | Existing; in dynamic mode installs first if absent, then enables. | Changed |
-| `DELETE` | `/plugins/:pluginId/install` | Uninstall a distributable plugin (refused for core). | New |
-| `GET` | `/plugins/:pluginId/install-status` | Poll install progress/state. | New |
-| `GET`/`POST`/`DELETE` | `/admin/plugins/allowlist` | Manage the third-party allowlist (admin-gated). | New |
+| Method                | Endpoint                            | Description                                                                                      | Status  |
+| --------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------ | ------- |
+| `GET`                 | `/plugins/catalog`                  | List distributable plugins available from the registry (manifest summaries), with install state. | New     |
+| `POST`                | `/plugins/:pluginId/install`        | Install (resolve+verify+load) a distributable plugin without enabling.                           | New     |
+| `POST`                | `/plugins/:pluginId/enable`         | Existing; in dynamic mode installs first if absent, then enables.                                | Changed |
+| `DELETE`              | `/plugins/:pluginId/install`        | Uninstall a distributable plugin (refused for core).                                             | New     |
+| `GET`                 | `/plugins/:pluginId/install-status` | Poll install progress/state.                                                                     | New     |
+| `GET`/`POST`/`DELETE` | `/admin/plugins/allowlist`          | Manage the third-party allowlist (admin-gated).                                                  | New     |
 
 - Auth: user-scoped endpoints use existing `@CurrentUser()`; allowlist endpoints
   are admin-gated. Install is rate-limited (registry protection).
@@ -191,12 +191,12 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 
 ## 7. Background Jobs
 
-| Trigger | When | What it does | Idempotency strategy |
-| ------- | ---- | ------------ | -------------------- |
-| **Lazy install-on-use** (`ensurePluginAvailable`) | Before *any* node invokes a distributable plugin (API replica or worker) | Install the pinned package into the local store if missing, then load+register. **The correctness guarantee** — a plugin enabled on one replica works on all replicas/worker with no restart or shared volume. | Per-id concurrency lock + version/integrity pin; skip if present. |
-| Boot reconcile (on `onApplicationBootstrap`) | Every API/worker start in dynamic mode | Warm the store by pre-installing the DB-recorded installed/enabled set. Optimisation only (avoids first-request latency), not correctness. | Same `ensurePluginAvailable`; idempotent. |
-| Long-running capability dispatch | Per pipeline/long op | In the job-runtime worker, call `ensurePluginAvailable` then run the plugin inside the isolated task. The worker has its own store, so it installs on first use just like the API. | Existing job idempotency / CAS in the task layer. |
-| GC | — | Out of scope for v1 (decided: keep installed files on disable, no GC). | n/a |
+| Trigger                                           | When                                                                     | What it does                                                                                                                                                                                                   | Idempotency strategy                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| **Lazy install-on-use** (`ensurePluginAvailable`) | Before _any_ node invokes a distributable plugin (API replica or worker) | Install the pinned package into the local store if missing, then load+register. **The correctness guarantee** — a plugin enabled on one replica works on all replicas/worker with no restart or shared volume. | Per-id concurrency lock + version/integrity pin; skip if present. |
+| Boot reconcile (on `onApplicationBootstrap`)      | Every API/worker start in dynamic mode                                   | Warm the store by pre-installing the DB-recorded installed/enabled set. Optimisation only (avoids first-request latency), not correctness.                                                                     | Same `ensurePluginAvailable`; idempotent.                         |
+| Long-running capability dispatch                  | Per pipeline/long op                                                     | In the job-runtime worker, call `ensurePluginAvailable` then run the plugin inside the isolated task. The worker has its own store, so it installs on first use just like the API.                             | Existing job idempotency / CAS in the task layer.                 |
+| GC                                                | —                                                                        | Out of scope for v1 (decided: keep installed files on disable, no GC).                                                                                                                                         | n/a                                                               |
 
 ## 8. Security & Permissions
 
@@ -246,16 +246,16 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 
 ## 11. Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---------- | ------ | ---------- |
-| Registry outage blocks enabling new plugins | Med | Med | Installed plugins unaffected; clean retryable failures; optional warm cache/mirror. |
-| Cold-start install cost on new replicas | Med | Med | Boot warmup pre-installs in parallel; lazy install-on-use covers anything not warmed; consider baking "popular" plugins. |
-| Plugin enabled on replica A not present on replica B / worker | High | High | **Lazy install-on-use** (`ensurePluginAvailable`) on every node before invocation — not boot-only reconcile. Worker installs into its own store too. (Codex P1 ×2.) |
-| Running untrusted-ish 3rd-party code in API process | Low (allowlist) | High | Allowlist + integrity; long-running paths in isolated job runtime; sandbox is a documented future phase. |
-| Read-only FS targets (Vercel) can't install at runtime | Med | Low | Dynamic mode requires writable store; Vercel/serverless documented as bundled-only. |
-| API hard-deps on storage plugins block making them distributable | High | Low | **Decided**: remove the direct imports, resolve storage via the facade, keep `local-fs` as core default (so the API boots storage-less of any distributable plugin). |
-| Default storage (`local-fs`) not shared across replicas | Med | Low | Pre-existing concern, not new; production enables a distributable shared backend (s3/minio/github-storage). `local-fs` only guarantees the API boots. |
-| Version drift between manifest and installed dist | Med | Low | Persist `installedVersion`+`integrity`; reconcile pins exact version. |
+| Risk                                                             | Likelihood      | Impact | Mitigation                                                                                                                                                           |
+| ---------------------------------------------------------------- | --------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Registry outage blocks enabling new plugins                      | Med             | Med    | Installed plugins unaffected; clean retryable failures; optional warm cache/mirror.                                                                                  |
+| Cold-start install cost on new replicas                          | Med             | Med    | Boot warmup pre-installs in parallel; lazy install-on-use covers anything not warmed; consider baking "popular" plugins.                                             |
+| Plugin enabled on replica A not present on replica B / worker    | High            | High   | **Lazy install-on-use** (`ensurePluginAvailable`) on every node before invocation — not boot-only reconcile. Worker installs into its own store too. (Codex P1 ×2.)  |
+| Running untrusted-ish 3rd-party code in API process              | Low (allowlist) | High   | Allowlist + integrity; long-running paths in isolated job runtime; sandbox is a documented future phase.                                                             |
+| Read-only FS targets (Vercel) can't install at runtime           | Med             | Low    | Dynamic mode requires writable store; Vercel/serverless documented as bundled-only.                                                                                  |
+| API hard-deps on storage plugins block making them distributable | High            | Low    | **Decided**: remove the direct imports, resolve storage via the facade, keep `local-fs` as core default (so the API boots storage-less of any distributable plugin). |
+| Default storage (`local-fs`) not shared across replicas          | Med             | Low    | Pre-existing concern, not new; production enables a distributable shared backend (s3/minio/github-storage). `local-fs` only guarantees the API boots.                |
+| Version drift between manifest and installed dist                | Med             | Low    | Persist `installedVersion`+`integrity`; reconcile pins exact version.                                                                                                |
 
 ## 12. Constitution Reconciliation
 

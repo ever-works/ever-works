@@ -94,7 +94,7 @@ User clicks Enable (plugin not installed)
 Key properties:
 
 - **Install ≠ enable ≠ load** stay distinct (the SDK already separates
-  load/enable). Dynamic mode inserts *install + load* in front of *enable* only
+  load/enable). Dynamic mode inserts _install + load_ in front of _enable_ only
   when the plugin is absent.
 - **Idempotent + concurrency-guarded** per plugin id (two simultaneous enables
   of the same plugin install once).
@@ -113,7 +113,7 @@ per-replica store, two mechanisms keep every node consistent **without** a share
 volume:
 
 **(a) Lazy install-on-use — the correctness guarantee.** Before any node (an API
-replica *or* a job-runtime worker) invokes a distributable plugin, it ensures the
+replica _or_ a job-runtime worker) invokes a distributable plugin, it ensures the
 package is present locally and installs it if not:
 
 ```
@@ -158,7 +158,7 @@ operation's `executionProfile`:
 
 > **The worker is a separate runtime with its own store.** The Trigger.dev worker
 > is deployed independently from the API and prepares its own `./plugins` bundle
-> at deploy time — so a plugin *installed at runtime in the API* does **not**
+> at deploy time — so a plugin _installed at runtime in the API_ does **not**
 > exist in the worker. The long-running path therefore calls the same
 > `ensurePluginAvailable()` (§6 lazy install-on-use) inside the task **before**
 > invoking the plugin, installing into the worker's own store on first use. The
@@ -207,29 +207,29 @@ not part of this feature.
 
 ## 11. Failure modes
 
-| Failure | Behaviour |
-| ------- | --------- |
-| Registry unreachable | New installs fail cleanly + retryable; installed plugins keep working; reconcile retries on next boot. |
-| Package not permitted | Refused before download (allowlist), 409. |
-| Integrity mismatch | Refused, nothing loaded, 424. |
-| Invalid manifest / incompatible version | Recorded `installState='error'` + reason, 422; nothing registered. |
-| Throwing plugin constructor | Same as load failure today — caught, recorded, isolated. |
-| Mode switch (bundled↔dynamic) | Reconcile on restart; user enable choices preserved in DB. |
+| Failure                                 | Behaviour                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Registry unreachable                    | New installs fail cleanly + retryable; installed plugins keep working; reconcile retries on next boot. |
+| Package not permitted                   | Refused before download (allowlist), 409.                                                              |
+| Integrity mismatch                      | Refused, nothing loaded, 424.                                                                          |
+| Invalid manifest / incompatible version | Recorded `installState='error'` + reason, 422; nothing registered.                                     |
+| Throwing plugin constructor             | Same as load failure today — caught, recorded, isolated.                                               |
+| Mode switch (bundled↔dynamic)           | Reconcile on restart; user enable choices preserved in DB.                                             |
 
 ## 12. Constitution Reconciliation
 
-| Principle | How this design respects it |
-| --------- | --------------------------- |
-| I — Plugin-first | Plugins stay the integration unit; this is supply-chain plumbing. |
-| II — Capability-driven | Resolution/enable unchanged; install precedes them. |
-| III — Source-of-truth repos | Unaffected. |
-| IV — Trigger.dev | Long-running plugin execution routed through the job runtime. |
-| V — Forward-only migrations | New columns/table additive with defaults. |
-| VI — Tests | Installer/allowlist/reconcile/router/publish all tested. |
-| VII — Secret hygiene | Registry tokens + plugin creds are secrets; `x-secret` preserved. |
-| VIII — Plugin counts | Canonical built-in-plugins doc carries core vs distributable split. |
-| IX — Behaviour-first | Behaviour in the feature spec; this is architecture. |
-| X — Backwards-compat | Default `bundled` preserves current behaviour; all additions additive. |
+| Principle                   | How this design respects it                                            |
+| --------------------------- | ---------------------------------------------------------------------- |
+| I — Plugin-first            | Plugins stay the integration unit; this is supply-chain plumbing.      |
+| II — Capability-driven      | Resolution/enable unchanged; install precedes them.                    |
+| III — Source-of-truth repos | Unaffected.                                                            |
+| IV — Trigger.dev            | Long-running plugin execution routed through the job runtime.          |
+| V — Forward-only migrations | New columns/table additive with defaults.                              |
+| VI — Tests                  | Installer/allowlist/reconcile/router/publish all tested.               |
+| VII — Secret hygiene        | Registry tokens + plugin creds are secrets; `x-secret` preserved.      |
+| VIII — Plugin counts        | Canonical built-in-plugins doc carries core vs distributable split.    |
+| IX — Behaviour-first        | Behaviour in the feature spec; this is architecture.                   |
+| X — Backwards-compat        | Default `bundled` preserves current behaviour; all additions additive. |
 
 ## 13. References
 
