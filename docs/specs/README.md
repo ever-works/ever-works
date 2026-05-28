@@ -28,6 +28,7 @@ docs/specs/
 │   ├── pipeline-executor.md        # Executor / step / modifier substrate
 │   ├── trigger-integration.md      # Trigger.dev wiring
 │   ├── plugin-sdk.md               # @ever-works/plugin SDK deep-dive
+│   ├── runtime-plugins.md          # Dual-mode distribution + runtime installer
 │   ├── settings-system.md          # 3-tier resolution + secret hygiene
 │   ├── ai-facade.md                # AiFacadeService routing & model catalog
 │   ├── auth.md                     # JWT + OAuth + API keys + device flow
@@ -56,6 +57,7 @@ docs/specs/
     ├── comparisons/
     ├── creating-a-work/
     ├── custom-domains/
+    ├── dynamic-plugin-distribution/
     ├── data-generator/
     ├── data-management/
     ├── work-changelog/
@@ -94,6 +96,7 @@ which now live folded into `tasks.md`).
 | [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                   |
 | [`data-generator`](features/data-generator/spec)                   | Retrospective | Data repository management and item persistence                |
 | [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene              |
+| [`dynamic-plugin-distribution`](features/dynamic-plugin-distribution/spec) | Draft         | Dual-mode plugins: bundle all, or core-only + runtime npm install |
 | [`work-changelog`](features/work-changelog/spec)                   | Retrospective | Audit trail of all work mutations                              |
 | [`work-import`](features/work-import/spec)                         | Retrospective | Bootstrap from existing repo or Awesome List                   |
 | [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
