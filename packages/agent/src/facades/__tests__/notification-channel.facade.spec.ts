@@ -50,6 +50,7 @@ describe('NotificationChannelFacadeService', () => {
             'work_generation_finished',
             { text: 'done', messageRef: 'ref-1' },
             async () => [],
+            { userId: 'user-1' },
         );
         expect(results).toEqual([]);
     });
@@ -60,6 +61,7 @@ describe('NotificationChannelFacadeService', () => {
             'work_generation_finished',
             { text: 'done', messageRef: 'ref-1' },
             async () => ['in-app'],
+            { userId: 'user-1' },
         );
         expect(results).toEqual([
             { channelId: 'in-app', pluginId: 'in-app', status: 'delivered' },
@@ -68,7 +70,7 @@ describe('NotificationChannelFacadeService', () => {
 
     it('fails verifyTarget when no plugin matches', async () => {
         await expect(
-            facade.verifyTarget('discord-channel', { webhookUrl: 'https://x' }, {}),
+            facade.verifyTarget('discord-channel', { webhookUrl: 'https://x' }, { userId: 'user-1' }),
         ).rejects.toBeInstanceOf(NotificationChannelFacadeError);
     });
 });

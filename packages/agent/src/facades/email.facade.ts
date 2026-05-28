@@ -95,7 +95,7 @@ export class EmailFacadeService extends BaseFacadeService {
      */
     async send(
         input: EmailFacadeSendInput,
-        options: EmailFacadeSendOptions = {},
+        options: EmailFacadeSendOptions,
     ): Promise<EmailSendResult> {
         const plugin = await this.resolveOutboundPlugin(options);
         const settings = await this.resolveSettings(plugin.id, options);
@@ -138,7 +138,7 @@ export class EmailFacadeService extends BaseFacadeService {
      */
     async verifyAddress(
         address: string,
-        options: EmailFacadeSendOptions = {},
+        options: EmailFacadeSendOptions,
     ): Promise<{ verificationToken: string; providerMessageId?: string }> {
         const plugin = await this.resolveOutboundPlugin(options);
         const settings = await this.resolveSettings(plugin.id, options);
@@ -163,15 +163,15 @@ export class EmailFacadeService extends BaseFacadeService {
         pluginId: string,
         rawBody: Buffer,
         headers: Readonly<Record<string, string>>,
-        options: FacadeOptions = {},
+        options?: FacadeOptions,
     ): Promise<EmailInboundMessage> {
         const plugin = this.getInboundPluginById(pluginId);
         const settings = await this.resolveSettings(pluginId, options);
         const emailOpts: EmailOptions = {
-            userId: options.userId,
-            workId: options.workId,
-            agentId: options.agentId,
-            taskId: options.taskId,
+            userId: options?.userId,
+            workId: options?.workId,
+            agentId: options?.agentId,
+            taskId: options?.taskId,
             settings,
         };
         plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
@@ -242,10 +242,14 @@ export class EmailFacadeService extends BaseFacadeService {
 
     private async resolveSettings(
         pluginId: string,
-        options: FacadeOptions,
+        options?: Pick<FacadeOptions, 'userId' | 'workId'>,
     ): Promise<Record<string, unknown> | undefined> {
         if (!this.settingsService) return undefined;
-        return this.settingsService.getResolvedSettings(pluginId, options.userId, options.workId);
+        return this.settingsService.getSettings(pluginId, {
+            userId: options?.userId,
+            workId: options?.workId,
+            includeSecrets: true,
+        });
     }
 
     /**
@@ -310,16 +314,16 @@ export class EmailFacadeService extends BaseFacadeService {
     ): Promise<void> {
         if (!this.pluginUsageService || !options.userId) return;
         try {
-            await this.pluginUsageService.recordUsage({
+            await this.pluginUsageService.record({
                 userId: options.userId,
                 workId: options.workId,
                 agentId: options.agentId,
                 taskId: options.taskId,
                 pluginId,
                 capability: PluginUsageCapability.EMAIL,
-                operation,
                 units: 1,
                 costCents: 0,
+                metadata: { operation },
             });
         } catch (err) {
             this.logger.warn(`PluginUsageEvent emission failed for ${pluginId}: ${String(err)}`);

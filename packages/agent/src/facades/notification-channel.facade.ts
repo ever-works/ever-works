@@ -97,7 +97,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
             userId: string,
             eventType: string,
         ) => Promise<readonly string[]>,
-        options: FacadeOptions = {},
+        options: FacadeOptions,
     ): Promise<readonly NotificationChannelFanoutResult[]> {
         const channelIds = await resolveChannelIds(userId, eventType);
         if (channelIds.length === 0) {
@@ -119,7 +119,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
     async sendDirect(
         channelId: string,
         payload: NotificationChannelFanoutInput,
-        options: FacadeOptions = {},
+        options: FacadeOptions,
     ): Promise<NotificationChannelFanoutResult> {
         return this.sendOne(channelId, payload, options, payload.eventType ?? undefined);
     }
@@ -131,7 +131,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
     async verifyTarget(
         pluginId: string,
         config: ChannelTargetConfig,
-        options: FacadeOptions = {},
+        options: FacadeOptions,
     ): Promise<ChannelVerification> {
         const plugin = this.getChannelPluginById(pluginId);
         const settings = await this.resolveSettings(pluginId, options);
@@ -255,7 +255,11 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         options: FacadeOptions,
     ): Promise<Record<string, unknown> | undefined> {
         if (!this.settingsService) return undefined;
-        return this.settingsService.getResolvedSettings(pluginId, options.userId, options.workId);
+        return this.settingsService.getSettings(pluginId, {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets: true,
+        });
     }
 
     private async logDelivery(
@@ -290,16 +294,16 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
     ): Promise<void> {
         if (!this.pluginUsageService || !options.userId) return;
         try {
-            await this.pluginUsageService.recordUsage({
+            await this.pluginUsageService.record({
                 userId: options.userId,
                 workId: options.workId,
                 agentId: options.agentId,
                 taskId: options.taskId,
                 pluginId,
                 capability: PluginUsageCapability.NOTIFICATION_CHANNEL,
-                operation,
                 units: 1,
                 costCents: 0,
+                metadata: { operation },
             });
         } catch (err) {
             this.logger.warn(`PluginUsageEvent emission failed for ${pluginId}: ${String(err)}`);
