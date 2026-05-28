@@ -1,4 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const sendMock = vi.fn();
+
+vi.mock('resend', () => ({
+	Resend: class {
+		emails = { send: sendMock };
+	}
+}));
+
 import { ResendPlugin } from './resend-plugin.js';
 
 describe('ResendPlugin', () => {
@@ -7,6 +16,7 @@ describe('ResendPlugin', () => {
 	beforeEach(() => {
 		plugin = new ResendPlugin();
 		process.env.RESEND_API_KEY = 'test-key';
+		sendMock.mockReset();
 	});
 
 	it('declares only email-outbound (inbound is private beta)', () => {
@@ -14,59 +24,37 @@ describe('ResendPlugin', () => {
 		expect(plugin.capabilities).not.toContain('email-inbound');
 	});
 
-	it('POSTs to /emails with Bearer auth and returns the id', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: true,
-			status: 200,
-			json: async () => ({ id: 'rs-abc-123' })
-		} as Response);
+	it('sends via the resend SDK with an idempotency key and returns the id', async () => {
+		sendMock.mockResolvedValueOnce({ data: { id: 'rs-abc-123' }, error: null });
 
 		const result = await plugin.sendEmail(
-			{
-				from: 'a@example.com',
-				to: ['b@example.com'],
-				subject: 'hi',
-				bodyText: 'hi',
-				messageRef: 'ref-1'
-			},
+			{ from: 'a@example.com', to: ['b@example.com'], subject: 'hi', bodyText: 'hi', messageRef: 'ref-1' },
 			{ userId: 'user-1' }
 		);
 
 		expect(result.providerMessageId).toBe('rs-abc-123');
-		const [, init] = fetchMock.mock.calls[0];
-		const headers = (init as RequestInit & { headers: Record<string, string> }).headers;
-		expect(headers.Authorization).toBe('Bearer test-key');
-		expect(headers['Idempotency-Key']).toBe('ref-1');
-		fetchMock.mockRestore();
+		const [payload, opts] = sendMock.mock.calls[0];
+		expect(payload.to).toEqual(['b@example.com']);
+		expect(payload.text).toBe('hi');
+		expect(opts).toEqual({ idempotencyKey: 'ref-1' });
 	});
 
-	it('throws when Resend returns an error', async () => {
-		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: false,
-			status: 422,
-			json: async () => ({ error: { statusCode: 422, message: 'Invalid sender' } })
-		} as Response);
+	it('throws when the resend SDK returns an error', async () => {
+		sendMock.mockResolvedValueOnce({
+			data: null,
+			error: { name: 'validation_error', message: 'Invalid sender' }
+		});
 
 		await expect(
 			plugin.sendEmail(
-				{
-					from: 'a@example.com',
-					to: ['b@example.com'],
-					subject: 'hi',
-					bodyText: 'hi',
-					messageRef: 'ref-err'
-				},
+				{ from: 'a@example.com', to: ['b@example.com'], subject: 'hi', bodyText: 'hi', messageRef: 'ref-err' },
 				{ userId: 'u' }
 			)
-		).rejects.toThrow(/Resend send failed/);
+		).rejects.toThrow(/Resend send failed \(validation_error\): Invalid sender/);
 	});
 
-	it('serves repeated messageRef from idempotency cache without re-calling fetch', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
-			ok: true,
-			status: 200,
-			json: async () => ({ id: 'rs-cache' })
-		} as Response);
+	it('serves repeated messageRef from the idempotency cache without re-calling the SDK', async () => {
+		sendMock.mockResolvedValue({ data: { id: 'rs-cache' }, error: null });
 
 		const input = {
 			from: 'a@example.com',
@@ -77,7 +65,6 @@ describe('ResendPlugin', () => {
 		};
 		await plugin.sendEmail(input, { userId: 'u' });
 		await plugin.sendEmail(input, { userId: 'u' });
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		fetchMock.mockRestore();
+		expect(sendMock).toHaveBeenCalledTimes(1);
 	});
 });

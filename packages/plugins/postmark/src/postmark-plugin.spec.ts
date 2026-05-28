@@ -1,4 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const sendEmailMock = vi.fn();
+
+vi.mock('postmark', () => ({
+	ServerClient: class {
+		sendEmail = sendEmailMock;
+	}
+}));
+
 import { PostmarkPlugin } from './postmark-plugin.js';
 
 describe('PostmarkPlugin', () => {
@@ -7,6 +16,7 @@ describe('PostmarkPlugin', () => {
 	beforeEach(() => {
 		plugin = new PostmarkPlugin();
 		process.env.POSTMARK_API_KEY = 'test-key';
+		sendEmailMock.mockReset();
 	});
 
 	it('declares email-outbound + email-inbound capabilities', () => {
@@ -15,12 +25,8 @@ describe('PostmarkPlugin', () => {
 	});
 
 	describe('sendEmail', () => {
-		it('POSTs to /email and returns providerMessageId on success', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				json: async () => ({ MessageID: 'pm-123', ErrorCode: 0 })
-			} as Response);
+		it('sends via the postmark SDK and returns providerMessageId on success', async () => {
+			sendEmailMock.mockResolvedValueOnce({ MessageID: 'pm-123', ErrorCode: 0 });
 
 			const result = await plugin.sendEmail(
 				{
@@ -35,19 +41,13 @@ describe('PostmarkPlugin', () => {
 
 			expect(result.providerMessageId).toBe('pm-123');
 			expect(result.accepted).toEqual(['b@example.com']);
-			expect(fetchMock).toHaveBeenCalledWith(
-				'https://api.postmarkapp.com/email',
-				expect.objectContaining({ method: 'POST' })
-			);
-			fetchMock.mockRestore();
+			const msg = sendEmailMock.mock.calls[0][0];
+			expect(msg.To).toBe('b@example.com');
+			expect(msg.TextBody).toBe('hi');
 		});
 
-		it('throws when Postmark returns an error', async () => {
-			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: false,
-				status: 422,
-				json: async () => ({ MessageID: '', ErrorCode: 405, Message: 'Invalid sender' })
-			} as Response);
+		it('throws when the postmark SDK rejects the send', async () => {
+			sendEmailMock.mockRejectedValueOnce({ code: 405, message: 'Invalid sender' });
 
 			await expect(
 				plugin.sendEmail(
@@ -60,15 +60,11 @@ describe('PostmarkPlugin', () => {
 					},
 					{ userId: 'user-1' }
 				)
-			).rejects.toThrow(/Postmark send failed/);
+			).rejects.toThrow(/Postmark send failed \(405\): Invalid sender/);
 		});
 
 		it('returns the cached result for a repeated messageRef (idempotency)', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
-				ok: true,
-				status: 200,
-				json: async () => ({ MessageID: 'pm-cache', ErrorCode: 0 })
-			} as Response);
+			sendEmailMock.mockResolvedValue({ MessageID: 'pm-cache', ErrorCode: 0 });
 
 			const input = {
 				from: 'a@example.com',
@@ -80,8 +76,7 @@ describe('PostmarkPlugin', () => {
 			const r1 = await plugin.sendEmail(input, { userId: 'u' });
 			const r2 = await plugin.sendEmail(input, { userId: 'u' });
 			expect(r1).toEqual(r2);
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			fetchMock.mockRestore();
+			expect(sendEmailMock).toHaveBeenCalledTimes(1);
 		});
 	});
 
