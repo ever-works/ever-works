@@ -17,14 +17,6 @@ import type {
 	AgentMemoryContext
 } from '@ever-works/plugin';
 
-/** Minimal shape of the cancellation marker some pipelines stash on
- *  the context bag. Pipelines use slightly different shapes; we only
- *  care about a `code` field. */
-interface CancellationLike {
-	readonly code?: string;
-	readonly message?: string;
-}
-
 /** Step injected at the START of every pipeline run — fetches prior
  *  agent-memory context relevant to the Work and stashes it on the
  *  pipeline context for downstream steps to pick up. */
@@ -86,7 +78,13 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 	readonly category: PluginCategory = 'utility';
 	readonly capabilities = ['pipeline-modifier'] as const;
 	readonly configurationMode = 'hybrid' as const;
-	readonly targetPipelines = ['*'] as const;
+	// Step-orchestratable pipelines only. Self-managed pipelines
+	// (claude-code, codex, opencode, etc.) bypass modifier injection
+	// because they route through `FullPipelineExecutorService`, so
+	// listing them here would be silently ineffective (Codex P2 on
+	// PR #1081). Enumerate explicitly instead of `['*']` so it's
+	// obvious which pipelines pick this up.
+	readonly targetPipelines = ['standard-pipeline', 'agent-pipeline'] as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -228,8 +226,18 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			);
 		}
 
-		const memoryFacade = execContext?.agentMemoryFacade;
 		const logger = execContext?.logger ?? console;
+
+		// Honour the work-scoped `enabled` flag at execution time —
+		// `canSkip()` is not currently called by the pipeline builder
+		// (Codex P2 on PR #1081). Until that wiring lands, gate inside
+		// `execute()` so toggling the flag actually disables the steps.
+		if (settings.enabled !== true) {
+			logger.log(`memory-pipeline-modifier: step "${stepId}" disabled by settings — skipping`);
+			return context;
+		}
+
+		const memoryFacade = execContext?.agentMemoryFacade;
 
 		if (!memoryFacade) {
 			logger.warn(
@@ -308,11 +316,14 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		try {
 			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
 			const items = (context as { items?: unknown[] }).items;
-			const cancellation = (context as { cancellationError?: CancellationLike }).cancellationError;
-			const errorMessage = (context as { errorMessage?: string }).errorMessage;
 
-			const summary = this.buildSummary(work, items, cancellation, errorMessage);
-			const tags = this.buildTags(work, items, cancellation, errorMessage);
+			// v1 records SUCCESSFUL runs only — the `last` step doesn't
+			// fire when an earlier step throws or the run is cancelled
+			// (Codex P2 on PR #1081). Capturing failure/cancellation
+			// signals will move to an `IPipelineModifierPlugin.rollback`
+			// hook in a follow-up PR; the tag taxonomy stays the same.
+			const summary = this.buildSummary(work, items);
+			const tags = this.buildTags(work);
 
 			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
 				{
@@ -358,33 +369,17 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 	private buildSummary(
 		work: { id?: string; name?: string; slug?: string } | undefined,
-		items: unknown[] | undefined,
-		cancellation: CancellationLike | undefined,
-		errorMessage: string | undefined
+		items: unknown[] | undefined
 	): string {
 		const workLabel = work?.name ?? work?.slug ?? work?.id ?? 'unknown Work';
-		if (cancellation) {
-			const code: string = cancellation.code ?? 'unknown';
-			return `Work "${workLabel}" — generation cancelled (${code}).`;
-		}
-		if (errorMessage) {
-			return `Work "${workLabel}" — generation failed: ${errorMessage.slice(0, 240)}`;
-		}
 		const count = Array.isArray(items) ? items.length : 0;
 		return `Work "${workLabel}" — pipeline completed with ${count} item${count === 1 ? '' : 's'}.`;
 	}
 
-	private buildTags(
-		work: { id?: string; slug?: string } | undefined,
-		_items: unknown[] | undefined,
-		cancellation: CancellationLike | undefined,
-		errorMessage: string | undefined
-	): readonly string[] {
+	private buildTags(work: { id?: string; slug?: string } | undefined): readonly string[] {
 		const tags: string[] = ['pipeline-run'];
 		if (work?.slug) tags.push(`work:${work.slug}`);
 		else if (work?.id) tags.push(`work-id:${work.id}`);
-		if (cancellation) tags.push('cancelled');
-		if (errorMessage) tags.push('failed');
 		return tags;
 	}
 }

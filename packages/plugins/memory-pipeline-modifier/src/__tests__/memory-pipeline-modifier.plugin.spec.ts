@@ -26,13 +26,30 @@ describe('MemoryPipelineModifierPlugin', () => {
 		} as unknown as IAgentMemoryStepFacade;
 	});
 
-	function makeContext(overrides?: Partial<Record<string, unknown>>): IPipelineContext {
-		return {
+	// stepSettings.enabled MUST be true for execute() to actually do
+	// work — `canSkip()` is informational today (Codex P2 on PR #1081
+	// — the pipeline builder doesn't call it yet), so the gate lives
+	// inside `execute()`. Each test that exercises a step path passes
+	// `enabled: true` here.
+	function makeContext(overrides?: Partial<Record<string, unknown>>, enabled = true): IPipelineContext {
+		const base: Record<string, unknown> = {
 			work: { id: 'work-1', slug: 'best-react-tools', name: 'Best React Tools', user: { id: 'u-1' } },
 			request: { prompt: 'Top 10 React UI libraries' },
 			items: [{ name: 'Item A' }, { name: 'Item B' }],
 			...overrides
-		} as unknown as IPipelineContext;
+		};
+		if (enabled) {
+			base.stepSettings = {
+				...((overrides?.stepSettings as Record<string, unknown> | undefined) ?? {}),
+				'memory-pipeline-modifier': {
+					enabled: true,
+					...(((overrides?.stepSettings as Record<string, unknown> | undefined)?.[
+						'memory-pipeline-modifier'
+					] as Record<string, unknown>) ?? {})
+				}
+			};
+		}
+		return base as unknown as IPipelineContext;
 	}
 
 	function makeExecContext(): StepExecutionContext {
@@ -49,8 +66,10 @@ describe('MemoryPipelineModifierPlugin', () => {
 			expect(plugin.capabilities).toContain('pipeline-modifier');
 		});
 
-		it('targets all pipelines (["*"])', () => {
-			expect(plugin.targetPipelines).toEqual(['*']);
+		it('targets ONLY step-orchestratable pipelines (standard + agent), not the wildcard', () => {
+			// Self-managed pipelines (claude-code, codex, opencode) bypass
+			// modifier injection — Codex P2 on PR #1081.
+			expect([...plugin.targetPipelines]).toEqual(['standard-pipeline', 'agent-pipeline']);
 		});
 
 		it('declares two injected steps at first + last positions', () => {
@@ -71,14 +90,22 @@ describe('MemoryPipelineModifierPlugin', () => {
 
 	describe('canSkip', () => {
 		it('returns true when settings.enabled !== true (default off)', async () => {
-			await expect(plugin.canSkip(makeContext())).resolves.toBe(true);
+			await expect(plugin.canSkip(makeContext({}, false))).resolves.toBe(true);
 		});
 
 		it('returns false when stepSettings.enabled === true', async () => {
-			const context = makeContext({
-				stepSettings: { 'memory-pipeline-modifier': { enabled: true } }
+			await expect(plugin.canSkip(makeContext())).resolves.toBe(false);
+		});
+	});
+
+	describe('enabled gate inside execute()', () => {
+		it('no-ops when stepSettings.enabled !== true (since pipeline builder may not call canSkip)', async () => {
+			const context = makeContext({}, false);
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
 			});
-			await expect(plugin.canSkip(context)).resolves.toBe(false);
+			expect(memoryFacade.buildContext).not.toHaveBeenCalled();
+			expect(logger.log).toHaveBeenCalledWith(expect.stringMatching(/disabled by settings/));
 		});
 	});
 
@@ -112,14 +139,13 @@ describe('MemoryPipelineModifierPlugin', () => {
 				content: 'prior memory text',
 				approxTokens: 250
 			});
-			const context = makeContext();
-			await plugin.execute(context, {
-				settings: {
-					stepId: FETCH_CONTEXT_STEP_ID,
-					execContext: makeExecContext(),
-					purpose: 'fix-bug',
-					maxContextTokens: 1000
+			const context = makeContext({
+				stepSettings: {
+					'memory-pipeline-modifier': { enabled: true, purpose: 'fix-bug', maxContextTokens: 1000 }
 				}
+			});
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
 			});
 			expect(memoryFacade.buildContext).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -148,9 +174,8 @@ describe('MemoryPipelineModifierPlugin', () => {
 			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
 				new Error('connection refused')
 			);
-			const context = makeContext();
 			await expect(
-				plugin.execute(context, {
+				plugin.execute(makeContext(), {
 					settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
 				})
 			).resolves.toBeDefined();
@@ -178,47 +203,11 @@ describe('MemoryPipelineModifierPlugin', () => {
 			);
 		});
 
-		it('marks tags as `failed` when the pipeline context has an errorMessage', async () => {
-			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-				id: 'mem-1',
-				createdAt: 'now',
-				content: 'x'
-			});
-			const context = makeContext({ errorMessage: 'AI provider rate-limited' });
-			await plugin.execute(context, {
-				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContext() }
-			});
-			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tags: expect.arrayContaining(['failed']),
-					content: expect.stringMatching(/rate-limited/)
-				}),
-				expect.any(Object)
-			);
-		});
-
-		it('marks tags as `cancelled` when the context has a cancellationError', async () => {
-			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-				id: 'mem-1',
-				createdAt: 'now',
-				content: 'x'
-			});
-			const context = makeContext({ cancellationError: { code: 'user-cancel' } });
-			await plugin.execute(context, {
-				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContext() }
-			});
-			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
-				expect.objectContaining({
-					tags: expect.arrayContaining(['cancelled']),
-					content: expect.stringMatching(/cancelled.*user-cancel/)
-				}),
-				expect.any(Object)
-			);
-		});
-
 		it('skips entirely when stepSettings.saveSummary === false', async () => {
 			const context = makeContext({
-				stepSettings: { 'memory-pipeline-modifier': { saveSummary: false } }
+				stepSettings: {
+					'memory-pipeline-modifier': { enabled: true, saveSummary: false }
+				}
 			});
 			await plugin.execute(context, {
 				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContext() }
