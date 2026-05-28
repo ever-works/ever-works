@@ -17,7 +17,13 @@ interface LogoEverWorkProps {
     config?: WorkConfig | null;
 }
 
-export function LogoEverWork({
+/**
+ * Wordmark image only — no `<Link>` wrapper. Use this when the logo
+ * needs to live inside another interactive element (e.g. the
+ * `<WorkspaceSwitcher>` dropdown trigger) where nesting a `<Link>`
+ * inside a `<button>` would be invalid HTML.
+ */
+export function LogoEverWorkImage({
     className,
     width = 120,
     height = 40,
@@ -25,10 +31,8 @@ export function LogoEverWork({
     config: configProps,
 }: LogoEverWorkProps) {
     const siteConfig = getSiteConfig(configProps);
-    const logoHref = siteConfig.website || '/';
-
     return (
-        <Link href={logoHref} className={cn('relative flex items-center', className)}>
+        <span className={cn('relative flex items-center', className)}>
             <Image
                 src={siteConfig.logo.light}
                 alt={siteConfig.name}
@@ -45,7 +49,64 @@ export function LogoEverWork({
                 priority={false}
                 className="hidden dark:block h-auto w-auto max-h-12 object-contain"
             />
+        </span>
+    );
+}
+
+export function LogoEverWork({
+    className,
+    width = 120,
+    height = 40,
+    priority = true,
+    config: configProps,
+}: LogoEverWorkProps) {
+    const siteConfig = getSiteConfig(configProps);
+    const logoHref = siteConfig.website || '/';
+
+    return (
+        <Link href={logoHref} className={cn('relative flex items-center', className)}>
+            <LogoEverWorkImage
+                width={width}
+                height={height}
+                priority={priority}
+                config={configProps}
+            />
         </Link>
+    );
+}
+
+/**
+ * Spinning favicon image only — no `<Link>` wrapper. Same rationale as
+ * `LogoEverWorkImage`: lets the favicon be embedded inside other
+ * interactive elements (or composed alongside other content) without
+ * nesting links.
+ */
+export function FaviconEverWorkImage({
+    className,
+    config: configProps,
+    size = 32,
+}: {
+    className?: string;
+    config?: WorkConfig | null;
+    size?: number;
+}) {
+    const siteConfig = getSiteConfig(configProps);
+    const { isDark, mounted } = useTheme();
+    const faviconSrc = mounted && isDark ? siteConfig.favicon.dark : siteConfig.favicon.light;
+
+    return (
+        <Image
+            key={faviconSrc}
+            src={faviconSrc}
+            alt={siteConfig.name}
+            width={size}
+            height={size}
+            style={{ animationDuration: '10s' }}
+            className={cn(
+                'object-contain max-h-8 animate-spin motion-reduce:animate-none',
+                className,
+            )}
+        />
     );
 }
 
@@ -57,23 +118,13 @@ export function FaviconEverWork({
     config?: WorkConfig | null;
 }) {
     const siteConfig = getSiteConfig(configProps);
-    const { isDark, mounted } = useTheme();
-    const faviconSrc = mounted && isDark ? siteConfig.favicon.dark : siteConfig.favicon.light;
 
     return (
         <Link
             href={siteConfig.website || '/'}
             className={cn('relative flex items-center', className)}
         >
-            <Image
-                key={faviconSrc}
-                src={faviconSrc}
-                alt={siteConfig.name}
-                width={32}
-                height={32}
-                style={{ animationDuration: '10s' }}
-                className="object-contain max-h-8 ml-[10.5px] animate-spin motion-reduce:animate-none"
-            />
+            <FaviconEverWorkImage config={configProps} className="ml-[10.5px]" />
         </Link>
     );
 }
