@@ -58,6 +58,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AuthSession',
     'AuthVerification',
     'CacheEntry',
+    'ComposioTriggerSubscription',
     'Conversation',
     'ConversationMessage',
     'EmailConversation',
