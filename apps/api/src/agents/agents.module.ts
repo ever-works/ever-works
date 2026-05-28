@@ -7,13 +7,25 @@ import {
     AGENT_PLUGIN_TOOLS_FACADE,
     AGENT_AI_DISPATCH_FACADE,
     AGENT_GIT_FACADE,
+    AGENT_EMAIL_FACADE,
+    AGENT_NOTIFY_CHANNEL_FACADE,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
     type AgentAiDispatchFacade,
     type AgentAiToolCall,
     type AgentGitFacade,
+    type AgentEmailFacade,
+    type AgentNotifyChannelFacade,
 } from '@ever-works/agent/agents';
+import {
+    AgentEmailAssignmentRepository,
+    TenantEmailAddressRepository,
+    NotificationChannelRepository,
+} from '@ever-works/agent/database';
+import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
 // The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
@@ -90,6 +102,9 @@ import { AgentsController } from './agents.controller';
         TasksDomainModule,
         FacadesModule,
         AuthModule,
+        // Notifications v2 (EW-670) — EmailModule provides EmailService,
+        // consumed by the AGENT_EMAIL_FACADE binding below.
+        EmailModule,
     ],
     controllers: [AgentsController],
     providers: [
@@ -381,6 +396,95 @@ import { AgentsController } from './agents.controller';
                 },
             }),
         },
+        // Notifications v2 (EW-670) — AGENT_EMAIL_FACADE binding. Routes
+        // the `sendEmail` + `messageAgent` Agent tools through the
+        // api-side EmailService (which resolves the agent's outbound
+        // address + persists the message + records usage). `messageAgent`
+        // resolves the TARGET agent's primary inbound address, then sends
+        // from the sender's outbound — the inbound dispatcher routes it
+        // into a conversation thread on arrival.
+        {
+            provide: AGENT_EMAIL_FACADE,
+            inject: [
+                EmailService,
+                AgentEmailAssignmentRepository,
+                TenantEmailAddressRepository,
+            ],
+            useFactory: (
+                email: EmailService,
+                assignments: AgentEmailAssignmentRepository,
+                addresses: TenantEmailAddressRepository,
+            ): AgentEmailFacade => ({
+                async sendEmail({ userId, agentId, to, cc, subject, bodyText, bodyHtml, fromAddressId }) {
+                    const result = await email.sendMessage(userId, {
+                        agentId,
+                        to: [...to],
+                        cc: cc ? [...cc] : undefined,
+                        subject,
+                        bodyText,
+                        bodyHtml,
+                        fromAddressId,
+                    });
+                    return {
+                        providerMessageId: result.providerMessageId,
+                        accepted: [...result.accepted],
+                        rejected: result.rejected.map((r) => ({ ...r })),
+                    };
+                },
+                async messageAgent({ userId, fromAgentId, targetAgentId, subject, body }) {
+                    const inbound = await assignments.findByAgent(targetAgentId, 'inbound');
+                    const assignment = inbound[0];
+                    if (!assignment) {
+                        throw new Error(
+                            `messageAgent: target agent ${targetAgentId} has no inbound email address.`,
+                        );
+                    }
+                    const address = await addresses.findById(assignment.emailAddressId);
+                    if (!address) {
+                        throw new Error('messageAgent: target inbound address not found.');
+                    }
+                    const result = await email.sendMessage(userId, {
+                        agentId: fromAgentId,
+                        to: [address.address],
+                        subject,
+                        bodyText: body,
+                    });
+                    return {
+                        providerMessageId: result.providerMessageId,
+                        targetAddress: address.address,
+                    };
+                },
+            }),
+        },
+        // Notifications v2 (EW-673) — AGENT_NOTIFY_CHANNEL_FACADE binding.
+        // Routes the `notifyChannel` Agent tool through
+        // NotificationChannelFacadeService.sendDirect; listEnabledChannels
+        // reads the user's active channels for the model to choose from.
+        {
+            provide: AGENT_NOTIFY_CHANNEL_FACADE,
+            inject: [NotificationChannelFacadeService, NotificationChannelRepository],
+            useFactory: (
+                channels: NotificationChannelFacadeService,
+                channelRepo: NotificationChannelRepository,
+            ): AgentNotifyChannelFacade => ({
+                async notifyChannel({ userId, agentId, channelId, text }) {
+                    const result = await channels.sendDirect(
+                        channelId,
+                        { text, messageRef: `agent-${agentId}-${Date.now()}` },
+                        { userId, agentId },
+                    );
+                    return {
+                        status: result.status,
+                        providerMessageId: result.providerMessageId,
+                        error: result.error,
+                    };
+                },
+                async listEnabledChannels(userId) {
+                    const rows = await channelRepo.findActiveByUser(userId);
+                    return rows.map((c) => ({ id: c.id, name: c.name, pluginId: c.pluginId }));
+                },
+            }),
+        },
     ],
     exports: [
         AGENT_RUN_CHAT_BACK_POSTER,
@@ -388,6 +492,8 @@ import { AgentsController } from './agents.controller';
         AGENT_PLUGIN_TOOLS_FACADE,
         AGENT_AI_DISPATCH_FACADE,
         AGENT_GIT_FACADE,
+        AGENT_EMAIL_FACADE,
+        AGENT_NOTIFY_CHANNEL_FACADE,
     ],
 })
 export class AgentsModule {}
