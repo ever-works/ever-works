@@ -32,7 +32,8 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@ever-works/plugin": "workspace:*"
+		"@ever-works/plugin": "workspace:*",
+		"postmark": "^4.0.5"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",

@@ -1,0 +1,47 @@
+{
+	"name": "@ever-works/email-templates",
+	"version": "1.0.0",
+	"description": "React-Email server-side templates + renderer for Ever Works (Notifications v2)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@react-email/components": "^0.0.36",
+		"@react-email/render": "^1.1.4",
+		"react": "^19.2.0",
+		"react-dom": "^19.2.0"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.0",
+		"@types/react-dom": "^19.2.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	}
+}

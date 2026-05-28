@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/resend-plugin",
+	"name": "@ever-works/mailgun-plugin",
 	"version": "1.0.0",
-	"description": "Resend email provider plugin (outbound only) for Ever Works platform",
+	"description": "Mailgun email provider plugin (outbound + inbound) for Ever Works platform",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
@@ -33,7 +33,8 @@
 	},
 	"dependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"resend": "^4.5.1"
+		"form-data": "^4.0.1",
+		"mailgun.js": "^10.2.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
@@ -43,30 +44,49 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "resend",
-			"name": "Resend",
+			"id": "mailgun",
+			"name": "Mailgun",
 			"version": "1.0.0",
 			"category": "email-provider",
 			"capabilities": [
-				"email-outbound"
+				"email-outbound",
+				"email-inbound"
 			],
-			"description": "Send transactional + agent-driven email through Resend. Inbound is deferred until Resend GA (currently private beta).",
+			"description": "Send + receive email through Mailgun (Messages API + signed inbound routes, US/EU regions).",
 			"settings": {
 				"type": "object",
 				"properties": {
 					"apiKey": {
 						"type": "string",
-						"title": "Resend API key",
+						"title": "Mailgun API key",
 						"x-secret": true,
-						"x-envVar": "RESEND_API_KEY"
+						"x-envVar": "MAILGUN_API_KEY"
 					},
-					"defaultSenderDomain": {
+					"domain": {
 						"type": "string",
-						"title": "Default sender domain"
+						"title": "Sending domain",
+						"x-envVar": "MAILGUN_DOMAIN"
+					},
+					"region": {
+						"type": "string",
+						"title": "Region",
+						"enum": [
+							"us",
+							"eu"
+						],
+						"default": "us",
+						"x-envVar": "MAILGUN_REGION"
+					},
+					"webhookSigningKey": {
+						"type": "string",
+						"title": "Webhook signing key (inbound)",
+						"x-secret": true,
+						"x-envVar": "MAILGUN_WEBHOOK_SIGNING_KEY"
 					}
 				},
 				"required": [
-					"apiKey"
+					"apiKey",
+					"domain"
 				]
 			}
 		}

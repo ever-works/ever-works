@@ -8,6 +8,11 @@ jest.mock('@ever-works/agent/notifications', () => ({
     AGENT_INBOUND_EMAIL_DISPATCHER: 'AGENT_INBOUND_EMAIL_DISPATCHER',
 }));
 jest.mock('@ever-works/agent/database', () => ({}));
+// Stub the React-Email renderer so the api test never loads React.
+jest.mock('./templates/render', () => ({
+    renderTemplate: jest.fn(),
+    listTemplates: jest.fn(() => []),
+}));
 jest.mock('../auth', () => ({
     CurrentUser: () => () => undefined,
     Public: () => () => undefined,

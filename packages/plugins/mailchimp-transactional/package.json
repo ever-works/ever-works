@@ -1,7 +1,7 @@
 {
-	"name": "@ever-works/resend-plugin",
+	"name": "@ever-works/mailchimp-transactional-plugin",
 	"version": "1.0.0",
-	"description": "Resend email provider plugin (outbound only) for Ever Works platform",
+	"description": "Mailchimp Transactional (Mandrill) email provider plugin (outbound) for Ever Works platform",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
@@ -33,7 +33,7 @@
 	},
 	"dependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"resend": "^4.5.1"
+		"@mailchimp/mailchimp_transactional": "^1.0.59"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
@@ -43,22 +43,22 @@
 	},
 	"everworks": {
 		"plugin": {
-			"id": "resend",
-			"name": "Resend",
+			"id": "mailchimp-transactional",
+			"name": "Mailchimp Transactional",
 			"version": "1.0.0",
 			"category": "email-provider",
 			"capabilities": [
 				"email-outbound"
 			],
-			"description": "Send transactional + agent-driven email through Resend. Inbound is deferred until Resend GA (currently private beta).",
+			"description": "Send transactional + agent-driven email through Mailchimp Transactional (Mandrill) messages API.",
 			"settings": {
 				"type": "object",
 				"properties": {
 					"apiKey": {
 						"type": "string",
-						"title": "Resend API key",
+						"title": "Mandrill API key",
 						"x-secret": true,
-						"x-envVar": "RESEND_API_KEY"
+						"x-envVar": "MANDRILL_API_KEY"
 					},
 					"defaultSenderDomain": {
 						"type": "string",
