@@ -54,6 +54,22 @@ export interface PromptChipsRowProps<TValue extends string = string> {
 /** How far one click of ◀ / ▶ pans the track, in CSS pixels. */
 const STEP = 220;
 
+/**
+ * Total horizontal padding in the container when the row is panned to
+ * either boundary (atStart: `pl-1 pr-10` = 4 + 40 = 44; atEnd:
+ * `pl-10 pr-1` = 40 + 4 = 44). Used to compute `maxOffset` so the
+ * last chip's right edge can fully reach the visible area when the
+ * user clicks ▶ all the way — without this, `maxOffset` underestimates
+ * by `PADDING_AT_BOUNDARY` and `atEnd` triggers ~40px early (Codex P2
+ * on PR #1069).
+ */
+const PADDING_AT_BOUNDARY = 44;
+
+/** Padding values that match the Tailwind classes below. Pixel-perfect
+ *  mirrors of `pl-1 = 4`, `pl-10 = 40`, etc. */
+const PADDING_LARGE = 40; // pl-10 / pr-10
+const PADDING_SMALL = 4; // pl-1 / pr-1
+
 export function PromptChipsRow<TValue extends string = string>({
     chips,
     value,
@@ -90,7 +106,16 @@ export function PromptChipsRow<TValue extends string = string>({
         return () => ro.disconnect();
     }, [chips]);
 
-    const maxOffset = Math.max(0, trackWidth - containerWidth);
+    // `clientWidth` includes the container's padding. When the user has
+    // panned away from the start, that padding is `pl-10 pr-10` (80px
+    // total); at the boundaries it's `pl-1 pr-10` or `pl-10 pr-1`
+    // (44px total). The chip area visible to the user is therefore
+    // `clientWidth - totalPadding`. The largest valid `offset` keeps
+    // the last chip's right edge aligned with the inner right padding
+    // when atEnd, which is `trackWidth - (containerWidth - 44)`.
+    // (Codex P2 on PR #1069 — the previous `trackWidth - containerWidth`
+    // formula clipped the last ~44px of chips before atEnd flipped.)
+    const maxOffset = Math.max(0, trackWidth - containerWidth + PADDING_AT_BOUNDARY);
 
     // Clamp `offset` whenever the track or container resizes. Without
     // this, shrinking the viewport when the row is already panned to
@@ -108,6 +133,45 @@ export function PromptChipsRow<TValue extends string = string>({
             setOffset((prev) => Math.max(0, Math.min(maxOffset, prev + delta)));
         },
         [maxOffset],
+    );
+
+    /**
+     * Keyboard accessibility — pan the track so a newly-focused chip is
+     * fully visible. With the transform-based pan replacing the native
+     * scroller (PR #1069), the browser no longer scrolls hidden chip
+     * buttons into view when Tab focus advances. Codex P2 on PR #1069:
+     * without this, a keyboard user can tab to off-screen options with
+     * no visible focus indicator.
+     *
+     * Uses `getBoundingClientRect` for absolute position comparison —
+     * dodges the question of which element is the focused chip's
+     * `offsetParent` (it depends on `position` on ancestors).
+     */
+    const ensureChipVisible = useCallback(
+        (buttonEl: HTMLElement) => {
+            const container = containerRef.current;
+            if (!container) return;
+
+            const containerRect = container.getBoundingClientRect();
+            const buttonRect = buttonEl.getBoundingClientRect();
+
+            // Visible chip window: container interior minus arrow
+            // gutters. The gutter is `PADDING_LARGE` on the side that
+            // has a button and `PADDING_SMALL` on the side that doesn't.
+            const leftGutter = atStart ? PADDING_SMALL : PADDING_LARGE;
+            const rightGutter = atEnd ? PADDING_SMALL : PADDING_LARGE;
+            const visibleStart = containerRect.left + leftGutter;
+            const visibleEnd = containerRect.right - rightGutter;
+
+            if (buttonRect.left < visibleStart) {
+                const delta = buttonRect.left - visibleStart; // negative
+                setOffset((prev) => Math.max(0, prev + delta));
+            } else if (buttonRect.right > visibleEnd) {
+                const delta = buttonRect.right - visibleEnd; // positive
+                setOffset((prev) => Math.min(maxOffset, prev + delta));
+            }
+        },
+        [atStart, atEnd, maxOffset],
     );
 
     const trackStyle = useMemo(() => ({ transform: `translate3d(${-offset}px, 0, 0)` }), [offset]);
@@ -190,6 +254,13 @@ export function PromptChipsRow<TValue extends string = string>({
                                 // (jsx-a11y/role-supports-aria-props). aria-selected
                                 // is the right toggle state inside a listbox.
                                 onClick={() => onChange(selected ? null : c.value)}
+                                // Keyboard accessibility: when Tab moves focus
+                                // to a chip that's currently panned off-screen,
+                                // pan the track so the focused chip is in
+                                // view. Native scrolling used to handle this
+                                // automatically; the transform-based pan does
+                                // not, so we wire it explicitly.
+                                onFocus={(e) => ensureChipVisible(e.currentTarget)}
                                 data-testid={
                                     testIdPrefix ? `${testIdPrefix}-${c.value}` : undefined
                                 }
