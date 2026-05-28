@@ -145,8 +145,31 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
         );
         expect(postCall).toBeDefined();
         const body = JSON.parse((postCall![1] as RequestInit).body as string);
-        // countryCode is auto-uppercased before submit.
-        expect(body).toEqual({ name: 'Globex LLC', countryCode: 'DE' });
+        // countryCode is sent raw; the server normalizes (single source of
+        // truth — Greptile P2 on PR #1071).
+        expect(body).toEqual({ name: 'Globex LLC', countryCode: 'de' });
+    });
+
+    /**
+     * Regression — first-org classification races the initial org-list
+     * fetch. While `isLoading` is true the store's `data` is still `[]`, so
+     * an existing-org user must NOT be able to submit (and be misclassified
+     * as first-org → routed into upgrade-from-account, which 409s for 2nd+
+     * orgs). Submit stays gated until the fetch settles. (Greptile + Codex
+     * P1 on PR #1071.)
+     */
+    it('gates submit while the org list is still loading', () => {
+        __seedOrganizationsStoreForTests({ data: [], isLoading: true, error: null });
+        const fetchMock = vi.spyOn(global, 'fetch');
+        render(<RegisterCompanyDialog open={true} onOpenChange={vi.fn()} />);
+
+        fireEvent.change(screen.getByTestId('register-company-name'), {
+            target: { value: 'Acme Inc.' },
+        });
+        const submit = screen.getByTestId('register-company-submit') as HTMLButtonElement;
+        expect(submit.disabled).toBe(true);
+        fireEvent.click(submit);
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     /**

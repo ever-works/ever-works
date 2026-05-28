@@ -35,7 +35,10 @@ export interface RegisterCompanyDialogProps {
  * `registrationProvider = 'manual'` + `registrationStatus =
  * 'registered'` for v1 — the Stripe Atlas integration is deferred.
  *
- * Post-submit behavior mirrors the Phase 9 CreateOrganizationModal:
+ * Post-submit behavior mirrors the Phase 9 CreateOrganizationModal
+ * (decided only once the org list has loaded — submit is gated on the
+ * hook's `isLoading` so a still-loading `[]` can't misclassify an
+ * existing-org user as first-org):
  *  - First Org (`organizations.length === 0` pre-submit) → hands off
  *    to `<UpgradeOrCreateDialog>` so the user can choose Upgrade vs
  *    Empty.
@@ -50,7 +53,7 @@ export interface RegisterCompanyDialogProps {
 export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDialogProps) {
     const t = useTranslations('organizations.registerCompany');
     const router = useRouter();
-    const { organizations, mutate } = useOrganizations();
+    const { organizations, isLoading, mutate } = useOrganizations();
 
     const [name, setName] = useState('');
     const [countryCode, setCountryCode] = useState('');
@@ -90,6 +93,16 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
         if (isSubmitting) {
             return;
         }
+        // The first-org branch below is decided from `organizations.length`,
+        // which is `[]` until the initial GET /api/organizations resolves.
+        // Block submit until that fetch settles (isLoading flips false on
+        // success OR error) so an existing-org user submitting during a slow
+        // first load isn't misclassified as first-org and sent down the
+        // upgrade-from-account path, which 409s for 2nd+ orgs. (Greptile +
+        // Codex P1 on PR #1071.)
+        if (isLoading) {
+            return;
+        }
         const trimmedName = name.trim();
         if (trimmedName.length === 0) {
             setSubmitError(t('errors.nameRequired'));
@@ -116,7 +129,9 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: trimmedName,
-                    ...(cc.length > 0 ? { countryCode: cc.toUpperCase() } : {}),
+                    // Server normalizes (`dto.countryCode?.toUpperCase()`) — keep
+                    // it the single source of truth, send the raw 2-letter input.
+                    ...(cc.length > 0 ? { countryCode: cc } : {}),
                 }),
             });
             if (!res.ok) {
@@ -152,7 +167,17 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
         } finally {
             setIsSubmitting(false);
         }
-    }, [isSubmitting, name, countryCode, organizations.length, mutate, onOpenChange, router, t]);
+    }, [
+        isSubmitting,
+        isLoading,
+        name,
+        countryCode,
+        organizations.length,
+        mutate,
+        onOpenChange,
+        router,
+        t,
+    ]);
 
     const handleUpgradeDialogClose = useCallback(
         (didUpgrade: boolean) => {
@@ -225,8 +250,8 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                             </Button>
                             <Button
                                 onClick={handleSubmit}
-                                loading={isSubmitting}
-                                disabled={isSubmitting || name.trim().length === 0}
+                                loading={isSubmitting || isLoading}
+                                disabled={isSubmitting || isLoading || name.trim().length === 0}
                                 data-testid="register-company-submit"
                             >
                                 {t('submit')}
