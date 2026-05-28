@@ -1,0 +1,92 @@
+{
+	"name": "@ever-works/mailgun-plugin",
+	"version": "1.0.0",
+	"description": "Mailgun email provider plugin (outbound + inbound) for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "mailgun",
+			"name": "Mailgun",
+			"version": "1.0.0",
+			"category": "email-provider",
+			"capabilities": [
+				"email-outbound",
+				"email-inbound"
+			],
+			"description": "Send + receive email through Mailgun (Messages API + signed inbound routes, US/EU regions).",
+			"settings": {
+				"type": "object",
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "Mailgun API key",
+						"x-secret": true,
+						"x-envVar": "MAILGUN_API_KEY"
+					},
+					"domain": {
+						"type": "string",
+						"title": "Sending domain",
+						"x-envVar": "MAILGUN_DOMAIN"
+					},
+					"region": {
+						"type": "string",
+						"title": "Region",
+						"enum": [
+							"us",
+							"eu"
+						],
+						"default": "us",
+						"x-envVar": "MAILGUN_REGION"
+					},
+					"webhookSigningKey": {
+						"type": "string",
+						"title": "Webhook signing key (inbound)",
+						"x-secret": true,
+						"x-envVar": "MAILGUN_WEBHOOK_SIGNING_KEY"
+					}
+				},
+				"required": [
+					"apiKey",
+					"domain"
+				]
+			}
+		}
+	}
+}
