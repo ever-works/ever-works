@@ -237,6 +237,8 @@ describe('classifyGenerationError', () => {
             ['gemini quota exceeded', 'Google'],
             ['groq insufficient_quota', 'Groq'],
             ['ollama insufficient_quota', 'Ollama'],
+            ['lm-studio insufficient_quota', 'LM Studio'],
+            ['vllm insufficient_quota', 'vLLM'],
             ['openrouter rate_limit', 'OpenRouter'],
         ])('detects provider %p as %p', (input, provider) => {
             const result = classifyGenerationError(input);
