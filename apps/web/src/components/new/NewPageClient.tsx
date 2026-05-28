@@ -101,10 +101,7 @@ const CHIP_ORDER: ChipType[] = [
  * `store` so the server page can resolve one flag set covering the whole
  * catalog.
  */
-export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store'> = [
-    ...CHIP_ORDER,
-    'store',
-];
+export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store'> = [...CHIP_ORDER, 'store'];
 
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,
