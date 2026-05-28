@@ -1,4 +1,4 @@
-# ADR-015: Dual-Mode Plugin Distribution (bundled + runtime npm install)
+# ADR-016: Dual-Mode Plugin Distribution (bundled + runtime npm install)
 
 ## Status
 

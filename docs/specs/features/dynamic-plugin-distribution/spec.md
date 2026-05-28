@@ -289,7 +289,7 @@ All initial open questions were resolved with @evereq on 2026-05-28:
 ## 10. References
 
 - Related features: [`plugin-system`](../plugin-system/spec.md)
-- Related ADRs: [`015-dynamic-plugin-distribution`](../../decisions/015-dynamic-plugin-distribution.md)
+- Related ADRs: [`016-dynamic-plugin-distribution`](../../decisions/016-dynamic-plugin-distribution.md)
 - Related architecture: [`runtime-plugins`](../../architecture/runtime-plugins.md),
   [`plugin-sdk`](../../architecture/plugin-sdk.md),
   [`deployment`](../../architecture/deployment.md),

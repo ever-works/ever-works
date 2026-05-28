@@ -279,7 +279,7 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 
 - Spec: `./spec.md`
 - Tasks: `./tasks.md`
-- ADR: [`015-dynamic-plugin-distribution`](../../decisions/015-dynamic-plugin-distribution.md)
+- ADR: [`016-dynamic-plugin-distribution`](../../decisions/016-dynamic-plugin-distribution.md)
 - Architecture: [`runtime-plugins`](../../architecture/runtime-plugins.md),
   [`plugin-sdk`](../../architecture/plugin-sdk.md),
   [`deployment`](../../architecture/deployment.md)

@@ -204,7 +204,7 @@ not part of this feature.
 
 - Feature spec: [`features/dynamic-plugin-distribution/spec`](../features/dynamic-plugin-distribution/spec.md)
 - Plan: [`features/dynamic-plugin-distribution/plan`](../features/dynamic-plugin-distribution/plan.md)
-- ADR: [`decisions/015-dynamic-plugin-distribution`](../decisions/015-dynamic-plugin-distribution.md)
+- ADR: [`decisions/016-dynamic-plugin-distribution`](../decisions/016-dynamic-plugin-distribution.md)
 - SDK: [`plugin-sdk`](./plugin-sdk.md)
 - Deployment: [`deployment`](./deployment.md)
 - Trigger.dev: [`trigger-integration`](./trigger-integration.md)
