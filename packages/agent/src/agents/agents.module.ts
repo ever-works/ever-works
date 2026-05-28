@@ -21,6 +21,7 @@ import { AgentRunService } from './agent-run.service';
 import { AgentToolService } from './agent-tool.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
+import { FacadesModule } from '../facades/facades.module';
 
 /**
  * Agents/Skills/Tasks — Phase 3 (PR #1017 specs). The agent-side
@@ -46,6 +47,12 @@ import { SkillsModule } from '../skills/skills.module';
         // Phase 10 — AgentRunService resolves active skills via
         // SkillBindingRepository before assembling the prompt.
         SkillsModule,
+        // PR #1084 follow-up: AgentRunService injects
+        // AgentMemoryFacadeService (@Optional) so it can open + close a
+        // memory session per run. Without this import the @Optional()
+        // resolves to undefined in production and the wiring never
+        // fires (Codex P1 on PR #1084).
+        FacadesModule,
     ],
     providers: [
         AgentRepository,
