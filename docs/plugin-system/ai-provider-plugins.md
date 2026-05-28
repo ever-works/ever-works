@@ -161,6 +161,38 @@ Groq provides extremely fast inference through custom LPU hardware. Ideal for la
 
 Ollama runs models locally. Users must have Ollama installed and running. The `baseUrl` setting (default: `http://localhost:11434`) points to the local Ollama instance.
 
+### LM Studio
+
+| Property           | Value                          |
+| ------------------ | ------------------------------ |
+| Package            | `@ever-works/lm-studio-plugin` |
+| Provider Type      | `lm-studio`                    |
+| Configuration Mode | `user-required`                |
+| Default Model      | User's loaded model            |
+| Structured Output  | Model dependent                |
+| Streaming          | Yes                            |
+| Tool Calling       | Model dependent                |
+| Vision             | Model dependent                |
+| Embeddings         | Model dependent                |
+
+LM Studio runs models locally and serves them through an OpenAI-compatible API. Start the **Local Server** in the LM Studio app; the `baseUrl` setting (default: `http://localhost:1234/v1`) points to it. No API key is required by default. The model fields have no hardcoded default — they are populated from the currently loaded model via the `model-select` widget.
+
+### vLLM
+
+| Property           | Value                     |
+| ------------------ | ------------------------- |
+| Package            | `@ever-works/vllm-plugin` |
+| Provider Type      | `vllm`                    |
+| Configuration Mode | `user-required`           |
+| Default Model      | Server's `--model`        |
+| Structured Output  | Model dependent           |
+| Streaming          | Yes                       |
+| Tool Calling       | Model dependent           |
+| Vision             | Model dependent           |
+| Embeddings         | Model dependent           |
+
+vLLM is a high-throughput inference server, usually deployed on a GPU host. It exposes an OpenAI-compatible API; the `baseUrl` setting (default: `http://localhost:8000/v1`) points to it. The `apiKey` field defaults to vLLM's `EMPTY` placeholder and is only needed when the server was started with `--api-key` (it is stored encrypted via `x-secret`). For the managed cloud to reach a vLLM server, the base URL must be resolvable from where work generation runs — see the [vLLM plugin page](./vllm-plugin.md) for the networking note.
+
 ### Mistral
 
 | Property           | Value                        |
