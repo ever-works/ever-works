@@ -51,15 +51,19 @@
 
 ### Not started (next session)
 
-- **EW-670** Agent integration: `sendEmail` + `messageAgent` tools + dispatcher + git facade
 - **EW-675** WhatsApp + Novu channel plugins
+
+### Partially done (this loop)
+
+- **EW-670** Agent integration — `sendEmail` tool done (T23). Still pending: `messageAgent` tool (T24), `AGENT_INBOUND_EMAIL_DISPATCHER` token + dispatcher (T25).
 
 ### Newly done (this overnight cron loop)
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
 - **T22 EW-677** Subscription resolver (`resolveChannels` + quiet-hours + mute) — [`bc23e150`](https://github.com/ever-works/ever-works/commit/bc23e150). BullMQ delayed-delivery + org-defaults fallback deferred (TODO in service). Listener now uses the real resolver instead of the T20 stub.
-- **T22b** Repo-method alignment — *this commit*. Aligned the T11 facades + T12 api services to the repositories' actual semantic method APIs. Resolves the Known Issue below.
+- **T22b** Repo-method alignment — [`49953380`](https://github.com/ever-works/ever-works/commit/49953380). Aligned the T11 facades + T12 api services to the repositories' actual semantic method APIs.
+- **T23 EW-670** Agent `sendEmail` tool descriptor — *this commit*. New `AGENT_EMAIL_FACADE` token + `AgentEmailFacade` contract (mirrors AGENT_GIT_FACADE), `buildSendEmailTool` gated on `canCallExternalTools` + facade presence; ≥1-outbound-assignment enforced at invoke time. 4 new unit tests (13/13 agent-tool suite green).
 
 ## ✅ Resolved — apps/api repo method mismatch (was a T22 finding, fixed in T22b)
 

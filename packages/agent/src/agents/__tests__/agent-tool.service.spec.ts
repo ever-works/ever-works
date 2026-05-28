@@ -198,4 +198,91 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect('error' in out).toBe(true);
         });
     });
+
+    describe('sendEmail tool (EW-670 / T23)', () => {
+        const makeEmailFacade = () => ({ sendEmail: jest.fn() });
+
+        it('is NOT exposed when emailFacade token is unbound', () => {
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).not.toContain('sendEmail');
+        });
+
+        it('is NOT exposed without canCallExternalTools even when facade is wired', () => {
+            const facade = makeEmailFacade();
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(makeAgent());
+            expect(tools.map((t) => t.name)).not.toContain('sendEmail');
+        });
+
+        it('is exposed when canCallExternalTools + facade are both present', () => {
+            const facade = makeEmailFacade();
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('sendEmail');
+        });
+
+        it('invoke rejects empty recipient list + forwards valid sends to the facade', async () => {
+            const facade = makeEmailFacade();
+            facade.sendEmail.mockResolvedValue({
+                providerMessageId: 'pm-1',
+                accepted: ['b@x.com'],
+                rejected: [],
+            });
+            const withFacade = new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+            const tools = withFacade.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'sendEmail')!;
+
+            const bad = (await tool.invoke({
+                to: [],
+                subject: 's',
+                bodyText: 'b',
+            } as any)) as Record<string, unknown>;
+            expect('error' in bad).toBe(true);
+            expect(facade.sendEmail).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({
+                to: ['b@x.com'],
+                subject: 'hello',
+                bodyText: 'world',
+            } as any);
+            expect(facade.sendEmail).toHaveBeenCalledTimes(1);
+            expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-1');
+        });
+    });
 });

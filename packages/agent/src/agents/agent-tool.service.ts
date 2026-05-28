@@ -25,6 +25,11 @@ import {
     type AgentScreenshotResult,
     type AgentExtractContentResult,
 } from './agent-plugin-tools-facade';
+import {
+    AGENT_EMAIL_FACADE,
+    type AgentEmailFacade,
+    type AgentSendEmailResult,
+} from './agent-email-facade';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -100,6 +105,13 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_PLUGIN_TOOLS_FACADE)
         private readonly pluginTools?: AgentPluginToolsFacade,
+        // Notifications v2 (EW-670) — Agent email tools. Token-injected
+        // (same circular-dep dodge as AGENT_GIT_FACADE) so non-API
+        // contexts + unit tests build the descriptor list without a
+        // runtime EmailFacadeService dependency.
+        @Optional()
+        @Inject(AGENT_EMAIL_FACADE)
+        private readonly emailFacade?: AgentEmailFacade,
         // Review-fix I6: route createSubAgent through AgentsService so
         // scope-ownership validation + slug-uniqueness + avatar-field
         // validation + permission refinement all run, instead of the
@@ -186,6 +198,16 @@ export class AgentToolService {
             tools.push(this.buildSearchWebTool(agent));
             tools.push(this.buildScreenshotTool(agent));
             tools.push(this.buildExtractContentTool(agent));
+        }
+
+        // Notifications v2 (EW-670) — sendEmail. Same canCallExternalTools
+        // gate (outbound network call risk class) + token presence. The
+        // "≥1 outbound assignment" requirement is enforced at invoke time
+        // (the adapter rejects when the Agent has no outbound address),
+        // mirroring the commitToRepo "scope-not-Work" invoke-time reject —
+        // the assignment lookup is async and resolveAllowedTools is sync.
+        if (agent.permissions?.canCallExternalTools && this.emailFacade) {
+            tools.push(this.buildSendEmailTool(agent));
         }
 
         // getActivity + getKbDocument — placeholders that document the
@@ -540,6 +562,79 @@ export class AgentToolService {
                         maxResults: args.maxResults,
                         includeDomains: args.includeDomains,
                         excludeDomains: args.excludeDomains,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildSendEmailTool(
+        agent: Agent,
+    ): AgentToolDescriptor<
+        {
+            to: string[];
+            subject: string;
+            bodyText: string;
+            cc?: string[];
+            bodyHtml?: string;
+            fromAddressId?: string;
+        },
+        AgentSendEmailResult
+    > {
+        return {
+            name: 'sendEmail',
+            description:
+                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Returns the provider message id plus accepted/rejected recipient lists. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    to: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Recipient email addresses (RFC 5321 mailboxes).',
+                    },
+                    subject: { type: 'string', description: 'Email subject line.' },
+                    bodyText: { type: 'string', description: 'Plain-text body (always required).' },
+                    cc: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional CC recipients.',
+                    },
+                    bodyHtml: {
+                        type: 'string',
+                        description: 'Optional HTML body. When omitted, bodyText is sent as-is.',
+                    },
+                    fromAddressId: {
+                        type: 'string',
+                        description:
+                            "Optional tenant_email_addresses id to send from. Defaults to the agent's primary (lowest-priority) outbound assignment.",
+                    },
+                },
+                required: ['to', 'subject', 'bodyText'],
+            },
+            invoke: async (args) => {
+                if (!Array.isArray(args?.to) || args.to.length === 0) {
+                    return { error: 'to must be a non-empty array of email addresses.' };
+                }
+                if (!args?.subject || args.subject.trim().length === 0) {
+                    return { error: 'subject is required.' };
+                }
+                if (!args?.bodyText || args.bodyText.trim().length === 0) {
+                    return { error: 'bodyText is required.' };
+                }
+                try {
+                    return await this.emailFacade!.sendEmail({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        workId: agent.workId ?? undefined,
+                        to: args.to,
+                        cc: args.cc,
+                        subject: args.subject,
+                        bodyText: args.bodyText,
+                        bodyHtml: args.bodyHtml,
+                        fromAddressId: args.fromAddressId,
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };
