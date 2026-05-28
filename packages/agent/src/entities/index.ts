@@ -84,3 +84,6 @@ export * from './user-notification-subscription.entity';
 export * from './user-notification-preference.entity';
 export * from './user-notification-category-mute.entity';
 export * from './organization-notification-default.entity';
+
+// Composio triggers (EW-684 PR-D)
+export * from './composio-trigger-subscription.entity';
