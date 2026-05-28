@@ -4,11 +4,14 @@ import {
     OrganizationRepository,
     TenantRepository,
     UserRepository,
+    WorkRepository,
 } from '@ever-works/agent/database';
+import { WorkModule } from '@ever-works/agent/services';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 import { UsersModule } from '../users/users.module';
 import { OrganizationService } from './organization.service';
 import { OrganizationsController } from './organizations.controller';
+import { WorkRegisteredListener } from './work-registered.listener';
 
 /**
  * EW-658 (Tenants & Organizations Phase 6) — Organizations module.
@@ -27,13 +30,22 @@ import { OrganizationsController } from './organizations.controller';
  * and `OrganizationService` consume it for slug allocation.
  */
 @Module({
-    imports: [DatabaseModule, UsersModule],
+    // EW-665 (Phase 13) — `WorkModule` provides `WorkLifecycleService`, used
+    // by the Register-Company controller to land + transition the backing
+    // Company Work. `WorkModule` doesn't import Organizations, so no cycle.
+    imports: [DatabaseModule, UsersModule, WorkModule],
     providers: [
         UserRepository,
         TenantRepository,
         OrganizationRepository,
+        // EW-665 (Phase 13) — `WorkRegisteredListener` loads the full
+        // Company Work to read its name/website before spawning the Org.
+        WorkRepository,
         TenantBootstrapService,
         OrganizationService,
+        // EW-665 (Phase 13) — turns a Company Work's `→ registered`
+        // transition (the `work.status.changed` event) into an Org.
+        WorkRegisteredListener,
     ],
     controllers: [OrganizationsController],
     exports: [OrganizationService, TenantBootstrapService],
