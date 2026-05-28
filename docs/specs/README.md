@@ -21,9 +21,11 @@ docs/specs/
 ├── decisions/                      # Architecture Decision Records (ADRs)
 │   ├── 001-pipeline-checkpointing.md
 │   ├── 002-trigger-worker-callback-channel.md
-│   └── 003-pnpm-overrides-strategy.md
+│   ├── 003-pnpm-overrides-strategy.md
+│   └── 015-job-runtime-provider-pluggability.md  # Pluggable background-job runtime
 ├── architecture/                   # Cross-feature architecture docs
 │   ├── README.md                   # Reading order + companion-pair index
+│   ├── job-runtime-providers.md    # Pluggable runtime contract + worker models
 │   ├── pipeline-overview.md        # High-level generation flow
 │   ├── pipeline-executor.md        # Executor / step / modifier substrate
 │   ├── trigger-integration.md      # Trigger.dev wiring
@@ -63,6 +65,7 @@ docs/specs/
     ├── work-members/
     ├── generation-cancellation/
     ├── git-operations/
+    ├── job-runtime-providers/   # Pluggable background-job runtime (proposed)
     ├── item-source-validation/
     ├── markdown-generator/
     ├── mcp-server/
@@ -83,30 +86,31 @@ full Spec Kit format and retain their deeper architectural `spec.md`
 (see also their `acceptance.md` for the original acceptance criteria
 which now live folded into `tasks.md`).
 
-| Feature                                                            | Status        | Description                                                    |
-| ------------------------------------------------------------------ | ------------- | -------------------------------------------------------------- |
-| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-work prompt overrides per pipeline step                    |
-| [`api-keys`](features/api-keys/spec)                               | Retrospective | Long-lived auth tokens for CI / CLI / MCP                      |
-| [`collections`](features/collections/spec)                         | Retrospective | Editorial groupings cutting across categories                  |
-| [`community-pr-processing`](features/community-pr-processing/spec) | Retrospective | AI-driven processing of community-contributed PRs              |
-| [`comparisons`](features/comparisons/spec)                         | Retrospective | A vs B comparison page generator                               |
-| [`creating-a-work`](features/creating-a-work/spec)                 | Retrospective | Three creation methods: AI / Manual / Import                   |
-| [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                   |
-| [`data-generator`](features/data-generator/spec)                   | Retrospective | Data repository management and item persistence                |
-| [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene              |
-| [`work-changelog`](features/work-changelog/spec)                   | Retrospective | Audit trail of all work mutations                              |
-| [`work-import`](features/work-import/spec)                         | Retrospective | Bootstrap from existing repo or Awesome List                   |
-| [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
-| [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths              |
-| [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                |
-| [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                     |
-| [`markdown-generator`](features/markdown-generator/spec)           | Retrospective | Markdown rendering pipeline                                    |
-| [`mcp-server`](features/mcp-server/spec)                           | Retrospective | OpenAPI-derived MCP tool surface                               |
-| [`plugin-system`](features/plugin-system/spec)                     | Retrospective | Capability-driven plugin architecture (39 first-party plugins) |
-| [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction     |
-| [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo             |
-| [`website-generator`](features/website-generator/spec)             | Retrospective | Static site generation pipeline                                |
-| [`works-config`](features/works-config/spec)                       | Retrospective | `.works/works.yml` source-controlled work configuration        |
+| Feature                                                            | Status        | Description                                                                                   |
+| ------------------------------------------------------------------ | ------------- | --------------------------------------------------------------------------------------------- |
+| [`advanced-prompts`](features/advanced-prompts/spec)               | Retrospective | Per-work prompt overrides per pipeline step                                                   |
+| [`api-keys`](features/api-keys/spec)                               | Retrospective | Long-lived auth tokens for CI / CLI / MCP                                                     |
+| [`collections`](features/collections/spec)                         | Retrospective | Editorial groupings cutting across categories                                                 |
+| [`community-pr-processing`](features/community-pr-processing/spec) | Retrospective | AI-driven processing of community-contributed PRs                                             |
+| [`comparisons`](features/comparisons/spec)                         | Retrospective | A vs B comparison page generator                                                              |
+| [`creating-a-work`](features/creating-a-work/spec)                 | Retrospective | Three creation methods: AI / Manual / Import                                                  |
+| [`custom-domains`](features/custom-domains/spec)                   | Retrospective | Branded domain assignment with provider sync                                                  |
+| [`data-generator`](features/data-generator/spec)                   | Retrospective | Data repository management and item persistence                                               |
+| [`data-management`](features/data-management/spec)                 | Retrospective | Export / Import / GitHub Sync with secret hygiene                                             |
+| [`work-changelog`](features/work-changelog/spec)                   | Retrospective | Audit trail of all work mutations                                                             |
+| [`work-import`](features/work-import/spec)                         | Retrospective | Bootstrap from existing repo or Awesome List                                                  |
+| [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)                                  |
+| [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths                                             |
+| [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                                               |
+| [`job-runtime-providers`](features/job-runtime-providers/spec)     | Draft         | Pluggable background-job runtime (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest) |
+| [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                                                    |
+| [`markdown-generator`](features/markdown-generator/spec)           | Retrospective | Markdown rendering pipeline                                                                   |
+| [`mcp-server`](features/mcp-server/spec)                           | Retrospective | OpenAPI-derived MCP tool surface                                                              |
+| [`plugin-system`](features/plugin-system/spec)                     | Retrospective | Capability-driven plugin architecture (39 first-party plugins)                                |
+| [`scheduled-updates`](features/scheduled-updates/spec)             | Retrospective | Cron-driven generation with CAS claim and drift correction                                    |
+| [`taxonomy-system`](features/taxonomy-system/spec)                 | Retrospective | Categories, tags, and collections in the data repo                                            |
+| [`website-generator`](features/website-generator/spec)             | Retrospective | Static site generation pipeline                                                               |
+| [`works-config`](features/works-config/spec)                       | Retrospective | `.works/works.yml` source-controlled work configuration                                       |
 
 ## Reading order for new contributors
 
