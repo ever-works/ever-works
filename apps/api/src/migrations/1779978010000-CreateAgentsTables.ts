@@ -152,7 +152,7 @@ export class CreateAgentsTables1779978010000 implements MigrationInterface {
                         {
                             name: 'fk_agents_avatar_upload',
                             columnNames: ['avatarImageUploadId'],
-                            referencedTableName: 'work_knowledge_upload',
+                            referencedTableName: 'work_knowledge_uploads',
                             referencedColumnNames: ['id'],
                             onDelete: 'SET NULL',
                         },

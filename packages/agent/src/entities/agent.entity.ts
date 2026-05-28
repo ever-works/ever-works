@@ -54,7 +54,7 @@ export enum AgentStatus {
  *
  * - `INITIALS` — first 1-2 letters in a circle; color hashed from slug. Default.
  * - `ICON`     — lucide-react icon name; color hashed.
- * - `IMAGE`    — uploaded image (FK to `work_knowledge_upload`). Requires the
+ * - `IMAGE`    — uploaded image (FK to `work_knowledge_uploads`). Requires the
  *                tenant to have a storage plugin enabled.
  */
 export enum AgentAvatarMode {
@@ -261,7 +261,7 @@ export class Agent {
     avatarIcon?: string | null;
 
     /**
-     * FK to `work_knowledge_upload.id`. Populated only when
+     * FK to `work_knowledge_uploads.id`. Populated only when
      * `avatarMode = 'image'`. Reuses the existing KB upload pipeline so we
      * inherit storage / quota / ACL semantics.
      */
