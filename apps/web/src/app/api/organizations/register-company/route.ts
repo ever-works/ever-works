@@ -44,6 +44,15 @@ export async function POST(request: NextRequest) {
                 status: upstream.status || 500,
             });
         }
+        if (payload === null) {
+            // The NestJS controller always serialises a full
+            // OrganizationResponse on success, so a 2xx with an empty /
+            // unparseable body is an upstream contract violation. Surface it
+            // as an error instead of forwarding a literal `null` the dialog
+            // would deref as `org.slug` and crash on. (Greptile P1, PR #1071.)
+            console.error('register-company: upstream returned a 2xx with no body');
+            return NextResponse.json({ error: 'Failed to register company' }, { status: 502 });
+        }
         return NextResponse.json(payload, { status: 201 });
     } catch (error) {
         console.error('Failed to proxy POST /api/organizations/register-company:', error);
