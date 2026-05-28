@@ -88,7 +88,7 @@ Resolution:
 1. Load `user_notification_subscriptions` rows for `(userId, eventType)`.
 2. If none, fall back to the organisation default → built-in default → `['in-app']`.
 3. Filter out channels the user has disabled.
-4. Apply quiet hours: if now ∈ quiet window AND event.urgent === false AND channel is not `in-app`, queue delivery for end-of-quiet-window via BullMQ delayed job.
+4. Apply quiet hours: if now ∈ quiet window AND event.urgent === false AND channel is not `in-app`, defer delivery to end-of-quiet-window by enqueuing the Trigger.dev `notification-channel-delivery` task with a `delay` (the run waits server-side until the window closes). No BullMQ.
 5. Apply category mute: if `(userId, category)` has an active mute, drop all non-`in-app` channels (in-app still records the notification for retrospective viewing).
 
 Output: a list of `channelId`s. The caller fans out via `NotificationChannelFacadeService.send(channelIds, payload)`.
