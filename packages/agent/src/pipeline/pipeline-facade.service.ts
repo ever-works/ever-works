@@ -105,6 +105,7 @@ export class PipelineFacadeService {
         signal?: AbortSignal,
         kbContext?: KbContextBundleData,
         kbTools?: IKbToolsFacade,
+        memorySessionId?: string,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
@@ -146,6 +147,7 @@ export class PipelineFacadeService {
             signal,
             kbContext,
             kbTools,
+            memorySessionId,
         };
     }
 
