@@ -98,7 +98,7 @@ The detail layout wraps all sub-pages with shared navigation:
 | ----------- | ------------------------- | ---------------------------- |
 | Overview    | `/works/[id]`             | Work stats and quick actions |
 | Items       | `/works/[id]/items`       | Manage work items            |
-| Generator   | `/works/[id]/generator`   | Run item generation          |
+| Worker      | `/works/[id]/generator`   | Run item generation          |
 | Comparisons | `/works/[id]/comparisons` | Item comparison pages        |
 | History     | `/works/[id]/history`     | Generation run history       |
 | Members     | `/works/[id]/members`     | Team access management       |

@@ -1554,7 +1554,7 @@
                 "overview": "ภาพรวม",
                 "activity": "กิจกรรม",
                 "items": "รายการ",
-                "generator": "เครื่องสร้าง",
+                "generator": "Worker",
                 "schedule": "กำหนดการ",
                 "history": "ประวัติ",
                 "comparisons": "การเปรียบเทียบ",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "ยังไม่เริ่มการสร้าง",
                     "description": "เริ่มสร้างรายการสำหรับงานของคุณเพื่อเติมเนื้อหา",
-                    "action": "เริ่มการสร้าง"
+                    "action": "เริ่ม Work"
                 },
                 "generating": {
                     "title": "กำลังสร้าง",
@@ -1769,12 +1769,12 @@
                     "title": "การสร้างล้มเหลว",
                     "description": "เกิดข้อผิดพลาดระหว่างการสร้าง",
                     "withWarnings": "การสร้างล้มเหลวพร้อมข้อผิดพลาด:",
-                    "retry": "ลองสร้างใหม่"
+                    "retry": "ลอง Work ใหม่"
                 },
                 "cancelled": {
                     "title": "ยกเลิกการสร้าง",
                     "description": "การสร้างก่อนหน้าถูกหยุดก่อนเสร็จสิ้น",
-                    "restart": "เริ่มการสร้างใหม่"
+                    "restart": "เริ่ม Work ใหม่"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "รายละเอียดการตั้งค่า",
-                "initialPrompt": "พรอมต์การสร้างเริ่มต้น",
+                "initialPrompt": "พรอมต์ Worker เริ่มต้น",
                 "companyDetails": "ข้อมูลบริษัท",
                 "companyName": "ชื่อบริษัท",
                 "companyWebsite": "เว็บไซต์",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "สร้าง",
+                    "generate": "Work",
                     "schedule": "กำหนดการ",
                     "history": "ประวัติ",
                     "comparisons": "การเปรียบเทียบ",
-                    "navigationLabel": "แท็บเครื่องมือสร้าง"
+                    "navigationLabel": "แท็บ Worker"
                 },
                 "regenerationWarning": "คำเตือนการสร้างใหม่",
                 "regenerationWarningDescription": "งานนี้ถูกสร้างแล้ว การเริ่มสร้างใหม่จะแทนที่รายการที่มีอยู่",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "ไม่สามารถโหลดการตั้งค่าฟอร์มได้",
                 "selectOption": "เลือกตัวเลือก",
                 "workName": "ชื่องาน",
-                "generationPrompt": "พรอมต์การสร้าง",
+                "generationPrompt": "พรอมต์ Worker",
                 "modelOverride": "แทนที่โมเดล AI",
                 "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "ระบุรายละเอียดเกี่ยวกับประเภทเนื้อหาที่ต้องการสร้าง",
                 "repositoryDescription": "คำอธิบายคลัง",
                 "repositoryPlaceholder": "คำอธิบายสั้น ๆ ของคลัง (ไม่บังคับ)",
-                "startGeneration": "เริ่มสร้าง",
+                "startGeneration": "เริ่ม Work",
                 "regenerateItems": "สร้างรายการใหม่",
                 "updateItems": "เรียกใช้การสร้าง",
                 "recreateWork": "สร้างงานใหม่",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "เป้าหมายที่ดำเนินต่อไป — สร้างความคิดตามกำหนดการหรือครั้งเดียว",
@@ -3292,7 +3293,8 @@
                 "landing-page": "หน้าเดียวที่มุ่งเน้น — รายชื่อรอ การเปิดตัวผลิตภัณฑ์ การลงทะเบียนเวบินาร์ การดึงลูกค้า",
                 "blog": "บล็อกที่มีหมวดหมู่ RSS การเน้นโค้ด และเนื้อหาที่พร้อมใช้กับ SEO",
                 "directory": "เว็บไดเรกทอรี่ที่คัดสรรมาแล้ว พร้อมค้นหา ตัวกรอง และข้อมูลรายการที่มโนรม",
-                "awesome-repo": "เรโพซิทอรี่อะไรก็ได้ที่น่าทึ่ง — ดัชนี markdown ลิงก์ที่จัดหมวดหมู่ และเมตาดาทาที่รีเฟรชได้"
+                "awesome-repo": "เรโพซิทอรี่อะไรก็ได้ที่น่าทึ่ง — ดัชนี markdown ลิงก์ที่จัดหมวดหมู่ และเมตาดาทาที่รีเฟรชได้",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "สร้าง",
@@ -4597,7 +4599,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4702,7 +4717,7 @@
             "work": "งาน",
             "overview": "ภาพรวม",
             "items": "รายการ",
-            "generator": "ตัวสร้าง",
+            "generator": "Worker",
             "settings": "การตั้งค่า",
             "deploy": "เผยแพร่",
             "members": "สมาชิก",
@@ -4928,6 +4943,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

@@ -4,6 +4,7 @@ import { ScopeContextService } from './scope-context.service';
 import { ScopeStampingSubscriber } from './scope-stamping.subscriber';
 import { ScopeResolverMiddleware } from './scope-resolver.middleware';
 import { ScopeOwnershipGuard } from './scope-ownership.guard';
+import { SessionScopeGuard } from './session-scope.guard';
 
 /**
  * EW-657 (Tenants & Organizations Phase 5b) — exposes
@@ -43,8 +44,9 @@ import { ScopeOwnershipGuard } from './scope-ownership.guard';
         ScopeStampingSubscriber,
         ScopeResolverMiddleware,
         ScopeOwnershipGuard,
+        SessionScopeGuard,
     ],
-    exports: [ScopeContextService, ScopeOwnershipGuard],
+    exports: [ScopeContextService, ScopeOwnershipGuard, SessionScopeGuard],
 })
 export class ScopeModule implements NestModule {
     /**

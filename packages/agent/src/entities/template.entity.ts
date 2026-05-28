@@ -5,7 +5,16 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColum
 // templates in the catalog. The DB column is `varchar(32)` so
 // the new value fits without a migration; PR X seeds the
 // Mission Template repos.
-export type TemplateKind = 'website' | 'work' | 'mission';
+//
+// EW-662 (Tenants & Organizations Phase 10) — `'company'` joins the
+// union for the Company WorkType. Companies are a special template
+// kind that, when their backing Work transitions to `registered`,
+// spawn an `Organization` row (see `OrganizationService.createOrganizationFromCompanyWork`).
+// Same `varchar(32)` column — no migration needed for the new value.
+// No seed templates ship in v1 (Stripe Atlas integration is deferred);
+// the chip on `+ New` routes directly into the Register-Company
+// form which calls the `OrganizationService` manual-completion path.
+export type TemplateKind = 'website' | 'work' | 'mission' | 'company';
 export type TemplateSourceType = 'built_in' | 'custom';
 
 @Entity({ name: 'templates' })

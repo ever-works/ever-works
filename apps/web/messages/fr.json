@@ -1554,7 +1554,7 @@
                 "overview": "Aperçu",
                 "activity": "Activité",
                 "items": "Éléments",
-                "generator": "Générateur",
+                "generator": "Worker",
                 "schedule": "Programmation",
                 "history": "Historique",
                 "comparisons": "Comparaisons",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Génération non démarrée",
                     "description": "Commencez à générer des éléments pour votre travail afin de le peupler de contenu.",
-                    "action": "Démarrer la génération"
+                    "action": "Démarrer le Work"
                 },
                 "generating": {
                     "title": "Génération en cours",
@@ -1769,12 +1769,12 @@
                     "title": "Échec de la génération",
                     "description": "Une erreur s'est produite pendant la génération.",
                     "withWarnings": "Échec de la génération avec erreurs :",
-                    "retry": "Relancer la génération"
+                    "retry": "Relancer le Work"
                 },
                 "cancelled": {
                     "title": "Génération annulée",
                     "description": "La génération précédente a été arrêtée avant achèvement.",
-                    "restart": "Redémarrer la génération"
+                    "restart": "Redémarrer le Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Détails de configuration",
-                "initialPrompt": "Invite initiale de génération",
+                "initialPrompt": "Invite initiale du Worker",
                 "companyDetails": "Informations sur l'entreprise",
                 "companyName": "Nom de l'entreprise",
                 "companyWebsite": "Site web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Générer",
+                    "generate": "Work",
                     "schedule": "Planification",
                     "history": "Historique",
                     "comparisons": "Comparaisons",
-                    "navigationLabel": "Onglets du générateur"
+                    "navigationLabel": "Onglets Worker"
                 },
                 "regenerationWarning": "Avertissement de régénération",
                 "regenerationWarningDescription": "Ce travail a déjà été généré. Lancer une nouvelle génération remplacera les éléments existants.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Échec du chargement de la configuration du formulaire",
                 "selectOption": "Sélectionner une option",
                 "workName": "Nom du travail",
-                "generationPrompt": "Prompt de génération",
+                "generationPrompt": "Prompt du Worker",
                 "modelOverride": "Remplacement du modèle IA",
                 "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optionnel. Utilise par défaut le modèle importé ou précédent, sauf si vous le remplacez ici.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Soyez précis sur le type de contenu que vous souhaitez générer",
                 "repositoryDescription": "Description du dépôt",
                 "repositoryPlaceholder": "Brève description du dépôt (optionnel)",
-                "startGeneration": "Démarrer la génération",
+                "startGeneration": "Démarrer le Work",
                 "regenerateItems": "Régénérer les éléments",
                 "updateItems": "Exécuter la génération",
                 "recreateWork": "Recréer le travail",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "Un objectif continu que l'agent continue de traiter — génère des Idées de manière planifiée ou ponctuelle.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "Une page d'atterrissage concentrée — listes d'attente, lancements de produits, inscriptions à des webinaires, capture de prospects.",
                 "blog": "Un blog avec catégories, RSS, coloration syntaxique et contenu prêt pour le SEO.",
                 "directory": "Un site de répertoire curaté avec recherche, filtres et données d'articles structurées.",
-                "awesome-repo": "Un dépôt de type awesome-list — index markdown, liens catégorisés et métadonnées actualisables."
+                "awesome-repo": "Un dépôt de type awesome-list — index markdown, liens catégorisés et métadonnées actualisables.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Créer",
@@ -4533,7 +4535,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4638,7 +4653,7 @@
             "work": "Travail",
             "overview": "Aperçu",
             "items": "Éléments",
-            "generator": "Générateur",
+            "generator": "Worker",
             "settings": "Paramètres",
             "deploy": "Déployer",
             "members": "Membres",
@@ -4864,6 +4879,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

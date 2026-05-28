@@ -7,7 +7,13 @@ import { APIResponse } from './types';
 // in sync to avoid a runtime dep on the agent package from
 // apps/web). PR X seeds Mission Template repos; PR Y wires the
 // "Use this Template" button to pre-fill /new?type=mission.
-export type TemplateKind = 'website' | 'work' | 'mission';
+//
+// EW-662 (Tenants & Organizations Phase 10) — `'company'` joins the
+// union so the Company WorkType has a place in the catalog. No seed
+// templates ship in v1; the chip on `+ New` routes directly into
+// the Register-Company form which calls the OrganizationService
+// manual-completion path.
+export type TemplateKind = 'website' | 'work' | 'mission' | 'company';
 export type TemplateSourceType = 'built_in' | 'custom';
 export type TemplateOriginType = 'standard' | 'forked' | 'custom_url';
 

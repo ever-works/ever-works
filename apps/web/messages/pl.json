@@ -1554,7 +1554,7 @@
                 "overview": "Przegląd",
                 "activity": "Aktywność",
                 "items": "Elementy",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Harmonogram",
                 "history": "Historia",
                 "comparisons": "Porównania",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generowanie nie rozpoczęte",
                     "description": "Rozpocznij generowanie elementów dla pracy, aby wypełnić go zawartością.",
-                    "action": "Rozpocznij generowanie"
+                    "action": "Rozpocznij Work"
                 },
                 "generating": {
                     "title": "Generowanie w toku",
@@ -1769,12 +1769,12 @@
                     "title": "Generowanie nie powiodło się",
                     "description": "Wystąpił błąd podczas generowania.",
                     "withWarnings": "Generowanie nie powiodło się z błędami:",
-                    "retry": "Ponów generowanie"
+                    "retry": "Ponów Work"
                 },
                 "cancelled": {
                     "title": "Generowanie anulowane",
                     "description": "Poprzednie generowanie zostało zatrzymane przed ukończeniem.",
-                    "restart": "Uruchom ponownie generowanie"
+                    "restart": "Uruchom ponownie Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Szczegóły konfiguracji",
-                "initialPrompt": "Początkowy prompt generowania",
+                "initialPrompt": "Początkowy prompt Worker",
                 "companyDetails": "Informacje o firmie",
                 "companyName": "Nazwa firmy",
                 "companyWebsite": "Strona internetowa",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Generuj",
+                    "generate": "Work",
                     "schedule": "Harmonogram",
                     "history": "Historia",
                     "comparisons": "Porównania",
-                    "navigationLabel": "Zakładki generatora"
+                    "navigationLabel": "Zakładki Worker"
                 },
                 "regenerationWarning": "Ostrzeżenie przed ponowną generacją",
                 "regenerationWarningDescription": "Ten praca został już wygenerowany. Rozpoczęcie nowej generacji zastąpi istniejące elementy.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Nie udało się załadować konfiguracji formularza",
                 "selectOption": "Wybierz opcję",
                 "workName": "Nazwa pracy",
-                "generationPrompt": "Prompt generacji",
+                "generationPrompt": "Prompt Worker",
                 "modelOverride": "Nadpisanie modelu AI",
                 "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Bądź precyzyjny co do typu treści, którą chcesz wygenerować",
                 "repositoryDescription": "Opis repozytorium",
                 "repositoryPlaceholder": "Krótki opis repozytorium (opcjonalnie)",
-                "startGeneration": "Rozpocznij generację",
+                "startGeneration": "Rozpocznij Work",
                 "regenerateItems": "Zregeneruj elementy",
                 "updateItems": "Uruchom generację",
                 "recreateWork": "Odtwórz praca",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "Trwający Cel, nad którym Agent stale pracuje — generuje Pomysły według harmonogramu lub jednorazowo.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "Skoncentrowana strona jednopodstronowa — listy oczekujących, uruchomienia produktów, zapisy na webinary, przechwytywanie leadów.",
                 "blog": "Blog z kategoriami, RSS, podświetlaniem kodu i treścią gotową do SEO.",
                 "directory": "Kuratorska strona katalogowa z wyszukiwarką, filtrami i strukturyzowanymi danymi.",
-                "awesome-repo": "Repozytorium awesome-list — indeks markdown, kategoryzowane linki i odświeżalne metadane."
+                "awesome-repo": "Repozytorium awesome-list — indeks markdown, kategoryzowane linki i odświeżalne metadane.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Utwórz",
@@ -4597,7 +4599,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4702,7 +4717,7 @@
             "work": "Praca",
             "overview": "Przegląd",
             "items": "Elementy",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Ustawienia",
             "deploy": "Wdróż",
             "members": "Członkowie",
@@ -4928,6 +4943,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

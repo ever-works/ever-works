@@ -55,12 +55,16 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
 }
 
 describe('NewPageClient (chat-open + canvas-route on submit)', () => {
-    it('renders all 9 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo', () => {
+    it('renders all 10 chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Company', () => {
         const { container } = render(<NewPageClient />);
         const chipButtons = Array.from(
             container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
-        expect(chipButtons).toHaveLength(9);
+        // EW-662 Phase 10 — `company` joined the live chip set so the
+        // total is now 10. `store` stays as an inert "Soon" chip
+        // (a `button[role="option"]` without `aria-selected` — filtered
+        // out by the selector above).
+        expect(chipButtons).toHaveLength(10);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
             'dashboard.newPage.chips.mission',
@@ -72,7 +76,44 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             'dashboard.newPage.chips.blog',
             'dashboard.newPage.chips.directory',
             'dashboard.newPage.chips.awesome-repo',
+            'dashboard.newPage.chips.company',
         ]);
+    });
+
+    it('renders a chip as the inert "Soon" span when its kind is in disabledKinds', () => {
+        // PromptChipsRow renders coming-soon chips as a <span
+        // aria-disabled="true"> instead of a <button role="option"
+        // aria-selected>. `disabledKinds={['blog']}` mirrors a
+        // server-evaluated `works-blog` flag resolving to false.
+        const { container } = render(<NewPageClient disabledKinds={['blog']} />);
+
+        // Blog is no longer an interactive button…
+        const blogButton = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('chips.blog'));
+        expect(blogButton).toBeUndefined();
+
+        // …it's the inert coming-soon span instead.
+        const blogChip = container.querySelector('span[data-testid="new-chip-blog"]');
+        expect(blogChip).not.toBeNull();
+        expect(blogChip?.getAttribute('aria-disabled')).toBe('true');
+
+        // A normally-live sibling (website) stays an interactive button.
+        const websiteButton = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('chips.website'));
+        expect(websiteButton).toBeTruthy();
+    });
+
+    it('keeps a chip live (interactive button) when disabledKinds is omitted', () => {
+        const { container } = render(<NewPageClient />);
+        const blogButton = Array.from(
+            container.querySelectorAll('button[role="option"][aria-selected]'),
+        ).find((b) => b.textContent?.includes('chips.blog'));
+        expect(blogButton).toBeTruthy();
+        // And it's NOT rendered as the inert coming-soon span.
+        const blogSpan = container.querySelector('span[data-testid="new-chip-blog"]');
+        expect(blogSpan).toBeNull();
     });
 
     it('pre-selects the chip from initialType prop', () => {
@@ -198,6 +239,62 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         );
         const textarea = getTextarea(container);
         expect(textarea.value).toBe(prefill);
+    });
+
+    describe('disabled kinds cannot be selected or submitted', () => {
+        it('does NOT select a kind that is both URL-preselected (initialType) and in disabledKinds; it never becomes the active selection or renders as a live chip', () => {
+            // A disabled chip is rendered inert and must not be the
+            // active selection — server-side sanitisation already drops a
+            // disabled `?type=` handoff, and the client guard backstops it
+            // by clearing any disabled selection to the safe default.
+            const { container } = render(
+                <NewPageClient initialType="blog" disabledKinds={['blog']} />,
+            );
+
+            // Blog is the inert "Soon" span — not an interactive option,
+            // so it can never be aria-selected.
+            const blogSpan = container.querySelector('span[data-testid="new-chip-blog"]');
+            expect(blogSpan).not.toBeNull();
+            expect(blogSpan?.getAttribute('aria-disabled')).toBe('true');
+
+            // No interactive chip is selected as `blog`.
+            const selectedBlog = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected="true"]'),
+            ).find((b) => b.textContent?.includes('chips.blog'));
+            expect(selectedBlog).toBeUndefined();
+
+            // Selection falls back to the safe default (mission).
+            const selectedMission = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected="true"]'),
+            ).find((b) => b.textContent?.includes('chips.mission'));
+            expect(selectedMission).toBeTruthy();
+        });
+
+        it('clears a previously-selected kind when it becomes disabled, falling back to the safe default', () => {
+            // Start with `blog` live + selected…
+            const { container, rerender } = render(<NewPageClient initialType="blog" />);
+            const selectedBlog = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected="true"]'),
+            ).find((b) => b.textContent?.includes('chips.blog'));
+            expect(selectedBlog).toBeTruthy();
+
+            // …then a flag flip disables `blog`. The reset effect must
+            // move the active selection off `blog` so it can't be
+            // submitted.
+            act(() => {
+                rerender(<NewPageClient initialType="blog" disabledKinds={['blog']} />);
+            });
+
+            const stillSelectedBlog = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected="true"]'),
+            ).find((b) => b.textContent?.includes('chips.blog'));
+            expect(stillSelectedBlog).toBeUndefined();
+
+            const selectedMission = Array.from(
+                container.querySelectorAll('button[role="option"][aria-selected="true"]'),
+            ).find((b) => b.textContent?.includes('chips.mission'));
+            expect(selectedMission).toBeTruthy();
+        });
     });
 
     describe('Mission template path (initialTemplateId set)', () => {

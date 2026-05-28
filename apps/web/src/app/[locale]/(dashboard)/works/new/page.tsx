@@ -10,7 +10,8 @@ import {
     type WebsiteTemplateOption,
 } from '@/lib/api';
 import { redirect } from 'next/navigation';
-import NewWorkClient, { type CreationMode } from './new-work-client';
+import NewWorkClient, { ALL_WORK_KIND_CHIP_VALUES, type CreationMode } from './new-work-client';
+import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -124,6 +125,20 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
         }
     }
 
+    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
+    // Fail-open: no PostHog config / errors / missing flags → everything
+    // enabled. The current user id is the flag distinct id so per-user /
+    // percentage rollouts work; falls back to 'anonymous' otherwise.
+    const disabledSet = await getDisabledWorkKinds(ALL_WORK_KIND_CHIP_VALUES, user.id);
+    const disabledKinds = Array.from(disabledSet);
+
+    // A kind disabled by a feature flag must not be preselectable via the
+    // `?kind=` URL handoff — otherwise a user could deep-link a "Soon"
+    // chip into the selected state and submit it. If the resolved kind is
+    // disabled, drop it back to the default (null → client defaults to
+    // its own first live kind).
+    const safeInitialKind = initialKind && disabledSet.has(initialKind) ? null : initialKind;
+
     return (
         <NewWorkClient
             user={user!}
@@ -135,7 +150,8 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             proposal={proposal}
             initialMode={initialMode}
             initialPrompt={initialPrompt}
-            initialKind={initialKind}
+            initialKind={safeInitialKind}
+            disabledKinds={disabledKinds}
         />
     );
 }

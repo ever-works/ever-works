@@ -40,6 +40,7 @@ import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
 import { ScopeOwnershipGuard } from './scope/scope-ownership.guard';
+import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -146,10 +147,22 @@ import { DatabaseModule } from '@ever-works/agent/database';
             provide: APP_GUARD,
             useClass: AuthSessionGuard,
         },
+        // EW-664 (Phase 12) — runs AFTER AuthSessionGuard (guard order
+        // matches providers-array order) so request.user is set, and
+        // BEFORE ScopeOwnershipGuard so the ownership check sees the
+        // seeded scope. Falls back to the authenticated user's default
+        // scope (their Tenant + last-active Org) on legacy un-prefixed
+        // routes where no slug resolved a scope. No-op for slug routes
+        // (scope already set) and unauthenticated requests.
+        {
+            provide: APP_GUARD,
+            useClass: SessionScopeGuard,
+        },
         // EW-659 (Phase 7) — runs AFTER AuthSessionGuard (guard order
         // matches providers-array order) so request.user is set. Rejects
         // a scope mismatch with 403 to prevent cross-tenant access via
-        // slug.
+        // slug. Runs after SessionScopeGuard so it sees the seeded scope
+        // (which is the user's own Tenant — passes trivially).
         {
             provide: APP_GUARD,
             useClass: ScopeOwnershipGuard,

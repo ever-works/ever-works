@@ -1554,7 +1554,7 @@
                 "overview": "Overzicht",
                 "activity": "Activiteit",
                 "items": "Items",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Planning",
                 "history": "Geschiedenis",
                 "comparisons": "Vergelijkingen",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generatie nog niet gestart",
                     "description": "Start met genereren van items voor uw map om deze met inhoud te vullen.",
-                    "action": "Generatie starten"
+                    "action": "Work starten"
                 },
                 "generating": {
                     "title": "Generatie bezig",
@@ -1769,12 +1769,12 @@
                     "title": "Generatie mislukt",
                     "description": "Er is een fout opgetreden tijdens de generatie.",
                     "withWarnings": "Generatie mislukt met fouten:",
-                    "retry": "Generatie opnieuw proberen"
+                    "retry": "Work opnieuw proberen"
                 },
                 "cancelled": {
                     "title": "Generatie geannuleerd",
                     "description": "De vorige generatie is gestopt voordat deze voltooid was.",
-                    "restart": "Generatie herstarten"
+                    "restart": "Work herstarten"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Configuratiedetails",
-                "initialPrompt": "Initiële generatieprompt",
+                "initialPrompt": "Initiële Worker-prompt",
                 "companyDetails": "Bedrijfsgegevens",
                 "companyName": "Bedrijfsnaam",
                 "companyWebsite": "Website",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Genereren",
+                    "generate": "Work",
                     "schedule": "Schema",
                     "history": "Geschiedenis",
                     "comparisons": "Vergelijkingen",
-                    "navigationLabel": "Generator-tabbladen"
+                    "navigationLabel": "Worker-tabbladen"
                 },
                 "regenerationWarning": "Waarschuwing hergeneratie",
                 "regenerationWarningDescription": "Deze map is al gegenereerd. Het starten van een nieuwe generatie zal bestaande items vervangen.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Kon formulierconfiguratie niet laden",
                 "selectOption": "Selecteer een optie",
                 "workName": "Mapnaam",
-                "generationPrompt": "Generatieprompt",
+                "generationPrompt": "Worker-prompt",
                 "modelOverride": "AI-model overschrijven",
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optioneel. Gebruikt standaard het geïmporteerde of vorige model, tenzij je het hier overschrijft.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Wees specifiek over het type content dat je wilt genereren",
                 "repositoryDescription": "Repository-beschrijving",
                 "repositoryPlaceholder": "Korte beschrijving van de repository (optioneel)",
-                "startGeneration": "Generatie starten",
+                "startGeneration": "Work starten",
                 "regenerateItems": "Items opnieuw genereren",
                 "updateItems": "Generatie uitvoeren",
                 "recreateWork": "Map opnieuw aanmaken",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "Een doorlopend Doel waar de agent aan blijft werken — genereert Idees op een schema of in één keer.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "Een gerichte één-pagina — wachtlijsten, productlanceringen, webinar aanmeldingen, lead capture.",
                 "blog": "Een blog met categorieën, RSS, code highlighting, en SEO-ready content.",
                 "directory": "Een geselecteerde directory site met zoekfunctie, filters, en gestructureerde item data.",
-                "awesome-repo": "Een awesome-list repo — markdown index, gecategoriseerde links, en verversbare metadata."
+                "awesome-repo": "Een awesome-list repo — markdown index, gecategoriseerde links, en verversbare metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Maken",
@@ -4597,7 +4599,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4702,7 +4717,7 @@
             "work": "Werk",
             "overview": "Overzicht",
             "items": "Items",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Instellingen",
             "deploy": "Deployen",
             "members": "Leden",
@@ -4928,6 +4943,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

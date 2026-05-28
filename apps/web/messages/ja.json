@@ -1554,7 +1554,7 @@
                 "overview": "概要",
                 "activity": "アクティビティ",
                 "items": "アイテム",
-                "generator": "ジェネレーター",
+                "generator": "Worker",
                 "schedule": "スケジュール",
                 "history": "履歴",
                 "comparisons": "比較",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "生成未開始",
                     "description": "ワークにコンテンツを格納するためにアイテムの生成を開始してください。",
-                    "action": "生成を開始"
+                    "action": "Work を開始"
                 },
                 "generating": {
                     "title": "生成中",
@@ -1769,12 +1769,12 @@
                     "title": "生成エラー",
                     "description": "生成中にエラーが発生しました。",
                     "withWarnings": "エラーで生成に失敗:",
-                    "retry": "生成を再試行"
+                    "retry": "Work を再試行"
                 },
                 "cancelled": {
                     "title": "生成キャンセル",
                     "description": "前の生成が完了前に停止されました。",
-                    "restart": "生成を再開"
+                    "restart": "Work を再開"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "設定詳細",
-                "initialPrompt": "初期生成プロンプト",
+                "initialPrompt": "初期 Worker プロンプト",
                 "companyDetails": "会社情報",
                 "companyName": "会社名",
                 "companyWebsite": "ウェブサイト",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "生成",
+                    "generate": "Work",
                     "schedule": "スケジュール",
                     "history": "履歴",
                     "comparisons": "比較",
-                    "navigationLabel": "ジェネレーター タブ"
+                    "navigationLabel": "Worker タブ"
                 },
                 "regenerationWarning": "再生成の警告",
                 "regenerationWarningDescription": "このワークはすでに生成されています。新規生成を開始すると、既存のアイテムが置き換えられます。",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "フォーム構成の読み込みに失敗しました",
                 "selectOption": "オプションを選択",
                 "workName": "ワーク名",
-                "generationPrompt": "生成プロンプト",
+                "generationPrompt": "Worker プロンプト",
                 "modelOverride": "AI モデル上書き",
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "生成したいコンテンツの種類について具体的に記述してください",
                 "repositoryDescription": "リポジトリの説明",
                 "repositoryPlaceholder": "リポジトリの簡単な説明（オプション）",
-                "startGeneration": "生成を開始",
+                "startGeneration": "Work を開始",
                 "regenerateItems": "アイテムを再生成",
                 "updateItems": "生成を実行",
                 "recreateWork": "ワークを再作成",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "エージェントが継続的に取り組む継続的な目標 — スケジュールまたはワンショットでアイデアを生成します。",
@@ -3292,7 +3293,8 @@
                 "landing-page": "焦点の当てられたワンページ — 等待リスト、製品ローンチ、ウェビナー登録、リード取得。",
                 "blog": "カテゴリ、RSS、コードハイライト、SEO対応コンテンツ付きブログ。",
                 "directory": "検索、フィルター、構造化された項目データ付きのキュレートされたディレクトリサイト。",
-                "awesome-repo": "すごいリストリポジトリ — マークダウンインデックス、カテゴリ分けされたリンク、更新可能なメタデータ。"
+                "awesome-repo": "すごいリストリポジトリ — マークダウンインデックス、カテゴリ分けされたリンク、更新可能なメタデータ。",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "作成",
@@ -4597,7 +4599,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4702,7 +4717,7 @@
             "work": "ワーク",
             "overview": "概要",
             "items": "アイテム",
-            "generator": "ジェネレーター",
+            "generator": "Worker",
             "settings": "設定",
             "deploy": "デプロイ",
             "members": "メンバー",
@@ -4928,6 +4943,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {
