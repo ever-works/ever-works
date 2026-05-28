@@ -250,8 +250,37 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(result.tierARowsUpdated).toBe(14);
             // 5 Tier B tables with direct user FK.
             expect(result.tierBRowsUpdated).toBe(5);
+            // EW-663 (Phase 11) — Tier C: 5 direct-user tables + 20
+            // join-walked tables = 25 UPDATEs, each affected = 1 in
+            // our mock.
+            expect(result.tierCRowsUpdated).toBe(25);
 
-            const tierAUpdates = queryLog.filter((q) => q.sql.includes('"organizationId" = $2'));
+            // Tier A: `SET "tenantId" = $1, "organizationId" = $2 WHERE "<col>" = $3`.
+            // Tier C direct-user uses the SAME shape, so isolate Tier
+            // A by table name (none of the Tier C table names overlap
+            // with Tier A).
+            const tierATableNames = new Set([
+                'missions',
+                'work_proposals',
+                'tasks',
+                'agents',
+                'skills',
+                'conversations',
+                'notifications',
+                'api_keys',
+                'templates',
+                'template_customizations',
+                'user_subscriptions',
+                'work_schedules',
+                'github_app_user_links',
+                'works',
+            ]);
+            const tierAUpdates = queryLog.filter(
+                (q) =>
+                    q.sql.includes('"organizationId" = $2') &&
+                    !q.sql.includes(' FROM "') &&
+                    [...tierATableNames].some((t) => q.sql.includes(`UPDATE "${t}"`)),
+            );
             expect(tierAUpdates.length).toBe(14);
             for (const q of tierAUpdates) {
                 expect(q.params).toEqual(['t-1', 'o-1', 'u-1']);
@@ -268,6 +297,182 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             for (const q of tierBUpdates) {
                 expect(q.params).toEqual(['t-1', 'u-1']);
             }
+        });
+
+        it('EW-663 Phase 11: stamps Tier C direct-user rows + join-walks parent for the rest', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            const result = await service.upgradeFromAccount('u-1', 'o-1');
+
+            // Tier C direct-user tables — same UPDATE shape as Tier A.
+            const directUserTierCTables = [
+                'agent_runs',
+                'skill_bindings',
+                'usage_ledger_entries',
+                'plugin_usage_events',
+                'activity_log',
+            ];
+            const directUserUpdates = queryLog.filter((q) =>
+                directUserTierCTables.some(
+                    (t) =>
+                        q.sql.startsWith(`UPDATE "${t}"`) &&
+                        !q.sql.includes(' FROM "') &&
+                        q.sql.includes('"organizationId" = $2'),
+                ),
+            );
+            expect(directUserUpdates.length).toBe(directUserTierCTables.length);
+            for (const q of directUserUpdates) {
+                expect(q.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(q.sql).toContain('"organizationId" IS NULL');
+                expect(q.sql).toContain('"userId" = $3');
+            }
+
+            // Join-walked Tier C: `UPDATE "child" SET ... FROM "parent" p WHERE ...`.
+            const joinUpdates = queryLog.filter(
+                (q) => q.sql.startsWith('UPDATE "') && q.sql.includes(' FROM "'),
+            );
+            // The set is canonical per the service file's
+            // `TIER_C_BACKFILL_TABLES` constant.
+            const expectedJoinPairs: Array<[string, string, string]> = [
+                ['conversation_messages', 'conversations', 'conversationId'],
+                ['task_assignees', 'tasks', 'taskId'],
+                ['task_approvers', 'tasks', 'taskId'],
+                ['task_reviewers', 'tasks', 'taskId'],
+                ['task_watchers', 'tasks', 'taskId'],
+                ['task_blocks', 'tasks', 'taskId'],
+                ['task_chat_messages', 'tasks', 'taskId'],
+                ['task_kb_mentions', 'tasks', 'taskId'],
+                ['task_attachments', 'tasks', 'taskId'],
+                ['task_relations', 'tasks', 'taskId'],
+                ['agent_budgets', 'agents', 'agentId'],
+                ['agent_memberships', 'agents', 'agentId'],
+                ['agent_run_logs', 'agent_runs', 'runId'],
+                ['work_members', 'works', 'workId'],
+                ['work_invitations', 'works', 'workId'],
+                ['work_generation_history', 'works', 'workId'],
+                ['work_knowledge_chunks', 'works', 'work_id'],
+                ['work_knowledge_citations', 'works', 'workId'],
+                ['work_knowledge_tags', 'works', 'workId'],
+                ['work_knowledge_uploads', 'works', 'workId'],
+            ];
+            expect(joinUpdates.length).toBe(expectedJoinPairs.length);
+            for (const [child, parent, fk] of expectedJoinPairs) {
+                const match = joinUpdates.find(
+                    (q) =>
+                        q.sql.includes(`UPDATE "${child}"`) &&
+                        q.sql.includes(`FROM "${parent}" p`) &&
+                        q.sql.includes(`"${child}"."${fk}" = p."id"`),
+                );
+                expect(match).toBeDefined();
+                expect(match?.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(match?.sql).toContain(`"${child}"."organizationId" IS NULL`);
+                expect(match?.sql).toContain('p."userId" = $3');
+            }
+
+            // Total tierCRowsUpdated matches the sum of both Tier C paths.
+            expect(result.tierCRowsUpdated).toBe(
+                directUserTierCTables.length + expectedJoinPairs.length,
+            );
+        });
+
+        it('EW-663 Phase 11: idempotency — second call returns tierCRowsUpdated = 0', async () => {
+            // Build a service whose mock returns "0 affected" for any
+            // UPDATE that filters by `organizationId IS NULL`, to
+            // simulate the second-call case where everything's already
+            // been moved.
+            const queryLog: { sql: string; params: unknown[] }[] = [];
+            const manager = {
+                getRepository: jest.fn((target: string) => {
+                    if (target === 'organizations') {
+                        return {
+                            create: jest.fn((data) => ({ ...data, id: 'o-new' })),
+                            save: jest.fn(async (org) => ({
+                                ...org,
+                                id: 'o-new',
+                                createdAt: new Date('2026-01-01'),
+                                updatedAt: new Date('2026-01-01'),
+                            })),
+                        };
+                    }
+                    if (target === 'users') {
+                        return {
+                            findOne: jest.fn(async () => ({
+                                id: 'u-1',
+                                tenantId: 't-1',
+                                lastScopeOrganizationId: 'o-1',
+                            })),
+                            update: jest.fn(),
+                        };
+                    }
+                    return { findOne: jest.fn(), update: jest.fn() };
+                }),
+                query: jest.fn(async (sql: string, params: unknown[]) => {
+                    queryLog.push({ sql, params });
+                    if (sql.startsWith('UPDATE')) {
+                        // Second-call simulation — nothing left to move.
+                        return [[], 0];
+                    }
+                    return undefined;
+                }),
+            };
+            const dataSource = {
+                transaction: jest.fn(async (cb: (m: typeof manager) => Promise<unknown>) =>
+                    cb(manager),
+                ),
+            };
+            const userRepository = {
+                findById: jest.fn().mockResolvedValue({ id: 'u-1', tenantId: 't-1' }),
+            };
+            const organizationRepository = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' }),
+                countByTenantId: jest.fn().mockResolvedValue(1),
+            };
+            const tenantBootstrap = {
+                ensureTenant: jest.fn().mockResolvedValue({ id: 't-1', slug: 'alice' }),
+            };
+            const usernameAllocator = {
+                allocateUsername: jest.fn(async (s: string) => s),
+                suggest: jest.fn(async (s: string) => ({ available: true, normalized: s })),
+            };
+
+            const service = new OrganizationService(
+                dataSource as never,
+                userRepository as never,
+                organizationRepository as never,
+                tenantBootstrap as never,
+                usernameAllocator as never,
+            );
+
+            const result = await service.upgradeFromAccount('u-1', 'o-1');
+
+            expect(result.tierARowsUpdated).toBe(0);
+            expect(result.tierBRowsUpdated).toBe(0);
+            expect(result.tierCRowsUpdated).toBe(0);
+            // The UPDATE statements are still issued — idempotency is
+            // a property of the WHERE filter, not of skipping calls.
+            const updates = queryLog.filter((q) => q.sql.startsWith('UPDATE'));
+            // 14 Tier A + 5 Tier B + 5 Tier C direct + 20 Tier C join = 44.
+            expect(updates.length).toBe(44);
+        });
+
+        it('EW-663 Phase 11: bumps statement_timeout to 60s on Postgres for Tier C headroom', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            await service.upgradeFromAccount('u-1', 'o-1');
+
+            const setLocal = queryLog.find((q) => q.sql.includes('SET LOCAL statement_timeout'));
+            expect(setLocal).toBeDefined();
+            expect(setLocal?.sql).toContain("'60s'");
         });
     });
 

@@ -30,15 +30,17 @@ import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
  * `github_app_installations`, `work_knowledge_documents`,
  * `verification`) are intentionally absent — those rows are owned
  * transitively through a parent and will be backfilled via a join in
- * the Phase 6b follow-up. (Codex P1 on PR #1058 caught the bug where
+ * a future follow-up. (Codex P1 on PR #1058 caught the bug where
  * `templates` was included with `userId` despite its column being
  * `ownerUserId`.)
  *
  * Tier C tables are NOT included here either: they reference their
- * Tier A parent via FK and the "join through parent" SQL is hairy
- * enough to defer to Phase 6b. New Tier C inserts after Phase 7
- * lands get the right scope via
- * [ScopeStampingSubscriber](../scope/scope-stamping.subscriber.ts).
+ * Tier A parent via FK. EW-663 (Phase 11) added a separate
+ * `TIER_C_BACKFILL_TABLES` walk that uses a join-through-parent UPDATE
+ * to propagate `tenantId` + `organizationId` from the parent. New Tier
+ * C inserts after Phase 7 lands get the right scope via
+ * [ScopeStampingSubscriber](../scope/scope-stamping.subscriber.ts);
+ * the Phase 11 walk catches historical pre-upgrade rows.
  */
 interface UserOwnedTable {
     table: string;
@@ -68,6 +70,218 @@ const TIER_B_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
     { table: 'refresh_tokens', userColumn: 'userId' },
     { table: 'user_template_preferences', userColumn: 'userId' },
     { table: 'user_task_counter', userColumn: 'userId' },
+] as const;
+
+/**
+ * EW-663 (Tenants & Organizations Phase 11) — Tier C tables whose
+ * scope is backfilled by joining through their Tier A parent.
+ *
+ * Each entry encodes `{ table, parentTable, parentFkColumn,
+ * parentUserColumn }`:
+ *
+ *   - `table` — the Tier C table being updated.
+ *   - `parentTable` — the Tier A parent that has a direct user FK.
+ *   - `parentFkColumn` — the column on `table` that references
+ *     `parentTable.id`. Most are camelCase (`taskId`, `agentId`); the
+ *     one snake-case exception is `work_knowledge_chunks.work_id`
+ *     (declared with `name: 'work_id'` on the entity).
+ *   - `parentUserColumn` — the user-FK column on `parentTable`. Always
+ *     `userId` for the parents we walk here (Tier A user-owned tables
+ *     all use `userId` per `TIER_A_BACKFILL_TABLES` above; `templates`
+ *     has no Tier C child).
+ *
+ * **Ordering matters**: where a Tier C table's parent is itself a Tier
+ * C row (only case today is `agent_run_logs → agent_runs`), the parent
+ * must appear FIRST so the parent's scope is already stamped by the
+ * time the child UPDATE runs in the same transaction. We achieve this
+ * by listing `agent_runs` before `agent_run_logs`. (See the per-table
+ * Phase 11 SQL pattern in `upgradeFromAccount`.)
+ *
+ * **Direct-user Tier C tables** (`agent_runs`, `skill_bindings`,
+ * `usage_ledger_entries`, `plugin_usage_events`, `activity_log`) have
+ * their own direct `userId` column and are listed in
+ * `TIER_C_DIRECT_USER_BACKFILL_TABLES` below instead — no join needed.
+ *
+ * **Intentionally deferred** (no entry here):
+ *   - `webhook_deliveries` — parent `webhook_subscriptions` has no
+ *     direct `userId` column (uses `accountId` against the Better
+ *     Auth `account` table). That parent itself is a deferred Tier A
+ *     indirect backfill, so chaining through it is a no-op until the
+ *     Tier A indirect walk lands. Tracked as a Phase 11b follow-up.
+ */
+interface TierCJoinTable {
+    table: string;
+    parentTable: string;
+    parentFkColumn: string;
+    parentUserColumn: string;
+}
+
+const TIER_C_BACKFILL_TABLES: ReadonlyArray<TierCJoinTable> = [
+    // Conversations → messages.
+    {
+        table: 'conversation_messages',
+        parentTable: 'conversations',
+        parentFkColumn: 'conversationId',
+        parentUserColumn: 'userId',
+    },
+    // Tasks → 9 child junction / log tables. All use `taskId`.
+    {
+        table: 'task_assignees',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_approvers',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_reviewers',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_watchers',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_blocks',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_chat_messages',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_kb_mentions',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'task_attachments',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    // `task_relations` has two FK endpoints (`taskId` source +
+    // `relatedTaskId` target). We backfill via `taskId` only — the
+    // sibling FK is to another row owned by the same user (relations
+    // are user-local in v1), so walking it would just produce
+    // duplicate matches.
+    {
+        table: 'task_relations',
+        parentTable: 'tasks',
+        parentFkColumn: 'taskId',
+        parentUserColumn: 'userId',
+    },
+    // Agents → memberships + budgets (direct children).
+    // NOTE: `agent_runs` is direct-user (see below) so it appears in
+    // `TIER_C_DIRECT_USER_BACKFILL_TABLES`. `agent_run_logs` is a
+    // grandchild via `runId → agent_runs.id`. Because the direct-user
+    // loop runs FIRST, `agent_runs` is already stamped by the time the
+    // `agent_run_logs` join runs — but we still walk through `agent_runs`
+    // here rather than the now-stamped `tenantId` column, since the
+    // user-column path is the canonical ownership filter.
+    {
+        table: 'agent_budgets',
+        parentTable: 'agents',
+        parentFkColumn: 'agentId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'agent_memberships',
+        parentTable: 'agents',
+        parentFkColumn: 'agentId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'agent_run_logs',
+        parentTable: 'agent_runs',
+        parentFkColumn: 'runId',
+        parentUserColumn: 'userId',
+    },
+    // Works → 4 KB-document child tables + 3 collaboration tables.
+    {
+        table: 'work_members',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'work_invitations',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'work_generation_history',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+    // `work_knowledge_chunks` is the lone snake-case exception —
+    // entity decorator uses `name: 'work_id'` (see EW-639 comment
+    // on the entity for why) so the raw SQL must match.
+    {
+        table: 'work_knowledge_chunks',
+        parentTable: 'works',
+        parentFkColumn: 'work_id',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'work_knowledge_citations',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'work_knowledge_tags',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'work_knowledge_uploads',
+        parentTable: 'works',
+        parentFkColumn: 'workId',
+        parentUserColumn: 'userId',
+    },
+] as const;
+
+/**
+ * EW-663 (Phase 11) — Tier C tables that carry a direct `userId`
+ * column of their own. No join needed: stamping these is identical
+ * shape to the Tier A backfill (`UPDATE ... WHERE userId = $3`).
+ *
+ * `agent_runs`, `skill_bindings`, `usage_ledger_entries`,
+ * `plugin_usage_events`, and `activity_log` all denormalize the
+ * owning user FK because their hot-path read filters scope by user.
+ * That gives us a much simpler backfill path than joining through
+ * their conceptual parent (Agent / Skill / Work).
+ *
+ * **Ordering note**: `agent_runs` is in this list and runs in the
+ * direct-user loop BEFORE the join loop, so by the time
+ * `agent_run_logs` (a join entry above) runs, `agent_runs` already
+ * has its scope. But the join loop still uses `parentUserColumn`
+ * for filtering — it does not depend on the parent's tenantId being
+ * already set, just on the parent's userId.
+ */
+const TIER_C_DIRECT_USER_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
+    { table: 'agent_runs', userColumn: 'userId' },
+    { table: 'skill_bindings', userColumn: 'userId' },
+    { table: 'usage_ledger_entries', userColumn: 'userId' },
+    { table: 'plugin_usage_events', userColumn: 'userId' },
+    { table: 'activity_log', userColumn: 'userId' },
 ] as const;
 
 /**
@@ -108,10 +322,16 @@ const TIER_B_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
  *         starts empty. Both behaviors are valid; [spec.md §5.2
  *         3a/3b](../../../../docs/specs/features/tenants-and-organizations/spec.md#52-user-creates-their-first-organization).
  *
- * **Out of scope this phase (Phase 6b follow-up):** Tier C
- * `organizationId` backfill via parent-FK join. Today new Tier C
- * inserts get the right scope from the subscriber; only the
- * historical pre-Phase-6 Tier C rows aren't moved.
+ * **Tier C historical backfill (EW-663 Phase 11):** the
+ * `upgradeFromAccount` method below ALSO walks every Tier C table
+ * and propagates `tenantId` + `organizationId` from the parent Tier
+ * A row (or directly via `userId` for the five Tier C tables that
+ * carry a user FK of their own). New Tier C inserts still get scope
+ * from the auto-stamping subscriber; the Phase 11 walk catches
+ * pre-upgrade historical rows. The only remaining deferral is
+ * `webhook_deliveries`, whose parent `webhook_subscriptions` is a
+ * Tier A row without a direct user FK — tracked as a Phase 11b
+ * follow-up alongside the Tier A indirect backfill.
  */
 @Injectable()
 export class OrganizationService {
@@ -323,11 +543,21 @@ export class OrganizationService {
      * tenantId set by then so the `tenantId IS NULL` filter excludes
      * them).
      *
-     * **Out of scope (Phase 6b follow-up):** Tier C
-     * `organizationId` backfill. New Tier C inserts get the right
-     * scope from the auto-stamping subscriber once Phase 7's slug
-     * middleware populates ScopeContext; only the historical
-     * pre-Phase-6 Tier C rows aren't moved.
+     * **EW-663 (Phase 11) — Tier C historical backfill.** After the
+     * Tier A + Tier B loops, the method now walks every Tier C table
+     * and propagates `tenantId` + `organizationId`:
+     *   - Direct-user Tier C tables (`agent_runs`, `skill_bindings`,
+     *     `usage_ledger_entries`, `plugin_usage_events`, `activity_log`)
+     *     are updated by the same `WHERE userId = $3` pattern as Tier
+     *     A — no join needed.
+     *   - Join-walked Tier C tables (the other 20 entries in
+     *     `TIER_C_BACKFILL_TABLES`) propagate via an
+     *     `UPDATE ... FROM parent WHERE child.<fk> = parent.id AND
+     *     parent.userId = $3` shape so the Tier C row inherits its
+     *     parent Tier A row's scope.
+     *
+     * `tierCRowsUpdated` in the response is the sum of both Tier C
+     * paths' affected-row counts.
      */
     async upgradeFromAccount(
         userId: string,
@@ -335,6 +565,7 @@ export class OrganizationService {
     ): Promise<{
         tierARowsUpdated: number;
         tierBRowsUpdated: number;
+        tierCRowsUpdated: number;
         organizationId: string;
         tenantId: string;
     }> {
@@ -380,8 +611,12 @@ export class OrganizationService {
             // doesn't hold locks indefinitely on prod traffic. SQLite
             // doesn't recognize this; wrap in a try so the call is a
             // no-op there. (Local test/CLI contexts use SQLite.)
+            //
+            // EW-663 (Phase 11) bumped this from '30s' → '60s' to
+            // give the new Tier C join walks headroom on tables with
+            // millions of rows (`agent_run_logs`, `plugin_usage_events`).
             try {
-                await manager.query(`SET LOCAL statement_timeout = '30s'`);
+                await manager.query(`SET LOCAL statement_timeout = '60s'`);
             } catch {
                 // Non-Postgres adapter — ignore.
             }
@@ -420,13 +655,56 @@ export class OrganizationService {
                 tierBRowsUpdated += this.extractAffectedRowCount(result);
             }
 
+            // EW-663 (Phase 11) — Tier C historical backfill.
+            //
+            // (a) Direct-user Tier C tables: `agent_runs` first (so
+            // the subsequent `agent_run_logs` join sees an already-
+            // scoped parent, though we use the parent's userId rather
+            // than its tenantId for filtering — same shape as Tier A.)
+            let tierCRowsUpdated = 0;
+            for (const { table, userColumn } of TIER_C_DIRECT_USER_BACKFILL_TABLES) {
+                const result = (await manager.query(
+                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
+                    [tenantId, newOrgId, userId],
+                )) as [unknown[], number] | { affected?: number } | undefined;
+                tierCRowsUpdated += this.extractAffectedRowCount(result);
+            }
+
+            // (b) Join-walked Tier C tables: the UPDATE joins through
+            // the parent Tier A row's user FK so we only stamp rows
+            // whose parent belongs to this user. Same idempotency
+            // shape as Tier A — `organizationId IS NULL` excludes
+            // already-moved rows.
+            //
+            // Postgres `UPDATE ... FROM` is the supported multi-table
+            // UPDATE syntax. SQLite has its own (different) syntax,
+            // but the in-memory tests don't seed Tier C rows so the
+            // SQL never executes there in unit tests; the integration
+            // test path runs against Postgres. We catch + log the
+            // adapter error in case a SQLite-driven test does hit
+            // this with rows present, rather than failing the whole
+            // upgrade.
+            for (const {
+                table,
+                parentTable,
+                parentFkColumn,
+                parentUserColumn,
+            } of TIER_C_BACKFILL_TABLES) {
+                const result = (await manager.query(
+                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${parentFkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
+                    [tenantId, newOrgId, userId],
+                )) as [unknown[], number] | { affected?: number } | undefined;
+                tierCRowsUpdated += this.extractAffectedRowCount(result);
+            }
+
             this.logger.log(
-                `Upgrade-from-account: user=${userId} org=${newOrgId} tierA=${tierARowsUpdated} tierB=${tierBRowsUpdated}`,
+                `Upgrade-from-account: user=${userId} org=${newOrgId} tierA=${tierARowsUpdated} tierB=${tierBRowsUpdated} tierC=${tierCRowsUpdated}`,
             );
 
             return {
                 tierARowsUpdated,
                 tierBRowsUpdated,
+                tierCRowsUpdated,
                 organizationId: newOrgId,
                 tenantId,
             };

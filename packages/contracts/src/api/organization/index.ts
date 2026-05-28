@@ -71,6 +71,13 @@ export interface UpgradeFromAccountResponse {
 	tierARowsUpdated: number;
 	/** Total Tier B rows updated. */
 	tierBRowsUpdated: number;
+	/**
+	 * EW-663 (Phase 11 follow-up) — total Tier C rows backfilled via the
+	 * parent-FK join walk (e.g. `conversation_messages` whose parent
+	 * `conversations` belongs to the user). Zero before Phase 11 ships
+	 * and on second-call idempotency.
+	 */
+	tierCRowsUpdated: number;
 }
 
 /**
