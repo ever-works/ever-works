@@ -68,6 +68,39 @@ describe('ScopeContextService (EW-657 Phase 5b)', () => {
         });
     });
 
+    describe('setScope() (EW-664 Phase 12)', () => {
+        it('seeds the scope in place within a runWith frame', () => {
+            const seeded = { tenantId: 't-seeded', organizationId: 'o-seeded' };
+            const observed = service.runWith(EMPTY_SCOPE, () => {
+                service.setScope(seeded);
+                return service.getScope();
+            });
+            expect(observed).toEqual(seeded);
+        });
+
+        it('getScope() reflects the seeded value through awaited async work', async () => {
+            const seeded = { tenantId: 't-async-seed', organizationId: null };
+            const observed = await service.runWith(EMPTY_SCOPE, async () => {
+                service.setScope(seeded);
+                await new Promise((resolve) => setImmediate(resolve));
+                return service.getScope();
+            });
+            expect(observed).toEqual(seeded);
+        });
+
+        it('is a no-op when called outside any runWith frame', () => {
+            service.setScope({ tenantId: 't-x', organizationId: 'o-x' });
+            expect(service.getScope()).toEqual(EMPTY_SCOPE);
+        });
+
+        it('does not leak the seeded scope after the runWith block exits', () => {
+            service.runWith(EMPTY_SCOPE, () => {
+                service.setScope({ tenantId: 't-leak', organizationId: 'o-leak' });
+            });
+            expect(service.getScope()).toEqual(EMPTY_SCOPE);
+        });
+    });
+
     describe('isolation', () => {
         it('two concurrent async runWith blocks do not bleed scope into each other', async () => {
             const a = { tenantId: 't-a', organizationId: null };
