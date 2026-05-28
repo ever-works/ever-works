@@ -35,7 +35,7 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
             return;
         }
 
-        const plugins = this.registry.getAllPlugins?.() ?? [];
+        const plugins = this.registry.getAll();
         let upserts = 0;
 
         for (const registered of plugins) {
@@ -44,8 +44,7 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
             for (const event of events) {
                 const key = `${registered.plugin.id}:${event.key}`;
                 try {
-                    const existing = await this.eventTypes.findOne({ where: { key } });
-                    const next = {
+                    await this.eventTypes.upsert({
                         key,
                         category: event.category,
                         title: event.title,
@@ -54,12 +53,7 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
                         defaultChannels: [...(event.defaultChannels ?? ['in-app'])],
                         source: 'plugin' as const,
                         pluginId: registered.plugin.id,
-                    };
-                    if (existing) {
-                        await this.eventTypes.save({ ...existing, ...next });
-                    } else {
-                        await this.eventTypes.save(this.eventTypes.create(next));
-                    }
+                    });
                     upserts++;
                 } catch (err) {
                     this.logger.warn(

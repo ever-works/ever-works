@@ -28,7 +28,6 @@ export async function GET(request: NextRequest) {
         {
             method: 'GET',
             headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
-            // @ts-expect-error — Node fetch duplex required when streaming.
             cache: 'no-store',
         },
     );

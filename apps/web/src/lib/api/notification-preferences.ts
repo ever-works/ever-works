@@ -38,19 +38,20 @@ export interface PreferencesView {
 
 export const notificationPreferencesAPI = {
     listEventTypes: async () => {
-        const data = await serverFetch<{ eventTypes: NotificationEventType[] }>({
-            path: '/api/notifications/event-types',
-        });
+        const data = await serverFetch<{ eventTypes: NotificationEventType[] }>(
+            '/api/notifications/event-types',
+        );
         return data.eventTypes;
     },
     getPreferences: async () => {
-        return serverFetch<PreferencesView>({ path: '/api/notifications/preferences' });
+        return serverFetch<PreferencesView>('/api/notifications/preferences');
     },
     setEventSubscription: async (eventKey: string, channelIds: string[]) => {
         return serverMutation<{ subscription: NotificationSubscription }>({
             method: 'PUT',
-            path: `/api/notifications/preferences/event/${encodeURIComponent(eventKey)}`,
-            body: { channelIds },
+            endpoint: `/api/notifications/preferences/event/${encodeURIComponent(eventKey)}`,
+            data: { channelIds },
+            wrapInData: false,
         });
     },
     setQuietHours: async (input: {
@@ -60,21 +61,25 @@ export const notificationPreferencesAPI = {
     }) => {
         return serverMutation<{ preference: NotificationPreference }>({
             method: 'PUT',
-            path: '/api/notifications/preferences/quiet-hours',
-            body: input,
+            endpoint: '/api/notifications/preferences/quiet-hours',
+            data: input,
+            wrapInData: false,
         });
     },
     muteCategory: async (category: string, mutedUntil: string | null) => {
         return serverMutation<{ mute: { category: string; mutedUntil: string | null } }>({
             method: 'POST',
-            path: '/api/notifications/preferences/mute',
-            body: { category, mutedUntil },
+            endpoint: '/api/notifications/preferences/mute',
+            data: { category, mutedUntil },
+            wrapInData: false,
         });
     },
     unmuteCategory: async (category: string) => {
         await serverMutation<void>({
             method: 'DELETE',
-            path: `/api/notifications/preferences/mute/${encodeURIComponent(category)}`,
+            endpoint: `/api/notifications/preferences/mute/${encodeURIComponent(category)}`,
+            data: {},
+            wrapInData: false,
         });
     },
 };

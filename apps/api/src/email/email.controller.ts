@@ -17,9 +17,7 @@ import {
     HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
 import { EmailFacadeService } from '@ever-works/agent/facades';
 import {
     AGENT_INBOUND_EMAIL_DISPATCHER,
@@ -34,6 +32,28 @@ import {
     UpdateEmailAddressInput,
     SendMessageInput,
 } from './email.service';
+
+/**
+ * Minimal Response/Request surfaces for the SSE inbox stream + inbound
+ * webhook. Mirrors the convention in usage.controller.ts /
+ * openai-compat.controller.ts — avoids pulling the full
+ * `import('express').Response` / `Request` type (not in the api tsconfig).
+ */
+type SseResponse = {
+    setHeader(name: string, value: string): void;
+    flushHeaders?(): void;
+    write(chunk: string): void;
+    on(event: 'close', listener: () => void): void;
+};
+
+type SseRequest = {
+    on(event: 'close', listener: () => void): void;
+};
+
+type WebhookRequest = {
+    body?: unknown;
+    rawBody?: Buffer;
+};
 
 /**
  * EW-650 / EW-669 — Email surface REST API.
@@ -148,8 +168,8 @@ export class EmailController {
     async streamMessages(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('agentId') agentId: string,
-        @Res() res: Response,
-        @Req() req: Request,
+        @Res() res: SseResponse,
+        @Req() req: SseRequest,
     ): Promise<void> {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -242,10 +262,10 @@ export class EmailController {
     @ApiOperation({ summary: 'Provider inbound-email webhook' })
     async inboundWebhook(
         @Param('pluginId') pluginId: string,
-        @Req() req: Request,
+        @Req() req: WebhookRequest,
         @Headers() headers: Record<string, string>,
     ) {
-        const rawBody = (req as Request & { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+        const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
         const message = await this.emailFacade.parseInbound(pluginId, rawBody, headers);
 
         // EW-670 / T25 — route the parsed inbound message to the agent

@@ -25,38 +25,43 @@ export interface CreateChannelDto {
 
 export const notificationChannelsAPI = {
     list: async () => {
-        const data = await serverFetch<{ channels: NotificationChannel[] }>({
-            path: '/api/notification-channels',
-        });
+        const data = await serverFetch<{ channels: NotificationChannel[] }>(
+            '/api/notification-channels',
+        );
         return data.channels;
     },
     create: async (input: CreateChannelDto) => {
         const data = await serverMutation<{ channel: NotificationChannel }>({
             method: 'POST',
-            path: '/api/notification-channels',
-            body: input,
+            endpoint: '/api/notification-channels',
+            data: input,
+            wrapInData: false,
         });
         return data.channel;
     },
     update: async (id: string, input: Partial<CreateChannelDto> & { disabled?: boolean }) => {
         const data = await serverMutation<{ channel: NotificationChannel }>({
             method: 'PATCH',
-            path: `/api/notification-channels/${id}`,
-            body: input,
+            endpoint: `/api/notification-channels/${id}`,
+            data: input,
+            wrapInData: false,
         });
         return data.channel;
     },
     remove: async (id: string) => {
         await serverMutation<void>({
             method: 'DELETE',
-            path: `/api/notification-channels/${id}`,
+            endpoint: `/api/notification-channels/${id}`,
+            data: {},
+            wrapInData: false,
         });
     },
     sendTest: async (id: string) => {
         return serverMutation<{ status: string; error?: string; providerMessageId?: string }>({
             method: 'POST',
-            path: `/api/notification-channels/${id}/test`,
-            body: {},
+            endpoint: `/api/notification-channels/${id}/test`,
+            data: {},
+            wrapInData: false,
         });
     },
 };
