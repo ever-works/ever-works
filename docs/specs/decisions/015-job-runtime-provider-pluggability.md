@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — Tracking implementation in [EW-685](https://evertech.atlassian.net/browse/EW-685). This ADR is forward-looking; **nothing changes today**. Trigger.dev (SaaS) stays the default background-job runtime and remains fully supported. No deployment is forced to change anything.
+**Proposed** — Tracking implementation in [EW-683](https://evertech.atlassian.net/browse/EW-683). This ADR is forward-looking; **nothing changes today**. Trigger.dev (SaaS) stays the default background-job runtime and remains fully supported. No deployment is forced to change anything.
 
 ## Date
 
@@ -86,7 +86,7 @@ The background-job runtime becomes a **pluggable provider** selected at deployme
 
 ## Implementation outline
 
-Tracked in [EW-685](https://evertech.atlassian.net/browse/EW-685). Full detail in the feature spec set under [`features/job-runtime-providers/`](../features/job-runtime-providers/spec.md). High-level shape:
+Tracked in [EW-683](https://evertech.atlassian.net/browse/EW-683). Full detail in the feature spec set under [`features/job-runtime-providers/`](../features/job-runtime-providers/spec.md). High-level shape:
 
 1. Define the `job-runtime` capability + `IJobRuntimeProvider` contract in `packages/plugin/src/job-runtime/`.
 2. Generalise the dispatcher wiring so the active provider is bound to all `*_DISPATCHER` symbols via a factory that reads `EVER_WORKS_JOB_RUNTIME`.
@@ -98,7 +98,7 @@ Tracked in [EW-685](https://evertech.atlassian.net/browse/EW-685). Full detail i
 
 ## References
 
-- [EW-685 — Job-runtime provider pluggability (epic)](https://evertech.atlassian.net/browse/EW-685)
+- [EW-683 — Job-runtime provider pluggability (epic)](https://evertech.atlassian.net/browse/EW-683)
 - [`architecture/job-runtime-providers.md`](../architecture/job-runtime-providers.md) — the provider contract + worker-hosting models.
 - [`features/job-runtime-providers/spec.md`](../features/job-runtime-providers/spec.md) · [`plan.md`](../features/job-runtime-providers/plan.md) · [`tasks.md`](../features/job-runtime-providers/tasks.md) · [`providers.md`](../features/job-runtime-providers/providers.md)
 - [ADR-005 — Cache and Lock Pluggability](./005-cache-and-lock-pluggability.md) — the sibling pattern this ADR mirrors (env-selected, Postgres-default, additive).

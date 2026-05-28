@@ -1,6 +1,6 @@
 # Architecture: Job-Runtime Providers (pluggable background-job runtime)
 
-**Status**: `Proposed` (tracking [EW-685](https://evertech.atlassian.net/browse/EW-685))
+**Status**: `Proposed` (tracking [EW-683](https://evertech.atlassian.net/browse/EW-683))
 **Last updated**: 2026-05-28
 **Audience**: AI agents and engineers who need to understand how the platform's long-running work is dispatched, scheduled, cancelled, and executed — and how that runtime becomes a **swappable provider** (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest optional).
 

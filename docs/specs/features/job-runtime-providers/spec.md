@@ -8,7 +8,7 @@
 **Created**: 2026-05-28
 **Last updated**: 2026-05-28
 **Owner**: Ever Works Team
-**Epic**: [EW-685](https://evertech.atlassian.net/browse/EW-685)
+**Epic**: [EW-683](https://evertech.atlassian.net/browse/EW-683)
 
 ---
 
@@ -127,4 +127,4 @@ The "user" here is primarily the **operator** deploying Ever Works, plus the **e
 - Provider detail: [`providers.md`](./providers.md)
 - Related ADRs: [ADR-005](../../decisions/005-cache-and-lock-pluggability.md), [ADR-002](../../decisions/002-trigger-worker-callback-channel.md)
 - Related features: [`scheduled-updates`](../scheduled-updates/spec.md), [`generation-cancellation`](../generation-cancellation/spec.md), [`plugin-system`](../plugin-system/spec.md)
-- Jira: [EW-685](https://evertech.atlassian.net/browse/EW-685) (epic), [EW-168](https://evertech.atlassian.net/browse/EW-168)/[EW-169](https://evertech.atlassian.net/browse/EW-169) (prior abstraction), [EW-592](https://evertech.atlassian.net/browse/EW-592) (self-hosted Trigger.dev)
+- Jira: [EW-683](https://evertech.atlassian.net/browse/EW-683) (epic), [EW-168](https://evertech.atlassian.net/browse/EW-168)/[EW-169](https://evertech.atlassian.net/browse/EW-169) (prior abstraction), [EW-592](https://evertech.atlassian.net/browse/EW-592) (self-hosted Trigger.dev)
