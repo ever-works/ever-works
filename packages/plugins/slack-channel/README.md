@@ -4,7 +4,7 @@ Slack notification channel for the Ever Works platform.
 
 - **Capabilities**: `notification-channel`, `notification-channel-slack`
 - **Shape**: `broadcast`
-- **Transport**: Slack incoming webhook (Block Kit supported via the `slack-blocks` rich payload kind)
+- **Transport**: official `@slack/webhook` SDK (`IncomingWebhook`) over a Slack incoming webhook (Block Kit supported via the `slack-blocks` rich payload kind)
 
 ## Settings (channel-level `targetConfig`)
 
