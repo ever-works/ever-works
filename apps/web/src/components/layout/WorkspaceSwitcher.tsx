@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Building2, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
@@ -15,6 +16,7 @@ import {
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { useActiveScope } from '@/lib/hooks/use-active-scope';
 import { LogoEverWork } from '../logos';
+import { CreateOrganizationModal } from '../organizations/CreateOrganizationModal';
 import type { WorkConfig } from '@/lib/api';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
@@ -82,6 +84,11 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
     const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
     const { activeOrganization } = useActiveScope();
+    // Phase 9 — EW-661 — lifts the create-Org modal state into the
+    // switcher. `+ Create Organization` opens it; on success the modal
+    // routes to `/{slug}/dashboard` and (if first Org) chains into the
+    // upgrade-or-empty dialog.
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
 
     // Empty state: no orgs yet → render the existing logo unmodified.
     // We intentionally treat `isLoading` as empty for the initial
@@ -121,75 +128,75 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
     };
 
     const handleCreateOrg = () => {
-        // Phase 9 — EW-661 lands the modal. For now we log so the
-        // wiring point is explicit and easy to grep for during the
-        // next PR.
-        console.log('TODO Phase 9: open CreateOrganizationModal');
+        setIsCreateOpen(true);
     };
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger
-                className={cn(
-                    'w-full rounded-md transition-colors cursor-pointer',
-                    'focus:outline-none focus-visible:outline-none',
-                    'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                    'px-2 py-1.5',
-                )}
-            >
-                <div className="flex items-center gap-2 w-full">
-                    <OrgAvatar org={triggerOrg} />
-                    <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
-                        {pickLabel(triggerOrg)}
-                    </span>
-                    <ChevronsUpDown
-                        className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
-                        strokeWidth={1.5}
-                        aria-hidden="true"
-                    />
-                </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="bottom" align="start" className="w-60">
-                <DropdownMenuLabel>{t('heading')}</DropdownMenuLabel>
-                {organizations.map((org) => {
-                    const isActive = activeOrganization?.id === org.id;
-                    return (
-                        <DropdownMenuItem
-                            key={org.id}
-                            onClick={() => handleSelectOrg(org)}
-                            className="cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2 w-full">
-                                <OrgAvatar org={org} size="xs" />
-                                <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
-                                    {pickLabel(org)}
-                                </span>
-                                {isActive && (
-                                    <Check
-                                        className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
-                                        strokeWidth={1.5}
-                                        aria-label="Active organization"
-                                    />
-                                )}
-                            </div>
-                        </DropdownMenuItem>
-                    );
-                })}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleCreateOrg} className="cursor-pointer">
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger
+                    className={cn(
+                        'w-full rounded-md transition-colors cursor-pointer',
+                        'focus:outline-none focus-visible:outline-none',
+                        'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
+                        'px-2 py-1.5',
+                    )}
+                >
                     <div className="flex items-center gap-2 w-full">
-                        <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
-                            <Plus
-                                className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
-                                strokeWidth={1.5}
-                            />
+                        <OrgAvatar org={triggerOrg} />
+                        <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
+                            {pickLabel(triggerOrg)}
                         </span>
-                        <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
-                            {t('createNew')}
-                        </span>
+                        <ChevronsUpDown
+                            className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
+                            strokeWidth={1.5}
+                            aria-hidden="true"
+                        />
                     </div>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="bottom" align="start" className="w-60">
+                    <DropdownMenuLabel>{t('heading')}</DropdownMenuLabel>
+                    {organizations.map((org) => {
+                        const isActive = activeOrganization?.id === org.id;
+                        return (
+                            <DropdownMenuItem
+                                key={org.id}
+                                onClick={() => handleSelectOrg(org)}
+                                className="cursor-pointer"
+                            >
+                                <div className="flex items-center gap-2 w-full">
+                                    <OrgAvatar org={org} size="xs" />
+                                    <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
+                                        {pickLabel(org)}
+                                    </span>
+                                    {isActive && (
+                                        <Check
+                                            className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
+                                            strokeWidth={1.5}
+                                            aria-label="Active organization"
+                                        />
+                                    )}
+                                </div>
+                            </DropdownMenuItem>
+                        );
+                    })}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleCreateOrg} className="cursor-pointer">
+                        <div className="flex items-center gap-2 w-full">
+                            <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
+                                <Plus
+                                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                                    strokeWidth={1.5}
+                                />
+                            </span>
+                            <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
+                                {t('createNew')}
+                            </span>
+                        </div>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <CreateOrganizationModal open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+        </>
     );
 }

@@ -7,6 +7,7 @@ import { updateProfile, resendVerificationEmail } from '@/app/actions/settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { Mail } from 'lucide-react';
+import { CreateFirstOrgBanner } from '@/components/organizations/CreateFirstOrgBanner';
 
 interface ProfileSettingsProps {
     user: {
@@ -77,6 +78,13 @@ export function ProfileSettings({ user }: ProfileSettingsProps) {
 
     return (
         <div className="space-y-6">
+            {/*
+             * EW-661 — surfaces a "Create your first Organization"
+             * banner. Auto-hides itself once `organizations.length > 0`,
+             * so this is a no-op for users who already have an Org.
+             */}
+            <CreateFirstOrgBanner />
+
             <div>
                 <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-4">
                     {t('title')}
