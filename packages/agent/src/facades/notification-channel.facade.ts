@@ -77,6 +77,17 @@ export const NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER =
     'NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER' as const;
 
 /**
+ * A channel to fan out to, optionally deferred. `deferUntil` (ISO-8601)
+ * is set for channels held by quiet hours — the facade enqueues them on
+ * the Trigger.dev delivery task with that `delay`. Plain strings (no
+ * deferral) are accepted too for back-compat with simple resolvers.
+ */
+export interface ResolvedChannelTarget {
+    channelId: string;
+    deferUntil?: string;
+}
+
+/**
  * NotificationChannelFacadeService — fan-out point for multi-channel
  * notification delivery. Mirrors `EmailFacadeService` shape but for the
  * `NOTIFICATION_CHANNEL` umbrella capability.
@@ -129,19 +140,32 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         userId: string,
         eventType: string,
         payload: NotificationChannelFanoutInput,
-        resolveChannelIds: (userId: string, eventType: string) => Promise<readonly string[]>,
+        resolveChannelIds: (
+            userId: string,
+            eventType: string,
+        ) => Promise<readonly (string | ResolvedChannelTarget)[]>,
         options: FacadeOptions,
     ): Promise<readonly NotificationChannelFanoutResult[]> {
-        const channelIds = await resolveChannelIds(userId, eventType);
-        if (channelIds.length === 0) {
+        const resolved = await resolveChannelIds(userId, eventType);
+        if (resolved.length === 0) {
             this.logger.debug(`No channels resolved for user=${userId} event=${eventType}`);
             return [];
         }
         const scopedOptions: FacadeOptions = { ...options, userId };
         const attempts = await Promise.all(
-            channelIds.map((channelId) =>
-                this.dispatchOrSend(channelId, payload, scopedOptions, eventType),
-            ),
+            resolved.map((target) => {
+                const { channelId, deferUntil } =
+                    typeof target === 'string'
+                        ? { channelId: target, deferUntil: undefined }
+                        : target;
+                return this.dispatchOrSend(
+                    channelId,
+                    payload,
+                    scopedOptions,
+                    eventType,
+                    deferUntil,
+                );
+            }),
         );
         return attempts;
     }

@@ -111,6 +111,7 @@ export {
     type NotificationChannelFanoutResult,
     type NotificationChannelDeliveryPayload,
     type NotificationChannelDeliveryDispatcher,
+    type ResolvedChannelTarget,
 } from './notification-channel.facade';
 
 // Agent-Memory Facade — pluggable persistent memory for agents

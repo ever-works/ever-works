@@ -5,7 +5,10 @@ import {
     type NotificationFanoutEvent,
     UserNotificationSubscriptionService,
 } from '@ever-works/agent/notifications';
-import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
+import {
+    NotificationChannelFacadeService,
+    type ResolvedChannelTarget,
+} from '@ever-works/agent/facades';
 
 /**
  * EW-664 / EW-678 / T20 + T22 — Producer fanout listener.
@@ -70,14 +73,25 @@ export class NotificationFanoutListener {
      * NotificationService.create, so the channel facade treats it as a
      * no-op sentinel).
      */
-    private async resolveChannelIds(userId: string, eventKey: string): Promise<string[]> {
+    private async resolveChannelIds(
+        userId: string,
+        eventKey: string,
+    ): Promise<ResolvedChannelTarget[]> {
         if (!this.subscriptions) return [];
         try {
-            const channels = await this.subscriptions.resolveChannels(userId, eventKey);
+            const plan = await this.subscriptions.resolvePlan(userId, eventKey);
             // Drop the 'in-app' sentinel before fanout — in-app delivery
             // already happened in the v1 producer's create() call; the
-            // channel facade only handles the external channels.
-            return channels.filter((c) => c !== 'in-app');
+            // channel facade only handles the external channels. Deferred
+            // (quiet-hours) channels carry `deferUntil` so the facade
+            // enqueues them on the Trigger.dev delivery task with that delay.
+            const immediate = plan.immediate
+                .filter((c) => c !== 'in-app')
+                .map((channelId) => ({ channelId }));
+            const deferred = plan.deferred
+                .filter((c) => c !== 'in-app')
+                .map((channelId) => ({ channelId, deferUntil: plan.deferUntil }));
+            return [...immediate, ...deferred];
         } catch (err) {
             this.logger.debug(
                 `Subscription resolver fallback to [] for user=${userId} event=${eventKey}: ${String(err)}`,
