@@ -5,6 +5,13 @@ import {
     deviceAuthAPI,
     type PluginDeviceAuthStatus,
 } from '@/lib/api/plugins-capabilities/device-auth';
+import {
+    composioAPI,
+    type ComposioConnectedAccount,
+    type ComposioToolkit,
+    type InitiateConnectionRequest,
+    type InitiateConnectionResponse,
+} from '@/lib/api/plugins-capabilities/composio';
 import { revalidatePath } from 'next/cache';
 
 export interface ActionResult<T = unknown> {
@@ -233,6 +240,52 @@ export async function startPluginDeviceAuth(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to start device auth',
+        };
+    }
+}
+
+export async function listComposioToolkits(
+    limit?: number,
+): Promise<ActionResult<ComposioToolkit[]>> {
+    try {
+        const data = await composioAPI.listToolkits(limit);
+        return { success: true, data };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to list Composio toolkits',
+        };
+    }
+}
+
+export async function listComposioConnectedAccounts(
+    toolkitSlug?: string,
+): Promise<ActionResult<ComposioConnectedAccount[]>> {
+    try {
+        const data = await composioAPI.listConnectedAccounts(toolkitSlug);
+        return { success: true, data };
+    } catch (error) {
+        return {
+            success: false,
+            error:
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to list Composio connected accounts',
+        };
+    }
+}
+
+export async function initiateComposioConnection(
+    body: InitiateConnectionRequest,
+): Promise<ActionResult<InitiateConnectionResponse>> {
+    try {
+        const data = await composioAPI.initiateConnection(body);
+        return { success: true, data };
+    } catch (error) {
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to initiate Composio connection',
         };
     }
 }
