@@ -11,11 +11,13 @@ import {
     Post,
     Query,
     Req,
+    Res,
     UseGuards,
     HttpCode,
     HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { EmailFacadeService } from '@ever-works/agent/facades';
@@ -127,6 +129,76 @@ export class EmailController {
             Number.parseInt(offset, 10),
         );
         return { messages };
+    }
+
+    /**
+     * EW-681 / T34 — Server-Sent-Events stream of new inbound messages
+     * for an agent. Poll-based (no Redis pub/sub infra): every 5s the
+     * handler diffs the agent's recent messages against the ids already
+     * sent on this connection and emits the new ones as `message`
+     * events; a heartbeat comment keeps the connection alive. The client
+     * `useInboxStream` hook calls the inbox hook's `mutate()` on each
+     * event. Declared BEFORE `messages/:id` so `:id` doesn't capture
+     * "stream".
+     */
+    @UseGuards(AuthSessionGuard)
+    @ApiBearerAuth('JWT-auth')
+    @Get('messages/stream')
+    @ApiOperation({ summary: 'SSE stream of new inbound messages for an agent' })
+    async streamMessages(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('agentId') agentId: string,
+        @Res() res: Response,
+        @Req() req: Request,
+    ): Promise<void> {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders?.();
+
+        const seen = new Set<string>();
+        let closed = false;
+        let primed = false;
+
+        const poll = async () => {
+            if (closed) return;
+            try {
+                const rows = (await this.emailService.listMessagesForAgent(
+                    auth.userId,
+                    agentId,
+                    50,
+                    0,
+                )) as { id: string }[];
+                for (const row of rows) {
+                    if (!seen.has(row.id)) {
+                        seen.add(row.id);
+                        // Skip the very first poll's backlog from being
+                        // announced as "new" — only emit on subsequent diffs.
+                        if (primed) {
+                            res.write(`event: message\ndata: ${JSON.stringify(row)}\n\n`);
+                        }
+                    }
+                }
+                primed = true;
+            } catch {
+                // Swallow — the heartbeat keeps the stream open; the client
+                // falls back to polling if the connection drops.
+            }
+        };
+
+        await poll(); // prime the seen-set with the current backlog
+        const pollTimer = setInterval(() => void poll(), 5000);
+        const heartbeat = setInterval(() => {
+            if (!closed) res.write(': ping\n\n');
+        }, 15000);
+
+        const cleanup = () => {
+            closed = true;
+            clearInterval(pollTimer);
+            clearInterval(heartbeat);
+        };
+        req.on('close', cleanup);
+        res.on('close', cleanup);
     }
 
     @UseGuards(AuthSessionGuard)
