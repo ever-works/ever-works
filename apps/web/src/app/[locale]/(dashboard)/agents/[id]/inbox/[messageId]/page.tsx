@@ -11,10 +11,6 @@ export default async function AgentInboxMessagePage({
     params: Promise<{ id: string; messageId: string }>;
 }) {
     const { id, messageId } = await params;
-    try {
-        const message = await emailAddressesAPI.getMessage(messageId);
-        return <MessageDetail agentId={id} message={message} />;
-    } catch {
-        notFound();
-    }
+    const message = await emailAddressesAPI.getMessage(messageId).catch(() => notFound());
+    return <MessageDetail agentId={id} message={message} />;
 }
