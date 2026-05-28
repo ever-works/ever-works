@@ -46,4 +46,17 @@ export * from './repositories/skill-binding.repository';
 // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653.
 export * from './repositories/tenant.repository';
 export * from './repositories/organization.repository';
+// Notifications v2 (EW-650 / EW-663 / EW-664) — email + multi-channel
+// + per-user preference repositories.
+export * from './repositories/tenant-email-address.repository';
+export * from './repositories/agent-email-assignment.repository';
+export * from './repositories/email-conversation.repository';
+export * from './repositories/email-message.repository';
+export * from './repositories/notification-channel.repository';
+export * from './repositories/notification-channel-delivery-log.repository';
+export * from './repositories/notification-event-type.repository';
+export * from './repositories/user-notification-subscription.repository';
+export * from './repositories/user-notification-preference.repository';
+export * from './repositories/user-notification-category-mute.repository';
+export * from './repositories/organization-notification-default.repository';
 export * from './database-init.service';

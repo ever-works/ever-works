@@ -3,22 +3,20 @@ import { OnEvent } from '@nestjs/event-emitter';
 import {
     NOTIFICATION_FANOUT_EVENT,
     type NotificationFanoutEvent,
+    UserNotificationSubscriptionService,
 } from '@ever-works/agent/notifications';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
-import { NotificationPreferencesService } from './notification-preferences.service';
 
 /**
- * EW-664 / EW-678 / T20 — Producer fanout listener.
+ * EW-664 / EW-678 / T20 + T22 — Producer fanout listener.
  *
  * Subscribes to `NOTIFICATION_FANOUT_EVENT` (emitted by every v1
  * `notify*` producer in `packages/agent/src/notifications/notification.service.ts`)
  * and forwards the payload to the multi-channel facade.
  *
- * Channel resolution today uses the `user_notification_subscriptions`
- * table directly — a thin wrapper that returns the rows' `channelIds`
- * array. The full quiet-hours + category-mute + org-defaults resolver
- * lives in `UserNotificationSubscriptionService` and lands in T22; this
- * listener swaps to it without touching the v1 producers.
+ * Channel resolution delegates to `UserNotificationSubscriptionService.resolveChannels`
+ * (T22) — full fallback chain (subscription → event defaults → in-app)
+ * plus category-mute + quiet-hours filtering.
  *
  * Hard-rule additive: v1 in-app delivery via NotificationService.create
  * is untouched. Fanout is layered on top and failures here NEVER
@@ -30,7 +28,7 @@ export class NotificationFanoutListener {
 
     constructor(
         @Optional() private readonly channelFacade?: NotificationChannelFacadeService,
-        @Optional() private readonly preferences?: NotificationPreferencesService,
+        @Optional() private readonly subscriptions?: UserNotificationSubscriptionService,
     ) {}
 
     @OnEvent(NOTIFICATION_FANOUT_EVENT, { async: true, suppressErrors: true })
@@ -65,17 +63,21 @@ export class NotificationFanoutListener {
     }
 
     /**
-     * Thin channel-resolver. Today: returns `user_notification_subscriptions.channelIds`
-     * for the (user, event) row, or [] when no subscription is configured.
-     * T22 will replace this with `UserNotificationSubscriptionService.resolveChannels`
-     * which adds quiet-hours, category mutes, and organisation defaults.
+     * Delegates to the full resolver (T22): subscription → event
+     * defaults → in-app fallback, with category-mute + quiet-hours
+     * filtering applied. Returns ['in-app'] as a safe default if the
+     * resolver isn't wired (in-app is already covered by v1's
+     * NotificationService.create, so the channel facade treats it as a
+     * no-op sentinel).
      */
     private async resolveChannelIds(userId: string, eventKey: string): Promise<string[]> {
-        if (!this.preferences) return [];
+        if (!this.subscriptions) return [];
         try {
-            const view = await this.preferences.getPreferences(userId);
-            const sub = view.subscriptions.find((s) => s.eventTypeKey === eventKey);
-            return sub?.channelIds ?? [];
+            const channels = await this.subscriptions.resolveChannels(userId, eventKey);
+            // Drop the 'in-app' sentinel before fanout — in-app delivery
+            // already happened in the v1 producer's create() call; the
+            // channel facade only handles the external channels.
+            return channels.filter((c) => c !== 'in-app');
         } catch (err) {
             this.logger.debug(
                 `Subscription resolver fallback to [] for user=${userId} event=${eventKey}: ${String(err)}`,

@@ -53,12 +53,32 @@
 
 - **EW-670** Agent integration: `sendEmail` + `messageAgent` tools + dispatcher + git facade
 - **EW-675** WhatsApp + Novu channel plugins
-- **EW-677** UserNotificationSubscriptionService + delayed-delivery BullMQ queue
 
 ### Newly done (this overnight cron loop)
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
-- **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + follow-up
+- **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
+- **T22 EW-677** Subscription resolver (`resolveChannels` + quiet-hours + mute) — *this commit*. BullMQ delayed-delivery + org-defaults fallback deferred (TODO in service). Listener now uses the real resolver instead of the T20 stub.
+
+## ⚠ Known issue found during T22 — apps/api repo method mismatch
+
+The custom repository classes under `packages/agent/src/database/repositories/`
+expose **semantic methods** (`findByKey`, `findForEvent`, `findByUser`,
+`isMuted`, `upsert`, …), NOT raw TypeORM `findOne`/`find`/`save`/`create`/`remove`.
+
+The T12 services — `apps/api/src/email/email.service.ts`,
+`apps/api/src/notification-channels/notification-channels.service.ts`,
+`apps/api/src/notifications/notification-preferences.service.ts` — were written
+assuming the raw TypeORM API and **will not compile** against the actual repo
+classes. The `EmailFacadeService` / `NotificationChannelFacadeService` (T11) have
+the same issue where they call `.findOne` / `.find` / `.save` / `.create` on the
+new repos.
+
+**Fix required (next dedicated tick before any PR):** either (a) add the missing
+semantic methods to each repository, or (b) expose the underlying TypeORM
+`Repository` and call through it. Option (a) matches the existing house style.
+The agent-package resolver (T22) + all 3 plugins are clean; this is contained to
+the api-layer services + the two facades.
 
 ## Verified locally
 
