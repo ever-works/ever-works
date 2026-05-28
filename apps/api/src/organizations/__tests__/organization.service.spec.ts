@@ -25,6 +25,7 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
         organizationById?: Org | null;
         orgCountByTenant?: number;
         tenantId?: string;
+        existingLinkedOrg?: (Org & { linkedWorkId?: string | null }) | null;
     }) {
         const queryLog: QueryRecord[] = [];
 
@@ -47,6 +48,11 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             findBySlug: jest.fn().mockResolvedValue(null),
             findByTenantId: jest.fn().mockResolvedValue([]),
             countByTenantId: jest.fn().mockResolvedValue(opts.orgCountByTenant ?? 0),
+            // EW-665 (Phase 13) — idempotency guard in
+            // createOrganizationFromCompanyWork looks up an existing Org by
+            // its backing Work id. Default to "none linked yet"; tests that
+            // exercise the re-fire path override this per-case.
+            findByLinkedWorkId: jest.fn().mockResolvedValue(opts.existingLinkedOrg ?? null),
             update: jest.fn().mockResolvedValue(undefined),
         };
 
@@ -250,8 +256,38 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(result.tierARowsUpdated).toBe(14);
             // 5 Tier B tables with direct user FK.
             expect(result.tierBRowsUpdated).toBe(5);
+            // EW-663 (Phase 11) — Tier C: 5 direct-user tables + 20
+            // join-walked tables + 6 indirect tables (5 both-column +
+            // 1 work_knowledge_documents tenantId-only) = 31 UPDATEs,
+            // each affected = 1 in our mock.
+            expect(result.tierCRowsUpdated).toBe(31);
 
-            const tierAUpdates = queryLog.filter((q) => q.sql.includes('"organizationId" = $2'));
+            // Tier A: `SET "tenantId" = $1, "organizationId" = $2 WHERE "<col>" = $3`.
+            // Tier C direct-user uses the SAME shape, so isolate Tier
+            // A by table name (none of the Tier C table names overlap
+            // with Tier A).
+            const tierATableNames = new Set([
+                'missions',
+                'work_proposals',
+                'tasks',
+                'agents',
+                'skills',
+                'conversations',
+                'notifications',
+                'api_keys',
+                'templates',
+                'template_customizations',
+                'user_subscriptions',
+                'work_schedules',
+                'github_app_user_links',
+                'works',
+            ]);
+            const tierAUpdates = queryLog.filter(
+                (q) =>
+                    q.sql.includes('"organizationId" = $2') &&
+                    !q.sql.includes(' FROM "') &&
+                    [...tierATableNames].some((t) => q.sql.includes(`UPDATE "${t}"`)),
+            );
             expect(tierAUpdates.length).toBe(14);
             for (const q of tierAUpdates) {
                 expect(q.params).toEqual(['t-1', 'o-1', 'u-1']);
@@ -261,13 +297,279 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 expect(q.sql).toContain('"organizationId" IS NULL');
             }
 
+            // Tier B is the simple `UPDATE t SET tenantId WHERE col` shape
+            // (no JOIN). Exclude the indirect work_knowledge_documents
+            // tenantId-only UPDATE, which also has no `organizationId`
+            // but DOES use a `FROM "works"` join.
             const tierBUpdates = queryLog.filter(
-                (q) => q.sql.includes('SET "tenantId" = $1') && !q.sql.includes('organizationId'),
+                (q) =>
+                    q.sql.includes('SET "tenantId" = $1') &&
+                    !q.sql.includes('organizationId') &&
+                    !q.sql.includes(' FROM "'),
             );
             expect(tierBUpdates.length).toBe(5);
             for (const q of tierBUpdates) {
                 expect(q.params).toEqual(['t-1', 'u-1']);
             }
+        });
+
+        it('EW-663 Phase 11: stamps Tier C direct-user rows + join-walks parent for the rest', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            const result = await service.upgradeFromAccount('u-1', 'o-1');
+
+            // Tier C direct-user tables — same UPDATE shape as Tier A.
+            const directUserTierCTables = [
+                'agent_runs',
+                'skill_bindings',
+                'usage_ledger_entries',
+                'plugin_usage_events',
+                'activity_log',
+            ];
+            const directUserUpdates = queryLog.filter((q) =>
+                directUserTierCTables.some(
+                    (t) =>
+                        q.sql.startsWith(`UPDATE "${t}"`) &&
+                        !q.sql.includes(' FROM "') &&
+                        q.sql.includes('"organizationId" = $2'),
+                ),
+            );
+            expect(directUserUpdates.length).toBe(directUserTierCTables.length);
+            for (const q of directUserUpdates) {
+                expect(q.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(q.sql).toContain('"organizationId" IS NULL');
+                expect(q.sql).toContain('"userId" = $3');
+            }
+
+            // Join-walked Tier C: `UPDATE "child" SET ... FROM "parent" p WHERE ...`.
+            // Restrict to the canonical Tier C child tables so the 6
+            // indirect-backfill joins (webhook_*, onboarding_requests,
+            // work_deployments, work_knowledge_documents) don't inflate
+            // the count — those are asserted in their own test.
+            const tierCJoinChildren = new Set([
+                'conversation_messages',
+                'task_assignees',
+                'task_approvers',
+                'task_reviewers',
+                'task_watchers',
+                'task_blocks',
+                'task_chat_messages',
+                'task_kb_mentions',
+                'task_attachments',
+                'task_relations',
+                'agent_budgets',
+                'agent_memberships',
+                'agent_run_logs',
+                'work_members',
+                'work_invitations',
+                'work_generation_history',
+                'work_knowledge_chunks',
+                'work_knowledge_citations',
+                'work_knowledge_tags',
+                'work_knowledge_uploads',
+            ]);
+            const joinUpdates = queryLog.filter(
+                (q) =>
+                    q.sql.startsWith('UPDATE "') &&
+                    q.sql.includes(' FROM "') &&
+                    [...tierCJoinChildren].some((t) => q.sql.startsWith(`UPDATE "${t}"`)),
+            );
+            // The set is canonical per the service file's
+            // `TIER_C_BACKFILL_TABLES` constant.
+            const expectedJoinPairs: Array<[string, string, string]> = [
+                ['conversation_messages', 'conversations', 'conversationId'],
+                ['task_assignees', 'tasks', 'taskId'],
+                ['task_approvers', 'tasks', 'taskId'],
+                ['task_reviewers', 'tasks', 'taskId'],
+                ['task_watchers', 'tasks', 'taskId'],
+                ['task_blocks', 'tasks', 'taskId'],
+                ['task_chat_messages', 'tasks', 'taskId'],
+                ['task_kb_mentions', 'tasks', 'taskId'],
+                ['task_attachments', 'tasks', 'taskId'],
+                ['task_relations', 'tasks', 'taskId'],
+                ['agent_budgets', 'agents', 'agentId'],
+                ['agent_memberships', 'agents', 'agentId'],
+                ['agent_run_logs', 'agent_runs', 'runId'],
+                ['work_members', 'works', 'workId'],
+                ['work_invitations', 'works', 'workId'],
+                ['work_generation_history', 'works', 'workId'],
+                ['work_knowledge_chunks', 'works', 'work_id'],
+                ['work_knowledge_citations', 'works', 'workId'],
+                ['work_knowledge_tags', 'works', 'workId'],
+                ['work_knowledge_uploads', 'works', 'workId'],
+            ];
+            expect(joinUpdates.length).toBe(expectedJoinPairs.length);
+            for (const [child, parent, fk] of expectedJoinPairs) {
+                const match = joinUpdates.find(
+                    (q) =>
+                        q.sql.includes(`UPDATE "${child}"`) &&
+                        q.sql.includes(`FROM "${parent}" p`) &&
+                        q.sql.includes(`"${child}"."${fk}" = p."id"`),
+                );
+                expect(match).toBeDefined();
+                expect(match?.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(match?.sql).toContain(`"${child}"."organizationId" IS NULL`);
+                expect(match?.sql).toContain('p."userId" = $3');
+            }
+
+            // Total tierCRowsUpdated matches direct + join + the 6
+            // indirect UPDATEs (asserted in the dedicated test below).
+            const INDIRECT_UPDATE_COUNT = 6;
+            expect(result.tierCRowsUpdated).toBe(
+                directUserTierCTables.length + expectedJoinPairs.length + INDIRECT_UPDATE_COUNT,
+            );
+        });
+
+        it('EW-663 Phase 11: indirect backfill — joins account/works for tables with no direct user FK', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            await service.upgradeFromAccount('u-1', 'o-1');
+
+            // Both-column indirect tables: UPDATE child SET tenantId,
+            // organizationId FROM parent WHERE child.fk = p.id AND
+            // p.userId = $3 AND child.organizationId IS NULL.
+            const expectedIndirect: Array<[string, string, string]> = [
+                ['webhook_subscriptions', 'account', 'accountId'],
+                ['webhook_deliveries', 'account', 'accountId'],
+                ['onboarding_requests', 'account', 'accountId'],
+                ['work_deployments', 'works', 'workId'],
+                ['onboarding_requests', 'works', 'workId'],
+            ];
+            for (const [child, parent, fk] of expectedIndirect) {
+                const match = queryLog.find(
+                    (q) =>
+                        q.sql.includes(`UPDATE "${child}"`) &&
+                        q.sql.includes(`FROM "${parent}" p`) &&
+                        q.sql.includes(`"${child}"."${fk}" = p."id"`) &&
+                        q.sql.includes('"organizationId" = $2'),
+                );
+                expect(match).toBeDefined();
+                expect(match?.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(match?.sql).toContain(`"${child}"."organizationId" IS NULL`);
+                expect(match?.sql).toContain('p."userId" = $3');
+            }
+
+            // work_knowledge_documents — tenantId ONLY (scope XOR check
+            // forbids writing organizationId on work-scoped rows).
+            const wkd = queryLog.find((q) => q.sql.includes('UPDATE "work_knowledge_documents"'));
+            expect(wkd).toBeDefined();
+            expect(wkd?.sql).toContain('SET "tenantId" = $1');
+            expect(wkd?.sql).not.toContain('"organizationId" = $2');
+            expect(wkd?.sql).toContain('FROM "works" p');
+            expect(wkd?.sql).toContain('"work_knowledge_documents"."workId" = p."id"');
+            expect(wkd?.sql).toContain('"work_knowledge_documents"."tenantId" IS NULL');
+            expect(wkd?.params).toEqual(['t-1', 'u-1']);
+
+            // github_app_installations is NEVER touched (shared resource).
+            const ghaTouched = queryLog.some((q) =>
+                q.sql.includes('UPDATE "github_app_installations"'),
+            );
+            expect(ghaTouched).toBe(false);
+        });
+
+        it('EW-663 Phase 11: idempotency — second call returns tierCRowsUpdated = 0', async () => {
+            // Build a service whose mock returns "0 affected" for any
+            // UPDATE that filters by `organizationId IS NULL`, to
+            // simulate the second-call case where everything's already
+            // been moved.
+            const queryLog: { sql: string; params: unknown[] }[] = [];
+            const manager = {
+                getRepository: jest.fn((target: string) => {
+                    if (target === 'organizations') {
+                        return {
+                            create: jest.fn((data) => ({ ...data, id: 'o-new' })),
+                            save: jest.fn(async (org) => ({
+                                ...org,
+                                id: 'o-new',
+                                createdAt: new Date('2026-01-01'),
+                                updatedAt: new Date('2026-01-01'),
+                            })),
+                        };
+                    }
+                    if (target === 'users') {
+                        return {
+                            findOne: jest.fn(async () => ({
+                                id: 'u-1',
+                                tenantId: 't-1',
+                                lastScopeOrganizationId: 'o-1',
+                            })),
+                            update: jest.fn(),
+                        };
+                    }
+                    return { findOne: jest.fn(), update: jest.fn() };
+                }),
+                query: jest.fn(async (sql: string, params: unknown[]) => {
+                    queryLog.push({ sql, params });
+                    if (sql.startsWith('UPDATE')) {
+                        // Second-call simulation — nothing left to move.
+                        return [[], 0];
+                    }
+                    return undefined;
+                }),
+            };
+            const dataSource = {
+                transaction: jest.fn(async (cb: (m: typeof manager) => Promise<unknown>) =>
+                    cb(manager),
+                ),
+            };
+            const userRepository = {
+                findById: jest.fn().mockResolvedValue({ id: 'u-1', tenantId: 't-1' }),
+            };
+            const organizationRepository = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' }),
+                countByTenantId: jest.fn().mockResolvedValue(1),
+            };
+            const tenantBootstrap = {
+                ensureTenant: jest.fn().mockResolvedValue({ id: 't-1', slug: 'alice' }),
+            };
+            const usernameAllocator = {
+                allocateUsername: jest.fn(async (s: string) => s),
+                suggest: jest.fn(async (s: string) => ({ available: true, normalized: s })),
+            };
+
+            const service = new OrganizationService(
+                dataSource as never,
+                userRepository as never,
+                organizationRepository as never,
+                tenantBootstrap as never,
+                usernameAllocator as never,
+            );
+
+            const result = await service.upgradeFromAccount('u-1', 'o-1');
+
+            expect(result.tierARowsUpdated).toBe(0);
+            expect(result.tierBRowsUpdated).toBe(0);
+            expect(result.tierCRowsUpdated).toBe(0);
+            // The UPDATE statements are still issued — idempotency is
+            // a property of the WHERE filter, not of skipping calls.
+            const updates = queryLog.filter((q) => q.sql.startsWith('UPDATE'));
+            // 14 Tier A + 5 Tier B + 5 Tier C direct + 20 Tier C join
+            // + 6 indirect (5 both-column + 1 wkd tenantId-only) = 50.
+            expect(updates.length).toBe(50);
+        });
+
+        it('EW-663 Phase 11: bumps statement_timeout to 60s on Postgres for Tier C headroom', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            await service.upgradeFromAccount('u-1', 'o-1');
+
+            const setLocal = queryLog.find((q) => q.sql.includes('SET LOCAL statement_timeout'));
+            expect(setLocal).toBeDefined();
+            expect(setLocal?.sql).toContain("'60s'");
         });
     });
 
@@ -451,6 +753,35 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             await expect(
                 service.createOrganizationFromCompanyWork('u-1', { id: 'w-x', name: '' }),
             ).rejects.toBeInstanceOf(ConflictException);
+        });
+
+        it('EW-665 Phase 13: is idempotent on linkedWorkId — returns the existing Org without creating a new one', async () => {
+            const existing = {
+                id: 'o-existing',
+                tenantId: 't-1',
+                slug: 'acme',
+                displayName: 'Acme Inc.',
+                linkedWorkId: 'w-42',
+            };
+            const { service, organizationRepository, tenantBootstrap } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: 'o-existing' },
+                existingLinkedOrg: existing,
+            });
+
+            const org = (await service.createOrganizationFromCompanyWork('u-1', {
+                id: 'w-42',
+                name: 'acme-website',
+                companyName: 'Acme Inc.',
+            })) as unknown as { id: string; linkedWorkId: string | null };
+
+            // Returned the pre-existing Org, NOT a freshly-minted 'o-new'.
+            expect(org.id).toBe('o-existing');
+            expect(org.linkedWorkId).toBe('w-42');
+            expect(organizationRepository.findByLinkedWorkId).toHaveBeenCalledWith('w-42');
+            // Short-circuited before touching the create path — Tenant
+            // bootstrap (the first side-effect of createOrganization) is
+            // never reached.
+            expect(tenantBootstrap.ensureTenant).not.toHaveBeenCalled();
         });
     });
 });

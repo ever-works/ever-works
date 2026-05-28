@@ -199,9 +199,9 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
         1. Verify ownership (user owns Tenant; Org belongs to that Tenant).
         2. Verify Org's tenantId matches user's tenantId.
         3. **First-Org guard:** the endpoint is only callable while the user has **exactly one** Organization under their Tenant AND `:organizationId` is that one Org. Concretely: `SELECT COUNT(*) FROM organizations WHERE tenantId = :userTenantId` must equal 1, and the single row's `id` must equal `:organizationId`. Either condition failing → throw `409 Conflict` with error code `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS`. This prevents retroactively pulling items into a non-first Org.
-        4. **Tier A/C rows** (entities that have `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`. Rows already migrated to a Tenant are left as-is (idempotency).
+        4. **Tier A rows** (entities that have `organizationId` + direct `userId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set BOTH `tenantId = newTenant.id` AND `organizationId = newOrg.id`. Rows already migrated to a Tenant are left as-is (idempotency). ~~Tier C deferred to Phase 6b follow-up.~~ **Phase 11 follow-up shipped 2026-05-28 (EW-663)** — Tier C is now handled by the same `upgradeFromAccount` call; see Phase 11 below.
         5. **Tier B rows** (entities without `organizationId`): UPDATE every row where `userId = X AND tenantId IS NULL` → set `tenantId = newTenant.id` ONLY. Do NOT attempt to write `organizationId` — the column does not exist on these tables and the UPDATE would fail.
-        6. This is a transaction; the table list is enumerated in code (one UPDATE per table, all under one DB transaction). On Postgres, set `SET LOCAL statement_timeout = '30s'` for safety.
+        6. This is a transaction; the table list is enumerated in code (one UPDATE per table, all under one DB transaction). On Postgres, set `SET LOCAL statement_timeout = '60s'` for safety (bumped from `'30s'` in Phase 11 to give the new Tier C join walks headroom).
 3. New service: `apps/api/src/scope/scope-context.service.ts` — the request-scoped provider from Phase 5.
 4. New service: `apps/api/src/scope/tenant-bootstrap.service.ts` — `ensureTenant(userId): Promise<Tenant>`. Lazy creation logic in one place.
 
@@ -301,6 +301,57 @@ The plan is **10 phases**. Each phase is a JIRA Story (Story keys assigned at ti
 
 ---
 
+## Phase 11 — Tier C historical `organizationId` backfill (EW-663)
+
+**Shipped 2026-05-28.** Closes the Tier C gap deferred from Phase 6 step 4.
+
+**Goal:** Backfill `tenantId` + `organizationId` on historical (pre-upgrade) Tier C rows when the user runs `upgrade-from-account`. New Tier C inserts already auto-stamp via the Phase 5b `ScopeStampingSubscriber`; this catches the rows that predate the user's first Organization.
+
+**Changes (pure service-layer + SQL — no migration, no new columns, no new deps):**
+
+1. `OrganizationService.upgradeFromAccount` gained a third backfill stage after the Tier A + Tier B loops:
+    - **Direct-user Tier C tables** (`agent_runs`, `skill_bindings`, `usage_ledger_entries`, `plugin_usage_events`, `activity_log`) carry their own `userId` column, so they use the same `UPDATE ... WHERE "userId" = $3 AND "organizationId" IS NULL` shape as Tier A.
+    - **Join-walked Tier C tables** (the other 20) propagate scope from their Tier A parent via `UPDATE "child" SET "tenantId" = $1, "organizationId" = $2 FROM "parent" p WHERE "child"."<fk>" = p."id" AND p."userId" = $3 AND "child"."organizationId" IS NULL`.
+2. `SET LOCAL statement_timeout` bumped `'30s'` → `'60s'` for join headroom on large tables.
+3. New `tierCRowsUpdated: number` on the `upgradeFromAccount` result + `UpgradeFromAccountResponse` contract.
+
+**Tier C → parent FK walk** (26 tables: 5 direct-user + 20 join-walked + 1 deferred):
+
+| Tier C table             | Parent table          | FK column                | Path                                                    |
+| ------------------------ | --------------------- | ------------------------ | ------------------------------------------------------- |
+| conversation_messages    | conversations         | conversationId           | join                                                    |
+| task_assignees           | tasks                 | taskId                   | join                                                    |
+| task_approvers           | tasks                 | taskId                   | join                                                    |
+| task_reviewers           | tasks                 | taskId                   | join                                                    |
+| task_watchers            | tasks                 | taskId                   | join                                                    |
+| task_blocks              | tasks                 | taskId                   | join                                                    |
+| task_chat_messages       | tasks                 | taskId                   | join                                                    |
+| task_kb_mentions         | tasks                 | taskId                   | join                                                    |
+| task_attachments         | tasks                 | taskId                   | join                                                    |
+| task_relations           | tasks                 | taskId (source endpoint) | join                                                    |
+| agent_budgets            | agents                | agentId                  | join                                                    |
+| agent_memberships        | agents                | agentId                  | join                                                    |
+| agent_run_logs           | agent_runs            | runId                    | join (after agent_runs is stamped)                      |
+| work_members             | works                 | workId                   | join                                                    |
+| work_invitations         | works                 | workId                   | join                                                    |
+| work_generation_history  | works                 | workId                   | join                                                    |
+| work_knowledge_chunks    | works                 | work_id (snake-case)     | join                                                    |
+| work_knowledge_citations | works                 | workId                   | join                                                    |
+| work_knowledge_tags      | works                 | workId                   | join                                                    |
+| work_knowledge_uploads   | works                 | workId                   | join                                                    |
+| agent_runs               | — (direct `userId`)   | —                        | direct                                                  |
+| skill_bindings           | — (direct `userId`)   | —                        | direct                                                  |
+| usage_ledger_entries     | — (direct `userId`)   | —                        | direct                                                  |
+| plugin_usage_events      | — (direct `userId`)   | —                        | direct                                                  |
+| activity_log             | — (direct `userId`)   | —                        | direct                                                  |
+| webhook_deliveries       | webhook_subscriptions | subscriptionId           | **deferred — parent has no direct user FK (Phase 11b)** |
+
+**Deviation from the original prompt mapping:** `agent_runs` was expected to be join-walked via `agentId`, but the entity carries a direct `userId` so it moved to the direct-user path. `agent_run_logs` uses `runId` (not `agentRunId`). `task_blocks` uses `taskId` (its sibling FK is `blockedByTaskId`); `task_relations` uses `taskId` (sibling `relatedTaskId`). `work_knowledge_*` parent FK is `documentId` for the doc tables in some other contexts, but for scope ownership we walk the direct `workId`/`work_id` column straight to `works` (the KB-document tables themselves are not user-owned Tier A). `webhook_deliveries` is deferred because `webhook_subscriptions` has no direct `userId` (it uses `accountId`).
+
+**Tests:** extended `organization.service.spec.ts` — Tier C UPDATE shapes + params, total `tierCRowsUpdated`, idempotency (second call = 0), and the 60s `statement_timeout` bump.
+
+---
+
 ## Cross-cutting concerns
 
 ### Database safety
@@ -352,5 +403,6 @@ Refer to [`CI_RELEASE_GATES.md`](../../../../../../Workspace/knowledge/runbooks/
 | 8     | WorkspaceSwitcher UI                              | 6, 7       | `develop` |
 | 9     | CreateOrganizationModal + upgrade-vs-new dialog   | 6, 7, 8    | `develop` |
 | 10    | Company chip + Work→Org wire-up                   | 6, 7       | `develop` |
+| 11    | Tier C historical `organizationId` backfill       | 5, 6       | `develop` |
 
 Phases 3, 4, 5 can run in parallel after Phase 1. Phases 8, 9, 10 can run in parallel after Phases 6–7. Otherwise, sequential.

@@ -93,6 +93,16 @@ const CHIP_ORDER: ChipType[] = [
     'company',
 ];
 
+/**
+ * Every chip value whose availability is gated by a `works-<value>`
+ * PostHog feature flag (fail-open — see
+ * `@/lib/feature-flags/work-kinds`). Includes the live chips (which now
+ * cover `company`, graduated in EW-662 Phase 10) plus the inert baseline
+ * `store` so the server page can resolve one flag set covering the whole
+ * catalog.
+ */
+export const ALL_NEW_CHIP_VALUES: ReadonlyArray<ChipType | 'store'> = [...CHIP_ORDER, 'store'];
+
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     mission: Target,
     idea: Lightbulb,
@@ -189,6 +199,13 @@ export interface NewPageClientProps {
     initialType?: ChipType | null;
     initialPrompt?: string;
     initialTemplateId?: string;
+    /**
+     * Work-kind chip values whose `works-<value>` PostHog flag resolved
+     * to an explicit `false`. Evaluated server-side and passed down (the
+     * web app keeps `posthog-js` out of the client bundle). Defaults to
+     * `[]` → everything enabled (fail-open).
+     */
+    disabledKinds?: string[];
 }
 
 const CHIP_INTENT_LABEL: Record<ChipType, string> = {
@@ -226,6 +243,7 @@ export function NewPageClient({
     initialType = 'mission',
     initialPrompt,
     initialTemplateId,
+    disabledKinds = [],
 }: NewPageClientProps) {
     const t = useTranslations('dashboard.newPage');
     const router = useRouter();
@@ -272,6 +290,20 @@ export function NewPageClient({
         setChatOpen?.(false);
     }, [setChatOpen]);
 
+    // Set of chip values whose `works-<value>` flag resolved to false
+    // server-side. A disabled chip must never be the active selection
+    // (and thus never submittable).
+    const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
+
+    // Effective selection — derived during render so a disabled chip is
+    // never the active selection (no effect/setState round-trip; see the
+    // project's "derive state, don't store it in an effect" rule). If the
+    // raw `selectedChip` is flag-disabled, fall back to the safe default
+    // (`mission` is never flag-gated here). Everything that reads/acts on
+    // the selection uses `effectiveChip`, so a disabled kind can never be
+    // submitted or handed off.
+    const effectiveChip: ChipType = disabledSet.has(selectedChip) ? 'mission' : selectedChip;
+
     const submit = () => {
         // EW-662 Phase 10 — Company chip short-circuits the chat-AI
         // path. There's no prompt-to-mission/work pipeline here: the
@@ -280,7 +312,10 @@ export function NewPageClient({
         // collects the name + countryCode form). Open it and bail out
         // of the rest of the submit logic — no min-length check,
         // because the prompt input is incidental for this chip.
-        if (selectedChip === 'company') {
+        // Use `effectiveChip` (not the raw selection) so a `works-company`
+        // flag-disabled chip — which renders inert — can't still open the
+        // register dialog via a stale selection.
+        if (effectiveChip === 'company') {
             setCompanyDialogOpen(true);
             return;
         }
@@ -307,7 +342,7 @@ export function NewPageClient({
             // non-template Mission creation. Just open the panel so
             // the user can iterate manually if they want, but don't
             // dispatch a message.
-            if (selectedChip === 'mission' && initialTemplateId) {
+            if (effectiveChip === 'mission' && initialTemplateId) {
                 try {
                     const mission = await createMissionAction({
                         description,
@@ -359,7 +394,7 @@ export function NewPageClient({
             // currentPageUrl context tells it where the user is, and
             // the intent prefix narrows it further.
             startFromPrompt(description, {
-                intent: CHIP_INTENT_LABEL[selectedChip],
+                intent: CHIP_INTENT_LABEL[effectiveChip],
                 attachments: buildAttachmentRefs(attachments),
             });
 
@@ -367,16 +402,16 @@ export function NewPageClient({
             // page does NOT pre-fill the prompt — the user already
             // sent it, chat is the live channel from here on. The
             // canvas is for optional manual editing of the entity.
-            if (selectedChip === 'mission') {
+            if (effectiveChip === 'mission') {
                 router.push(ROUTES.DASHBOARD_MISSIONS);
                 return;
             }
-            if (selectedChip === 'idea') {
+            if (effectiveChip === 'idea') {
                 router.push(ROUTES.DASHBOARD_IDEAS);
                 return;
             }
-            const canvasRoute = CHIP_TO_CANVAS_ROUTE[selectedChip];
-            const workKind = CHIP_TO_WORK_KIND[selectedChip];
+            const canvasRoute = CHIP_TO_CANVAS_ROUTE[effectiveChip];
+            const workKind = CHIP_TO_WORK_KIND[effectiveChip];
             if (canvasRoute && workKind) {
                 // Work canvases need `mode=ai` so /works/new skips its
                 // own composer entry view and renders the form. They
@@ -397,8 +432,8 @@ export function NewPageClient({
     // Per-chip placeholder cycle. New reference on each chip flip
     // resets the typewriter inside PromptComposer.
     const placeholderExamples = useMemo(
-        () => PLACEHOLDERS_BY_CHIP[selectedChip] ?? PLACEHOLDERS_BY_CHIP.mission,
-        [selectedChip],
+        () => PLACEHOLDERS_BY_CHIP[effectiveChip] ?? PLACEHOLDERS_BY_CHIP.mission,
+        [effectiveChip],
     );
 
     // Full chip catalog. `store` stays as an inert "Soon" chip,
@@ -409,16 +444,24 @@ export function NewPageClient({
     // sits at the end of the live `CHIP_ORDER` list so we render it
     // automatically from the loop below. Picking it opens the
     // Register-Company dialog on submit (see `submit()` above).
+    //
+    // `comingSoon` per live chip is the union of its hardcoded baseline
+    // and any chip whose `works-<value>` PostHog flag resolved to an
+    // explicit `false` server-side. Missing/undefined flags stay enabled.
     const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store'>>>(
         () => [
             ...CHIP_ORDER.map((c) => ({
                 value: c,
                 label: t(`chips.${c}`),
                 Icon: CHIP_ICONS[c],
+                comingSoon: disabledSet.has(c),
             })),
+            // `store` is the only hardcoded coming-soon baseline now
+            // (`company` graduated to a live chip in EW-662 Phase 10).
+            // Its `comingSoon` is pinned `true` regardless of any flag.
             { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
         ],
-        [t],
+        [t, disabledSet],
     );
 
     return (
@@ -449,7 +492,7 @@ export function NewPageClient({
                     <div className="space-y-2">
                         <PromptChipsRow
                             chips={allChips}
-                            value={selectedChip}
+                            value={effectiveChip}
                             onChange={(next) => {
                                 // `store` is the last remaining inert "Soon"
                                 // chip — the chips row never emits it.
@@ -466,7 +509,7 @@ export function NewPageClient({
                             testIdPrefix="new-chip"
                         />
                         <p className="px-1 text-xs text-text-muted dark:text-text-muted-dark">
-                            {t(`chipDescriptions.${selectedChip}`)}
+                            {t(`chipDescriptions.${effectiveChip}`)}
                         </p>
                     </div>
                 }
