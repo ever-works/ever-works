@@ -43,7 +43,7 @@
 
 ### Partially done
 
-- **EW-681** SWR hooks + SSE + i18n + E2E — server API clients (T17) + inbox client hook (T33, `useAgentInbox` via the repo's useSyncExternalStore store pattern + a BFF proxy route — SWR is not an apps/web dep) done. SSE stream (T34) + i18n (T35) + Playwright E2E (T36) pending. (channels/preferences client hooks follow the same store pattern when their pages need live revalidation — settings pages currently fetch server-side.)
+- **EW-681** SWR hooks + SSE + i18n + E2E — server API clients (T17) + inbox client hook (T33) + SSE stream (T34) done. i18n (T35) + Playwright E2E (T36) pending. (channels/preferences client hooks follow the same store pattern when their pages need live revalidation — settings pages currently fetch server-side.)
 
 ### Not started
 
@@ -70,7 +70,8 @@ _(none — all remaining items are in "Partially done" above)_
 - **T30 EW-675** Novu channel plugin — [`06cd2323`](https://github.com/ever-works/ever-works/commit/06cd2323). `packages/plugins/novu-channel/` Trigger API (workflow shape, raw fetch), payload merge, environments/me verifyTarget, self-hosted apiBase. type-check clean, 9/9 Vitest. Completes EW-675 + the full plugin set.
 - **T31 EW-680** Inbox message detail page — [`5604736b`](https://github.com/ever-works/ever-works/commit/5604736b). `GET /api/email/messages/:id` route + `EmailService.getMessage` (per-user ownership) + `emailAddressesAPI.getMessage` client + `MessageDetail` component (sandboxed iframe for HTML body) + `/agents/[id]/inbox/[messageId]` page; inbox rows link to it.
 - **T32 EW-680** Inbox composer — [`52b4656b`](https://github.com/ever-works/ever-works/commit/52b4656b). `POST /api/email/messages` route + `EmailService.sendMessage` (resolves agent primary-outbound address → EmailFacade.send) + `emailAddressesAPI.sendMessage` client + `sendAgentEmailAction` server action + `Composer` client component + `/agents/[id]/inbox/compose` page. Completes EW-680.
-- **T33 EW-681** Inbox client hook — *this commit*. `useAgentInbox(agentId)` (module-store + useSyncExternalStore, exposes messages/isLoading/error/mutate) + BFF proxy `apps/web/src/app/api/email/messages/route.ts`. No SWR (not an apps/web dep — mirrors use-organizations.ts). `mutate()` is the hook T34's SSE stream will call on new inbound mail.
+- **T33 EW-681** Inbox client hook — [`c545720e`](https://github.com/ever-works/ever-works/commit/c545720e). `useAgentInbox(agentId)` (module-store + useSyncExternalStore, exposes messages/isLoading/error/mutate) + BFF proxy `apps/web/src/app/api/email/messages/route.ts`. No SWR (not an apps/web dep — mirrors use-organizations.ts).
+- **T34 EW-681** SSE inbox stream — [`73be2295`](https://github.com/ever-works/ever-works/commit/73be2295). Poll-based `GET /api/email/messages/stream` (diffs new inbound rows, heartbeat, cleanup; declared before `messages/:id`) + BFF stream proxy + `useInboxStream(agentId, onMessage)` hook (EventSource → calls `mutate`, 30s poll fallback).
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
