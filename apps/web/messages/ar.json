@@ -1554,7 +1554,7 @@
                 "overview": "نظرة عامة",
                 "activity": "النشاط",
                 "items": "العناصر",
-                "generator": "مولد",
+                "generator": "Worker",
                 "schedule": "جدولة",
                 "history": "سجل",
                 "comparisons": "مقارنات",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "لم يبدأ التوليد",
                     "description": "ابدأ في توليد العناصر لعملك لملئه بالمحتوى.",
-                    "action": "بدء التوليد"
+                    "action": "بدء الـWork"
                 },
                 "generating": {
                     "title": "التوليد قيد التقدم",
@@ -1769,12 +1769,12 @@
                     "title": "فشل التوليد",
                     "description": "حدث خطأ أثناء التوليد.",
                     "withWarnings": "فشل التوليد مع أخطاء:",
-                    "retry": "إعادة محاولة التوليد"
+                    "retry": "إعادة محاولة الـWork"
                 },
                 "cancelled": {
                     "title": "تم إلغاء التوليد",
                     "description": "تم إيقاف التوليد السابق قبل الاكتمال.",
-                    "restart": "إعادة تشغيل التوليد"
+                    "restart": "إعادة تشغيل الـWork"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "تفاصيل التهيئة",
-                "initialPrompt": "موجه التوليد الأولي",
+                "initialPrompt": "موجه الـWorker الأولي",
                 "companyDetails": "معلومات الشركة",
                 "companyName": "اسم الشركة",
                 "companyWebsite": "الموقع الإلكتروني",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "توليد",
+                    "generate": "Work",
                     "schedule": "جدولة",
                     "history": "التاريخ",
                     "comparisons": "المقارنات",
-                    "navigationLabel": "تبويبات المولد"
+                    "navigationLabel": "تبويبات Worker"
                 },
                 "regenerationWarning": "تحذير إعادة التوليد",
                 "regenerationWarningDescription": "تم توليد هذا المجلد بالفعل. بدء توليد جديد سيستبدل العناصر الموجودة.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "فشل في تحميل تكوين النموذج",
                 "selectOption": "اختر خيارًا",
                 "workName": "اسم المجلد",
-                "generationPrompt": "موجه التوليد",
+                "generationPrompt": "موجه الـWorker",
                 "modelOverride": "تجاوز نموذج الذكاء الاصطناعي",
                 "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "كن محددًا بشأن نوع المحتوى الذي تريد توليده",
                 "repositoryDescription": "وصف المستودع",
                 "repositoryPlaceholder": "وصف موجز للمستودع (اختياري)",
-                "startGeneration": "بدء التوليد",
+                "startGeneration": "بدء الـWork",
                 "regenerateItems": "إعادة توليد العناصر",
                 "updateItems": "تشغيل التوليد",
                 "recreateWork": "إعادة إنشاء المجلد",
@@ -3283,7 +3283,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "هدف مستمر يعمل عليه الوكلاء باستمرار — ينتج أفكرة وفق جدولة أو لمرة واحدة.",
@@ -3292,7 +3293,8 @@
                 "landing-page": "صفحة مركزة واحدة — قوائم الانتظار، إطلاق المنتجات، تسجيلات الندوات، التقاط العملاء.",
                 "blog": "مدونة مع فئات، RSS، تمييز الكود، ومحتوى جاهز لتحسين محركات البحث.",
                 "directory": "موقع دليل مختار مع بحث، عوامل تصفية، وبيانات منظمة للعناصر.",
-                "awesome-repo": "مستودع قائمة رائعة — فهرس markdown، روابط مصنفة، وبيانات قابلة للتحديث."
+                "awesome-repo": "مستودع قائمة رائعة — فهرس markdown، روابط مصنفة، وبيانات قابلة للتحديث.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "إنشاء",
@@ -4533,7 +4535,20 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
+            },
+            "chipDescriptions": {
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "or": "or",
@@ -4638,7 +4653,7 @@
             "work": "العمل",
             "overview": "نظرة عامة",
             "items": "العناصر",
-            "generator": "المولد",
+            "generator": "Worker",
             "settings": "الإعدادات",
             "deploy": "النشر",
             "members": "الأعضاء",
@@ -4864,6 +4879,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {

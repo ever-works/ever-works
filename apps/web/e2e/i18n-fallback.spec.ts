@@ -17,15 +17,20 @@ test.describe('i18n — unknown locale falls back', () => {
         expect(res?.status() ?? 0).toBeLessThan(500);
     });
 
-    test('root path / redirects to default locale', async ({ page, baseURL }) => {
+    test('root path / stays unprefixed (PR #1052 `localePrefix: never`)', async ({
+        page,
+        baseURL,
+    }) => {
         const res = await page.goto(`${baseURL || 'http://localhost:3000'}/`, {
             waitUntil: 'domcontentloaded',
         });
         expect(res?.status() ?? 0).toBeLessThan(500);
-        // After the redirect, the URL should contain a locale prefix.
-        // Default is `en`, but some builds may detect from Accept-Language.
+        // PR #1052 dropped the URL-level locale prefix. `/` no longer
+        // redirects to `/en/` — it renders the canonical unprefixed
+        // home directly. Assert that the URL does NOT contain a
+        // `/<locale>/` segment.
         const url = page.url();
-        expect(url).toMatch(/\/(en|fr|es|de|it|pt|nl|ja|zh|ru|ar)(\/|$|\?)/);
+        expect(url).not.toMatch(/\/(en|fr|es|de|it|pt|nl|ja|zh|ru|ar)(\/|$|\?|#)/);
     });
 });
 

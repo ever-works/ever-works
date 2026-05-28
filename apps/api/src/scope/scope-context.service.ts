@@ -1,6 +1,18 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ScopeContext, EMPTY_SCOPE } from './scope-context.types';
+
+/**
+ * Mutable holder stored in the `AsyncLocalStorage`. We store a holder
+ * (`{ current }`) rather than the `ScopeContext` directly so that a
+ * guard running LATER in the same async context (after `request.user`
+ * is populated) can re-seed the scope in place via `setScope` — the
+ * `runWith` frame is already on the stack and we can't restart it from
+ * a guard. See [`SessionScopeGuard`](./session-scope.guard.ts).
+ */
+interface ScopeHolder {
+    current: ScopeContext;
+}
 
 /**
  * EW-657 (Tenants & Organizations Phase 5b) — request-scoped
@@ -36,14 +48,15 @@ import { ScopeContext, EMPTY_SCOPE } from './scope-context.types';
  */
 @Injectable()
 export class ScopeContextService {
-    private readonly storage = new AsyncLocalStorage<ScopeContext>();
+    private readonly logger = new Logger(ScopeContextService.name);
+    private readonly storage = new AsyncLocalStorage<ScopeHolder>();
 
     /**
      * Returns the active scope, or `EMPTY_SCOPE` (both fields `null`)
      * if called outside a `runWith` boundary.
      */
     getScope(): ScopeContext {
-        return this.storage.getStore() ?? EMPTY_SCOPE;
+        return this.storage.getStore()?.current ?? EMPTY_SCOPE;
     }
 
     getTenantId(): string | null {
@@ -61,6 +74,37 @@ export class ScopeContextService {
      * because that's exactly what `AsyncLocalStorage` is for.
      */
     runWith<T>(scope: ScopeContext, fn: () => T): T {
-        return this.storage.run(scope, fn);
+        return this.storage.run({ current: scope }, fn);
+    }
+
+    /**
+     * EW-664 (Tenants & Organizations Phase 12) — re-seed the active
+     * scope IN PLACE within the current `runWith` frame.
+     *
+     * Used by [`SessionScopeGuard`](./session-scope.guard.ts) to fall
+     * back to an authenticated user's default scope (their Tenant +
+     * last-active Org) on legacy un-prefixed routes, where the Phase 7
+     * [`ScopeResolverMiddleware`](./scope-resolver.middleware.ts) ran
+     * the request under `EMPTY_SCOPE` because no slug was present. The
+     * middleware can't do this itself — it runs BEFORE `AuthSessionGuard`
+     * populates `request.user`, so it has no user to read a default
+     * scope from.
+     *
+     * Mutates the holder the middleware created via `runWith`, so every
+     * later reader in the same async context (the controller, the
+     * Phase 5b [`ScopeStampingSubscriber`](./scope-stamping.subscriber.ts))
+     * observes the seeded scope.
+     *
+     * Outside any `runWith` frame (no holder in the ALS — e.g. boot-time
+     * code, or a misordered guard) this is a no-op: seeding only makes
+     * sense inside a request that has an active scope holder.
+     */
+    setScope(scope: ScopeContext): void {
+        const holder = this.storage.getStore();
+        if (!holder) {
+            this.logger.debug('setScope() called outside a runWith frame — no-op');
+            return;
+        }
+        holder.current = scope;
     }
 }

@@ -1565,7 +1565,7 @@
                 "overview": "Overview",
                 "activity": "Activity",
                 "items": "Items",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Schedule",
                 "history": "History",
                 "comparisons": "Comparisons",
@@ -1758,7 +1758,7 @@
                 "notStarted": {
                     "title": "Generation Not Started",
                     "description": "Start generating items for your Work to populate it with content.",
-                    "action": "Start Generation"
+                    "action": "Start Work"
                 },
                 "generating": {
                     "title": "Generation in Progress",
@@ -1780,12 +1780,12 @@
                     "title": "Generation Failed",
                     "description": "An error occurred during generation.",
                     "withWarnings": "Generation failed with errors:",
-                    "retry": "Retry Generation"
+                    "retry": "Retry Work"
                 },
                 "cancelled": {
                     "title": "Generation Cancelled",
                     "description": "The previous generation was stopped before completion.",
-                    "restart": "Restart Generation"
+                    "restart": "Restart Work"
                 }
             },
             "stats": {
@@ -1984,7 +1984,7 @@
             },
             "config": {
                 "title": "Configuration Details",
-                "initialPrompt": "Initial Generation Prompt",
+                "initialPrompt": "Initial Worker Prompt",
                 "companyDetails": "Company Information",
                 "companyName": "Company Name",
                 "companyWebsite": "Website",
@@ -2354,11 +2354,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Generate",
+                    "generate": "Work",
                     "schedule": "Schedule",
                     "history": "History",
                     "comparisons": "Comparisons",
-                    "navigationLabel": "Generator tabs"
+                    "navigationLabel": "Worker tabs"
                 },
                 "regenerationWarning": "Regeneration Warning",
                 "regenerationWarningDescription": "This Work has already been generated. Starting a new generation will replace existing items.",
@@ -2372,7 +2372,7 @@
                 "failedToLoadFormSchema": "Failed to load form configuration",
                 "selectOption": "Select an option",
                 "workName": "Work Name",
-                "generationPrompt": "Generation Prompt",
+                "generationPrompt": "Worker Prompt",
                 "modelOverride": "AI Model Override",
                 "modelOverridePlaceholder": "e.g. openai/gpt-4.1 or openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optional. Uses the imported or previous model by default unless you override it here.",
@@ -2384,7 +2384,7 @@
                 "promptHelperText": "Be specific about the type of content you want to generate",
                 "repositoryDescription": "Repository Description",
                 "repositoryPlaceholder": "Brief description of the repository (optional)",
-                "startGeneration": "Start Generation",
+                "startGeneration": "Start Work",
                 "regenerateItems": "Regenerate Items",
                 "updateItems": "Run Generation",
                 "recreateWork": "Recreate Work",
@@ -3296,7 +3296,8 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "company": "Company"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -3307,7 +3308,8 @@
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
             "submitTitle": "Create",
@@ -4457,7 +4459,7 @@
             "work": "Work",
             "overview": "Overview",
             "items": "Items",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Settings",
             "deploy": "Deploy",
             "members": "Members",
@@ -4683,6 +4685,23 @@
             "errors": {
                 "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
                 "generic": "Failed to move your existing items"
+            }
+        },
+        "registerCompany": {
+            "title": "Register Company",
+            "description": "Register a new legal entity. We'll create an Organization in your account so you can run Missions, Ideas, and Works under it.",
+            "nameLabel": "Company name",
+            "namePlaceholder": "Acme Inc.",
+            "countryCodeLabel": "Country (ISO 3166-1)",
+            "countryCodePlaceholder": "US",
+            "helpProviderManual": "Manual registration for v1. Stripe Atlas integration is coming — your Organization will be linked automatically once it ships.",
+            "submit": "Register",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Company name is required",
+                "nameTooLong": "Company name must be 200 characters or fewer",
+                "countryCodeInvalid": "Country code must be a 2-letter ISO 3166-1 code (e.g. US, DE)",
+                "generic": "Failed to register company"
             }
         },
         "banner": {
