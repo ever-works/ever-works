@@ -18,3 +18,4 @@ export * from './task-tracker.interface.js';
 // Notifications v2 (EW-650 + siblings) — email + chat channel contracts.
 export * from './email-provider.interface.js';
 export * from './notification-channel.interface.js';
+export * from './agent-memory.interface.js';

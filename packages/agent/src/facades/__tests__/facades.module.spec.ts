@@ -13,6 +13,8 @@ import { PromptFacadeService } from '../prompt.facade';
 // PR #1019 (Skills + Tasks) — two new facades.
 import { SkillsFacadeService } from '../skills.facade';
 import { TasksFacadeService } from '../tasks.facade';
+// EW-N (agentmemory plugin) — pluggable persistent memory facade.
+import { AgentMemoryFacadeService } from '../agent-memory.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -38,6 +40,8 @@ describe('FacadesModule + barrel re-exports', () => {
         // PR #1019 — Skills + Tasks facades.
         SkillsFacadeService,
         TasksFacadeService,
+        // EW-N — Agent-Memory facade (default plugin: agentmemory REST :3111).
+        AgentMemoryFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -53,7 +57,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(importNames).toContain('DatabaseModule');
         });
 
-        it('declares all ten facade classes as providers (one entry per facade, no extras)', () => {
+        it('declares every facade class as a provider (one entry per facade, no extras)', () => {
             const providers = getMeta('providers');
             for (const cls of FACADE_CLASSES) {
                 expect(providers).toContain(cls);
@@ -65,7 +69,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(providers).toHaveLength(FACADE_CLASSES.length);
         });
 
-        it('exports all ten facade classes (one-to-one with providers)', () => {
+        it('exports every facade class (one-to-one with providers)', () => {
             const exports = getMeta('exports');
             for (const cls of FACADE_CLASSES) {
                 expect(exports).toContain(cls);
@@ -89,7 +93,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.FacadesModule).toBe(FacadesModule);
         });
 
-        it('re-exports each of the ten facade service classes verbatim', () => {
+        it('re-exports each facade service class verbatim', () => {
             expect(facadesBarrel.AiFacadeService).toBe(AiFacadeService);
             expect(facadesBarrel.SearchFacadeService).toBe(SearchFacadeService);
             expect(facadesBarrel.ScreenshotFacadeService).toBe(ScreenshotFacadeService);
@@ -100,6 +104,9 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.DeployFacadeService).toBe(DeployFacadeService);
             expect(facadesBarrel.CodeEditFacadeService).toBe(CodeEditFacadeService);
             expect(facadesBarrel.PromptFacadeService).toBe(PromptFacadeService);
+            expect(facadesBarrel.SkillsFacadeService).toBe(SkillsFacadeService);
+            expect(facadesBarrel.TasksFacadeService).toBe(TasksFacadeService);
+            expect(facadesBarrel.AgentMemoryFacadeService).toBe(AgentMemoryFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -189,6 +196,9 @@ describe('FacadesModule + barrel re-exports', () => {
                     'SkillsFacadeService',
                     'TasksFacadeError',
                     'TasksFacadeService',
+                    // Agent-Memory facade (default plugin: agentmemory REST :3111).
+                    'AgentMemoryFacadeError',
+                    'AgentMemoryFacadeService',
                 ].sort(),
             );
         });

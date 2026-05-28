@@ -110,6 +110,11 @@ export {
     type NotificationChannelFanoutResult,
 } from './notification-channel.facade';
 
+// Agent-Memory Facade — pluggable persistent memory for agents
+// (default plugin `@ever-works/agentmemory-plugin` talks to a local or
+// hosted `agentmemory` REST server on :3111)
+export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

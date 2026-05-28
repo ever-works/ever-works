@@ -17,6 +17,7 @@ import { SkillsFacadeService } from './skills.facade';
 import { TasksFacadeService } from './tasks.facade';
 import { EmailFacadeService } from './email.facade';
 import { NotificationChannelFacadeService } from './notification-channel.facade';
+import { AgentMemoryFacadeService } from './agent-memory.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -34,6 +35,7 @@ const FACADES = [
     // Notifications v2 (EW-650 + EW-663) — email + multi-channel notifications.
     EmailFacadeService,
     NotificationChannelFacadeService,
+    AgentMemoryFacadeService,
 ];
 
 /**

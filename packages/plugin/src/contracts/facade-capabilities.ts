@@ -44,7 +44,14 @@ export const PLUGIN_CAPABILITIES = {
 	NOTIFICATION_CHANNEL_SLACK: 'notification-channel-slack',
 	NOTIFICATION_CHANNEL_TELEGRAM: 'notification-channel-telegram',
 	NOTIFICATION_CHANNEL_WHATSAPP: 'notification-channel-whatsapp',
-	NOTIFICATION_CHANNEL_NOVU: 'notification-channel-novu'
+	NOTIFICATION_CHANNEL_NOVU: 'notification-channel-novu',
+	// Pluggable persistent memory for AI coding / generation agents.
+	// First-party implementation: `@ever-works/agentmemory-plugin`
+	// (talks to the `agentmemory` standalone Node server on :3111 —
+	// runs locally OR hosted via a configurable `baseUrl` + bearer
+	// token). Community plugins (mem0, zep, langmem) implement the
+	// same `IAgentMemoryPlugin` contract.
+	AGENT_MEMORY: 'agent-memory'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];
