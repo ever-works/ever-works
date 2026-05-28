@@ -90,12 +90,18 @@ const TIER_B_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
  *     all use `userId` per `TIER_A_BACKFILL_TABLES` above; `templates`
  *     has no Tier C child).
  *
- * **Ordering matters**: where a Tier C table's parent is itself a Tier
- * C row (only case today is `agent_run_logs → agent_runs`), the parent
- * must appear FIRST so the parent's scope is already stamped by the
- * time the child UPDATE runs in the same transaction. We achieve this
- * by listing `agent_runs` before `agent_run_logs`. (See the per-table
- * Phase 11 SQL pattern in `upgradeFromAccount`.)
+ * **Ordering note**: where a Tier C table's parent is itself a Tier C
+ * row (only case today is `agent_run_logs → agent_runs`), the parent
+ * must be stamped before the child runs. This guarantee comes from the
+ * loop ORDER in `upgradeFromAccount`, not from array position here:
+ * the direct-user loop (`TIER_C_DIRECT_USER_BACKFILL_TABLES`, which
+ * contains `agent_runs`) runs ENTIRELY before this join-walked loop
+ * (`agent_run_logs`). Note that `agent_run_logs`'s join still filters
+ * on the parent's `userId`, not its freshly-stamped `tenantId`, so it
+ * doesn't actually depend on the parent already being scoped — the
+ * ordering is belt-and-suspenders. **Do NOT add `agent_runs` to this
+ * constant** — it's direct-user and would double-stamp + inflate the
+ * affected-row count.
  *
  * **Direct-user Tier C tables** (`agent_runs`, `skill_bindings`,
  * `usage_ledger_entries`, `plugin_usage_events`, `activity_log`) have
@@ -770,14 +776,14 @@ export class OrganizationService {
             // shape as Tier A — `organizationId IS NULL` excludes
             // already-moved rows.
             //
-            // Postgres `UPDATE ... FROM` is the supported multi-table
-            // UPDATE syntax. SQLite has its own (different) syntax,
-            // but the in-memory tests don't seed Tier C rows so the
-            // SQL never executes there in unit tests; the integration
-            // test path runs against Postgres. We catch + log the
-            // adapter error in case a SQLite-driven test does hit
-            // this with rows present, rather than failing the whole
-            // upgrade.
+            // Uses Postgres `UPDATE ... FROM` (prod is Postgres). We do
+            // NOT wrap these in try/catch: the entire upgrade runs in
+            // one `dataSource.transaction`, so if any statement throws
+            // (e.g. an exotic adapter that rejects the syntax) the whole
+            // upgrade rolls back atomically rather than leaving a
+            // partial backfill — which is the correct failure mode. The
+            // unit tests stub `manager.query` and never seed Tier C
+            // rows, so this SQL only executes for real against Postgres.
             for (const {
                 table,
                 parentTable,
