@@ -486,6 +486,9 @@ export class AiProviderPromptService extends BasePromptService {
             openrouter:
                 'Examples: openai/gpt-5.2, openai/gpt-5-mini, anthropic/claude-opus-4.5, google/gemini-3-flash, meta-llama/llama-3.3-70b-instruct:free',
             ollama: 'Examples: llama3.3, llama3.2, qwen2.5, qwen2.5-coder, deepseek-r1, gemma2, phi4',
+            'lm-studio':
+                'Use the model id currently loaded in LM Studio (e.g. qwen2.5-7b-instruct, llama-3.2-3b-instruct)',
+            vllm: 'Use the model id vLLM was launched with via --model (e.g. meta-llama/Llama-3.1-8B-Instruct)',
             groq: 'Examples: openai/gpt-oss-120b, llama-3.3-70b-versatile, llama-3.1-8b-instant, qwen-qwq-32b',
             custom: 'Enter any model name supported by your OpenAI-compatible endpoint',
         };

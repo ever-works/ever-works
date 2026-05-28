@@ -27,6 +27,8 @@ import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
 import { kbEmbedDocumentTask } from '../tasks/trigger/kb-embed-document.task';
 import { kbOrgOverlayFanoutTask } from '../tasks/trigger/kb-org-overlay-fanout.task';
+import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
+import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
 @Injectable()
 export class TriggerService
@@ -178,6 +180,43 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch webhook-delivery task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * Notifications v2 (EW-663) — enqueue one channel delivery to
+     * Trigger.dev. Returns the run id, or `null` when Trigger.dev is
+     * disabled (`shouldUseTrigger()` false) or the dispatch threw — the
+     * facade's in-process fallback handles both. When `payload.deferUntil`
+     * is set (quiet-hours), the run is scheduled with a `delay` so it
+     * fires at end-of-window.
+     */
+    async dispatchNotificationChannelDelivery(
+        payload: NotificationChannelDeliveryPayload,
+    ): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const delay = payload.deferUntil ? new Date(payload.deferUntil) : undefined;
+            const handle = await notificationChannelDeliveryTask.trigger(payload, {
+                tags: [
+                    'notification-channel-delivery',
+                    `channel:${payload.channelId}`,
+                    ...(payload.eventType ? [`event:${payload.eventType}`] : []),
+                ],
+                machine: this.machine() as any,
+                ...(delay ? { delay } : {}),
+            });
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error(
+                'Failed to dispatch notification-channel-delivery task',
+                error as Error,
+            );
             return null;
         }
     }

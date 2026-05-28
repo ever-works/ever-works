@@ -1,4 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const sendMock = vi.fn();
+const ctorMock = vi.fn();
+
+vi.mock('@slack/webhook', () => ({
+	IncomingWebhook: class {
+		constructor(url: string) {
+			ctorMock(url);
+		}
+		send = sendMock;
+	}
+}));
+
 import { SlackChannelPlugin } from './slack-channel-plugin.js';
 
 describe('SlackChannelPlugin', () => {
@@ -6,6 +19,8 @@ describe('SlackChannelPlugin', () => {
 
 	beforeEach(() => {
 		plugin = new SlackChannelPlugin();
+		sendMock.mockReset();
+		ctorMock.mockReset();
 	});
 
 	it('declares notification-channel + notification-channel-slack', () => {
@@ -34,12 +49,8 @@ describe('SlackChannelPlugin', () => {
 	});
 
 	describe('send', () => {
-		it('POSTs text + blocks to the webhook and returns a synthetic id', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				text: async () => 'ok'
-			} as Response);
+		it('sends text + blocks via the @slack/webhook SDK and returns a synthetic id', async () => {
+			sendMock.mockResolvedValueOnce({ text: 'ok' });
 			const res = await plugin.send(
 				{
 					text: 'build is green',
@@ -51,19 +62,17 @@ describe('SlackChannelPlugin', () => {
 				{}
 			);
 			expect(res.providerMessageId).toBe('slack-ref-1');
-			const [, init] = fetchMock.mock.calls[0];
-			const body = JSON.parse((init as RequestInit).body as string);
-			expect(body.text).toBe('build is green');
-			expect(body.blocks).toEqual([{ type: 'section' }]);
-			fetchMock.mockRestore();
+			expect(ctorMock).toHaveBeenCalledWith('https://hooks.slack.com/services/T/B/x');
+			const message = sendMock.mock.calls[0][0];
+			expect(message.text).toBe('build is green');
+			expect(message.blocks).toEqual([{ type: 'section' }]);
 		});
 
-		it('throws on non-2xx Slack response', async () => {
-			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: false,
-				status: 400,
-				text: async () => 'invalid_payload'
-			} as Response);
+		it('throws on a Slack SDK send error (surfacing the HTTP status)', async () => {
+			sendMock.mockRejectedValueOnce({
+				message: 'invalid_payload',
+				original: { response: { status: 400 } }
+			});
 			await expect(
 				plugin.send(
 					{
@@ -74,15 +83,11 @@ describe('SlackChannelPlugin', () => {
 					},
 					{}
 				)
-			).rejects.toThrow(/Slack webhook failed/);
+			).rejects.toThrow(/Slack webhook failed \(400\): invalid_payload/);
 		});
 
 		it('hits the idempotency cache on repeated messageRef', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
-				ok: true,
-				status: 200,
-				text: async () => 'ok'
-			} as Response);
+			sendMock.mockResolvedValue({ text: 'ok' });
 			const input = {
 				text: 'x',
 				messageRef: 'ref-cache',
@@ -91,8 +96,7 @@ describe('SlackChannelPlugin', () => {
 			};
 			await plugin.send(input, {});
 			await plugin.send(input, {});
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			fetchMock.mockRestore();
+			expect(sendMock).toHaveBeenCalledTimes(1);
 		});
 	});
 });

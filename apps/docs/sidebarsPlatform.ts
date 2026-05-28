@@ -178,6 +178,8 @@ const sidebars: SidebarsConfig = {
 				'plugin-system/openai-plugin',
 				'plugin-system/anthropic-plugin',
 				'plugin-system/ollama-plugin',
+				'plugin-system/lm-studio-plugin',
+				'plugin-system/vllm-plugin',
 				'plugin-system/groq-plugin',
 				'plugin-system/tavily-plugin',
 				'plugin-system/apify-plugin',

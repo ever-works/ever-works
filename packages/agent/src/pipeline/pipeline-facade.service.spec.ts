@@ -181,6 +181,27 @@ describe('PipelineFacadeService', () => {
             expect(ctx.kbContext?.alwaysInjected.map((d) => d.id)).toEqual(['always-doc']);
             expect(ctx.kbContext?.queryRetrieved.map((d) => d.id)).toEqual(['query-doc']);
         });
+
+        // Item #18 — `memorySessionId` carrier so orchestrators (e.g.
+        // `AgentRunService`) can hand the open session through to the
+        // memory-pipeline-modifier.
+        it('forwards the provided memorySessionId into the StepExecutionContext', () => {
+            const ctx = service.createStepExecutionContext(
+                makeWork() as any,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'sess-orchestrator-1',
+            );
+            expect(ctx.memorySessionId).toBe('sess-orchestrator-1');
+        });
+
+        it('leaves memorySessionId undefined when no orchestrator session is supplied', () => {
+            const ctx = service.createStepExecutionContext(makeWork() as any);
+            expect(ctx.memorySessionId).toBeUndefined();
+        });
     });
 
     describe('logger prefix', () => {

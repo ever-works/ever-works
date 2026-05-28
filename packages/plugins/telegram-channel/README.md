@@ -4,7 +4,7 @@ Telegram notification channel for the Ever Works platform.
 
 - **Capabilities**: `notification-channel`, `notification-channel-telegram`
 - **Shape**: `direct` (one chat per channel)
-- **Transport**: Telegram Bot API `sendMessage` (MarkdownV2 via the `telegram-markdown` rich payload kind)
+- **Transport**: official `grammy` SDK (`Api.sendMessage`, a typed Bot-API client with no polling/bot framework; MarkdownV2 via the `telegram-markdown` rich payload kind)
 
 ## Settings (channel-level `targetConfig`)
 

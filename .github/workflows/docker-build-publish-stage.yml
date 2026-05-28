@@ -125,8 +125,13 @@ jobs:
             registry.digitalocean.com/ever/ever-works-web-stage:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-web-stage:latest
           cache-to: type=inline
+          # NEXT_PUBLIC_* must be passed at BUILD time — Next.js bakes them
+          # into the client bundle at `next build`, not at container start.
+          # Reuses the existing POSTHOG_* secrets (same phc_* key, same host).
           build-args: |
             NODE_ENV=production
+            NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_API_KEY }}
+            NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
 
       - name: Docker images list
         run: |

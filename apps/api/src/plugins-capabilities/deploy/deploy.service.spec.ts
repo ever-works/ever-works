@@ -62,6 +62,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         /** EW-120 dual-mode Activity Feed sync. Defaults to `push` to keep
          *  pre-dual-mode tests behaving as before. */
         activitySyncMode?: 'pull' | 'push' | 'disabled';
+        githubPluginOverrides?: Record<string, unknown>;
     }) => {
         const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
@@ -112,6 +113,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             dispatchWorkflow: jest.fn().mockResolvedValue(undefined),
             getRepositoryPublicKey: jest.fn().mockResolvedValue({ key_id: 'k', key: 'pubkey' }),
             enableDeploymentWorkflows: jest.fn().mockResolvedValue(undefined),
+            ...(overrides.githubPluginOverrides ?? {}),
         };
 
         const pluginRegistry = {
@@ -222,6 +224,36 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         const { dispatches } = captureCalls(githubPlugin);
         const workflows = dispatches.map((d: any) => d.workflow);
         expect(workflows).toEqual(['deploy_k8s.yaml']);
+    });
+
+    it('syncs the website template before dispatch when the required workflow is missing', async () => {
+        const notFound = Object.assign(new Error('Not found'), { status: 404 });
+        const getFileContent = jest
+            .fn()
+            .mockRejectedValueOnce(notFound)
+            .mockResolvedValueOnce('name: Kubernetes deploy');
+        const { service, githubPlugin } = buildService({
+            plugin: {
+                id: 'k8s',
+                getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+            },
+            githubPluginOverrides: { getFileContent },
+        });
+        jest.spyOn(service as any, 'delay').mockResolvedValue(undefined);
+
+        const result = await service.deploy('work-1', 'user-1', {});
+
+        expect(result.dispatched).toBe(true);
+        expect(getFileContent).toHaveBeenNthCalledWith(
+            1,
+            'acme',
+            'acme-site',
+            '.github/workflows/deploy_k8s.yaml',
+            'gh-token',
+            'main',
+        );
+        expect(githubPlugin.dispatchWorkflow).toHaveBeenCalledTimes(1);
     });
 
     it('falls back to deploy_prod.yaml for plugins without getWorkflowFilenames', async () => {
