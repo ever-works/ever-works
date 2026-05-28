@@ -318,4 +318,139 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(usernameAllocator.suggest).toHaveBeenCalledWith('alice');
         });
     });
+
+    /**
+     * EW-662 (Phase 10) — Register-Company sub-flow tests.
+     *
+     * Both `registerCompany` and `createOrganizationFromCompanyWork` end
+     * up calling `createOrganization` with a populated `extra` field;
+     * we assert the resulting Org row carries the right registration
+     * metadata (provider, status, legalName, countryCode, linkedWorkId).
+     */
+    describe('registerCompany (EW-662 Phase 10)', () => {
+        it('rejects empty name with ConflictException', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+            await expect(service.registerCompany('u-1', { name: '' })).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            await expect(service.registerCompany('u-1', { name: '   ' })).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('creates Org with manual provider + registered status + supplied metadata', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            const org = (await service.registerCompany('u-1', {
+                name: 'Acme Inc.',
+                countryCode: 'US',
+                legalName: 'Acme, Inc.',
+            })) as unknown as {
+                id: string;
+                slug: string;
+                legalName: string;
+                countryCode: string;
+                registrationProvider: string;
+                registrationStatus: string;
+                linkedWorkId: string | null;
+            };
+
+            expect(org.id).toBe('o-new');
+            expect(org.legalName).toBe('Acme, Inc.');
+            expect(org.countryCode).toBe('US');
+            expect(org.registrationProvider).toBe('manual');
+            expect(org.registrationStatus).toBe('registered');
+            // No backing Work in the manual-completion path — linkedWorkId stays null.
+            expect(org.linkedWorkId).toBeNull();
+        });
+
+        it('defaults legalName to the trimmed name when caller omits it', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            const org = (await service.registerCompany('u-1', {
+                name: '  Globex Holdings  ',
+            })) as unknown as { legalName: string };
+
+            expect(org.legalName).toBe('Globex Holdings');
+        });
+
+        it('passes a slugOverride straight through to the allocator', async () => {
+            const { service, usernameAllocator } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            await service.registerCompany('u-1', {
+                name: 'Acme Inc.',
+                slugOverride: 'acme-corp',
+            });
+
+            expect(usernameAllocator.allocateUsername).toHaveBeenCalledWith('acme-corp');
+        });
+    });
+
+    describe('createOrganizationFromCompanyWork (EW-662 Phase 10)', () => {
+        it('sets linkedWorkId + uses Work.companyName when present', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            const org = (await service.createOrganizationFromCompanyWork(
+                'u-1',
+                {
+                    id: 'w-42',
+                    name: 'acme-website',
+                    companyName: 'Acme Inc.',
+                    companyWebsite: 'https://acme.example',
+                },
+                { countryCode: 'DE' },
+            )) as unknown as {
+                id: string;
+                linkedWorkId: string | null;
+                legalName: string;
+                countryCode: string;
+                registrationProvider: string;
+                registrationStatus: string;
+            };
+
+            expect(org.linkedWorkId).toBe('w-42');
+            expect(org.legalName).toBe('Acme Inc.');
+            expect(org.countryCode).toBe('DE');
+            expect(org.registrationProvider).toBe('manual');
+            expect(org.registrationStatus).toBe('registered');
+        });
+
+        it('falls back to Work.name when companyName is missing', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            const org = (await service.createOrganizationFromCompanyWork('u-1', {
+                id: 'w-7',
+                name: 'Initech',
+            })) as unknown as { linkedWorkId: string; legalName: string };
+
+            expect(org.linkedWorkId).toBe('w-7');
+            // No companyName + no override → legalName defaults to the
+            // (trimmed) display name. This matches `registerCompany`'s
+            // own fallback so the v1 manual-completion path always ends
+            // up with a non-null legalName.
+            expect(org.legalName).toBe('Initech');
+        });
+
+        it('throws ConflictException when the Work has no usable name', async () => {
+            const { service } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+
+            await expect(
+                service.createOrganizationFromCompanyWork('u-1', { id: 'w-x', name: '' }),
+            ).rejects.toBeInstanceOf(ConflictException);
+        });
+    });
 });

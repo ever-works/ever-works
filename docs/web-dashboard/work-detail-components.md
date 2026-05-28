@@ -144,7 +144,7 @@ Renders a horizontal tab navigation bar. Each tab is a link that navigates to a 
 | ------------- | ----------- | ------------------------------------- |
 | `overview`    | Overview    | Always                                |
 | `items`       | Items       | Always                                |
-| `generator`   | Generator   | Always                                |
+| `generator`   | Worker      | Always                                |
 | `schedule`    | Schedule    | Always                                |
 | `history`     | History     | Always                                |
 | `comparisons` | Comparisons | Always                                |
