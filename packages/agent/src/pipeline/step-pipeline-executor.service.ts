@@ -250,6 +250,11 @@ export class StepPipelineExecutorService {
                 if (options?.signal?.aborted) {
                     this.logger.log(`Pipeline cancelled before group ${group.id}`);
                     runner.cancelExecution();
+                    await this.invokeModifierRollbacks(
+                        pipeline,
+                        context,
+                        new Error(`Pipeline cancelled at step: ${group.stepIds[0]}`),
+                    );
                     this.emitPipelineEvent(PipelineEvents.CANCELLED, {
                         workId: work.id,
                     });
@@ -337,6 +342,8 @@ export class StepPipelineExecutorService {
             runner.completeExecution();
             const failedStep = pipeline.steps[currentStepIndex]?.id;
 
+            await this.invokeModifierRollbacks(pipeline, context, error as Error);
+
             this.emitPipelineFailed(
                 work.id,
                 error as Error,
@@ -351,6 +358,43 @@ export class StepPipelineExecutorService {
                 error: error as Error,
                 failedStep,
             });
+        }
+    }
+
+    /**
+     * Invoke `IPipelineModifierPlugin.rollback()` on every modifier that
+     * contributed steps to the current run. Called when the pipeline
+     * fails or is cancelled, so modifiers can do compensating work
+     * (e.g. memory-pipeline-modifier persists a "failed run" observation
+     * the same way it would normally persist a "successful run" digest
+     * at the `last` step — which doesn't fire on failure).
+     *
+     * Each rollback is wrapped in its own try/catch so a faulty modifier
+     * cannot mask the original error or stop other modifiers from
+     * running.
+     */
+    private async invokeModifierRollbacks(
+        pipeline: ExecutablePipeline,
+        context: IPipelineContext,
+        error: Error,
+    ): Promise<void> {
+        const modifierIds = new Set<string>();
+        for (const executor of pipeline.executorMap.values()) {
+            if (executor.type === 'plugin') {
+                modifierIds.add(executor.pluginId);
+            }
+        }
+        for (const pluginId of modifierIds) {
+            const modifier = this.getModifierPluginExecutor(pluginId);
+            if (!modifier?.rollback) continue;
+            try {
+                await modifier.rollback(context, error);
+            } catch (rollbackError) {
+                // Don't let a rollback failure mask the original cause.
+                this.logger.warn(
+                    `Modifier "${pluginId}" rollback failed: ${(rollbackError as Error).message}`,
+                );
+            }
         }
     }
 
