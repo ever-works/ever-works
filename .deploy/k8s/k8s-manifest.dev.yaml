@@ -103,6 +103,18 @@ spec:
             - name: TRIGGER_MACHINE
               value: "$TRIGGER_MACHINE"
 
+            # PostHog (analytics + feature flags) + Sentry (errors + traces).
+            # See knowledge/infrastructure/EVER_WORKS_POSTHOG.md.
+            # SDKs are graceful no-ops when the env var is unset.
+            - name: SENTRY_DSN
+              value: "$SENTRY_DSN"
+            - name: SENTRY_ENVIRONMENT
+              value: "$SENTRY_ENVIRONMENT"
+            - name: POSTHOG_API_KEY
+              value: "$POSTHOG_API_KEY"
+            - name: POSTHOG_HOST
+              value: "$POSTHOG_HOST"
+
             # GitHub Auth
             - name: GH_CLIENT_ID
               value: "$GH_CLIENT_ID"
@@ -342,6 +354,22 @@ spec:
               value: "http://ever-works-api-dev:3100"
             - name: NEXT_PUBLIC_WEB_URL
               value: "https://appdev.ever.works"
+
+            # PostHog (server-side: feature flag eval via apps/web/src/lib/feature-flags)
+            # + Sentry (errors + traces). See knowledge/infrastructure/EVER_WORKS_POSTHOG.md.
+            # NEXT_PUBLIC_POSTHOG_KEY / NEXT_PUBLIC_POSTHOG_HOST are intentionally NOT
+            # set here — Next.js bakes NEXT_PUBLIC_* into the bundle at BUILD time,
+            # so they're plumbed through the docker-build workflow's build-args
+            # (see .github/workflows/docker-build-publish-dev.yml) and the web
+            # Dockerfile's ARG/ENV declarations.
+            - name: SENTRY_DSN
+              value: "$SENTRY_DSN"
+            - name: SENTRY_ENVIRONMENT
+              value: "$SENTRY_ENVIRONMENT"
+            - name: POSTHOG_API_KEY
+              value: "$POSTHOG_API_KEY"
+            - name: POSTHOG_HOST
+              value: "$POSTHOG_HOST"
           ports:
             - containerPort: 3000
               protocol: TCP

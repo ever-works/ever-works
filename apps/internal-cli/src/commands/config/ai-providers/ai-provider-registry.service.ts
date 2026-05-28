@@ -149,6 +149,48 @@ export class AiProviderRegistryService {
             docsUrl: 'https://github.com/ollama/ollama',
         });
 
+        this.providers.set('lm-studio', {
+            name: 'lm-studio',
+            displayName: 'LM Studio',
+            description: 'Local AI models through LM Studio (free)',
+            defaults: {
+                model: 'local-model',
+                temperature: 0.7,
+                maxTokens: 4096,
+                baseUrl: 'http://localhost:1234/v1',
+            },
+            requiresApiKey: false,
+            models: [
+                'qwen2.5-7b-instruct',
+                'llama-3.2-3b-instruct',
+                'mistral-7b-instruct',
+                'gemma-2-9b-it',
+                'phi-4',
+            ],
+            websiteUrl: 'https://lmstudio.ai',
+            docsUrl: 'https://lmstudio.ai/docs',
+        });
+
+        this.providers.set('vllm', {
+            name: 'vllm',
+            displayName: 'vLLM',
+            description: 'Self-hosted high-throughput inference via vLLM',
+            defaults: {
+                model: 'local-model',
+                temperature: 0.7,
+                maxTokens: 4096,
+                baseUrl: 'http://localhost:8000/v1',
+            },
+            requiresApiKey: false,
+            models: [
+                'meta-llama/Llama-3.1-8B-Instruct',
+                'Qwen/Qwen2.5-7B-Instruct',
+                'mistralai/Mistral-7B-Instruct-v0.3',
+            ],
+            websiteUrl: 'https://docs.vllm.ai',
+            docsUrl: 'https://docs.vllm.ai',
+        });
+
         // Groq
         this.providers.set('groq', {
             name: 'groq',

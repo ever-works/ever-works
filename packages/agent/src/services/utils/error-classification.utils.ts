@@ -121,6 +121,9 @@ function detectAiProvider(error: string): string {
     if (error.includes('google') || error.includes('gemini')) return 'Google';
     if (error.includes('groq')) return 'Groq';
     if (error.includes('ollama')) return 'Ollama';
+    if (error.includes('lm-studio') || error.includes('lmstudio') || error.includes('lm studio'))
+        return 'LM Studio';
+    if (error.includes('vllm')) return 'vLLM';
     if (error.includes('openrouter')) return 'OpenRouter';
     return 'AI Provider';
 }

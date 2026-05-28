@@ -10,6 +10,11 @@ import {
     KB_EMBED_DOCUMENT_DISPATCHER,
     KB_ORG_OVERLAY_FANOUT_DISPATCHER,
 } from '@ever-works/agent/tasks';
+import {
+    NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+    type NotificationChannelDeliveryDispatcher,
+    type NotificationChannelDeliveryPayload,
+} from '@ever-works/agent/facades';
 
 @Global()
 @Module({
@@ -47,6 +52,20 @@ import {
             provide: KB_ORG_OVERLAY_FANOUT_DISPATCHER,
             useExisting: TriggerService,
         },
+        // Notifications v2 (EW-663) — the facade's delivery dispatcher
+        // contract is `enqueue(payload) → { runId }`, so a thin adapter
+        // bridges to TriggerService.dispatchNotificationChannelDelivery
+        // (which returns the run id, or null when Trigger is disabled →
+        // the facade falls back to in-process delivery).
+        {
+            provide: NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+            useFactory: (trigger: TriggerService): NotificationChannelDeliveryDispatcher => ({
+                async enqueue(payload: NotificationChannelDeliveryPayload) {
+                    return { runId: await trigger.dispatchNotificationChannelDelivery(payload) };
+                },
+            }),
+            inject: [TriggerService],
+        },
     ],
     exports: [
         TriggerService,
@@ -58,6 +77,7 @@ import {
         KB_BACKFILL_SKELETON_DISPATCHER,
         KB_EMBED_DOCUMENT_DISPATCHER,
         KB_ORG_OVERLAY_FANOUT_DISPATCHER,
+        NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
     ],
 })
 export class TriggerModule {}

@@ -148,6 +148,44 @@ describe('UserNotificationSubscriptionService', () => {
             'in-app',
         ]);
     });
+
+    it('resolvePlan DEFERS non-in-app channels during quiet hours (does not drop them)', async () => {
+        eventTypes.findByKey.mockResolvedValue({
+            key: 'work_generation_finished',
+            category: 'generation',
+            urgent: false,
+            defaultChannels: ['in-app'],
+        });
+        subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'channel-1'] });
+        mutes.isMuted.mockResolvedValue(false);
+        preferences.findByUser.mockResolvedValue({
+            quietHoursStart: '00:00:00',
+            quietHoursEnd: '23:59:59',
+            timezone: 'UTC',
+        });
+
+        const plan = await service.resolvePlan('u', 'work_generation_finished');
+        expect(plan.immediate).toEqual(['in-app']);
+        expect(plan.deferred).toEqual(['channel-1']);
+        expect(typeof plan.deferUntil).toBe('string');
+        expect(new Date(plan.deferUntil!).getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('resolvePlan leaves deferred empty outside quiet hours', async () => {
+        eventTypes.findByKey.mockResolvedValue({
+            key: 'work_generation_finished',
+            category: 'generation',
+            urgent: false,
+            defaultChannels: ['in-app'],
+        });
+        subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'channel-1'] });
+        mutes.isMuted.mockResolvedValue(false);
+        preferences.findByUser.mockResolvedValue(null); // no quiet hours configured
+        const plan = await service.resolvePlan('u', 'work_generation_finished');
+        expect(plan.immediate).toEqual(['in-app', 'channel-1']);
+        expect(plan.deferred).toEqual([]);
+        expect(plan.deferUntil).toBeUndefined();
+    });
 });
 
 describe('isWithinQuietHours', () => {

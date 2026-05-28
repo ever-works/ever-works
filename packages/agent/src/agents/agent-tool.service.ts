@@ -606,9 +606,10 @@ export class AgentToolService {
         {
             to: string[];
             subject: string;
-            bodyText: string;
+            bodyText?: string;
             cc?: string[];
             bodyHtml?: string;
+            template?: { slug: string; props: Record<string, unknown> };
             fromAddressId?: string;
         },
         AgentSendEmailResult
@@ -616,7 +617,7 @@ export class AgentToolService {
         return {
             name: 'sendEmail',
             description:
-                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Returns the provider message id plus accepted/rejected recipient lists. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
+                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Provide either bodyText (optionally bodyHtml) OR a template to render. Returns the provider message id plus accepted/rejected recipient lists. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
             parameters: {
                 type: 'object',
                 properties: {
@@ -626,7 +627,10 @@ export class AgentToolService {
                         description: 'Recipient email addresses (RFC 5321 mailboxes).',
                     },
                     subject: { type: 'string', description: 'Email subject line.' },
-                    bodyText: { type: 'string', description: 'Plain-text body (always required).' },
+                    bodyText: {
+                        type: 'string',
+                        description: 'Plain-text body. Required unless `template` is provided.',
+                    },
                     cc: {
                         type: 'array',
                         items: { type: 'string' },
@@ -636,13 +640,18 @@ export class AgentToolService {
                         type: 'string',
                         description: 'Optional HTML body. When omitted, bodyText is sent as-is.',
                     },
+                    template: {
+                        type: 'object',
+                        description:
+                            'Render a registered React-Email template server-side instead of raw bodies (mutually exclusive with bodyText/bodyHtml). Shape: { slug: string (e.g. "agent-summary" | "agent-message"), props: object (fields depend on the slug) }.',
+                    },
                     fromAddressId: {
                         type: 'string',
                         description:
                             "Optional tenant_email_addresses id to send from. Defaults to the agent's primary (lowest-priority) outbound assignment.",
                     },
                 },
-                required: ['to', 'subject', 'bodyText'],
+                required: ['to', 'subject'],
             },
             invoke: async (args) => {
                 if (!Array.isArray(args?.to) || args.to.length === 0) {
@@ -651,8 +660,10 @@ export class AgentToolService {
                 if (!args?.subject || args.subject.trim().length === 0) {
                     return { error: 'subject is required.' };
                 }
-                if (!args?.bodyText || args.bodyText.trim().length === 0) {
-                    return { error: 'bodyText is required.' };
+                const hasBody = !!args?.bodyText && args.bodyText.trim().length > 0;
+                const hasTemplate = !!args?.template?.slug;
+                if (!hasBody && !hasTemplate) {
+                    return { error: 'Provide bodyText or a template.' };
                 }
                 try {
                     return await this.emailFacade!.sendEmail({
@@ -664,6 +675,7 @@ export class AgentToolService {
                         subject: args.subject,
                         bodyText: args.bodyText,
                         bodyHtml: args.bodyHtml,
+                        template: args.template,
                         fromAddressId: args.fromAddressId,
                     });
                 } catch (err) {

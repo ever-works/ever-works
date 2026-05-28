@@ -1,3 +1,4 @@
+import { IncomingWebhook } from '@slack/webhook';
 import type {
 	INotificationChannelPlugin,
 	ChannelSendInput,
@@ -26,9 +27,12 @@ function getWebhookUrl(config: ChannelTargetConfig): string {
  * webhook URL. Block Kit blocks are forwarded when the caller supplies
  * the `slack-blocks` rich payload kind.
  *
- * Slack incoming webhooks return the literal string `ok` on success
- * (no message id), so `providerMessageId` is synthesized from the
- * idempotency `messageRef`.
+ * Built on the official `@slack/webhook` SDK (`IncomingWebhook`) — the
+ * vendor SDK for the incoming-webhook mechanism this channel uses
+ * (`@slack/web-api` is the bot-token `chat.postMessage` path, a
+ * different config contract). Incoming webhooks return the literal
+ * string `ok` on success (no message id), so `providerMessageId` is
+ * synthesized from the idempotency `messageRef`.
  */
 export class SlackChannelPlugin implements INotificationChannelPlugin {
 	readonly id = 'slack-channel';
@@ -88,22 +92,19 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 			(typeof options.settings?.defaultIconEmoji === 'string' ? options.settings.defaultIconEmoji : undefined) ??
 			(typeof config.iconEmoji === 'string' ? (config.iconEmoji as string) : undefined);
 
-		const body: Record<string, unknown> = { text: payload.text };
-		if (username) body.username = username;
-		if (iconEmoji) body.icon_emoji = iconEmoji;
+		const message: Record<string, unknown> = { text: payload.text };
+		if (username) message.username = username;
+		if (iconEmoji) message.icon_emoji = iconEmoji;
 		if (payload.rich?.kind === 'slack-blocks') {
-			body.blocks = payload.rich.payload;
+			message.blocks = payload.rich.payload;
 		}
 
-		const response = await fetch(webhookUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
-
-		if (!response.ok) {
-			const text = await response.text().catch(() => '');
-			throw new Error(`Slack webhook failed (${response.status}): ${text}`);
+		try {
+			await new IncomingWebhook(webhookUrl).send(message);
+		} catch (err) {
+			const e = err as { message?: string; original?: { response?: { status?: number } } };
+			const status = e.original?.response?.status ?? 'error';
+			throw new Error(`Slack webhook failed (${status}): ${e.message ?? 'unknown error'}`);
 		}
 		// Success body is the literal "ok"; no id to capture.
 		const result: ChannelSendResult = {

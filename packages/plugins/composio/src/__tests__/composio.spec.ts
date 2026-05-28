@@ -1,24 +1,29 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ComposioPlugin } from '../composio.plugin.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
-type ResponseFactory = () => Response;
+/**
+ * Hoisted SDK mocks. Each is a freshly-created `vi.fn()` that the tests
+ * configure via `mockResolvedValueOnce` / `mockRejectedValueOnce`. The mock
+ * constructor returns an object that exposes these exact spies as
+ * `toolkits.get`, `connectedAccounts.list`, `tools.execute` — matching the
+ * `ComposioSdkLike` shape consumed by `ComposioClient`.
+ */
+const { mockToolkitsGet, mockConnectedAccountsList, mockToolsExecute } = vi.hoisted(() => ({
+	mockToolkitsGet: vi.fn(),
+	mockConnectedAccountsList: vi.fn(),
+	mockToolsExecute: vi.fn()
+}));
 
-function jsonResponse(body: unknown, status = 200): ResponseFactory {
-	return () =>
-		new Response(JSON.stringify(body), {
-			status,
-			headers: { 'content-type': 'application/json' }
-		});
-}
+vi.mock('@composio/core', () => ({
+	Composio: vi.fn().mockImplementation(() => ({
+		toolkits: { get: mockToolkitsGet },
+		connectedAccounts: { list: mockConnectedAccountsList },
+		tools: { execute: mockToolsExecute }
+	}))
+}));
 
-function rawResponse(text: string, status = 200): ResponseFactory {
-	return () =>
-		new Response(text, {
-			status,
-			headers: { 'content-type': 'text/plain' }
-		});
-}
+// Import after vi.mock so the plugin's ComposioClient picks up the mocked SDK.
+const { ComposioPlugin } = await import('../composio.plugin.js');
 
 function createMockContext(settingsOverride?: Record<string, unknown>): PluginContext {
 	const settings = settingsOverride ?? { apiKey: 'test-key' };
@@ -99,39 +104,28 @@ function errorMessage(error: Error | string | undefined): string {
 	return typeof error === 'string' ? error : error.message;
 }
 
-/**
- * Stubs the global fetch with sequential response factories. Each factory
- * is invoked per call so a fresh `Response` (with an unread body stream) is
- * returned — module-scoped `Response` instances would otherwise throw
- * `Body is unusable` on the second test that touches them.
- */
-function stubFetchSequence(factories: ResponseFactory[]): ReturnType<typeof vi.fn> {
-	const spy = vi.fn();
-	for (const factory of factories) {
-		spy.mockImplementationOnce(async () => factory());
-	}
-	// Any further calls return an empty success envelope so tests don't hang.
-	spy.mockImplementation(async () => jsonResponse({ items: [] })());
-	(globalThis as { fetch: typeof fetch }).fetch = spy as unknown as typeof fetch;
-	return spy;
+const ACTIVE_GMAIL_ACCOUNTS = {
+	items: [{ id: 'ca_active', status: 'ACTIVE', toolkit: { slug: 'GMAIL' } }]
+};
+
+/** Helper: stage the SDK with an active connection + a successful tool response. */
+function stageHappyPath(toolData: unknown): void {
+	mockConnectedAccountsList.mockResolvedValueOnce(ACTIVE_GMAIL_ACCOUNTS);
+	mockToolsExecute.mockResolvedValueOnce({ successful: true, data: toolData });
 }
 
-const ACTIVE_GMAIL_ACCOUNT: ResponseFactory = jsonResponse({
-	items: [{ id: 'ca_active', status: 'ACTIVE', toolkit: { slug: 'GMAIL' } }]
-});
+function sdkError(status: number, message: string): Error {
+	const err = new Error(message);
+	(err as { status?: number }).status = status;
+	return err;
+}
 
 describe('ComposioPlugin', () => {
-	let plugin: ComposioPlugin;
-	let originalFetch: typeof fetch;
+	let plugin: InstanceType<typeof ComposioPlugin>;
 
 	beforeEach(() => {
 		plugin = new ComposioPlugin();
-		originalFetch = globalThis.fetch;
 		vi.clearAllMocks();
-	});
-
-	afterEach(() => {
-		(globalThis as { fetch: typeof fetch }).fetch = originalFetch;
 	});
 
 	describe('metadata', () => {
@@ -161,7 +155,6 @@ describe('ComposioPlugin', () => {
 
 		it('does not put tool selection in plugin settings (per-run config only)', () => {
 			const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
-			// We DO have defaults, but per-tool fields live in the generator form
 			expect(props.toolkit).toBeUndefined();
 			expect(props.tool_slug).toBeUndefined();
 		});
@@ -297,13 +290,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('executes a structured-shape tool and returns items', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({
-					successful: true,
-					data: { items: [{ name: 'A', url: 'https://a' }, { name: 'B' }] }
-				})
-			]);
+			stageHappyPath({ items: [{ name: 'A', url: 'https://a' }, { name: 'B' }] });
 
 			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 
@@ -312,29 +299,24 @@ describe('ComposioPlugin', () => {
 			expect(result.stepsCompleted).toBeGreaterThan(0);
 		});
 
-		it('calls /tools/execute/{slug} with the resolved user_id and arguments', async () => {
-			const spy = stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({ successful: true, data: { items: [{ name: 'X' }] } })
-			]);
+		it('calls sdk.tools.execute with the resolved userId and arguments', async () => {
+			stageHappyPath({ items: [{ name: 'X' }] });
 
 			await plugin.execute(createWork(), createRequest(), createExisting());
 
-			const execCall = spy.mock.calls.find(
-				([url]) => typeof url === 'string' && url.includes('/tools/execute/')
-			)!;
-			expect(execCall).toBeDefined();
-			expect(execCall[0]).toContain('/tools/execute/GMAIL_LIST_MESSAGES');
-			const body = JSON.parse((execCall[1] as { body: string }).body);
-			expect(body.user_id).toBe('user-456'); // defaults to ever works user id
-			expect(body.arguments.metadata.workSlug).toBe('test-work');
+			expect(mockToolsExecute).toHaveBeenCalledWith(
+				'GMAIL_LIST_MESSAGES',
+				expect.objectContaining({
+					userId: 'user-456', // defaults to ever works user id
+					arguments: expect.objectContaining({
+						metadata: expect.objectContaining({ workSlug: 'test-work' })
+					})
+				})
+			);
 		});
 
 		it('honors composio_user_id override', async () => {
-			const spy = stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({ successful: true, data: { items: [{ name: 'X' }] } })
-			]);
+			stageHappyPath({ items: [{ name: 'X' }] });
 
 			await plugin.execute(
 				createWork(),
@@ -348,15 +330,14 @@ describe('ComposioPlugin', () => {
 				createExisting()
 			);
 
-			const execCall = spy.mock.calls.find(
-				([url]) => typeof url === 'string' && url.includes('/tools/execute/')
-			)!;
-			const body = JSON.parse((execCall[1] as { body: string }).body);
-			expect(body.user_id).toBe('alice@example.com');
+			expect(mockToolsExecute).toHaveBeenCalledWith(
+				'GMAIL_LIST_MESSAGES',
+				expect.objectContaining({ userId: 'alice@example.com' })
+			);
 		});
 
 		it('completes successfully for a side-effect tool with no items', async () => {
-			stubFetchSequence([ACTIVE_GMAIL_ACCOUNT, jsonResponse({ successful: true, data: { ok: true } })]);
+			stageHappyPath({ ok: true });
 
 			const result = await plugin.execute(
 				createWork(),
@@ -376,13 +357,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('deduplicates items against existing names', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({
-					successful: true,
-					data: { items: [{ name: 'Alice' }, { name: 'Bob' }] }
-				})
-			]);
+			stageHappyPath({ items: [{ name: 'Alice' }, { name: 'Bob' }] });
 
 			const result = await plugin.execute(
 				createWork(),
@@ -395,9 +370,9 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('returns failure when no ACTIVE connected account exists', async () => {
-			stubFetchSequence([
-				jsonResponse({ items: [{ id: 'ca_x', status: 'EXPIRED', toolkit: { slug: 'GMAIL' } }] })
-			]);
+			mockConnectedAccountsList.mockResolvedValueOnce({
+				items: [{ id: 'ca_x', status: 'EXPIRED', toolkit: { slug: 'GMAIL' } }]
+			});
 
 			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 			expect(result.success).toBe(false);
@@ -416,10 +391,8 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('surfaces Composio successful=false envelope as an error', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({ successful: false, error: 'gmail quota exceeded' })
-			]);
+			mockConnectedAccountsList.mockResolvedValueOnce(ACTIVE_GMAIL_ACCOUNTS);
+			mockToolsExecute.mockResolvedValueOnce({ successful: false, error: 'gmail quota exceeded' });
 
 			const result = await plugin.execute(createWork(), createRequest(), createExisting());
 			expect(result.success).toBe(false);
@@ -427,15 +400,9 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('executes a native-shape tool with field mapping', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({
-					successful: true,
-					data: [
-						{ subject: 'Alice', link: 'https://alice', labels: ['important'] },
-						{ subject: 'Bob', link: 'https://bob' }
-					]
-				})
+			stageHappyPath([
+				{ subject: 'Alice', link: 'https://alice', labels: ['important'] },
+				{ subject: 'Bob', link: 'https://bob' }
 			]);
 
 			const result = await plugin.execute(
@@ -460,10 +427,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('exposes pipeline state after execution', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({ successful: true, data: { items: [{ name: 'A' }] } })
-			]);
+			stageHappyPath({ items: [{ name: 'A' }] });
 
 			await plugin.execute(createWork(), createRequest(), createExisting());
 			const state = plugin.getState();
@@ -484,7 +448,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('succeeds when API key is accepted (no default toolkit set)', async () => {
-			stubFetchSequence([jsonResponse({ items: [{ slug: 'GMAIL', name: 'Gmail' }] })]);
+			mockToolkitsGet.mockResolvedValueOnce({ items: [{ slug: 'GMAIL', name: 'Gmail' }] });
 
 			const result = await plugin.validateConnection({ apiKey: 'test-key' });
 			expect(result.success).toBe(true);
@@ -492,10 +456,8 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('reports ACTIVE account for the default toolkit + user', async () => {
-			stubFetchSequence([
-				jsonResponse({ items: [{ slug: 'GMAIL' }] }),
-				jsonResponse({ items: [{ id: 'ca_a', status: 'ACTIVE' }] })
-			]);
+			mockToolkitsGet.mockResolvedValueOnce({ items: [{ slug: 'GMAIL' }] });
+			mockConnectedAccountsList.mockResolvedValueOnce({ items: [{ id: 'ca_a', status: 'ACTIVE' }] });
 
 			const result = await plugin.validateConnection({
 				apiKey: 'test-key',
@@ -508,7 +470,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('flattens wrapped settings values', async () => {
-			stubFetchSequence([jsonResponse({ items: [] })]);
+			mockToolkitsGet.mockResolvedValueOnce({ items: [] });
 
 			const result = await plugin.validateConnection({
 				apiKey: { value: 'wrapped-key' }
@@ -518,7 +480,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('reports underlying error when toolkit listing fails', async () => {
-			stubFetchSequence([rawResponse('forbidden', 403)]);
+			mockToolkitsGet.mockRejectedValueOnce(sdkError(403, 'forbidden'));
 
 			const result = await plugin.validateConnection({ apiKey: 'test-key' });
 			expect(result.success).toBe(false);

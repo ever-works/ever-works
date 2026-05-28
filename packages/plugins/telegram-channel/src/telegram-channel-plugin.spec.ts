@@ -1,4 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const sendMessageMock = vi.fn();
+const getMeMock = vi.fn();
+const ctorMock = vi.fn();
+
+vi.mock('grammy', () => ({
+	Api: class {
+		constructor(token: string) {
+			ctorMock(token);
+		}
+		sendMessage = sendMessageMock;
+		getMe = getMeMock;
+	}
+}));
+
 import { TelegramChannelPlugin } from './telegram-channel-plugin.js';
 
 describe('TelegramChannelPlugin', () => {
@@ -6,6 +21,9 @@ describe('TelegramChannelPlugin', () => {
 
 	beforeEach(() => {
 		plugin = new TelegramChannelPlugin();
+		sendMessageMock.mockReset();
+		getMeMock.mockReset();
+		ctorMock.mockReset();
 	});
 
 	it('declares notification-channel + notification-channel-telegram (direct shape)', () => {
@@ -16,22 +34,15 @@ describe('TelegramChannelPlugin', () => {
 
 	describe('verifyTarget', () => {
 		it('returns valid when getMe succeeds', async () => {
-			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				json: async () => ({ ok: true, result: { id: 42, username: ' everworks_bot' } })
-			} as Response);
+			getMeMock.mockResolvedValueOnce({ id: 42, username: 'everworks_bot' });
 			const res = await plugin.verifyTarget({ botToken: 'tok', chatId: '123' }, {});
 			expect(res.valid).toBe(true);
-			expect(res.details).toMatchObject({ botId: 42, username: ' everworks_bot' });
+			expect(res.details).toMatchObject({ botId: 42, username: 'everworks_bot' });
+			expect(ctorMock).toHaveBeenCalledWith('tok');
 		});
 
 		it('returns invalid when getMe rejects the token', async () => {
-			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: false,
-				status: 401,
-				json: async () => ({ ok: false, description: 'Unauthorized' })
-			} as Response);
+			getMeMock.mockRejectedValueOnce({ error_code: 401, description: 'Unauthorized' });
 			const res = await plugin.verifyTarget({ botToken: 'bad', chatId: '123' }, {});
 			expect(res.valid).toBe(false);
 			expect(res.message).toMatch(/Unauthorized/);
@@ -44,12 +55,8 @@ describe('TelegramChannelPlugin', () => {
 	});
 
 	describe('send', () => {
-		it('POSTs sendMessage + returns the telegram message id', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 555 } })
-			} as Response);
+		it('sends via the grammy Api and returns the telegram message id', async () => {
+			sendMessageMock.mockResolvedValueOnce({ message_id: 555 });
 			const res = await plugin.send(
 				{
 					text: 'deploy done',
@@ -60,20 +67,14 @@ describe('TelegramChannelPlugin', () => {
 				{}
 			);
 			expect(res.providerMessageId).toBe('555');
-			const [url, init] = fetchMock.mock.calls[0];
-			expect(url).toContain('/bottok/sendMessage');
-			const body = JSON.parse((init as RequestInit).body as string);
-			expect(body.chat_id).toBe('123');
-			expect(body.text).toBe('deploy done');
-			fetchMock.mockRestore();
+			expect(ctorMock).toHaveBeenCalledWith('tok');
+			const [chatId, text] = sendMessageMock.mock.calls[0];
+			expect(chatId).toBe('123');
+			expect(text).toBe('deploy done');
 		});
 
 		it('forwards MarkdownV2 for the telegram-markdown rich kind', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: true,
-				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 1 } })
-			} as Response);
+			sendMessageMock.mockResolvedValueOnce({ message_id: 1 });
 			await plugin.send(
 				{
 					text: 'fallback',
@@ -84,18 +85,13 @@ describe('TelegramChannelPlugin', () => {
 				},
 				{}
 			);
-			const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
-			expect(body.parse_mode).toBe('MarkdownV2');
-			expect(body.text).toBe('*bold*');
-			fetchMock.mockRestore();
+			const [, text, other] = sendMessageMock.mock.calls[0];
+			expect(text).toBe('*bold*');
+			expect(other.parse_mode).toBe('MarkdownV2');
 		});
 
-		it('throws when Telegram returns ok:false', async () => {
-			vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-				ok: false,
-				status: 400,
-				json: async () => ({ ok: false, error_code: 400, description: 'chat not found' })
-			} as Response);
+		it('throws when the grammy Api send rejects (surfacing error_code + description)', async () => {
+			sendMessageMock.mockRejectedValueOnce({ error_code: 400, description: 'chat not found' });
 			await expect(
 				plugin.send(
 					{
@@ -106,15 +102,11 @@ describe('TelegramChannelPlugin', () => {
 					},
 					{}
 				)
-			).rejects.toThrow(/Telegram sendMessage failed/);
+			).rejects.toThrow(/Telegram sendMessage failed \(400\): chat not found/);
 		});
 
 		it('hits the idempotency cache on repeated messageRef', async () => {
-			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
-				ok: true,
-				status: 200,
-				json: async () => ({ ok: true, result: { message_id: 9 } })
-			} as Response);
+			sendMessageMock.mockResolvedValue({ message_id: 9 });
 			const input = {
 				text: 'x',
 				messageRef: 'ref-cache',
@@ -123,8 +115,7 @@ describe('TelegramChannelPlugin', () => {
 			};
 			await plugin.send(input, {});
 			await plugin.send(input, {});
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			fetchMock.mockRestore();
+			expect(sendMessageMock).toHaveBeenCalledTimes(1);
 		});
 	});
 });

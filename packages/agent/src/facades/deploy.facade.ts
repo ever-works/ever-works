@@ -94,6 +94,20 @@ export class DeployFacadeService implements IDeployFacade {
         private readonly workPluginRepository?: WorkPluginRepository,
     ) {}
 
+    resolveProviderId(providerId: string): string {
+        return resolvePluginProviderId(providerId);
+    }
+
+    getProviderName(providerId: string | undefined): string {
+        if (!providerId) return 'Deployment';
+
+        const resolvedProviderId = resolvePluginProviderId(providerId);
+        const registered = this.registry.get(resolvedProviderId);
+        const plugin = registered?.plugin as IDeploymentPlugin | undefined;
+
+        return plugin?.name || plugin?.providerName || providerId;
+    }
+
     /**
      * Check if deployment is configured for a work
      */
@@ -132,14 +146,15 @@ export class DeployFacadeService implements IDeployFacade {
         userId: string,
         workId?: string,
     ): Promise<boolean> {
-        const registered = this.registry.get(providerId);
+        const resolvedProviderId = resolvePluginProviderId(providerId);
+        const registered = this.registry.get(resolvedProviderId);
         if (!registered || registered.state !== 'loaded') {
             return false;
         }
         if (!registered.manifest.capabilities.includes(this.CAPABILITY)) {
             return false;
         }
-        return !!(await this.getTokenFromSettings(providerId, userId, workId));
+        return !!(await this.getTokenFromSettings(resolvedProviderId, userId, workId));
     }
 
     /**
@@ -574,7 +589,8 @@ export class DeployFacadeService implements IDeployFacade {
         if (!domain.verified) return;
 
         // Only promote to primary URL if current website is auto-assigned or unset
-        const isAutoAssigned = !work.website || work.website.endsWith('.vercel.app');
+        const currentHost = this.extractHostname(work.website);
+        const isAutoAssigned = !currentHost || this.isAutoAssignedDomain(currentHost);
         if (!isAutoAssigned) return;
 
         await this.workRepository.update(work.id, {
@@ -582,8 +598,34 @@ export class DeployFacadeService implements IDeployFacade {
         });
     }
 
+    private extractHostname(value?: string | null): string | undefined {
+        if (!value) return undefined;
+        try {
+            return new URL(value).hostname.toLowerCase();
+        } catch {
+            return (
+                value
+                    .replace(/^https?:\/\//, '')
+                    .split('/')[0]
+                    ?.toLowerCase() || undefined
+            );
+        }
+    }
+
     private isAutoAssignedDomain(domain: string): boolean {
-        return domain.endsWith('.vercel.app');
+        const host = this.extractHostname(domain);
+        if (!host) return false;
+
+        const everWorksDomain = (process.env.EVER_WORKS_DOMAIN || 'ever.works')
+            .trim()
+            .replace(/^\.+|\.+$/g, '')
+            .toLowerCase();
+
+        return (
+            host.endsWith('.vercel.app') ||
+            (Boolean(everWorksDomain) &&
+                (host === everWorksDomain || host.endsWith(`.${everWorksDomain}`)))
+        );
     }
 
     private sortDomainsForDisplay(domains: DeploymentDomain[]): DeploymentDomain[] {

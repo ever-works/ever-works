@@ -22,6 +22,15 @@ type DeploymentTerminalState = 'READY' | 'ERROR' | 'CANCELED' | 'TIMEOUT';
 const isTerminalState = (state: DeploymentReadyState): state is DeploymentTerminalState =>
     state === 'READY' || state === 'ERROR' || state === 'CANCELED' || state === 'TIMEOUT';
 
+const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
+const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
+function resolveDeployProviderId(providerId: string): string {
+    return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
+        ? KUBERNETES_DEPLOY_PROVIDER_ID
+        : providerId;
+}
+
 /**
  * DeploymentVerifierService monitors deployment progress and updates work status.
  *
@@ -224,7 +233,7 @@ export class DeploymentVerifierService {
         const providerId = work.deployProvider;
         if (!providerId) return;
 
-        const registered = this.pluginRegistry.get(providerId);
+        const registered = this.pluginRegistry.get(resolveDeployProviderId(providerId));
         const plugin = registered?.plugin as IDeploymentPlugin | undefined;
         const providerName = plugin?.providerName ?? plugin?.name ?? providerId;
 

@@ -209,6 +209,25 @@ describe('DeployController', () => {
             });
         });
 
+        it('treats ever-works as available when the k8s plugin is loaded', async () => {
+            deployFacade.getAvailableProviders.mockReturnValue([
+                { id: 'k8s', name: 'Kubernetes', enabled: true },
+            ]);
+            deployFacade.isProviderConfigured.mockResolvedValue(true);
+
+            const result = await controller.isProviderConfigured(auth, 'ever-works');
+
+            expect(deployFacade.isProviderConfigured).toHaveBeenCalledWith(
+                'ever-works',
+                'caller-1',
+            );
+            expect(result).toMatchObject({
+                configured: true,
+                available: true,
+                enabled: true,
+            });
+        });
+
         it('returns configured:false with the not-configured-message when enabled but unconfigured', async () => {
             deployFacade.getAvailableProviders.mockReturnValue([
                 { id: 'vercel', name: 'Vercel', enabled: true },

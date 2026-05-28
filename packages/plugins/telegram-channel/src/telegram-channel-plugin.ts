@@ -1,3 +1,4 @@
+import { Api } from 'grammy';
 import type {
 	INotificationChannelPlugin,
 	ChannelSendInput,
@@ -10,8 +11,6 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-
-const TELEGRAM_API_BASE = 'https://api.telegram.org';
 
 interface TelegramTarget {
 	botToken: string;
@@ -30,23 +29,20 @@ function getTarget(config: ChannelTargetConfig): TelegramTarget {
 	return { botToken, chatId };
 }
 
-interface TelegramSendResponse {
-	ok: boolean;
-	result?: { message_id: number };
-	description?: string;
-	error_code?: number;
-}
-
-interface TelegramGetMeResponse {
-	ok: boolean;
-	result?: { id: number; username?: string; first_name?: string };
-	description?: string;
+/** Telegram Bot API errors carry an error_code + description. */
+function describeError(err: unknown): { code: number | string; message: string } {
+	const e = err as { error_code?: number; description?: string; message?: string };
+	return {
+		code: e.error_code ?? 'error',
+		message: e.description ?? e.message ?? 'unknown error'
+	};
 }
 
 /**
- * Telegram notification channel — sends via the Bot API `sendMessage`
- * method. `chatId` is the destination chat; discover it by having the
- * user message the bot then reading `getUpdates` (see README).
+ * Telegram notification channel — sends via the official `grammy`
+ * SDK's lightweight `Api` client (typed Bot API calls, no bot/polling
+ * framework). `chatId` is the destination chat; discover it by having
+ * the user message the bot then reading `getUpdates` (see README).
  *
  * MarkdownV2 is forwarded when the caller supplies the
  * `telegram-markdown` rich payload kind.
@@ -88,22 +84,10 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 			return { valid: false, message: 'chatId is required' };
 		}
 		try {
-			const response = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/getMe`, {
-				method: 'GET'
-			});
-			const data = (await response.json()) as TelegramGetMeResponse;
-			if (!response.ok || !data.ok) {
-				return {
-					valid: false,
-					message: `Telegram getMe failed: ${data.description ?? response.status}`
-				};
-			}
-			return {
-				valid: true,
-				details: { botId: data.result?.id, username: data.result?.username }
-			};
+			const me = await new Api(botToken).getMe();
+			return { valid: true, details: { botId: me.id, username: me.username } };
 		} catch (err) {
-			return { valid: false, message: err instanceof Error ? err.message : String(err) };
+			return { valid: false, message: `Telegram getMe failed: ${describeError(err).message}` };
 		}
 	}
 
@@ -112,37 +96,26 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 		if (cached) return cached;
 
 		const { botToken, chatId } = getTarget(payload.target ?? {});
-		const disableNotification =
-			typeof options.settings?.disableNotification === 'boolean'
-				? options.settings.disableNotification
-				: undefined;
-
-		const body: Record<string, unknown> = {
-			chat_id: chatId,
-			text: payload.rich?.kind === 'telegram-markdown' ? payload.rich.payload : payload.text
-		};
-		if (payload.rich?.kind === 'telegram-markdown') {
-			body.parse_mode = 'MarkdownV2';
-		}
-		if (disableNotification !== undefined) {
-			body.disable_notification = disableNotification;
+		const isMarkdown = payload.rich?.kind === 'telegram-markdown';
+		const text = isMarkdown ? String(payload.rich.payload) : payload.text;
+		const other: { parse_mode?: 'MarkdownV2'; disable_notification?: boolean } = {};
+		if (isMarkdown) other.parse_mode = 'MarkdownV2';
+		if (typeof options.settings?.disableNotification === 'boolean') {
+			other.disable_notification = options.settings.disableNotification;
 		}
 
-		const response = await fetch(`${TELEGRAM_API_BASE}/bot${botToken}/sendMessage`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
-		const data = (await response.json()) as TelegramSendResponse;
-		if (!response.ok || !data.ok) {
-			throw new Error(
-				`Telegram sendMessage failed (${response.status} / ${data.error_code ?? '?'}): ${data.description ?? 'unknown error'}`
-			);
+		let messageId: string;
+		try {
+			const message = await new Api(botToken).sendMessage(chatId, text, other);
+			messageId = String(message.message_id);
+		} catch (err) {
+			const { code, message } = describeError(err);
+			throw new Error(`Telegram sendMessage failed (${code}): ${message}`);
 		}
 
 		const result: ChannelSendResult = {
 			provider: this.id,
-			providerMessageId: String(data.result?.message_id ?? `telegram-${payload.messageRef}`),
+			providerMessageId: messageId,
 			deliveredAt: new Date()
 		};
 		this.idempotencyCache.set(payload.messageRef, result);

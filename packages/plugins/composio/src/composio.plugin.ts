@@ -2,8 +2,10 @@ import type {
 	IPlugin,
 	IPipelinePlugin,
 	IFormSchemaProvider,
+	ISkillsProviderPlugin,
 	PluginContext,
 	PluginCategory,
+	PluginSettings,
 	JsonSchema,
 	ValidationResult,
 	ConnectionValidationResult,
@@ -17,6 +19,10 @@ import type {
 	ExistingItems,
 	PluginManifest,
 	PluginHealthCheck,
+	SkillCatalogEntry,
+	SkillCatalogListOptions,
+	SkillCatalogListResult,
+	SkillCatalogUpdate,
 	StepStatus,
 	FormFieldDefinition,
 	FormFieldGroup,
@@ -24,6 +30,14 @@ import type {
 	FacadeOptions
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
+import {
+	buildSkillCatalogEntries,
+	diffSkillCatalogVersions,
+	filterSkillCatalog,
+	readApiKey,
+	readBaseUrl,
+	readDefaultUserId
+} from './skills-provider.js';
 
 import type {
 	ComposioStepId,
@@ -63,14 +77,15 @@ import { README } from './readme.js';
  * their accounts once via Composio's hosted flow, and the platform runs
  * tools against `composio.user_id` (defaulted to the Ever Works user id).
  */
-export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider {
+export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider, ISkillsProviderPlugin {
 	readonly id = 'composio';
 	readonly name = 'Composio Integrations';
 	readonly version = '1.0.0';
 	readonly category: PluginCategory = 'pipeline';
-	readonly capabilities = ['pipeline', 'form-schema-provider'] as const;
+	readonly capabilities = ['pipeline', 'form-schema-provider', 'skills-provider'] as const;
 	readonly configurationMode = 'user-required' as const;
 	readonly handledConfigFields = ['*'] as const;
+	readonly providerName = 'Composio Integrations';
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
@@ -137,7 +152,7 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		};
 	}
 
-	async isAvailable(settings?: Record<string, unknown>): Promise<boolean> {
+	isAvailable(settings?: Record<string, unknown>): boolean {
 		return hasApiKey(settings ?? {});
 	}
 
@@ -252,6 +267,50 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 	getDefaultValues(): Record<string, unknown> {
 		return formDefaults(this.getFormFields());
+	}
+
+	// ── ISkillsProviderPlugin ───────────────────────────────────────────
+	//
+	// Each ACTIVE Composio connected account the user owns surfaces as one
+	// markdown skill entry under `composio-<toolkit>`. The agent reads the
+	// entry's body during planning and learns to dispatch the toolkit via
+	// the composio pipeline plugin. Connection state is read live (cached
+	// per call) — there's no separate ingestion job.
+
+	async listEntries(options: SkillCatalogListOptions): Promise<SkillCatalogListResult> {
+		const entries = await this.loadEntries(options.settings);
+		return filterSkillCatalog(entries, options);
+	}
+
+	async getEntry(slug: string, settings?: PluginSettings): Promise<SkillCatalogEntry | null> {
+		const entries = await this.loadEntries(settings);
+		return entries.find((e) => e.slug === slug) ?? null;
+	}
+
+	async checkForUpdates(
+		installedVersions: Record<string, string>,
+		settings?: PluginSettings
+	): Promise<{ updated: SkillCatalogUpdate[] }> {
+		const entries = await this.loadEntries(settings);
+		return diffSkillCatalogVersions(entries, installedVersions);
+	}
+
+	private async loadEntries(settings?: PluginSettings): Promise<SkillCatalogEntry[]> {
+		const apiKey = readApiKey(settings);
+		const defaultUserId = readDefaultUserId(settings);
+		if (!apiKey || !defaultUserId) return [];
+		try {
+			return await buildSkillCatalogEntries({
+				apiKey,
+				baseUrl: readBaseUrl(settings),
+				defaultUserId,
+				logger: this.context?.logger ?? console
+			});
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			(this.context?.logger ?? console).warn(`Composio skills-provider: failed to load catalog — ${message}`);
+			return [];
+		}
 	}
 
 	// ── IPipelinePlugin ─────────────────────────────────────────────────
@@ -378,10 +437,13 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				`Starting tool "${toolRef.toolSlug}" for user "${toolRef.userId}"...`
 			);
 
+			// Timeout enforcement happens at the pipeline level via the `setTimeout`
+			// above that fires `abortController.abort()` — the SDK doesn't accept
+			// a timeout parameter, so we only forward the signal here.
 			const execResult: ComposioExecutionResult = await client.executeTool(
 				toolRef,
 				payload as unknown as Record<string, unknown>,
-				{ signal, timeoutMs: composioSettings.timeoutMs }
+				{ signal }
 			);
 
 			reportProgress(onProgress, 2, 70, 'Execute Composio Tool', 'Tool completed.');

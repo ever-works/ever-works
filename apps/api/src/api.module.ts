@@ -22,6 +22,7 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
+import { ComposioApiModule } from './plugins/composio/composio.module';
 import { ComposioTriggersModule } from './plugins/composio-triggers/composio-triggers.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
@@ -105,6 +106,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
             useFactory: () => ({}),
         }),
         PluginsModule,
+        ComposioApiModule,
         ComposioTriggersModule,
         GitProviderModule,
         OAuthModule,
