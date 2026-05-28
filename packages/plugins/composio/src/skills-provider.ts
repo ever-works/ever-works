@@ -6,7 +6,7 @@ import type {
 	SkillCatalogUpdate
 } from '@ever-works/plugin';
 
-import { ComposioClient } from './utils/composio-client.js';
+import { ComposioClient, type ComposioSdkLike } from './utils/composio-client.js';
 
 const SKILL_VERSION = '1.0.0';
 const ACTIVE_STATUS = 'ACTIVE';
@@ -16,7 +16,13 @@ interface BuildEntriesOptions {
 	baseUrl?: string;
 	defaultUserId?: string;
 	logger?: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
-	fetchImpl?: typeof fetch;
+	/**
+	 * Test seam — inject a `Composio`-shaped stub to bypass real SDK
+	 * construction. Mirrors `ComposioClientOptions.sdkOverride`; replaces the
+	 * old `fetchImpl` seam that the v1 handwritten REST client used before the
+	 * `@composio/core` SDK migration (PR-A).
+	 */
+	sdkOverride?: ComposioSdkLike;
 }
 
 /**
@@ -34,7 +40,7 @@ export async function buildSkillCatalogEntries({
 	baseUrl,
 	defaultUserId,
 	logger,
-	fetchImpl
+	sdkOverride
 }: BuildEntriesOptions): Promise<SkillCatalogEntry[]> {
 	if (!apiKey || !defaultUserId) return [];
 
@@ -42,7 +48,7 @@ export async function buildSkillCatalogEntries({
 		apiKey,
 		baseUrl,
 		logger: logger ?? { log: () => undefined, warn: () => undefined },
-		fetchImpl
+		sdkOverride
 	});
 
 	const accounts = await client.listConnectedAccounts(defaultUserId);
