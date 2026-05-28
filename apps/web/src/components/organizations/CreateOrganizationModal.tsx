@@ -192,7 +192,19 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                     const org = (await res.json()) as OrganizationResponse;
                     // Refresh the org list so the switcher updates and
                     // subsequent first-Org checks aren't fooled.
-                    await mutate();
+                    //
+                    // **Best-effort**: the POST already succeeded; the Org
+                    // exists. A transient 500/401/network failure on the
+                    // follow-up GET /api/organizations must NOT surface as
+                    // a creation error — otherwise the user retries and
+                    // we end up with duplicate Orgs. (Codex P2 on PR
+                    // #1063.) The switcher will pick up the new Org on
+                    // its next natural refresh.
+                    try {
+                        await mutate();
+                    } catch {
+                        // Swallow — see comment above.
+                    }
                     if (wasFirstOrgRef.current) {
                         // Keep the parent modal mounted but hidden behind
                         // the upgrade dialog so the user can't backtrack
