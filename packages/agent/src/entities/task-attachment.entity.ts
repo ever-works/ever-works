@@ -11,7 +11,7 @@ import { Task } from './task.entity';
 
 /**
  * Tasks feature — Phase 11.2. FK pointer to a row in
- * `work_knowledge_upload` (the existing upload pipeline). Storage
+ * `work_knowledge_uploads` (the existing upload pipeline). Storage
  * + dedup are reused; this row is just the Task→Upload edge.
  */
 @Entity({ name: 'task_attachments' })
