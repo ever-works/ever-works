@@ -4,6 +4,8 @@ import {
     Delete,
     Get,
     Headers,
+    Inject,
+    Optional,
     Param,
     Patch,
     Post,
@@ -17,6 +19,10 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { EmailFacadeService } from '@ever-works/agent/facades';
+import {
+    AGENT_INBOUND_EMAIL_DISPATCHER,
+    type AgentInboundEmailDispatcher,
+} from '@ever-works/agent/notifications';
 import type { EmailAddressDirection } from '@ever-works/agent/entities';
 import { CurrentUser, AuthSessionGuard, Public } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -35,6 +41,9 @@ export class EmailController {
     constructor(
         private readonly emailService: EmailService,
         private readonly emailFacade: EmailFacadeService,
+        @Optional()
+        @Inject(AGENT_INBOUND_EMAIL_DISPATCHER)
+        private readonly inboundDispatcher?: AgentInboundEmailDispatcher,
     ) {}
 
     // -------------------------------------------------------------
@@ -142,7 +151,33 @@ export class EmailController {
     ) {
         const rawBody = (req as Request & { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
         const message = await this.emailFacade.parseInbound(pluginId, rawBody, headers);
-        return { received: true, providerMessageId: message.providerMessageId };
+
+        // EW-670 / T25 — route the parsed inbound message to the agent
+        // inbound dispatcher (resolves the destination agent + dispatch
+        // mode, persists the email_messages row, spawns a task or appends
+        // to a conversation). Optional: when the token isn't bound the
+        // webhook still acks so the provider stops retrying.
+        let dispatch: { handled: boolean; agentId?: string; mode?: string } | undefined;
+        if (this.inboundDispatcher) {
+            dispatch = await this.inboundDispatcher.dispatch({
+                pluginId,
+                providerMessageId: message.providerMessageId,
+                from: message.from,
+                to: [...message.to],
+                subject: message.subject,
+                bodyText: message.bodyText,
+                bodyHtml: message.bodyHtml,
+                receivedAt: message.receivedAt,
+            });
+        }
+
+        return {
+            received: true,
+            providerMessageId: message.providerMessageId,
+            handled: dispatch?.handled ?? false,
+            agentId: dispatch?.agentId,
+            mode: dispatch?.mode,
+        };
     }
 
     @Public()

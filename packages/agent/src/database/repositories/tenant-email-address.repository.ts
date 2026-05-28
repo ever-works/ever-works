@@ -44,6 +44,24 @@ export class TenantEmailAddressRepository {
         return this.repository.find({ where, order: { createdAt: 'ASC' } });
     }
 
+    /**
+     * Resolve an active address row by its literal mailbox — used by the
+     * inbound-email dispatcher (EW-670 / T25) to map a webhook recipient
+     * to its tenant address. Returns the first non-disabled match; an
+     * address that handles both directions matches an inbound lookup via
+     * the `direction IN ('inbound','both')` filter the caller supplies.
+     */
+    async findByAddress(
+        address: string,
+        directions: readonly EmailAddressDirection[] = ['inbound', 'both'],
+    ): Promise<TenantEmailAddress | null> {
+        const rows = await this.repository.find({
+            where: { address, disabledAt: IsNull() },
+            order: { createdAt: 'ASC' },
+        });
+        return rows.find((r) => directions.includes(r.direction)) ?? null;
+    }
+
     async findByVerificationToken(token: string): Promise<TenantEmailAddress | null> {
         return this.repository.findOne({ where: { verificationToken: token } });
     }

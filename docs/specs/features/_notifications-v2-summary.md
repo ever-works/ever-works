@@ -55,9 +55,11 @@
 
 ### Partially done (this loop)
 
-- **EW-670** Agent integration — `sendEmail` tool (T23) + `messageAgent` tool (T24) done. Still pending: `AGENT_INBOUND_EMAIL_DISPATCHER` token + dispatcher (T25).
+- **EW-674** Notification channel plugins — Discord done (T15). Slack (T27) + Telegram (T28) pending.
 
 ### Newly done (this overnight cron loop)
+
+- **T25 EW-670** Agent inbound-email dispatcher — *this commit*. Completes EW-670 (sendEmail + messageAgent + inbound dispatcher all done). `AGENT_INBOUND_EMAIL_DISPATCHER` token + `DefaultInboundEmailDispatcher` (task-spawn + conversation modes), `INBOUND_EMAIL_TASK_SPAWNER` optional adapter, `deriveThreadKey` helper, `findByAddress` repo method, and inbound-webhook wiring. 8 new unit tests (60/60 agent notifications suites green).
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
