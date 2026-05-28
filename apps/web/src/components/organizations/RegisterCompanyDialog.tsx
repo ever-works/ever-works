@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,12 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
     const [name, setName] = useState('');
     const [countryCode, setCountryCode] = useState('');
     const [submitError, setSubmitError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
+    // Explicit submitting flag rather than `useTransition`'s `pending`:
+    // `useTransition`'s pending state only stays true synchronously inside
+    // its callback, and our submit kicks off a detached async IIFE, so
+    // `pending` flipped back to false immediately and the disabled button
+    // wasn't actually preventing double-submit. (Codex P2 on PR #1067.)
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [createdOrg, setCreatedOrg] = useState<OrganizationResponse | null>(null);
     const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
     /**
@@ -73,10 +78,18 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
             setSubmitError(null);
             setCreatedOrg(null);
             setShowUpgradeDialog(false);
+            setIsSubmitting(false);
         }
     }, [open]);
 
-    const handleSubmit = useCallback(() => {
+    const handleSubmit = useCallback(async () => {
+        // Guard against double-submit while the previous request is
+        // still in flight. The `disabled={isSubmitting}` on the button
+        // covers click-through-keyboard / Enter; this guard covers any
+        // direct programmatic call.
+        if (isSubmitting) {
+            return;
+        }
         const trimmedName = name.trim();
         if (trimmedName.length === 0) {
             setSubmitError(t('errors.nameRequired'));
@@ -93,54 +106,53 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
         }
         setSubmitError(null);
         wasFirstOrgRef.current = organizations.length === 0;
+        setIsSubmitting(true);
 
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const res = await fetch('/api/organizations/register-company', {
-                        method: 'POST',
-                        credentials: 'include',
-                        cache: 'no-store',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            name: trimmedName,
-                            ...(cc.length > 0 ? { countryCode: cc.toUpperCase() } : {}),
-                        }),
-                    });
-                    if (!res.ok) {
-                        const body = await res
-                            .json()
-                            .catch(() => ({ error: 'Failed to register company' }));
-                        setSubmitError(
-                            (body as { message?: string; error?: string }).message ??
-                                (body as { error?: string }).error ??
-                                t('errors.generic'),
-                        );
-                        return;
-                    }
-                    const org = (await res.json()) as OrganizationResponse;
-                    // Refresh the org list (best-effort — the POST already
-                    // succeeded; a transient GET failure must not surface
-                    // as a register error, otherwise the user retries +
-                    // we end up with duplicate Orgs).
-                    try {
-                        await mutate();
-                    } catch {
-                        // Swallow.
-                    }
-                    if (wasFirstOrgRef.current) {
-                        setCreatedOrg(org);
-                        setShowUpgradeDialog(true);
-                    } else {
-                        onOpenChange(false);
-                        router.push(`/${org.slug}/dashboard`);
-                    }
-                } catch (err) {
-                    setSubmitError(err instanceof Error ? err.message : t('errors.generic'));
-                }
-            })();
-        });
-    }, [name, countryCode, organizations.length, mutate, onOpenChange, router, t]);
+        try {
+            const res = await fetch('/api/organizations/register-company', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: trimmedName,
+                    ...(cc.length > 0 ? { countryCode: cc.toUpperCase() } : {}),
+                }),
+            });
+            if (!res.ok) {
+                const body = await res
+                    .json()
+                    .catch(() => ({ error: 'Failed to register company' }));
+                setSubmitError(
+                    (body as { message?: string; error?: string }).message ??
+                        (body as { error?: string }).error ??
+                        t('errors.generic'),
+                );
+                return;
+            }
+            const org = (await res.json()) as OrganizationResponse;
+            // Refresh the org list (best-effort — the POST already
+            // succeeded; a transient GET failure must not surface as
+            // a register error, otherwise the user retries + we end
+            // up with duplicate Orgs).
+            try {
+                await mutate();
+            } catch {
+                // Swallow.
+            }
+            if (wasFirstOrgRef.current) {
+                setCreatedOrg(org);
+                setShowUpgradeDialog(true);
+            } else {
+                onOpenChange(false);
+                router.push(`/${org.slug}/dashboard`);
+            }
+        } catch (err) {
+            setSubmitError(err instanceof Error ? err.message : t('errors.generic'));
+        } finally {
+            setIsSubmitting(false);
+        }
+    }, [isSubmitting, name, countryCode, organizations.length, mutate, onOpenChange, router, t]);
 
     const handleUpgradeDialogClose = useCallback(
         (didUpgrade: boolean) => {
@@ -180,7 +192,7 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                                 placeholder={t('namePlaceholder')}
                                 maxLength={MAX_NAME_LENGTH}
                                 autoFocus
-                                disabled={pending}
+                                disabled={isSubmitting}
                                 data-testid="register-company-name"
                             />
                             <Input
@@ -190,7 +202,7 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                                 onChange={(e) => setCountryCode(e.target.value)}
                                 placeholder={t('countryCodePlaceholder')}
                                 maxLength={2}
-                                disabled={pending}
+                                disabled={isSubmitting}
                                 data-testid="register-company-country"
                             />
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -207,14 +219,14 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                             <Button
                                 variant="ghost"
                                 onClick={() => onOpenChange(false)}
-                                disabled={pending}
+                                disabled={isSubmitting}
                             >
                                 {t('cancel')}
                             </Button>
                             <Button
                                 onClick={handleSubmit}
-                                loading={pending}
-                                disabled={pending || name.trim().length === 0}
+                                loading={isSubmitting}
+                                disabled={isSubmitting || name.trim().length === 0}
                                 data-testid="register-company-submit"
                             >
                                 {t('submit')}
