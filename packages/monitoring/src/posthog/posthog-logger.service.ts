@@ -121,7 +121,7 @@ export class PostHogLoggerService implements LoggerService {
                     message: serializeMessage(message),
                     context: ctx,
                     service: 'ever-works-api',
-                    env: resolveEnv()
+                    env: resolveEnv(),
                 };
                 if (message instanceof Error) {
                     properties.error_name = message.name;
@@ -133,7 +133,7 @@ export class PostHogLoggerService implements LoggerService {
                 client.capture({
                     distinctId: this.distinctId,
                     event: '$log',
-                    properties
+                    properties,
                 });
             }
         } catch {

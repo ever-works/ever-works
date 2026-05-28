@@ -20,8 +20,8 @@ jest.mock('posthog-node', () => ({
     PostHog: jest.fn().mockImplementation(() => ({
         capture: captureMock,
         identify: jest.fn(),
-        shutdown: shutdownMock
-    }))
+        shutdown: shutdownMock,
+    })),
 }));
 
 // Mock @sentry/nestjs so we can spy on captureException without ever talking
@@ -36,13 +36,13 @@ jest.mock('@sentry/nestjs', () => ({
         info: jest.fn(),
         warn: jest.fn(),
         error: jest.fn(),
-        fatal: jest.fn()
-    }
+        fatal: jest.fn(),
+    },
 }));
 
 // Avoid the optional profiling-node native dep blowing up the test.
 jest.mock('@sentry/profiling-node', () => ({
-    nodeProfilingIntegration: () => ({ name: 'mock-profiling' })
+    nodeProfilingIntegration: () => ({ name: 'mock-profiling' }),
 }));
 
 import { initPostHog, shutdownPostHog } from '../posthog.config';
@@ -99,7 +99,7 @@ describe('PostHogLoggerService', () => {
         it.each([
             ['warn', 'warn'],
             ['debug', 'debug'],
-            ['verbose', 'verbose']
+            ['verbose', 'verbose'],
         ])('forwards %s() emits as $log with level=%s', (method, expectedLevel) => {
             const svc = new PostHogLoggerService();
             (svc as any)[method]('hi');
