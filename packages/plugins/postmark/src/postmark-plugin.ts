@@ -163,6 +163,19 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		}
 	}
 
+	extractInboundRecipients(rawBody: Buffer, _headers: Readonly<Record<string, string>>): readonly string[] {
+		// Best-effort recipient extraction WITHOUT verifying the
+		// signature — used by the facade to resolve the owning user's
+		// scope before verification. Must never throw.
+		try {
+			const payload = JSON.parse(rawBody.toString('utf8')) as PostmarkInboundPayload;
+			const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [payload.To] : []);
+			return to.filter((address): address is string => typeof address === 'string' && address.length > 0);
+		} catch {
+			return [];
+		}
+	}
+
 	async parseInboundWebhook(
 		rawBody: Buffer,
 		_headers: Readonly<Record<string, string>>,
