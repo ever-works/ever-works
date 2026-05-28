@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { NewPageClient, type ChipType } from '@/components/new';
+import { NewPageClient, ALL_NEW_CHIP_VALUES, type ChipType } from '@/components/new';
 import { templatesAPI } from '@/lib/api/templates';
 import { missionsAPI } from '@/lib/api/missions';
+import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.newPage');
@@ -62,6 +63,22 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
         initialType = missions.length > 0 ? 'idea' : 'mission';
     }
 
+    // Gate each work-kind chip behind its `works-<value>` PostHog flag.
+    // Fail-open: no PostHog config / errors / missing flags → everything
+    // enabled. No cheap user id is available on this page, so we evaluate
+    // against the 'anonymous' distinct id (fine for global on/off flags).
+    const disabledSet = await getDisabledWorkKinds(ALL_NEW_CHIP_VALUES);
+    const disabledKinds = Array.from(disabledSet);
+
+    // A kind disabled by a feature flag must not be preselectable via the
+    // `?type=` URL handoff — otherwise a user could deep-link a "Soon"
+    // chip into the selected/auto-start state and submit it. If the
+    // resolved kind is disabled, drop it back to the safe default
+    // (Mission, which is never flag-gated here).
+    if (disabledSet.has(initialType)) {
+        initialType = 'mission';
+    }
+
     let initialPrompt: string | undefined;
     let initialTemplateId: string | undefined;
     const templateIdRaw = (params?.template ?? '').trim();
@@ -82,6 +99,7 @@ export default async function NewPage({ searchParams }: { searchParams: SearchPa
             initialType={initialType}
             initialPrompt={initialPrompt}
             initialTemplateId={initialTemplateId}
+            disabledKinds={disabledKinds}
         />
     );
 }
