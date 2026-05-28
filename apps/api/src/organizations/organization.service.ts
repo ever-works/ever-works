@@ -102,12 +102,13 @@ const TIER_B_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
  * their own direct `userId` column and are listed in
  * `TIER_C_DIRECT_USER_BACKFILL_TABLES` below instead — no join needed.
  *
- * **Intentionally deferred** (no entry here):
- *   - `webhook_deliveries` — parent `webhook_subscriptions` has no
- *     direct `userId` column (uses `accountId` against the Better
- *     Auth `account` table). That parent itself is a deferred Tier A
- *     indirect backfill, so chaining through it is a no-op until the
- *     Tier A indirect walk lands. Tracked as a Phase 11b follow-up.
+ * `webhook_deliveries`, `webhook_subscriptions`, `onboarding_requests`,
+ * `work_deployments`, and `work_knowledge_documents` have no direct
+ * user FK — they're handled by the indirect-backfill loop instead
+ * (see `INDIRECT_BOTH_BACKFILL_TABLES` /
+ * `INDIRECT_TENANT_ONLY_VIA_WORK` below). `github_app_installations`
+ * is a shared resource with no per-user owner and is intentionally
+ * left unscoped.
  */
 interface TierCJoinTable {
     table: string;
@@ -285,6 +286,91 @@ const TIER_C_DIRECT_USER_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
 ] as const;
 
 /**
+ * EW-663 (Phase 11) — **indirect** backfill tables. These carry
+ * `organizationId` but have no direct `userId` column, so Phase 6's
+ * direct-userId Tier A walk skipped them. They're owned transitively
+ * through a parent that IS user-keyed (`account.userId` or
+ * `works.userId`), so we reach them with a join. Closing this gap
+ * means upgrade-from-account leaves NO scopable row behind.
+ *
+ * `parentTable` is joined on `<table>.<fkColumn> = parent.id` and
+ * filtered on `parent.userColumn = :userId`. Rows whose FK is NULL
+ * (the column is nullable on `onboarding_requests`) simply don't match
+ * the join and are left alone — correct, because a row with no
+ * account/work link has no owner to attribute it to.
+ */
+interface IndirectBackfillTable {
+    table: string;
+    fkColumn: string;
+    parentTable: string;
+    parentUserColumn: string;
+}
+
+const INDIRECT_BOTH_BACKFILL_TABLES: ReadonlyArray<IndirectBackfillTable> = [
+    // Owned via the Better Auth `account` row (account.userId).
+    {
+        table: 'webhook_subscriptions',
+        fkColumn: 'accountId',
+        parentTable: 'account',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'webhook_deliveries',
+        fkColumn: 'accountId',
+        parentTable: 'account',
+        parentUserColumn: 'userId',
+    },
+    {
+        table: 'onboarding_requests',
+        fkColumn: 'accountId',
+        parentTable: 'account',
+        parentUserColumn: 'userId',
+    },
+    // Owned via the parent Work (works.userId).
+    {
+        table: 'work_deployments',
+        fkColumn: 'workId',
+        parentTable: 'works',
+        parentUserColumn: 'userId',
+    },
+    // `onboarding_requests` can be linked by EITHER accountId or workId
+    // (both nullable). The accountId pass above covers account-linked
+    // rows; this pass covers work-linked rows. The `organizationId IS
+    // NULL` filter makes the second pass a no-op for rows the first
+    // already moved.
+    {
+        table: 'onboarding_requests',
+        fkColumn: 'workId',
+        parentTable: 'works',
+        parentUserColumn: 'userId',
+    },
+] as const;
+
+/**
+ * EW-663 (Phase 11) — `work_knowledge_documents` is special. Its
+ * `work_knowledge_documents_scope_xor` CHECK enforces exactly one of
+ * (`workId`, `organizationId`) non-NULL. Work-scoped docs have
+ * `workId` set + `organizationId` NULL; org-scoped docs already have
+ * `organizationId` set. So on upgrade we can ONLY stamp `tenantId`
+ * (via `workId → works.userId`) — writing `organizationId` on a
+ * work-scoped row would set BOTH columns and violate the CHECK. The
+ * org-scoped rows are already scoped, nothing to do.
+ *
+ * **`github_app_installations` is intentionally NOT backfilled.** It
+ * has no user / account / work FK — it's a shared GitHub-side resource
+ * (one row per GitHub App installation, which can map to many users).
+ * Per-user ownership is expressed via `github_app_user_links` (a
+ * direct-userId Tier A table that IS backfilled). Scoping the shared
+ * installation row to one user's Org would be wrong.
+ */
+const INDIRECT_TENANT_ONLY_VIA_WORK = {
+    table: 'work_knowledge_documents',
+    fkColumn: 'workId',
+    parentTable: 'works',
+    parentUserColumn: 'userId',
+} as const;
+
+/**
  * EW-658 (Tenants & Organizations Phase 6) — Organization CRUD +
  * lazy-upgrade flow.
  *
@@ -322,16 +408,24 @@ const TIER_C_DIRECT_USER_BACKFILL_TABLES: ReadonlyArray<UserOwnedTable> = [
  *         starts empty. Both behaviors are valid; [spec.md §5.2
  *         3a/3b](../../../../docs/specs/features/tenants-and-organizations/spec.md#52-user-creates-their-first-organization).
  *
- * **Tier C historical backfill (EW-663 Phase 11):** the
- * `upgradeFromAccount` method below ALSO walks every Tier C table
- * and propagates `tenantId` + `organizationId` from the parent Tier
- * A row (or directly via `userId` for the five Tier C tables that
- * carry a user FK of their own). New Tier C inserts still get scope
- * from the auto-stamping subscriber; the Phase 11 walk catches
- * pre-upgrade historical rows. The only remaining deferral is
- * `webhook_deliveries`, whose parent `webhook_subscriptions` is a
- * Tier A row without a direct user FK — tracked as a Phase 11b
- * follow-up alongside the Tier A indirect backfill.
+ * **Tier C + indirect historical backfill (EW-663 Phase 11):** the
+ * `upgradeFromAccount` method below walks EVERY remaining scopable
+ * table and propagates `tenantId` + `organizationId`:
+ *   - Tier C tables, via the parent Tier A row's `userId` (join) or
+ *     directly for the five Tier C tables that carry their own user FK.
+ *   - Indirect Tier A/C tables with no direct user FK
+ *     (`webhook_subscriptions`, `webhook_deliveries`,
+ *     `onboarding_requests`, `work_deployments`), via a join to their
+ *     user-keyed parent (`account.userId` / `works.userId`).
+ *   - `work_knowledge_documents`, tenantId-only (its scope-XOR CHECK
+ *     forbids writing organizationId on work-scoped rows).
+ *
+ * New rows still get scope from the auto-stamping subscriber; this
+ * walk catches pre-upgrade historical rows. The ONLY table left
+ * unscoped is `github_app_installations` — a shared GitHub-side
+ * resource with no per-user owner (ownership lives in
+ * `github_app_user_links`, which IS backfilled). Nothing else is
+ * deferred.
  */
 @Injectable()
 export class OrganizationService {
@@ -697,8 +791,46 @@ export class OrganizationService {
                 tierCRowsUpdated += this.extractAffectedRowCount(result);
             }
 
+            // (c) Indirect backfill — tables with no direct user FK,
+            // reached via a join to a user-keyed parent (account /
+            // works). Closes the Phase 6 gap so upgrade leaves no
+            // scopable row behind. (EW-663 Phase 11.)
+            let indirectRowsUpdated = 0;
+            for (const {
+                table,
+                fkColumn,
+                parentTable,
+                parentUserColumn,
+            } of INDIRECT_BOTH_BACKFILL_TABLES) {
+                const result = (await manager.query(
+                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
+                    [tenantId, newOrgId, userId],
+                )) as [unknown[], number] | { affected?: number } | undefined;
+                indirectRowsUpdated += this.extractAffectedRowCount(result);
+            }
+
+            // (d) work_knowledge_documents — tenantId ONLY (the scope
+            // XOR check forbids setting organizationId on a work-scoped
+            // row). Filter on `tenantId IS NULL` since organizationId
+            // can't be the sentinel here. (EW-663 Phase 11.)
+            {
+                const { table, fkColumn, parentTable, parentUserColumn } =
+                    INDIRECT_TENANT_ONLY_VIA_WORK;
+                const result = (await manager.query(
+                    `UPDATE "${table}" SET "tenantId" = $1 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $2 AND "${table}"."tenantId" IS NULL`,
+                    [tenantId, userId],
+                )) as [unknown[], number] | { affected?: number } | undefined;
+                indirectRowsUpdated += this.extractAffectedRowCount(result);
+            }
+
+            // Indirect rows fold into the tierC count for the response
+            // (they're all "denormalized children / leaf records" from
+            // the caller's perspective — the distinction is purely
+            // internal to how we reach them).
+            tierCRowsUpdated += indirectRowsUpdated;
+
             this.logger.log(
-                `Upgrade-from-account: user=${userId} org=${newOrgId} tierA=${tierARowsUpdated} tierB=${tierBRowsUpdated} tierC=${tierCRowsUpdated}`,
+                `Upgrade-from-account: user=${userId} org=${newOrgId} tierA=${tierARowsUpdated} tierB=${tierBRowsUpdated} tierC=${tierCRowsUpdated} (indirect=${indirectRowsUpdated})`,
             );
 
             return {

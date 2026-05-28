@@ -251,9 +251,10 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             // 5 Tier B tables with direct user FK.
             expect(result.tierBRowsUpdated).toBe(5);
             // EW-663 (Phase 11) — Tier C: 5 direct-user tables + 20
-            // join-walked tables = 25 UPDATEs, each affected = 1 in
-            // our mock.
-            expect(result.tierCRowsUpdated).toBe(25);
+            // join-walked tables + 6 indirect tables (5 both-column +
+            // 1 work_knowledge_documents tenantId-only) = 31 UPDATEs,
+            // each affected = 1 in our mock.
+            expect(result.tierCRowsUpdated).toBe(31);
 
             // Tier A: `SET "tenantId" = $1, "organizationId" = $2 WHERE "<col>" = $3`.
             // Tier C direct-user uses the SAME shape, so isolate Tier
@@ -290,8 +291,15 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 expect(q.sql).toContain('"organizationId" IS NULL');
             }
 
+            // Tier B is the simple `UPDATE t SET tenantId WHERE col` shape
+            // (no JOIN). Exclude the indirect work_knowledge_documents
+            // tenantId-only UPDATE, which also has no `organizationId`
+            // but DOES use a `FROM "works"` join.
             const tierBUpdates = queryLog.filter(
-                (q) => q.sql.includes('SET "tenantId" = $1') && !q.sql.includes('organizationId'),
+                (q) =>
+                    q.sql.includes('SET "tenantId" = $1') &&
+                    !q.sql.includes('organizationId') &&
+                    !q.sql.includes(' FROM "'),
             );
             expect(tierBUpdates.length).toBe(5);
             for (const q of tierBUpdates) {
@@ -332,8 +340,37 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             }
 
             // Join-walked Tier C: `UPDATE "child" SET ... FROM "parent" p WHERE ...`.
+            // Restrict to the canonical Tier C child tables so the 6
+            // indirect-backfill joins (webhook_*, onboarding_requests,
+            // work_deployments, work_knowledge_documents) don't inflate
+            // the count — those are asserted in their own test.
+            const tierCJoinChildren = new Set([
+                'conversation_messages',
+                'task_assignees',
+                'task_approvers',
+                'task_reviewers',
+                'task_watchers',
+                'task_blocks',
+                'task_chat_messages',
+                'task_kb_mentions',
+                'task_attachments',
+                'task_relations',
+                'agent_budgets',
+                'agent_memberships',
+                'agent_run_logs',
+                'work_members',
+                'work_invitations',
+                'work_generation_history',
+                'work_knowledge_chunks',
+                'work_knowledge_citations',
+                'work_knowledge_tags',
+                'work_knowledge_uploads',
+            ]);
             const joinUpdates = queryLog.filter(
-                (q) => q.sql.startsWith('UPDATE "') && q.sql.includes(' FROM "'),
+                (q) =>
+                    q.sql.startsWith('UPDATE "') &&
+                    q.sql.includes(' FROM "') &&
+                    [...tierCJoinChildren].some((t) => q.sql.startsWith(`UPDATE "${t}"`)),
             );
             // The set is canonical per the service file's
             // `TIER_C_BACKFILL_TABLES` constant.
@@ -373,10 +410,63 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 expect(match?.sql).toContain('p."userId" = $3');
             }
 
-            // Total tierCRowsUpdated matches the sum of both Tier C paths.
+            // Total tierCRowsUpdated matches direct + join + the 6
+            // indirect UPDATEs (asserted in the dedicated test below).
+            const INDIRECT_UPDATE_COUNT = 6;
             expect(result.tierCRowsUpdated).toBe(
-                directUserTierCTables.length + expectedJoinPairs.length,
+                directUserTierCTables.length + expectedJoinPairs.length + INDIRECT_UPDATE_COUNT,
             );
+        });
+
+        it('EW-663 Phase 11: indirect backfill — joins account/works for tables with no direct user FK', async () => {
+            const { service, queryLog } = makeService({
+                user: { id: 'u-1', tenantId: 't-1' },
+                organizationById: { id: 'o-1', tenantId: 't-1', slug: 'x', displayName: 'X' },
+                orgCountByTenant: 1,
+            });
+
+            await service.upgradeFromAccount('u-1', 'o-1');
+
+            // Both-column indirect tables: UPDATE child SET tenantId,
+            // organizationId FROM parent WHERE child.fk = p.id AND
+            // p.userId = $3 AND child.organizationId IS NULL.
+            const expectedIndirect: Array<[string, string, string]> = [
+                ['webhook_subscriptions', 'account', 'accountId'],
+                ['webhook_deliveries', 'account', 'accountId'],
+                ['onboarding_requests', 'account', 'accountId'],
+                ['work_deployments', 'works', 'workId'],
+                ['onboarding_requests', 'works', 'workId'],
+            ];
+            for (const [child, parent, fk] of expectedIndirect) {
+                const match = queryLog.find(
+                    (q) =>
+                        q.sql.includes(`UPDATE "${child}"`) &&
+                        q.sql.includes(`FROM "${parent}" p`) &&
+                        q.sql.includes(`"${child}"."${fk}" = p."id"`) &&
+                        q.sql.includes('"organizationId" = $2'),
+                );
+                expect(match).toBeDefined();
+                expect(match?.params).toEqual(['t-1', 'o-1', 'u-1']);
+                expect(match?.sql).toContain(`"${child}"."organizationId" IS NULL`);
+                expect(match?.sql).toContain('p."userId" = $3');
+            }
+
+            // work_knowledge_documents — tenantId ONLY (scope XOR check
+            // forbids writing organizationId on work-scoped rows).
+            const wkd = queryLog.find((q) => q.sql.includes('UPDATE "work_knowledge_documents"'));
+            expect(wkd).toBeDefined();
+            expect(wkd?.sql).toContain('SET "tenantId" = $1');
+            expect(wkd?.sql).not.toContain('"organizationId" = $2');
+            expect(wkd?.sql).toContain('FROM "works" p');
+            expect(wkd?.sql).toContain('"work_knowledge_documents"."workId" = p."id"');
+            expect(wkd?.sql).toContain('"work_knowledge_documents"."tenantId" IS NULL');
+            expect(wkd?.params).toEqual(['t-1', 'u-1']);
+
+            // github_app_installations is NEVER touched (shared resource).
+            const ghaTouched = queryLog.some((q) =>
+                q.sql.includes('UPDATE "github_app_installations"'),
+            );
+            expect(ghaTouched).toBe(false);
         });
 
         it('EW-663 Phase 11: idempotency — second call returns tierCRowsUpdated = 0', async () => {
@@ -457,8 +547,9 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             // The UPDATE statements are still issued — idempotency is
             // a property of the WHERE filter, not of skipping calls.
             const updates = queryLog.filter((q) => q.sql.startsWith('UPDATE'));
-            // 14 Tier A + 5 Tier B + 5 Tier C direct + 20 Tier C join = 44.
-            expect(updates.length).toBe(44);
+            // 14 Tier A + 5 Tier B + 5 Tier C direct + 20 Tier C join
+            // + 6 indirect (5 both-column + 1 wkd tenantId-only) = 50.
+            expect(updates.length).toBe(50);
         });
 
         it('EW-663 Phase 11: bumps statement_timeout to 60s on Postgres for Tier C headroom', async () => {
