@@ -43,3 +43,63 @@ export async function GET(_request: NextRequest) {
         return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 });
     }
 }
+
+/**
+ * EW-661 (Tenants & Organizations Phase 9) — web BFF proxy for
+ * `POST /api/organizations`.
+ *
+ * Forwards the JSON body (`{ name, slug? }`) verbatim to the NestJS API
+ * with the user's bearer token attached. Returns the new
+ * `OrganizationResponse` payload as-is so the client-side
+ * `CreateOrganizationModal` can read `slug` to navigate, and `id` to
+ * call the follow-up `upgrade-from-account` endpoint.
+ *
+ * Error status codes from the upstream are passed through (e.g. 409
+ * slug-conflict, 400 validation failure) so the modal can render the
+ * right copy.
+ */
+export async function POST(request: NextRequest) {
+    const token = await getAuthAccessCookie();
+    if (!token) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let body: unknown;
+    try {
+        body = await request.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const headers = new Headers();
+    headers.set('Authorization', `Bearer ${token}`);
+    headers.set('Content-Type', 'application/json');
+
+    try {
+        const upstream = await fetch(`${API_URL}/organizations`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            cache: 'no-store',
+        });
+        const text = await upstream.text();
+        const payload = text ? safeParse(text) : null;
+        if (!upstream.ok) {
+            return NextResponse.json(payload ?? { error: 'Failed to create organization' }, {
+                status: upstream.status || 500,
+            });
+        }
+        return NextResponse.json(payload, { status: 201 });
+    } catch (error) {
+        console.error('Failed to proxy POST /api/organizations:', error);
+        return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 });
+    }
+}
+
+function safeParse(text: string): unknown {
+    try {
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}
