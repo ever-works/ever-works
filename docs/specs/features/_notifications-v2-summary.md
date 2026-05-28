@@ -53,8 +53,12 @@
 
 - **EW-670** Agent integration: `sendEmail` + `messageAgent` tools + dispatcher + git facade
 - **EW-675** WhatsApp + Novu channel plugins
-- **EW-676** Event registry + plugin manifest extension
 - **EW-677** UserNotificationSubscriptionService + delayed-delivery BullMQ queue
+
+### Newly done (this overnight cron loop)
+
+- **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
+- **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + follow-up
 
 ## Verified locally
 

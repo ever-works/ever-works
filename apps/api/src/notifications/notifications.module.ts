@@ -9,6 +9,7 @@ import { NotificationCleanupService } from './notification-cleanup.service';
 import { NotificationPreferencesController } from './notification-preferences.controller';
 import { NotificationPreferencesService } from './notification-preferences.service';
 import { NotificationFanoutListener } from './notification-fanout.listener';
+import { NotificationEventTypeBootstrap } from './notification-event-type-bootstrap.service';
 
 @Module({
     imports: [AgentNotificationsModule, DatabaseModule, FacadesModule, AuthModule],
@@ -24,6 +25,10 @@ import { NotificationFanoutListener } from './notification-fanout.listener';
         // producers and routes to NotificationChannelFacadeService. Failures
         // never propagate back into the v1 in-app create path.
         NotificationFanoutListener,
+        // EW-664 / EW-676 / T21 — on bootstrap, upserts plugin-contributed
+        // notification event types into the registry. Core event types are
+        // seeded by SeedNotificationEventTypes1780000010000.
+        NotificationEventTypeBootstrap,
     ],
     exports: [AgentNotificationsModule, NotificationPreferencesService],
 })
