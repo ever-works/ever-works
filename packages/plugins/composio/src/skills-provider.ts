@@ -6,7 +6,7 @@ import type {
 	SkillCatalogUpdate
 } from '@ever-works/plugin';
 
-import { ComposioClient } from './utils/composio-client.js';
+import { ComposioClient, type ComposioSdkLike } from './utils/composio-client.js';
 
 const SKILL_VERSION = '1.0.0';
 const ACTIVE_STATUS = 'ACTIVE';
@@ -16,7 +16,8 @@ interface BuildEntriesOptions {
 	baseUrl?: string;
 	defaultUserId?: string;
 	logger?: { log(...args: unknown[]): void; warn(...args: unknown[]): void };
-	fetchImpl?: typeof fetch;
+	/** Test seam — inject a mocked SDK to bypass real Composio construction. */
+	sdkOverride?: ComposioSdkLike;
 }
 
 /**
@@ -34,7 +35,7 @@ export async function buildSkillCatalogEntries({
 	baseUrl,
 	defaultUserId,
 	logger,
-	fetchImpl
+	sdkOverride
 }: BuildEntriesOptions): Promise<SkillCatalogEntry[]> {
 	if (!apiKey || !defaultUserId) return [];
 
@@ -42,7 +43,7 @@ export async function buildSkillCatalogEntries({
 		apiKey,
 		baseUrl,
 		logger: logger ?? { log: () => undefined, warn: () => undefined },
-		fetchImpl
+		...(sdkOverride ? { sdkOverride } : {})
 	});
 
 	const accounts = await client.listConnectedAccounts(defaultUserId);
@@ -116,10 +117,7 @@ export function filterSkillCatalog(
 	if (options.search) {
 		const q = options.search.toLowerCase();
 		filtered = filtered.filter(
-			(e) =>
-				e.slug.includes(q) ||
-				e.title.toLowerCase().includes(q) ||
-				e.description.toLowerCase().includes(q)
+			(e) => e.slug.includes(q) || e.title.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)
 		);
 	}
 	if (options.tags && options.tags.length > 0) {

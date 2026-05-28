@@ -1,21 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ComposioPlugin } from '../composio.plugin.js';
-import {
-	buildSkillCatalogEntries,
-	diffSkillCatalogVersions,
-	filterSkillCatalog
-} from '../skills-provider.js';
+import { buildSkillCatalogEntries, diffSkillCatalogVersions, filterSkillCatalog } from '../skills-provider.js';
+import type { ComposioSdkLike } from '../utils/composio-client.js';
 import type { SkillCatalogEntry } from '@ever-works/plugin';
 
-function jsonResponse(body: unknown): Response {
-	return new Response(JSON.stringify(body), {
-		status: 200,
-		headers: { 'content-type': 'application/json' }
-	});
-}
-
-function mockFetchAccounts(items: unknown[]): typeof fetch {
-	return vi.fn().mockResolvedValue(jsonResponse({ items })) as unknown as typeof fetch;
+function mockSdkWithAccounts(items: unknown[]): ComposioSdkLike {
+	return {
+		toolkits: { get: vi.fn() },
+		connectedAccounts: {
+			list: vi.fn().mockResolvedValue({ items })
+		},
+		tools: { execute: vi.fn() }
+	} as unknown as ComposioSdkLike;
 }
 
 describe('Composio skills-provider — capability surface', () => {
@@ -48,7 +44,7 @@ describe('buildSkillCatalogEntries', () => {
 	});
 
 	it('emits one entry per unique ACTIVE toolkit, skipping INITIATED/EXPIRED', async () => {
-		const fetchImpl = mockFetchAccounts([
+		const sdkOverride = mockSdkWithAccounts([
 			{ id: 'ca_1', status: 'ACTIVE', toolkit: { slug: 'GMAIL' } },
 			{ id: 'ca_2', status: 'ACTIVE', toolkit: { slug: 'GMAIL' } }, // duplicate toolkit
 			{ id: 'ca_3', status: 'ACTIVE', toolkit: { slug: 'GITHUB' } },
@@ -60,7 +56,7 @@ describe('buildSkillCatalogEntries', () => {
 			apiKey: 'k',
 			baseUrl: 'https://composio.test/api/v3',
 			defaultUserId: 'user-1',
-			fetchImpl
+			sdkOverride
 		});
 
 		expect(entries.map((e) => e.slug)).toEqual(['composio-github', 'composio-gmail']);
@@ -73,13 +69,11 @@ describe('buildSkillCatalogEntries', () => {
 	});
 
 	it('returns empty when the user has no ACTIVE connections', async () => {
-		const fetchImpl = mockFetchAccounts([
-			{ id: 'ca_1', status: 'INITIATED', toolkit: { slug: 'GMAIL' } }
-		]);
+		const sdkOverride = mockSdkWithAccounts([{ id: 'ca_1', status: 'INITIATED', toolkit: { slug: 'GMAIL' } }]);
 		const entries = await buildSkillCatalogEntries({
 			apiKey: 'k',
 			defaultUserId: 'user-1',
-			fetchImpl
+			sdkOverride
 		});
 		expect(entries).toEqual([]);
 	});
@@ -144,9 +138,7 @@ describe('diffSkillCatalogVersions', () => {
 			}
 		];
 		const result = diffSkillCatalogVersions(entries, { 'composio-gmail': '0.9.0' });
-		expect(result.updated).toEqual([
-			{ slug: 'composio-gmail', oldVersion: '0.9.0', newVersion: '1.0.0' }
-		]);
+		expect(result.updated).toEqual([{ slug: 'composio-gmail', oldVersion: '0.9.0', newVersion: '1.0.0' }]);
 	});
 
 	it('ignores entries the user does not have installed', () => {
