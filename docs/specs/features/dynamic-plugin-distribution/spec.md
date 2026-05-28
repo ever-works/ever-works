@@ -58,13 +58,17 @@ isn't present yet.
   provider's model list), **when** it runs, **then** the dynamically-installed
   plugin executes in-process via dynamic import with no extra hop.
 - **Given** a long-running capability call (e.g. a full generation pipeline
-  step), **when** it runs, **then** the plugin executes inside the pluggable
-  job runtime (Trigger.dev today) where third-party code is already isolated,
-  and the result is returned through the existing job result channel.
+  step), **when** it runs, **then** the job-runtime worker first ensures the
+  plugin is installed in its own store (lazy install-on-use), then executes it
+  inside the isolated task process, returning the result through the existing
+  job result channel.
+- **Given** a plugin was enabled on one API replica, **when** a later request
+  for it is routed to a *different* replica (or the worker) that has not yet
+  installed it, **then** that node lazily installs it on first use and serves the
+  request — no restart or shared volume required.
 - **Given** a fresh pod / new replica in dynamic mode, **when** it boots,
-  **then** it reconciles its local plugin store against the set of
-  installed/enabled plugins recorded in the database, re-installing any that
-  are missing, before serving traffic.
+  **then** it warms its local store by pre-installing the DB-recorded
+  installed/enabled set, and in any case lazily installs any plugin on first use.
 
 ### 2.2 Edge cases & failures
 
@@ -142,9 +146,15 @@ Runtime install / enable:
 - **FR-12** The system MUST persist, per plugin, its distribution source
   (`bundled` | `registry`), the installed package spec, the installed version,
   and the integrity value used.
-- **FR-13** On boot in dynamic mode, the system MUST reconcile the local plugin
-  store against the database record of installed/enabled distributable plugins,
-  re-installing any missing ones before marking itself ready.
+- **FR-13** Every node — each API replica **and** each job-runtime worker — MUST
+  ensure a distributable plugin is installed in its own local store before
+  invoking it (**lazy install-on-use**), so a plugin enabled on one replica is
+  usable on all replicas and in the worker **without** requiring a restart or a
+  shared volume. This is the correctness guarantee for per-replica stores.
+- **FR-13a** On boot in dynamic mode, a node SHOULD pre-install (warm) the
+  DB-recorded installed/enabled distributable set to avoid a first-request
+  latency spike. Boot reconcile is an optimisation, not the correctness
+  mechanism (FR-13 is).
 - **FR-14** A failed install MUST leave the plugin in a clearly-failed state
   with a recorded reason and MUST NOT register a partially-loaded plugin.
 
@@ -241,8 +251,10 @@ Compatibility:
 - [ ] A corrupted/integrity-mismatched download is refused and nothing loads.
 - [ ] A registry outage fails new installs cleanly while installed plugins keep
       working; retry succeeds when the registry returns.
-- [ ] A new replica reconciles its plugin store from the DB on boot and serves
-      the same enabled plugins as its peers.
+- [ ] A plugin enabled on one API replica is served by a different replica that
+      never handled the enable, via lazy install-on-use, with no restart.
+- [ ] A long-running call for a runtime-installed plugin succeeds in the
+      job-runtime worker (worker lazily installs it into its own store first).
 - [ ] Short capability calls run in-process; long-running ones run in the job
       runtime — verified by an integration test of each path.
 - [ ] Core/`systemPlugin` plugins cannot be uninstalled or disabled.

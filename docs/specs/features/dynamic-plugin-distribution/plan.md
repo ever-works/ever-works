@@ -193,9 +193,10 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 
 | Trigger | When | What it does | Idempotency strategy |
 | ------- | ---- | ------------ | -------------------- |
-| Boot reconcile (on `onApplicationBootstrap`) | Every API start in dynamic mode | Install any DB-recorded installed/enabled distributable plugins missing from the local store. | Per-plugin install is idempotent (version+integrity pinned); skip if present. |
-| Long-running capability dispatch | Per pipeline/long op | Run plugin call inside the job runtime task that imports the plugin. | Existing job idempotency / CAS in the task layer. |
-| Optional GC (later) | Cron | Remove store files for long-unused disabled plugins. | Guarded by retention policy; out of v1 unless cheap. |
+| **Lazy install-on-use** (`ensurePluginAvailable`) | Before *any* node invokes a distributable plugin (API replica or worker) | Install the pinned package into the local store if missing, then load+register. **The correctness guarantee** — a plugin enabled on one replica works on all replicas/worker with no restart or shared volume. | Per-id concurrency lock + version/integrity pin; skip if present. |
+| Boot reconcile (on `onApplicationBootstrap`) | Every API/worker start in dynamic mode | Warm the store by pre-installing the DB-recorded installed/enabled set. Optimisation only (avoids first-request latency), not correctness. | Same `ensurePluginAvailable`; idempotent. |
+| Long-running capability dispatch | Per pipeline/long op | In the job-runtime worker, call `ensurePluginAvailable` then run the plugin inside the isolated task. The worker has its own store, so it installs on first use just like the API. | Existing job idempotency / CAS in the task layer. |
+| GC | — | Out of scope for v1 (decided: keep installed files on disable, no GC). | n/a |
 
 ## 8. Security & Permissions
 
@@ -248,7 +249,8 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 | Risk | Likelihood | Impact | Mitigation |
 | ---- | ---------- | ------ | ---------- |
 | Registry outage blocks enabling new plugins | Med | Med | Installed plugins unaffected; clean retryable failures; optional warm cache/mirror. |
-| Cold-start install cost on new replicas | Med | Med | Per-replica reconcile in parallel; consider baking "popular" plugins; readiness gate until reconcile done. |
+| Cold-start install cost on new replicas | Med | Med | Boot warmup pre-installs in parallel; lazy install-on-use covers anything not warmed; consider baking "popular" plugins. |
+| Plugin enabled on replica A not present on replica B / worker | High | High | **Lazy install-on-use** (`ensurePluginAvailable`) on every node before invocation — not boot-only reconcile. Worker installs into its own store too. (Codex P1 ×2.) |
 | Running untrusted-ish 3rd-party code in API process | Low (allowlist) | High | Allowlist + integrity; long-running paths in isolated job runtime; sandbox is a documented future phase. |
 | Read-only FS targets (Vercel) can't install at runtime | Med | Low | Dynamic mode requires writable store; Vercel/serverless documented as bundled-only. |
 | API hard-deps on storage plugins block making them distributable | High | Low | **Decided**: remove the direct imports, resolve storage via the facade, keep `local-fs` as core default (so the API boots storage-less of any distributable plugin). |

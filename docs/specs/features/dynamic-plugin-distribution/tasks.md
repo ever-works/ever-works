@@ -107,11 +107,15 @@
       install → `PluginLoaderService.load(path)` → register → then enable.
       Bundled mode unchanged. Update `installState` transitions + failure reason.
     - **Test**: enable-installs-then-enables; failure leaves no partial registration (FR-14).
-- [ ] **T19**. Boot reconcile in
-      `packages/agent/src/plugins/services/plugin-bootstrap.service.ts`: in
-      dynamic mode, install any DB-recorded installed/enabled distributable
-      plugins missing from the store before marking ready (FR-13). Idempotent.
-    - **Test**: reconcile installs missing, skips present, is safe to re-run.
+- [ ] **T19**. **Lazy install-on-use** `ensurePluginAvailable(pluginId)` on the
+      installer/loader path: before any node invokes a distributable plugin,
+      install-if-missing (pinned version+integrity, per-id lock) then load+register.
+      This is the correctness guarantee (FR-13) — a plugin enabled on replica A is
+      usable on replica B and in the worker with no restart/shared volume. Also add
+      **boot warmup** in `plugin-bootstrap.service.ts` that pre-installs the
+      DB-recorded set (FR-13a, optimisation only). Idempotent.
+    - **Test**: enable on one registry instance → second instance with empty store
+      lazily installs on first use; warmup pre-installs; both safe to re-run.
 - [ ] **T20**. Uninstall path (`DELETE /plugins/:id/install` service method);
       refuse for core/`systemPlugin`; default retention = keep files, mark
       not-installed. **Test**: core refusal + non-core uninstall.
@@ -142,9 +146,13 @@
       dynamically-loaded plugin directly for `sync` operations (FR-15). No change
       for bundled/core. **Test**: short call stays in-process (no job dispatch).
 - [ ] **T27**. Long-running path: route `long-running` plugin calls through the
-      job runtime (Trigger.dev task in `packages/tasks/src/tasks/trigger/`) that
-      imports the plugin and returns via the existing result channel (FR-16).
-      Coordinate with [EW-683] for provider abstraction. **Test**: long call dispatched.
+      job runtime (Trigger.dev task in `packages/tasks/src/tasks/trigger/`). The
+      task MUST call `ensurePluginAvailable` (T19) **first** — the worker is a
+      separate runtime with its own store, so a runtime-installed plugin is absent
+      there until installed — then import the plugin and return via the existing
+      result channel (FR-16). Coordinate with [EW-683] for provider abstraction.
+    - **Test**: long call for a runtime-installed plugin succeeds in the worker
+      (worker installs into its own store first), not just the API.
 - [ ] **T28**. Result/error propagation + timeout/retry parity between paths.
 
 ## Phase 8 — Deployment (T29–T32)

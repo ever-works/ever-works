@@ -69,8 +69,11 @@ Supporting decisions:
 
 - New supply-chain surface: registry availability, auth, integrity, allowlist
   administration.
-- Cold-start install cost on fresh replicas (mitigated by boot reconcile +
-  optional baking/PVC).
+- Cold-start install cost on fresh replicas (mitigated by boot warmup + optional
+  baking/PVC). Cross-replica/worker correctness relies on **lazy install-on-use**
+  (`ensurePluginAvailable` runs on every node — API replicas and the job-runtime
+  worker — before invoking a plugin), not boot reconcile alone; the worker
+  installs into its own store on first use. (Resolves Codex P1 ×2 on PR #1098.)
 - Dynamic mode requires a writable runtime store, so read-only-FS serverless
   targets (Vercel) remain `bundled`-only. The store is just a writable directory
   (default `/app/plugins`), per-replica with boot reconcile — no shared volume or

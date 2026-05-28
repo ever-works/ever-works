@@ -105,22 +105,43 @@ Key properties:
   `await import(entryPath)`, and `DEFAULT_PLUGIN_PATHS` already includes
   `./plugins` and `./node_modules/@ever-works`.
 
-## 6. Boot reconcile
+## 6. Install propagation across replicas & workers
 
 Pods are ephemeral and replicas scale horizontally; the **database is the source
-of truth** for which distributable plugins are installed/enabled. On
-`onApplicationBootstrap` in dynamic mode, `PluginBootstrapService` reconciles:
+of truth** for which distributable plugins are installed/enabled. With a
+per-replica store, two mechanisms keep every node consistent **without** a shared
+volume:
+
+**(a) Lazy install-on-use — the correctness guarantee.** Before any node (an API
+replica *or* a job-runtime worker) invokes a distributable plugin, it ensures the
+package is present locally and installs it if not:
+
+```
+ensurePluginAvailable(pluginId):
+    rec = DB row for pluginId            # source, registrySpec, integrity
+    if rec.source == 'registry' and (not present in store OR integrity mismatch):
+        PluginInstallerService.install(rec.registrySpec, rec.integrity)  # idempotent, per-id lock
+    load + register if not already in this process's registry
+```
+
+This closes the gap Codex flagged: when pod A handles the first enable and marks
+the plugin `installed` in the DB, pod B (and the worker) do **not** need a restart
+— the first request that reaches them lazily installs the package before use. The
+per-id concurrency lock + integrity pin make concurrent lazy installs safe.
+
+**(b) Boot reconcile — a warmup optimisation.** On `onApplicationBootstrap` in
+dynamic mode, `PluginBootstrapService` pre-installs the DB-recorded
+installed/enabled set so a freshly-started replica is warm before taking traffic:
 
 ```
 for each DB plugin where source='registry' and (installed or enabled):
-    if not present in PLUGIN_INSTALL_DIR (or integrity mismatch):
-        PluginInstallerService.install(pinned version + integrity)
-mark ready only after reconcile completes (readiness gate)
+    ensurePluginAvailable(pluginId)
+optionally gate readiness until warmup completes
 ```
 
-This makes a fresh replica converge to its peers without shared storage. A
-shared RWX volume or a "bake popular plugins into the image" optimisation can
-reduce cold-start cost later, but is not required for correctness.
+Reconcile is **not** the correctness mechanism (lazy install-on-use is) — it just
+avoids a first-request latency spike. A shared RWX volume or "bake popular plugins
+into the image" can further reduce cold-start cost, but neither is required.
 
 ## 7. Execution model
 
@@ -134,6 +155,16 @@ operation's `executionProfile`:
   **pluggable job runtime** (Trigger.dev today). Plugin code imported inside the
   task process is **already isolated** there, and the result returns through the
   existing job result channel.
+
+> **The worker is a separate runtime with its own store.** The Trigger.dev worker
+> is deployed independently from the API and prepares its own `./plugins` bundle
+> at deploy time — so a plugin *installed at runtime in the API* does **not**
+> exist in the worker. The long-running path therefore calls the same
+> `ensurePluginAvailable()` (§6 lazy install-on-use) inside the task **before**
+> invoking the plugin, installing into the worker's own store on first use. The
+> installer (`@ever-works/agent` plugins module) runs in the worker just as it
+> does in the API. Without this, an enable that succeeds in the API would fail the
+> first long-running call in the worker — the second P1 Codex flagged.
 
 This is why v1 needs no bespoke sandbox: long-running third-party work inherits
 the job runtime's isolation, and the install allowlist limits what can run at
