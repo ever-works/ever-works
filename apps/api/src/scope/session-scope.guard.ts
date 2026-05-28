@@ -23,32 +23,33 @@ import { ScopeContextService } from './scope-context.service';
  * populates `request.user`, so it has no user to read `tenantId` /
  * `lastScopeOrganizationId` from. This guard runs AFTER `AuthSessionGuard`
  * (guards execute in `providers`-array registration order — see
- * `api.module.ts`) and seeds the scope in place via
+ * `api.module.ts`) and does TWO things: hydrates `req.user.tenantId`
+ * and, on legacy routes, seeds the default scope in place via
  * [`ScopeContextService.setScope`](./scope-context.service.ts).
  *
- * **Behavior** (always returns `true` — this guard never blocks, it
- * only seeds scope):
+ * **Behavior** (always returns `true` — this guard never blocks):
  *
  *   - Non-HTTP context (RPC / WS) → allow, do nothing.
- *   - Scope already resolved (`scope.tenantId !== null`) → a slug
- *     resolved a scope (Phase 7 middleware did its job, or it's a
- *     slug-prefixed route) → allow, do nothing.
- *   - No `request.user` → unauthenticated; nothing to seed → allow.
- *   - User has a `tenantId` → seed `{ tenantId, organizationId:
- *     lastScopeOrganizationId ?? null }`.
- *   - User has a null `tenantId` (never created an Org) → leave
- *     `EMPTY_SCOPE`; nothing to seed.
+ *   - No `request.user` → unauthenticated; nothing to hydrate → allow.
+ *   - Otherwise: load the user row once and HYDRATE
+ *     `req.user.tenantId` (the auth layer never sets it). This happens
+ *     on BOTH legacy and slug-prefixed routes — see below.
+ *   - Then SEED scope only if no slug already resolved one
+ *     (`scope.tenantId === null`) AND the user has a Tenant →
+ *     `{ tenantId, organizationId: lastScopeOrganizationId ?? null }`.
+ *     A user with no Tenant leaves `EMPTY_SCOPE`.
  *
- * **Why this guard is positioned before `ScopeOwnershipGuard`:** the
- * seeded scope is the user's OWN Tenant, so the ownership check passes
- * trivially (`user.tenantId === scope.tenantId`).
+ * **Why hydrate on slug routes too (not just legacy):** the next guard,
+ * `ScopeOwnershipGuard`, authorizes by comparing `req.user.tenantId`
+ * against the resolved `scope.tenantId`. `AuthenticatedUser` doesn't
+ * carry `tenantId`, so if we only hydrated on legacy routes, every
+ * authenticated slug-prefixed request would 403. (Codex + Greptile P1
+ * on PR #1074.) Positioned before `ScopeOwnershipGuard` so the
+ * hydrated value + seeded scope are both visible to it.
  *
- * **Performance:** the `AuthenticatedUser` request object does NOT carry
- * `tenantId` / `lastScopeOrganizationId`, so we look the user up with
- * one extra `findById` per authenticated request that reaches this guard
- * WITH an empty scope — i.e. legacy un-prefixed routes only. Slug routes
- * short-circuit on the `scope.tenantId !== null` check above and never
- * hit the database here. That cost is acceptable.
+ * **Performance:** one extra indexed-PK `findById` per authenticated
+ * request. Acceptable; can be cached or folded into the auth token in
+ * a later optimization.
  */
 @Injectable()
 export class SessionScopeGuard implements CanActivate {
