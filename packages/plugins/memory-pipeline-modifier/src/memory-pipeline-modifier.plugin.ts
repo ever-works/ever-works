@@ -2,6 +2,7 @@ import type {
 	IPlugin,
 	IPipelineModifierPlugin,
 	IPipelineContext,
+	ModifierBuildTimeCheck,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -208,6 +209,17 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		return settings.enabled !== true;
 	}
 
+	/**
+	 * KB option B (PR #1087). The pipeline-builder calls this BEFORE
+	 * injecting our steps, so disabling the modifier here means zero
+	 * overhead on the host pipeline — no STEP_STARTED events, no step
+	 * metrics, no executor branching. Decision is purely settings-based,
+	 * matching the existing `canSkip(context)` semantics.
+	 */
+	async canSkipAtBuildTime(input: ModifierBuildTimeCheck): Promise<boolean> {
+		return input.settings.enabled !== true;
+	}
+
 	async execute(
 		context: IPipelineContext,
 		options?: StepExecutionOptions,
@@ -228,12 +240,13 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 		const logger = execContext?.logger ?? console;
 
-		// Honour the work-scoped `enabled` flag at execution time —
-		// `canSkip()` is not currently called by the pipeline builder
-		// (Codex P2 on PR #1081). Until that wiring lands, gate inside
-		// `execute()` so toggling the flag actually disables the steps.
+		// As of PR #1087, `canSkipAtBuildTime` gates this modifier
+		// before its steps are injected, so reaching `execute()` already
+		// implies `settings.enabled === true`. We keep a defensive
+		// check here as a safety net in case the host doesn't honour
+		// canSkipAtBuildTime (older agent build, third-party orchestrator):
+		// silently no-op without warning.
 		if (settings.enabled !== true) {
-			logger.log(`memory-pipeline-modifier: step "${stepId}" disabled by settings — skipping`);
 			return context;
 		}
 
@@ -245,6 +258,12 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			);
 			return context;
 		}
+
+		// Stash execContext on the context bag so rollback() can find the
+		// bound memory facade later — rollback's interface signature is
+		// (context, error) without an options bag, so this is the only
+		// way to thread the facade through without changing the contract.
+		(context as ContextBag).__memoryModifierExecContext = execContext;
 
 		if (stepId === FETCH_CONTEXT_STEP_ID) {
 			return await this.runFetchContext(context as ContextBag, memoryFacade, settings, logger);
@@ -258,6 +277,72 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 	async validate(_context: IPipelineContext): Promise<{ valid: boolean; error?: string }> {
 		return { valid: true };
+	}
+
+	/**
+	 * Called by the step-pipeline-executor when the host pipeline fails
+	 * or is cancelled. The `last`-positioned `memory-save` step never
+	 * fires in that case (the executor breaks out of the step loop
+	 * before reaching `last`), so we use rollback to persist a digest
+	 * tagged `failed` / `cancelled` instead.
+	 *
+	 * Note: the rollback interface doesn't include `options` / `execContext`,
+	 * so we recover the bound memory facade by reading it from the
+	 * context bag where `execute()` stashed it on its first run. If the
+	 * fetch-context step never ran (e.g. modifier disabled, or the
+	 * pipeline failed before group 0), there's nothing stashed and we
+	 * no-op silently.
+	 */
+	async rollback(context: IPipelineContext, error: Error): Promise<void> {
+		const settings = this.resolveSettings(context);
+		if (settings.enabled !== true) return;
+		if (settings.saveSummary === false) return;
+
+		const execContext = (context as ContextBag).__memoryModifierExecContext as StepExecutionContext | undefined;
+		const memoryFacade = execContext?.agentMemoryFacade;
+		const logger = execContext?.logger ?? console;
+
+		if (!memoryFacade) {
+			// fetch-context didn't run, or the modifier was disabled when
+			// it did. Either way there's no facade to call.
+			return;
+		}
+
+		try {
+			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
+			const items = (context as { items?: unknown[] }).items;
+			const isCancellation = this.looksLikeCancellation(error);
+
+			const summary = this.buildFailureSummary(work, items, error, isCancellation);
+			const tags = this.buildFailureTags(work, isCancellation);
+
+			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
+				{
+					content: summary,
+					tags,
+					projectId: work?.slug ?? work?.id,
+					metadata: {
+						workId: work?.id,
+						workSlug: work?.slug,
+						itemCount: Array.isArray(items) ? items.length : undefined,
+						errorMessage: error.message,
+						errorName: error.name,
+						failedAt: new Date().toISOString()
+					}
+				},
+				{ userId: 'bound', workId: 'bound' }
+			);
+
+			logger.log(
+				`memory-rollback: saved ${isCancellation ? 'cancellation' : 'failure'} observation ${record.id} for Work "${work?.slug ?? work?.id ?? '?'}"`
+			);
+		} catch (rollbackError) {
+			const message = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+			logger.warn(`memory-rollback: failed to save failure observation — ${message}`);
+			// Do not rethrow — the host executor catches and demotes
+			// rollback errors, but defending here too keeps the
+			// invariant local.
+		}
 	}
 
 	// ── step implementations ───────────────────────────────────────────
@@ -317,11 +402,10 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
 			const items = (context as { items?: unknown[] }).items;
 
-			// v1 records SUCCESSFUL runs only — the `last` step doesn't
-			// fire when an earlier step throws or the run is cancelled
-			// (Codex P2 on PR #1081). Capturing failure/cancellation
-			// signals will move to an `IPipelineModifierPlugin.rollback`
-			// hook in a follow-up PR; the tag taxonomy stays the same.
+			// `memory-save` only runs on success — failure / cancellation
+			// digests are persisted via `rollback()` instead. Codex P2 on
+			// PR #1081 spotted that the failed/cancelled branches were
+			// unreachable at this step's call site.
 			const summary = this.buildSummary(work, items);
 			const tags = this.buildTags(work);
 
@@ -381,5 +465,41 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		if (work?.slug) tags.push(`work:${work.slug}`);
 		else if (work?.id) tags.push(`work-id:${work.id}`);
 		return tags;
+	}
+
+	private buildFailureSummary(
+		work: { id?: string; name?: string; slug?: string } | undefined,
+		items: unknown[] | undefined,
+		error: Error,
+		isCancellation: boolean
+	): string {
+		const workLabel = work?.name ?? work?.slug ?? work?.id ?? 'unknown Work';
+		const count = Array.isArray(items) ? items.length : 0;
+		const verb = isCancellation ? 'cancelled' : 'failed';
+		const trimmedMessage = (error.message ?? '').slice(0, 240);
+		const itemNote = count > 0 ? ` (${count} item${count === 1 ? '' : 's'} produced before stop)` : '';
+		return `Work "${workLabel}" — pipeline ${verb}${itemNote}: ${trimmedMessage}`;
+	}
+
+	private buildFailureTags(
+		work: { id?: string; slug?: string } | undefined,
+		isCancellation: boolean
+	): readonly string[] {
+		// `let` because we push into this — matches the team's "const
+		// for non-mutated values" rule (greptile P2 on PR #1082).
+		// eslint-disable-next-line prefer-const
+		let tags: string[] = ['pipeline-run', isCancellation ? 'cancelled' : 'failed'];
+		if (work?.slug) tags.push(`work:${work.slug}`);
+		else if (work?.id) tags.push(`work-id:${work.id}`);
+		return tags;
+	}
+
+	private looksLikeCancellation(error: Error): boolean {
+		// step-pipeline-executor builds the cancellation error with the
+		// "Pipeline cancelled" prefix. We also catch `AbortError` for
+		// callers that wrap the signal directly.
+		const name = error.name?.toLowerCase() ?? '';
+		const message = error.message?.toLowerCase() ?? '';
+		return name === 'aborterror' || message.includes('cancelled') || message.includes('canceled');
 	}
 }

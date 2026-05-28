@@ -26,6 +26,9 @@ import type {
     ExistingItems,
     IPipelineContext,
     PipelineExecutionOptions,
+    IPipelineModifierPlugin,
+    PipelineStepDefinition,
+    PluginCategory,
 } from '@ever-works/plugin';
 
 /** Simple 3-step linear chain for executor tests */
@@ -397,6 +400,163 @@ describe('StepPipelineExecutorService', () => {
                 PipelineEvents.CANCELLED,
                 expect.any(Object),
             );
+        });
+
+        describe('modifier rollback wiring', () => {
+            function makeMockModifier(
+                id: string,
+                stepDef: PipelineStepDefinition,
+            ): IPipelineModifierPlugin & { rollback: jest.Mock; execute: jest.Mock } {
+                return {
+                    id,
+                    name: `Mock modifier ${id}`,
+                    version: '1.0.0',
+                    category: 'utility' as PluginCategory,
+                    capabilities: ['pipeline-modifier'],
+                    targetPipelines: ['standard-pipeline'],
+                    settingsSchema: { type: 'object', properties: {} },
+                    configurationMode: 'hybrid',
+                    onLoad: jest.fn(),
+                    onUnload: jest.fn(),
+                    getStepDefinition: () => stepDef,
+                    execute: jest
+                        .fn()
+                        .mockImplementation((ctx: IPipelineContext) => Promise.resolve(ctx)),
+                    rollback: jest.fn().mockResolvedValue(undefined),
+                } as unknown as IPipelineModifierPlugin & {
+                    rollback: jest.Mock;
+                    execute: jest.Mock;
+                };
+            }
+
+            function registerModifier(
+                modifier: IPipelineModifierPlugin & { rollback: jest.Mock },
+            ): void {
+                registry.register(modifier, {
+                    id: modifier.id,
+                    name: modifier.name,
+                    version: modifier.version,
+                    description: 'Test modifier',
+                    category: modifier.category,
+                    capabilities: ['pipeline-modifier'],
+                    targetPipelines: modifier.targetPipelines as string[],
+                    autoEnable: true,
+                });
+                registry.updateState(modifier.id, 'loaded');
+            }
+
+            it('invokes modifier.rollback when the pipeline fails mid-run', async () => {
+                const modifier = makeMockModifier('mod-failure', {
+                    id: 'mod-injected-step',
+                    name: 'Injected step',
+                    position: { type: 'first' },
+                });
+                registerModifier(modifier);
+
+                // The outer beforeEach makes step-init set ctx.shouldStop;
+                // override it so the pipeline actually progresses to
+                // step-process.
+                standardPlugin.registerStepExecutor('step-init', {
+                    name: 'Step Init',
+                    run: jest.fn().mockResolvedValue(undefined),
+                });
+                standardPlugin.registerStepExecutor('step-process', {
+                    name: 'Step Process',
+                    run: jest.fn().mockRejectedValue(new Error('process failure')),
+                });
+
+                const result = await service.execute(
+                    standardPlugin,
+                    mockWork,
+                    mockRequest,
+                    mockExisting,
+                );
+
+                expect(result.success).toBe(false);
+                expect(modifier.rollback).toHaveBeenCalledTimes(1);
+                const [ctxArg, errArg] = modifier.rollback.mock.calls[0];
+                expect(ctxArg).toBeDefined();
+                expect(errArg).toBeInstanceOf(Error);
+                expect((errArg as Error).message).toBe('process failure');
+            });
+
+            it('invokes modifier.rollback when the pipeline is cancelled', async () => {
+                const modifier = makeMockModifier('mod-cancel', {
+                    id: 'mod-injected-cancel-step',
+                    name: 'Cancellation-aware injected step',
+                    position: { type: 'first' },
+                });
+                registerModifier(modifier);
+
+                const controller = new AbortController();
+                controller.abort();
+
+                await service.execute(standardPlugin, mockWork, mockRequest, mockExisting, {
+                    signal: controller.signal,
+                });
+
+                expect(modifier.rollback).toHaveBeenCalledTimes(1);
+                const [, errArg] = modifier.rollback.mock.calls[0];
+                expect((errArg as Error).message).toMatch(/cancelled/i);
+            });
+
+            it('swallows rollback errors so the original failure still surfaces', async () => {
+                const modifier = makeMockModifier('mod-bad-rollback', {
+                    id: 'mod-bad-rollback-step',
+                    name: 'Misbehaving rollback modifier',
+                    position: { type: 'first' },
+                });
+                modifier.rollback.mockRejectedValueOnce(new Error('rollback exploded'));
+                registerModifier(modifier);
+
+                standardPlugin.registerStepExecutor('step-init', {
+                    name: 'Step Init',
+                    run: jest.fn().mockResolvedValue(undefined),
+                });
+                standardPlugin.registerStepExecutor('step-process', {
+                    name: 'Step Process',
+                    run: jest.fn().mockRejectedValue(new Error('original pipeline failure')),
+                });
+
+                const result = await service.execute(
+                    standardPlugin,
+                    mockWork,
+                    mockRequest,
+                    mockExisting,
+                );
+
+                // The pipeline still reports the ORIGINAL failure, not the
+                // rollback failure — rollback is best-effort.
+                expect(result.success).toBe(false);
+                expect(modifier.rollback).toHaveBeenCalled();
+                expect(eventEmitter.emit).toHaveBeenCalledWith(
+                    PipelineEvents.FAILED,
+                    expect.objectContaining({
+                        error: expect.stringMatching(/original pipeline failure/),
+                    }),
+                );
+            });
+
+            it('is a no-op when no modifiers are registered (the common case)', async () => {
+                standardPlugin.registerStepExecutor('step-init', {
+                    name: 'Step Init',
+                    run: jest.fn().mockResolvedValue(undefined),
+                });
+                standardPlugin.registerStepExecutor('step-process', {
+                    name: 'Step Process',
+                    run: jest.fn().mockRejectedValue(new Error('boom')),
+                });
+
+                // No modifier registered. Just confirm the pipeline still
+                // fails cleanly without throwing inside invokeModifierRollbacks.
+                const result = await service.execute(
+                    standardPlugin,
+                    mockWork,
+                    mockRequest,
+                    mockExisting,
+                );
+                expect(result.success).toBe(false);
+            });
         });
 
         it('should continue on error when continueOnError is true', async () => {

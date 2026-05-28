@@ -98,14 +98,44 @@ describe('MemoryPipelineModifierPlugin', () => {
 		});
 	});
 
-	describe('enabled gate inside execute()', () => {
-		it('no-ops when stepSettings.enabled !== true (since pipeline builder may not call canSkip)', async () => {
+	describe("defensive enabled guard inside execute() (host doesn't honour canSkipAtBuildTime)", () => {
+		it('silently no-ops when stepSettings.enabled !== true', async () => {
+			// PR #1087 makes canSkipAtBuildTime the canonical gate, but
+			// we keep this guard for older agent builds / third-party
+			// orchestrators that don't call it.
 			const context = makeContext({}, false);
 			await plugin.execute(context, {
 				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
 			});
 			expect(memoryFacade.buildContext).not.toHaveBeenCalled();
-			expect(logger.log).toHaveBeenCalledWith(expect.stringMatching(/disabled by settings/));
+		});
+	});
+
+	describe('canSkipAtBuildTime (KB option B, PR #1087)', () => {
+		it('returns true when settings.enabled is missing (default off)', async () => {
+			await expect(plugin.canSkipAtBuildTime({ settings: {}, pipelineId: 'standard-pipeline' })).resolves.toBe(
+				true
+			);
+		});
+
+		it('returns true when settings.enabled === false', async () => {
+			await expect(
+				plugin.canSkipAtBuildTime({
+					settings: { enabled: false },
+					pipelineId: 'standard-pipeline'
+				})
+			).resolves.toBe(true);
+		});
+
+		it('returns false when settings.enabled === true (work opts in)', async () => {
+			await expect(
+				plugin.canSkipAtBuildTime({
+					settings: { enabled: true },
+					pipelineId: 'standard-pipeline',
+					workId: 'work-1',
+					userId: 'u-1'
+				})
+			).resolves.toBe(false);
 		});
 	});
 
@@ -224,6 +254,112 @@ describe('MemoryPipelineModifierPlugin', () => {
 				})
 			).resolves.toBeDefined();
 			expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/agentmemory down/));
+		});
+	});
+
+	describe('rollback() hook (failure / cancellation capture)', () => {
+		async function primeStashedExecContext(): Promise<ReturnType<typeof makeContext>> {
+			// rollback reads execContext from the context bag; populate it
+			// by running the fetch-context step first (the executor runs
+			// modifier steps in pipeline order, so by the time rollback
+			// fires fetch-context has already stashed the facade).
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ content: '' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			return context;
+		}
+
+		it('persists a `failed` observation when the pipeline throws', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			await plugin.rollback(context, new Error('AI provider rate-limited'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: expect.stringMatching(/failed.*rate-limited/),
+					tags: expect.arrayContaining(['pipeline-run', 'failed', 'work:best-react-tools'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('marks a cancellation distinctly from a failure', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			await plugin.rollback(context, new Error('Pipeline cancelled at step: foo'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: expect.stringMatching(/cancelled/),
+					tags: expect.arrayContaining(['cancelled'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('recognises AbortError as a cancellation', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			const abortError = new Error('some abort message');
+			abortError.name = 'AbortError';
+			await plugin.rollback(context, abortError);
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					tags: expect.arrayContaining(['cancelled'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('no-ops silently when fetch-context never stashed an execContext', async () => {
+			// Skip the priming step — the pipeline failed before our
+			// fetch ran, so nothing is stashed. rollback should swallow.
+			const context = makeContext();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it('no-ops when the modifier is disabled (enabled !== true)', async () => {
+			await primeStashedExecContext();
+			const context = makeContext({}, false);
+			// Even though execContext is stashable from the priming run,
+			// settings.enabled is false, so rollback should not call save.
+			(context as Record<string, unknown>).__memoryModifierExecContext = makeExecContext();
+			vi.clearAllMocks();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it('no-ops when saveSummary === false (operator opted out of post-run saves)', async () => {
+			const context = makeContext({
+				stepSettings: {
+					'memory-pipeline-modifier': { enabled: true, saveSummary: false }
+				}
+			});
+			(context as Record<string, unknown>).__memoryModifierExecContext = makeExecContext();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it("swallows saveMemory errors so the executor isn't derailed", async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+				new Error('agentmemory unreachable')
+			);
+			await expect(plugin.rollback(context, new Error('original failure'))).resolves.toBeUndefined();
+			expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/agentmemory unreachable/));
 		});
 	});
 

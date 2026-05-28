@@ -1,0 +1,74 @@
+{
+	"name": "@ever-works/mailchimp-transactional-plugin",
+	"version": "1.0.0",
+	"description": "Mailchimp Transactional (Mandrill) email provider plugin (outbound) for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@mailchimp/mailchimp_transactional": "^1.0.59"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "mailchimp-transactional",
+			"name": "Mailchimp Transactional",
+			"version": "1.0.0",
+			"category": "email-provider",
+			"capabilities": [
+				"email-outbound"
+			],
+			"description": "Send transactional + agent-driven email through Mailchimp Transactional (Mandrill) messages API.",
+			"settings": {
+				"type": "object",
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "Mandrill API key",
+						"x-secret": true,
+						"x-envVar": "MANDRILL_API_KEY"
+					},
+					"defaultSenderDomain": {
+						"type": "string",
+						"title": "Default sender domain"
+					}
+				},
+				"required": [
+					"apiKey"
+				]
+			}
+		}
+	}
+}

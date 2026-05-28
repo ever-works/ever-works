@@ -1,3 +1,4 @@
+import { Resend } from 'resend';
 import type {
 	IEmailOutboundPlugin,
 	EmailSendInput,
@@ -9,8 +10,6 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
-const RESEND_API_BASE = 'https://api.resend.com';
-
 function resolveApiKey(options: EmailOptions): string {
 	const fromSettings = options.settings?.apiKey;
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
@@ -19,15 +18,11 @@ function resolveApiKey(options: EmailOptions): string {
 	throw new Error('Resend plugin requires `apiKey` setting or RESEND_API_KEY env var.');
 }
 
-interface ResendSendResponse {
-	readonly id?: string;
-	readonly error?: { readonly statusCode: number; readonly message: string };
-}
-
 /**
- * Resend outbound email plugin. Direct fetch against the Resend REST
- * API — we avoid the `resend` npm package so the plugin has zero
- * runtime deps beyond `@ever-works/plugin`.
+ * Resend outbound email plugin, built on the official `resend` SDK.
+ * Idempotency is handled by Resend natively via the `idempotencyKey`
+ * request option (keyed on `EmailSendInput.messageRef`), backed by a
+ * local cache so repeated refs short-circuit without a network call.
  */
 export class ResendPlugin implements IEmailOutboundPlugin {
 	readonly id = 'resend';
@@ -58,43 +53,39 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 		const cached = this.idempotencyCache.get(input.messageRef);
 		if (cached) return cached;
 
-		const apiKey = resolveApiKey(options);
+		const resend = new Resend(resolveApiKey(options));
 		const fromField = input.fromName ? `${input.fromName} <${input.from}>` : input.from;
-		const body = {
-			from: fromField,
-			to: [...input.to],
-			cc: input.cc ? [...input.cc] : undefined,
-			bcc: input.bcc ? [...input.bcc] : undefined,
-			subject: input.subject,
-			text: input.bodyText,
-			html: input.bodyHtml,
-			reply_to: input.replyTo,
-			tags: input.metadata ? Object.entries(input.metadata).map(([name, value]) => ({ name, value })) : undefined,
-			attachments: input.attachments?.map((a) => ({
-				filename: a.filename,
-				content: a.content,
-				content_type: a.mimeType
-			}))
-		};
 
-		const response = await fetch(`${RESEND_API_BASE}/emails`, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${apiKey}`,
-				'Idempotency-Key': input.messageRef
+		const { data, error } = await resend.emails.send(
+			{
+				from: fromField,
+				to: [...input.to],
+				cc: input.cc ? [...input.cc] : undefined,
+				bcc: input.bcc ? [...input.bcc] : undefined,
+				subject: input.subject,
+				text: input.bodyText,
+				html: input.bodyHtml,
+				replyTo: input.replyTo,
+				tags: input.metadata
+					? Object.entries(input.metadata).map(([name, value]) => ({ name, value }))
+					: undefined,
+				attachments: input.attachments?.map((a) => ({
+					filename: a.filename,
+					content: a.content,
+					contentType: a.mimeType,
+					contentId: a.cid
+				}))
 			},
-			body: JSON.stringify(body)
-		});
+			{ idempotencyKey: input.messageRef }
+		);
 
-		const data = (await response.json()) as ResendSendResponse;
-		if (!response.ok || data.error) {
-			throw new Error(`Resend send failed (${response.status}): ${data.error?.message ?? 'unknown error'}`);
+		if (error) {
+			throw new Error(`Resend send failed (${error.name}): ${error.message}`);
 		}
+
 		const result: EmailSendResult = {
 			provider: this.id,
-			providerMessageId: data.id ?? `resend-${input.messageRef}`,
+			providerMessageId: data?.id ?? `resend-${input.messageRef}`,
 			accepted: [...input.to],
 			rejected: []
 		};

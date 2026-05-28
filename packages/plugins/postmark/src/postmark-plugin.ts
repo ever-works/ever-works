@@ -1,3 +1,4 @@
+import { ServerClient } from 'postmark';
 import type {
 	IEmailOutboundPlugin,
 	IEmailInboundPlugin,
@@ -12,8 +13,6 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-
-const POSTMARK_API_BASE = 'https://api.postmarkapp.com';
 
 /**
  * Resolve the configured API token. Plugin settings come from
@@ -34,13 +33,6 @@ function resolveInboundSecret(options: EmailOptions): string | undefined {
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
 	const fromEnv = process.env.POSTMARK_INBOUND_SECRET;
 	return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
-}
-
-interface PostmarkSendResponse {
-	readonly MessageID: string;
-	readonly ErrorCode: number;
-	readonly Message?: string;
-	readonly To?: string;
 }
 
 interface PostmarkInboundPayload {
@@ -97,45 +89,39 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		const cached = this.idempotencyCache.get(input.messageRef);
 		if (cached) return cached;
 
-		const apiKey = resolveApiKey(options);
-		const body = {
-			From: input.fromName ? `${input.fromName} <${input.from}>` : input.from,
-			To: input.to.join(', '),
-			Cc: input.cc?.join(', '),
-			Bcc: input.bcc?.join(', '),
-			Subject: input.subject,
-			TextBody: input.bodyText,
-			HtmlBody: input.bodyHtml,
-			ReplyTo: input.replyTo,
-			Tag: input.metadata?.tag,
-			Metadata: input.metadata,
-			Attachments: input.attachments?.map((a) => ({
-				Name: a.filename,
-				Content: a.content,
-				ContentType: a.mimeType,
-				ContentID: a.cid
-			}))
-		};
-
-		const response = await fetch(`${POSTMARK_API_BASE}/email`, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-				'X-Postmark-Server-Token': apiKey
-			},
-			body: JSON.stringify(body)
-		});
-
-		const data = (await response.json()) as PostmarkSendResponse;
-		if (!response.ok || data.ErrorCode !== 0) {
-			throw new Error(
-				`Postmark send failed (${response.status} / ${data.ErrorCode}): ${data.Message ?? 'unknown error'}`
-			);
+		const client = new ServerClient(resolveApiKey(options));
+		let messageId: string;
+		try {
+			const res = await client.sendEmail({
+				From: input.fromName ? `${input.fromName} <${input.from}>` : input.from,
+				To: input.to.join(', '),
+				Cc: input.cc?.join(', '),
+				Bcc: input.bcc?.join(', '),
+				Subject: input.subject,
+				TextBody: input.bodyText,
+				HtmlBody: input.bodyHtml,
+				ReplyTo: input.replyTo,
+				Tag: input.metadata?.tag,
+				Metadata: input.metadata,
+				Attachments: input.attachments?.map((a) => ({
+					Name: a.filename,
+					Content: a.content,
+					ContentType: a.mimeType,
+					ContentID: a.cid ?? null
+				}))
+			});
+			if (res.ErrorCode !== 0) {
+				throw new Error(`ErrorCode ${res.ErrorCode}: ${res.Message}`);
+			}
+			messageId = res.MessageID;
+		} catch (err) {
+			const e = err as { code?: number; message?: string };
+			throw new Error(`Postmark send failed (${e.code ?? 'error'}): ${e.message ?? 'unknown error'}`);
 		}
+
 		const result: EmailSendResult = {
 			provider: this.id,
-			providerMessageId: data.MessageID,
+			providerMessageId: messageId,
 			accepted: [...input.to],
 			rejected: []
 		};

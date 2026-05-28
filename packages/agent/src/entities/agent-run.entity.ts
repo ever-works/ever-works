@@ -89,6 +89,28 @@ export class AgentRun {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
+    /**
+     * Agent-memory session id for this run (follow-up to PR #1073 +
+     * #1081). When an agent-memory provider is configured and the
+     * user/work has it enabled, `AgentRunService.execute()` opens a
+     * session at the start of the run and stores the returned id here
+     * so observations saved during the run can be linked back to it
+     * in audit + the eventual session-list UI. Null on:
+     *
+     * - Runs that started before this column existed.
+     * - Runs where no agent-memory provider is enabled for the user
+     *   or work.
+     * - Runs where `openSession` failed (memory failures must never
+     *   crash the agent run; we log + leave the column null).
+     *
+     * Length is a plain `varchar` rather than `uuid` because the
+     * backend's id format is up to the agent-memory provider —
+     * `@ever-works/agentmemory-plugin` happens to use ULIDs, but
+     * future providers (mem0, zep) may not.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    memorySessionId?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

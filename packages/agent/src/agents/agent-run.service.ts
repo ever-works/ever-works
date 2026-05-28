@@ -31,6 +31,7 @@ import {
     type AgentAiMessage,
     type AgentAiToolCall,
 } from './agent-ai-dispatch-facade';
+import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 
 export interface AgentRunContext {
     runId: string;
@@ -133,6 +134,12 @@ export class AgentRunService {
         @Optional()
         @Inject(AGENT_AI_DISPATCH_FACADE)
         private readonly aiDispatch?: AgentAiDispatchFacade,
+        // Follow-up to PR #1073 + #1081 — when an agent-memory provider
+        // is configured for this user/agent, the run opens a session at
+        // the start and closes it on finalize. `@Optional()` so unit
+        // tests + OSS builds without the agentmemory plugin keep
+        // constructing the service identically.
+        @Optional() private readonly agentMemory?: AgentMemoryFacadeService,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -167,6 +174,11 @@ export class AgentRunService {
             });
             return { runId: context.runId, status: 'budget-blocked', budgetCheck };
         }
+
+        // 1a. Open an agent-memory session for this run when the user
+        // has an agent-memory provider configured. Best-effort —
+        // memory failures must never prevent the run from happening.
+        const memorySessionId = await this.tryOpenMemorySession(context, agent);
 
         // 2. Load assembly inputs in parallel. Phase 10 adds Skills
         // resolution alongside the cheap inputs. Scope-description
@@ -272,10 +284,15 @@ export class AgentRunService {
 
         const dispatchResult = await this.runToolLoop(context, agent, prompt);
         if (dispatchResult.errored) {
-            const finalizeResult = await this.finalize(context, {
-                errored: true,
-                errorMessage: dispatchResult.errorMessage,
-            });
+            const finalizeResult = await this.finalize(
+                context,
+                {
+                    errored: true,
+                    errorMessage: dispatchResult.errorMessage,
+                },
+                memorySessionId,
+                agent,
+            );
             return {
                 runId: context.runId,
                 status: 'dispatch-failed',
@@ -290,7 +307,12 @@ export class AgentRunService {
             };
         }
 
-        const finalizeResult = await this.finalize(context, dispatchResult.outcome);
+        const finalizeResult = await this.finalize(
+            context,
+            dispatchResult.outcome,
+            memorySessionId,
+            agent,
+        );
         return {
             runId: context.runId,
             status: 'dispatched',
@@ -652,6 +674,8 @@ export class AgentRunService {
     async finalize(
         context: AgentRunContext,
         outcome: AgentRunOutcome,
+        memorySessionId?: string | null,
+        agent?: Agent | null,
     ): Promise<{
         runId: string;
         status: 'completed' | 'failed';
@@ -664,10 +688,12 @@ export class AgentRunService {
             await this.runs
                 .markFailed(context.runId, outcome.errorMessage ?? 'Agent run errored')
                 .catch(() => undefined);
+            await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
             return { runId: context.runId, status: 'failed' };
         }
 
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
+        await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
 
         let postedMessageId: string | undefined;
         let finishedTaskStatus: string | undefined;
@@ -945,6 +971,98 @@ export class AgentRunService {
             }
         }
         return kept;
+    }
+
+    /**
+     * Open an agent-memory session for this run when the user / Agent
+     * has an agent-memory provider configured + enabled. Best-effort:
+     * any failure logs at WARN and returns `null`, the run continues
+     * without a session. On success, the returned id is persisted on
+     * the `agent_runs` row and threaded into `finalize()` so we can
+     * close the same session at the end.
+     */
+    private async tryOpenMemorySession(
+        context: AgentRunContext,
+        agent: Agent,
+    ): Promise<string | null> {
+        if (!this.agentMemory) return null;
+        // NOTE: deliberately NOT calling `isConfigured()` first — that
+        // check is registry-global (true whenever ANY agent-memory plugin
+        // is loaded, regardless of user enablement), so it would
+        // false-positive and produce noisy WARN logs on every run for
+        // users without the provider enabled. We let `openSession` do
+        // the real resolution; if no provider is enabled for the
+        // user/work scope it throws `NoProviderError` which we swallow
+        // silently here (Greptile P1 on PR #1084).
+        try {
+            const session = await this.agentMemory.openSession(
+                {
+                    runId: context.runId,
+                    agentId: agent.id,
+                    agentName: agent.name,
+                    triggerKind: context.kind,
+                    taskId: context.taskId ?? undefined,
+                    chatMessageId: context.chatMessageId ?? undefined,
+                },
+                // Pass `workId` through so Work-scoped agents resolve
+                // their Work-level memory provider (and its Work-level
+                // settings) — Codex/Greptile P1 on PR #1084. Without
+                // this, the session opens under the user-fallback
+                // provider while later pipeline steps might pick a
+                // different one for the same Work.
+                {
+                    userId: context.userId,
+                    ...(agent.workId ? { workId: agent.workId } : {}),
+                },
+            );
+            await this.runs.setMemorySessionId(context.runId, session.id).catch((err) => {
+                // Persist failure is non-fatal — the session exists
+                // remotely; we just can't link to it in the dashboard.
+                this.logger.warn(
+                    `AgentRunService: failed to persist memorySessionId for run ${context.runId}: ${err}`,
+                );
+            });
+            return session.id;
+        } catch (err) {
+            // `NoProviderError` is the expected case when the user has
+            // no agent-memory provider enabled — log at debug so it
+            // doesn't fill ops logs. Other errors still warn.
+            const isNoProvider = err instanceof Error && err.name === 'NoProviderError';
+            const log = isNoProvider
+                ? this.logger.debug.bind(this.logger)
+                : this.logger.warn.bind(this.logger);
+            log(
+                `AgentRunService: agent-memory openSession skipped for run ${context.runId}: ${(err as Error).message}`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * Close the agent-memory session opened at the start of the run.
+     * Idempotent on the backend side (closing a closed session is a
+     * no-op per the IAgentMemoryPlugin contract). Best-effort — a
+     * close failure is logged but does not affect the run outcome.
+     */
+    private async tryCloseMemorySession(
+        memorySessionId: string | null | undefined,
+        context: AgentRunContext,
+        agent: Agent | null,
+    ): Promise<void> {
+        if (!memorySessionId || !this.agentMemory) return;
+        try {
+            // Forward `workId` to match the open call's resolution —
+            // without it a Work-scoped agent might target a different
+            // backend on close vs open (Greptile P1 on PR #1084).
+            await this.agentMemory.closeSession(memorySessionId, {
+                userId: context.userId,
+                ...(agent?.workId ? { workId: agent.workId } : {}),
+            });
+        } catch (err) {
+            this.logger.warn(
+                `AgentRunService: agent-memory closeSession failed for run ${context.runId} (session ${memorySessionId}): ${err}`,
+            );
+        }
     }
 
     private async logActivity(args: {
