@@ -68,15 +68,15 @@ The "user" here is primarily the **operator** deploying Ever Works, plus the **e
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept | Description |
-| --- | --- |
-| `job-runtime` capability | New plugin capability category for background-job runtimes. |
-| `IJobRuntimeProvider` | Contract a runtime plugin implements: dispatchers + schedule + cancel + status + worker host. |
-| Job-runtime provider | A plugin (`trigger`/`temporal`/`bullmq`/`pgboss`/`inngest`) implementing the contract. |
-| Active runtime | The single provider selected by `EVER_WORKS_JOB_RUNTIME` for a deployment. |
-| Dispatcher | Existing per-job-type interface (`WorkGenerationDispatcher`, …) the active provider fulfils. |
-| Worker host | The process/model that executes agent orchestrators for a given runtime (push vs. pull). |
-| Conformance suite | Provider-agnostic test all providers must pass to be "supported." |
+| Entity / concept         | Description                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `job-runtime` capability | New plugin capability category for background-job runtimes.                                   |
+| `IJobRuntimeProvider`    | Contract a runtime plugin implements: dispatchers + schedule + cancel + status + worker host. |
+| Job-runtime provider     | A plugin (`trigger`/`temporal`/`bullmq`/`pgboss`/`inngest`) implementing the contract.        |
+| Active runtime           | The single provider selected by `EVER_WORKS_JOB_RUNTIME` for a deployment.                    |
+| Dispatcher               | Existing per-job-type interface (`WorkGenerationDispatcher`, …) the active provider fulfils.  |
+| Worker host              | The process/model that executes agent orchestrators for a given runtime (push vs. pull).      |
+| Conformance suite        | Provider-agnostic test all providers must pass to be "supported."                             |
 
 ## 6. Out of Scope
 

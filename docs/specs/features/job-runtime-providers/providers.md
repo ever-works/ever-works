@@ -11,27 +11,27 @@
 
 ## 1. Capability matrix
 
-| Dimension | **Trigger.dev** (default) | **Temporal** | **BullMQ** | **pg-boss** | **Inngest** |
-| --- | --- | --- | --- | --- | --- |
-| Primary store | Trigger.dev cloud / self-host (Postgres+Redis under the hood) | Temporal Service (Cassandra/Postgres/MySQL) | **Redis only** | **PostgreSQL only** | Inngest cloud |
-| Self-host? | ✅ (k8s, heavy) | ✅ (free, MIT) | ✅ (you run Redis) | ✅ (you run Postgres) | ⚠️ technically yes, but **SSPL** — see §6 |
-| Remote self-managed? | ✅ (`TRIGGER_API_URL`) | ✅ (any cluster) | ✅ (managed Redis) | ✅ (managed Postgres) | n/a |
-| SaaS / managed? | ✅ (default today) | ✅ (Temporal Cloud, mTLS) | via managed Redis only | via managed Postgres only | ✅ (the only supported mode) |
-| Licence (engine) | Apache-2.0 (self-host components) | **MIT** | MIT | MIT | **SSPL** → Apache-2.0 after 3y delay |
-| Official SDK (TS) | `@trigger.dev/sdk` | `@temporalio/{client,worker,workflow,activity}` | `bullmq` | `pg-boss` | `inngest` |
-| Worker model | Tasks deployed to platform; platform runs them | Long-running worker polls task queue | Worker process consumes Redis | In-process/sidecar polls Postgres | Functions served over HTTP; cloud invokes |
-| Push or pull | Push (platform invokes) | Pull (worker polls) | Pull (worker polls) | Pull (worker polls) | Push (cloud invokes via HTTP) |
-| Native cron | `schedules.task` | Schedules API | repeatable jobs / `JobScheduler` | `schedule()` | cron functions |
-| Native cancel | ✅ signal | ✅ signal | cooperative (flag) | cooperative (flag) | `cancelOn` / events |
-| Durable multi-hour run | ✅ (`maxDuration` 5h) | ✅ (best-in-class) | ⚠️ tune lock renewal | ⚠️ tune visibility timeout | ⚠️ express as steps |
-| Idempotency primitive | `idempotencyKey` | workflow id | job id | job id / singleton key | event idempotency id |
-| "Just Postgres" deploy | ❌ | ❌ (needs its DB) | ❌ (needs Redis) | ✅ **reuses platform DB** | ❌ |
-| Recommended for | hosted SaaS (default) | large self-host needing durability | teams already on Redis | minimal self-host, OSS distro | hosted teams wanting Inngest |
+| Dimension              | **Trigger.dev** (default)                                     | **Temporal**                                    | **BullMQ**                       | **pg-boss**                       | **Inngest**                               |
+| ---------------------- | ------------------------------------------------------------- | ----------------------------------------------- | -------------------------------- | --------------------------------- | ----------------------------------------- |
+| Primary store          | Trigger.dev cloud / self-host (Postgres+Redis under the hood) | Temporal Service (Cassandra/Postgres/MySQL)     | **Redis only**                   | **PostgreSQL only**               | Inngest cloud                             |
+| Self-host?             | ✅ (k8s, heavy)                                               | ✅ (free, MIT)                                  | ✅ (you run Redis)               | ✅ (you run Postgres)             | ⚠️ technically yes, but **SSPL** — see §6 |
+| Remote self-managed?   | ✅ (`TRIGGER_API_URL`)                                        | ✅ (any cluster)                                | ✅ (managed Redis)               | ✅ (managed Postgres)             | n/a                                       |
+| SaaS / managed?        | ✅ (default today)                                            | ✅ (Temporal Cloud, mTLS)                       | via managed Redis only           | via managed Postgres only         | ✅ (the only supported mode)              |
+| Licence (engine)       | Apache-2.0 (self-host components)                             | **MIT**                                         | MIT                              | MIT                               | **SSPL** → Apache-2.0 after 3y delay      |
+| Official SDK (TS)      | `@trigger.dev/sdk`                                            | `@temporalio/{client,worker,workflow,activity}` | `bullmq`                         | `pg-boss`                         | `inngest`                                 |
+| Worker model           | Tasks deployed to platform; platform runs them                | Long-running worker polls task queue            | Worker process consumes Redis    | In-process/sidecar polls Postgres | Functions served over HTTP; cloud invokes |
+| Push or pull           | Push (platform invokes)                                       | Pull (worker polls)                             | Pull (worker polls)              | Pull (worker polls)               | Push (cloud invokes via HTTP)             |
+| Native cron            | `schedules.task`                                              | Schedules API                                   | repeatable jobs / `JobScheduler` | `schedule()`                      | cron functions                            |
+| Native cancel          | ✅ signal                                                     | ✅ signal                                       | cooperative (flag)               | cooperative (flag)                | `cancelOn` / events                       |
+| Durable multi-hour run | ✅ (`maxDuration` 5h)                                         | ✅ (best-in-class)                              | ⚠️ tune lock renewal             | ⚠️ tune visibility timeout        | ⚠️ express as steps                       |
+| Idempotency primitive  | `idempotencyKey`                                              | workflow id                                     | job id                           | job id / singleton key            | event idempotency id                      |
+| "Just Postgres" deploy | ❌                                                            | ❌ (needs its DB)                               | ❌ (needs Redis)                 | ✅ **reuses platform DB**         | ❌                                        |
+| Recommended for        | hosted SaaS (default)                                         | large self-host needing durability              | teams already on Redis           | minimal self-host, OSS distro     | hosted teams wanting Inngest              |
 
 **Two headline corrections to the original request, carried from research:**
 
 1. **"BullMQ with Redis or PostgreSQL if possible"** — BullMQ is **Redis-only**; it is built directly on Redis data structures and has no Postgres backend. The "PostgreSQL if possible" need is met by a **separate** provider, **pg-boss** (Postgres-native), per the decision in ADR-015. We ship both: BullMQ (Redis) and pg-boss (Postgres).
-2. **Inngest "not allowed to self-host"** — Inngest *is* technically self-hostable, but under **SSPL**, which is the real blocker for a commercial multi-tenant SaaS. We scope Inngest to **SaaS only** for that licensing reason (documented in §6), which matches the original intent on firmer grounds.
+2. **Inngest "not allowed to self-host"** — Inngest _is_ technically self-hostable, but under **SSPL**, which is the real blocker for a commercial multi-tenant SaaS. We scope Inngest to **SaaS only** for that licensing reason (documented in §6), which matches the original intent on firmer grounds.
 
 ---
 
@@ -40,6 +40,7 @@
 **What it is.** The current runtime. Durable task queue with retries, cancellation, machines, and a run dashboard. The platform's tasks live in `packages/tasks/` (`@ever-works/trigger-tasks`) and deploy via `pnpm deploy:trigger`.
 
 **Deployment modes.**
+
 - **SaaS** (today): `api.trigger.dev`, project `proj_uevrbfmpvojzzazvhffy`.
 - **Self-hosted**: Trigger.dev can run on Kubernetes (tracked separately in [EW-592](https://evertech.atlassian.net/browse/EW-592)); selected by pointing `TRIGGER_API_URL` at the self-hosted instance. This is "the trigger provider, self-hosted URL" — **not** a separate provider.
 
@@ -47,7 +48,7 @@
 
 **Official SDK.** `@trigger.dev/sdk` (v4.x). Already a workspace dependency.
 
-**Worker model.** *Push*: tasks are deployed to Trigger.dev; the platform runs them on its machines (`micro`…`large-2x`). Cron via `schedules.task`. The worker bootstraps a NestJS app context (`withWorkerContext`) and calls back to the API over the SuperJSON channel.
+**Worker model.** _Push_: tasks are deployed to Trigger.dev; the platform runs them on its machines (`micro`…`large-2x`). Cron via `schedules.task`. The worker bootstraps a NestJS app context (`withWorkerContext`) and calls back to the API over the SuperJSON channel.
 
 **Cancellation.** First-class: `runs.cancel(runId)` → `AbortSignal` into the task → orchestrator observes `signal.aborted` at checkpoints.
 
@@ -64,6 +65,7 @@
 **What it is.** A durable-execution engine. Workflows are deterministic, replayable functions; side effects run in Activities. Best-in-class for long, reliable, observable processes — a natural fit for the multi-hour generation pipeline.
 
 **Deployment modes.**
+
 - **Local/dev**: `temporal server start-dev` (Temporal CLI) runs a full service + Web UI (`:8233`) on an in-memory DB; gRPC on `:7233`. Ideal for the plugin's dev mode.
 - **Self-hosted (prod)**: run the Temporal Service backed by Cassandra/PostgreSQL/MySQL, on k8s or VMs. **Free, MIT-licensed, no limits.**
 - **Remote self-managed**: connect to an existing cluster via `TEMPORAL_ADDRESS`.
@@ -73,7 +75,7 @@
 
 **Official SDK (TS).** `@temporalio/client` (enqueue/signal/cancel), `@temporalio/worker` (host workers), `@temporalio/workflow` (workflow code — sandboxed/deterministic), `@temporalio/activity` (side-effecting work).
 
-**Worker model.** *Pull*: a long-running **Worker** process polls a **task queue** and executes Workflows + Activities. The platform runs ≥1 worker deployment/sidecar. The generation orchestrator becomes a **Workflow**; the actual agent work (AI calls, git, search) becomes **Activities** (activities may call back to the API over the existing SuperJSON channel, or run in-process given the worker hosts the agent module). Cron via the **Schedules** API.
+**Worker model.** _Pull_: a long-running **Worker** process polls a **task queue** and executes Workflows + Activities. The platform runs ≥1 worker deployment/sidecar. The generation orchestrator becomes a **Workflow**; the actual agent work (AI calls, git, search) becomes **Activities** (activities may call back to the API over the existing SuperJSON channel, or run in-process given the worker hosts the agent module). Cron via the **Schedules** API.
 
 **Cancellation.** First-class workflow cancellation; cancellation scopes propagate to activities → maps to the orchestrator `AbortSignal` checkpoints.
 
@@ -89,7 +91,7 @@
 
 ## 4. BullMQ (Redis-backed)
 
-**What it is.** A fast, robust Node.js queue built on Redis. Already a transitive dependency of `@ever-works/agent` (used today by the `agent-pipeline` plugin's internal worker pool — a *narrow* use; this provider is a broader, platform-wide use).
+**What it is.** A fast, robust Node.js queue built on Redis. Already a transitive dependency of `@ever-works/agent` (used today by the `agent-pipeline` plugin's internal worker pool — a _narrow_ use; this provider is a broader, platform-wide use).
 
 **Deployment modes.** Needs a **Redis** (local, self-hosted, or managed — ElastiCache / Upstash / Redis Cloud). **No SaaS** of its own; "managed" means managed Redis.
 
@@ -97,9 +99,9 @@
 
 **Official SDK.** `bullmq` (v5.x). `Queue` (producer), `Worker` (consumer), `JobScheduler`/repeatable jobs (cron), `QueueEvents` (status), flows (parent/child).
 
-**Worker model.** *Pull*: a `Worker` consumes jobs from Redis; run N replicas for throughput. Workers can run in-process in a dedicated worker app or as a sidecar. Cron via repeatable jobs.
+**Worker model.** _Pull_: a `Worker` consumes jobs from Redis; run N replicas for throughput. Workers can run in-process in a dedicated worker app or as a sidecar. Cron via repeatable jobs.
 
-**Cancellation.** No native cancel of a *running* job. Implement **cooperative cancellation**: a Redis flag (or the existing DB cancellation flag) the orchestrator polls at each `throwIfGenerationCancelled` checkpoint. Pending (not-yet-started) jobs can be removed directly.
+**Cancellation.** No native cancel of a _running_ job. Implement **cooperative cancellation**: a Redis flag (or the existing DB cancellation flag) the orchestrator polls at each `throwIfGenerationCancelled` checkpoint. Pending (not-yet-started) jobs can be removed directly.
 
 **Idempotency / concurrency.** Custom **job id** = idempotency key (duplicate id is ignored). Concurrency via worker `concurrency`, named groups, and rate limits; `concurrencyKey` maps to grouped queues / job-id namespacing.
 
@@ -121,7 +123,7 @@
 
 **Official SDK.** `pg-boss` (v10.x). `boss.send(name, data, options)` (enqueue), `boss.work(name, handler)` (consume), `boss.schedule(name, cron, data)` (cron), singleton/throttle options.
 
-**Worker model.** *Pull*: a pg-boss instance polls Postgres and dispatches to handlers; run in-process in a worker app or sidecar. Cron via `schedule()`.
+**Worker model.** _Pull_: a pg-boss instance polls Postgres and dispatches to handlers; run in-process in a worker app or sidecar. Cron via `schedule()`.
 
 **Cancellation.** Cooperative, same pattern as BullMQ (cancel flag polled at orchestrator checkpoints); `cancel(jobId)` removes pending jobs.
 
@@ -139,13 +141,13 @@
 
 **What it is.** Event-driven durable functions / step functions, strong for AI workflows and fan-out. Functions are defined in code and **served over HTTP**; Inngest invokes them.
 
-**Why SaaS only.** Inngest's server + CLI are released under the **SSPL** (Server Side Public License), converting to Apache-2.0 only after a **3-year delay** (fair-source/DOSP model). SSPL's "offering the software as a service" clause makes **self-hosting Inngest inside a commercial multi-tenant SaaS legally fraught** — the same reason MongoDB's SSPL deters embedding in SaaS. Technically Inngest *can* be self-hosted (single binary, dev server, air-gapped), but for Ever Works' hosted/commercial posture we deliberately scope Inngest to **Inngest Cloud only** and record the reason here. This matches the original "SaaS only" intent on a firmer (legal, not technical) basis. Self-hosting Inngest is therefore **explicitly out of scope** for this provider; operators who want a self-owned runtime use Temporal, BullMQ, or pg-boss.
+**Why SaaS only.** Inngest's server + CLI are released under the **SSPL** (Server Side Public License), converting to Apache-2.0 only after a **3-year delay** (fair-source/DOSP model). SSPL's "offering the software as a service" clause makes **self-hosting Inngest inside a commercial multi-tenant SaaS legally fraught** — the same reason MongoDB's SSPL deters embedding in SaaS. Technically Inngest _can_ be self-hosted (single binary, dev server, air-gapped), but for Ever Works' hosted/commercial posture we deliberately scope Inngest to **Inngest Cloud only** and record the reason here. This matches the original "SaaS only" intent on a firmer (legal, not technical) basis. Self-hosting Inngest is therefore **explicitly out of scope** for this provider; operators who want a self-owned runtime use Temporal, BullMQ, or pg-boss.
 
 **Deployment mode.** **Inngest Cloud** only. The platform serves functions at an HTTP endpoint (`serve()` handler, mounted in the API or a small service); Inngest Cloud calls that endpoint to run steps.
 
 **Official SDK.** `inngest` (TS). `Inngest` client (send events), `createFunction` (define), `serve` (HTTP handler), steps (`step.run`, `step.sleep`, `step.waitForEvent`), `cancelOn`.
 
-**Worker model.** *Push*: no long-running worker we operate; Inngest Cloud invokes our HTTP functions. Cron via cron functions. **The signing-key-authenticated webhook is the trust boundary** — analogous to (and reusing the posture of) the `x-trigger-secret` internal channel.
+**Worker model.** _Push_: no long-running worker we operate; Inngest Cloud invokes our HTTP functions. Cron via cron functions. **The signing-key-authenticated webhook is the trust boundary** — analogous to (and reusing the posture of) the `x-trigger-secret` internal channel.
 
 **Cancellation.** Via `cancelOn` events / the cancel API; map `cancel(runId)` to sending the cancel event or calling the REST cancel.
 

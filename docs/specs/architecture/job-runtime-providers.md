@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-Long-running operations (work generation, import, onboarding, scheduled dispatch, KB embedding, webhook delivery, agent heartbeats, deploy-ready polling, mission ticks) cannot run inside an HTTP request. Today they all run on **Trigger.dev SaaS**. This spec defines the **`job-runtime` capability**: a provider contract that lets a deployment choose *which* runtime executes that work, while the rest of the platform — the API, the agent business logic, the dispatcher call sites — stays identical regardless of choice.
+Long-running operations (work generation, import, onboarding, scheduled dispatch, KB embedding, webhook delivery, agent heartbeats, deploy-ready polling, mission ticks) cannot run inside an HTTP request. Today they all run on **Trigger.dev SaaS**. This spec defines the **`job-runtime` capability**: a provider contract that lets a deployment choose _which_ runtime executes that work, while the rest of the platform — the API, the agent business logic, the dispatcher call sites — stays identical regardless of choice.
 
 The runtime owns exactly six concerns, and **only** these six:
 
@@ -21,7 +21,7 @@ The runtime owns exactly six concerns, and **only** these six:
 5. **Retry / idempotency** — re-run safely with stable identity.
 6. **Worker hosting** — run the process that executes `@ever-works/agent` orchestrators.
 
-Everything else — what the work *does*, the SuperJSON callback channel, the pre-created `historyId`, secret hygiene — is provider-neutral and unchanged.
+Everything else — what the work _does_, the SuperJSON callback channel, the pre-created `historyId`, secret hygiene — is provider-neutral and unchanged.
 
 ## 2. The seam that makes this possible
 
@@ -38,17 +38,17 @@ export const WORK_GENERATION_DISPATCHER = Symbol('WORK_GENERATION_DISPATCHER');
 
 The API depends only on these symbols; it has **no** `@trigger.dev/sdk` import. `TriggerService` (`packages/tasks/src/trigger/trigger.service.ts`) implements all of them today. The eight dispatcher seams in use:
 
-| Dispatcher symbol | Payload | Used by |
-| --- | --- | --- |
-| `WORK_GENERATION_DISPATCHER` | `WorkGenerationPayload` | `WorkGenerationService` |
-| `WORK_IMPORT_DISPATCHER` | `WorkImportPayload` | `WorkImportService` |
-| `TEMPLATE_CUSTOMIZATION_DISPATCHER` | `TemplateCustomizationPayload` | template customization |
-| `WEBHOOK_DELIVERY_DISPATCHER` | `WebhookDeliveryPayload` | webhook delivery |
-| `KB_MIRROR_DOCUMENT_DISPATCHER` | `KbMirrorDocumentPayload` | KB mirror |
-| `KB_BACKFILL_SKELETON_DISPATCHER` | `KbBackfillSkeletonPayload` | KB backfill |
-| `KB_EMBED_DOCUMENT_DISPATCHER` | `KbEmbedDocumentPayload` | KB embed |
-| `KB_ORG_OVERLAY_FANOUT_DISPATCHER` | `KbOrgOverlayFanoutPayload` | KB org overlay |
-| (+ `AGENT_TASK_EXECUTE_DISPATCHER`, `AGENT_CHAT_REPLY_DISPATCHER` wired in `apps/api/src/tasks/tasks.module.ts`) | | agents |
+| Dispatcher symbol                                                                                                | Payload                        | Used by                 |
+| ---------------------------------------------------------------------------------------------------------------- | ------------------------------ | ----------------------- |
+| `WORK_GENERATION_DISPATCHER`                                                                                     | `WorkGenerationPayload`        | `WorkGenerationService` |
+| `WORK_IMPORT_DISPATCHER`                                                                                         | `WorkImportPayload`            | `WorkImportService`     |
+| `TEMPLATE_CUSTOMIZATION_DISPATCHER`                                                                              | `TemplateCustomizationPayload` | template customization  |
+| `WEBHOOK_DELIVERY_DISPATCHER`                                                                                    | `WebhookDeliveryPayload`       | webhook delivery        |
+| `KB_MIRROR_DOCUMENT_DISPATCHER`                                                                                  | `KbMirrorDocumentPayload`      | KB mirror               |
+| `KB_BACKFILL_SKELETON_DISPATCHER`                                                                                | `KbBackfillSkeletonPayload`    | KB backfill             |
+| `KB_EMBED_DOCUMENT_DISPATCHER`                                                                                   | `KbEmbedDocumentPayload`       | KB embed                |
+| `KB_ORG_OVERLAY_FANOUT_DISPATCHER`                                                                               | `KbOrgOverlayFanoutPayload`    | KB org overlay          |
+| (+ `AGENT_TASK_EXECUTE_DISPATCHER`, `AGENT_CHAT_REPLY_DISPATCHER` wired in `apps/api/src/tasks/tasks.module.ts`) |                                | agents                  |
 
 **The refactor's premise:** instead of binding these symbols to `TriggerService`, bind them to whichever `IJobRuntimeProvider` is active. Call sites do not change.
 
@@ -81,21 +81,20 @@ export interface IJobRuntimeProvider {
 	startWorkerHost?(opts: WorkerHostOptions): Promise<WorkerHostHandle>;
 }
 
-export type JobRunStatus =
-	| 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown';
+export type JobRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 
 export interface ScheduleSpec {
-	id: string;            // e.g. 'work-schedule-dispatcher'
-	cron: string;          // standard 5-field cron
-	payload?: unknown;     // optional static payload
+	id: string; // e.g. 'work-schedule-dispatcher'
+	cron: string; // standard 5-field cron
+	payload?: unknown; // optional static payload
 }
 
 export interface JobEnqueueOptions {
 	tags?: string[];
-	idempotencyKey?: string;   // stable identity across retries
-	concurrencyKey?: string;   // serialise per key (e.g. per workId/orgId)
+	idempotencyKey?: string; // stable identity across retries
+	concurrencyKey?: string; // serialise per key (e.g. per workId/orgId)
 	maxDurationSeconds?: number;
-	machineHint?: string;      // provider maps to its own sizing
+	machineHint?: string; // provider maps to its own sizing
 }
 ```
 
@@ -122,10 +121,15 @@ Binding (proposed) lives where the dispatcher symbols are provided. A factory re
 // packages/agent/src/tasks/job-runtime.providers.ts (proposed shape)
 const provider = jobRuntimeRegistry.getActive(); // by EVER_WORKS_JOB_RUNTIME
 [
-	WORK_GENERATION_DISPATCHER, WORK_IMPORT_DISPATCHER, TEMPLATE_CUSTOMIZATION_DISPATCHER,
-	WEBHOOK_DELIVERY_DISPATCHER, KB_MIRROR_DOCUMENT_DISPATCHER, KB_BACKFILL_SKELETON_DISPATCHER,
-	KB_EMBED_DOCUMENT_DISPATCHER, KB_ORG_OVERLAY_FANOUT_DISPATCHER,
-].forEach(sym => bind(sym, () => provider.dispatchers));
+	WORK_GENERATION_DISPATCHER,
+	WORK_IMPORT_DISPATCHER,
+	TEMPLATE_CUSTOMIZATION_DISPATCHER,
+	WEBHOOK_DELIVERY_DISPATCHER,
+	KB_MIRROR_DOCUMENT_DISPATCHER,
+	KB_BACKFILL_SKELETON_DISPATCHER,
+	KB_EMBED_DOCUMENT_DISPATCHER,
+	KB_ORG_OVERLAY_FANOUT_DISPATCHER
+].forEach((sym) => bind(sym, () => provider.dispatchers));
 ```
 
 Provider-specific credentials/options use the **standard plugin settings system** (`x-secret`, `x-envVar`, JSON-Schema, admin scope). The selector (`EVER_WORKS_JOB_RUNTIME`) is the only "which provider" knob; everything else is the chosen provider's settings.
@@ -152,13 +156,13 @@ Provider-specific credentials/options use the **standard plugin settings system*
 
 Enqueue is the easy half. The genuinely different part is **how each runtime hosts and invokes the worker** that runs the agent orchestrators. The contract abstracts dispatch; it cannot fully abstract hosting, so each provider documents its model and ships its own worker entrypoint + deploy artifacts. The agent orchestrator code (`TriggerGenerationOrchestrator` → generalise to `JobOrchestrator`) and the SuperJSON callback channel are reused unchanged.
 
-| Provider | Worker-hosting model | Who invokes the worker | Cron mechanism |
-| --- | --- | --- | --- |
-| **Trigger.dev** | Tasks deployed to Trigger.dev (`pnpm deploy:trigger`); Trigger.dev runs them on its machines (cloud or self-hosted). | Trigger.dev platform | `schedules.task` |
-| **Temporal** | Long-running **Worker** process polls a task queue; we run it as a deployment/sidecar. Orchestrator = a Temporal **Workflow**; agent work = **Activities**. | Temporal Service hands tasks to polling workers | Temporal **Schedules** API |
-| **BullMQ** | In-process or sidecar `Worker` consuming a Redis queue; we run N worker replicas. | The worker process pulls jobs from Redis | BullMQ **repeatable jobs** (`JobScheduler`) |
-| **pg-boss** | In-process or sidecar pg-boss instance polling Postgres; `boss.work(name, handler)`. | pg-boss polling Postgres | pg-boss **`schedule()`** (cron) |
-| **Inngest** | Functions served over **HTTP** (`serve()` handler mounted in the API or a small service); **Inngest Cloud invokes them** via webhook. | Inngest Cloud calls our HTTP endpoint | Inngest **cron functions** |
+| Provider        | Worker-hosting model                                                                                                                                        | Who invokes the worker                          | Cron mechanism                              |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------- |
+| **Trigger.dev** | Tasks deployed to Trigger.dev (`pnpm deploy:trigger`); Trigger.dev runs them on its machines (cloud or self-hosted).                                        | Trigger.dev platform                            | `schedules.task`                            |
+| **Temporal**    | Long-running **Worker** process polls a task queue; we run it as a deployment/sidecar. Orchestrator = a Temporal **Workflow**; agent work = **Activities**. | Temporal Service hands tasks to polling workers | Temporal **Schedules** API                  |
+| **BullMQ**      | In-process or sidecar `Worker` consuming a Redis queue; we run N worker replicas.                                                                           | The worker process pulls jobs from Redis        | BullMQ **repeatable jobs** (`JobScheduler`) |
+| **pg-boss**     | In-process or sidecar pg-boss instance polling Postgres; `boss.work(name, handler)`.                                                                        | pg-boss polling Postgres                        | pg-boss **`schedule()`** (cron)             |
+| **Inngest**     | Functions served over **HTTP** (`serve()` handler mounted in the API or a small service); **Inngest Cloud invokes them** via webhook.                       | Inngest Cloud calls our HTTP endpoint           | Inngest **cron functions**                  |
 
 Key implications captured for the plan:
 

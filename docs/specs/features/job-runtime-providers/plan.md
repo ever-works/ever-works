@@ -33,17 +33,17 @@ The seam already exists (dispatcher interfaces + DI symbols, [`architecture/job-
 
 ## 2. Tech Choices
 
-| Concern | Choice | Rationale |
-| --- | --- | --- |
-| Abstraction | New `job-runtime` capability + `IJobRuntimeProvider` in `packages/plugin/` | Plugin-first (Principle I); mirrors existing capabilities. |
-| Selection | `EVER_WORKS_JOB_RUNTIME` env, default `trigger` | Mirrors ADR-005 `EVER_WORKS_*_BACKEND`; infra is global, not per-user. |
-| Trigger provider | Re-house existing `TriggerService` | Zero behaviour change; lowest risk. |
-| Temporal | `@temporalio/{client,worker,workflow,activity}` | Official SDK (NN #22); MIT server, free self-host + Cloud. |
-| BullMQ | `bullmq` | Official SDK; already a transitive dep; Redis-native. |
-| Postgres queue | `pg-boss` | Postgres-native (BullMQ can't do Postgres); reuses platform DB. |
-| Inngest | `inngest` | Official SDK; SaaS-only (SSPL). |
-| Conformance | Shared Vitest/Jest suite against `IJobRuntimeProvider` | Mirrors ADR-005 `LockProvider` contract suite. |
-| Worker hosting | Per-provider entrypoints + compose/k8s artifacts | Models genuinely differ (push vs pull); cannot fully abstract. |
+| Concern          | Choice                                                                     | Rationale                                                              |
+| ---------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Abstraction      | New `job-runtime` capability + `IJobRuntimeProvider` in `packages/plugin/` | Plugin-first (Principle I); mirrors existing capabilities.             |
+| Selection        | `EVER_WORKS_JOB_RUNTIME` env, default `trigger`                            | Mirrors ADR-005 `EVER_WORKS_*_BACKEND`; infra is global, not per-user. |
+| Trigger provider | Re-house existing `TriggerService`                                         | Zero behaviour change; lowest risk.                                    |
+| Temporal         | `@temporalio/{client,worker,workflow,activity}`                            | Official SDK (NN #22); MIT server, free self-host + Cloud.             |
+| BullMQ           | `bullmq`                                                                   | Official SDK; already a transitive dep; Redis-native.                  |
+| Postgres queue   | `pg-boss`                                                                  | Postgres-native (BullMQ can't do Postgres); reuses platform DB.        |
+| Inngest          | `inngest`                                                                  | Official SDK; SaaS-only (SSPL).                                        |
+| Conformance      | Shared Vitest/Jest suite against `IJobRuntimeProvider`                     | Mirrors ADR-005 `LockProvider` contract suite.                         |
+| Worker hosting   | Per-provider entrypoints + compose/k8s artifacts                           | Models genuinely differ (push vs pull); cannot fully abstract.         |
 
 ## 3. Data Model
 
@@ -66,10 +66,10 @@ Optional (later): a small `job_runtime_runs` mirror table if we want a provider-
 
 No new public endpoints. The internal callback controller (`/internal/trigger/*`) is generalised to `/internal/jobs/*` with `/internal/trigger/*` kept as an alias route (back-compat for the in-flight Trigger.dev worker during rollout). Auth header generalised `x-trigger-secret` → `x-internal-secret` (alias retained).
 
-| Method | Endpoint | Description | Status |
-| --- | --- | --- | --- |
-| `POST` | `/internal/jobs/remote/call` | SuperJSON RPC (was `/internal/trigger/remote/call`) | Generalised |
-| `GET` | `/internal/jobs/works/:id/context` | Worker work/user/token context | Generalised |
+| Method | Endpoint                           | Description                                         | Status      |
+| ------ | ---------------------------------- | --------------------------------------------------- | ----------- |
+| `POST` | `/internal/jobs/remote/call`       | SuperJSON RPC (was `/internal/trigger/remote/call`) | Generalised |
+| `GET`  | `/internal/jobs/works/:id/context` | Worker work/user/token context                      | Generalised |
 
 ## 5. Plugin Surface
 
@@ -87,12 +87,12 @@ No new public endpoints. The internal callback controller (`/internal/trigger/*`
 
 The recurring jobs that exist today must be expressed per provider (each provider's native cron):
 
-| Trigger | When | What it does | Idempotency strategy |
-| --- | --- | --- | --- |
-| schedule dispatcher | every N min | claim + dispatch due `WorkSchedule`s | runtime-neutral CAS claim ([`scheduled-updates`](../scheduled-updates/spec.md)) |
-| deploy-ready poller | every 2 min | flip mid-deploy works to READY | idempotent poll |
-| agent heartbeat dispatcher | every N min | dispatch agent heartbeats | CAS claim |
-| data-repo-sync / recurrence / mission-tick / research-rerun | various | existing cron tasks | existing idempotency |
+| Trigger                                                     | When        | What it does                         | Idempotency strategy                                                            |
+| ----------------------------------------------------------- | ----------- | ------------------------------------ | ------------------------------------------------------------------------------- |
+| schedule dispatcher                                         | every N min | claim + dispatch due `WorkSchedule`s | runtime-neutral CAS claim ([`scheduled-updates`](../scheduled-updates/spec.md)) |
+| deploy-ready poller                                         | every 2 min | flip mid-deploy works to READY       | idempotent poll                                                                 |
+| agent heartbeat dispatcher                                  | every N min | dispatch agent heartbeats            | CAS claim                                                                       |
+| data-repo-sync / recurrence / mission-tick / research-rerun | various     | existing cron tasks                  | existing idempotency                                                            |
 
 Each provider implements these via its scheduler (Trigger.dev `schedules.task`, Temporal Schedules, BullMQ repeatable, pg-boss `schedule`, Inngest cron). The CAS claim makes "exactly one firing per tick" a non-load-bearing convenience, so providers with weaker single-firing guarantees remain correct.
 
@@ -124,15 +124,15 @@ Each provider stays behind an `experimental` flag (startup warning) until its co
 
 ## 11. Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Re-housing Trigger.dev subtly changes behaviour | Med | High | Phase 1 gate = existing trigger e2e passes unchanged; diff is mechanical move. |
-| Worker-hosting models too different to share orchestrator | Med | High | Keep agent orchestrator + SuperJSON channel reused; only the host wrapper differs per provider; prove with pg-boss first. |
-| Cooperative cancel (BullMQ/pg-boss) leaves zombie runs | Med | Med | Reuse existing `throwIfGenerationCancelled` checkpoints + the three-layer terminal-write defense. |
-| Multi-hour jobs trip BullMQ/pg-boss timeouts | Med | Med | Tune lock renewal / visibility timeout; document; conformance includes a long-job case. |
-| Inngest per-step limits break the long pipeline | Med | Med | Express pipeline as steps under Inngest; keep Inngest experimental; document the constraint. |
-| Five providers rot at different rates | High | Med | Shared conformance suite in CI; non-default = experimental + best-effort; only `trigger` is supported-default. |
-| Maintenance/CI cost | High | Low-Med | Matrix CI runs conformance per provider; providers are independently installable plugins. |
+| Risk                                                      | Likelihood | Impact  | Mitigation                                                                                                                |
+| --------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Re-housing Trigger.dev subtly changes behaviour           | Med        | High    | Phase 1 gate = existing trigger e2e passes unchanged; diff is mechanical move.                                            |
+| Worker-hosting models too different to share orchestrator | Med        | High    | Keep agent orchestrator + SuperJSON channel reused; only the host wrapper differs per provider; prove with pg-boss first. |
+| Cooperative cancel (BullMQ/pg-boss) leaves zombie runs    | Med        | Med     | Reuse existing `throwIfGenerationCancelled` checkpoints + the three-layer terminal-write defense.                         |
+| Multi-hour jobs trip BullMQ/pg-boss timeouts              | Med        | Med     | Tune lock renewal / visibility timeout; document; conformance includes a long-job case.                                   |
+| Inngest per-step limits break the long pipeline           | Med        | Med     | Express pipeline as steps under Inngest; keep Inngest experimental; document the constraint.                              |
+| Five providers rot at different rates                     | High       | Med     | Shared conformance suite in CI; non-default = experimental + best-effort; only `trigger` is supported-default.            |
+| Maintenance/CI cost                                       | High       | Low-Med | Matrix CI runs conformance per provider; providers are independently installable plugins.                                 |
 
 ## 12. Constitution Reconciliation
 

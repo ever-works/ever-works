@@ -22,7 +22,7 @@ This was built deliberately as a "Background Job Manager Abstraction Layer" ([EW
 
 **Why make the runtime pluggable now?** Ever Works is an **open-source, self-hostable** product as much as a hosted SaaS ("runs on your machine, your cloud, or ours"). The single hard dependency on Trigger.dev SaaS is the one piece of the long-running-work story that a self-hoster cannot fully own:
 
-1. **Self-hosting / data residency / air-gap.** Operators running the OSS distribution in their own cloud (or fully offline) want a runtime they control end-to-end, without sending payloads to a third-party SaaS. Trigger.dev *can* be self-hosted on Kubernetes ([EW-592](https://evertech.atlassian.net/browse/EW-592)), but it is operationally heavy, and some operators would rather use a runtime they already run.
+1. **Self-hosting / data residency / air-gap.** Operators running the OSS distribution in their own cloud (or fully offline) want a runtime they control end-to-end, without sending payloads to a third-party SaaS. Trigger.dev _can_ be self-hosted on Kubernetes ([EW-592](https://evertech.atlassian.net/browse/EW-592)), but it is operationally heavy, and some operators would rather use a runtime they already run.
 2. **Reuse existing infrastructure investments.** Operators who already run **Temporal**, a **Redis + BullMQ** tier, or just **PostgreSQL** want to point Ever Works at what they have rather than stand up Trigger.dev.
 3. **"Just PostgreSQL" deployments.** Mirroring [ADR-005](./005-cache-and-lock-pluggability.md) (cache/lock pluggability), a small self-hoster should be able to run the whole platform on a single PostgreSQL instance with **no Redis and no external SaaS** — which means a Postgres-native queue option (pg-boss) for background jobs.
 4. **Durability / workflow semantics at scale.** Larger deployments may want Temporal's durable-execution and long-history guarantees for the multi-hour generation pipeline.
@@ -39,10 +39,10 @@ The background-job runtime becomes a **pluggable provider** selected at deployme
 2. **Refactor the current Trigger.dev integration into the first provider** — `@ever-works/plugin-job-runtime-trigger` — by moving `TriggerService` behind `IJobRuntimeProvider`. **No behaviour change** for existing deployments; this is a pure re-housing of working code.
 
 3. **Add four sibling providers**, each enable/disable-able and configurable through the standard plugin settings system (`x-secret`, `x-envVar`, JSON-Schema), and each documenting its self-host vs SaaS story:
-   - **Temporal** (`@ever-works/plugin-job-runtime-temporal`) — self-hosted (the platform stands up / connects to a Temporal Service) **or** remote self-managed cluster **or** Temporal Cloud (mTLS). Server is MIT-licensed and free to self-host.
-   - **BullMQ** (`@ever-works/plugin-job-runtime-bullmq`) — Redis-backed queue. Connects to a local, remote, or managed Redis (ElastiCache / Upstash / Redis Cloud). BullMQ is **Redis-only** by design.
-   - **pg-boss** (`@ever-works/plugin-job-runtime-pgboss`) — **PostgreSQL-native** queue. Reuses the platform's existing PostgreSQL with no Redis and no SaaS. This is the "just Postgres" answer to the "BullMQ with Redis *or* PostgreSQL" requirement (BullMQ cannot use Postgres; pg-boss is the Postgres path).
-   - **Inngest** (`@ever-works/plugin-job-runtime-inngest`) — **SaaS only** (Inngest Cloud). Inngest *is* technically self-hostable, but its server + CLI ship under the **SSPL** (converting to Apache-2.0 only after a 3-year delay), which is legally incompatible with offering it inside a commercial multi-tenant SaaS. We therefore scope Inngest to its managed cloud and document the licensing rationale rather than the technical one. See [`features/job-runtime-providers/providers.md`](../features/job-runtime-providers/providers.md#inngest).
+    - **Temporal** (`@ever-works/plugin-job-runtime-temporal`) — self-hosted (the platform stands up / connects to a Temporal Service) **or** remote self-managed cluster **or** Temporal Cloud (mTLS). Server is MIT-licensed and free to self-host.
+    - **BullMQ** (`@ever-works/plugin-job-runtime-bullmq`) — Redis-backed queue. Connects to a local, remote, or managed Redis (ElastiCache / Upstash / Redis Cloud). BullMQ is **Redis-only** by design.
+    - **pg-boss** (`@ever-works/plugin-job-runtime-pgboss`) — **PostgreSQL-native** queue. Reuses the platform's existing PostgreSQL with no Redis and no SaaS. This is the "just Postgres" answer to the "BullMQ with Redis _or_ PostgreSQL" requirement (BullMQ cannot use Postgres; pg-boss is the Postgres path).
+    - **Inngest** (`@ever-works/plugin-job-runtime-inngest`) — **SaaS only** (Inngest Cloud). Inngest _is_ technically self-hostable, but its server + CLI ship under the **SSPL** (converting to Apache-2.0 only after a 3-year delay), which is legally incompatible with offering it inside a commercial multi-tenant SaaS. We therefore scope Inngest to its managed cloud and document the licensing rationale rather than the technical one. See [`features/job-runtime-providers/providers.md`](../features/job-runtime-providers/providers.md#inngest).
 
 4. **Selection is instance-global, env-driven, with exactly one active runtime per deployment** — a new `EVER_WORKS_JOB_RUNTIME={trigger,temporal,bullmq,pgboss,inngest}` (default `trigger`), mirroring ADR-005's `EVER_WORKS_CACHE_BACKEND` / `EVER_WORKS_LOCK_BACKEND`. Unlike AI/search/deployment plugins (which resolve per-user/per-work), the job runtime is **deployment infrastructure**: one active provider, chosen by the operator, scoped global/admin — like the cache and lock backends, and like the `k8s` deployment plugin's admin-only config.
 
@@ -58,8 +58,8 @@ The background-job runtime becomes a **pluggable provider** selected at deployme
 
 - Running **multiple** job runtimes simultaneously / per-work runtime routing. v1 is one active runtime per deployment. A later ADR can add routing if a real need appears.
 - Replacing cache/lock backends — that is [ADR-005](./005-cache-and-lock-pluggability.md)'s concern. (The two compose: a "just Postgres" deployment = pg-boss runtime + TypeORM cache + Postgres lock.)
-- Migrating *in-flight* runs between providers. Switching runtime is a deploy-time decision; in-flight runs drain on the old runtime or are re-enqueued.
-- Changing what the tasks *do*. Business logic in `@ever-works/agent` is untouched.
+- Migrating _in-flight_ runs between providers. Switching runtime is a deploy-time decision; in-flight runs drain on the old runtime or are re-enqueued.
+- Changing what the tasks _do_. Business logic in `@ever-works/agent` is untouched.
 
 ### Constitution note
 
