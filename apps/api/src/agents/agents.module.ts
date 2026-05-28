@@ -7,13 +7,29 @@ import {
     AGENT_PLUGIN_TOOLS_FACADE,
     AGENT_AI_DISPATCH_FACADE,
     AGENT_GIT_FACADE,
+    AGENT_EMAIL_FACADE,
+    AGENT_NOTIFY_CHANNEL_FACADE,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
     type AgentAiDispatchFacade,
     type AgentAiToolCall,
     type AgentGitFacade,
+    type AgentEmailFacade,
+    type AgentNotifyChannelFacade,
 } from '@ever-works/agent/agents';
+import {
+    AgentEmailAssignmentRepository,
+    TenantEmailAddressRepository,
+    NotificationChannelRepository,
+} from '@ever-works/agent/database';
+import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
+import { EmailModule } from '../email/email.module';
+import { EmailService } from '../email/email.service';
+import {
+    INBOUND_EMAIL_TASK_SPAWNER,
+    type InboundEmailTaskSpawner,
+} from '@ever-works/agent/notifications';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
 // The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
@@ -90,6 +106,9 @@ import { AgentsController } from './agents.controller';
         TasksDomainModule,
         FacadesModule,
         AuthModule,
+        // Notifications v2 (EW-670) — EmailModule provides EmailService,
+        // consumed by the AGENT_EMAIL_FACADE binding below.
+        EmailModule,
     ],
     controllers: [AgentsController],
     providers: [
@@ -117,6 +136,35 @@ import { AgentsController } from './agents.controller';
                         force: force ?? false,
                     });
                     return { status: row.status };
+                },
+            }),
+        },
+        // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
+        // The inbound-email dispatcher's `task-spawn` mode delegates here:
+        // create a Task from the inbound email (scoped to the address
+        // owner, created-by the receiving agent) and assign that agent so
+        // the task-tracking flow dispatches `agent-task-execute`. When this
+        // token is unbound the dispatcher persists the message but spawns
+        // no Task (graceful no-op).
+        {
+            provide: INBOUND_EMAIL_TASK_SPAWNER,
+            inject: [TasksService],
+            useFactory: (tasks: TasksService): InboundEmailTaskSpawner => ({
+                async spawnTaskForInboundEmail({ agentId, userId, subject, bodyText, from }) {
+                    const title = subject?.trim()
+                        ? subject.trim().slice(0, 200)
+                        : `Inbound email from ${from}`;
+                    const task = await tasks.create(userId, {
+                        title,
+                        description: bodyText?.trim() ? bodyText.trim().slice(0, 8000) : null,
+                        labels: ['inbound-email'],
+                        createdByType: 'agent',
+                        createdById: agentId,
+                    });
+                    // Assign the receiving agent so the task-tracking flow
+                    // fans out agent-task-execute for it.
+                    await tasks.addAssignee(userId, task.id, 'agent', agentId);
+                    return { taskId: task.id };
                 },
             }),
         },
@@ -381,6 +429,105 @@ import { AgentsController } from './agents.controller';
                 },
             }),
         },
+        // Notifications v2 (EW-670) — AGENT_EMAIL_FACADE binding. Routes
+        // the `sendEmail` + `messageAgent` Agent tools through the
+        // api-side EmailService (which resolves the agent's outbound
+        // address + persists the message + records usage). `messageAgent`
+        // resolves the TARGET agent's primary inbound address, then sends
+        // from the sender's outbound — the inbound dispatcher routes it
+        // into a conversation thread on arrival.
+        {
+            provide: AGENT_EMAIL_FACADE,
+            inject: [EmailService, AgentEmailAssignmentRepository, TenantEmailAddressRepository],
+            useFactory: (
+                email: EmailService,
+                assignments: AgentEmailAssignmentRepository,
+                addresses: TenantEmailAddressRepository,
+            ): AgentEmailFacade => ({
+                async sendEmail({
+                    userId,
+                    agentId,
+                    to,
+                    cc,
+                    subject,
+                    bodyText,
+                    bodyHtml,
+                    template,
+                    fromAddressId,
+                }) {
+                    const result = await email.sendMessage(userId, {
+                        agentId,
+                        to: [...to],
+                        cc: cc ? [...cc] : undefined,
+                        subject,
+                        bodyText,
+                        bodyHtml,
+                        template,
+                        fromAddressId,
+                    });
+                    return {
+                        providerMessageId: result.providerMessageId,
+                        accepted: [...result.accepted],
+                        rejected: result.rejected.map((r) => ({ ...r })),
+                    };
+                },
+                async messageAgent({ userId, fromAgentId, targetAgentId, subject, body }) {
+                    const inbound = await assignments.findByAgent(targetAgentId, 'inbound');
+                    const assignment = inbound[0];
+                    if (!assignment) {
+                        throw new Error(
+                            `messageAgent: target agent ${targetAgentId} has no inbound email address.`,
+                        );
+                    }
+                    const address = await addresses.findById(assignment.emailAddressId);
+                    if (!address) {
+                        throw new Error('messageAgent: target inbound address not found.');
+                    }
+                    const result = await email.sendMessage(userId, {
+                        agentId: fromAgentId,
+                        to: [address.address],
+                        subject,
+                        bodyText: body,
+                    });
+                    return {
+                        providerMessageId: result.providerMessageId,
+                        targetAddress: address.address,
+                    };
+                },
+            }),
+        },
+        // Notifications v2 (EW-673) — AGENT_NOTIFY_CHANNEL_FACADE binding.
+        // Routes the `notifyChannel` Agent tool through
+        // NotificationChannelFacadeService.sendDirect; listEnabledChannels
+        // reads the user's active channels for the model to choose from.
+        {
+            provide: AGENT_NOTIFY_CHANNEL_FACADE,
+            inject: [NotificationChannelFacadeService, NotificationChannelRepository],
+            useFactory: (
+                channels: NotificationChannelFacadeService,
+                channelRepo: NotificationChannelRepository,
+            ): AgentNotifyChannelFacade => ({
+                async notifyChannel({ userId, agentId, channelId, text }) {
+                    const result = await channels.sendDirect(
+                        channelId,
+                        { text, messageRef: `agent-${agentId}-${Date.now()}` },
+                        { userId, agentId },
+                    );
+                    // sendDirect is the synchronous inline path (no Trigger
+                    // dispatch), so it only ever resolves delivered/failed —
+                    // narrow the facade's wider union for the agent tool.
+                    return {
+                        status: result.status === 'failed' ? 'failed' : 'delivered',
+                        providerMessageId: result.providerMessageId,
+                        error: result.error,
+                    };
+                },
+                async listEnabledChannels(userId) {
+                    const rows = await channelRepo.findActiveByUser(userId);
+                    return rows.map((c) => ({ id: c.id, name: c.name, pluginId: c.pluginId }));
+                },
+            }),
+        },
     ],
     exports: [
         AGENT_RUN_CHAT_BACK_POSTER,
@@ -388,6 +535,9 @@ import { AgentsController } from './agents.controller';
         AGENT_PLUGIN_TOOLS_FACADE,
         AGENT_AI_DISPATCH_FACADE,
         AGENT_GIT_FACADE,
+        AGENT_EMAIL_FACADE,
+        AGENT_NOTIFY_CHANNEL_FACADE,
+        INBOUND_EMAIL_TASK_SPAWNER,
     ],
 })
 export class AgentsModule {}

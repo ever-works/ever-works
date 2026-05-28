@@ -17,6 +17,7 @@ import { useKeyboardShortcuts } from '@/lib/hooks/use-keyboard-shortcuts';
 import { ConnectGithubModal } from '@/components/auth/connect-github-modal';
 import { BackgroundActivityProvider } from '@/lib/hooks/use-background-activity';
 import { EverWorksOnboardingWizard } from '@/components/onboarding/EverWorksOnboardingWizard';
+import { PostHogIdentify } from '@/components/posthog/PostHogIdentify';
 import { computeStepList } from '@/components/onboarding/useOnboardingFlow';
 import { dismissOnboarding } from '@/app/actions/onboarding/state';
 import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
@@ -344,6 +345,7 @@ export function DashboardLayoutClient({
     return (
         <BackgroundActivityProvider>
             <ChatProvider>
+                <PostHogIdentify userId={user.id} email={user.email} name={user.username} />
                 <EverWorksOnboardingWizard
                     open={isOnboardingOpen}
                     initialState={onboardingState}

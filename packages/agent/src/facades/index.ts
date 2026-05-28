@@ -93,6 +93,32 @@ export { SkillsFacadeService, SkillsFacadeError } from './skills.facade';
 // Tasks Facade — Agents/Skills/Tasks PR #1017, Phase 11.8 (ADR-013)
 export { TasksFacadeService, TasksFacadeError } from './tasks.facade';
 
+// Email Facade — Notifications v2 (EW-650, EW-668)
+export {
+    EmailFacadeService,
+    EmailFacadeError,
+    type EmailFacadeSendInput,
+    type EmailFacadeSendOptions,
+    type EmailFacadeTemplate,
+} from './email.facade';
+
+// Notification Channel Facade — Notifications v2 (EW-663, EW-672)
+export {
+    NotificationChannelFacadeService,
+    NotificationChannelFacadeError,
+    NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
+    type NotificationChannelFanoutInput,
+    type NotificationChannelFanoutResult,
+    type NotificationChannelDeliveryPayload,
+    type NotificationChannelDeliveryDispatcher,
+    type ResolvedChannelTarget,
+} from './notification-channel.facade';
+
+// Agent-Memory Facade — pluggable persistent memory for agents
+// (default plugin `@ever-works/agentmemory-plugin` talks to a local or
+// hosted `agentmemory` REST server on :3111)
+export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

@@ -9,16 +9,18 @@ describe('AiProviderRegistryService', () => {
     });
 
     describe('getAllProviders', () => {
-        it('registers exactly the seven default providers', () => {
+        it('registers exactly the nine default providers', () => {
             const providers = service.getAllProviders();
             expect(providers.map((p) => p.name).sort()).toEqual([
                 'anthropic',
                 'custom',
                 'google',
                 'groq',
+                'lm-studio',
                 'ollama',
                 'openai',
                 'openrouter',
+                'vllm',
             ]);
         });
 
@@ -48,14 +50,13 @@ describe('AiProviderRegistryService', () => {
     });
 
     describe('provider properties pinning', () => {
-        it('ollama is the only provider that does NOT require an api key by default', () => {
-            const ollama = service.getProvider('ollama');
-            const custom = service.getProvider('custom');
-            expect(ollama?.requiresApiKey).toBe(false);
-            // custom is also requiresApiKey:false; ollama and custom should both be flagged
-            expect(custom?.requiresApiKey).toBe(false);
+        it('local providers (ollama, lm-studio, vllm) and custom do NOT require an api key by default', () => {
+            const noKeyProviders = ['ollama', 'lm-studio', 'vllm', 'custom'];
+            for (const name of noKeyProviders) {
+                expect(service.getProvider(name)?.requiresApiKey).toBe(false);
+            }
             for (const p of service.getAllProviders()) {
-                if (p.name === 'ollama' || p.name === 'custom') continue;
+                if (noKeyProviders.includes(p.name)) continue;
                 expect(p.requiresApiKey).toBe(true);
             }
         });

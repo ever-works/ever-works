@@ -97,6 +97,8 @@ export class SetSubCommand extends CommandRunner {
                 'anthropic',
                 'openrouter',
                 'ollama',
+                'lm-studio',
+                'vllm',
                 'groq',
                 'custom',
             ];

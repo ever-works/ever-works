@@ -5,7 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import helmet from 'helmet';
-import { initSentry, initPostHog } from '@ever-works/monitoring';
+import { initSentry, initPostHog, PostHogLoggerService } from '@ever-works/monitoring';
 import { IncomingMessage, ServerResponse } from 'http';
 import * as path from 'path';
 import { json, urlencoded } from 'express';
@@ -30,6 +30,12 @@ async function bootstrap() {
     initPostHog();
 
     const app = await NestFactory.create(ApiModule);
+
+    // Forward every NestJS Logger emit (log/warn/error/debug/verbose) to
+    // PostHog Logs as a `$log` event while still writing to stdout. The
+    // PostHogLoggerService fails open — without POSTHOG_API_KEY it degrades
+    // to the default NestJS console logger (no PostHog traffic, no errors).
+    app.useLogger(new PostHogLoggerService());
 
     const captureRawBody = (
         req: IncomingMessage & { rawBody?: string },

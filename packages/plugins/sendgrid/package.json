@@ -1,0 +1,74 @@
+{
+	"name": "@ever-works/sendgrid-plugin",
+	"version": "1.0.0",
+	"description": "SendGrid email provider plugin (outbound only) for Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@sendgrid/mail": "^8.1.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "sendgrid",
+			"name": "SendGrid",
+			"version": "1.0.0",
+			"category": "email-provider",
+			"capabilities": [
+				"email-outbound"
+			],
+			"description": "Send transactional + agent-driven email through Twilio SendGrid (v3 Mail Send API).",
+			"settings": {
+				"type": "object",
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "SendGrid API key",
+						"x-secret": true,
+						"x-envVar": "SENDGRID_API_KEY"
+					},
+					"defaultSenderDomain": {
+						"type": "string",
+						"title": "Default sender domain"
+					}
+				},
+				"required": [
+					"apiKey"
+				]
+			}
+		}
+	}
+}

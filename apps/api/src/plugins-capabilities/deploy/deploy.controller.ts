@@ -27,6 +27,15 @@ import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
 
+const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
+const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
+function resolveDeployProviderId(providerId: string): string {
+    return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
+        ? KUBERNETES_DEPLOY_PROVIDER_ID
+        : providerId;
+}
+
 @ApiTags('Deploy')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/deploy')
@@ -43,8 +52,9 @@ export class DeployController {
 
     private getProviderName(deployProvider: string | undefined): string {
         if (!deployProvider) return 'Deployment';
+        const resolvedProviderId = resolveDeployProviderId(deployProvider);
         const providers = this.deployFacade.getAvailableProviders();
-        const provider = providers.find((p) => p.id === deployProvider);
+        const provider = providers.find((p) => p.id === resolvedProviderId);
         return provider?.name || deployProvider;
     }
 
@@ -80,7 +90,8 @@ export class DeployController {
         @Param('providerId') providerId: string,
     ) {
         const providers = this.deployFacade.getAvailableProviders();
-        const provider = providers.find((p) => p.id === providerId);
+        const resolvedProviderId = resolveDeployProviderId(providerId);
+        const provider = providers.find((p) => p.id === resolvedProviderId);
 
         if (!provider) {
             return {

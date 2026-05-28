@@ -9,6 +9,8 @@ import { WorksModule } from './works/works.module';
 import { KbStorageModule } from './uploads/kb-storage.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MailModule } from './mail/mail.module';
+import { EmailModule } from './email/email.module';
+import { NotificationChannelsModule } from './notification-channels/notification-channels.module';
 import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 import { APIController } from './api.controller';
@@ -20,10 +22,13 @@ import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
 import { PluginsModule } from './plugins/plugins.module';
+import { ComposioApiModule } from './plugins/composio/composio.module';
+import { ComposioTriggersModule } from './plugins/composio-triggers/composio-triggers.module';
 import { GitProviderModule } from './plugins-capabilities/git-provider/git-provider.module';
 import { OAuthModule } from './plugins-capabilities/oauth/oauth.module';
 import { DeviceAuthModule } from './plugins-capabilities/device-auth/device-auth.module';
 import { DeployModule } from './plugins-capabilities/deploy/deploy.module';
+import { AgentMemoryApiModule } from './plugins-capabilities/agent-memory/agent-memory.module';
 import { AiConversationModule } from './ai-conversation/ai-conversation.module';
 import { AccountModule } from './account/account.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
@@ -86,6 +91,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         KbStorageModule,
         WorksModule,
         MailModule,
+        // Notifications v2 (EW-650 + EW-663) — additive surfaces. v1
+        // MailModule + NotificationsModule above keep working unchanged.
+        EmailModule,
+        NotificationChannelsModule,
         TriggerInternalModule,
         SubscriptionsModule,
         NotificationsModule,
@@ -97,10 +106,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
             useFactory: () => ({}),
         }),
         PluginsModule,
+        ComposioApiModule,
+        ComposioTriggersModule,
         GitProviderModule,
         OAuthModule,
         DeviceAuthModule,
         DeployModule,
+        AgentMemoryApiModule,
         AiConversationModule,
         AccountModule,
         ActivityLogModule,

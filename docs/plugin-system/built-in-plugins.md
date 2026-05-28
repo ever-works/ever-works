@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 40 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, and utility categories. This page documents each plugin, its configuration, and environment variables.
+The platform ships with 42 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, and utility categories. This page documents each plugin, its configuration, and environment variables.
 
 ## AI Providers
 
@@ -117,6 +117,42 @@ Use locally running models via Ollama. No API key required.
 | `baseUrl`      | string | —        | Ollama URL (required, e.g., `http://localhost:11434/v1`) |
 | `defaultModel` | string | `llama2` | Default model                                            |
 | `apiKey`       | string | `ollama` | API key (optional, defaults to `ollama`)                 |
+
+### LM Studio
+
+Use locally running models via the LM Studio local server. No API key required.
+
+| Field              | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `lm-studio`     |
+| Configuration Mode | `user-required` |
+| Auto Enable        | No              |
+
+**Settings:**
+
+| Setting        | Type   | Default     | Description                                                      |
+| -------------- | ------ | ----------- | ---------------------------------------------------------------- |
+| `baseUrl`      | string | —           | LM Studio URL (required, e.g., `http://localhost:1234/v1`)       |
+| `apiKey`       | string | `lm-studio` | API key (optional; only for an auth proxy in front of LM Studio) |
+| `defaultModel` | string | —           | Loaded model id (required; populated via the model picker)       |
+
+### vLLM
+
+Use a self-hosted vLLM OpenAI-compatible server (typically GPU-hosted).
+
+| Field              | Value           |
+| ------------------ | --------------- |
+| Plugin ID          | `vllm`          |
+| Configuration Mode | `user-required` |
+| Auto Enable        | No              |
+
+**Settings:**
+
+| Setting        | Type   | Default | Description                                                          |
+| -------------- | ------ | ------- | -------------------------------------------------------------------- |
+| `baseUrl`      | string | —       | vLLM URL (required, e.g., `http://localhost:8000/v1`)                |
+| `apiKey`       | string | `EMPTY` | API key (secret; only required if started with `--api-key`)          |
+| `defaultModel` | string | —       | Model id passed to `vllm serve --model` (required; via model picker) |
 
 ### Mistral
 
@@ -840,6 +876,19 @@ Pipeline plugin that triggers Zapier actions during work generation. Lets you wi
 | Capabilities       | `pipeline`, `form-schema-provider` |
 
 See [Zapier Plugin](./zapier-plugin.md) for setup. Refer to `packages/plugins/zapier/src/` for the current settings schema.
+
+### Composio Integrations
+
+Pipeline plugin that executes Composio tools during work generation. Gives Ever Works access to 500+ third-party app integrations (Gmail, Slack, GitHub, Notion, Linear, Salesforce, …) with OAuth brokered per user by Composio.
+
+| Field              | Value                              |
+| ------------------ | ---------------------------------- |
+| Plugin ID          | `composio`                         |
+| Configuration Mode | `user-required`                    |
+| Auto Enable        | No                                 |
+| Capabilities       | `pipeline`, `form-schema-provider` |
+
+See [Composio Plugin](./composio-plugin.md) for setup. Refer to `packages/plugins/composio/src/` for the current settings schema.
 
 ## Prompt Management
 

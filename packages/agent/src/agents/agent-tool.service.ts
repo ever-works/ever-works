@@ -25,6 +25,17 @@ import {
     type AgentScreenshotResult,
     type AgentExtractContentResult,
 } from './agent-plugin-tools-facade';
+import {
+    AGENT_EMAIL_FACADE,
+    type AgentEmailFacade,
+    type AgentSendEmailResult,
+    type AgentMessageAgentResult,
+} from './agent-email-facade';
+import {
+    AGENT_NOTIFY_CHANNEL_FACADE,
+    type AgentNotifyChannelFacade,
+    type AgentNotifyChannelResult,
+} from './agent-notify-channel-facade';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -100,6 +111,18 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_PLUGIN_TOOLS_FACADE)
         private readonly pluginTools?: AgentPluginToolsFacade,
+        // Notifications v2 (EW-670) — Agent email tools. Token-injected
+        // (same circular-dep dodge as AGENT_GIT_FACADE) so non-API
+        // contexts + unit tests build the descriptor list without a
+        // runtime EmailFacadeService dependency.
+        @Optional()
+        @Inject(AGENT_EMAIL_FACADE)
+        private readonly emailFacade?: AgentEmailFacade,
+        // Notifications v2 (EW-673) — Agent notifyChannel tool. Same
+        // token-injection dodge; forwards to NotificationChannelFacadeService.
+        @Optional()
+        @Inject(AGENT_NOTIFY_CHANNEL_FACADE)
+        private readonly notifyChannelFacade?: AgentNotifyChannelFacade,
         // Review-fix I6: route createSubAgent through AgentsService so
         // scope-ownership validation + slug-uniqueness + avatar-field
         // validation + permission refinement all run, instead of the
@@ -186,6 +209,37 @@ export class AgentToolService {
             tools.push(this.buildSearchWebTool(agent));
             tools.push(this.buildScreenshotTool(agent));
             tools.push(this.buildExtractContentTool(agent));
+        }
+
+        // Notifications v2 (EW-670) — sendEmail. Same canCallExternalTools
+        // gate (outbound network call risk class) + token presence. The
+        // "≥1 outbound assignment" requirement is enforced at invoke time
+        // (the adapter rejects when the Agent has no outbound address),
+        // mirroring the commitToRepo "scope-not-Work" invoke-time reject —
+        // the assignment lookup is async and resolveAllowedTools is sync.
+        if (agent.permissions?.canCallExternalTools && this.emailFacade) {
+            tools.push(this.buildSendEmailTool(agent));
+        }
+
+        // Notifications v2 (EW-670 / T24) — messageAgent. Higher-level
+        // peer-to-peer verb (spec §12.4). Gated on the same permission +
+        // facade presence AND the facade implementing the optional
+        // messageAgent method (the contract slot is optional so older
+        // adapters that only wired sendEmail don't expose a broken tool).
+        if (
+            agent.permissions?.canCallExternalTools &&
+            this.emailFacade &&
+            typeof this.emailFacade.messageAgent === 'function'
+        ) {
+            tools.push(this.buildMessageAgentTool(agent));
+        }
+
+        // Notifications v2 (EW-673 / T26) — notifyChannel. Same
+        // canCallExternalTools gate + token presence. The ≥1-enabled-channel
+        // requirement is enforced at invoke time (the adapter rejects an
+        // unknown/disabled/foreign channel id).
+        if (agent.permissions?.canCallExternalTools && this.notifyChannelFacade) {
+            tools.push(this.buildNotifyChannelTool(agent));
         }
 
         // getActivity + getKbDocument — placeholders that document the
@@ -540,6 +594,194 @@ export class AgentToolService {
                         maxResults: args.maxResults,
                         includeDomains: args.includeDomains,
                         excludeDomains: args.excludeDomains,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildSendEmailTool(agent: Agent): AgentToolDescriptor<
+        {
+            to: string[];
+            subject: string;
+            bodyText?: string;
+            cc?: string[];
+            bodyHtml?: string;
+            template?: { slug: string; props: Record<string, unknown> };
+            fromAddressId?: string;
+        },
+        AgentSendEmailResult
+    > {
+        return {
+            name: 'sendEmail',
+            description:
+                "Send an email from one of this agent's assigned outbound addresses. Requires canCallExternalTools AND at least one outbound email address assigned to the agent (Settings → Integrations → Emails). Provide either bodyText (optionally bodyHtml) OR a template to render. Returns the provider message id plus accepted/rejected recipient lists. Use for agent-authored outbound mail; for messaging a peer agent prefer messageAgent.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    to: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Recipient email addresses (RFC 5321 mailboxes).',
+                    },
+                    subject: { type: 'string', description: 'Email subject line.' },
+                    bodyText: {
+                        type: 'string',
+                        description: 'Plain-text body. Required unless `template` is provided.',
+                    },
+                    cc: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Optional CC recipients.',
+                    },
+                    bodyHtml: {
+                        type: 'string',
+                        description: 'Optional HTML body. When omitted, bodyText is sent as-is.',
+                    },
+                    template: {
+                        type: 'object',
+                        description:
+                            'Render a registered React-Email template server-side instead of raw bodies (mutually exclusive with bodyText/bodyHtml). Shape: { slug: string (e.g. "agent-summary" | "agent-message"), props: object (fields depend on the slug) }.',
+                    },
+                    fromAddressId: {
+                        type: 'string',
+                        description:
+                            "Optional tenant_email_addresses id to send from. Defaults to the agent's primary (lowest-priority) outbound assignment.",
+                    },
+                },
+                required: ['to', 'subject'],
+            },
+            invoke: async (args) => {
+                if (!Array.isArray(args?.to) || args.to.length === 0) {
+                    return { error: 'to must be a non-empty array of email addresses.' };
+                }
+                if (!args?.subject || args.subject.trim().length === 0) {
+                    return { error: 'subject is required.' };
+                }
+                const hasBody = !!args?.bodyText && args.bodyText.trim().length > 0;
+                const hasTemplate = !!args?.template?.slug;
+                if (!hasBody && !hasTemplate) {
+                    return { error: 'Provide bodyText or a template.' };
+                }
+                try {
+                    return await this.emailFacade!.sendEmail({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        workId: agent.workId ?? undefined,
+                        to: args.to,
+                        cc: args.cc,
+                        subject: args.subject,
+                        bodyText: args.bodyText,
+                        bodyHtml: args.bodyHtml,
+                        template: args.template,
+                        fromAddressId: args.fromAddressId,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildMessageAgentTool(agent: Agent): AgentToolDescriptor<
+        {
+            targetAgentId: string;
+            subject: string;
+            body: string;
+            attachReferences?: { workId?: string; taskId?: string; missionId?: string }[];
+        },
+        AgentMessageAgentResult
+    > {
+        return {
+            name: 'messageAgent',
+            description:
+                "Send a message to a peer agent by id. The platform resolves the target agent's primary inbound email address and routes the message into a conversation thread (the receiving agent processes it via its chat-reply path, not as a new task). Prefer this over sendEmail for agent-to-agent coordination. Requires canCallExternalTools. Errors if the target agent has no inbound address assigned.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    targetAgentId: {
+                        type: 'string',
+                        description: 'The id of the agent to message.',
+                    },
+                    subject: { type: 'string', description: 'Message subject line.' },
+                    body: { type: 'string', description: 'Message body (plain text).' },
+                    attachReferences: {
+                        type: 'array',
+                        items: { type: 'object' },
+                        description:
+                            'Optional references to attach as context: objects with workId / taskId / missionId.',
+                    },
+                },
+                required: ['targetAgentId', 'subject', 'body'],
+            },
+            invoke: async (args) => {
+                if (!args?.targetAgentId || args.targetAgentId.trim().length === 0) {
+                    return { error: 'targetAgentId is required.' };
+                }
+                if (args.targetAgentId === agent.id) {
+                    return { error: 'An agent cannot message itself.' };
+                }
+                if (!args?.subject || args.subject.trim().length === 0) {
+                    return { error: 'subject is required.' };
+                }
+                if (!args?.body || args.body.trim().length === 0) {
+                    return { error: 'body is required.' };
+                }
+                if (typeof this.emailFacade?.messageAgent !== 'function') {
+                    return {
+                        error: 'messageAgent is not supported by the configured email adapter.',
+                    };
+                }
+                try {
+                    return await this.emailFacade.messageAgent({
+                        userId: agent.userId,
+                        fromAgentId: agent.id,
+                        targetAgentId: args.targetAgentId,
+                        subject: args.subject,
+                        body: args.body,
+                        attachReferences: args.attachReferences,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildNotifyChannelTool(
+        agent: Agent,
+    ): AgentToolDescriptor<{ channelId: string; text: string }, AgentNotifyChannelResult> {
+        return {
+            name: 'notifyChannel',
+            description:
+                "Send an ad-hoc message to one of the user's configured notification channels (Discord / Slack / Telegram / WhatsApp / Novu) by channel id. Requires canCallExternalTools + at least one enabled channel. Use for proactive status pings to the human operator; for structured event notifications prefer letting the platform's subscription fanout handle delivery.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    channelId: {
+                        type: 'string',
+                        description:
+                            "The notification_channels id to deliver to (one of the agent user's enabled channels).",
+                    },
+                    text: { type: 'string', description: 'Plain-text message body.' },
+                },
+                required: ['channelId', 'text'],
+            },
+            invoke: async (args) => {
+                if (!args?.channelId || args.channelId.trim().length === 0) {
+                    return { error: 'channelId is required.' };
+                }
+                if (!args?.text || args.text.trim().length === 0) {
+                    return { error: 'text is required.' };
+                }
+                try {
+                    return await this.notifyChannelFacade!.notifyChannel({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        channelId: args.channelId,
+                        text: args.text,
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

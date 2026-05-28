@@ -1,0 +1,68 @@
+{
+	"name": "@ever-works/agentmemory-plugin",
+	"version": "1.0.0",
+	"description": "Persistent agent-memory plugin — talks to a local or hosted `agentmemory` server (REST :3111). Default backend for the agent-memory capability shared by Claude Code / Codex / OpenCode / MCP clients.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.1"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "agentmemory",
+			"name": "Agent Memory",
+			"version": "1.0.0",
+			"category": "utility",
+			"capabilities": [
+				"agent-memory"
+			],
+			"description": "Persistent memory store for AI coding / generation agents. Connects to a local or hosted `agentmemory` REST server (default http://localhost:3111).",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "public",
+			"defaultForCapabilities": [
+				"agent-memory"
+			]
+		}
+	}
+}

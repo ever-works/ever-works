@@ -151,6 +151,15 @@ export class AgentRunRepository {
     }
 
     /**
+     * Persist the agent-memory session id once `AgentRunService.execute()`
+     * has opened a session at the start of the run. Best-effort — if
+     * this fails, the run continues (memory is not on the critical path).
+     */
+    async setMemorySessionId(runId: string, memorySessionId: string): Promise<void> {
+        await this.repository.update(runId, { memorySessionId });
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the

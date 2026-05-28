@@ -72,3 +72,18 @@ export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './work-proposal-attachment.entity';
 export * from './agent-attachment.entity';
+// Notifications v2 (EW-650 + siblings) — email + multi-channel + per-user prefs
+export * from './tenant-email-address.entity';
+export * from './agent-email-assignment.entity';
+export * from './email-conversation.entity';
+export * from './email-message.entity';
+export * from './notification-channel.entity';
+export * from './notification-channel-delivery-log.entity';
+export * from './notification-event-type.entity';
+export * from './user-notification-subscription.entity';
+export * from './user-notification-preference.entity';
+export * from './user-notification-category-mute.entity';
+export * from './organization-notification-default.entity';
+
+// Composio triggers (EW-684 PR-D)
+export * from './composio-trigger-subscription.entity';

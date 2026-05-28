@@ -170,10 +170,14 @@ export default function NewWorkClient({
         return selected?.connectionInfo?.connected ?? false;
     }, [selectedProviderId, providers]);
 
-    // `store` + `company` are inert "Soon" chips (roadmap, not shipped).
-    // `comingSoon` is the union of that hardcoded baseline and any kind
-    // whose `works-<value>` PostHog flag resolved to an explicit `false`
-    // server-side. Missing/undefined flags stay enabled.
+    // `store` is now flag-controlled via `works-store` like every other
+    // kind (the flag currently resolves to `false`, so the chip still
+    // renders inert "Soon" today). `company` stays a hardcoded inert
+    // "Soon" baseline on this surface — the live company chip lives on
+    // `/new`, not `/works/new`.
+    // `comingSoon` per live kind is purely driven by whether its
+    // `works-<value>` PostHog flag resolved to `false` server-side.
+    // Missing/undefined flags stay enabled (fail-open).
     const disabledSet = useMemo(() => new Set(disabledKinds), [disabledKinds]);
 
     // Effective selection — derived during render so a flag-disabled kind
@@ -192,10 +196,12 @@ export default function NewWorkClient({
         [effectiveKind],
     );
 
-    // Full work-kind chip catalog. `store` + `company` are inert "Soon"
-    // chips (roadmap, not shipped) appended after the live kinds so they
-    // match the marketing site's chip catalog without breaking the
-    // existing /works/new kind picker behavior.
+    // Full work-kind chip catalog. `store` is now flag-controlled via
+    // `works-store` like every other kind; `company` stays a hardcoded
+    // inert "Soon" baseline here (the live Company chip lives on `/new`).
+    // Both are appended after the live kinds so they match the marketing
+    // site's chip catalog without breaking the existing /works/new kind
+    // picker behavior.
     const workKindChips = useMemo<ReadonlyArray<PromptChip<InitialWorkKind | 'store' | 'company'>>>(
         () => [
             ...WORK_KIND_ORDER.map((k) => ({
@@ -204,8 +210,18 @@ export default function NewWorkClient({
                 Icon: WORK_KIND_ICONS[k],
                 comingSoon: disabledSet.has(k),
             })),
-            // `store` + `company` are hardcoded coming-soon baseline.
-            { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
+            // store is flag-controlled via works-store like every other kind.
+            // The `works-store` PostHog flag exists as `active: false`, so
+            // the chip continues to render as the inert "Soon" baseline
+            // until the flag is flipped — no code change required to enable.
+            // `company` stays hardcoded coming-soon here (the live company
+            // chip lives on `/new`, not `/works/new`).
+            {
+                value: 'store' as const,
+                label: 'Store',
+                Icon: Store,
+                comingSoon: disabledSet.has('store'),
+            },
             { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
         ],
         [t, disabledSet],
