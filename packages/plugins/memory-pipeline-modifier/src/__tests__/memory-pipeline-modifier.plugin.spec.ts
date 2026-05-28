@@ -98,14 +98,44 @@ describe('MemoryPipelineModifierPlugin', () => {
 		});
 	});
 
-	describe('enabled gate inside execute()', () => {
-		it('no-ops when stepSettings.enabled !== true (since pipeline builder may not call canSkip)', async () => {
+	describe("defensive enabled guard inside execute() (host doesn't honour canSkipAtBuildTime)", () => {
+		it('silently no-ops when stepSettings.enabled !== true', async () => {
+			// PR #1087 makes canSkipAtBuildTime the canonical gate, but
+			// we keep this guard for older agent builds / third-party
+			// orchestrators that don't call it.
 			const context = makeContext({}, false);
 			await plugin.execute(context, {
 				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
 			});
 			expect(memoryFacade.buildContext).not.toHaveBeenCalled();
-			expect(logger.log).toHaveBeenCalledWith(expect.stringMatching(/disabled by settings/));
+		});
+	});
+
+	describe('canSkipAtBuildTime (KB option B, PR #1087)', () => {
+		it('returns true when settings.enabled is missing (default off)', async () => {
+			await expect(plugin.canSkipAtBuildTime({ settings: {}, pipelineId: 'standard-pipeline' })).resolves.toBe(
+				true
+			);
+		});
+
+		it('returns true when settings.enabled === false', async () => {
+			await expect(
+				plugin.canSkipAtBuildTime({
+					settings: { enabled: false },
+					pipelineId: 'standard-pipeline'
+				})
+			).resolves.toBe(true);
+		});
+
+		it('returns false when settings.enabled === true (work opts in)', async () => {
+			await expect(
+				plugin.canSkipAtBuildTime({
+					settings: { enabled: true },
+					pipelineId: 'standard-pipeline',
+					workId: 'work-1',
+					userId: 'u-1'
+				})
+			).resolves.toBe(false);
 		});
 	});
 

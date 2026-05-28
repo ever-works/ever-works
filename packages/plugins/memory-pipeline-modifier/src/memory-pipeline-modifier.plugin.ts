@@ -2,6 +2,7 @@ import type {
 	IPlugin,
 	IPipelineModifierPlugin,
 	IPipelineContext,
+	ModifierBuildTimeCheck,
 	PluginContext,
 	PluginCategory,
 	JsonSchema,
@@ -208,6 +209,17 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		return settings.enabled !== true;
 	}
 
+	/**
+	 * KB option B (PR #1087). The pipeline-builder calls this BEFORE
+	 * injecting our steps, so disabling the modifier here means zero
+	 * overhead on the host pipeline — no STEP_STARTED events, no step
+	 * metrics, no executor branching. Decision is purely settings-based,
+	 * matching the existing `canSkip(context)` semantics.
+	 */
+	async canSkipAtBuildTime(input: ModifierBuildTimeCheck): Promise<boolean> {
+		return input.settings.enabled !== true;
+	}
+
 	async execute(
 		context: IPipelineContext,
 		options?: StepExecutionOptions,
@@ -228,12 +240,13 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 		const logger = execContext?.logger ?? console;
 
-		// Honour the work-scoped `enabled` flag at execution time —
-		// `canSkip()` is not currently called by the pipeline builder
-		// (Codex P2 on PR #1081). Until that wiring lands, gate inside
-		// `execute()` so toggling the flag actually disables the steps.
+		// As of PR #1087, `canSkipAtBuildTime` gates this modifier
+		// before its steps are injected, so reaching `execute()` already
+		// implies `settings.enabled === true`. We keep a defensive
+		// check here as a safety net in case the host doesn't honour
+		// canSkipAtBuildTime (older agent build, third-party orchestrator):
+		// silently no-op without warning.
 		if (settings.enabled !== true) {
-			logger.log(`memory-pipeline-modifier: step "${stepId}" disabled by settings — skipping`);
 			return context;
 		}
 
