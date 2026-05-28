@@ -419,6 +419,7 @@ import { AgentsController } from './agents.controller';
                     subject,
                     bodyText,
                     bodyHtml,
+                    template,
                     fromAddressId,
                 }) {
                     const result = await email.sendMessage(userId, {
@@ -428,6 +429,7 @@ import { AgentsController } from './agents.controller';
                         subject,
                         bodyText,
                         bodyHtml,
+                        template,
                         fromAddressId,
                     });
                     return {
