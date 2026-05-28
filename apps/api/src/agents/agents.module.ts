@@ -480,8 +480,11 @@ import { AgentsController } from './agents.controller';
                         { text, messageRef: `agent-${agentId}-${Date.now()}` },
                         { userId, agentId },
                     );
+                    // sendDirect is the synchronous inline path (no Trigger
+                    // dispatch), so it only ever resolves delivered/failed —
+                    // narrow the facade's wider union for the agent tool.
                     return {
-                        status: result.status,
+                        status: result.status === 'failed' ? 'failed' : 'delivered',
                         providerMessageId: result.providerMessageId,
                         error: result.error,
                     };

@@ -170,12 +170,18 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                     options,
                     deferUntil,
                 });
-                return {
-                    channelId,
-                    pluginId: 'queued',
-                    status: 'queued',
-                    providerMessageId: runId ?? undefined,
-                };
+                // A null runId means Trigger.dev is disabled / didn't
+                // enqueue — fall through to in-process delivery so the
+                // notification isn't silently lost. Only a real run id
+                // means the delivery is genuinely queued.
+                if (runId) {
+                    return {
+                        channelId,
+                        pluginId: 'queued',
+                        status: 'queued',
+                        providerMessageId: runId,
+                    };
+                }
             } catch (err) {
                 // Enqueue failed — fall back to an in-process attempt so the
                 // notification isn't silently lost.
