@@ -19,6 +19,11 @@ export enum PluginUsageCapability {
     SEARCH = 'search',
     SCREENSHOT = 'screenshot',
     EXTRACTOR = 'extractor',
+    // Notifications v2 (EW-650 + EW-663) — additive enum values, no
+    // migration needed (column is varchar). Email-outbound plugins emit
+    // EMAIL; notification-channel plugins emit NOTIFICATION_CHANNEL.
+    EMAIL = 'email',
+    NOTIFICATION_CHANNEL = 'notification_channel',
 }
 
 @Index(['workId', 'occurredAt'])

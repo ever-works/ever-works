@@ -93,6 +93,23 @@ export { SkillsFacadeService, SkillsFacadeError } from './skills.facade';
 // Tasks Facade — Agents/Skills/Tasks PR #1017, Phase 11.8 (ADR-013)
 export { TasksFacadeService, TasksFacadeError } from './tasks.facade';
 
+// Email Facade — Notifications v2 (EW-650, EW-668)
+export {
+    EmailFacadeService,
+    EmailFacadeError,
+    type EmailFacadeSendInput,
+    type EmailFacadeSendOptions,
+    type EmailFacadeTemplate,
+} from './email.facade';
+
+// Notification Channel Facade — Notifications v2 (EW-663, EW-672)
+export {
+    NotificationChannelFacadeService,
+    NotificationChannelFacadeError,
+    type NotificationChannelFanoutInput,
+    type NotificationChannelFanoutResult,
+} from './notification-channel.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {
