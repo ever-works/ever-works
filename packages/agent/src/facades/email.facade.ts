@@ -210,7 +210,19 @@ export class EmailFacadeService extends BaseFacadeService {
             for (const recipient of recipients) {
                 if (!recipient) continue;
                 const owner = await this.emailAddresses.findByAddress(recipient);
-                if (owner?.userId) {
+                // Only adopt the resolved owner when the matched address is
+                // registered to THIS plugin — a mailbox can be registered by
+                // multiple tenants/providers, so an address-only match could
+                // otherwise attribute the verification scope to the wrong
+                // owner (Codex/Greptile on PR #1115). When it doesn't match we
+                // fall back to the base (admin/env) scope below.
+                //
+                // Note: widening the scope to the owner's userId never
+                // *weakens* verification — `getSettings({ userId })` resolves
+                // the admin→user hierarchy, so an admin-level
+                // `inboundWebhookSecret` is still present (and enforced) at
+                // owner scope; the user's own secret only layers on top.
+                if (owner?.userId && owner.pluginId === plugin.id) {
                     return { ...base, userId: owner.userId };
                 }
             }

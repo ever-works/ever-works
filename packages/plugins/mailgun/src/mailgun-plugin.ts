@@ -203,10 +203,17 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 				(typeof body['recipient'] === 'string' ? (body['recipient'] as string) : undefined) ??
 				(typeof body['To'] === 'string' ? (body['To'] as string) : undefined) ??
 				'';
+			// `recipient` is a bare address, but the `To` fallback is the raw
+			// RFC 2822 header (may be `"Name" <a@b>`), so strip the display
+			// name / angle brackets before matching.
 			return raw
 				? raw
 						.split(',')
-						.map((s) => s.trim())
+						.map((s) => {
+							const trimmed = s.trim();
+							const match = trimmed.match(/<([^>]+)>/);
+							return (match ? match[1] : trimmed).trim();
+						})
 						.filter((s) => s.length > 0)
 				: [];
 		} catch {

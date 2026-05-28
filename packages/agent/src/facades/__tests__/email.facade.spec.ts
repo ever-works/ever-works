@@ -97,7 +97,10 @@ describe('EmailFacadeService', () => {
             (settings.getSettings as jest.Mock).mockResolvedValue({
                 inboundWebhookSecret: 'owner-secret',
             });
-            emailAddresses.findByAddress.mockResolvedValue({ userId: 'owner-9' });
+            emailAddresses.findByAddress.mockResolvedValue({
+                userId: 'owner-9',
+                pluginId: 'postmark',
+            });
 
             await facade.parseInbound('postmark', Buffer.from('{}'), {});
 
@@ -134,6 +137,24 @@ describe('EmailFacadeService', () => {
                 expect.objectContaining({ userId: undefined }),
             );
             expect(plugin.verifyWebhookSignature).toHaveBeenCalled();
+        });
+
+        it('falls back to default scope when the matched address belongs to a different plugin', async () => {
+            const plugin = makeInboundPlugin();
+            registry.getByCapability.mockImplementation(((cap: string) =>
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+            // Address is registered to mailgun, not the postmark webhook in flight.
+            emailAddresses.findByAddress.mockResolvedValue({
+                userId: 'owner-9',
+                pluginId: 'mailgun',
+            });
+
+            await facade.parseInbound('postmark', Buffer.from('{}'), {});
+
+            expect(settings.getSettings).toHaveBeenCalledWith(
+                'postmark',
+                expect.objectContaining({ userId: undefined }),
+            );
         });
 
         it('skips recipient resolution when the caller already supplies a userId', async () => {
