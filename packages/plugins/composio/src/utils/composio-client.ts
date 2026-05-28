@@ -96,8 +96,13 @@ export class ComposioClient {
 	 */
 	async listConnectedAccounts(userId: string, toolkit?: string): Promise<ComposioConnectedAccount[]> {
 		const url = new URL(`${this.baseUrl}/connected_accounts`);
-		url.searchParams.set('user_ids', userId);
-		if (toolkit) url.searchParams.set('toolkit_slugs', toolkit.toUpperCase());
+		// Composio v3 connected_accounts filters are list parameters — encode them
+		// as repeated query params (`?user_ids=a&user_ids=b`) which is the format
+		// the Composio Python SDK serializes. `.set()` would replace prior values
+		// AND, on Composio side, can be interpreted as a single value rather than
+		// a one-element list, which has been seen to filter strictly differently.
+		url.searchParams.append('user_ids', userId);
+		if (toolkit) url.searchParams.append('toolkit_slugs', toolkit.toUpperCase());
 		const response = await this.request(url.toString(), { method: 'GET' });
 		const body = (await response.json()) as unknown;
 		return extractList<ComposioConnectedAccount>(body);

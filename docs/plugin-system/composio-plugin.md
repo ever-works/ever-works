@@ -38,12 +38,12 @@ Per-run options are exposed on the generator form: toolkit, tool slug, Composio 
 
 ## How it differs from Zapier and Activepieces
 
-| Concern              | Composio                                                     | Zapier                                       | Activepieces                                  |
-| -------------------- | ------------------------------------------------------------ | -------------------------------------------- | --------------------------------------------- |
-| Catalog scope        | 500+ apps                                                    | 9000+ apps                                   | ~200 apps                                     |
-| OAuth model          | Per-user, brokered by Composio                              | Per-Zap connection                           | Per-project credentials                       |
-| Action identifier    | Tool slug (`GMAIL_SEND_EMAIL`)                              | App + action type + action key + connection  | Flow ID                                       |
-| Best for             | Agent-style multi-user tool calling                          | Webhook chaining + multi-step automations    | Self-hosted automation flows                  |
+| Concern           | Composio                            | Zapier                                      | Activepieces                 |
+| ----------------- | ----------------------------------- | ------------------------------------------- | ---------------------------- |
+| Catalog scope     | 500+ apps                           | 9000+ apps                                  | ~200 apps                    |
+| OAuth model       | Per-user, brokered by Composio      | Per-Zap connection                          | Per-project credentials      |
+| Action identifier | Tool slug (`GMAIL_SEND_EMAIL`)      | App + action type + action key + connection | Flow ID                      |
+| Best for          | Agent-style multi-user tool calling | Webhook chaining + multi-step automations   | Self-hosted automation flows |
 
 Native Ever Works plugins (`github`, `notion-extractor`, …) still beat Composio for the apps they cover (richer extraction, custom UI hints, our own OAuth callbacks). Use those where they exist, and use Composio for the long tail.
 

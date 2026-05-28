@@ -100,7 +100,8 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			defaultToolkit: {
 				type: 'string',
 				title: 'Default Toolkit',
-				description: 'Default toolkit slug (e.g. GMAIL, GITHUB, SLACK). Used when no toolkit is set in the generator form.',
+				description:
+					'Default toolkit slug (e.g. GMAIL, GITHUB, SLACK). Used when no toolkit is set in the generator form.',
 				'x-scope': 'user'
 			},
 			defaultToolSlug: {
@@ -400,9 +401,7 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			if (composioSettings.resultShape === 'side-effect') {
 				// Fire-and-forget tool (send email, post message, create task, …).
 				// The tool executed successfully but produces no work items — treat as success with 0 items.
-				logger.log(
-					`Side-effect tool completed — no items parsed. Response: ${safeStringify(execResult.data)}`
-				);
+				logger.log(`Side-effect tool completed — no items parsed. Response: ${safeStringify(execResult.data)}`);
 				parsed = { items: [], categories: [], tags: [], brands: [] };
 				items = [];
 			} else {
@@ -511,13 +510,18 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 			contentField: trimOrUndefined(config.content_field)
 		};
 
+		// Math.max(60_000, …) is always ≥ 60_000 — handles NaN/0 from the config
+		// field. No need for a separate DEFAULT_TIMEOUT_MS fallback after it.
+		const timeoutCandidate = timeoutMinutes * 60 * 1000;
+		const timeoutMs = Number.isFinite(timeoutCandidate) ? Math.max(60_000, timeoutCandidate) : DEFAULT_TIMEOUT_MS;
+
 		return {
 			apiKey,
 			baseUrl: trimOrUndefined(pluginSettings.baseUrl),
 			defaultUserId: trimOrUndefined(pluginSettings.defaultUserId),
 			defaultToolkit: trimOrUndefined(pluginSettings.defaultToolkit),
 			defaultToolSlug: trimOrUndefined(pluginSettings.defaultToolSlug),
-			timeoutMs: Math.max(60_000, timeoutMinutes * 60 * 1000) || DEFAULT_TIMEOUT_MS,
+			timeoutMs,
 			resultShape,
 			fieldMapping
 		};
@@ -530,8 +534,7 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	): ComposioToolRef {
 		const toolkit = (trimOrUndefined(config.toolkit) || settings.defaultToolkit || '').trim().toUpperCase();
 		const toolSlug = (trimOrUndefined(config.tool_slug) || settings.defaultToolSlug || '').trim().toUpperCase();
-		const userId =
-			trimOrUndefined(config.composio_user_id) || settings.defaultUserId || fallbackUserId;
+		const userId = trimOrUndefined(config.composio_user_id) || settings.defaultUserId || fallbackUserId;
 
 		return { toolkit, toolSlug, userId };
 	}

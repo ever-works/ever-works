@@ -169,7 +169,8 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'repo_access_token',
 			type: 'password',
 			label: 'Repository Access Token',
-			description: 'Read-only access token for the data repository (short-lived recommended)',
+			description:
+				'Read-only access token for the data repository. ⚠️ This token is forwarded verbatim to Composio as part of the tool arguments — it crosses your trust boundary into a third-party API where it may be logged or stored. Use a short-lived, narrowly-scoped, read-only PAT and rotate it after each run.',
 			placeholder: 'ghp_...',
 			group: 'data',
 			showIf: REPO_ACCESS_CONDITION,

@@ -76,7 +76,7 @@ describe('ComposioClient', () => {
 			expect(result).toEqual([{ slug: 'GMAIL', name: 'Gmail' }]);
 			const [url, init] = fetchImpl.mock.calls[0];
 			expect((url as string).startsWith('https://composio.test/api/v3/toolkits')).toBe(true);
-			expect((url as string)).toContain('limit=50');
+			expect(url as string).toContain('limit=50');
 			const headers = new Headers((init as RequestInit).headers);
 			expect(headers.get('x-api-key')).toBe('test-key');
 			expect(headers.get('accept')).toBe('application/json');
@@ -88,10 +88,10 @@ describe('ComposioClient', () => {
 			const client = createClient(fetchImpl);
 
 			await client.listToolkits(99999);
-			expect((fetchImpl.mock.calls[0][0] as string)).toContain('limit=200');
+			expect(fetchImpl.mock.calls[0][0] as string).toContain('limit=200');
 
 			await client.listToolkits(0);
-			expect((fetchImpl.mock.calls[1][0] as string)).toContain('limit=1');
+			expect(fetchImpl.mock.calls[1][0] as string).toContain('limit=1');
 		});
 
 		it('extracts the array under .items', async () => {
@@ -174,9 +174,11 @@ describe('ComposioClient', () => {
 		});
 
 		it('normalizes status to upper-case before matching', async () => {
-			const fetchImpl = vi.fn().mockResolvedValue(
-				jsonResponse({ items: [{ id: 'ca_x', status: 'active', toolkit: { slug: 'GMAIL' } }] })
-			);
+			const fetchImpl = vi
+				.fn()
+				.mockResolvedValue(
+					jsonResponse({ items: [{ id: 'ca_x', status: 'active', toolkit: { slug: 'GMAIL' } }] })
+				);
 			const client = createClient(fetchImpl);
 
 			const account = await client.validateConnection(createRef());
@@ -184,20 +186,24 @@ describe('ComposioClient', () => {
 		});
 
 		it('throws a friendly error when no ACTIVE account exists', async () => {
-			const fetchImpl = vi.fn().mockResolvedValue(
-				jsonResponse({ items: [{ id: 'ca_1', status: 'EXPIRED', toolkit: { slug: 'GMAIL' } }] })
-			);
+			const fetchImpl = vi
+				.fn()
+				.mockResolvedValue(
+					jsonResponse({ items: [{ id: 'ca_1', status: 'EXPIRED', toolkit: { slug: 'GMAIL' } }] })
+				);
 			const client = createClient(fetchImpl);
 
-			await expect(client.validateConnection(createRef())).rejects.toThrow(/No active Composio connected account/i);
+			await expect(client.validateConnection(createRef())).rejects.toThrow(
+				/No active Composio connected account/i
+			);
 		});
 	});
 
 	describe('executeTool', () => {
 		it('POSTs to /tools/execute/{slug} with { user_id, arguments }', async () => {
-			const fetchImpl = vi.fn().mockResolvedValue(
-				jsonResponse({ successful: true, data: { items: [{ name: 'A' }] } })
-			);
+			const fetchImpl = vi
+				.fn()
+				.mockResolvedValue(jsonResponse({ successful: true, data: { items: [{ name: 'A' }] } }));
 			const client = createClient(fetchImpl);
 
 			const result = await client.executeTool(createRef(), { to: 'a@b.c', subject: 'hi' });
@@ -214,9 +220,7 @@ describe('ComposioClient', () => {
 		});
 
 		it('URL-encodes the tool slug', async () => {
-			const fetchImpl = vi
-				.fn()
-				.mockResolvedValue(jsonResponse({ successful: true, data: {} }));
+			const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ successful: true, data: {} }));
 			const client = createClient(fetchImpl);
 
 			await client.executeTool(createRef({ toolSlug: 'TOOL/WITH SPACE' }), {});
@@ -226,9 +230,7 @@ describe('ComposioClient', () => {
 		});
 
 		it('converts timeoutMs to seconds in the request body', async () => {
-			const fetchImpl = vi
-				.fn()
-				.mockResolvedValue(jsonResponse({ successful: true, data: {} }));
+			const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ successful: true, data: {} }));
 			const client = createClient(fetchImpl);
 
 			await client.executeTool(createRef(), {}, { timeoutMs: 90_000 });
@@ -238,9 +240,11 @@ describe('ComposioClient', () => {
 		});
 
 		it('throws when successful=false even on HTTP 200', async () => {
-			const fetchImpl = vi.fn().mockResolvedValue(
-				jsonResponse({ successful: false, error: 'gmail quota exceeded', log_id: 'log_42' })
-			);
+			const fetchImpl = vi
+				.fn()
+				.mockResolvedValue(
+					jsonResponse({ successful: false, error: 'gmail quota exceeded', log_id: 'log_42' })
+				);
 			const client = createClient(fetchImpl);
 
 			await expect(client.executeTool(createRef(), {})).rejects.toThrow(/gmail quota exceeded.*log_42/i);
@@ -262,7 +266,9 @@ describe('ComposioClient', () => {
 			const fetchImpl = vi.fn().mockResolvedValue(errorResponse(404, 'not found'));
 			const client = createClient(fetchImpl);
 
-			await expect(client.executeTool(createRef(), {})).rejects.toThrow(/404.*tool slug or toolkit does not exist/i);
+			await expect(client.executeTool(createRef(), {})).rejects.toThrow(
+				/404.*tool slug or toolkit does not exist/i
+			);
 		});
 	});
 });

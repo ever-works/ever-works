@@ -9,7 +9,8 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ComposioStepId>[]
 	{
 		id: 'validate-composio',
 		name: 'Validate Composio Connection',
-		description: 'Verify the API key, the tool exists, and the user has an active connected account for the toolkit',
+		description:
+			'Verify the API key, the tool exists, and the user has an active connected account for the toolkit',
 		position: { type: 'first' },
 		dependencies: [],
 		optional: false,

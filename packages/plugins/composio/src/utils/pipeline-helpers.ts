@@ -87,13 +87,17 @@ export async function resolveSettings(
 			context.getSettings('work', workId)
 		]);
 
+		// Spread into a fresh object — `context.getSettings()` may return a
+		// shared cache reference, and mutating it in place would leak work-level
+		// overrides into subsequent reads for the same user.
+		const merged: PluginSettings = { ...userSettings };
 		for (const key in workSettings) {
 			if (workSettings[key] !== undefined && workSettings[key] !== null) {
-				userSettings[key] = workSettings[key];
+				merged[key] = workSettings[key];
 			}
 		}
 
-		return userSettings;
+		return merged;
 	} catch {
 		return {};
 	}

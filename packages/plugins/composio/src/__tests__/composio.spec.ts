@@ -356,10 +356,7 @@ describe('ComposioPlugin', () => {
 		});
 
 		it('completes successfully for a side-effect tool with no items', async () => {
-			stubFetchSequence([
-				ACTIVE_GMAIL_ACCOUNT,
-				jsonResponse({ successful: true, data: { ok: true } })
-			]);
+			stubFetchSequence([ACTIVE_GMAIL_ACCOUNT, jsonResponse({ successful: true, data: { ok: true } })]);
 
 			const result = await plugin.execute(
 				createWork(),
@@ -544,4 +541,3 @@ describe('ComposioPlugin', () => {
 		});
 	});
 });
-

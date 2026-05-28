@@ -53,7 +53,9 @@ describe('parseComposioOutput — structured shape', () => {
 	});
 
 	it('throws on an object with no items + no envelope keys', () => {
-		expect(() => parseComposioOutput({ foo: 'bar' }, 'structured', EMPTY_MAPPING)).toThrow(/does not contain an "items" array/);
+		expect(() => parseComposioOutput({ foo: 'bar' }, 'structured', EMPTY_MAPPING)).toThrow(
+			/does not contain an "items" array/
+		);
 	});
 
 	it('throws on null / undefined', () => {
@@ -109,7 +111,13 @@ describe('parseComposioOutput — native shape', () => {
 	it('maps array records onto items via field mapping', () => {
 		const result = parseComposioOutput(
 			[
-				{ title: 'Alice', link: 'https://alice.example', snippet: 'About Alice', labels: ['admin'], org: 'Acme' },
+				{
+					title: 'Alice',
+					link: 'https://alice.example',
+					snippet: 'About Alice',
+					labels: ['admin'],
+					org: 'Acme'
+				},
 				{ title: 'Bob', link: 'https://bob.example', labels: 'engineer, designer' }
 			],
 			'native',
@@ -126,37 +134,29 @@ describe('parseComposioOutput — native shape', () => {
 	});
 
 	it('reads from common envelopes (messages, issues, records, …)', () => {
-		const result = parseComposioOutput(
-			{ messages: [{ title: 'A' }, { title: 'B' }] },
-			'native',
-			{ nameField: 'title' }
-		);
+		const result = parseComposioOutput({ messages: [{ title: 'A' }, { title: 'B' }] }, 'native', {
+			nameField: 'title'
+		});
 		expect(result.items).toHaveLength(2);
 	});
 
 	it('walks dot-paths and array indexes', () => {
-		const result = parseComposioOutput(
-			[{ profile: { name: 'Alice' } }, { profile: { name: 'Bob' } }],
-			'native',
-			{ nameField: 'profile.name' }
-		);
+		const result = parseComposioOutput([{ profile: { name: 'Alice' } }, { profile: { name: 'Bob' } }], 'native', {
+			nameField: 'profile.name'
+		});
 
 		expect(result.items.map((i) => i.name)).toEqual(['Alice', 'Bob']);
 	});
 
 	it('drops records with an empty name', () => {
-		const result = parseComposioOutput(
-			[{ title: 'Alice' }, { title: '' }, { title: '   ' }],
-			'native',
-			{ nameField: 'title' }
-		);
+		const result = parseComposioOutput([{ title: 'Alice' }, { title: '' }, { title: '   ' }], 'native', {
+			nameField: 'title'
+		});
 		expect(result.items).toHaveLength(1);
 	});
 
 	it('throws if zero records produce items', () => {
-		expect(() => parseComposioOutput([{}], 'native', { nameField: 'missing' })).toThrow(
-			/none could be mapped/i
-		);
+		expect(() => parseComposioOutput([{}], 'native', { nameField: 'missing' })).toThrow(/none could be mapped/i);
 	});
 
 	it('treats a single object as a one-record list', () => {
@@ -175,11 +175,10 @@ describe('parseComposioOutput — native shape', () => {
 	});
 
 	it('accepts string image fields', () => {
-		const result = parseComposioOutput(
-			[{ title: 'A', image: 'https://a/img.png' }],
-			'native',
-			{ nameField: 'title', imageField: 'image' }
-		);
+		const result = parseComposioOutput([{ title: 'A', image: 'https://a/img.png' }], 'native', {
+			nameField: 'title',
+			imageField: 'image'
+		});
 		expect(result.items[0].images).toEqual(['https://a/img.png']);
 	});
 });
