@@ -41,12 +41,12 @@ exists for "memory entries" because there is no memory table.
 
 ## 2. Personas + use cases
 
-| Persona  | Use case                                                                                                  |
-| -------- | --------------------------------------------------------------------------------------------------------- |
-| Operator | Enables an agent-memory provider so Works accumulate context across scheduled regenerations.               |
-| User     | Turns on "Agent Memory Hooks" for a Work; each run fetches prior context and saves a digest.               |
-| User     | Reviews / forgets individual memory observations from the admin UI.                                        |
-| Agent    | An agent run opens one memory session and shares it across everything it does in that run.                 |
+| Persona  | Use case                                                                                     |
+| -------- | -------------------------------------------------------------------------------------------- |
+| Operator | Enables an agent-memory provider so Works accumulate context across scheduled regenerations. |
+| User     | Turns on "Agent Memory Hooks" for a Work; each run fetches prior context and saves a digest. |
+| User     | Reviews / forgets individual memory observations from the admin UI.                          |
+| Agent    | An agent run opens one memory session and shares it across everything it does in that run.   |
 
 ---
 
@@ -126,13 +126,13 @@ no metrics, no executor branching) on Works that don't use memory. A defensive
 
 Mounted at `/api/agent-memory`, JWT-protected (`AuthSessionGuard`):
 
-| Method + path                         | Notes                                                                 |
-| ------------------------------------- | --------------------------------------------------------------------- |
-| `GET /check-availability`             | Whether a provider is registered + loaded.                            |
-| `POST /sessions`                      | Open a session. Ownership-checked when `workId` supplied.             |
-| `POST /sessions/:sessionId/close`     | Close a session. Ownership-checked + work-scoped when `workId` given. |
-| `GET /sessions`                       | List sessions (404 if provider lacks `listSessions`).                 |
-| `POST /save` / `/search` / `/context` | Save / search / build-context. Ownership-checked when `workId` given. |
+| Method + path                         | Notes                                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| `GET /check-availability`             | Whether a provider is registered + loaded.                              |
+| `POST /sessions`                      | Open a session. Ownership-checked when `workId` supplied.               |
+| `POST /sessions/:sessionId/close`     | Close a session. Ownership-checked + work-scoped when `workId` given.   |
+| `GET /sessions`                       | List sessions (404 if provider lacks `listSessions`).                   |
+| `POST /save` / `/search` / `/context` | Save / search / build-context. Ownership-checked when `workId` given.   |
 | `DELETE /entries/:entryId`            | Forget one record. Ownership-checked + work-scoped when `workId` given. |
 
 **Ownership / isolation.** When a request carries a `workId`, the controller
