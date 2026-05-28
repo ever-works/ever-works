@@ -6,6 +6,8 @@ import type {
 	ChannelTargetConfig,
 	ChannelVerification,
 	ChannelShape,
+	PluginCategory,
+	JsonSchema,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -27,11 +29,27 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 	readonly id = 'discord-channel';
 	readonly name = 'Discord';
 	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'notification-channel';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL,
 		PLUGIN_CAPABILITIES.NOTIFICATION_CHANNEL_DISCORD,
 	] as const;
 	readonly shape: ChannelShape = 'broadcast';
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			defaultUsername: { type: 'string' },
+			defaultAvatarUrl: { type: 'string' },
+		},
+	};
+
+	async onLoad(): Promise<void> {
+		// No-op — Discord plugin has no warm-up resources.
+	}
+
+	async onUnload(): Promise<void> {
+		this.idempotencyCache.clear();
+	}
 
 	private readonly idempotencyCache = new Map<string, ChannelSendResult>();
 

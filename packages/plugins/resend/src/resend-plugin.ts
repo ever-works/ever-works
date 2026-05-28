@@ -4,6 +4,8 @@ import type {
 	EmailSendResult,
 	EmailOptions,
 	EmailVerification,
+	PluginCategory,
+	JsonSchema,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -31,7 +33,24 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 	readonly id = 'resend';
 	readonly name = 'Resend';
 	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'email-provider';
 	readonly capabilities = [PLUGIN_CAPABILITIES.EMAIL_OUTBOUND] as const;
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			apiKey: { type: 'string', 'x-secret': true, 'x-envVar': 'RESEND_API_KEY' },
+			defaultSenderDomain: { type: 'string' },
+		},
+		required: ['apiKey'],
+	};
+
+	async onLoad(): Promise<void> {
+		// No-op — Resend plugin has no warm-up resources.
+	}
+
+	async onUnload(): Promise<void> {
+		this.idempotencyCache.clear();
+	}
 
 	private readonly idempotencyCache = new Map<string, EmailSendResult>();
 

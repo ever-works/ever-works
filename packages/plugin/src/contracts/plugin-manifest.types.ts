@@ -17,7 +17,12 @@ export const PLUGIN_CATEGORIES = [
 	'theme',
 	// EW-637 — pluggable object storage backends (local-fs, S3, MinIO, GitHub).
 	// See packages/plugin/src/contracts/capabilities/storage.interface.ts.
-	'storage'
+	'storage',
+	// Notifications v2 (EW-650 + EW-663) — email + chat-channel providers.
+	// See `capabilities/email-provider.interface.ts` and
+	// `capabilities/notification-channel.interface.ts`.
+	'email-provider',
+	'notification-channel'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];

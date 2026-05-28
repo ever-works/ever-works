@@ -8,6 +8,8 @@ import type {
 	EmailVerification,
 	EmailAttachment,
 	EmailDeliveryEvent,
+	PluginCategory,
+	JsonSchema,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
@@ -68,10 +70,29 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 	readonly id = 'postmark';
 	readonly name = 'Postmark';
 	readonly version = '1.0.0';
+	readonly category: PluginCategory = 'email-provider';
 	readonly capabilities = [
 		PLUGIN_CAPABILITIES.EMAIL_OUTBOUND,
 		PLUGIN_CAPABILITIES.EMAIL_INBOUND,
 	] as const;
+	readonly settingsSchema: JsonSchema = {
+		type: 'object',
+		properties: {
+			apiKey: { type: 'string', 'x-secret': true, 'x-envVar': 'POSTMARK_API_KEY' },
+			defaultSenderDomain: { type: 'string' },
+			inboundWebhookSecret: { type: 'string', 'x-secret': true, 'x-envVar': 'POSTMARK_INBOUND_SECRET' },
+			inboundStreamId: { type: 'string' },
+		},
+		required: ['apiKey'],
+	};
+
+	async onLoad(): Promise<void> {
+		// No-op — Postmark plugin has no warm-up resources.
+	}
+
+	async onUnload(): Promise<void> {
+		this.idempotencyCache.clear();
+	}
 
 	private readonly idempotencyCache = new Map<string, EmailSendResult>();
 
