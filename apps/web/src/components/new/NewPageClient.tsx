@@ -28,6 +28,7 @@ import { ROUTES } from '@/lib/constants';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
+import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompanyDialog';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -43,11 +44,17 @@ import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/
  *   - website + 4 work kinds — forwarded to `/works/new` with the
  *                       prompt and the selected kind preserved.
  *
- * `store` and `company` are catalog entries telegraphing roadmap
- * scope (see Workspace notes `2026-05-23-missions-ideas-works-spec.md`
- * + AGENTS.md "stores + companies are in-scope future use cases"). They
- * render as inert "Soon" chips and aren't selectable yet, matching how
- * the marketing site already telegraphs them.
+ * `store` is a catalog entry telegraphing roadmap scope (see Workspace
+ * notes `2026-05-23-missions-ideas-works-spec.md` + AGENTS.md "stores
+ * + companies are in-scope future use cases"). It renders as an inert
+ * "Soon" chip, matching how the marketing site telegraphs it.
+ *
+ * EW-662 (Phase 10) — `company` graduated from inert to live: picking
+ * the Company chip opens the Register-Company dialog (spec §5.4), which
+ * creates an Organization with `registrationProvider = 'manual'` and
+ * `registrationStatus = 'registered'`. The full Stripe Atlas SDK
+ * integration is deferred to a later phase; for v1 the manual-completion
+ * path is the only way Company Works produce Orgs.
  *
  * The chat panel is auto-collapsed on mount so the prompt + chips
  * get the full main column on first land. Users can reopen it from
@@ -62,8 +69,17 @@ export type ChipType =
     | 'landing-page'
     | 'blog'
     | 'directory'
-    | 'awesome-repo';
+    | 'awesome-repo'
+    | 'company';
 
+// Spec §6.3 order:
+// `Mission · Idea · Website · Landing Page · Store · Blog · Directory
+//  · Awesome Repo · Knowledge Base · Company`.
+//
+// Live chips below stay in their current order (mission first, ideas
+// second, then content chips). `Company` joins at the end of the live
+// chip list per the spec, sitting next to the inert `store` chip which
+// is appended afterwards.
 const CHIP_ORDER: ChipType[] = [
     'mission',
     'idea',
@@ -74,6 +90,7 @@ const CHIP_ORDER: ChipType[] = [
     'blog',
     'directory',
     'awesome-repo',
+    'company',
 ];
 
 const CHIP_ICONS: Record<ChipType, LucideIcon> = {
@@ -88,6 +105,9 @@ const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     // makes the two chips visually indistinguishable in the chip row.
     directory: FolderOpen,
     'awesome-repo': Star,
+    // EW-662 Phase 10 — same `Building2` icon the WorkspaceSwitcher
+    // empty state uses for consistency.
+    company: Building2,
 };
 
 const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
@@ -152,6 +172,17 @@ const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
         'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
         'e.g. "Awesome list of free design resources for indie founders — icons, illustrations, fonts"',
     ],
+    // EW-662 Phase 10 — Company placeholders telegraph that this chip
+    // ends in a registered Organization (manual-completion path for v1).
+    // The prompt input is ignored on submit — the chip opens the
+    // Register-Company dialog directly — but the placeholder still
+    // sets context if the user lands on `?type=company` first.
+    company: [
+        'e.g. "Acme Inc. — an Org for our consultancy"',
+        'e.g. "Globex Holdings — the umbrella entity for our product lines"',
+        'e.g. "Soylent Labs — research entity for AI experimentation"',
+        'e.g. "Initech LLC — billing entity for our SaaS clients"',
+    ],
 };
 
 export interface NewPageClientProps {
@@ -170,6 +201,7 @@ const CHIP_INTENT_LABEL: Record<ChipType, string> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome list repo',
+    company: 'Company',
 };
 
 const CHIP_TO_CANVAS_ROUTE: Partial<Record<ChipType, string>> = {
@@ -202,6 +234,24 @@ export function NewPageClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+    // EW-662 Phase 10 — Company chip is a special chip whose submit
+    // opens the Register-Company dialog instead of going through the
+    // chat-AI / canvas pipeline. We hold the dialog open-state here so
+    // it survives chip switches.
+    const [companyDialogOpen, setCompanyDialogOpen] = useState(false);
+
+    // Auto-open the dialog when the user lands on `/new?type=company`
+    // (e.g. from the Settings → Account banner). The chip is selected
+    // by the page's initialType param; we mirror that into the dialog
+    // open state once on mount.
+    useEffect(() => {
+        if (initialType === 'company') {
+            setCompanyDialogOpen(true);
+        }
+        // Only run on mount — chip switches are handled by the click
+        // handler in PromptChipsRow below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // `buildAttachmentRefs` imported from PromptComposer — turns the
     // composer's full attachment list into chat-ready refs (filtering
@@ -223,6 +273,17 @@ export function NewPageClient({
     }, [setChatOpen]);
 
     const submit = () => {
+        // EW-662 Phase 10 — Company chip short-circuits the chat-AI
+        // path. There's no prompt-to-mission/work pipeline here: the
+        // user is going to register an Organization-backed Company,
+        // and that flow is owned by `<RegisterCompanyDialog>` (which
+        // collects the name + countryCode form). Open it and bail out
+        // of the rest of the submit logic — no min-length check,
+        // because the prompt input is incidental for this chip.
+        if (selectedChip === 'company') {
+            setCompanyDialogOpen(true);
+            return;
+        }
         const description = prompt.trim();
         if (description.length < 10) {
             toast.error(t('hints.minLength'));
@@ -340,10 +401,15 @@ export function NewPageClient({
         [selectedChip],
     );
 
-    // Full chip catalog. `store` + `company` are inert "Soon" chips,
-    // appended after the live chips so they sit at the end of the
+    // Full chip catalog. `store` stays as an inert "Soon" chip,
+    // appended after the live chips so it sits at the end of the
     // horizontal scroll the way the marketing site does it.
-    const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store' | 'company'>>>(
+    //
+    // EW-662 Phase 10 — `company` graduated from "Soon" to live; it
+    // sits at the end of the live `CHIP_ORDER` list so we render it
+    // automatically from the loop below. Picking it opens the
+    // Register-Company dialog on submit (see `submit()` above).
+    const allChips = useMemo<ReadonlyArray<PromptChip<ChipType | 'store'>>>(
         () => [
             ...CHIP_ORDER.map((c) => ({
                 value: c,
@@ -351,7 +417,6 @@ export function NewPageClient({
                 Icon: CHIP_ICONS[c],
             })),
             { value: 'store' as const, label: 'Store', Icon: Store, comingSoon: true },
-            { value: 'company' as const, label: 'Company', Icon: Building2, comingSoon: true },
         ],
         [t],
     );
@@ -386,10 +451,13 @@ export function NewPageClient({
                             chips={allChips}
                             value={selectedChip}
                             onChange={(next) => {
-                                // `store` and `company` are inert, so the
-                                // chips row never emits them — narrow back
-                                // to ChipType before persisting.
-                                if (next === null || next === 'store' || next === 'company') {
+                                // `store` is the last remaining inert "Soon"
+                                // chip — the chips row never emits it.
+                                // Narrow back to ChipType before persisting.
+                                // (`company` graduated to live in EW-662
+                                // Phase 10 and is handled like any other
+                                // ChipType.)
+                                if (next === null || next === 'store') {
                                     return;
                                 }
                                 setSelectedChip(next);
@@ -403,6 +471,11 @@ export function NewPageClient({
                     </div>
                 }
             />
+
+            {/* EW-662 Phase 10 — Register-Company dialog. Opens when the
+                user submits the Company chip or lands on
+                `/new?type=company`. */}
+            <RegisterCompanyDialog open={companyDialogOpen} onOpenChange={setCompanyDialogOpen} />
         </div>
     );
 }

@@ -8,7 +8,11 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
-import type { Organization } from '@ever-works/agent/entities';
+import type {
+    Organization,
+    OrganizationRegistrationProvider,
+    OrganizationRegistrationStatus,
+} from '@ever-works/agent/entities';
 import { UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS } from '@ever-works/contracts/api';
 import { UsernameAllocatorService } from '../users/services/username-allocator.service';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
@@ -131,11 +135,26 @@ export class OrganizationService {
      * outside the txn because it's idempotent (the
      * `tenants.ownerUserId UNIQUE` constraint catches racers), but
      * the rest must be atomic.
+     *
+     * EW-662 (Phase 10) added the optional `extra` parameter so the
+     * Register-Company path ([spec.md §5.4](../../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company))
+     * can persist `legalName`, `countryCode`, `registrationProvider`,
+     * `registrationStatus`, and `linkedWorkId` in the same atomic
+     * insert. All `extra` fields default to NULL / `'draft'` if
+     * omitted, so the existing Phase 6/9 Settings + Switcher callers
+     * keep behaving exactly as before.
      */
     async createOrganization(
         userId: string,
         name: string,
         slugOverride?: string,
+        extra?: {
+            legalName?: string | null;
+            countryCode?: string | null;
+            registrationProvider?: OrganizationRegistrationProvider | null;
+            registrationStatus?: OrganizationRegistrationStatus | null;
+            linkedWorkId?: string | null;
+        },
     ): Promise<Organization> {
         const trimmedName = name?.trim();
         if (!trimmedName) {
@@ -153,10 +172,21 @@ export class OrganizationService {
         return this.dataSource.transaction(async (manager) => {
             // Use the manager's repository so the INSERT lands in the
             // same transaction as the backfill UPDATEs below.
+            //
+            // `extra` fields are layered on top of the base shape so
+            // Phase 6 callers (which pass nothing) keep producing
+            // `{ tenantId, slug, displayName }` exactly as before. The
+            // entity's column defaults handle the unspecified columns
+            // (registrationStatus defaults to `'draft'`).
             const org = manager.getRepository<Organization>('organizations').create({
                 tenantId: tenant.id,
                 slug,
                 displayName: trimmedName,
+                legalName: extra?.legalName ?? null,
+                countryCode: extra?.countryCode ?? null,
+                registrationProvider: extra?.registrationProvider ?? null,
+                registrationStatus: extra?.registrationStatus ?? 'draft',
+                linkedWorkId: extra?.linkedWorkId ?? null,
             });
             const saved = await manager.getRepository<Organization>('organizations').save(org);
 
@@ -191,6 +221,87 @@ export class OrganizationService {
             );
 
             return saved;
+        });
+    }
+
+    /**
+     * EW-662 (Tenants & Organizations Phase 10) — Register-Company
+     * sub-flow entry point ([spec.md §5.4](../../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)).
+     *
+     * Creates an Organization directly from the chip-driven form on the
+     * `+ New` page (Company chip → Register-Company modal). For v1 the
+     * Stripe-Atlas integration is deferred; we land the Org with
+     * `registrationProvider = 'manual'` and `registrationStatus =
+     * 'registered'` so it behaves like any other Org from the moment
+     * the form submits.
+     *
+     * This is essentially `createOrganization` with the registration
+     * metadata pre-populated and the slug allocated from the legal
+     * name (so e.g. "Acme, Inc." becomes `acme-inc`). When a Phase 11+
+     * SDK integration creates a backing Work first, the same shape
+     * works — pass `linkedWorkId` to point at the Work.
+     */
+    async registerCompany(
+        userId: string,
+        params: {
+            name: string;
+            countryCode?: string | null;
+            legalName?: string | null;
+            linkedWorkId?: string | null;
+            slugOverride?: string;
+        },
+    ): Promise<Organization> {
+        const trimmed = params.name?.trim();
+        if (!trimmed) {
+            throw new ConflictException('Company name is required');
+        }
+        const trimmedLegal = params.legalName?.trim() || trimmed;
+
+        return this.createOrganization(userId, trimmed, params.slugOverride, {
+            legalName: trimmedLegal,
+            countryCode: params.countryCode?.trim() || null,
+            registrationProvider: 'manual',
+            registrationStatus: 'registered',
+            linkedWorkId: params.linkedWorkId ?? null,
+        });
+    }
+
+    /**
+     * EW-662 (Tenants & Organizations Phase 10) — wire-up entry point
+     * for a future Work-of-type-Company `registered` status transition
+     * (plan.md Phase 10 step 3).
+     *
+     * Today the platform's `Work` entity has neither a `kind` column
+     * nor a `status` column, so the actual status-transition hook
+     * doesn't fire yet. This method exists so the moment those columns
+     * land (Phase 11+ when the Stripe Atlas SDK ships), the calling
+     * code is a one-liner — the entity-to-Org plumbing is already in
+     * place + unit-tested here.
+     *
+     * Use this whenever a caller has a real `Work` row to link.
+     * Otherwise prefer `registerCompany` which is the chip-driven
+     * manual-completion path.
+     */
+    async createOrganizationFromCompanyWork(
+        userId: string,
+        work: {
+            id: string;
+            name: string;
+            companyName?: string | null;
+            companyWebsite?: string | null;
+        },
+        params?: { countryCode?: string | null; legalName?: string | null; slugOverride?: string },
+    ): Promise<Organization> {
+        const displayName = (work.companyName?.trim() || work.name)?.trim();
+        if (!displayName) {
+            throw new ConflictException('Work has no usable name for Organization creation');
+        }
+        return this.registerCompany(userId, {
+            name: displayName,
+            countryCode: params?.countryCode ?? null,
+            legalName: params?.legalName ?? work.companyName ?? null,
+            linkedWorkId: work.id,
+            slugOverride: params?.slugOverride,
         });
     }
 

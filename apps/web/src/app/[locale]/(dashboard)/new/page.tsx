@@ -19,6 +19,9 @@ const VALID_CHIP_TYPES: ChipType[] = [
     'blog',
     'directory',
     'awesome-repo',
+    // EW-662 (Phase 10) — Company joins the live chip set so
+    // `/new?type=company` lands directly on the Register-Company flow.
+    'company',
 ];
 
 /**

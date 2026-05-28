@@ -15,6 +15,26 @@ export interface CreateOrganizationRequest {
 	slug?: string;
 }
 
+/**
+ * EW-662 (Tenants & Organizations Phase 10) — body for
+ * `POST /api/organizations/register-company`.
+ *
+ * Driven by the Company chip on `+ New`. The service hard-codes
+ * `registrationProvider = 'manual'` and `registrationStatus =
+ * 'registered'` for v1 (Stripe Atlas integration is deferred); the
+ * client only supplies the user-visible fields.
+ */
+export interface RegisterCompanyRequest {
+	/** Display name. 1-200 chars. */
+	name: string;
+	/** Registered legal name. Defaults to `name` when omitted. */
+	legalName?: string;
+	/** ISO 3166-1 alpha-2 country code (e.g. `'US'`). */
+	countryCode?: string;
+	/** Optional slug override. If omitted, allocated from `name`. */
+	slug?: string;
+}
+
 export interface UpdateOrganizationRequest {
 	displayName?: string;
 	legalName?: string;
