@@ -227,6 +227,112 @@ describe('MemoryPipelineModifierPlugin', () => {
 		});
 	});
 
+	describe('rollback() hook (failure / cancellation capture)', () => {
+		async function primeStashedExecContext(): Promise<ReturnType<typeof makeContext>> {
+			// rollback reads execContext from the context bag; populate it
+			// by running the fetch-context step first (the executor runs
+			// modifier steps in pipeline order, so by the time rollback
+			// fires fetch-context has already stashed the facade).
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ content: '' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			return context;
+		}
+
+		it('persists a `failed` observation when the pipeline throws', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			await plugin.rollback(context, new Error('AI provider rate-limited'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: expect.stringMatching(/failed.*rate-limited/),
+					tags: expect.arrayContaining(['pipeline-run', 'failed', 'work:best-react-tools'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('marks a cancellation distinctly from a failure', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			await plugin.rollback(context, new Error('Pipeline cancelled at step: foo'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					content: expect.stringMatching(/cancelled/),
+					tags: expect.arrayContaining(['cancelled'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('recognises AbortError as a cancellation', async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+				id: 'mem-1',
+				createdAt: 'now',
+				content: 'x'
+			});
+			const abortError = new Error('some abort message');
+			abortError.name = 'AbortError';
+			await plugin.rollback(context, abortError);
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({
+					tags: expect.arrayContaining(['cancelled'])
+				}),
+				expect.any(Object)
+			);
+		});
+
+		it('no-ops silently when fetch-context never stashed an execContext', async () => {
+			// Skip the priming step — the pipeline failed before our
+			// fetch ran, so nothing is stashed. rollback should swallow.
+			const context = makeContext();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it('no-ops when the modifier is disabled (enabled !== true)', async () => {
+			await primeStashedExecContext();
+			const context = makeContext({}, false);
+			// Even though execContext is stashable from the priming run,
+			// settings.enabled is false, so rollback should not call save.
+			(context as Record<string, unknown>).__memoryModifierExecContext = makeExecContext();
+			vi.clearAllMocks();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it('no-ops when saveSummary === false (operator opted out of post-run saves)', async () => {
+			const context = makeContext({
+				stepSettings: {
+					'memory-pipeline-modifier': { enabled: true, saveSummary: false }
+				}
+			});
+			(context as Record<string, unknown>).__memoryModifierExecContext = makeExecContext();
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+		});
+
+		it("swallows saveMemory errors so the executor isn't derailed", async () => {
+			const context = await primeStashedExecContext();
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+				new Error('agentmemory unreachable')
+			);
+			await expect(plugin.rollback(context, new Error('original failure'))).resolves.toBeUndefined();
+			expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/agentmemory unreachable/));
+		});
+	});
+
 	describe('lifecycle + validation', () => {
 		it('reports healthy', async () => {
 			const health = await plugin.healthCheck();
