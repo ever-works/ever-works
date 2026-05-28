@@ -2,10 +2,11 @@
 
 **Feature ID**: `email-providers`
 **Branch**: `feat/email-providers`
-**Status**: `Draft`
+**Status**: `Draft (v1.1)`
 **Jira Epic**: [EW-650](https://evertech.atlassian.net/browse/EW-650)
 **Created**: 2026-05-26
-**Last updated**: 2026-05-26
+**Last updated**: 2026-05-28
+**Version**: v1.1 — added §11 React-Email/composer UI, §12 agent-to-agent communication, §13 sibling-spec cross-references. v1 sections 0–10 unchanged.
 **Owner**: Product (Ruslan)
 **Related code today**:
 
@@ -347,3 +348,114 @@ Rate-limited per plugin id (default 600/min — reduces blast radius if a provid
 - **Calendar providers** (separate spec) — same plugin pattern, different verbs (`createEvent`, `listEvents`).
 - **Voice / SMS providers** (separate spec) — same pattern, Twilio + MessageBird + Plivo + Vonage.
 - **Multi-tenant ownership** — `tenant_email_addresses` is single-tenant per `userId` in v1; promote to organization-owned when the multi-tenancy track lands.
+
+---
+
+## 11. React-Email + composer UI integration (v1.1 — additive)
+
+> **Why this section was added:** the v1 spec defined the data model + plugin contract but left the rendering surface vague. Operators want a rich composer for one-off agent emails, and outbound templates should be authored as React components so designers can iterate without Handlebars. This section is additive — Handlebars templates from the existing `mail-providers/` surface keep working unchanged; React-Email is an *additional* template medium that the `EmailFacadeService` can render.
+
+### 11.1 React-Email components (server-side render)
+
+The platform adopts [`@react-email/components`](https://react.email/docs/components/html) and [`@react-email/render`](https://react.email/docs/utilities/render) for outbound email composition. Both packages live in **`apps/api`** so rendering happens on the server before handoff to the provider plugin's `sendEmail`.
+
+- Templates live under `apps/api/src/email/templates/react/<slug>.tsx` (TSX). Each exports a default React component that accepts a typed `Props` object.
+- The `EmailFacadeService.send` accepts an optional `template: { kind: 'react', slug: string, props: T }` argument. When provided, the facade calls `render(<Template {...props} />, { pretty: false })` to produce the HTML body and `render(<Template {...props} />, { plainText: true })` for the text fallback. The provider plugin still receives `bodyHtml` + `bodyText` in the canonical `EmailSendInput` shape — providers never see React.
+- Existing Handlebars templates under `apps/api/src/templates/*.hbs` continue to work via `mail-providers`. The two systems coexist; choice is per-call.
+
+### 11.2 Composer UI (web app)
+
+A new in-app composer lives under [`agent-inbox-ui`](../agent-inbox-ui/spec.md) and is referenced here for completeness:
+
+- Rich-text + Markdown editor (operator-facing, *not* React-Email TSX). On submit, the composed content lands in `email_messages.bodyText` + `bodyHtml`.
+- Template picker: drops in any registered React-Email template, pre-fills the form with the template's `Props` shape (via a Zod schema each template co-locates).
+- Live preview pane: `iframe srcDoc={render(<Template {...props} />)}` renders the React-Email output as the operator types.
+
+### 11.3 Novu in-app inbox widget (optional)
+
+For tenants that opt in via the `novu` plugin (see [`notification-channels`](../notification-channels/spec.md)), the web app can mount [`@novu/react`](https://docs.novu.co/inbox/react/get-started) as an alternative in-app notification surface alongside the platform's native notifications panel. The native panel from `notifications` v1 remains the default; Novu is **additional**, not a replacement.
+
+---
+
+## 12. Agent-to-agent communication via email (v1.1 — additive)
+
+> **Why this section was added:** v1 framed inbound email as "external mail → Task". v1.1 elevates email to a **first-class peer of Tasks** as a communication medium *between agents*. Tasks remain the canonical work unit; email becomes a parallel addressable channel for inter-agent (and human↔agent) conversation.
+
+### 12.1 Conceptual model
+
+Each Agent with at least one inbound assignment exposes a stable mailbox address. Any sender — another Agent, a human user, or an external system — can reach the agent at that address. The receiving Agent's run loop processes inbound mail with the same scheduling primitives as Task execution.
+
+| Sender                | Receiver | Mechanism                                                                                                          |
+| --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| Agent A → Agent B     | Agent B  | `sendEmail` tool call with `to: ["<agent-b-slug>@inbound.acme.com"]`. Webhook fan-in → Agent B's inbound dispatcher |
+| Human → Agent         | Agent    | Standard SMTP send to the agent's address; provider webhook → inbound dispatcher                                   |
+| External AI → Agent   | Agent    | Same as human — agent inbox is just an SMTP address                                                                |
+| Agent → Human (reply) | Human    | `sendEmail` from the agent's outbound assignment; threading via `In-Reply-To` (v2)                                 |
+
+### 12.2 Dispatch semantics
+
+The inbound dispatcher gains two modes (set per `agent_email_assignments` row):
+
+- **`task-spawn` (v1 default).** Each inbound message creates or joins a Task. Existing behavior from §5.2.
+- **`conversation` (v1.1 new).** Inbound messages append to a per-Agent **EmailConversation** thread (keyed by `(agentId, threadKey)` where `threadKey` is derived from `In-Reply-To` or message subject). The agent's chat-reply path processes the message the same way it processes chat messages — no new Task is created. Use this when the goal is ongoing dialogue, not a discrete unit of work.
+
+The mode is a property of the **assignment**, not the address — one address can serve multiple agents in different modes (rare but supported).
+
+### 12.3 Data model deltas
+
+```
+email_conversations
+  id              uuid PK
+  agentId         uuid FK agents ON DELETE CASCADE
+  threadKey       varchar(200)               -- derived from In-Reply-To header or normalized subject
+  participants    jsonb                      -- [{address, displayName?}, …]
+  lastMessageAt   timestamp
+  createdAt       timestamp
+  UNIQUE(agentId, threadKey)
+```
+
+`email_messages` gains a nullable FK `conversationId` (NULL when the message is bound to a Task instead). One of `taskId` / `conversationId` is always set; the other is NULL.
+
+### 12.4 New `messageAgent` tool descriptor
+
+In addition to `sendEmail` (raw outbound, §5.1), Agents with `canCallExternalTools=true` get a higher-level `messageAgent` tool:
+
+```typescript
+interface MessageAgentInput {
+  targetAgentId: string;      // resolved via agent registry
+  subject: string;
+  body: string;               // plain text; React-Email template optional
+  attachReferences?: { workId?: string; taskId?: string; missionId?: string }[];
+}
+```
+
+The descriptor resolves the target agent's *primary inbound address* and calls `EmailFacadeService.send` with appropriate routing metadata so the receiving end auto-routes into `conversation` mode. This gives agents a clean "send a message to peer agent" verb without making them assemble RFC 5321 addresses by hand.
+
+### 12.5 Why not just use Tasks for inter-agent messaging?
+
+- Tasks are units of *work* (have lifecycle: created → in-progress → done → archived). A conversational ping ("FYI, the deploy finished") doesn't fit that shape.
+- Email is the universal cross-system addressing scheme. Agents reachable by email are reachable by humans, by external AI agents, by webhooks, and by other Ever Works tenants — all without bespoke integration code.
+- The Agent's existing chat-reply path is the right execution model for conversational input; the `conversation` mode reuses it without inventing a new dispatcher.
+
+---
+
+## 13. Cross-references to sibling specs (v1.1)
+
+The notifications/communications track is now decomposed into four sibling specs. This spec (`email-providers`) owns email-specific concerns; the siblings pick up adjacent surfaces:
+
+| Spec                                                       | Owns                                                                                                                  | Jira Epic |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------- |
+| `email-providers` (this doc)                               | Tenant email addresses, per-Agent assignment, Email plugin contract, EmailFacadeService, React-Email templates        | EW-650    |
+| [`notification-channels`](../notification-channels/spec.md) | Multi-channel notification plugin contract (Discord/Slack/Telegram/WhatsApp/Novu), channel router, fanout/failover    | TBD       |
+| [`event-subscriptions`](../event-subscriptions/spec.md)     | Per-user per-event delivery preferences extending `notifications` v1 (mute, quiet hours, channel selection)            | TBD       |
+| [`agent-inbox-ui`](../agent-inbox-ui/spec.md)               | Per-agent inbox views, composer with React-Email preview, address-management wizard                                    | TBD       |
+
+All four share the same constitution gates and the same plugin-registry foundation. The dependency graph is:
+
+```
+agent-inbox-ui ──▶ email-providers ──┐
+                                      ├─▶ event-subscriptions ──▶ notifications v1
+notification-channels ────────────────┘
+```
+
+`email-providers` and `notification-channels` are independent (can ship in either order). `event-subscriptions` is the user-facing aggregator and depends on at least one channel surface (in-app via v1, plus any of email/Discord/Slack/etc.).
