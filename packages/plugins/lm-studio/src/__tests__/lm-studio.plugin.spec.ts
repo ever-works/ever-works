@@ -47,11 +47,12 @@ describe('LmStudioPlugin', () => {
 			expect(plugin.settingsSchema.required).toEqual(['baseUrl', 'defaultModel']);
 		});
 
-		it('should have apiKey with placeholder default value', () => {
+		it('should have apiKey as an encrypted secret with a placeholder default', () => {
 			const apiKeySchema = plugin.settingsSchema.properties?.apiKey as any;
 			expect(apiKeySchema).toBeDefined();
 			expect(apiKeySchema.type).toBe('string');
 			expect(apiKeySchema.default).toBe('lm-studio');
+			expect(apiKeySchema['x-secret']).toBe(true);
 			expect(apiKeySchema['x-scope']).toBe('user');
 		});
 
@@ -204,6 +205,29 @@ describe('LmStudioPlugin', () => {
 
 			expect(aiOpsInstance.testConnection).toHaveBeenCalledWith(
 				expect.objectContaining({ baseURL: 'http://custom:1234/v1' })
+			);
+		});
+
+		it('should pass resolved settings (URL, key, embedding model) to AiOperations.createEmbedding', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.createEmbedding({
+				input: 'hello',
+				settings: {
+					baseUrl: 'http://custom:1234/v1',
+					apiKey: 'proxy-token',
+					embeddingModel: 'nomic-embed-text'
+				}
+			});
+
+			expect(aiOpsInstance.createEmbedding).toHaveBeenCalledWith(
+				expect.objectContaining({ input: 'hello' }),
+				expect.objectContaining({
+					baseURL: 'http://custom:1234/v1',
+					apiKey: 'proxy-token',
+					embeddingModel: 'nomic-embed-text'
+				})
 			);
 		});
 	});

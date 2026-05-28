@@ -41,11 +41,12 @@ LM Studio exposes the same OpenAI-compatible `/v1` API as the other AI providers
 ## Settings
 
 - **LM Studio Server URL** — address of your LM Studio server, e.g. `http://localhost:1234/v1` (per-user, required).
-- **API Key** — usually not needed; only for instances placed behind an auth proxy (per-user).
+- **API Key** — usually not needed; only for instances placed behind an auth proxy. Stored encrypted (per-user).
 - **Default Model** — used for all AI tasks unless a tier-specific model is set. No hardcoded default: pick a model after the connection is established and the model list loads.
 - **Simple Tasks Model** — handles tags, short descriptions, and quick classifications.
 - **Standard Tasks Model** — handles listings, summaries, and content reformatting.
 - **Complex Tasks Model** — handles full page generation and multi-step analysis.
+- **Embedding Model** — model used for semantic-search embeddings; only needed if you use KB search.
 - **Temperature** — controls output variety; lower is more consistent (hidden, advanced).
 - **Max Tokens** — limits the length of each AI-generated response (hidden, advanced).
 

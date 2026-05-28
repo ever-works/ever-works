@@ -44,16 +44,17 @@ The plugin talks to LM Studio through its OpenAI-compatible `/v1` API endpoint, 
 
 ### Settings Schema
 
-| Setting        | Type     | Default     | Scope    | Description                                                       |
-| -------------- | -------- | ----------- | -------- | ----------------------------------------------------------------- |
-| `baseUrl`      | `string` | —           | `user`   | Address of the LM Studio server (e.g. `http://localhost:1234/v1`) |
-| `apiKey`       | `string` | `lm-studio` | `user`   | Only needed if LM Studio is placed behind an auth proxy           |
-| `defaultModel` | `string` | —           | `global` | Used for all AI tasks unless a tier-specific model is set         |
-| `simpleModel`  | `string` | —           | `global` | Handles tags, short descriptions, and quick classifications       |
-| `mediumModel`  | `string` | —           | `global` | Handles listings, summaries, and content reformatting             |
-| `complexModel` | `string` | —           | `global` | Handles full page generation and multi-step analysis              |
-| `temperature`  | `number` | `0.7`       | hidden   | Controls output randomness (0 = deterministic, 2 = creative)      |
-| `maxTokens`    | `number` | `4096`      | hidden   | Maximum length of each AI-generated response                      |
+| Setting          | Type     | Default     | Scope    | Description                                                            |
+| ---------------- | -------- | ----------- | -------- | ---------------------------------------------------------------------- |
+| `baseUrl`        | `string` | —           | `user`   | Address of the LM Studio server (e.g. `http://localhost:1234/v1`)      |
+| `apiKey`         | `string` | `lm-studio` | `user`   | Only needed for an auth proxy in front of LM Studio (stored encrypted) |
+| `defaultModel`   | `string` | —           | `global` | Used for all AI tasks unless a tier-specific model is set              |
+| `simpleModel`    | `string` | —           | `global` | Handles tags, short descriptions, and quick classifications            |
+| `mediumModel`    | `string` | —           | `global` | Handles listings, summaries, and content reformatting                  |
+| `complexModel`   | `string` | —           | `global` | Handles full page generation and multi-step analysis                   |
+| `embeddingModel` | `string` | —           | `global` | Model for semantic-search embeddings (only needed for KB search)       |
+| `temperature`    | `number` | `0.7`       | hidden   | Controls output randomness (0 = deterministic, 2 = creative)           |
+| `maxTokens`      | `number` | `4096`      | hidden   | Maximum length of each AI-generated response                           |
 
 Model fields use the `x-widget: model-select` extension, which renders a model dropdown in the dashboard UI populated by calling `listModels()` against the configured server. Unlike cloud providers, **the model fields ship without a hardcoded default** — LM Studio serves whatever model you have loaded, so you select it after the connection succeeds.
 

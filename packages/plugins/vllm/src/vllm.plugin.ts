@@ -87,6 +87,13 @@ export class VllmPlugin extends BaseAiProvider {
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
+			embeddingModel: {
+				type: 'string',
+				title: 'Embedding Model',
+				description: 'Model used for semantic search embeddings (only needed if you use KB search)',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
 
 			temperature: {
 				type: 'number',
@@ -146,7 +153,7 @@ export class VllmPlugin extends BaseAiProvider {
 		if (!this.aiOps) {
 			throw new Error('vLLM plugin not loaded');
 		}
-		return this.aiOps.createEmbedding(options);
+		return this.aiOps.createEmbedding(options, this.resolveConfig(options.settings));
 	}
 
 	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {

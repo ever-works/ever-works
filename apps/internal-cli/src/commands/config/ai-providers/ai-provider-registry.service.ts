@@ -156,7 +156,7 @@ export class AiProviderRegistryService {
             defaults: {
                 model: 'local-model',
                 temperature: 0.7,
-                maxTokens: 8192,
+                maxTokens: 4096,
                 baseUrl: 'http://localhost:1234/v1',
             },
             requiresApiKey: false,
@@ -178,7 +178,7 @@ export class AiProviderRegistryService {
             defaults: {
                 model: 'local-model',
                 temperature: 0.7,
-                maxTokens: 8192,
+                maxTokens: 4096,
                 baseUrl: 'http://localhost:8000/v1',
             },
             requiresApiKey: false,

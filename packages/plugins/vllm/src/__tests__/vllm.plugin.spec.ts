@@ -207,5 +207,28 @@ describe('VllmPlugin', () => {
 				expect.objectContaining({ baseURL: 'http://custom:8000/v1' })
 			);
 		});
+
+		it('should pass resolved settings (URL, key, embedding model) to AiOperations.createEmbedding', async () => {
+			await plugin.onLoad(createMockContext());
+			const aiOpsInstance = (AiOperations as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+			await plugin.createEmbedding({
+				input: 'hello',
+				settings: {
+					baseUrl: 'http://custom:8000/v1',
+					apiKey: 'sk-vllm-token',
+					embeddingModel: 'intfloat/e5-mistral-7b-instruct'
+				}
+			});
+
+			expect(aiOpsInstance.createEmbedding).toHaveBeenCalledWith(
+				expect.objectContaining({ input: 'hello' }),
+				expect.objectContaining({
+					baseURL: 'http://custom:8000/v1',
+					apiKey: 'sk-vllm-token',
+					embeddingModel: 'intfloat/e5-mistral-7b-instruct'
+				})
+			);
+		});
 	});
 });

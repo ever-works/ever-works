@@ -44,16 +44,17 @@ The plugin talks to vLLM through its OpenAI-compatible `/v1` API endpoint. vLLM 
 
 ### Settings Schema
 
-| Setting        | Type     | Default | Scope    | Description                                                          |
-| -------------- | -------- | ------- | -------- | -------------------------------------------------------------------- |
-| `baseUrl`      | `string` | —       | `user`   | Address of the vLLM server (e.g. `http://localhost:8000/v1`)         |
-| `apiKey`       | `string` | `EMPTY` | `user`   | Only required if the server was started with `--api-key` (encrypted) |
-| `defaultModel` | `string` | —       | `global` | Used for all AI tasks unless a tier-specific model is set            |
-| `simpleModel`  | `string` | —       | `global` | Handles tags, short descriptions, and quick classifications          |
-| `mediumModel`  | `string` | —       | `global` | Handles listings, summaries, and content reformatting                |
-| `complexModel` | `string` | —       | `global` | Handles full page generation and multi-step analysis                 |
-| `temperature`  | `number` | `0.7`   | hidden   | Controls output randomness (0 = deterministic, 2 = creative)         |
-| `maxTokens`    | `number` | `4096`  | hidden   | Maximum length of each AI-generated response                         |
+| Setting          | Type     | Default | Scope    | Description                                                          |
+| ---------------- | -------- | ------- | -------- | -------------------------------------------------------------------- |
+| `baseUrl`        | `string` | —       | `user`   | Address of the vLLM server (e.g. `http://localhost:8000/v1`)         |
+| `apiKey`         | `string` | `EMPTY` | `user`   | Only required if the server was started with `--api-key` (encrypted) |
+| `defaultModel`   | `string` | —       | `global` | Used for all AI tasks unless a tier-specific model is set            |
+| `simpleModel`    | `string` | —       | `global` | Handles tags, short descriptions, and quick classifications          |
+| `mediumModel`    | `string` | —       | `global` | Handles listings, summaries, and content reformatting                |
+| `complexModel`   | `string` | —       | `global` | Handles full page generation and multi-step analysis                 |
+| `embeddingModel` | `string` | —       | `global` | Model for semantic-search embeddings (only needed for KB search)     |
+| `temperature`    | `number` | `0.7`   | hidden   | Controls output randomness (0 = deterministic, 2 = creative)         |
+| `maxTokens`      | `number` | `4096`  | hidden   | Maximum length of each AI-generated response                         |
 
 The `apiKey` field is marked `x-secret`, so a real token is stored encrypted. It defaults to vLLM's documented `EMPTY` placeholder, which an unsecured server accepts. Model fields use `x-widget: model-select` and have **no hardcoded default** — set them to the model id vLLM was launched with.
 

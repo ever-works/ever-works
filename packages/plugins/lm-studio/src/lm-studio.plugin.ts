@@ -54,6 +54,7 @@ export class LmStudioPlugin extends BaseAiProvider {
 				title: 'API Key',
 				description: 'Usually not needed; only for LM Studio instances placed behind an auth proxy',
 				default: 'lm-studio',
+				'x-secret': true,
 				'x-scope': 'user'
 			},
 			defaultModel: {
@@ -81,6 +82,13 @@ export class LmStudioPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
+				'x-widget': 'model-select',
+				'x-scope': 'global'
+			},
+			embeddingModel: {
+				type: 'string',
+				title: 'Embedding Model',
+				description: 'Model used for semantic search embeddings (only needed if you use KB search)',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -143,7 +151,7 @@ export class LmStudioPlugin extends BaseAiProvider {
 		if (!this.aiOps) {
 			throw new Error('LM Studio plugin not loaded');
 		}
-		return this.aiOps.createEmbedding(options);
+		return this.aiOps.createEmbedding(options, this.resolveConfig(options.settings));
 	}
 
 	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
