@@ -23,6 +23,7 @@ import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { CheckSlugQueryDto } from './dto/check-slug.dto';
+import { RegisterCompanyDto } from './dto/register-company.dto';
 
 /**
  * EW-658 (Tenants & Organizations Phase 6) — Organization CRUD +
@@ -64,6 +65,26 @@ export class OrganizationsController {
             dto.name,
             dto.slug,
         );
+        return this.toResponse(org);
+    }
+
+    @Post('register-company')
+    @ApiOperation({
+        summary: 'Register a Company (Phase 10 — Company chip)',
+        description:
+            "EW-662: Registers a Company via the manual-completion path ([spec.md §5.4](../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)). Creates an Organization with `registrationProvider = 'manual'` and `registrationStatus = 'registered'` directly — the Stripe Atlas SDK integration is deferred. Lazy-creates the Tenant + backfills `tenantId` the same way `POST /api/organizations` does.",
+    })
+    @ApiResponse({ status: 201, description: 'Company registered + Organization created' })
+    async registerCompany(
+        @Req() req: { user: { userId: string } },
+        @Body() dto: RegisterCompanyDto,
+    ): Promise<OrganizationResponse> {
+        const org = await this.organizationService.registerCompany(req.user.userId, {
+            name: dto.name,
+            legalName: dto.legalName,
+            countryCode: dto.countryCode?.toUpperCase() ?? null,
+            slugOverride: dto.slug,
+        });
         return this.toResponse(org);
     }
 
