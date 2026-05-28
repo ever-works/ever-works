@@ -43,6 +43,17 @@ export interface EmailMessageListItem {
     createdAt: string;
 }
 
+export interface EmailMessageDetail extends EmailMessageListItem {
+    ccAddresses: string[] | null;
+    bccAddresses: string[] | null;
+    bodyText: string;
+    bodyHtml: string | null;
+    agentId: string | null;
+    taskId: string | null;
+    conversationId: string | null;
+    providerMessageId: string | null;
+}
+
 export const emailAddressesAPI = {
     list: async (direction?: EmailAddressDirection) => {
         const query = direction ? `?direction=${direction}` : '';
@@ -83,5 +94,11 @@ export const emailAddressesAPI = {
             path: `/api/email/messages?agentId=${agentId}&limit=${limit}&offset=${offset}`,
         });
         return data.messages;
+    },
+    getMessage: async (id: string) => {
+        const data = await serverFetch<{ message: EmailMessageDetail }>({
+            path: `/api/email/messages/${id}`,
+        });
+        return data.message;
     },
 };

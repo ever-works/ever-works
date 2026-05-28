@@ -103,6 +103,18 @@ export class EmailService {
         });
     }
 
+    /**
+     * EW-680 / T31 — fetch a single message, enforcing per-user
+     * ownership (the repo's findById isn't user-scoped).
+     */
+    async getMessage(userId: string, id: string): Promise<unknown> {
+        const row = await this.messages.findById(id);
+        if (!row || row.userId !== userId) {
+            throw new NotFoundException('Message not found');
+        }
+        return row;
+    }
+
     private async findOwnedOrThrow(userId: string, id: string): Promise<TenantEmailAddress> {
         const row = await this.addresses.findByIdForUser(id, userId);
         if (!row) throw new NotFoundException('Email address not found');

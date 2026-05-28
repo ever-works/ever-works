@@ -124,6 +124,15 @@ export class EmailController {
         return { messages };
     }
 
+    @UseGuards(AuthSessionGuard)
+    @ApiBearerAuth('JWT-auth')
+    @Get('messages/:id')
+    @ApiOperation({ summary: 'Get a single email message by id' })
+    async getMessage(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+        const message = await this.emailService.getMessage(auth.userId, id);
+        return { message };
+    }
+
     // -------------------------------------------------------------
     // Public — address verification click-through
     // -------------------------------------------------------------

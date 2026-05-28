@@ -68,7 +68,14 @@ export function AgentInboxPanel({ agentId, initialMessages }: Props) {
                                         </span>
                                     </td>
                                     <td className="py-2">{m.from}</td>
-                                    <td className="py-2 font-medium">{m.subject}</td>
+                                    <td className="py-2 font-medium">
+                                        <a
+                                            href={`/agents/${agentId}/inbox/${m.id}`}
+                                            className="hover:underline"
+                                        >
+                                            {m.subject}
+                                        </a>
+                                    </td>
                                     <td className="py-2 text-xs text-muted-foreground">
                                         {new Date(when).toLocaleString()}
                                     </td>

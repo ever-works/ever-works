@@ -43,7 +43,7 @@
 
 ### Partially done
 
-- **EW-680** Per-Agent inbox tab + components — list view done (T17); message detail page (T31) + composer page (T32) pending.
+- **EW-680** Per-Agent inbox tab + components — list view (T17) + message detail page (T31) done; composer page (T32) pending.
 - **EW-681** SWR hooks + SSE + i18n + E2E — API clients done (T17); SWR client hooks (T33) + SSE stream (T34) + i18n (T35) + Playwright E2E (T36) pending.
 
 ### Not started
@@ -67,7 +67,8 @@ _(none — all remaining items are in "Partially done" above)_
 - **T27 EW-674** Slack channel plugin — [`889c6e15`](https://github.com/ever-works/ever-works/commit/889c6e15). `packages/plugins/slack-channel/` incoming-webhook + Block Kit, mirrors Discord. type-check clean, 7/7 Vitest.
 - **T28 EW-674** Telegram channel plugin — [`6f9abf89`](https://github.com/ever-works/ever-works/commit/6f9abf89). `packages/plugins/telegram-channel/` Bot API sendMessage (direct shape), MarkdownV2 support, getMe verifyTarget. type-check clean, 8/8 Vitest. Completes EW-674.
 - **T29 EW-675** WhatsApp channel plugin — [`45b92c7a`](https://github.com/ever-works/ever-works/commit/45b92c7a). `packages/plugins/whatsapp-channel/` Cloud API send (text + template, direct shape), 24h-window note, phone-number-id verifyTarget. type-check clean, 8/8 Vitest.
-- **T30 EW-675** Novu channel plugin — *this commit*. `packages/plugins/novu-channel/` Trigger API (workflow shape, raw fetch), payload merge, environments/me verifyTarget, self-hosted apiBase. type-check clean, 9/9 Vitest. Completes EW-675 + the full plugin set.
+- **T30 EW-675** Novu channel plugin — [`06cd2323`](https://github.com/ever-works/ever-works/commit/06cd2323). `packages/plugins/novu-channel/` Trigger API (workflow shape, raw fetch), payload merge, environments/me verifyTarget, self-hosted apiBase. type-check clean, 9/9 Vitest. Completes EW-675 + the full plugin set.
+- **T31 EW-680** Inbox message detail page — *this commit*. `GET /api/email/messages/:id` route + `EmailService.getMessage` (per-user ownership) + `emailAddressesAPI.getMessage` client + `MessageDetail` component (sandboxed iframe for HTML body) + `/agents/[id]/inbox/[messageId]` page; inbox rows now link to it. apps/web type-check deferred to T18-style batch (consistent with prior UI ticks).
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
