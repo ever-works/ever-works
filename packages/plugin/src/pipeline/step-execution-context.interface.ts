@@ -138,4 +138,21 @@ export interface StepExecutionContext {
 	 * responsible for null-checking before use.
 	 */
 	readonly agentMemoryFacade?: IAgentMemoryStepFacade;
+
+	/**
+	 * Optional agent-memory session id supplied by the orchestrator that
+	 * invoked the pipeline (e.g. `AgentRunService` already opens a
+	 * session per run via `AgentMemoryFacadeService.openSession`). When
+	 * set, pipeline modifiers/steps that touch agent-memory MUST associate
+	 * their `saveMemory` / `buildContext` calls with this session instead
+	 * of opening one of their own, so the orchestrator and pipeline share
+	 * the same `agent_memory_sessions` row.
+	 *
+	 * Carrier-only — populated by `PipelineFacadeService.createStepExecutionContext`.
+	 * Optional: pipelines run from non-agent surfaces (Work generation
+	 * tasks, manual triggers, OSS builds without `agentmemory-plugin`)
+	 * leave it `undefined` and the memory modifier falls back to its
+	 * default per-run association (no explicit session id).
+	 */
+	readonly memorySessionId?: string;
 }

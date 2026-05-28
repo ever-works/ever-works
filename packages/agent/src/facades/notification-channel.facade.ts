@@ -157,7 +157,14 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                 error: 'channels repository not injected',
             };
         }
-        const channel = await this.channels.findById(channelId);
+        // Codex P2 (PR #1085): scope channel lookup to the caller when a userId is
+        // available. Otherwise a caller could supply a leaked channel UUID owned by
+        // another user and have their text fan out to that user's webhook. We
+        // intentionally return the same "not found" shape for "doesn't exist" and
+        // "belongs to someone else" so we don't leak channel existence across users.
+        const channel = options.userId
+            ? await this.channels.findByIdForUser(channelId, options.userId)
+            : await this.channels.findById(channelId);
         if (!channel) {
             return {
                 channelId,

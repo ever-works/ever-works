@@ -315,12 +315,14 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 
 			const summary = this.buildFailureSummary(work, items, error, isCancellation);
 			const tags = this.buildFailureTags(work, isCancellation);
+			const sessionId = execContext?.memorySessionId;
 
 			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
 				{
 					content: summary,
 					tags,
 					projectId: work?.slug ?? work?.id,
+					...(sessionId ? { sessionId } : {}),
 					metadata: {
 						workId: work?.id,
 						workSlug: work?.slug,
@@ -357,12 +359,22 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			const work = (context as { work?: { id?: string; name?: string; slug?: string } }).work;
 			const request = (context as { request?: { prompt?: string } }).request;
 
+			// Honour a session id supplied by the orchestrator (e.g.
+			// AgentRunService opens a session per agent run and propagates
+			// it via StepExecutionContext.memorySessionId). When absent —
+			// the usual case for plain Work-generation pipelines — the
+			// backend associates the record with no specific session.
+			const sessionId = (context as ContextBag).__memoryModifierExecContext
+				? ((context as ContextBag).__memoryModifierExecContext as StepExecutionContext).memorySessionId
+				: undefined;
+
 			const ctx: AgentMemoryContext = await memoryFacade.buildContext(
 				{
 					query: request?.prompt,
 					purpose: settings.purpose ?? DEFAULT_PURPOSE,
 					projectId: work?.slug ?? work?.id,
-					maxTokens: settings.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS
+					maxTokens: settings.maxContextTokens ?? DEFAULT_MAX_CONTEXT_TOKENS,
+					...(sessionId ? { sessionId } : {})
 				},
 				// Bound facade ignores its facadeOptions — pass placeholder.
 				{ userId: 'bound', workId: 'bound' }
@@ -408,12 +420,16 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 			// unreachable at this step's call site.
 			const summary = this.buildSummary(work, items);
 			const tags = this.buildTags(work);
+			const sessionId = (context as ContextBag).__memoryModifierExecContext
+				? ((context as ContextBag).__memoryModifierExecContext as StepExecutionContext).memorySessionId
+				: undefined;
 
 			const record: AgentMemoryRecord = await memoryFacade.saveMemory(
 				{
 					content: summary,
 					tags,
 					projectId: work?.slug ?? work?.id,
+					...(sessionId ? { sessionId } : {}),
 					metadata: {
 						workId: work?.id,
 						workSlug: work?.slug,
