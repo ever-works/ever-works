@@ -108,6 +108,8 @@ export {
     NotificationChannelFacadeError,
     type NotificationChannelFanoutInput,
     type NotificationChannelFanoutResult,
+    type NotificationChannelDeliveryPayload,
+    type NotificationChannelDeliveryDispatcher,
 } from './notification-channel.facade';
 
 // Agent-Memory Facade — pluggable persistent memory for agents
