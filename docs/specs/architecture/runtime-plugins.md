@@ -43,15 +43,17 @@ Classification is declared on the plugin via the manifest field `distribution`
 (`'core' | 'registry'`), defaulting from `systemPlugin`:
 
 - **Core** (`distribution: 'core'`) — always bundled, present in both modes,
-  never fetched from a registry. Comprises:
-  - every `systemPlugin: true` plugin: `agent-pipeline`, `comparison-generator`,
-    `github`, `k8s`, `local-content-extractor`, `local-fs`, `openrouter`,
-    `standard-pipeline`, `tavily`, `vercel`;
-  - plugins the API cannot boot without — today the storage plugins imported
-    directly in `apps/api/package.json`: `aws-s3`, `github-storage`, `minio`
-    (see Open Question on whether these stay core or lose the hard import).
-- **Distributable** (`distribution: 'registry'`) — everything else; published
-  and runtime-installable.
+  never fetched from a registry. Comprises **every `systemPlugin: true` plugin**:
+  `agent-pipeline`, `comparison-generator`, `github`, `k8s`,
+  `local-content-extractor`, `local-fs`, `openrouter`, `standard-pipeline`,
+  `tavily`, `vercel`. `local-fs` doubles as the **default storage backend** so the
+  API boots with working storage even when no distributable storage plugin is
+  enabled.
+- **Distributable** (`distribution: 'registry'`) — everything else, **including**
+  the storage plugins `aws-s3`, `github-storage`, and `minio`. The API today hard
+  imports those three in `apps/api/package.json`; that coupling is **removed** and
+  storage is resolved through the capability facade/registry, which is what lets
+  them be distributable (see EW-693 T8b).
 
 The manifest is the source of truth; the value is denormalised onto the
 `plugins` row for listing.

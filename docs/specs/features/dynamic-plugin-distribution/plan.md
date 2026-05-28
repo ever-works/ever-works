@@ -162,9 +162,16 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
   capability/operation granularity) to `PluginManifest`
   (`src/contracts/plugin-manifest.types.ts`) + JSON-schema validator update.
   Additive; default derivation keeps old manifests valid.
-- **All plugin `package.json`s**: set `distribution` (core for `systemPlugin`
-  + API-boot-critical; `registry` for the rest); flip `private: true → false`
-  with `publishConfig` for distributable plugins; add per-plugin `release` wiring.
+- **All plugin `package.json`s**: set `distribution` (core for every
+  `systemPlugin`; `registry` for the rest, **including** `aws-s3`, `minio`,
+  `github-storage`); flip `private: true → false` with `publishConfig` for
+  distributable plugins; add per-plugin `release` wiring.
+- **Decouple the API from storage plugins**: remove the direct
+  `@ever-works/{aws-s3,minio,github-storage}-plugin` dependencies from
+  `apps/api/package.json` and resolve storage through the capability
+  facade/registry instead of static imports. Keep `local-fs` (a `systemPlugin`)
+  bundled as the core default storage so the API boots without any distributable
+  storage plugin present. This is what makes those three plugins distributable.
 - **Loader (`plugin-loader.service.ts`)**: accept an explicit install path from
   the installer (reuse `loadPluginModule`); no behaviour change in bundled mode.
 - **New `PluginInstallerService`** (`packages/agent/src/plugins/services/`):
@@ -214,8 +221,10 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 ## 10. Phased Rollout
 
 1. **Phase 1 — SDK & data model**: manifest `distribution`/exec fields + JSON
-   schema; `PluginEntity` columns + `PluginAllowlistEntity` + migrations; DTOs.
-   Behind the flag; default `bundled`; no behaviour change.
+   schema; `PluginEntity` columns + `PluginAllowlistEntity` + migrations; DTOs;
+   **decouple the API from storage plugins** (remove hard imports, resolve via
+   facade, keep `local-fs` core). Behind the flag; default `bundled`; no
+   behaviour change.
 2. **Phase 2 — Publish pipeline**: Changesets + dual-publish CI (npm + GitHub
    Packages); flip `private` + `publishConfig` on distributable plugins;
    dry-run, then first real publishes. Independent of runtime mode.
@@ -230,8 +239,9 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
    read-only-FS limitation (dynamic mode unsupported on read-only serverless).
 6. **Phase 6 — UI & catalog**: catalog listing, install states, progress,
    errors, admin allowlist UI.
-7. **Phase 7 — Soak & default**: enable dynamic mode on a staging/SaaS target,
-   soak, then decide per-target defaults (Open Question).
+7. **Phase 7 — Soak**: enable dynamic mode on a staging target and soak. The
+   shipped default stays `bundled` everywhere (SaaS + self-host); `dynamic` is
+   opt-in per deployment — no default flip planned for v1.
 
 ## 11. Risks & Mitigations
 
@@ -241,7 +251,8 @@ First-party `@ever-works/*` is implicitly allowed (no row required).
 | Cold-start install cost on new replicas | Med | Med | Per-replica reconcile in parallel; consider baking "popular" plugins; readiness gate until reconcile done. |
 | Running untrusted-ish 3rd-party code in API process | Low (allowlist) | High | Allowlist + integrity; long-running paths in isolated job runtime; sandbox is a documented future phase. |
 | Read-only FS targets (Vercel) can't install at runtime | Med | Low | Dynamic mode requires writable store; Vercel/serverless documented as bundled-only. |
-| API hard-deps on storage plugins block making them distributable | High | Low | Keep aws-s3/minio/github-storage core for v1 (Open Question), or remove direct import. |
+| API hard-deps on storage plugins block making them distributable | High | Low | **Decided**: remove the direct imports, resolve storage via the facade, keep `local-fs` as core default (so the API boots storage-less of any distributable plugin). |
+| Default storage (`local-fs`) not shared across replicas | Med | Low | Pre-existing concern, not new; production enables a distributable shared backend (s3/minio/github-storage). `local-fs` only guarantees the API boots. |
 | Version drift between manifest and installed dist | Med | Low | Persist `installedVersion`+`integrity`; reconcile pins exact version. |
 
 ## 12. Constitution Reconciliation

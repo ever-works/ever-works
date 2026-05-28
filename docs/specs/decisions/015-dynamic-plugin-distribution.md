@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed**
+**Accepted** — decisions locked with @evereq 2026-05-28; implementation tracked under EW-693.
 
 ## Date
 
@@ -72,10 +72,13 @@ Supporting decisions:
 - Cold-start install cost on fresh replicas (mitigated by boot reconcile +
   optional baking/PVC).
 - Dynamic mode requires a writable runtime store, so read-only-FS serverless
-  targets (Vercel) remain `bundled`-only.
-- The API's current hard imports of storage plugins (`aws-s3`, `minio`,
-  `github-storage`) must either stay core-bundled or be refactored to resolve via
-  the loader (tracked as an open question).
+  targets (Vercel) remain `bundled`-only. The store is just a writable directory
+  (default `/app/plugins`), per-replica with boot reconcile — no shared volume or
+  external service required.
+- The API's hard imports of storage plugins (`aws-s3`, `minio`, `github-storage`)
+  are **removed**; storage is resolved via the capability facade and those three
+  become distributable. `local-fs` stays core as the default storage so the API
+  boots without any distributable plugin (EW-693 T8b).
 
 **Neutral**
 

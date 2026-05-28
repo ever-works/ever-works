@@ -92,6 +92,9 @@ isn't present yet.
 - **Given** a core plugin, **when** any user attempts to "uninstall" it in
   dynamic mode, **then** the action is refused — core plugins are always present
   and (for `systemPlugin`) cannot be disabled.
+- **Given** dynamic mode and no distributable storage plugin enabled, **when**
+  the platform boots, **then** the core default storage (`local-fs`) is available
+  so storage-dependent features still function.
 
 ## 3. Functional Requirements
 
@@ -105,9 +108,13 @@ Distribution mode & core set:
   bundled in the image, present in both modes) or **distributable** (published
   to a registry, runtime-installable in dynamic mode). The classification MUST
   be declared on the plugin (manifest), not hard-coded in the platform.
-- **FR-4** Core MUST include every plugin marked `systemPlugin: true` and every
-  plugin that the API directly depends on to boot. The system MUST NOT allow a
-  distributable plugin to be one the API cannot start without.
+- **FR-4** Core MUST include every plugin marked `systemPlugin: true`, and the
+  API MUST NOT statically depend on any **distributable** plugin to boot.
+  Storage plugins `aws-s3`, `minio`, and `github-storage` are **distributable**;
+  the API's current hard imports of them MUST be removed and storage resolved via
+  the capability facade/registry. `local-fs` (a `systemPlugin`) remains core and
+  is the default storage backend so the platform boots with working storage even
+  when no distributable storage plugin is enabled.
 - **FR-5** The system MUST NOT require core plugins to be fetched from a
   registry in either mode.
 
@@ -196,13 +203,13 @@ Compatibility:
 | Entity / concept | Description |
 | ---------------- | ----------- |
 | Distribution mode | Platform setting selecting `bundled` (all in image) vs `dynamic` (core in image, rest from registry). |
-| Core plugin | A plugin always shipped in the image and present in both modes (system plugins + boot-critical plugins). |
+| Core plugin | A plugin always shipped in the image and present in both modes (every `systemPlugin`, incl. `local-fs` as the boot default storage). Distributable storage (`aws-s3`/`minio`/`github-storage`) is NOT core. |
+| Runtime plugin store | A writable directory on a node (default `/app/plugins`) where pulled plugins are written so Node can `import()` them — per-replica, reconciled on boot; not external infrastructure. |
 | Distributable plugin | A plugin published to a registry and installable at runtime in dynamic mode. |
 | Plugin registry | The npm source(s) plugins are published to and pulled from — public npm + GitHub Packages, configurable. |
 | Plugin catalog | The listable set of distributable plugins (manifest summaries) shown in the UI before install. |
 | Install state | Lifecycle of a plugin's presence on a node: available → installing → installed / error (distinct from enabled). |
 | Plugin allowlist | Admin-managed set of non-first-party packages permitted for runtime install, with version/integrity pinning. |
-| Runtime plugin store | Writable location on a node where dynamically-installed plugins live and are imported from. |
 | Boot reconcile | Start-up routine that makes a node's plugin store match the DB record of installed/enabled plugins. |
 | Execution location | Where a capability call runs: in-process (short) vs job runtime (long-running). |
 
@@ -243,11 +250,21 @@ Compatibility:
 
 ## 8. Open Questions
 
-- `[NEEDS CLARIFICATION: default for the hosted SaaS (apps.ever.works) — ship dynamic mode there while self-host defaults to bundled, or both default bundled until dynamic soaks?]`
-- `[NEEDS CLARIFICATION: multi-replica plugin store — shared RWX volume vs per-replica ephemeral store with boot reconcile (plan recommends per-replica reconcile; confirm acceptable cold-start cost)?]`
-- `[NEEDS CLARIFICATION: retention policy on disable — keep installed files (recommended) vs garbage-collect after N days unused?]`
-- `[NEEDS CLARIFICATION: do the API-imported storage plugins (aws-s3, minio, github-storage) become core-bundled, or is the API's direct dependency removed so they can be distributable?]`
-- `[NEEDS CLARIFICATION: allowlist administration surface — env/config only, admin API, or both for v1?]`
+All initial open questions were resolved with @evereq on 2026-05-28:
+
+- **Default mode** — `bundled` everywhere (hosted SaaS and self-host alike);
+  `dynamic` is strictly opt-in. *(Resolved: bundled default.)*
+- **Multi-replica plugin store** — per-replica ephemeral store + boot reconcile;
+  **no shared RWX volume required**. A shared PVC is an optional optimization,
+  not a prerequisite. *(Resolved: per-replica reconcile.)*
+- **Disable retention** — keep installed files on disable; **no garbage
+  collection** in v1. *(Resolved: keep installed.)*
+- **API storage plugins** — **remove** the API's hard imports of `aws-s3`,
+  `minio`, `github-storage` and make them **distributable**; resolve storage via
+  the capability facade; keep `local-fs` as the core default. *(Resolved:
+  decouple + distributable.)*
+- **Allowlist administration** — **both** env/config and an admin API.
+  *(Resolved: both surfaces.)*
 
 ## 9. Constitution Gates
 

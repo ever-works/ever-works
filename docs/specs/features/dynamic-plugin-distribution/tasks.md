@@ -34,7 +34,7 @@
 - [ ] **T4**. Bump `@ever-works/plugin` minor; note additive change in its
       changelog. Confirm `pnpm build:plugins` + type-check green.
 
-## Phase 2 — Data model & migrations (T5–T8)
+## Phase 2 — Data model & migrations (T5–T8b)
 
 - [ ] **T5**. Add columns to `PluginEntity` at
       `packages/agent/src/plugins/entities/plugin.entity.ts`: `source`,
@@ -51,6 +51,15 @@
       `AddPluginDistributionColumns` + `CreatePluginAllowlist`
       (`pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>`).
       Read the SQL by hand — additive, forward-only, no `DROP`. (NN #16)
+- [ ] **T8b**. Decouple the API from storage plugins: remove
+      `@ever-works/{aws-s3,minio,github-storage}-plugin` from
+      `apps/api/package.json`; resolve storage via the capability facade/registry
+      instead of static imports. Set those three plugins' manifest
+      `distribution: 'registry'`. Keep `local-fs` (`systemPlugin`) bundled as the
+      core default so the API boots with working storage and no distributable
+      plugin is boot-critical (FR-4).
+    - **Test**: API boots with only `local-fs`; s3/minio/github-storage resolve
+      via facade when enabled; e2e for default-storage path.
 
 ## Phase 3 — Publish pipeline (T9–T13)
 
