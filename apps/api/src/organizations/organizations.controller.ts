@@ -157,6 +157,7 @@ export class OrganizationsController {
             tenantId: result.tenantId,
             tierARowsUpdated: result.tierARowsUpdated,
             tierBRowsUpdated: result.tierBRowsUpdated,
+            tierCRowsUpdated: result.tierCRowsUpdated,
         };
     }
 
