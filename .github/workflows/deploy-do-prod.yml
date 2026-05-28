@@ -133,6 +133,16 @@ jobs:
           RESEND_APIKEY: ${{ secrets.RESEND_APIKEY }}
           RESEND_EMAIL_FROM: ${{ secrets.RESEND_EMAIL_FROM }}
 
+          # Sentry (errors, traces, profiling). DSN is set repo-wide; absent
+          # DSN -> SDK is a graceful no-op. SENTRY_ENVIRONMENT differentiates
+          # dev / staging / production in the Sentry UI.
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: production
+          # PostHog (server-side: analytics events, feature flag eval, logs).
+          # Same phc_* key used by NEXT_PUBLIC_POSTHOG_KEY at docker-build time.
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+
           # Ever Works Git (EW-608) — onboarding-wizard-v2 storage provider.
           # PAT is fine-grained, scoped to ever-works-cloud only. Non-secret
           # config (flag, org, visibility) is inlined here; only the PAT
