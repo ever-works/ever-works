@@ -31,6 +31,11 @@ import {
     type AgentSendEmailResult,
     type AgentMessageAgentResult,
 } from './agent-email-facade';
+import {
+    AGENT_NOTIFY_CHANNEL_FACADE,
+    type AgentNotifyChannelFacade,
+    type AgentNotifyChannelResult,
+} from './agent-notify-channel-facade';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -113,6 +118,11 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_EMAIL_FACADE)
         private readonly emailFacade?: AgentEmailFacade,
+        // Notifications v2 (EW-673) — Agent notifyChannel tool. Same
+        // token-injection dodge; forwards to NotificationChannelFacadeService.
+        @Optional()
+        @Inject(AGENT_NOTIFY_CHANNEL_FACADE)
+        private readonly notifyChannelFacade?: AgentNotifyChannelFacade,
         // Review-fix I6: route createSubAgent through AgentsService so
         // scope-ownership validation + slug-uniqueness + avatar-field
         // validation + permission refinement all run, instead of the
@@ -222,6 +232,14 @@ export class AgentToolService {
             typeof this.emailFacade.messageAgent === 'function'
         ) {
             tools.push(this.buildMessageAgentTool(agent));
+        }
+
+        // Notifications v2 (EW-673 / T26) — notifyChannel. Same
+        // canCallExternalTools gate + token presence. The ≥1-enabled-channel
+        // requirement is enforced at invoke time (the adapter rejects an
+        // unknown/disabled/foreign channel id).
+        if (agent.permissions?.canCallExternalTools && this.notifyChannelFacade) {
+            tools.push(this.buildNotifyChannelTool(agent));
         }
 
         // getActivity + getKbDocument — placeholders that document the
@@ -714,6 +732,46 @@ export class AgentToolService {
                         subject: args.subject,
                         body: args.body,
                         attachReferences: args.attachReferences,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildNotifyChannelTool(
+        agent: Agent,
+    ): AgentToolDescriptor<{ channelId: string; text: string }, AgentNotifyChannelResult> {
+        return {
+            name: 'notifyChannel',
+            description:
+                "Send an ad-hoc message to one of the user's configured notification channels (Discord / Slack / Telegram / WhatsApp / Novu) by channel id. Requires canCallExternalTools + at least one enabled channel. Use for proactive status pings to the human operator; for structured event notifications prefer letting the platform's subscription fanout handle delivery.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    channelId: {
+                        type: 'string',
+                        description:
+                            'The notification_channels id to deliver to (one of the agent user\'s enabled channels).',
+                    },
+                    text: { type: 'string', description: 'Plain-text message body.' },
+                },
+                required: ['channelId', 'text'],
+            },
+            invoke: async (args) => {
+                if (!args?.channelId || args.channelId.trim().length === 0) {
+                    return { error: 'channelId is required.' };
+                }
+                if (!args?.text || args.text.trim().length === 0) {
+                    return { error: 'text is required.' };
+                }
+                try {
+                    return await this.notifyChannelFacade!.notifyChannel({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        channelId: args.channelId,
+                        text: args.text,
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

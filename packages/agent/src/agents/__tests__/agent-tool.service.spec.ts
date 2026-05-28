@@ -350,4 +350,61 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-9');
         });
     });
+
+    describe('notifyChannel tool (EW-673 / T26)', () => {
+        const wire = (facade: unknown) =>
+            new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                undefined,
+                facade as any,
+            );
+
+        it('is NOT exposed without the facade token', () => {
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).not.toContain('notifyChannel');
+        });
+
+        it('is NOT exposed without canCallExternalTools', () => {
+            const tools = wire({ notifyChannel: jest.fn() }).resolveAllowedTools(makeAgent());
+            expect(tools.map((t) => t.name)).not.toContain('notifyChannel');
+        });
+
+        it('is exposed when permission + facade are present', () => {
+            const tools = wire({ notifyChannel: jest.fn() }).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('notifyChannel');
+        });
+
+        it('invoke validates input + forwards a valid call', async () => {
+            const facade = { notifyChannel: jest.fn().mockResolvedValue({ status: 'delivered', providerMessageId: 'm-1' }) };
+            const tools = wire(facade).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'notifyChannel')!;
+
+            const bad = (await tool.invoke({ channelId: '', text: 'x' } as any)) as Record<string, unknown>;
+            expect('error' in bad).toBe(true);
+            expect(facade.notifyChannel).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({ channelId: 'ch-1', text: 'deploy finished' } as any);
+            expect(facade.notifyChannel).toHaveBeenCalledWith(
+                expect.objectContaining({ channelId: 'ch-1', text: 'deploy finished' }),
+            );
+            expect((ok as { status: string }).status).toBe('delivered');
+        });
+    });
 });

@@ -41,25 +41,28 @@
 - **EW-672** Channel capabilities + facade + in-app adapter — T11
 - **EW-679** Settings/integrations pages + dependencies — T16, T17
 
-### Partially done (next session)
-
-- **EW-673** Channel data + controller + agent tool — controller + data done (T10, T12), `notifyChannel` agent tool descriptor pending
-- **EW-674** Discord/Slack/Telegram plugins — Discord done (T15), Slack + Telegram pending
-- **EW-678** Producer fanout + UI matrix — REST + UI done (T12, T17); producer fanout call from v1 `notify*` methods pending
-- **EW-680** Per-Agent inbox tab + components — list view done (T17); message detail page + composer page pending
-- **EW-681** SWR hooks + SSE + i18n + E2E — API clients done (T17); SWR client hooks + SSE stream + i18n + Playwright E2E pending
-
-### Not started (next session)
-
-- **EW-675** WhatsApp + Novu channel plugins
-
-### Partially done (this loop)
+### Partially done
 
 - **EW-674** Notification channel plugins — Discord done (T15). Slack (T27) + Telegram (T28) pending.
+- **EW-680** Per-Agent inbox tab + components — list view done (T17); message detail page (T31) + composer page (T32) pending.
+- **EW-681** SWR hooks + SSE + i18n + E2E — API clients done (T17); SWR client hooks (T33) + SSE stream (T34) + i18n (T35) + Playwright E2E (T36) pending.
+
+### Not started
+
+- **EW-675** WhatsApp + Novu channel plugins (T29 + T30)
+
+### Done since the original Phase-1 cut
+
+- **EW-670** Agent integration — sendEmail (T23) + messageAgent (T24) + inbound dispatcher (T25). Complete.
+- **EW-673** Channel data (T10) + controller (T12) + `notifyChannel` agent tool (T26). Complete.
+- **EW-676** Event registry seed + plugin manifest events (T21).
+- **EW-677** Subscription resolver (T22).
+- **EW-678** Producer fanout (T20) + REST/UI (T12/T17). Complete.
 
 ### Newly done (this overnight cron loop)
 
-- **T25 EW-670** Agent inbound-email dispatcher — *this commit*. Completes EW-670 (sendEmail + messageAgent + inbound dispatcher all done). `AGENT_INBOUND_EMAIL_DISPATCHER` token + `DefaultInboundEmailDispatcher` (task-spawn + conversation modes), `INBOUND_EMAIL_TASK_SPAWNER` optional adapter, `deriveThreadKey` helper, `findByAddress` repo method, and inbound-webhook wiring. 8 new unit tests (60/60 agent notifications suites green).
+- **T25 EW-670** Agent inbound-email dispatcher — [`b70a8634`](https://github.com/ever-works/ever-works/commit/b70a8634). `AGENT_INBOUND_EMAIL_DISPATCHER` token + `DefaultInboundEmailDispatcher` (task-spawn + conversation modes), `INBOUND_EMAIL_TASK_SPAWNER` optional adapter, `deriveThreadKey` helper, `findByAddress` repo method, inbound-webhook wiring. 8 new unit tests.
+- **T26 EW-673** Agent `notifyChannel` tool — *this commit*. New `AGENT_NOTIFY_CHANNEL_FACADE` token + contract; `buildNotifyChannelTool` gated on `canCallExternalTools` + facade presence, invoke-time channel-ownership enforcement. Completes EW-673. 4 new unit tests (20/20 agent-tool suite green).
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
