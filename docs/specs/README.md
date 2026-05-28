@@ -21,9 +21,11 @@ docs/specs/
 ├── decisions/                      # Architecture Decision Records (ADRs)
 │   ├── 001-pipeline-checkpointing.md
 │   ├── 002-trigger-worker-callback-channel.md
-│   └── 003-pnpm-overrides-strategy.md
+│   ├── 003-pnpm-overrides-strategy.md
+│   └── 015-job-runtime-provider-pluggability.md  # Pluggable background-job runtime
 ├── architecture/                   # Cross-feature architecture docs
 │   ├── README.md                   # Reading order + companion-pair index
+│   ├── job-runtime-providers.md    # Pluggable runtime contract + worker models
 │   ├── pipeline-overview.md        # High-level generation flow
 │   ├── pipeline-executor.md        # Executor / step / modifier substrate
 │   ├── trigger-integration.md      # Trigger.dev wiring
@@ -63,6 +65,7 @@ docs/specs/
     ├── work-members/
     ├── generation-cancellation/
     ├── git-operations/
+    ├── job-runtime-providers/   # Pluggable background-job runtime (proposed)
     ├── item-source-validation/
     ├── markdown-generator/
     ├── mcp-server/
@@ -99,6 +102,7 @@ which now live folded into `tasks.md`).
 | [`work-members`](features/work-members/spec)                       | Retrospective | Role-based collaboration (Owner / Manager / Editor / Viewer)   |
 | [`generation-cancellation`](features/generation-cancellation/spec) | Retrospective | Mid-flight generation cancel with four mode paths              |
 | [`git-operations`](features/git-operations/spec)                   | Retrospective | `GitFacadeService` and provider plugin contract                |
+| [`job-runtime-providers`](features/job-runtime-providers/spec)     | Draft         | Pluggable background-job runtime (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest) |
 | [`item-source-validation`](features/item-source-validation/spec)   | Retrospective | Reachability + AI accuracy checks per item                     |
 | [`markdown-generator`](features/markdown-generator/spec)           | Retrospective | Markdown rendering pipeline                                    |
 | [`mcp-server`](features/mcp-server/spec)                           | Retrospective | OpenAPI-derived MCP tool surface                               |
