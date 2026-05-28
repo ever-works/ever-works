@@ -378,10 +378,13 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				`Starting tool "${toolRef.toolSlug}" for user "${toolRef.userId}"...`
 			);
 
+			// Timeout enforcement happens at the pipeline level via the `setTimeout`
+			// above that fires `abortController.abort()` — the SDK doesn't accept
+			// a timeout parameter, so we only forward the signal here.
 			const execResult: ComposioExecutionResult = await client.executeTool(
 				toolRef,
 				payload as unknown as Record<string, unknown>,
-				{ signal, timeoutMs: composioSettings.timeoutMs }
+				{ signal }
 			);
 
 			reportProgress(onProgress, 2, 70, 'Execute Composio Tool', 'Tool completed.');

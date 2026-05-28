@@ -32,7 +32,9 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"dependencies": {},
+	"dependencies": {
+		"@composio/core": "^0.10.0"
+	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
