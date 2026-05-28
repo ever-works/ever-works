@@ -10,20 +10,15 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * unique and the application-level allocator (`UsernameAllocatorService`)
  * enforces no cross-table collision at write time.
  *
- * Backfill: simple `lower("username")` for any existing rows. The
- * platform is not yet live, so this is expected to be a no-op or
- * touch only test fixtures. New users created post-migration go
- * through the application-layer normalizer (lowercase + replace
- * non-`[a-z0-9-]` with hyphen + collapse + trim — see
- * `UsernameAllocatorService.normalize`), so future writes are
- * always URL-safe.
+ * Backfill: normalize existing `username`, then `email`, then
+ * `user-<id>` for legacy/anonymous rows with missing names. Duplicate
+ * slugs are resolved with deterministic `-N` suffixes before the
+ * UNIQUE index is created.
  *
  * Sequence inside `up`:
  *   1. Add nullable `slug` column.
- *   2. Backfill `slug = lower(username)` for any NULL row.
- *   3. Defensive pre-check: error if backfill produced duplicates
- *      (shouldn't happen given the prior `AddUniqueIndexToUsername`
- *      migration enforces case-insensitive uniqueness on username).
+ *   2. Backfill every missing slug with a URL-safe unique value.
+ *   3. Defensive pre-check: error if backfill produced duplicates.
  *   4. Add UNIQUE index on `slug`.
  *   5. Flip column to NOT NULL.
  *
@@ -43,11 +38,7 @@ export class AddSlugToUsers1779991001000 implements MigrationInterface {
             );
         }
 
-        // 2. Backfill from username (lowercase). The Postgres + SQLite UPDATE
-        //    shape is identical here; no dialect branching needed.
-        await queryRunner.query(
-            `UPDATE "users" SET "slug" = lower("username") WHERE "slug" IS NULL`,
-        );
+        await this.backfillMissingSlugs(queryRunner);
 
         // 3. Defensive duplicate check.
         const dupes = (await queryRunner.query(
@@ -75,10 +66,17 @@ export class AddSlugToUsers1779991001000 implements MigrationInterface {
             );
         }
 
-        // 5. Flip NOT NULL. queryRunner.changeColumn handles both Postgres and
-        //    SQLite (SQLite emits a recreate-table dance under the hood).
+        // 5. Flip NOT NULL. On Postgres, avoid queryRunner.changeColumn here:
+        //    TypeORM recreates the column by adding the replacement as NOT NULL
+        //    before copying the already-backfilled values, which fails on
+        //    existing tables. A raw ALTER preserves the populated column.
         const slugColumn = (await queryRunner.getTable('users'))?.findColumnByName('slug');
         if (slugColumn && slugColumn.isNullable) {
+            if (queryRunner.connection.options.type === 'postgres') {
+                await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "slug" SET NOT NULL`);
+                return;
+            }
+
             const updated = new TableColumn({
                 name: 'slug',
                 type: 'varchar',
@@ -86,6 +84,79 @@ export class AddSlugToUsers1779991001000 implements MigrationInterface {
             });
             await queryRunner.changeColumn('users', 'slug', updated);
         }
+    }
+
+    private async backfillMissingSlugs(queryRunner: QueryRunner): Promise<void> {
+        const rows = (await queryRunner.query(
+            `SELECT "id", "username", "email", "slug" FROM "users" ORDER BY "createdAt" ASC, "id" ASC`,
+        )) as Array<{
+            id: string;
+            username: string | null;
+            email: string | null;
+            slug: string | null;
+        }>;
+
+        const used = new Set<string>();
+        for (const row of rows) {
+            if (this.hasValue(row.slug)) {
+                used.add(row.slug.trim());
+            }
+        }
+
+        for (const row of rows) {
+            if (this.hasValue(row.slug)) {
+                continue;
+            }
+
+            const base = this.normalizeSlug(row.username ?? row.email ?? `user-${row.id}`);
+            const slug = this.allocateUniqueSlug(base, used);
+            used.add(slug);
+            await this.updateUserSlug(queryRunner, row.id, slug);
+        }
+    }
+
+    private async updateUserSlug(
+        queryRunner: QueryRunner,
+        userId: string,
+        slug: string,
+    ): Promise<void> {
+        if (queryRunner.connection.options.type === 'postgres') {
+            await queryRunner.query(`UPDATE "users" SET "slug" = $1 WHERE "id" = $2`, [
+                slug,
+                userId,
+            ]);
+            return;
+        }
+
+        await queryRunner.query(`UPDATE "users" SET "slug" = ? WHERE "id" = ?`, [slug, userId]);
+    }
+
+    private allocateUniqueSlug(base: string, used: Set<string>): string {
+        if (!used.has(base)) {
+            return base;
+        }
+
+        let suffix = 2;
+        let candidate = `${base}-${suffix}`;
+        while (used.has(candidate)) {
+            suffix += 1;
+            candidate = `${base}-${suffix}`;
+        }
+        return candidate;
+    }
+
+    private normalizeSlug(input: string): string {
+        const normalized = input
+            .toLowerCase()
+            .replace(/[^a-z0-9-]+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        return normalized.length > 0 ? normalized : 'u-anon';
+    }
+
+    private hasValue(value: string | null | undefined): value is string {
+        return typeof value === 'string' && value.trim().length > 0;
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

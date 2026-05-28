@@ -14,7 +14,7 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
  *   - task_blocks         — hard dependency edges
  *   - task_relations      — soft related/duplicates/follow-up edges
  *   - task_chat_messages  — per-Task chat thread
- *   - task_attachments    — Task → work_knowledge_upload edge
+ *   - task_attachments    — Task → work_knowledge_uploads edge
  *   - task_watchers       — explicit subscriptions
  *   - task_kb_mentions    — materialized KB references
  *   - user_task_counter   — per-user atomic slug sequence
