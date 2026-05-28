@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
@@ -48,23 +48,33 @@ function getInitializedDatabaseClient(dataSource: DataSource): any {
 }
 
 /**
- * EW-652 Phase 0 — keep this in lockstep with `User.deriveSlugIfMissing()`
- * in `packages/agent/src/entities/user.entity.ts` and with
- * `UsernameAllocatorService.normalize()` in
- * `apps/api/src/users/services/username-allocator.service.ts`. All three
- * sites must produce the same slug shape for a given input or the
- * cross-table uniqueness contract breaks.
+ * EW-652 Phase 0 — mirrors `UsernameAllocatorService.normalize()` in
+ * `apps/api/src/users/services/username-allocator.service.ts`, which is
+ * the slug shape the `/api/users/check-username` preflight reports as
+ * available. Keeping these in lockstep is load-bearing: a divergence
+ * lets the preflight return `available: true` for a normalized name
+ * whose actual Better Auth INSERT would then collide on the UNIQUE
+ * `users.slug` constraint.
+ *
+ * The User entity's `@BeforeInsert deriveSlugIfMissing()` hook falls
+ * back to the fixed string `u-anon`, but only one row in the entire
+ * table can have that slug (UNIQUE). Subsequent degenerate-username
+ * signups would collide there. Codex P2 on PR #1064: use a random
+ * suffix here so degenerate names like `!!!` or `---` each get a
+ * unique slug instead of all racing for the same `u-anon` row.
  */
 function deriveSlugFromName(name: string | undefined | null): string {
+    const fallback = (): string => `u-${randomBytes(4).toString('hex')}`;
+
     if (!name) {
-        return 'u-anon';
+        return fallback();
     }
     const normalized = name
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-+|-+$/g, '');
-    return normalized.length > 0 ? normalized : 'u-anon';
+    return normalized.length > 0 ? normalized : fallback();
 }
 
 function getTrustedOrigins() {
