@@ -302,9 +302,9 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
                 />
             )}
 
-            {plugin.pluginId === 'composio' && optimisticEnabled && Boolean(displaySettings.apiKey) && (
-                <ComposioConnectionsPanel />
-            )}
+            {plugin.pluginId === 'composio' &&
+                optimisticEnabled &&
+                Boolean(displaySettings.apiKey) && <ComposioConnectionsPanel />}
 
             {/* Settings Form */}
             {hasSettings ? (

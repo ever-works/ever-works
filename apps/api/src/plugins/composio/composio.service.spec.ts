@@ -118,7 +118,7 @@ describe('ComposioService', () => {
     });
 
     describe('listConnectedAccounts', () => {
-        it("hard-pins the user_id filter to the JWT user (no override)", async () => {
+        it('hard-pins the user_id filter to the JWT user (no override)', async () => {
             const sdk = buildSdkStub();
             (sdk.connectedAccounts.list as jest.Mock).mockResolvedValue({ items: [] });
             injectSdk(service, sdk);
@@ -222,11 +222,9 @@ describe('ComposioService', () => {
                 authConfigId: 'ac_xyz',
                 callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback',
             });
-            expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith(
-                'user-1',
-                'ac_xyz',
-                { callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback' },
-            );
+            expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith('user-1', 'ac_xyz', {
+                callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback',
+            });
         });
 
         it('translates 5xx errors into BadGatewayException', async () => {

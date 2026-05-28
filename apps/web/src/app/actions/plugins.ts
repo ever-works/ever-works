@@ -268,7 +268,9 @@ export async function listComposioConnectedAccounts(
         return {
             success: false,
             error:
-                error instanceof Error ? error.message : 'Failed to list Composio connected accounts',
+                error instanceof Error
+                    ? error.message
+                    : 'Failed to list Composio connected accounts',
         };
     }
 }
