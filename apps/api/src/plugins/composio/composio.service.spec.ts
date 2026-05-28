@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+    BadGatewayException,
+    BadRequestException,
+    NotFoundException,
+    UnauthorizedException,
+} from '@nestjs/common';
 
 // Short-circuit the heavy agent/plugins barrel chain — the only symbol we
 // need from it is the `PluginSettingsService` class token, and we provide
@@ -113,24 +118,13 @@ describe('ComposioService', () => {
     });
 
     describe('listConnectedAccounts', () => {
-        it("scopes the query to the caller's user id by default", async () => {
+        it("hard-pins the user_id filter to the JWT user (no override)", async () => {
             const sdk = buildSdkStub();
             (sdk.connectedAccounts.list as jest.Mock).mockResolvedValue({ items: [] });
             injectSdk(service, sdk);
 
             await service.listConnectedAccounts('user-1');
             expect(sdk.connectedAccounts.list).toHaveBeenCalledWith({ userIds: ['user-1'] });
-        });
-
-        it('honors a composioUserId override (typical for email-keyed accounts)', async () => {
-            const sdk = buildSdkStub();
-            (sdk.connectedAccounts.list as jest.Mock).mockResolvedValue({ items: [] });
-            injectSdk(service, sdk);
-
-            await service.listConnectedAccounts('user-1', { composioUserId: 'alice@example.com' });
-            expect(sdk.connectedAccounts.list).toHaveBeenCalledWith({
-                userIds: ['alice@example.com'],
-            });
         });
 
         it('passes toolkit filter as an uppercase array', async () => {
@@ -166,13 +160,19 @@ describe('ComposioService', () => {
     describe('initiateConnection', () => {
         it('throws when toolkitSlug is missing', async () => {
             await expect(
-                service.initiateConnection('user-1', { toolkitSlug: '' } as never),
+                service.initiateConnection('user-1', {
+                    toolkitSlug: '',
+                    authConfigId: 'ac_xyz',
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
         it('throws when authConfigId is missing', async () => {
             await expect(
-                service.initiateConnection('user-1', { toolkitSlug: 'GMAIL' } as never),
+                service.initiateConnection('user-1', {
+                    toolkitSlug: 'GMAIL',
+                    authConfigId: '',
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
 
@@ -210,7 +210,7 @@ describe('ComposioService', () => {
             expect(result.connectedAccountId).toBeUndefined();
         });
 
-        it('forwards composioUserId + callbackUrl to the SDK', async () => {
+        it('forwards callbackUrl to the SDK and always pins user_id to JWT user', async () => {
             const sdk = buildSdkStub();
             (sdk.connectedAccounts.initiate as jest.Mock).mockResolvedValue({
                 redirectUrl: 'https://composio.example/oauth',
@@ -220,14 +220,28 @@ describe('ComposioService', () => {
             await service.initiateConnection('user-1', {
                 toolkitSlug: 'GMAIL',
                 authConfigId: 'ac_xyz',
-                composioUserId: 'alice@example.com',
                 callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback',
             });
             expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith(
-                'alice@example.com',
+                'user-1',
                 'ac_xyz',
                 { callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback' },
             );
+        });
+
+        it('translates 5xx errors into BadGatewayException', async () => {
+            const sdk = buildSdkStub();
+            (sdk.connectedAccounts.initiate as jest.Mock).mockRejectedValue(
+                sdkError(503, 'upstream down'),
+            );
+            injectSdk(service, sdk);
+
+            await expect(
+                service.initiateConnection('user-1', {
+                    toolkitSlug: 'GMAIL',
+                    authConfigId: 'ac_xyz',
+                }),
+            ).rejects.toBeInstanceOf(BadGatewayException);
         });
 
         it('translates 404 errors into NotFoundException', async () => {

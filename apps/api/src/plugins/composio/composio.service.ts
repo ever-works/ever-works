@@ -1,6 +1,7 @@
 import {
     Injectable,
     Logger,
+    BadGatewayException,
     BadRequestException,
     NotFoundException,
     UnauthorizedException,
@@ -71,14 +72,9 @@ export class ComposioService {
     /**
      * Builds a per-request `Composio` SDK client from the caller's stored
      * `composio` plugin settings. Throws if the plugin is not enabled or
-     * the user hasn't set an API key.
-     *
-     * Override via `sdkFactory` for unit tests.
+     * the user hasn't set an API key. Tests stub via `jest.spyOn(svc, 'getSdk')`.
      */
-    private async getSdk(
-        userId: string,
-        sdkFactory?: (apiKey: string, baseUrl?: string) => ComposioSdkLike,
-    ): Promise<ComposioSdkLike> {
+    private async getSdk(userId: string): Promise<ComposioSdkLike> {
         const resolved = await this.settingsService
             .getResolvedSettings(COMPOSIO_PLUGIN_ID, { userId, includeSecrets: true })
             .catch(() => null);
@@ -90,7 +86,6 @@ export class ComposioService {
             );
         }
         const baseUrl = readString(settings, 'baseUrl') || undefined;
-        if (sdkFactory) return sdkFactory(apiKey, baseUrl);
         return new Composio({
             apiKey,
             ...(baseUrl ? { baseURL: baseUrl } : {}),
@@ -115,19 +110,18 @@ export class ComposioService {
      * Lists the caller's connected accounts on Composio. Optionally filtered
      * by toolkit slug to show "is GMAIL connected?" for a single chip.
      *
-     * `composioUserId` defaults to the JWT user id so each Ever Works user
-     * sees only their own connections. Settings UI may set it to an email
-     * if the upstream account is registered under a different identifier.
+     * The Composio user_id filter is hard-pinned to the JWT user id so a
+     * shared workspace API key cannot be used to enumerate another user's
+     * connected accounts.
      */
     async listConnectedAccounts(
         userId: string,
-        options: { toolkitSlug?: string; composioUserId?: string } = {},
+        options: { toolkitSlug?: string } = {},
     ): Promise<ComposioConnectedAccountDto[]> {
         const sdk = await this.getSdk(userId);
-        const targetUserId = options.composioUserId?.trim() || userId;
         try {
             const query: { userIds: string[]; toolkitSlugs?: string[] } = {
-                userIds: [targetUserId],
+                userIds: [userId],
             };
             if (options.toolkitSlug) query.toolkitSlugs = [options.toolkitSlug.toUpperCase()];
             const response = await sdk.connectedAccounts.list(query);
@@ -168,9 +162,8 @@ export class ComposioService {
             );
         }
         const sdk = await this.getSdk(userId);
-        const targetUserId = body.composioUserId?.trim() || userId;
         try {
-            const result = await sdk.connectedAccounts.initiate(targetUserId, body.authConfigId, {
+            const result = await sdk.connectedAccounts.initiate(userId, body.authConfigId, {
                 ...(body.callbackUrl ? { callbackUrl: body.callbackUrl } : {}),
             });
             const redirectUrl = result.connectionRequest?.redirectUrl ?? result.redirectUrl;
@@ -211,7 +204,7 @@ export class ComposioService {
             return new BadRequestException('Composio rate limit exceeded. Wait and retry.');
         }
         if (status !== undefined && status >= 500) {
-            return new BadRequestException(
+            return new BadGatewayException(
                 `Composio is returning HTTP ${status} during ${context}. Check https://status.composio.dev. (${message})`,
             );
         }

@@ -56,11 +56,9 @@ export class ComposioController {
     async listConnectedAccounts(
         @CurrentUser() auth: AuthenticatedUser,
         @Query('toolkit') toolkit?: string,
-        @Query('composio_user_id') composioUserId?: string,
     ): Promise<ComposioConnectedAccountListDto> {
         const items = await this.composio.listConnectedAccounts(auth.userId, {
             toolkitSlug: toolkit,
-            composioUserId,
         });
         return { items };
     }

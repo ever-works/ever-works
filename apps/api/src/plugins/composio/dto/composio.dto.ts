@@ -45,21 +45,13 @@ export class InitiateConnectionRequestDto {
     @IsNotEmpty()
     toolkitSlug!: string;
 
-    @ApiPropertyOptional({
+    @ApiProperty({
         description:
-            'Composio authConfig id (ac_*) to use for this connection. Omit to fall back to the toolkit default registered in Composio.',
+            'Composio authConfig id (ac_*) to use for this connection. Create an auth config for the toolkit in the Composio dashboard (or via the auth-configs API) and pass its id here.',
     })
-    @IsOptional()
     @IsString()
-    authConfigId?: string;
-
-    @ApiPropertyOptional({
-        description:
-            'Override the Composio user_id for this connection. Defaults to the Ever Works user id passed via JWT.',
-    })
-    @IsOptional()
-    @IsString()
-    composioUserId?: string;
+    @IsNotEmpty()
+    authConfigId!: string;
 
     @ApiPropertyOptional({
         description:
