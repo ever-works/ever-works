@@ -1,5 +1,17 @@
 import { createHmac } from 'node:crypto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const createMock = vi.fn();
+const clientMock = vi.fn(() => ({ messages: { create: createMock } }));
+
+vi.mock('mailgun.js', () => ({
+	default: class Mailgun {
+		constructor(_formData: unknown) {}
+		client = clientMock;
+	}
+}));
+vi.mock('form-data', () => ({ default: class FormData {} }));
+
 import { MailgunPlugin } from './mailgun-plugin.js';
 
 describe('MailgunPlugin', () => {
@@ -11,6 +23,8 @@ describe('MailgunPlugin', () => {
 		process.env.MAILGUN_DOMAIN = 'mg.example.com';
 		delete process.env.MAILGUN_REGION;
 		delete process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
+		createMock.mockReset();
+		clientMock.mockClear();
 	});
 
 	it('declares both email-outbound and email-inbound', () => {
@@ -18,12 +32,8 @@ describe('MailgunPlugin', () => {
 		expect(plugin.capabilities).toContain('email-inbound');
 	});
 
-	it('POSTs form-encoded to the region+domain Messages endpoint with Basic auth', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: true,
-			status: 200,
-			json: async () => ({ id: '<20260528.1@mg.example.com>', message: 'Queued. Thank you.' })
-		} as Response);
+	it('sends via mailgun.js messages.create against the resolved domain', async () => {
+		createMock.mockResolvedValueOnce({ id: '<20260528.1@mg.example.com>', message: 'Queued. Thank you.' });
 
 		const result = await plugin.sendEmail(
 			{
@@ -38,36 +48,24 @@ describe('MailgunPlugin', () => {
 		);
 
 		expect(result.providerMessageId).toBe('20260528.1@mg.example.com');
-		const [url, init] = fetchMock.mock.calls[0];
-		expect(String(url)).toBe('https://api.mailgun.net/v3/mg.example.com/messages');
-		const headers = (init as RequestInit & { headers: Record<string, string> }).headers;
-		expect(headers.Authorization).toBe(`Basic ${Buffer.from('api:test-key').toString('base64')}`);
-		const form = new URLSearchParams((init as RequestInit).body as string);
-		expect(form.get('from')).toBe('Agent <a@example.com>');
-		expect(form.get('to')).toBe('b@example.com');
-		fetchMock.mockRestore();
+		expect(clientMock).toHaveBeenCalledWith({ username: 'api', key: 'test-key', url: 'https://api.mailgun.net' });
+		const [domain, data] = createMock.mock.calls[0];
+		expect(domain).toBe('mg.example.com');
+		expect(data.from).toBe('Agent <a@example.com>');
+		expect(data.to).toEqual(['b@example.com']);
 	});
 
 	it('uses the EU base URL when region=eu', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: true,
-			status: 200,
-			json: async () => ({ id: '<x@mg>' })
-		} as Response);
+		createMock.mockResolvedValueOnce({ id: '<x@mg>' });
 		await plugin.sendEmail(
 			{ from: 'a@x.com', to: ['b@x.com'], subject: 's', bodyText: 't', messageRef: 'r-eu' },
 			{ userId: 'u', settings: { apiKey: 'k', domain: 'mg.example.com', region: 'eu' } }
 		);
-		expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.eu.mailgun.net/v3/mg.example.com/messages');
-		fetchMock.mockRestore();
+		expect(clientMock.mock.calls[0][0]).toMatchObject({ url: 'https://api.eu.mailgun.net' });
 	});
 
-	it('throws when Mailgun rejects the send', async () => {
-		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: false,
-			status: 401,
-			json: async () => ({ message: 'Forbidden' })
-		} as Response);
+	it('throws when the Mailgun SDK rejects the send', async () => {
+		createMock.mockRejectedValueOnce({ status: 401, message: 'Forbidden' });
 		await expect(
 			plugin.sendEmail(
 				{ from: 'a@x.com', to: ['b@x.com'], subject: 's', bodyText: 't', messageRef: 'r-err' },

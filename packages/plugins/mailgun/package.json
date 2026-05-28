@@ -32,7 +32,9 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@ever-works/plugin": "workspace:*"
+		"@ever-works/plugin": "workspace:*",
+		"form-data": "^4.0.1",
+		"mailgun.js": "^10.2.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",

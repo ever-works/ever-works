@@ -1,4 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const sendMock = vi.fn();
+const setApiKeyMock = vi.fn();
+
+vi.mock('@sendgrid/mail', () => ({
+	MailService: class {
+		setApiKey = setApiKeyMock;
+		send = sendMock;
+	}
+}));
+
 import { SendGridPlugin } from './sendgrid-plugin.js';
 
 describe('SendGridPlugin', () => {
@@ -7,6 +18,8 @@ describe('SendGridPlugin', () => {
 	beforeEach(() => {
 		plugin = new SendGridPlugin();
 		process.env.SENDGRID_API_KEY = 'test-key';
+		sendMock.mockReset();
+		setApiKeyMock.mockReset();
 	});
 
 	it('declares the email-outbound capability', () => {
@@ -14,17 +27,13 @@ describe('SendGridPlugin', () => {
 		expect(plugin.category).toBe('email-provider');
 	});
 
-	it('POSTs to /v3/mail/send with Bearer auth and reads X-Message-Id', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: true,
-			status: 202,
-			headers: new Headers({ 'x-message-id': 'sg-msg-123' }),
-			json: async () => ({})
-		} as Response);
+	it('sends via @sendgrid/mail and reads the X-Message-Id header', async () => {
+		sendMock.mockResolvedValueOnce([{ statusCode: 202, headers: { 'x-message-id': 'sg-msg-123' } }, {}]);
 
 		const result = await plugin.sendEmail(
 			{
 				from: 'a@example.com',
+				fromName: 'Agent',
 				to: ['b@example.com'],
 				subject: 'hi',
 				bodyText: 'hi',
@@ -36,49 +45,30 @@ describe('SendGridPlugin', () => {
 
 		expect(result.providerMessageId).toBe('sg-msg-123');
 		expect(result.accepted).toEqual(['b@example.com']);
-		const [url, init] = fetchMock.mock.calls[0];
-		expect(String(url)).toContain('/v3/mail/send');
-		const headers = (init as RequestInit & { headers: Record<string, string> }).headers;
-		expect(headers.Authorization).toBe('Bearer test-key');
-		const sent = JSON.parse((init as RequestInit).body as string);
-		expect(sent.personalizations[0].to).toEqual([{ email: 'b@example.com' }]);
-		expect(sent.content).toEqual([
-			{ type: 'text/plain', value: 'hi' },
-			{ type: 'text/html', value: '<p>hi</p>' }
-		]);
-		fetchMock.mockRestore();
+		expect(setApiKeyMock).toHaveBeenCalledWith('test-key');
+		const [msg, isMultiple] = sendMock.mock.calls[0];
+		expect(isMultiple).toBe(false);
+		expect(msg.from).toEqual({ email: 'a@example.com', name: 'Agent' });
+		expect(msg.text).toBe('hi');
+		expect(msg.html).toBe('<p>hi</p>');
 	});
 
-	it('throws with the SendGrid error messages when the API rejects', async () => {
-		vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-			ok: false,
-			status: 403,
-			headers: new Headers(),
-			json: async () => ({ errors: [{ message: 'The from address does not match a verified Sender Identity.' }] })
-		} as Response);
+	it('wraps SendGrid SDK errors with the provider error messages', async () => {
+		sendMock.mockRejectedValueOnce({
+			code: 403,
+			response: { body: { errors: [{ message: 'The from address does not match a verified Sender Identity.' }] } }
+		});
 
 		await expect(
 			plugin.sendEmail(
-				{
-					from: 'a@example.com',
-					to: ['b@example.com'],
-					subject: 'hi',
-					bodyText: 'hi',
-					messageRef: 'ref-err'
-				},
+				{ from: 'a@example.com', to: ['b@example.com'], subject: 'hi', bodyText: 'hi', messageRef: 'ref-err' },
 				{ userId: 'u' }
 			)
 		).rejects.toThrow(/SendGrid send failed \(403\): The from address/);
 	});
 
-	it('serves a repeated messageRef from the idempotency cache without re-calling fetch', async () => {
-		const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
-			ok: true,
-			status: 202,
-			headers: new Headers({ 'x-message-id': 'sg-cache' }),
-			json: async () => ({})
-		} as Response);
-
+	it('serves a repeated messageRef from the idempotency cache without re-calling the SDK', async () => {
+		sendMock.mockResolvedValue([{ statusCode: 202, headers: { 'x-message-id': 'sg-cache' } }, {}]);
 		const input = {
 			from: 'a@example.com',
 			to: ['b@example.com'],
@@ -88,8 +78,7 @@ describe('SendGridPlugin', () => {
 		};
 		await plugin.sendEmail(input, { userId: 'u' });
 		await plugin.sendEmail(input, { userId: 'u' });
-		expect(fetchMock).toHaveBeenCalledTimes(1);
-		fetchMock.mockRestore();
+		expect(sendMock).toHaveBeenCalledTimes(1);
 	});
 
 	it('throws a clear error when no API key is configured', async () => {
@@ -102,3 +91,6 @@ describe('SendGridPlugin', () => {
 		).rejects.toThrow(/requires `apiKey`/);
 	});
 });
+
+// No-op kept to avoid accidental global fetch leakage between suites.
+function fetchSanityRestore(): void {}

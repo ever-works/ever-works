@@ -1,3 +1,5 @@
+import { MailService } from '@sendgrid/mail';
+import type { MailDataRequired } from '@sendgrid/mail';
 import type {
 	IEmailOutboundPlugin,
 	EmailSendInput,
@@ -9,8 +11,6 @@ import type {
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 
-const SENDGRID_API_BASE = 'https://api.sendgrid.com';
-
 function resolveApiKey(options: EmailOptions): string {
 	const fromSettings = options.settings?.apiKey;
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
@@ -19,18 +19,16 @@ function resolveApiKey(options: EmailOptions): string {
 	throw new Error('SendGrid plugin requires `apiKey` setting or SENDGRID_API_KEY env var.');
 }
 
-interface SendGridErrorResponse {
-	readonly errors?: readonly { readonly message: string; readonly field?: string }[];
+interface SendGridError {
+	readonly code?: number;
+	readonly response?: { readonly body?: { readonly errors?: readonly { readonly message: string }[] } };
+	readonly message?: string;
 }
 
 /**
- * SendGrid outbound email plugin. Direct fetch against the SendGrid v3
- * Mail Send API — no `@sendgrid/mail` dependency, so the plugin keeps
- * zero runtime deps beyond `@ever-works/plugin`.
- *
- * SendGrid returns `202 Accepted` with an empty body on success; the
- * provider message id is surfaced via the `X-Message-Id` response
- * header. Errors come back as `{ errors: [{ message, field }] }`.
+ * SendGrid outbound email plugin, built on the official `@sendgrid/mail`
+ * SDK. A fresh `MailService` per send keeps the API key request-scoped
+ * (multi-tenant safe) rather than mutating the package-level singleton.
  */
 export class SendGridPlugin implements IEmailOutboundPlugin {
 	readonly id = 'sendgrid';
@@ -61,54 +59,38 @@ export class SendGridPlugin implements IEmailOutboundPlugin {
 		const cached = this.idempotencyCache.get(input.messageRef);
 		if (cached) return cached;
 
-		const apiKey = resolveApiKey(options);
-		const content: { type: string; value: string }[] = [{ type: 'text/plain', value: input.bodyText }];
-		if (input.bodyHtml) content.push({ type: 'text/html', value: input.bodyHtml });
+		const client = new MailService();
+		client.setApiKey(resolveApiKey(options));
 
-		const body = {
-			personalizations: [
-				{
-					to: input.to.map((email) => ({ email })),
-					cc: input.cc?.length ? input.cc.map((email) => ({ email })) : undefined,
-					bcc: input.bcc?.length ? input.bcc.map((email) => ({ email })) : undefined
-				}
-			],
-			from: input.fromName ? { email: input.from, name: input.fromName } : { email: input.from },
-			reply_to: input.replyTo ? { email: input.replyTo } : undefined,
+		const message: MailDataRequired = {
+			to: input.to as string[],
+			cc: input.cc?.length ? (input.cc as string[]) : undefined,
+			bcc: input.bcc?.length ? (input.bcc as string[]) : undefined,
+			from: input.fromName ? { email: input.from, name: input.fromName } : input.from,
+			replyTo: input.replyTo,
 			subject: input.subject,
-			content,
-			custom_args: input.metadata ? { ...input.metadata } : undefined,
+			text: input.bodyText,
+			html: input.bodyHtml,
+			customArgs: input.metadata ? { ...input.metadata } : undefined,
 			attachments: input.attachments?.map((a) => ({
 				content: a.content,
 				filename: a.filename,
 				type: a.mimeType,
 				disposition: a.cid ? 'inline' : 'attachment',
-				content_id: a.cid
+				contentId: a.cid
 			}))
 		};
 
-		const response = await fetch(`${SENDGRID_API_BASE}/v3/mail/send`, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${apiKey}`
-			},
-			body: JSON.stringify(body)
-		});
-
-		if (!response.ok) {
-			let message = 'unknown error';
-			try {
-				const data = (await response.json()) as SendGridErrorResponse;
-				message = data.errors?.map((e) => e.message).join('; ') ?? message;
-			} catch {
-				// Non-JSON error body — keep the generic message.
-			}
-			throw new Error(`SendGrid send failed (${response.status}): ${message}`);
+		let messageId: string;
+		try {
+			const [response] = await client.send(message, false);
+			messageId = (response?.headers?.['x-message-id'] as string | undefined) ?? `sendgrid-${input.messageRef}`;
+		} catch (err) {
+			const e = err as SendGridError;
+			const detail = e.response?.body?.errors?.map((x) => x.message).join('; ') ?? e.message ?? 'unknown error';
+			throw new Error(`SendGrid send failed (${e.code ?? 'error'}): ${detail}`);
 		}
 
-		const messageId = response.headers.get('x-message-id') ?? `sendgrid-${input.messageRef}`;
 		const result: EmailSendResult = {
 			provider: this.id,
 			providerMessageId: messageId,
@@ -125,8 +107,8 @@ export class SendGridPlugin implements IEmailOutboundPlugin {
 
 	async verifyAddress(address: string, _options: EmailOptions): Promise<EmailVerification> {
 		// SendGrid verifies sender identities / domains, not arbitrary
-		// addresses. We emit a token + return it; the platform-side verify
-		// route flips `verified` once the operator clicks the confirmation.
+		// addresses. We emit a token; the platform-side verify route flips
+		// `verified` once the operator clicks the confirmation.
 		const verificationToken = `sg-${Math.random().toString(36).slice(2)}${Date.now()}`;
 		return {
 			address,

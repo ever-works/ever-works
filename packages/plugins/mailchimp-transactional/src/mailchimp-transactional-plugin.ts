@@ -1,3 +1,4 @@
+import mailchimp from '@mailchimp/mailchimp_transactional';
 import type {
 	IEmailOutboundPlugin,
 	EmailSendInput,
@@ -8,8 +9,6 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
-
-const MANDRILL_API_BASE = 'https://mandrillapp.com/api/1.0';
 
 function resolveApiKey(options: EmailOptions): string {
 	const fromSettings = options.settings?.apiKey;
@@ -36,13 +35,11 @@ interface MandrillErrorResponse {
 const ACCEPTED = new Set(['sent', 'queued', 'scheduled']);
 
 /**
- * Mailchimp Transactional (formerly Mandrill) outbound email plugin.
- * Direct fetch against the Mandrill JSON API — no `@mailchimp/...`
- * dependency, so the plugin keeps zero runtime deps beyond
- * `@ever-works/plugin`.
+ * Mailchimp Transactional (formerly Mandrill) outbound email plugin,
+ * built on the official `@mailchimp/mailchimp_transactional` SDK.
  *
- * NOTE: this is the *transactional* product (per-message API at
- * mandrillapp.com), NOT the Mailchimp Marketing/campaigns API.
+ * NOTE: this is the *transactional* product (per-message API), NOT the
+ * Mailchimp Marketing/campaigns API.
  */
 export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 	readonly id = 'mailchimp-transactional';
@@ -73,16 +70,14 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 		const cached = this.idempotencyCache.get(input.messageRef);
 		if (cached) return cached;
 
-		const apiKey = resolveApiKey(options);
+		const client = mailchimp(resolveApiKey(options));
 		const to = [
 			...input.to.map((email) => ({ email, type: 'to' as const })),
 			...(input.cc ?? []).map((email) => ({ email, type: 'cc' as const })),
 			...(input.bcc ?? []).map((email) => ({ email, type: 'bcc' as const }))
 		];
-		const headers = input.replyTo ? { 'Reply-To': input.replyTo } : undefined;
 
-		const body = {
-			key: apiKey,
+		const response = (await client.messages.send({
 			message: {
 				from_email: input.from,
 				from_name: input.fromName,
@@ -90,7 +85,7 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 				subject: input.subject,
 				text: input.bodyText,
 				html: input.bodyHtml,
-				headers,
+				headers: input.replyTo ? { 'Reply-To': input.replyTo } : undefined,
 				metadata: input.metadata,
 				attachments: input.attachments?.map((a) => ({
 					type: a.mimeType,
@@ -98,29 +93,17 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 					content: a.content
 				}))
 			}
-		};
+		})) as readonly MandrillRecipientResult[] | MandrillErrorResponse;
 
-		const response = await fetch(`${MANDRILL_API_BASE}/messages/send.json`, {
-			method: 'POST',
-			headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-			body: JSON.stringify(body)
-		});
-
-		const data = (await response.json().catch(() => ({}))) as
-			| readonly MandrillRecipientResult[]
-			| MandrillErrorResponse;
-
-		const isArray = Array.isArray(data);
-		if (!response.ok || (!isArray && (data as MandrillErrorResponse).status === 'error')) {
-			const err = data as MandrillErrorResponse;
+		// The SDK resolves (not throws) with an error envelope on API errors.
+		if (!Array.isArray(response)) {
+			const err = response as MandrillErrorResponse;
 			throw new Error(
-				`Mailchimp Transactional send failed (${response.status} / ${err.name ?? 'error'}): ${
-					err.message ?? 'unknown error'
-				}`
+				`Mailchimp Transactional send failed (${err.name ?? 'error'}): ${err.message ?? 'unknown error'}`
 			);
 		}
 
-		const results: readonly MandrillRecipientResult[] = isArray ? data : [];
+		const results: readonly MandrillRecipientResult[] = response;
 		const accepted = results.filter((r) => ACCEPTED.has(r.status)).map((r) => r.email);
 		const rejected = results
 			.filter((r) => !ACCEPTED.has(r.status))

@@ -17,6 +17,6 @@ Mailchimp Transactional (formerly **Mandrill**) email provider plugin for Ever W
 
 ## Notes
 
-- Zero runtime deps beyond `@ever-works/plugin` — talks to the REST API via `fetch`.
-- Mandrill returns an array of per-recipient results; the plugin maps `sent`/`queued`/`scheduled` → `accepted` and `rejected`/`invalid` → `rejected` (with reason), and uses the first `_id` as the provider message id.
+- Built on the official **`@mailchimp/mailchimp_transactional`** SDK (`messages.send`). The SDK ships no `.d.ts`, so a minimal local ambient declaration covers the surface used.
+- Mandrill returns an array of per-recipient results; the plugin maps `sent`/`queued`/`scheduled` → `accepted` and `rejected`/`invalid` → `rejected` (with reason), and uses the first `_id` as the provider message id. On API errors the SDK resolves with an error envelope (it does not throw) — handled.
 - `sendEmail` de-dupes on `EmailSendInput.messageRef` (idempotency) across retries.

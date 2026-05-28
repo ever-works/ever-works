@@ -1,4 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import Mailgun from 'mailgun.js';
+import formData from 'form-data';
 import type {
 	IEmailOutboundPlugin,
 	IEmailInboundPlugin,
@@ -28,7 +30,7 @@ function resolveDomain(options: EmailOptions): string {
 	throw new Error('Mailgun plugin requires `domain` setting or MAILGUN_DOMAIN env var.');
 }
 
-function resolveApiBase(options: EmailOptions): string {
+function resolveApiUrl(options: EmailOptions): string {
 	const region = (options.settings?.region ?? process.env.MAILGUN_REGION ?? 'us') as string;
 	return region.toLowerCase() === 'eu' ? 'https://api.eu.mailgun.net' : 'https://api.mailgun.net';
 }
@@ -39,11 +41,6 @@ function resolveSigningKey(options: EmailOptions): string | undefined {
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
 	const fromEnv = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
 	return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
-}
-
-interface MailgunSendResponse {
-	readonly id?: string;
-	readonly message?: string;
 }
 
 /** Mailgun delivers webhooks as JSON OR form-urlencoded; decode both. */
@@ -83,10 +80,11 @@ function extractSignature(body: Record<string, unknown>): MailgunSignature | nul
 /**
  * Mailgun email provider plugin (outbound + inbound).
  *
- * Outbound uses the form-encoded Messages API; inbound verifies the
- * Mailgun HMAC-SHA256 signature (`HMAC(signingKey, timestamp + token)`)
- * and decodes the parsed message. Zero runtime deps beyond
- * `@ever-works/plugin` + Node's built-in `crypto`.
+ * Outbound uses the official `mailgun.js` SDK (Messages API, US/EU
+ * regions). Inbound verifies the Mailgun HMAC-SHA256 signature
+ * (`HMAC(signingKey, timestamp + token)`) with Node `crypto` — Mailgun
+ * ships no SDK helper for inbound-route parsing/verification — and
+ * decodes the parsed message.
  */
 export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin {
 	readonly id = 'mailgun';
@@ -125,38 +123,38 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 
 		const apiKey = resolveApiKey(options);
 		const domain = resolveDomain(options);
-		const base = resolveApiBase(options);
+		const mailgun = new Mailgun(formData);
+		const mg = mailgun.client({ username: 'api', key: apiKey, url: resolveApiUrl(options) });
 
-		const form = new URLSearchParams();
-		form.set('from', input.fromName ? `${input.fromName} <${input.from}>` : input.from);
-		for (const to of input.to) form.append('to', to);
-		for (const cc of input.cc ?? []) form.append('cc', cc);
-		for (const bcc of input.bcc ?? []) form.append('bcc', bcc);
-		form.set('subject', input.subject);
-		form.set('text', input.bodyText);
-		if (input.bodyHtml) form.set('html', input.bodyHtml);
-		if (input.replyTo) form.set('h:Reply-To', input.replyTo);
-		// Tag + custom variables for delivery tracking / spend tagging.
-		for (const [k, v] of Object.entries(input.metadata ?? {})) form.append(`v:${k}`, v);
+		// Mailgun custom variables (`v:<name>`) carry our attribution metadata.
+		const customVars: Record<string, string> = {};
+		for (const [k, v] of Object.entries(input.metadata ?? {})) customVars[`v:${k}`] = v;
 
-		const response = await fetch(`${base}/v3/${encodeURIComponent(domain)}/messages`, {
-			method: 'POST',
-			headers: {
-				Accept: 'application/json',
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Authorization: `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`
-			},
-			body: form.toString()
-		});
-
-		const data = (await response.json().catch(() => ({}))) as MailgunSendResponse;
-		if (!response.ok) {
-			throw new Error(`Mailgun send failed (${response.status}): ${data.message ?? 'unknown error'}`);
+		let id: string;
+		try {
+			const res = await mg.messages.create(domain, {
+				from: input.fromName ? `${input.fromName} <${input.from}>` : input.from,
+				to: [...input.to],
+				cc: input.cc?.length ? [...input.cc] : undefined,
+				bcc: input.bcc?.length ? [...input.bcc] : undefined,
+				subject: input.subject,
+				text: input.bodyText,
+				html: input.bodyHtml,
+				'h:Reply-To': input.replyTo,
+				...customVars
+			});
+			// Mailgun ids are angle-bracketed Message-Ids; strip for storage.
+			id = (res.id ?? `mailgun-${input.messageRef}`).replace(/^<|>$/g, '');
+		} catch (err) {
+			const e = err as { status?: number; message?: string; details?: string };
+			throw new Error(
+				`Mailgun send failed (${e.status ?? 'error'}): ${e.details ?? e.message ?? 'unknown error'}`
+			);
 		}
+
 		const result: EmailSendResult = {
 			provider: this.id,
-			// Mailgun ids are angle-bracketed Message-Ids; strip for storage.
-			providerMessageId: (data.id ?? `mailgun-${input.messageRef}`).replace(/^<|>$/g, ''),
+			providerMessageId: id,
 			accepted: [...input.to],
 			rejected: []
 		};

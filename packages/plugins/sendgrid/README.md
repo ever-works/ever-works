@@ -15,7 +15,7 @@ Twilio SendGrid email provider plugin for Ever Works (Notifications v2, EW-650).
 
 ## Notes
 
-- Zero runtime deps beyond `@ever-works/plugin` — talks to the REST API via `fetch`.
-- Success is `202 Accepted` with an empty body; the provider message id comes from the `X-Message-Id` response header.
+- Built on the official **`@sendgrid/mail`** SDK (a fresh `MailService` per send keeps the API key request-scoped / multi-tenant safe).
+- The provider message id comes from the `X-Message-Id` response header surfaced by the SDK.
 - `sendEmail` de-dupes on `EmailSendInput.messageRef` (idempotency) across retries.
 - Inbound (SendGrid Inbound Parse) is a separate webhook surface — add an `IEmailInboundPlugin` implementation when needed.

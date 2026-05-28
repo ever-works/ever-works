@@ -32,7 +32,8 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
-		"@ever-works/plugin": "workspace:*"
+		"@ever-works/plugin": "workspace:*",
+		"@sendgrid/mail": "^8.1.3"
 	},
 	"devDependencies": {
 		"@types/node": "^22.0.0",
