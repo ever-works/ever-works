@@ -870,6 +870,87 @@ export class DeployService {
         return randomBytes(this.CRON_SECRET_LENGTH).toString('hex');
     }
 
+    private async findMissingWorkflowFiles(
+        owner: string,
+        repo: string,
+        token: string,
+        branch: string,
+        workflowFiles: readonly string[],
+    ): Promise<string[] | null> {
+        const plugin = this.getGitHubPlugin();
+        if (typeof plugin.getFileContent !== 'function') {
+            return null;
+        }
+
+        const missing: string[] = [];
+        for (const workflowFile of workflowFiles) {
+            const workflowPath = `.github/workflows/${workflowFile}`;
+            try {
+                await plugin.getFileContent(owner, repo, workflowPath, token, branch);
+            } catch (error: any) {
+                if (this.isRepositoryFileNotFound(error)) {
+                    missing.push(workflowFile);
+                    continue;
+                }
+
+                this.logger.warn(
+                    `Could not preflight workflow file "${workflowPath}" in ${owner}/${repo}@${branch}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return null;
+            }
+        }
+
+        return missing;
+    }
+
+    private isRepositoryFileNotFound(error: unknown): boolean {
+        const maybeError = error as {
+            status?: number;
+            response?: { status?: number };
+            message?: string;
+        };
+        const status = maybeError?.status ?? maybeError?.response?.status;
+        if (status === 404) return true;
+
+        return typeof maybeError?.message === 'string' && /not found/i.test(maybeError.message);
+    }
+
+    private async areAllWorkflowFilesMissing(params: {
+        owner: string;
+        repo: string;
+        token: string;
+        branch: string;
+        workflowFiles: readonly string[];
+        phase: 'initial' | 'post-update';
+    }): Promise<boolean> {
+        const missing = await this.findMissingWorkflowFiles(
+            params.owner,
+            params.repo,
+            params.token,
+            params.branch,
+            params.workflowFiles,
+        );
+
+        if (!missing || missing.length === 0) {
+            return false;
+        }
+
+        const missingList = missing.join(', ');
+        if (missing.length === params.workflowFiles.length) {
+            this.logger.warn(
+                `Deployment workflow preflight (${params.phase}) found no configured workflow files in ${params.owner}/${params.repo}@${params.branch}: ${missingList}`,
+            );
+            return true;
+        }
+
+        this.logger.warn(
+            `Deployment workflow preflight (${params.phase}) found missing optional workflow file(s) in ${params.owner}/${params.repo}@${params.branch}: ${missingList}`,
+        );
+        return false;
+    }
+
     private async dispatchWithRetry(
         work: Work,
         user: User,
@@ -927,8 +1008,17 @@ export class DeployService {
             return false;
         };
 
-        // First attempt
-        const firstAttemptSuccess = await tryDispatch();
+        // First attempt. If the repo is missing every expected workflow,
+        // skip the doomed dispatch and sync from the selected template first.
+        const skipFirstAttempt = await this.areAllWorkflowFilesMissing({
+            owner,
+            repo,
+            token: gitToken,
+            branch: dispatchBranch,
+            workflowFiles: workflowFilesToTry,
+            phase: 'initial',
+        });
+        const firstAttemptSuccess = skipFirstAttempt ? false : await tryDispatch();
         if (firstAttemptSuccess) {
             return true;
         }
@@ -939,6 +1029,21 @@ export class DeployService {
             await this.websiteUpdateService.updateRepository(work, user);
             await this.createTriggerCommit(work, user);
             await this.delay(3000);
+
+            const stillMissingAllWorkflows = await this.areAllWorkflowFilesMissing({
+                owner,
+                repo,
+                token: gitToken,
+                branch: dispatchBranch,
+                workflowFiles: workflowFilesToTry,
+                phase: 'post-update',
+            });
+            if (stillMissingAllWorkflows) {
+                this.logger.error(
+                    `Deployment cannot continue because ${owner}/${repo}@${dispatchBranch} does not contain any expected deployment workflow: ${workflowFilesToTry.join(', ')}`,
+                );
+                return false;
+            }
 
             const retrySuccess = await tryDispatch();
             if (retrySuccess) {
