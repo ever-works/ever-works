@@ -43,7 +43,6 @@
 
 ### Partially done
 
-- **EW-674** Notification channel plugins — Discord (T15) + Slack (T27) done. Telegram (T28) pending.
 - **EW-680** Per-Agent inbox tab + components — list view done (T17); message detail page (T31) + composer page (T32) pending.
 - **EW-681** SWR hooks + SSE + i18n + E2E — API clients done (T17); SWR client hooks (T33) + SSE stream (T34) + i18n (T35) + Playwright E2E (T36) pending.
 
@@ -58,12 +57,14 @@
 - **EW-676** Event registry seed + plugin manifest events (T21).
 - **EW-677** Subscription resolver (T22).
 - **EW-678** Producer fanout (T20) + REST/UI (T12/T17). Complete.
+- **EW-674** Notification channel plugins — Discord (T15) + Slack (T27) + Telegram (T28). Complete.
 
 ### Newly done (this overnight cron loop)
 
 - **T25 EW-670** Agent inbound-email dispatcher — [`b70a8634`](https://github.com/ever-works/ever-works/commit/b70a8634). `AGENT_INBOUND_EMAIL_DISPATCHER` token + `DefaultInboundEmailDispatcher` (task-spawn + conversation modes), `INBOUND_EMAIL_TASK_SPAWNER` optional adapter, `deriveThreadKey` helper, `findByAddress` repo method, inbound-webhook wiring. 8 new unit tests.
 - **T26 EW-673** Agent `notifyChannel` tool — [`54d5c396`](https://github.com/ever-works/ever-works/commit/54d5c396). New `AGENT_NOTIFY_CHANNEL_FACADE` token + contract; `buildNotifyChannelTool` gated on `canCallExternalTools` + facade presence, invoke-time channel-ownership enforcement. Completes EW-673. 4 new unit tests.
 - **T27 EW-674** Slack channel plugin — [`889c6e15`](https://github.com/ever-works/ever-works/commit/889c6e15). `packages/plugins/slack-channel/` incoming-webhook + Block Kit, mirrors Discord. type-check clean, 7/7 Vitest.
+- **T28 EW-674** Telegram channel plugin — *this commit*. `packages/plugins/telegram-channel/` Bot API sendMessage (direct shape), MarkdownV2 support, getMe verifyTarget. type-check clean, 8/8 Vitest. Completes EW-674.
 
 - **T20 EW-678** Producer fanout — [`ead297eb`](https://github.com/ever-works/ever-works/commit/ead297eb)
 - **T21 EW-676** Event registry seed + plugin manifest events extension — [`126499ff`](https://github.com/ever-works/ever-works/commit/126499ff) + [`d1118ce6`](https://github.com/ever-works/ever-works/commit/d1118ce6)
