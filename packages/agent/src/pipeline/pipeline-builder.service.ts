@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     PipelineStepDefinition,
     StepPosition,
@@ -13,6 +13,7 @@ import {
     PluginRegistryService,
     RegisteredPlugin,
 } from '../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 
 /**
  * Create an empty executable pipeline
@@ -89,7 +90,14 @@ export class MissingDependencyError extends Error {
 export class PipelineBuilderService {
     private readonly logger = new Logger(PipelineBuilderService.name);
 
-    constructor(private readonly registry: PluginRegistryService) {}
+    constructor(
+        private readonly registry: PluginRegistryService,
+        // @Optional() because some unit tests construct this service
+        // directly without a settings service. PR #1087 — KB option B
+        // (canSkipAtBuildTime) needs settings resolution to call the
+        // hook with the resolved per-Work hierarchy.
+        @Optional() private readonly settingsService?: PluginSettingsService,
+    ) {}
 
     /**
      * Build an executable pipeline for a work.
@@ -235,6 +243,42 @@ export class PipelineBuilderService {
             const targets =
                 registered.plugin.targetPipelines ?? registered.manifest.targetPipelines;
             if (!targets?.includes(pipelineId) && !targets?.includes('*')) continue;
+
+            // PR #1087 — KB option B. If the modifier implements
+            // `canSkipAtBuildTime`, resolve its settings and let it
+            // decide whether to participate in this run. This replaces
+            // the previous pattern where modifiers had to gate inside
+            // `execute()` after their steps were already injected.
+            // Fail-open: a thrown error is treated as "don't skip" so
+            // a buggy modifier doesn't silently disappear.
+            if (typeof registered.plugin.canSkipAtBuildTime === 'function') {
+                let skip = false;
+                try {
+                    const settings = this.settingsService
+                        ? await this.settingsService.getSettings(registered.plugin.id, {
+                              userId,
+                              workId,
+                              includeSecrets: true,
+                          })
+                        : {};
+                    skip = await registered.plugin.canSkipAtBuildTime({
+                        settings,
+                        ...(workId ? { workId } : {}),
+                        ...(userId ? { userId } : {}),
+                        pipelineId,
+                    });
+                } catch (err) {
+                    this.logger.warn(
+                        `Modifier "${registered.plugin.id}".canSkipAtBuildTime threw — treating as don't-skip: ${(err as Error).message}`,
+                    );
+                }
+                if (skip) {
+                    this.logger.debug(
+                        `Modifier "${registered.plugin.id}" requested skip for pipeline=${pipelineId} work=${workId ?? '-'} user=${userId ?? '-'}`,
+                    );
+                    continue;
+                }
+            }
 
             result.push({
                 registered,

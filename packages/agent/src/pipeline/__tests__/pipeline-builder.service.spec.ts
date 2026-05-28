@@ -6,6 +6,7 @@ import {
     MissingDependencyError,
 } from '../pipeline-builder.service';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
+import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { MockPipelinePlugin } from './mock-pipeline-plugin';
 import type {
     IPlugin,
@@ -123,7 +124,10 @@ describe('PipelineBuilderService', () => {
         autoEnable: true,
     });
 
+    let settingsService: { getSettings: jest.Mock };
+
     beforeEach(async () => {
+        settingsService = { getSettings: jest.fn().mockResolvedValue({}) };
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PipelineBuilderService,
@@ -136,6 +140,13 @@ describe('PipelineBuilderService', () => {
                         on: jest.fn(),
                         off: jest.fn(),
                     },
+                },
+                {
+                    // PR #1087 — builder now calls
+                    // `PluginSettingsService.getSettings` to resolve
+                    // settings for `canSkipAtBuildTime`.
+                    provide: PluginSettingsService,
+                    useValue: settingsService,
                 },
             ],
         }).compile();
@@ -577,6 +588,107 @@ describe('PipelineBuilderService', () => {
 
             expect(pipeline.steps.some((s) => s.id === 'enabled-step')).toBe(true);
             expect(pipeline.steps.some((s) => s.id === 'disabled-step')).toBe(false);
+        });
+    });
+
+    describe('canSkipAtBuildTime wiring (PR #1087 — KB option B)', () => {
+        function makeModifierWithBuildTimeSkip(
+            id: string,
+            stepId: string,
+            canSkipAtBuildTime: jest.Mock,
+        ) {
+            const stepDef: PipelineStepDefinition = {
+                id: stepId,
+                name: 'Injected step',
+                position: { type: 'last' },
+            };
+            const modifier: any = {
+                id,
+                name: `Plugin ${id}`,
+                version: '1.0.0',
+                category: 'utility',
+                capabilities: ['pipeline-modifier'],
+                targetPipelines: ['standard-pipeline'],
+                settingsSchema: { type: 'object', properties: {} },
+                configurationMode: 'hybrid',
+                onLoad: jest.fn(),
+                onUnload: jest.fn(),
+                getStepDefinition: () => stepDef,
+                execute: jest.fn().mockImplementation((ctx: any) => Promise.resolve(ctx)),
+                canSkipAtBuildTime,
+            };
+            return { modifier, stepId };
+        }
+
+        it('omits the modifier and its injected step when canSkipAtBuildTime returns true', async () => {
+            const canSkip = jest.fn().mockResolvedValue(true);
+            const { modifier, stepId } = makeModifierWithBuildTimeSkip(
+                'mod-opt-out',
+                'opt-out-step',
+                canSkip,
+            );
+            settingsService.getSettings.mockResolvedValueOnce({ enabled: false });
+            registry.register(modifier, createMockManifest('mod-opt-out'), { state: 'loaded' });
+
+            const pipeline = await service.build(standardPlugin, 'work-1', 'user-1');
+
+            expect(canSkip).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    settings: { enabled: false },
+                    workId: 'work-1',
+                    userId: 'user-1',
+                    pipelineId: 'standard-pipeline',
+                }),
+            );
+            expect(pipeline.steps.some((s) => s.id === stepId)).toBe(false);
+        });
+
+        it('includes the modifier when canSkipAtBuildTime returns false', async () => {
+            const canSkip = jest.fn().mockResolvedValue(false);
+            const { modifier, stepId } = makeModifierWithBuildTimeSkip(
+                'mod-opt-in',
+                'opt-in-step',
+                canSkip,
+            );
+            settingsService.getSettings.mockResolvedValueOnce({ enabled: true });
+            registry.register(modifier, createMockManifest('mod-opt-in'), { state: 'loaded' });
+
+            const pipeline = await service.build(standardPlugin, 'work-1', 'user-1');
+
+            expect(canSkip).toHaveBeenCalledTimes(1);
+            expect(pipeline.steps.some((s) => s.id === stepId)).toBe(true);
+        });
+
+        it('treats a throwing canSkipAtBuildTime as "do not skip" (fail-open)', async () => {
+            const canSkip = jest.fn().mockRejectedValueOnce(new Error('settings DB down'));
+            const { modifier, stepId } = makeModifierWithBuildTimeSkip(
+                'mod-broken',
+                'broken-modifier-step',
+                canSkip,
+            );
+            registry.register(modifier, createMockManifest('mod-broken'), { state: 'loaded' });
+
+            const pipeline = await service.build(standardPlugin, 'work-1', 'user-1');
+
+            expect(pipeline.steps.some((s) => s.id === stepId)).toBe(true);
+        });
+
+        it('still injects when canSkipAtBuildTime is undefined (backwards compatible)', async () => {
+            const stepDef: PipelineStepDefinition = {
+                id: 'legacy-modifier-step',
+                name: 'Legacy injected step',
+                position: { type: 'last' },
+            };
+            const legacy = createMockPipelinePlugin('legacy-mod', stepDef);
+            // canSkipAtBuildTime is intentionally absent on the legacy
+            // mock — the builder must not require it.
+            registry.register(legacy as unknown as IPlugin, createMockManifest('legacy-mod'), {
+                state: 'loaded',
+            });
+
+            const pipeline = await service.build(standardPlugin, 'work-1', 'user-1');
+
+            expect(pipeline.steps.some((s) => s.id === stepDef.id)).toBe(true);
         });
     });
 });
