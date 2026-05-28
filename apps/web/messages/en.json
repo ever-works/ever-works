@@ -4690,5 +4690,108 @@
             "description": "Organize your work, share with teammates, and collaborate as a team.",
             "cta": "Create Organization"
         }
+    },
+    "notifications-v2": {
+        "emails": {
+            "title": "Email Addresses",
+            "subtitle": "Tenant-managed inbound + outbound addresses for agents.",
+            "addAddress": "Add address",
+            "empty": "No email addresses yet. Click Add address to register a Postmark / Resend / Mailgun / Sendgrid / Mailchimp inbox.",
+            "columns": {
+                "address": "Address",
+                "direction": "Direction",
+                "provider": "Provider",
+                "verified": "Verified"
+            },
+            "actions": {
+                "edit": "Edit",
+                "disable": "Disable",
+                "remove": "Remove",
+                "verify": "Resend verification"
+            }
+        },
+        "channels": {
+            "title": "Notification Channels",
+            "subtitle": "Connect Discord, Slack, Telegram, WhatsApp or Novu for multi-channel notification delivery.",
+            "addChannel": "Add channel",
+            "empty": "No channels yet. Add a Discord webhook, Slack incoming webhook, Telegram bot, or Novu workflow to start fanning notifications out beyond in-app.",
+            "columns": {
+                "name": "Name",
+                "provider": "Provider",
+                "verified": "Verified"
+            },
+            "actions": {
+                "test": "Test",
+                "edit": "Edit",
+                "disable": "Disable",
+                "remove": "Remove"
+            },
+            "testResult": {
+                "delivered": "Test delivered ✓",
+                "failed": "Test failed"
+            }
+        },
+        "preferences": {
+            "title": "Notification Preferences",
+            "subtitle": "Pick which channels deliver each event. In-app delivery is always on.",
+            "empty": "No event types registered yet. Producers will populate the registry on first emission.",
+            "columns": {
+                "event": "Event",
+                "inApp": "In-app"
+            },
+            "quietHours": {
+                "title": "Quiet hours",
+                "start": "Start",
+                "end": "End",
+                "timezone": "Timezone"
+            },
+            "mute": {
+                "title": "Mute category",
+                "until": "Mute until",
+                "muted": "Muted",
+                "unmute": "Unmute"
+            }
+        },
+        "inbox": {
+            "title": "Inbox",
+            "subtitleCount": "Inbound + outbound email for this agent. {count} messages.",
+            "compose": "Compose",
+            "empty": "No messages yet. Assign an inbound email address to this agent under Settings → Integrations → Emails to start receiving mail.",
+            "columns": {
+                "direction": "Direction",
+                "from": "From",
+                "subject": "Subject",
+                "when": "When",
+                "status": "Status"
+            },
+            "directionIn": "in",
+            "directionOut": "out",
+            "back": "← Back to inbox"
+        },
+        "detail": {
+            "from": "From",
+            "to": "To",
+            "cc": "Cc",
+            "inbound": "inbound",
+            "outbound": "outbound"
+        },
+        "composer": {
+            "title": "Compose",
+            "to": "To",
+            "toPlaceholder": "recipient@example.com, another@example.com",
+            "cc": "Cc",
+            "ccOptional": "(optional)",
+            "subject": "Subject",
+            "message": "Message",
+            "send": "Send",
+            "sending": "Sending…",
+            "sent": "Sent ✓",
+            "errors": {
+                "recipientRequired": "At least one recipient is required.",
+                "subjectRequired": "Subject is required.",
+                "bodyRequired": "Message body is required.",
+                "sendFailed": "Send failed."
+            }
+        }
     }
 }
