@@ -75,4 +75,25 @@ describe('NotificationChannelFacadeService', () => {
             ),
         ).rejects.toBeInstanceOf(NotificationChannelFacadeError);
     });
+
+    it('deliverToChannelOrThrow resolves for the in-app sentinel and throws on failure', async () => {
+        // 'in-app' is a no-op delivered sentinel — resolves.
+        await expect(
+            facade.deliverToChannelOrThrow(
+                'in-app',
+                { text: 'x', messageRef: 'r' },
+                { userId: 'u' },
+            ),
+        ).resolves.toMatchObject({ status: 'delivered' });
+
+        // No channels repo wired here → sendOne yields a failed result →
+        // the throwing variant surfaces it (so Trigger.dev retries).
+        await expect(
+            facade.deliverToChannelOrThrow(
+                'missing',
+                { text: 'x', messageRef: 'r' },
+                { userId: 'u' },
+            ),
+        ).rejects.toBeInstanceOf(NotificationChannelFacadeError);
+    });
 });

@@ -138,6 +138,32 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         });
     }
 
+    /**
+     * Single delivery attempt that THROWS on failure. This is the
+     * primitive the Trigger.dev `notification-channel-delivery` task
+     * calls (via the trigger-internal RPC) so its `retry` policy re-runs
+     * the attempt on failure — whereas `send()`'s parallel fanout uses
+     * `sendOne` directly, which swallows per-channel failures so one bad
+     * channel doesn't sink its siblings. On terminal retry-exhaustion
+     * the delivery-log row left by `sendOne` is the dead-letter.
+     */
+    async deliverToChannelOrThrow(
+        channelId: string,
+        payload: NotificationChannelFanoutInput,
+        options: FacadeOptions,
+        eventType?: string,
+    ): Promise<NotificationChannelFanoutResult> {
+        const result = await this.sendOne(channelId, payload, options, eventType);
+        if (result.status === 'failed') {
+            throw new NotificationChannelFacadeError(
+                result.error ?? 'channel delivery failed',
+                'deliverToChannelOrThrow',
+                result.pluginId,
+            );
+        }
+        return result;
+    }
+
     private async sendOne(
         channelId: string,
         payload: NotificationChannelFanoutInput,
