@@ -29,6 +29,7 @@ import {
     AGENT_EMAIL_FACADE,
     type AgentEmailFacade,
     type AgentSendEmailResult,
+    type AgentMessageAgentResult,
 } from './agent-email-facade';
 
 /**
@@ -208,6 +209,19 @@ export class AgentToolService {
         // the assignment lookup is async and resolveAllowedTools is sync.
         if (agent.permissions?.canCallExternalTools && this.emailFacade) {
             tools.push(this.buildSendEmailTool(agent));
+        }
+
+        // Notifications v2 (EW-670 / T24) — messageAgent. Higher-level
+        // peer-to-peer verb (spec §12.4). Gated on the same permission +
+        // facade presence AND the facade implementing the optional
+        // messageAgent method (the contract slot is optional so older
+        // adapters that only wired sendEmail don't expose a broken tool).
+        if (
+            agent.permissions?.canCallExternalTools &&
+            this.emailFacade &&
+            typeof this.emailFacade.messageAgent === 'function'
+        ) {
+            tools.push(this.buildMessageAgentTool(agent));
         }
 
         // getActivity + getKbDocument — placeholders that document the
@@ -635,6 +649,71 @@ export class AgentToolService {
                         bodyText: args.bodyText,
                         bodyHtml: args.bodyHtml,
                         fromAddressId: args.fromAddressId,
+                    });
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    private buildMessageAgentTool(
+        agent: Agent,
+    ): AgentToolDescriptor<
+        {
+            targetAgentId: string;
+            subject: string;
+            body: string;
+            attachReferences?: { workId?: string; taskId?: string; missionId?: string }[];
+        },
+        AgentMessageAgentResult
+    > {
+        return {
+            name: 'messageAgent',
+            description:
+                "Send a message to a peer agent by id. The platform resolves the target agent's primary inbound email address and routes the message into a conversation thread (the receiving agent processes it via its chat-reply path, not as a new task). Prefer this over sendEmail for agent-to-agent coordination. Requires canCallExternalTools. Errors if the target agent has no inbound address assigned.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    targetAgentId: {
+                        type: 'string',
+                        description: 'The id of the agent to message.',
+                    },
+                    subject: { type: 'string', description: 'Message subject line.' },
+                    body: { type: 'string', description: 'Message body (plain text).' },
+                    attachReferences: {
+                        type: 'array',
+                        items: { type: 'object' },
+                        description:
+                            'Optional references to attach as context: objects with workId / taskId / missionId.',
+                    },
+                },
+                required: ['targetAgentId', 'subject', 'body'],
+            },
+            invoke: async (args) => {
+                if (!args?.targetAgentId || args.targetAgentId.trim().length === 0) {
+                    return { error: 'targetAgentId is required.' };
+                }
+                if (args.targetAgentId === agent.id) {
+                    return { error: 'An agent cannot message itself.' };
+                }
+                if (!args?.subject || args.subject.trim().length === 0) {
+                    return { error: 'subject is required.' };
+                }
+                if (!args?.body || args.body.trim().length === 0) {
+                    return { error: 'body is required.' };
+                }
+                if (typeof this.emailFacade?.messageAgent !== 'function') {
+                    return { error: 'messageAgent is not supported by the configured email adapter.' };
+                }
+                try {
+                    return await this.emailFacade.messageAgent({
+                        userId: agent.userId,
+                        fromAgentId: agent.id,
+                        targetAgentId: args.targetAgentId,
+                        subject: args.subject,
+                        body: args.body,
+                        attachReferences: args.attachReferences,
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

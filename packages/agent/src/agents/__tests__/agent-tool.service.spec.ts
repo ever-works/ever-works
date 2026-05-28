@@ -285,4 +285,69 @@ describe('AgentToolService.resolveAllowedTools', () => {
             expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-1');
         });
     });
+
+    describe('messageAgent tool (EW-670 / T24)', () => {
+        const makeFullFacade = () => ({ sendEmail: jest.fn(), messageAgent: jest.fn() });
+        const wire = (facade: unknown) =>
+            new AgentToolService(
+                agents,
+                skills,
+                bindings,
+                files,
+                undefined,
+                undefined,
+                facade as any,
+            );
+
+        it('is NOT exposed when the facade only implements sendEmail', () => {
+            const svcSendOnly = wire({ sendEmail: jest.fn() });
+            const tools = svcSendOnly.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('sendEmail');
+            expect(tools.map((t) => t.name)).not.toContain('messageAgent');
+        });
+
+        it('is exposed when the facade implements messageAgent + permission present', () => {
+            const tools = wire(makeFullFacade()).resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            expect(tools.map((t) => t.name)).toContain('messageAgent');
+        });
+
+        it('invoke rejects self-message + forwards a valid peer message', async () => {
+            const facade = makeFullFacade();
+            facade.messageAgent.mockResolvedValue({
+                providerMessageId: 'pm-9',
+                targetAddress: 'peer@inbound.acme.com',
+            });
+            const tools = wire(facade).resolveAllowedTools(
+                makeAgent({
+                    id: 'agent-self',
+                    permissions: { ...makeAgent().permissions, canCallExternalTools: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'messageAgent')!;
+
+            const selfMsg = (await tool.invoke({
+                targetAgentId: 'agent-self',
+                subject: 's',
+                body: 'b',
+            } as any)) as Record<string, unknown>;
+            expect('error' in selfMsg).toBe(true);
+            expect(facade.messageAgent).not.toHaveBeenCalled();
+
+            const ok = await tool.invoke({
+                targetAgentId: 'agent-peer',
+                subject: 'sync up',
+                body: 'please review',
+            } as any);
+            expect(facade.messageAgent).toHaveBeenCalledTimes(1);
+            expect((ok as { providerMessageId: string }).providerMessageId).toBe('pm-9');
+        });
+    });
 });
