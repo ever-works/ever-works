@@ -185,24 +185,50 @@ describe('AgentRunService — agent-memory session lifecycle', () => {
         expect(runs.markFailed).toHaveBeenCalled();
     });
 
-    it('skips session entirely when the facade reports isConfigured() === false', async () => {
-        agentMemory.isConfigured.mockReturnValueOnce(false);
-        await makeSvc().execute(runContext);
+    it('skips silently when openSession throws NoProviderError (no enabled provider for this user)', async () => {
+        // The user has no agent-memory plugin enabled. The facade
+        // throws NoProviderError; we log at debug and continue.
+        const noProvider = new Error('No agent-memory provider configured or available');
+        noProvider.name = 'NoProviderError';
+        agentMemory.openSession.mockRejectedValueOnce(noProvider);
+        const result = await makeSvc().execute(runContext);
 
-        expect(agentMemory.openSession).not.toHaveBeenCalled();
+        expect(result.status).toBe('dispatched');
         expect(runs.setMemorySessionId).not.toHaveBeenCalled();
         expect(agentMemory.closeSession).not.toHaveBeenCalled();
+        expect(runs.markCompleted).toHaveBeenCalled();
     });
 
-    it('continues the run when openSession throws (best-effort: memory outage is non-fatal)', async () => {
+    it('continues the run when openSession throws an unexpected error (memory outage is non-fatal)', async () => {
         agentMemory.openSession.mockRejectedValueOnce(new Error('agentmemory unreachable'));
         const result = await makeSvc().execute(runContext);
 
         expect(result.status).toBe('dispatched');
         expect(runs.setMemorySessionId).not.toHaveBeenCalled();
-        // No session opened → no close to attempt.
         expect(agentMemory.closeSession).not.toHaveBeenCalled();
         expect(runs.markCompleted).toHaveBeenCalled();
+    });
+
+    it('forwards agent.workId to openSession + closeSession for Work-scoped agents', async () => {
+        agents.findById.mockResolvedValueOnce(makeAgent({ workId: 'work-77' }));
+        await makeSvc().execute(runContext);
+
+        expect(agentMemory.openSession).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.objectContaining({ userId: 'u1', workId: 'work-77' }),
+        );
+        expect(agentMemory.closeSession).toHaveBeenCalledWith(
+            'sess-42',
+            expect.objectContaining({ userId: 'u1', workId: 'work-77' }),
+        );
+    });
+
+    it('omits workId from FacadeOptions when the agent is not Work-scoped', async () => {
+        agents.findById.mockResolvedValueOnce(makeAgent({ workId: null }));
+        await makeSvc().execute(runContext);
+
+        const openOpts = agentMemory.openSession.mock.calls[0][1];
+        expect(openOpts).not.toHaveProperty('workId');
     });
 
     it('continues the run when setMemorySessionId fails (DB hiccup)', async () => {

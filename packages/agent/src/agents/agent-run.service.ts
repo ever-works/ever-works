@@ -291,6 +291,7 @@ export class AgentRunService {
                     errorMessage: dispatchResult.errorMessage,
                 },
                 memorySessionId,
+                agent,
             );
             return {
                 runId: context.runId,
@@ -310,6 +311,7 @@ export class AgentRunService {
             context,
             dispatchResult.outcome,
             memorySessionId,
+            agent,
         );
         return {
             runId: context.runId,
@@ -673,6 +675,7 @@ export class AgentRunService {
         context: AgentRunContext,
         outcome: AgentRunOutcome,
         memorySessionId?: string | null,
+        agent?: Agent | null,
     ): Promise<{
         runId: string;
         status: 'completed' | 'failed';
@@ -685,12 +688,12 @@ export class AgentRunService {
             await this.runs
                 .markFailed(context.runId, outcome.errorMessage ?? 'Agent run errored')
                 .catch(() => undefined);
-            await this.tryCloseMemorySession(memorySessionId, context);
+            await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
             return { runId: context.runId, status: 'failed' };
         }
 
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
-        await this.tryCloseMemorySession(memorySessionId, context);
+        await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
 
         let postedMessageId: string | undefined;
         let finishedTaskStatus: string | undefined;
@@ -983,7 +986,14 @@ export class AgentRunService {
         agent: Agent,
     ): Promise<string | null> {
         if (!this.agentMemory) return null;
-        if (!this.agentMemory.isConfigured()) return null;
+        // NOTE: deliberately NOT calling `isConfigured()` first — that
+        // check is registry-global (true whenever ANY agent-memory plugin
+        // is loaded, regardless of user enablement), so it would
+        // false-positive and produce noisy WARN logs on every run for
+        // users without the provider enabled. We let `openSession` do
+        // the real resolution; if no provider is enabled for the
+        // user/work scope it throws `NoProviderError` which we swallow
+        // silently here (Greptile P1 on PR #1084).
         try {
             const session = await this.agentMemory.openSession(
                 {
@@ -994,7 +1004,16 @@ export class AgentRunService {
                     taskId: context.taskId ?? undefined,
                     chatMessageId: context.chatMessageId ?? undefined,
                 },
-                { userId: context.userId },
+                // Pass `workId` through so Work-scoped agents resolve
+                // their Work-level memory provider (and its Work-level
+                // settings) — Codex/Greptile P1 on PR #1084. Without
+                // this, the session opens under the user-fallback
+                // provider while later pipeline steps might pick a
+                // different one for the same Work.
+                {
+                    userId: context.userId,
+                    ...(agent.workId ? { workId: agent.workId } : {}),
+                },
             );
             await this.runs.setMemorySessionId(context.runId, session.id).catch((err) => {
                 // Persist failure is non-fatal — the session exists
@@ -1005,8 +1024,15 @@ export class AgentRunService {
             });
             return session.id;
         } catch (err) {
-            this.logger.warn(
-                `AgentRunService: agent-memory openSession failed for run ${context.runId}: ${err}`,
+            // `NoProviderError` is the expected case when the user has
+            // no agent-memory provider enabled — log at debug so it
+            // doesn't fill ops logs. Other errors still warn.
+            const isNoProvider = err instanceof Error && err.name === 'NoProviderError';
+            const log = isNoProvider
+                ? this.logger.debug.bind(this.logger)
+                : this.logger.warn.bind(this.logger);
+            log(
+                `AgentRunService: agent-memory openSession skipped for run ${context.runId}: ${(err as Error).message}`,
             );
             return null;
         }
@@ -1021,10 +1047,17 @@ export class AgentRunService {
     private async tryCloseMemorySession(
         memorySessionId: string | null | undefined,
         context: AgentRunContext,
+        agent: Agent | null,
     ): Promise<void> {
         if (!memorySessionId || !this.agentMemory) return;
         try {
-            await this.agentMemory.closeSession(memorySessionId, { userId: context.userId });
+            // Forward `workId` to match the open call's resolution —
+            // without it a Work-scoped agent might target a different
+            // backend on close vs open (Greptile P1 on PR #1084).
+            await this.agentMemory.closeSession(memorySessionId, {
+                userId: context.userId,
+                ...(agent?.workId ? { workId: agent.workId } : {}),
+            });
         } catch (err) {
             this.logger.warn(
                 `AgentRunService: agent-memory closeSession failed for run ${context.runId} (session ${memorySessionId}): ${err}`,
