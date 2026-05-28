@@ -27,7 +27,6 @@ interface ComposioClientOptions {
 
 interface ExecuteToolOptions {
 	signal?: AbortSignal;
-	timeoutMs?: number;
 }
 
 /**
@@ -51,7 +50,20 @@ export interface ComposioSdkLike {
 		execute(
 			slug: string,
 			body: { userId: string; arguments?: Record<string, unknown> }
-		): Promise<{ successful?: boolean; data?: unknown; error?: string; logId?: string }>;
+		): Promise<{
+			successful?: boolean;
+			data?: unknown;
+			error?: string;
+			/**
+			 * The SDK transforms the v3 wire response from snake_case to camelCase
+			 * before resolving the promise — `log_id` → `logId`. Verified against
+			 * `@composio/core@0.10.0` (`dist/index.mjs`: `logId: response.log_id`).
+			 * We also tolerate `log_id` on the envelope as a defensive fallback
+			 * in case a future SDK version skips the transform.
+			 */
+			logId?: string;
+			log_id?: string;
+		}>;
 	};
 }
 
@@ -181,9 +193,13 @@ export class ComposioClient {
 		const envelope = signal ? await raceWithAbort(execPromise, signal) : await execPromise;
 
 		if (envelope.successful === false) {
+			// `logId` is the SDK-camelCased form; fall back to raw `log_id` in case
+			// a future SDK version stops transforming. Operators rely on this id
+			// to look up the upstream-app failure in the Composio dashboard.
+			const logId = envelope.logId ?? envelope.log_id;
 			throw new Error(
 				`Composio tool "${ref.toolSlug}" execution failed: ${envelope.error ?? 'unknown error'}` +
-					(envelope.logId ? ` (log_id=${envelope.logId})` : '')
+					(logId ? ` (log_id=${logId})` : '')
 			);
 		}
 
