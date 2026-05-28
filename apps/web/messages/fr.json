@@ -4825,5 +4825,51 @@
             "private": "Privé",
             "public": "Public"
         }
+    },
+    "organizations": {
+        "switcher": {
+            "heading": "Organizations",
+            "createNew": "+ Create Organization",
+            "bareTenant": "My account",
+            "loading": "Loading…"
+        },
+        "create": {
+            "title": "Create Organization",
+            "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
+            "nameLabel": "Name",
+            "namePlaceholder": "Acme Inc.",
+            "slugPreview": "Slug:",
+            "slugChecking": "Checking availability…",
+            "slugAvailable": "Available",
+            "slugTaken": "Taken, try: {suggestion}",
+            "slugTakenNoSuggestion": "That slug is taken",
+            "slugCheckError": "Couldn't check availability — you can still submit",
+            "submit": "Create",
+            "cancel": "Cancel",
+            "errors": {
+                "nameRequired": "Name is required",
+                "nameTooLong": "Name must be 200 characters or fewer",
+                "generic": "Failed to create Organization"
+            }
+        },
+        "upgrade": {
+            "title": "Move your existing items?",
+            "description": "You can pull your existing work into this Organization, or start it empty.",
+            "upgradeOption": "Move existing items",
+            "upgradeHelp": "Recommended. Your missions, ideas, and works move into this Organization.",
+            "emptyOption": "Start empty",
+            "emptyHelp": "Keep your existing items in your personal account. This Organization starts fresh.",
+            "confirm": "Continue",
+            "cancel": "Cancel",
+            "errors": {
+                "notAvailable": "Move isn't available for this Organization — your existing items will stay in your personal account.",
+                "generic": "Failed to move your existing items"
+            }
+        },
+        "banner": {
+            "title": "Create your first Organization",
+            "description": "Organize your work, share with teammates, and collaborate as a team.",
+            "cta": "Create Organization"
+        }
     }
 }
