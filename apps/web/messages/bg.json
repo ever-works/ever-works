@@ -1554,7 +1554,7 @@
                 "overview": "Преглед",
                 "activity": "Активност",
                 "items": "Елементи",
-                "generator": "Генератор",
+                "generator": "Worker",
                 "schedule": "График",
                 "history": "История",
                 "comparisons": "Сравнения",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Генериране не е започнато",
                     "description": "Стартирай генериране на елементи за твоята работа, за да я запълниш със съдържание.",
-                    "action": "Стартирай генериране"
+                    "action": "Стартирай Work"
                 },
                 "generating": {
                     "title": "Генериране в ход",
@@ -1769,12 +1769,12 @@
                     "title": "Генерирането неуспешно",
                     "description": "Грешка по време на генериране.",
                     "withWarnings": "Генерирането завърши с грешки:",
-                    "retry": "Опитай отново генериране"
+                    "retry": "Опитай отново Work"
                 },
                 "cancelled": {
                     "title": "Генерирането отменено",
                     "description": "Предишното генериране беше спрено преди завършване.",
-                    "restart": "Рестартирай генериране"
+                    "restart": "Рестартирай Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Детайли на конфигурацията",
-                "initialPrompt": "Първоначална подсказка за генериране",
+                "initialPrompt": "Първоначална подсказка за Worker",
                 "companyDetails": "Информация за компанията",
                 "companyName": "Име на компанията",
                 "companyWebsite": "Уебсайт",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Генериране",
+                    "generate": "Work",
                     "schedule": "График",
                     "history": "История",
                     "comparisons": "Сравнения",
-                    "navigationLabel": "Разделители на генератора"
+                    "navigationLabel": "Раздели на Worker"
                 },
                 "regenerationWarning": "Предупреждение за регенериране",
                 "regenerationWarningDescription": "Тази работа вече е генерирана. Стартирането на нова генерация ще замени съществуващите елементи.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Неуспешно зареждане на конфигурацията на формата",
                 "selectOption": "Изберете опция",
                 "workName": "Име на работата",
-                "generationPrompt": "Подсказка за генериране",
+                "generationPrompt": "Подсказка за Worker",
                 "modelOverride": "Презаписване на AI модел",
                 "modelOverridePlaceholder": "нпр. openai/gpt-4.1 или openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Не задължително. По подразбиране използва импортирания или предишния модел, освен ако не го презапишете тук.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Бъдете конкретни относно типа съдържание, което искате да генерирате",
                 "repositoryDescription": "Описание на репозиторията",
                 "repositoryPlaceholder": "Кратко описание на репозиторията (по избор)",
-                "startGeneration": "Започни генериране",
+                "startGeneration": "Започни Work",
                 "regenerateItems": "Регенерирай елементи",
                 "updateItems": "Изпълни генериране",
                 "recreateWork": "Създай отново работата",
@@ -4638,7 +4638,7 @@
             "work": "Работа",
             "overview": "Преглед",
             "items": "Елементи",
-            "generator": "Генератор",
+            "generator": "Worker",
             "settings": "Настройки",
             "deploy": "Разположи",
             "members": "Членове",

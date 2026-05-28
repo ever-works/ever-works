@@ -1554,7 +1554,7 @@
                 "overview": "Genel Bakış",
                 "activity": "Etkinlik",
                 "items": "Öğeler",
-                "generator": "Oluşturucu",
+                "generator": "Worker",
                 "schedule": "Program",
                 "history": "Geçmiş",
                 "comparisons": "Karşılaştırmalar",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Oluşturma Başlatılmadı",
                     "description": "İşizi içerikle doldurmak için öğe oluşturmaya başlayın.",
-                    "action": "Oluşturmayı Başlat"
+                    "action": "Work'i Başlat"
                 },
                 "generating": {
                     "title": "Oluşturma Devam Ediyor",
@@ -1769,12 +1769,12 @@
                     "title": "Oluşturma Başarısız",
                     "description": "Oluşturma sırasında bir hata oluştu.",
                     "withWarnings": "Hatalarla başarısız oldu:",
-                    "retry": "Oluşturmayı Tekrar Dene"
+                    "retry": "Work'i Tekrar Dene"
                 },
                 "cancelled": {
                     "title": "Oluşturma İptal Edildi",
                     "description": "Önceki oluşturma tamamlanmadan durduruldu.",
-                    "restart": "Oluşturmayı Yeniden Başlat"
+                    "restart": "Work'i Yeniden Başlat"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Yapılandırma Detayları",
-                "initialPrompt": "İlk Oluşturma İstem",
+                "initialPrompt": "İlk Worker İstemi",
                 "companyDetails": "Şirket Bilgileri",
                 "companyName": "Şirket Adı",
                 "companyWebsite": "Web Sitesi",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Oluştur",
+                    "generate": "Work",
                     "schedule": "Zamanlama",
                     "history": "Geçmiş",
                     "comparisons": "Karşılaştırmalar",
-                    "navigationLabel": "Oluşturucu sekmeleri"
+                    "navigationLabel": "Worker sekmeleri"
                 },
                 "regenerationWarning": "Yeniden Oluşturma Uyarısı",
                 "regenerationWarningDescription": "Bu iş zaten oluşturulmuş. Yeni bir oluşturma başlatmak mevcut öğeleri değiştirecektir.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Form yapılandırması yüklenemedi",
                 "selectOption": "Bir seçenek seçin",
                 "workName": "İş Adı",
-                "generationPrompt": "Oluşturma İstemı",
+                "generationPrompt": "Worker İstemi",
                 "modelOverride": "AI Modeli Geçersiz Kılma",
                 "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Oluşturmak istediğiniz içerik türünü detaylı belirtin",
                 "repositoryDescription": "Depo Tanımı",
                 "repositoryPlaceholder": "Deponun kısa tanımı (isteğe bağlı)",
-                "startGeneration": "Oluşturmayı Başlat",
+                "startGeneration": "Work'i Başlat",
                 "regenerateItems": "Öğeleri Yeniden Oluştur",
                 "updateItems": "Oluşturmayı Çalıştır",
                 "recreateWork": "İşi Yeniden Oluştur",
@@ -4702,7 +4702,7 @@
             "work": "İş",
             "overview": "Genel Bakış",
             "items": "Öğeler",
-            "generator": "Üretici",
+            "generator": "Worker",
             "settings": "Ayarlar",
             "deploy": "Dağıt",
             "members": "Üyeler",

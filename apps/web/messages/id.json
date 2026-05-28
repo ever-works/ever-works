@@ -1554,7 +1554,7 @@
                 "overview": "Ringkasan",
                 "activity": "Aktivitas",
                 "items": "Item",
-                "generator": "Generator",
+                "generator": "Worker",
                 "schedule": "Jadwal",
                 "history": "Riwayat",
                 "comparisons": "Perbandingan",
@@ -1747,7 +1747,7 @@
                 "notStarted": {
                     "title": "Generasi Belum Dimulai",
                     "description": "Mulai menghasilkan item untuk karya Anda agar diisi dengan konten.",
-                    "action": "Mulai Generasi"
+                    "action": "Mulai Work"
                 },
                 "generating": {
                     "title": "Generasi Sedang Berlangsung",
@@ -1769,12 +1769,12 @@
                     "title": "Generasi Gagal",
                     "description": "Terjadi kesalahan selama generasi.",
                     "withWarnings": "Generasi gagal dengan kesalahan:",
-                    "retry": "Coba Generasi Lagi"
+                    "retry": "Coba Work Lagi"
                 },
                 "cancelled": {
                     "title": "Generasi Dibatalkan",
                     "description": "Generasi sebelumnya dihentikan sebelum selesai.",
-                    "restart": "Mulai Ulang Generasi"
+                    "restart": "Mulai Ulang Work"
                 }
             },
             "stats": {
@@ -1973,7 +1973,7 @@
             },
             "config": {
                 "title": "Detail Konfigurasi",
-                "initialPrompt": "Prompt Generasi Awal",
+                "initialPrompt": "Prompt Worker Awal",
                 "companyDetails": "Informasi Perusahaan",
                 "companyName": "Nama Perusahaan",
                 "companyWebsite": "Situs Web",
@@ -2343,11 +2343,11 @@
             },
             "generator": {
                 "tabs": {
-                    "generate": "Hasilkan",
+                    "generate": "Work",
                     "schedule": "Jadwal",
                     "history": "Riwayat",
                     "comparisons": "Perbandingan",
-                    "navigationLabel": "Tab Generator"
+                    "navigationLabel": "Tab Worker"
                 },
                 "regenerationWarning": "Peringatan Regenerasi",
                 "regenerationWarningDescription": "Karya ini sudah dihasilkan. Memulai generasi baru akan mengganti item yang ada.",
@@ -2361,7 +2361,7 @@
                 "failedToLoadFormSchema": "Gagal memuat konfigurasi formulir",
                 "selectOption": "Pilih opsi",
                 "workName": "Nama Karya",
-                "generationPrompt": "Prompt Generasi",
+                "generationPrompt": "Prompt Worker",
                 "modelOverride": "Penggantian Model AI",
                 "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
@@ -2373,7 +2373,7 @@
                 "promptHelperText": "Jadilah spesifik tentang jenis konten yang ingin Anda hasilkan",
                 "repositoryDescription": "Deskripsi Repositori",
                 "repositoryPlaceholder": "Deskripsi singkat repositori (opsional)",
-                "startGeneration": "Mulai Generasi",
+                "startGeneration": "Mulai Work",
                 "regenerateItems": "Regenerasi Item",
                 "updateItems": "Jalankan Generasi",
                 "recreateWork": "Buat Ulang Karya",
@@ -4702,7 +4702,7 @@
             "work": "Karya",
             "overview": "Ikhtisar",
             "items": "Item",
-            "generator": "Generator",
+            "generator": "Worker",
             "settings": "Pengaturan",
             "deploy": "Penerapan",
             "members": "Anggota",
