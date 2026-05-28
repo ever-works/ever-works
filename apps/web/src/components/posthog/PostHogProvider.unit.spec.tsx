@@ -110,14 +110,9 @@ describe('PostHogPageview', () => {
         render(<PostHogPageview />);
 
         expect(captureSpy).toHaveBeenCalledTimes(1);
-        const [event, props] = captureSpy.mock.calls[0] as [
-            string,
-            { $current_url: string },
-        ];
+        const [event, props] = captureSpy.mock.calls[0] as [string, { $current_url: string }];
         expect(event).toBe('$pageview');
-        expect(props.$current_url).toBe(
-            'http://localhost:3000/dashboard/works?q=foo&page=2',
-        );
+        expect(props.$current_url).toBe('http://localhost:3000/dashboard/works?q=foo&page=2');
     });
 
     it('fires $pageview again when the pathname changes (SPA navigation)', async () => {
