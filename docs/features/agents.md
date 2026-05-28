@@ -14,12 +14,12 @@ If a [Work](./creating-a-work.md) is the thing being built and a [Mission](./mis
 
 Ever Works ships with two complementary layers:
 
-| Layer | What it is | When it runs |
-|---|---|---|
-| **Work Agent** (built-in) | The platform-managed engine that turns a Goal into [Ideas](./ideas.md) and Ideas into Works. Zero setup. | Always available — the default zero-friction path. |
-| **Agents** (you define) | Named specialists you create, scope, and give a personality, a budget, and a schedule. | Optional, advanced — for users who want a standing team. |
+| Layer                     | What it is                                                                                               | When it runs                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Work Agent** (built-in) | The platform-managed engine that turns a Goal into [Ideas](./ideas.md) and Ideas into Works. Zero setup. | Always available — the default zero-friction path.       |
+| **Agents** (you define)   | Named specialists you create, scope, and give a personality, a budget, and a schedule.                   | Optional, advanced — for users who want a standing team. |
 
-The Work Agent stays the easy on-ramp. User-defined Agents are the layer you reach for when you want a *standing organization* — a CEO that keeps every Mission on-roadmap, a Researcher that files findings every morning, a Reviewer that triages incoming community PRs.
+The Work Agent stays the easy on-ramp. User-defined Agents are the layer you reach for when you want a _standing organization_ — a CEO that keeps every Mission on-roadmap, a Researcher that files findings every morning, a Reviewer that triages incoming community PRs.
 
 ## What an Agent has
 
@@ -56,26 +56,26 @@ Ready-made Agent definitions (CEO, CTO, and more) ship as templates from the [`e
 
 An Agent's brain is five files, stored in the **scope's Git repo** (the Mission repo for Mission-scoped Agents, the Work's data repo for Work-scoped Agents) so you own and version everything:
 
-| File | Purpose |
-|---|---|
-| `SOUL.md` | Who the Agent is — personality, principles, voice. |
-| `AGENTS.md` | Operating instructions and house rules. |
-| `HEARTBEAT.md` | What to do on a scheduled tick. |
-| `TOOLS.md` | Which tools the Agent leans on. |
-| `agent.yml` | Metadata (provider, idle behavior, avatar, …). |
+| File           | Purpose                                            |
+| -------------- | -------------------------------------------------- |
+| `SOUL.md`      | Who the Agent is — personality, principles, voice. |
+| `AGENTS.md`    | Operating instructions and house rules.            |
+| `HEARTBEAT.md` | What to do on a scheduled tick.                    |
+| `TOOLS.md`     | Which tools the Agent leans on.                    |
+| `agent.yml`    | Metadata (provider, idle behavior, avatar, …).     |
 
 Tenant-scoped Agents with no control repo keep these inline in the database and serve them through the same API. You edit them in the Agent's **Instructions** tab (a five-tab markdown editor with autosave). The platform never auto-rewrites them — an Agent can only edit its own files, and only when `canEditAgentFiles` is on.
 
 ## Heartbeats — what an Agent does on an idle tick
 
-Set a `heartbeatCadence` (a cron expression, or `manual`) and the Agent wakes on schedule. Even with nothing assigned, a heartbeat is **not** a no-op — the Agent is asked *"What's the next action you should take? Choose ONE."* and may:
+Set a `heartbeatCadence` (a cron expression, or `manual`) and the Agent wakes on schedule. Even with nothing assigned, a heartbeat is **not** a no-op — the Agent is asked _"What's the next action you should take? Choose ONE."_ and may:
 
 - **Create a task** (self-assigned or assigned to another Agent in scope),
 - **Comment on an open task** it's part of,
 - **Edit one of its own definition files** to capture a learning, or
 - **Observe** the current state and do nothing this tick.
 
-This is the loop that makes Ever Works *keep going*. Tune it per Agent with `agent.yml`'s `idleBehavior: propose | observe | noop`.
+This is the loop that makes Ever Works _keep going_. Tune it per Agent with `agent.yml`'s `idleBehavior: propose | observe | noop`.
 
 ## Memory
 
@@ -113,7 +113,7 @@ A **dry-run** mode (`POST /agents/:id/dry-run`) builds the prompt and estimates 
 4. Choose a scope — Tenant for a company-wide role, or a specific Mission/Idea/Work.
 5. Create it (starts in `draft`), then open the **Dashboard** tab and click **Start**, optionally setting a heartbeat cadence and budget.
 
-You can also drive everything from the in-app AI Chat or any MCP client — *"Create a CEO agent for my company mission and run it daily."*
+You can also drive everything from the in-app AI Chat or any MCP client — _"Create a CEO agent for my company mission and run it daily."_
 
 ## See also
 

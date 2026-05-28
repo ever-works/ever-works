@@ -8,20 +8,20 @@ sidebar_label: Workers
 
 **Workers** are the engine room behind everything that happens when you're not looking. They're the background-execution layer that runs your [Agents](./agents.md), generation pipelines, [scheduled updates](./scheduled-updates.md), and [Mission](./missions.md) ticks reliably, in parallel, with retries — so the platform's [autonomous operation](./autonomous-operation.md) keeps humming whether you have one Work or a hundred.
 
-You rarely manage Workers directly. They're the "who's actually doing the job" answer underneath the Agents and schedules you *do* manage.
+You rarely manage Workers directly. They're the "who's actually doing the job" answer underneath the Agents and schedules you _do_ manage.
 
 ## What Workers run
 
-| Job kind | What it does |
-|---|---|
-| **Agent heartbeats** | Wake each active Agent on its cadence, run its decision loop, record the run. |
-| **Agent tasks & chat replies** | Execute work assigned to an Agent; reply when an Agent is mentioned. |
-| **Generation pipelines** | Build and refresh a Work's content and code. |
-| **Scheduled updates** | Re-run a Work's pipeline on its cadence. |
-| **Mission ticks** | Generate fresh Ideas for scheduled Missions. |
-| **Inbound email** | Turn incoming mail into Tasks or conversations. |
-| **Ingest & extraction** | Normalize and extract uploaded Knowledge Base sources. |
-| **Community PR processing** | Triage and merge community contributions. |
+| Job kind                       | What it does                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| **Agent heartbeats**           | Wake each active Agent on its cadence, run its decision loop, record the run. |
+| **Agent tasks & chat replies** | Execute work assigned to an Agent; reply when an Agent is mentioned.          |
+| **Generation pipelines**       | Build and refresh a Work's content and code.                                  |
+| **Scheduled updates**          | Re-run a Work's pipeline on its cadence.                                      |
+| **Mission ticks**              | Generate fresh Ideas for scheduled Missions.                                  |
+| **Inbound email**              | Turn incoming mail into Tasks or conversations.                               |
+| **Ingest & extraction**        | Normalize and extract uploaded Knowledge Base sources.                        |
+| **Community PR processing**    | Triage and merge community contributions.                                     |
 
 ## How Workers behave
 

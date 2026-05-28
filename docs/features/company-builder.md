@@ -8,7 +8,7 @@ sidebar_label: Company Builder
 
 > **Status: coming soon.** Company is a planned scope, telegraphed today by the **Company** chip on the create surface. Its foundations — [Missions](./missions.md), [Agents](./agents.md) with Tenant scope, [Tenants & Organizations](../advanced/multi-tenancy.md) — are live. The company-registration integrations and the "company-as-a-business" surface are on the roadmap. This page describes the destination.
 
-The **Company Builder** is Ever Works' most ambitious shape: not a website, but the *organization that runs websites, stores, and everything else* — staffed by AI [Agents](./agents.md) acting as real employees, working 24/7 toward your [Mission](./missions.md). If a Work is one site and a Mission is one goal, a **Company** is the whole operation: a CEO, a CTO, the Works they own, the budgets they spend against, and the schedule they run on.
+The **Company Builder** is Ever Works' most ambitious shape: not a website, but the _organization that runs websites, stores, and everything else_ — staffed by AI [Agents](./agents.md) acting as real employees, working 24/7 toward your [Mission](./missions.md). If a Work is one site and a Mission is one goal, a **Company** is the whole operation: a CEO, a CTO, the Works they own, the budgets they spend against, and the schedule they run on.
 
 ## From idea to operating company
 
@@ -33,7 +33,7 @@ flowchart TD
 
 ## How it relates to Tenants & Organizations
 
-The Company Builder is the product-facing expression of the platform's [multi-tenancy](../advanced/multi-tenancy.md) foundation. An Organization is the container; a Company is what you *do* with it — register it, staff it with Agents, give it Works, and let it run.
+The Company Builder is the product-facing expression of the platform's [multi-tenancy](../advanced/multi-tenancy.md) foundation. An Organization is the container; a Company is what you _do_ with it — register it, staff it with Agents, give it Works, and let it run.
 
 ## You own the company's output
 

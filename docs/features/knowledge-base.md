@@ -6,7 +6,7 @@ sidebar_label: Knowledge Base & Memory
 
 # Knowledge Base & Memory
 
-Every [Work](./creating-a-work.md) in Ever Works has its own **Knowledge Base (KB)** — a structured, typed, Git-backed store of institutional context: brand voice, legal copy, SEO conventions, glossary, competitor lists, audience personas, prior research, and the artifacts your [Agents](./agents.md) produce. It's the memory that makes the "maintain" half of *research → generate → deploy → maintain* mean something. Without it, every scheduled run starts from a blank prompt; with it, the runtime accumulates a durable, owned understanding of what your business actually is.
+Every [Work](./creating-a-work.md) in Ever Works has its own **Knowledge Base (KB)** — a structured, typed, Git-backed store of institutional context: brand voice, legal copy, SEO conventions, glossary, competitor lists, audience personas, prior research, and the artifacts your [Agents](./agents.md) produce. It's the memory that makes the "maintain" half of _research → generate → deploy → maintain_ mean something. Without it, every scheduled run starts from a blank prompt; with it, the runtime accumulates a durable, owned understanding of what your business actually is.
 
 This is the built-in equivalent of an internal wiki and a long-term memory layer — owned by you, versioned in Git, and read by every pipeline automatically.
 
@@ -14,18 +14,18 @@ This is the built-in equivalent of an internal wiki and a long-term memory layer
 
 A **KB document** is one piece of institutional context. Each has a markdown body, a metadata sidecar, a hierarchical path, a class, tags, and a status. Documents are **typed** by class, and the class drives how Agents use the document:
 
-| Class | How Agents treat it |
-|---|---|
-| `brand` | Soft guidance — "follow these brand guidelines". |
-| `legal` | Verbatim-or-omitted — copied exactly, never paraphrased. |
-| `seo` | Constraints — target keywords and structured-data patterns per page type. |
-| `glossary` | Term substitution — always use these terms, never invent synonyms. |
-| `competitors` | Inclusion / exclusion — drives comparisons and the do-not-mention rule. |
-| `personas` | Audience definitions — write for these readers. |
-| `style` | Editorial style guide — grammar, banned words, voice, tense. |
-| `research` | Reference material — retrieved opportunistically and cited. |
-| `output` | Agent-authored artifacts — reports, summaries, decks. |
-| `freeform` | Catch-all notes — retrieved by similarity or explicit mention. |
+| Class         | How Agents treat it                                                       |
+| ------------- | ------------------------------------------------------------------------- |
+| `brand`       | Soft guidance — "follow these brand guidelines".                          |
+| `legal`       | Verbatim-or-omitted — copied exactly, never paraphrased.                  |
+| `seo`         | Constraints — target keywords and structured-data patterns per page type. |
+| `glossary`    | Term substitution — always use these terms, never invent synonyms.        |
+| `competitors` | Inclusion / exclusion — drives comparisons and the do-not-mention rule.   |
+| `personas`    | Audience definitions — write for these readers.                           |
+| `style`       | Editorial style guide — grammar, banned words, voice, tense.              |
+| `research`    | Reference material — retrieved opportunistically and cited.               |
+| `output`      | Agent-authored artifacts — reports, summaries, decks.                     |
+| `freeform`    | Catch-all notes — retrieved by similarity or explicit mention.            |
 
 ## Git-backed, two-layer storage
 
@@ -72,7 +72,7 @@ Agents never read the binary original — they read the clean extract.
 
 The KB is exposed over REST, the [MCP server](./mcp-server.md) (`kb.list`, `kb.read`, `kb.search`, `kb.create`, `kb.update`, `kb.upload`), and the CLI (`ever works kb …`), so external Claude / GPT / Gemini sessions and scripts can read and write it with the same access controls.
 
-> **Built-in, with room to extend.** Memory, wiki, and knowledge management ship *inside* Ever Works as first-class features rather than something you bolt on. Where you want to connect an external knowledge or memory system (for example, an OpenHuman-style memory/wiki layer), that arrives as a plugin alongside these built-ins — additive, never a replacement.
+> **Built-in, with room to extend.** Memory, wiki, and knowledge management ship _inside_ Ever Works as first-class features rather than something you bolt on. Where you want to connect an external knowledge or memory system (for example, an OpenHuman-style memory/wiki layer), that arrives as a plugin alongside these built-ins — additive, never a replacement.
 
 ## See also
 

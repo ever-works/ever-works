@@ -8,7 +8,7 @@ sidebar_label: Store Builder
 
 > **Status: coming soon.** Stores are a planned [Work](./creating-a-work.md) type, telegraphed today by the **Store** chip on the create surface. The Mission → Idea → Work → Agents model below is live; the storefront generator and commerce integrations are on the roadmap. This page describes where it's going.
 
-A **Store** is a Work whose output is a working storefront — products, copy, categories, checkout — built from a commerce [template](./website-templates.md) and then *kept running* by your [Agents](./agents.md). The point isn't to hand you an empty shop. It's to research the catalog, write the product copy, populate the storefront, and keep optimizing it on a schedule. An AI workforce that's built to **act on your business, not just advise it**.
+A **Store** is a Work whose output is a working storefront — products, copy, categories, checkout — built from a commerce [template](./website-templates.md) and then _kept running_ by your [Agents](./agents.md). The point isn't to hand you an empty shop. It's to research the catalog, write the product copy, populate the storefront, and keep optimizing it on a schedule. An AI workforce that's built to **act on your business, not just advise it**.
 
 ## How a Store fits the model
 

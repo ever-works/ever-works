@@ -8,7 +8,7 @@ sidebar_label: Agent Email & Inboxes
 
 Real employees have email addresses. So do Ever Works [Agents](./agents.md). Any Agent — and any [Mission](./missions.md), [Idea](./ideas.md), or [Work](./creating-a-work.md) — can be given one or more **inbound and outbound mailboxes**, so your AI workforce can send updates, receive replies, and turn incoming mail into work, without a human in the loop.
 
-This turns email from a thing the platform occasionally *sends* (password resets, alerts) into a first-class, two-way channel your Agents live on.
+This turns email from a thing the platform occasionally _sends_ (password resets, alerts) into a first-class, two-way channel your Agents live on.
 
 ## What you can do
 
@@ -28,14 +28,14 @@ Register addresses once under **Settings → Integrations → Email Addresses**:
 
 Addresses are backed by **Email Provider plugins**, enabled and configured per tenant exactly like AI providers:
 
-| Provider | Direction |
-|---|---|
+| Provider                           | Direction          |
+| ---------------------------------- | ------------------ |
 | Mailchimp Transactional (Mandrill) | Outbound + Inbound |
-| Mailgun | Outbound + Inbound |
-| Postmark | Outbound + Inbound |
-| Sendgrid | Outbound + Inbound |
-| Resend | Outbound |
-| `local-smtp` (dev / self-host) | Outbound |
+| Mailgun                            | Outbound + Inbound |
+| Postmark                           | Outbound + Inbound |
+| Sendgrid                           | Outbound + Inbound |
+| Resend                             | Outbound           |
+| `local-smtp` (dev / self-host)     | Outbound           |
 
 Because providers are pluggable, you get **failover**: drain traffic from one provider to another on the same address without touching any Agent's configuration.
 
@@ -70,7 +70,7 @@ Outbound bodies can be authored as plain text/HTML or rendered from **React-Emai
 
 ## Why email, not just tasks?
 
-Tasks are units of *work* with a lifecycle. Email is the universal addressing scheme: an Agent reachable by email is reachable by humans, by external systems, by webhooks, and by other AI agents — without bespoke integration. Both coexist; you pick the right one per interaction.
+Tasks are units of _work_ with a lifecycle. Email is the universal addressing scheme: an Agent reachable by email is reachable by humans, by external systems, by webhooks, and by other AI agents — without bespoke integration. Both coexist; you pick the right one per interaction.
 
 ## See also
 

@@ -6,7 +6,7 @@ sidebar_label: The Founder Journey
 
 # The Founder Journey — Start, Build, Sell, Scale
 
-Most guides for founders are *just content* — articles that tell you what to do and leave you to do it. This one is different: every step maps to something Ever Works can actually **do for you**. Read it top to bottom as one playbook, or jump to the phase you're in. The four phases — **Start → Build → Sell → Scale** — line up with the platform's core building blocks: [Missions](../features/missions.md), [Ideas](../features/ideas.md), [Works](../features/creating-a-work.md), and [Agents](../features/agents.md).
+Most guides for founders are _just content_ — articles that tell you what to do and leave you to do it. This one is different: every step maps to something Ever Works can actually **do for you**. Read it top to bottom as one playbook, or jump to the phase you're in. The four phases — **Start → Build → Sell → Scale** — line up with the platform's core building blocks: [Missions](../features/missions.md), [Ideas](../features/ideas.md), [Works](../features/creating-a-work.md), and [Agents](../features/agents.md).
 
 The mental model in one line: **you set the goal; an AI organization researches, builds, and runs the business toward it — 24/7, in your own Git.**
 
@@ -25,8 +25,8 @@ flowchart LR
 
 You don't need a finished plan to begin. You need a **goal**.
 
-- **Define a [Mission](../features/missions.md).** A Mission is an ambitious, ongoing goal — *"run the best cats business worldwide,"* *"launch an AI-tools media company."* It's bigger than any one website, and Ever Works keeps pursuing it for you.
-- **Let Ideas come to you.** From a Mission, the platform generates [Ideas](../features/ideas.md): atomic, one-shot proposals (*"a directory of indie cat-toy brands," "a weekly cat-care blog"*). Add your own, accept the good ones, dismiss the rest.
+- **Define a [Mission](../features/missions.md).** A Mission is an ambitious, ongoing goal — _"run the best cats business worldwide,"_ _"launch an AI-tools media company."_ It's bigger than any one website, and Ever Works keeps pursuing it for you.
+- **Let Ideas come to you.** From a Mission, the platform generates [Ideas](../features/ideas.md): atomic, one-shot proposals (_"a directory of indie cat-toy brands," "a weekly cat-care blog"_). Add your own, accept the good ones, dismiss the rest.
 - **Plan vs. commit.** Not sure yet? Capture it as an **Idea** and let the system research it before you commit — think of an Idea as a lightweight plan you can drop cheaply. Already know exactly what you want? Skip straight to a **Work**.
 - **Think about the entity early.** If this is a real business, you'll eventually want a company behind it. The planned [Company Builder](../features/company-builder.md) is designed to guide incorporation through provider integrations (e.g. Stripe Atlas) — so registering the company is part of the journey, not a side quest.
 
@@ -54,7 +54,7 @@ This is where Ever Works diverges hardest from one-shot builders. A site that ex
 - **Hire an AI organization.** Create Tenant-scoped Agents for company-wide roles — a **CEO** to keep the roadmap coherent, a **CTO** to own the build, a **Researcher** to feed Ideas, a **Copywriter** to keep pages sharp. Ready-made roles ship as templates.
 - **Split global vs. focused.** Some Agents work across the whole company; others are scoped to a single Work (a "Blog Editor" for one blog). You decide the org chart.
 - **Give them mailboxes.** With [Agent Email & Inboxes](../features/agent-email.md), Agents send updates and outreach from real addresses and turn incoming mail into work — so sales and support conversations actually happen.
-- **Open a storefront.** The planned [Store Builder](../features/store-builder.md) turns a commerce goal into a working storefront that an AI team researches, stocks, writes, and optimizes — built to *act on* your business, not just advise.
+- **Open a storefront.** The planned [Store Builder](../features/store-builder.md) turns a commerce goal into a working storefront that an AI team researches, stocks, writes, and optimizes — built to _act on_ your business, not just advise.
 
 **Platform pieces:** [Agents](../features/agents.md) · [Agent Email & Inboxes](../features/agent-email.md) · [Store Builder](../features/store-builder.md) · [Company Builder](../features/company-builder.md)
 
@@ -75,14 +75,14 @@ The point of all this is leverage: the business should keep moving without you i
 
 ## The whole journey, in one picture
 
-| Phase | You do | Ever Works does | Core pieces |
-|---|---|---|---|
-| **Start** | Set a goal | Generates Ideas, plans, suggests the entity | Missions, Ideas |
-| **Build** | Pick what to ship | Researches, writes, codes, deploys from Templates | Works, Templates, KB |
-| **Sell** | Define the team & offer | Staffs Agents, gives them mailboxes, opens the store | Agents, Email, Store, Company |
-| **Scale** | Set budgets & let go | Runs everything 24/7, keeps improving | Autonomous Operation, Workers |
+| Phase     | You do                  | Ever Works does                                      | Core pieces                   |
+| --------- | ----------------------- | ---------------------------------------------------- | ----------------------------- |
+| **Start** | Set a goal              | Generates Ideas, plans, suggests the entity          | Missions, Ideas               |
+| **Build** | Pick what to ship       | Researches, writes, codes, deploys from Templates    | Works, Templates, KB          |
+| **Sell**  | Define the team & offer | Staffs Agents, gives them mailboxes, opens the store | Agents, Email, Store, Company |
+| **Scale** | Set budgets & let go    | Runs everything 24/7, keeps improving                | Autonomous Operation, Workers |
 
-You can be the solo founder who is *all of these roles at once* — on top of a platform that does the work. Start with a single Idea, or set a Mission and watch a company take shape.
+You can be the solo founder who is _all of these roles at once_ — on top of a platform that does the work. Start with a single Idea, or set a Mission and watch a company take shape.
 
 ## See also
 
