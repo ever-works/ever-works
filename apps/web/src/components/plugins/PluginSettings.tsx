@@ -28,6 +28,7 @@ import { PluginDeviceAuthConnection } from '@/components/settings/PluginDeviceAu
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { GitHubOrganizationsSettings } from '@/components/settings/GitHubOrganizationsSettings';
 import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
+import { ComposioTriggersPanel } from './composio/ComposioTriggersPanel';
 import { getCategoryLabel, getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
@@ -299,6 +300,10 @@ export function PluginSettings({ plugin, oauthConnection, deviceAuthStatus }: Pl
                     plugin={plugin}
                     connected={Boolean(oauthConnection?.connected)}
                 />
+            )}
+
+            {plugin.pluginId === 'composio' && optimisticEnabled && (
+                <ComposioTriggersPanel />
             )}
 
             {/* Settings Form */}

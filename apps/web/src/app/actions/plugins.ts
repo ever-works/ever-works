@@ -5,6 +5,11 @@ import {
     deviceAuthAPI,
     type PluginDeviceAuthStatus,
 } from '@/lib/api/plugins-capabilities/device-auth';
+import {
+    composioTriggersAPI,
+    type ComposioTrigger,
+    type CreateComposioTriggerInput,
+} from '@/lib/api/plugins-capabilities/composio-triggers';
 import { revalidatePath } from 'next/cache';
 
 export interface ActionResult<T = unknown> {
@@ -233,6 +238,44 @@ export async function startPluginDeviceAuth(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to start device auth',
+        };
+    }
+}
+
+export async function listComposioTriggers(): Promise<ActionResult<ComposioTrigger[]>> {
+    try {
+        const data = await composioTriggersAPI.list();
+        return { success: true, data };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to list Composio triggers',
+        };
+    }
+}
+
+export async function createComposioTrigger(
+    input: CreateComposioTriggerInput,
+): Promise<ActionResult<ComposioTrigger>> {
+    try {
+        const data = await composioTriggersAPI.create(input);
+        return { success: true, data };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to create Composio trigger',
+        };
+    }
+}
+
+export async function deleteComposioTrigger(id: string): Promise<ActionResult<void>> {
+    try {
+        await composioTriggersAPI.remove(id);
+        return { success: true };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to delete Composio trigger',
         };
     }
 }
