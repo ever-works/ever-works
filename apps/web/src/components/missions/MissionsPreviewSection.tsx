@@ -68,11 +68,11 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
     const previewMissions = missions.slice(0, PREVIEW_LIMIT);
 
     return (
-        <section className="mt-8 lg:mt-16" aria-labelledby="missions-preview-heading">
+        <section aria-labelledby="missions-preview-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                        <Target className="w-4 h-4 text-warning" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
+                        <Target className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                     </div>
                     <h2
                         id="missions-preview-heading"
