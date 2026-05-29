@@ -207,6 +207,7 @@ export function WorkAICreator({
                     <Input
                         label={`${t('workNameLabel')} *`}
                         type="text"
+                        name="name"
                         value={workName}
                         onChange={(e) => {
                             const nextName = e.target.value;
@@ -230,6 +231,7 @@ export function WorkAICreator({
                     <Input
                         label={t('slugLabel')}
                         type="text"
+                        name="slug"
                         value={slug}
                         onChange={(e) => {
                             setSlug(e.target.value);
@@ -244,6 +246,7 @@ export function WorkAICreator({
                     {/* AI Prompt */}
                     <Textarea
                         label={`${t('promptLabel')} *`}
+                        name="prompt"
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         placeholder={t('promptPlaceholder')}
