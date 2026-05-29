@@ -15,7 +15,19 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // Intra-shard parallelism. The full suite is ~1670 tests / 90 min on
+    // 1 worker; the e2e workflow shards across the GitHub matrix
+    // (see .github/workflows/e2e.yml — each shard owns its own API +
+    // in-memory sqlite, so cross-shard state isolation is perfect).
+    // Within a shard, tests share one DB / one logged-in storageState,
+    // so workers > 1 must be set carefully. PLAYWRIGHT_WORKERS lets a
+    // shard opt into parallel workers (the workflow defaults to 1 →
+    // safe baseline; bump per-shard once we audit shared-state specs).
+    workers: process.env.PLAYWRIGHT_WORKERS
+        ? Number(process.env.PLAYWRIGHT_WORKERS)
+        : process.env.CI
+          ? 1
+          : undefined,
     reporter: process.env.CI ? 'github' : 'html',
     // First-hit dashboard routes hit Next.js dev-mode compilation (~10–15s
     // each), and several spec files chain multiple such hits. 30s (Playwright

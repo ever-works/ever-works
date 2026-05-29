@@ -4,19 +4,104 @@ import { NotificationEventTypeRepository } from '@ever-works/agent/database';
 import type { PluginNotificationEvent } from '@ever-works/plugin';
 
 /**
- * EW-664 / EW-676 / T21 — pulls plugin-declared notification events
- * out of each registered plugin's manifest at app bootstrap and
- * upserts them into `notification_event_types`. The keys are namespaced
- * as `<pluginId>:<key>` so plugins can't collide with the core event
- * keys (`ai_credits_depleted`, `work_generation_finished`, …) seeded
- * by `SeedNotificationEventTypes1780000010000`.
+ * Core event registry — kept in sync with the rows
+ * `SeedNotificationEventTypes1780000010000` migration inserts on Postgres.
+ * Bootstrapped here too so SQLite / CI environments that boot with
+ * `synchronize: true` (migrationsRun is false in that mode) still end up
+ * with the core registry populated. Idempotent via TypeORM `repo.upsert`.
+ */
+interface CoreEventRow {
+    readonly key: string;
+    readonly category: string;
+    readonly title: string;
+    readonly description: string;
+    readonly urgent: boolean;
+    readonly defaultChannels: readonly string[];
+}
+
+const CORE_EVENTS: readonly CoreEventRow[] = [
+    {
+        key: 'ai_credits_depleted',
+        category: 'ai_credits',
+        title: 'AI credits depleted',
+        description:
+            'Your configured AI provider has run out of credits. Top up to resume generation.',
+        urgent: true,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'ai_provider_error',
+        category: 'ai_credits',
+        title: 'AI provider error',
+        description: 'Recurring error from one of your enabled AI providers.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'generation_error',
+        category: 'generation',
+        title: 'Generation failed',
+        description: 'A scheduled or manual content generation run failed for one of your works.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'schedule_paused',
+        category: 'generation',
+        title: 'Schedule paused',
+        description:
+            'Scheduled updates for a work have been paused — likely due to repeated errors or an exhausted credit pool.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'git_auth_expired',
+        category: 'integrations',
+        title: 'Git authentication expired',
+        description: 'Your Git provider authentication has expired and needs to be refreshed.',
+        urgent: true,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'work_generation_finished',
+        category: 'generation',
+        title: 'Work generation finished',
+        description: 'A scheduled or manual content generation run for a work finished.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'agent_run_finished',
+        category: 'agents',
+        title: 'Agent run finished',
+        description: 'An autonomous agent run completed.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'mission_blocked',
+        category: 'system',
+        title: 'Mission blocked',
+        description: 'A mission can no longer progress — review its blocking task to unblock.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+];
+
+/**
+ * EW-664 / EW-676 / T21 — at app bootstrap:
+ *  1. Seed CORE_EVENTS into `notification_event_types`. The same rows are
+ *     also inserted by `SeedNotificationEventTypes1780000010000`, but that
+ *     migration only runs when `migrationsRun=true` (prod). In CI / E2E
+ *     environments that boot with `synchronize: true`, migrations are
+ *     skipped, so we re-seed here. Idempotent via TypeORM
+ *     `repo.upsert([...], ['key'])`.
+ *  2. Pull plugin-declared notification events out of each registered
+ *     plugin's manifest and upsert them under `<pluginId>:<key>` so they
+ *     can't collide with core keys.
  *
- * Idempotent: re-runs on every boot, repeated upserts only touch the
- * rows whose title / description / urgent / defaultChannels actually
- * changed.
- *
- * Hard-rule additive: this only inserts new rows or updates plugin-
- * source rows; core rows seeded by the migration are left alone.
+ * Hard-rule additive: this only inserts new rows or updates existing
+ * core / plugin-source rows; never deletes.
  */
 @Injectable()
 export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
@@ -28,10 +113,43 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
     ) {}
 
     async onApplicationBootstrap(): Promise<void> {
-        if (!this.registry || !this.eventTypes) {
+        if (!this.eventTypes) {
             this.logger.debug(
-                'Plugin registry or event-types repository not wired; skipping plugin event bootstrap',
+                'Event-types repository not wired; skipping notification event bootstrap',
             );
+            return;
+        }
+
+        // 1. Seed core events (idempotent — safe to run alongside the
+        //    Postgres migration that inserts the same rows).
+        let coreUpserts = 0;
+        for (const event of CORE_EVENTS) {
+            try {
+                await this.eventTypes.upsert({
+                    key: event.key,
+                    category: event.category,
+                    title: event.title,
+                    description: event.description,
+                    urgent: event.urgent,
+                    defaultChannels: [...event.defaultChannels],
+                    source: 'core' as const,
+                    pluginId: null,
+                });
+                coreUpserts++;
+            } catch (err) {
+                this.logger.warn(
+                    `Failed to upsert core event ${event.key}: ${err instanceof Error ? err.message : String(err)}`,
+                );
+            }
+        }
+        if (coreUpserts > 0) {
+            this.logger.log(`Upserted ${coreUpserts} core notification event types`);
+        }
+
+        // 2. Seed plugin-contributed events (skipped if plugin registry
+        //    isn't wired — e.g. CLI / test contexts).
+        if (!this.registry) {
+            this.logger.debug('Plugin registry not wired; skipping plugin event bootstrap');
             return;
         }
 
