@@ -1296,7 +1296,14 @@ export class KnowledgeBaseService {
         );
 
         const document = await this.extractAndMaterialize(upload, input);
-        return { upload, document };
+        // `upload` above was returned from `uploadRepository.create` with
+        // `extractionStatus = RUNNING`. `extractAndMaterialize` mutates the
+        // row in-place to SUCCEEDED / SKIPPED / FAILED but only returns the
+        // document. Without this re-read the API response carries the stale
+        // RUNNING value, which trips the e2e A16 suite (it asserts on the
+        // create-response shape directly, no settle-poll).
+        const refreshed = await this.uploadRepository.findById(input.workId, upload.id);
+        return { upload: refreshed ?? upload, document };
     }
 
     /**
@@ -1352,7 +1359,14 @@ export class KnowledgeBaseService {
             description: null,
             title: undefined,
         });
-        return { upload: current, document };
+        // Same stale-state hazard as createUpload (see comment there): the
+        // extract path updates the row but returns only the document, so
+        // `current` still carries the pre-extract RUNNING status. Re-read
+        // so callers (and the API response) see the terminal state.
+        // (Named `terminalUpload` to avoid shadowing the `refreshed` const
+        // from the earlier RUNNING-write at line 1342.)
+        const terminalUpload = await this.uploadRepository.findById(workId, upload.id);
+        return { upload: terminalUpload ?? current, document };
     }
 
     /**

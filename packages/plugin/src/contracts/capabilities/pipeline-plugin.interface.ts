@@ -38,6 +38,17 @@ export interface PipelineExecutionOptions {
 	readonly execContext?: StepExecutionContext;
 	/** Callback for structured log entries (used by log collector) */
 	readonly onLogEntry?: (log: GenerationStepLog) => void;
+	/**
+	 * Agent-memory session id supplied by an orchestrator that already
+	 * opened a session for this run (e.g. an agent run that triggers a
+	 * pipeline). When set, the executor forwards it to every step via
+	 * `StepExecutionContext.memorySessionId` so memory-touching steps
+	 * associate their reads/writes with the shared session instead of
+	 * opening their own. Left `undefined` for plain Work-generation
+	 * runs, where the `memory-pipeline-modifier` opens a per-run session
+	 * of its own.
+	 */
+	readonly memorySessionId?: string;
 }
 
 /**

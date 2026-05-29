@@ -46,6 +46,21 @@ export interface ComposioSdkLike {
             redirectUrl?: string;
         }>;
     };
+    triggers: {
+        create(
+            userId: string,
+            slug: string,
+            body?: { triggerConfig?: Record<string, unknown>; connectedAccountId?: string },
+        ): Promise<{ triggerId: string }>;
+        delete(triggerId: string): Promise<{ triggerId: string }>;
+        verifyWebhook(params: {
+            id: string;
+            payload: string;
+            signature: string;
+            timestamp: string;
+            secret: string;
+        }): Promise<{ version: string; payload: unknown; rawPayload: string }>;
+    };
 }
 
 /**
@@ -176,6 +191,111 @@ export class ComposioService {
             };
         } catch (error) {
             throw this.wrapComposioError(error, `initiate connection to ${body.toolkitSlug}`);
+        }
+    }
+
+    /**
+     * Enable a trigger upstream on Composio for the caller and return the
+     * Composio-assigned `tg_*` id. When `connectedAccountId` is omitted,
+     * Composio uses the user's first connected account for the toolkit.
+     */
+    async createTrigger(
+        userId: string,
+        params: {
+            triggerSlug: string;
+            connectedAccountId?: string;
+            config?: Record<string, unknown>;
+        },
+    ): Promise<{ triggerId: string }> {
+        const sdk = await this.getSdk(userId);
+        try {
+            const body: { triggerConfig?: Record<string, unknown>; connectedAccountId?: string } =
+                {};
+            if (params.config) body.triggerConfig = params.config;
+            if (params.connectedAccountId) body.connectedAccountId = params.connectedAccountId;
+            const result = await sdk.triggers.create(userId, params.triggerSlug, body);
+            if (!result?.triggerId) {
+                throw new Error('Composio did not return a trigger id for the new trigger.');
+            }
+            return { triggerId: result.triggerId };
+        } catch (error) {
+            throw this.wrapComposioError(error, `enable trigger ${params.triggerSlug}`);
+        }
+    }
+
+    /**
+     * Disable/remove a trigger upstream on Composio. Best-effort — callers
+     * still remove the local row even when the upstream delete fails (the
+     * trigger may already be gone). Returns whether the upstream call
+     * succeeded so the caller can log.
+     */
+    async deleteTrigger(userId: string, composioTriggerId: string): Promise<boolean> {
+        try {
+            const sdk = await this.getSdk(userId);
+            await sdk.triggers.delete(composioTriggerId);
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `Composio upstream trigger delete failed for ${composioTriggerId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
+    }
+
+    /**
+     * Resolve the caller's project-level Composio webhook secret
+     * (`COMPOSIO_WEBHOOK_SECRET`, set under Composio dashboard → Project
+     * Settings → Webhook, mirrored into the plugin's `webhookSecret`
+     * setting). Returns undefined when not configured.
+     */
+    async getWebhookSecret(userId: string): Promise<string | undefined> {
+        const resolved = await this.settingsService
+            .getResolvedSettings(COMPOSIO_PLUGIN_ID, { userId, includeSecrets: true })
+            .catch(() => null);
+        const settings = (resolved?.settings ?? null) as Record<string, unknown> | null;
+        const fromSettings = readString(settings, 'webhookSecret');
+        if (fromSettings) return fromSettings;
+        const fromEnv = process.env.COMPOSIO_WEBHOOK_SECRET;
+        return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
+    }
+
+    /**
+     * Verify a Composio webhook delivery for `userId` using the official
+     * SDK verifier (HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}`
+     * against the project webhook secret, base64 `v1,<sig>` form). Throws
+     * `UnauthorizedException` when the secret isn't configured or the
+     * signature/timestamp is invalid. Returns the parsed payload + version.
+     */
+    async verifyWebhook(
+        userId: string,
+        delivery: { id: string; rawBody: string; signature: string; timestamp: string },
+    ): Promise<{ version: string; payload: unknown }> {
+        const secret = await this.getWebhookSecret(userId);
+        if (!secret) {
+            // Fail CLOSED: a delivery for a known trigger with no secret
+            // configured cannot be trusted — never accept-all.
+            throw new UnauthorizedException(
+                'Composio webhook secret is not configured. Set it under Settings → Plugins → Composio (from Composio dashboard → Project Settings → Webhook).',
+            );
+        }
+        const sdk = await this.getSdk(userId);
+        try {
+            const result = await sdk.triggers.verifyWebhook({
+                id: delivery.id,
+                payload: delivery.rawBody,
+                signature: delivery.signature,
+                timestamp: delivery.timestamp,
+                secret,
+            });
+            return { version: result.version, payload: result.payload };
+        } catch (error) {
+            throw new UnauthorizedException(
+                `Composio webhook signature verification failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
         }
     }
 

@@ -12,7 +12,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Work create — full UI wizard', () => {
     test('user lands on /works/new and form renders', async ({ page }) => {
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // PR DD — /works/new without ?mode 307s to /new. Pin manual mode so
+        // the wizard form is present to drive (the chooser page on /new
+        // doesn't carry the name/description/submit triple this spec relies on).
+        await page.goto('/en/works/new?mode=manual', { waitUntil: 'domcontentloaded' });
         await expect(page).not.toHaveURL(/\/login/);
         // /works/new is now a chooser screen (AI / Manual / Import) where
         // the actual form is revealed AFTER picking a mode. We pin that
@@ -26,7 +29,10 @@ test.describe('Work create — full UI wizard', () => {
     });
 
     test('submitting an empty form surfaces validation', async ({ page }) => {
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // PR DD — /works/new without ?mode 307s to /new. Pin manual mode so
+        // the wizard form is present to drive (the chooser page on /new
+        // doesn't carry the name/description/submit triple this spec relies on).
+        await page.goto('/en/works/new?mode=manual', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
         const submit = page
             .getByRole('button', { name: /create|next|continue|save|submit/i })
@@ -43,7 +49,10 @@ test.describe('Work create — full UI wizard', () => {
 
     test('filling the wizard and submitting creates a work + lands on detail', async ({ page }) => {
         const name = `e2e ui ${Date.now().toString(36)}`;
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // PR DD — /works/new without ?mode 307s to /new. Pin manual mode so
+        // the wizard form is present to drive (the chooser page on /new
+        // doesn't carry the name/description/submit triple this spec relies on).
+        await page.goto('/en/works/new?mode=manual', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_500);
 
         // Fill the first text input — typically the name. Some builds

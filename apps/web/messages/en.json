@@ -651,7 +651,28 @@
                 "cancel": "Cancel",
                 "back": "Back",
                 "next": "Next",
-                "create": "Create Agent"
+                "create": "Create Agent",
+                "templateStepTitle": "Start from a template (optional)",
+                "startFromScratch": "Start from scratch",
+                "pickParentHint": "Pick a {scope} above to continue, or choose Workspace scope.",
+                "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
+            },
+            "orDivider": "Or",
+            "createManually": "Create Agent Manually",
+            "prompt": {
+                "label": "Describe the Agent you want",
+                "minLength": "Describe your Agent in a few more words.",
+                "submitTitle": "Build this Agent"
+            },
+            "chips": {
+                "viewAll": "View All",
+                "ariaLabel": "Pick an Agent template"
+            },
+            "catalog": {
+                "allTemplates": "All templates",
+                "yourTemplates": "Your templates",
+                "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
+                "openInWizard": "Open in wizard"
             }
         },
         "tasksPage": {
@@ -4681,9 +4702,8 @@
     },
     "organizations": {
         "switcher": {
-            "heading": "Organizations",
-            "createNew": "+ Create Organization",
-            "bareTenant": "My account",
+            "heading": "Switch Organization",
+            "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {

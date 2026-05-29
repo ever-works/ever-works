@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
     BadRequestException,
     Body,
@@ -20,6 +19,7 @@ import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { Public } from '@src/auth/decorators/public.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { ComposioTriggersService } from './composio-triggers.service';
+import { ComposioService } from '../composio/composio.service';
 import {
     ComposioTriggerDto,
     ComposioTriggerListDto,
@@ -30,7 +30,10 @@ import type { ComposioTriggerSubscription } from '@ever-works/agent/entities';
 @ApiTags('Composio Triggers')
 @Controller('api/plugins/composio')
 export class ComposioTriggersController {
-    constructor(private readonly triggers: ComposioTriggersService) {}
+    constructor(
+        private readonly triggers: ComposioTriggersService,
+        private readonly composio: ComposioService,
+    ) {}
 
     @Get('triggers')
     @ApiBearerAuth('JWT-auth')
@@ -49,20 +52,23 @@ export class ComposioTriggersController {
     @ApiOperation({
         summary: 'Create a Composio trigger subscription',
         description:
-            "Allocates a server-generated HMAC secret and stores the subscription. The created `webhookSecret` is returned in the response **once** — store it client-side if you need to register the same trigger on a different platform. Subsequent GETs never include it. (Follow-up PR will also call Composio's `POST /triggers` to enable the trigger upstream and persist the returned `tg_*` id.)",
+            'Enables the trigger upstream on Composio (`triggers.create` via the official SDK) and stores the subscription keyed by the returned `tg_*` id. Composio signs inbound deliveries with the project webhook secret (configured under Settings → Plugins → Composio), which the `/webhook` endpoint verifies via the SDK.',
     })
     @ApiResponse({ status: 201, type: ComposioTriggerDto })
     async create(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateComposioTriggerDto,
     ): Promise<ComposioTriggerDto> {
-        // Until the upstream Composio enable-trigger call is wired,
-        // we mint a placeholder composioTriggerId so the row is uniquely
-        // queryable. Once enabled, this is replaced with the real
-        // `tg_*` returned by Composio in the same transaction.
-        const placeholderTriggerId = `local_${randomUUID()}`;
-        const row = await this.triggers.create(auth.userId, placeholderTriggerId, body);
-        return { ...toDto(row), webhookSecret: row.webhookSecret };
+        // Enable the trigger upstream on Composio first, then persist the
+        // row keyed by the real `tg_*` id so webhook deliveries (which
+        // carry that id) resolve back to this subscription.
+        const { triggerId } = await this.composio.createTrigger(auth.userId, {
+            triggerSlug: body.triggerSlug,
+            connectedAccountId: body.composioConnectedAccountId,
+            config: body.config ?? undefined,
+        });
+        const row = await this.triggers.create(auth.userId, triggerId, body);
+        return toDto(row);
     }
 
     @Delete('triggers/:id')
@@ -74,7 +80,13 @@ export class ComposioTriggersController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) id: string,
     ): Promise<void> {
-        await this.triggers.remove(auth.userId, id);
+        const composioTriggerId = await this.triggers.remove(auth.userId, id);
+        // Best-effort upstream teardown — the local row is already gone; a
+        // failed upstream delete (e.g. trigger already removed) is logged
+        // and swallowed inside the service.
+        if (composioTriggerId) {
+            await this.composio.deleteTrigger(auth.userId, composioTriggerId);
+        }
     }
 
     @Public()
@@ -83,16 +95,16 @@ export class ComposioTriggersController {
     @ApiOperation({
         summary: 'Composio webhook receiver',
         description:
-            'Inbound Composio webhook deliveries land here. Composio signs the JSON body with HMAC-SHA256 of the per-subscription secret; the digest arrives as `x-composio-signature`. The handler resolves the subscription by the `tg_*` trigger id in the payload, verifies the signature in constant time, and records the outcome. Returns 200 even on no-op outcomes so Composio does not retry; 401 only when signature verification fails.',
+            'Inbound Composio webhook deliveries land here. The handler resolves the subscription by the `tg_*` trigger id in the payload, then verifies the delivery via the official Composio SDK (`triggers.verifyWebhook`) using the project webhook secret + the `webhook-id` / `webhook-signature` / `webhook-timestamp` headers. Returns 200 on accept so Composio does not retry; 401 when verification fails, 404 for an unknown trigger.',
     })
     async webhook(
         @Req() req: { rawBody?: string },
         @Body() body: ComposioWebhookPayload,
-        @Headers('x-composio-signature') signature: string | undefined,
+        @Headers() headers: Record<string, string>,
     ): Promise<{ ok: true }> {
-        const triggerId = body?.trigger_id ?? body?.triggerId;
-        if (!triggerId || typeof triggerId !== 'string') {
-            throw new BadRequestException('Missing trigger_id in webhook payload');
+        const triggerId = extractComposioTriggerId(body);
+        if (!triggerId) {
+            throw new BadRequestException('Missing trigger id in webhook payload');
         }
         if (!req.rawBody) {
             throw new BadRequestException('Missing raw webhook payload');
@@ -106,7 +118,15 @@ export class ComposioTriggersController {
         }
 
         try {
-            this.triggers.verifyDelivery(subscription, req.rawBody, signature);
+            // Verify against the OWNING user's project webhook secret — the
+            // webhook is @Public(), so the user is resolved from the trigger
+            // id, not an auth token. Fails closed when no secret is set.
+            await this.composio.verifyWebhook(subscription.userId, {
+                id: headers['webhook-id'] ?? '',
+                rawBody: req.rawBody,
+                signature: headers['webhook-signature'] ?? '',
+                timestamp: headers['webhook-timestamp'] ?? '',
+            });
         } catch (error) {
             await this.triggers.recordDelivery(subscription.id, 'rejected');
             throw error;
@@ -123,7 +143,18 @@ export class ComposioTriggersController {
 interface ComposioWebhookPayload {
     trigger_id?: string;
     triggerId?: string;
+    metadata?: { trigger_id?: string };
     [key: string]: unknown;
+}
+
+/**
+ * Extract the `tg_*` trigger id from a Composio webhook payload. V3
+ * nests it under `metadata.trigger_id`; legacy V1/V2 carry it top-level
+ * as `trigger_id` / `triggerId`.
+ */
+function extractComposioTriggerId(body: ComposioWebhookPayload | undefined): string | undefined {
+    const candidate = body?.metadata?.trigger_id ?? body?.trigger_id ?? body?.triggerId;
+    return typeof candidate === 'string' && candidate.length > 0 ? candidate : undefined;
 }
 
 function toDto(row: ComposioTriggerSubscription): ComposioTriggerDto {

@@ -10,9 +10,17 @@ import { test, expect } from '@playwright/test';
 const LOCALES_TO_CHECK = ['en', 'es', 'fr', 'de', 'pt', 'it'];
 
 test.describe('i18n — login page content varies across locales', () => {
-    test('login titles are distinct across locales', async ({ page, baseURL }) => {
+    test('login titles are distinct across locales', async ({ page, baseURL, context }) => {
         const titles: Record<string, string> = {};
         for (const locale of LOCALES_TO_CHECK) {
+            // PR #1052 dropped the URL-level locale prefix (`/en/login` →
+            // `/login`); locale is now resolved from the `NEXT_LOCALE`
+            // cookie. Set the cookie per-iteration so each request lands
+            // with the intended locale before navigating.
+            const host = new URL(baseURL || 'http://localhost:3000').hostname;
+            await context.addCookies([
+                { name: 'NEXT_LOCALE', value: locale, domain: host, path: '/' },
+            ]);
             const url = `${baseURL || 'http://localhost:3000'}/${locale}/login`;
             await page.goto(url, { waitUntil: 'domcontentloaded' });
             titles[locale] = await page.title();
@@ -27,8 +35,14 @@ test.describe('i18n — login page content varies across locales', () => {
         expect(anyDifferent, `titles: ${JSON.stringify(titles)}`).toBe(true);
     });
 
-    test('login page lang attribute matches locale', async ({ page, baseURL }) => {
+    test('login page lang attribute matches locale', async ({ page, baseURL, context }) => {
         for (const locale of LOCALES_TO_CHECK) {
+            // Same cookie-based locale switch (see test above) — the URL
+            // prefix no longer changes the rendered locale.
+            const host = new URL(baseURL || 'http://localhost:3000').hostname;
+            await context.addCookies([
+                { name: 'NEXT_LOCALE', value: locale, domain: host, path: '/' },
+            ]);
             const url = `${baseURL || 'http://localhost:3000'}/${locale}/login`;
             await page.goto(url, { waitUntil: 'domcontentloaded' });
             const lang = await page.locator('html').getAttribute('lang');

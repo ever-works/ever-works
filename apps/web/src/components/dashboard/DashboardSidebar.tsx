@@ -39,7 +39,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { FaviconEverWork } from '../logos';
 import { WorkspaceSwitcher } from '../layout/WorkspaceSwitcher';
 import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
@@ -153,23 +152,23 @@ export function DashboardSidebar({
                 >
                     <div className="w-full relative">
                         {/*
-                            EW-660 (Tenants & Organizations Phase 8) —
-                            the expanded sidebar swaps `<LogoEverWork>`
-                            for `<WorkspaceSwitcher>`, which itself
-                            renders the unmodified logo when the user
-                            has zero Organizations (NN #20 — extension,
-                            not replacement). The collapsed sidebar
-                            keeps the bare favicon: there's no room for
-                            a chip+chevron at 16px column width, and
-                            users in that mode already expand the
-                            sidebar before reaching for the switcher.
+                            `<WorkspaceSwitcher>` is the single trigger
+                            for both states: expanded shows `[icon]
+                            [active org name OR Ever Works wordmark]
+                            [chevron]`, collapsed shows just `[icon]`.
+                            The icon is the active org's avatar when
+                            one is selected, otherwise the spinning
+                            Ever Works favicon — clicking either opens
+                            the same popover with org list + "Create
+                            Organization".
                         */}
-                        <div className={cn('flex items-center -ml-2')}>
-                            {isCollapsed ? (
-                                <FaviconEverWork config={config} className={cn('w-11 ml-[5px]')} />
-                            ) : (
-                                <WorkspaceSwitcher config={config} logoClassName="" />
+                        <div
+                            className={cn(
+                                'flex items-center',
+                                isCollapsed ? 'justify-center' : 'pr-6',
                             )}
+                        >
+                            <WorkspaceSwitcher config={config} isCollapsed={isCollapsed} />
                         </div>
                         <div
                             className={cn(

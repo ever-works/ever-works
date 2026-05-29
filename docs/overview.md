@@ -9,6 +9,32 @@ sidebar_position: 2
 
 The Ever Works Platform provides the backend infrastructure for building, generating, and deploying AI-powered work websites.
 
+## What Ever Works is
+
+Ever Works is an **open-source, agentic runtime** that researches, ships, and maintains content-rich websites and Git repositories. It brings together two things most tools keep apart:
+
+- **The builder experience** — describe what you want and get a shipped website, blog, directory, landing page (and, soon, [stores](/features/store-builder)) generated from a [template](/features/website-templates).
+- **The autonomous workforce** — an army of AI [Agents](/features/agents) acting as real employees that keep the work going long after the first build: writing content, finding and adding items, improving code, researching, and proposing what to do next — [24/7, on a schedule](/features/autonomous-operation).
+
+One-shot AI builders generate code and stop. Ever Works keeps building, maintaining, and growing — and because **code and content both live in your own Git**, you own everything and nothing is locked in. The platform is open source under **AGPLv3**.
+
+### The mental model
+
+```mermaid
+flowchart LR
+    M[Mission<br/>an ongoing goal] --> I[Ideas<br/>atomic proposals]
+    I --> W[Works<br/>live, self-updating sites]
+    A[Agents<br/>your AI employees] --> W
+    A --> I
+```
+
+- A **[Mission](/features/missions)** is an ambitious, ongoing goal the system keeps pursuing.
+- An **[Idea](/features/ideas)** is a one-shot proposal — one Idea becomes one Work. (Unsure what to build? Capture an Idea and let it be researched first, like a lightweight plan.)
+- A **[Work](/features/creating-a-work)** is the buildable, self-maintaining unit — a website, blog, directory, landing page, store, and more.
+- **[Agents](/features/agents)** are named AI workers (CEO, CTO, Researcher, …) that run the Missions, Ideas, and Works for you.
+
+For the full step-by-step, see the [Founder Journey guide](/guides/founder-journey).
+
 ## How It Works
 
 1. **Create a Work** — A user creates a work project through the web dashboard or API, providing a topic and description.

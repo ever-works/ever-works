@@ -11,10 +11,13 @@ This page outlines the current direction of Ever Works, areas of active developm
 
 ## Product Vision
 
-Ever Works aims to be the most comprehensive open-source solution for building professional work websites. The long-term vision encompasses:
+Ever Works aims to be the open-source, agentic runtime that **researches, ships, and maintains** content-rich websites and the businesses around them — merging the builder experience of one-shot AI site builders with an autonomous workforce that keeps working 24/7. The long-term vision encompasses:
 
 - **AI-first content generation** that makes it possible to build and maintain large works with minimal manual effort
-- **A thriving plugin ecosystem** that allows developers to extend the Platform with custom AI providers, data sources, and integrations
+- **An autonomous AI workforce** — user-defined [Agents](/features/agents) (CEO, CTO, Researcher, …) that run [Missions](/features/missions), [Ideas](/features/ideas), and [Works](/features/creating-a-work) on a schedule, not just on prompt — see [Autonomous Operation](/features/autonomous-operation)
+- **From idea to business** — beyond websites, planned [Store](/features/store-builder) and [Company](/features/company-builder) builders so a goal can become a registered, AI-run operation
+- **Own everything** — code and content live in your own Git under AGPLv3; a planned [Desktop App](/features/desktop-app) runs the whole stack locally
+- **A thriving plugin ecosystem** that allows developers to extend the Platform with custom AI providers, data sources, email providers, and integrations
 - **Production-grade website templates** that are beautiful, performant, and fully customizable
 - **Multi-work management** that scales from a single work to hundreds, all managed from a unified backend
 
@@ -23,6 +26,16 @@ Ever Works aims to be the most comprehensive open-source solution for building p
 ### Platform
 
 The following areas are actively being worked on in the Platform repository:
+
+#### Autonomous Workforce (Agents, Missions, Ideas)
+
+- [Missions](/features/missions) and [Ideas](/features/ideas) — the goal → proposal → Work hierarchy that lets the platform keep generating what to build next
+- User-defined [Agents](/features/agents) — named AI employees with scopes, heartbeats, budgets, permissions, skills, and tasks
+- [Agent Email & Inboxes](/features/agent-email) — inbound/outbound mailboxes per Agent and per Mission/Idea/Work, backed by pluggable email providers
+- [Knowledge Base & Memory](/features/knowledge-base) — per-Work, Git-backed institutional context and long-term memory
+- [Store](/features/store-builder) and [Company](/features/company-builder) builders — new Work shapes that turn a goal into a self-maintaining storefront or AI-run company
+- [Desktop App](/features/desktop-app) — the full stack running locally as a single application
+- Dynamic plugin distribution — install plugins on demand at runtime rather than bundling everything
 
 #### Plugin System Expansion
 

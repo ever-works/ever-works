@@ -4907,9 +4907,8 @@
     },
     "organizations": {
         "switcher": {
-            "heading": "Organizations",
-            "createNew": "+ Create Organization",
-            "bareTenant": "My account",
+            "heading": "Switch Organization",
+            "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {

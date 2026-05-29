@@ -152,9 +152,26 @@ describe('AgentMemoryController', () => {
         });
 
         it('closeSession rejects an empty sessionId', async () => {
-            await expect(controller.closeSession(auth, '')).rejects.toBeInstanceOf(
+            await expect(controller.closeSession(auth, '', {})).rejects.toBeInstanceOf(
                 BadRequestException,
             );
+        });
+
+        it('closeSession enforces ownership + scopes by workId when one is supplied', async () => {
+            await controller.closeSession(auth, 'sess-1', { workId: 'work-1' });
+            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(agentMemory.closeSession).toHaveBeenCalledWith(
+                'sess-1',
+                expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
+            );
+        });
+
+        it('closeSession propagates an ownership rejection (cannot close another user Work session)', async () => {
+            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+            await expect(
+                controller.closeSession(auth, 'sess-1', { workId: 'work-x' }),
+            ).rejects.toThrow('not your work');
+            expect(agentMemory.closeSession).not.toHaveBeenCalled();
         });
 
         it('listSessions forwards limit + projectId', async () => {
@@ -168,17 +185,34 @@ describe('AgentMemoryController', () => {
 
     describe('deleteEntry', () => {
         it('rejects an empty entryId', async () => {
-            await expect(controller.deleteEntry(auth, '')).rejects.toBeInstanceOf(
+            await expect(controller.deleteEntry(auth, '', {})).rejects.toBeInstanceOf(
                 BadRequestException,
             );
         });
 
         it('passes the id to the facade', async () => {
-            await controller.deleteEntry(auth, 'mem-42');
+            await controller.deleteEntry(auth, 'mem-42', {});
             expect(agentMemory.deleteEntry).toHaveBeenCalledWith(
                 'mem-42',
                 expect.objectContaining({ userId: 'user-1' }),
             );
+        });
+
+        it('enforces ownership + scopes by workId when one is supplied', async () => {
+            await controller.deleteEntry(auth, 'mem-42', { workId: 'work-1' });
+            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(agentMemory.deleteEntry).toHaveBeenCalledWith(
+                'mem-42',
+                expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
+            );
+        });
+
+        it('propagates an ownership rejection (cannot forget another user Work entry)', async () => {
+            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+            await expect(
+                controller.deleteEntry(auth, 'mem-42', { workId: 'work-x' }),
+            ).rejects.toThrow('not your work');
+            expect(agentMemory.deleteEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -203,7 +237,7 @@ describe('AgentMemoryController', () => {
             agentMemory.deleteEntry.mockRejectedValueOnce(
                 new Error('Agent-memory provider "x" does not support deleteEntry'),
             );
-            await expect(controller.deleteEntry(auth, 'mem-1')).rejects.toBeInstanceOf(
+            await expect(controller.deleteEntry(auth, 'mem-1', {})).rejects.toBeInstanceOf(
                 NotFoundException,
             );
         });

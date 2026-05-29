@@ -89,7 +89,11 @@ test.describe('Complete user journey', () => {
             await page.waitForTimeout(500);
         }
 
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // PR DD — bare /works/new now 307s to the unified /new picker.
+        // Pin `?mode=manual` so we land directly on the manual form (which
+        // is what the rest of this journey drives) without needing to
+        // click through a chooser that no longer exists at /works/new.
+        await page.goto('/en/works/new?mode=manual', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
         // Also dismiss on /works/new in case the modal re-renders there.
         if (await dismissGithubModal.isVisible({ timeout: 3_000 }).catch(() => false)) {
@@ -97,27 +101,26 @@ test.describe('Complete user journey', () => {
             await page.waitForTimeout(500);
         }
 
-        // Select manual creation mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await expect(manualCard).toBeVisible({ timeout: 10_000 });
-        await manualCard.click();
-
-        // Fill work form (scope to the work creation form, not the AI chat input form)
+        // The previously separate "Create Manually" flow was merged into
+        // the unified WorkAICreator (new-work-client.tsx:405-426). The shared
+        // ui/Input wrapper drops the `name` prop between JSX and the rendered
+        // `<input>` (verified against the failing-run aria-snapshot — the
+        // textbox is present but `input[name="name"]` returns 0). Target by
+        // accessible role + label instead.
         const dirSlug = `journey-${suffix}`;
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
-
-        const nameInput = workForm.locator('input[type="text"]').first();
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
         await nameInput.fill(`Journey Dir ${dirSlug}`);
 
-        const descriptionTextarea = workForm.locator('textarea').first();
+        const descriptionTextarea = page.getByRole('textbox', { name: /Describe Your Work/i });
         await descriptionTextarea.fill('Full journey test work');
 
-        // Submit
-        const submitButton = workForm.locator('button[type="submit"]');
+        // Submit via the primary CTA (WorkAICreator uses an onClick handler,
+        // not form onSubmit — no `button[type="submit"]` to scope to).
+        const submitButton = page
+            .locator('button')
+            .filter({ hasText: /(create|submit|build|generate)/i })
+            .first();
         await submitButton.click();
 
         // Wait for redirect or error

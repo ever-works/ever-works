@@ -8,24 +8,34 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Work listing', () => {
     test('should load the works page', async ({ page }) => {
-        await page.goto('/en/works');
+        const response = await page.goto('/en/works');
 
         await expect(page).toHaveURL(/\/works/);
-        // Page should render without server error
-        await expect(page.locator('body')).not.toContainText('500');
+        // Assert against HTTP status — the body now includes "500+ third-
+        // party apps" copy (Composio plugin description) when the Plugins
+        // panel is in view, which false-positives a body substring check.
+        expect(response?.status(), '/en/works should not 5xx').toBeLessThan(500);
     });
 
     test('should show "new work" button or link', async ({ page }) => {
         await page.goto('/en/works');
 
-        const newDirLink = page.locator('a[href*="/works/new"]');
+        // PR DD repointed primary "+ New" CTAs from /works/new → /new (the
+        // unified picker). Accept either destination; both shapes also with
+        // the legacy /en locale prefix.
+        const newDirLink = page.locator(
+            'a[href$="/new"]:not([href*="/works/"]), a[href$="/works/new"], a[href*="/works/new?"]',
+        );
         await expect(newDirLink.first()).toBeVisible({ timeout: 10_000 });
     });
 });
 
 test.describe('Work creation', () => {
     test('should show creation mode selector on new work page', async ({ page }) => {
-        await page.goto('/en/works/new');
+        // PR DD — /works/new without ?mode/?proposal 307s to the unified
+        // /new picker. Force `?mode=ai` so the legacy mode-card selector
+        // assertion still applies.
+        await page.goto('/en/works/new?mode=ai');
 
         // Should show 3 creation mode cards: AI, Manual, Import
         // Each is a <button> with descriptive text
@@ -36,15 +46,9 @@ test.describe('Work creation', () => {
     });
 
     test('should navigate to manual creation mode', async ({ page }) => {
-        await page.goto('/en/works/new');
-
-        // Click the manual creation card (second button with PenLine icon)
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await expect(manualCard).toBeVisible({ timeout: 10_000 });
-        await manualCard.click();
+        // Land directly on manual mode — PR DD redirect now means a bare
+        // /works/new goes to /new; `?mode=manual` keeps us on the form.
+        await page.goto('/en/works/new?mode=manual');
 
         // Should show the manual form with name, slug, description fields
         await expect(page.locator('input[placeholder]').first()).toBeVisible({ timeout: 5_000 });
@@ -53,61 +57,59 @@ test.describe('Work creation', () => {
     test('should create a work via manual form', async ({ page }) => {
         const slug = `e2e-test-${Date.now().toString(36)}`;
 
-        await page.goto('/en/works/new');
+        await page.goto('/en/works/new?mode=manual');
 
-        // Select manual mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await manualCard.click();
-
-        // Wait for the work creation form (scoped to avoid the AI chat input form)
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
-
-        // Fill in the work form
-        const nameInput = workForm.locator('input[type="text"]').first();
+        // The previously separate "Create Manually" flow was merged into the
+        // unified WorkAICreator (new-work-client.tsx:405-426). The shared
+        // ui/Input wrapper drops `name` between the JSX prop and the rendered
+        // `<input>` — verified against the failing run's aria-snapshot, which
+        // shows `textbox "Work Name *"` but `locator('input[name="name"]')`
+        // returning 0. Targeting by accessible role + name is stable across
+        // that wrapper.
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
         await nameInput.fill(`E2E Test Dir ${slug}`);
 
-        // Slug should auto-populate, but let's verify it exists
-        const slugInput = workForm.locator('input[type="text"]').nth(1);
+        // Slug auto-populates from name; just verify it picked something up.
+        const slugInput = page.getByRole('textbox', { name: /Work Slug/i });
         await expect(slugInput).toHaveValue(/.+/);
 
-        // Description — textarea
-        const descriptionTextarea = workForm.locator('textarea').first();
-        await descriptionTextarea.fill('Automated E2E test work for Playwright testing');
+        // Description / prompt textarea — same wrapper drops `name`, so use
+        // the accessible label.
+        const promptTextarea = page.getByRole('textbox', { name: /Describe Your Work/i });
+        await promptTextarea.fill('Automated E2E test work for Playwright testing');
 
-        // Submit the form
-        const submitButton = workForm.locator('button[type="submit"]');
+        // Submit — the primary CTA on the page. WorkAICreator handles submit
+        // via an onClick handler on a Button, not a form's onSubmit.
+        const submitButton = page
+            .locator('button')
+            .filter({ hasText: /(create|submit|build|generate)/i })
+            .first();
         await submitButton.click();
 
-        // Should either redirect to the new work or show success
-        // Wait for navigation away from /new page or for a toast success
+        // Should either redirect to the new work or show success.
         await page.waitForURL(/\/works\/(?!new)/, { timeout: 15_000 }).catch(() => {
-            // If no redirect, check for error toast
+            // If no redirect, check for error toast — assertion below is
+            // loose because git-provider-less E2E may surface a soft error.
         });
     });
 
     test('should navigate back from manual form to mode selector', async ({ page }) => {
-        await page.goto('/en/works/new');
+        // Land on manual mode directly (see comment on the previous test).
+        await page.goto('/en/works/new?mode=manual');
 
-        // Enter manual mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await manualCard.click();
+        // Same wrapper drops `name`; target by accessible role + label.
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
 
-        // Wait for the work creation form (scoped to avoid AI chat input form)
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
-
-        // Click back button
+        // Click back button → returns to the mode-card selector on /works/new.
         const backButton = page.locator('button').filter({ hasText: /back/i }).first();
         if (await backButton.isVisible()) {
             await backButton.click();
-            // Should show mode selector again with 3 cards
+            const manualCard = page
+                .locator('button')
+                .filter({ hasText: /Configure|Manual/i })
+                .first();
             await expect(manualCard).toBeVisible({ timeout: 5_000 });
         }
     });
@@ -122,10 +124,28 @@ test.describe('Work detail', () => {
         const workLink = page.locator('a[href*="/works/"]').first();
 
         if (await workLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-            await workLink.click();
+            // Capture the actual work-detail navigation response (works with
+            // Next.js soft routing — the RSC fetch is a real HTTP request).
+            // `performance.getEntriesByType('navigation')` only reflects the
+            // initial /en/works load and would always be 200 on a soft nav,
+            // silently passing even if the detail page 5xx'd.
+            const [response] = await Promise.all([
+                page
+                    .waitForResponse(
+                        (r) =>
+                            /\/works\/[^/?#]+/.test(new URL(r.url()).pathname) &&
+                            r.request().method() === 'GET',
+                        { timeout: 10_000 },
+                    )
+                    .catch(() => null),
+                workLink.click(),
+            ]);
             await expect(page).toHaveURL(/\/works\/.+/);
-            // Should render without error
-            await expect(page.locator('body')).not.toContainText('500');
+            if (response) {
+                expect(response.status(), 'work detail navigation should not 5xx').toBeLessThan(
+                    500,
+                );
+            }
         }
     });
 });

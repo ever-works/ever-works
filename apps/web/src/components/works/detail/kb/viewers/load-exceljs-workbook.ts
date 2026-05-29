@@ -8,20 +8,20 @@ interface ExcelJsModule {
  * Dynamic-import wrapper around `new exceljs.Workbook()`.
  *
  * Lives in its own module so the viewer spec can mock the single
- * helper instead of `vi.mock('exceljs', …)` — and uses an opaque
- * runtime computation for the module specifier so Vite's static
- * analyzer doesn't eagerly walk exceljs's dependency graph during
- * test discovery. Without that, vitest OOMs even with
- * `--max-old-space-size=8192` because exceljs pulls in jszip,
- * archiver, and a ~700-class typings tree the resolver parses.
+ * helper at the boundary (`vi.mock('./load-exceljs-workbook', …)`)
+ * instead of `vi.mock('exceljs', …)` — the latter still forces
+ * vitest to resolve exceljs's dep graph (jszip, archiver, ~700-class
+ * typings) and OOMs on Windows even with `--max-old-space-size=8192`.
  *
- * The runtime path is unchanged — Next.js's webpack still lazy-
- * loads exceljs the first time an operator opens an XLSX preview.
+ * The static `import('exceljs')` is required for Next.js: webpack
+ * needs a literal specifier to code-split the package into its own
+ * chunk. An opaque runtime computation here (`['exceljs'].join('')`)
+ * makes webpack emit "Module not found: Can't resolve <dynamic>",
+ * which poisons the dev manifest and 500s every route. Since the
+ * test mock fully bypasses this module, no runtime obfuscation is
+ * needed.
  */
 export async function createExceljsWorkbook(): Promise<ExcelWorkbook> {
-    // Compute the specifier at runtime so Vite can't constant-fold
-    // the dynamic import target.
-    const id = ['exceljs'].join('');
-    const mod = (await import(/* @vite-ignore */ id)) as unknown as ExcelJsModule;
+    const mod = (await import('exceljs')) as unknown as ExcelJsModule;
     return new mod.Workbook();
 }

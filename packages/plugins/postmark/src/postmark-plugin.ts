@@ -35,6 +35,16 @@ function resolveInboundSecret(options: EmailOptions): string | undefined {
 	return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
 }
 
+/**
+ * Extract the bare mailbox from a possibly display-name-wrapped RFC 2822
+ * address (`"Name" <a@b>` → `a@b`). Returns the trimmed input when no
+ * angle-bracket form is present.
+ */
+function parseEmailAddress(raw: string): string {
+	const match = raw.match(/<([^>]+)>/);
+	return (match ? match[1] : raw).trim();
+}
+
 interface PostmarkInboundPayload {
 	readonly MessageID: string;
 	readonly From: string;
@@ -160,6 +170,22 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		const expectedB64 = Buffer.from(`postmark:${expected}`).toString('base64');
 		if (provided !== expectedB64) {
 			throw new Error('Postmark inbound: signature mismatch.');
+		}
+	}
+
+	extractInboundRecipients(rawBody: Buffer, _headers: Readonly<Record<string, string>>): readonly string[] {
+		// Best-effort recipient extraction WITHOUT verifying the
+		// signature — used by the facade to resolve the owning user's
+		// scope before verification. Must never throw.
+		try {
+			const payload = JSON.parse(rawBody.toString('utf8')) as PostmarkInboundPayload;
+			// `ToFull[].Email` is already a bare address. The `To` fallback
+			// is the raw RFC 2822 header (may be `"Name" <a@b>`), so strip
+			// the display name / angle brackets before matching.
+			const to = payload.ToFull?.map((t) => t.Email) ?? (payload.To ? [parseEmailAddress(payload.To)] : []);
+			return to.filter((address): address is string => typeof address === 'string' && address.length > 0);
+		} catch {
+			return [];
 		}
 	}
 

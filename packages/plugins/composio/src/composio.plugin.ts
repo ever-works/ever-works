@@ -99,6 +99,15 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 				'x-envVar': 'COMPOSIO_API_KEY',
 				'x-scope': 'user'
 			},
+			webhookSecret: {
+				type: 'string',
+				title: 'Composio Webhook Secret',
+				description:
+					'Your Composio project webhook secret, from Composio dashboard → Project Settings → Webhook. Required to verify inbound trigger webhook deliveries (HMAC-SHA256 of the signed payload). Without it, trigger deliveries are rejected.',
+				'x-secret': true,
+				'x-envVar': 'COMPOSIO_WEBHOOK_SECRET',
+				'x-scope': 'user'
+			},
 			baseUrl: {
 				type: 'string',
 				title: 'Composio API Base URL',

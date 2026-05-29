@@ -29,10 +29,17 @@ describe('template-catalog DTOs validation', () => {
             expect(await validate(dto)).toHaveLength(0);
         });
 
-        it('rejects missing kind via @IsString', async () => {
+        it('accepts kind="mission" (PR W extension)', async () => {
+            const dto = plainToInstance(ListTemplatesQueryDto, { kind: 'mission' });
+            expect(await validate(dto)).toHaveLength(0);
+        });
+
+        it('defaults to "work" when kind is omitted (back-compat)', async () => {
             const dto = plainToInstance(ListTemplatesQueryDto, {});
-            const errs = await validate(dto);
-            expect(constraintsFor(errs, 'kind').isString).toBeDefined();
+            // Validation passes — kind is optional.
+            expect(await validate(dto)).toHaveLength(0);
+            // The class-default applies after construction.
+            expect(dto.kind).toBe('work');
         });
 
         it('rejects out-of-enum kind via @IsIn', async () => {

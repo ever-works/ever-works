@@ -96,6 +96,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined, // no signal in options
                 undefined, // no kbContext (no KB service wired)
                 undefined, // no kbTools (no adapter wired)
+                undefined, // no memorySessionId (no orchestrator session)
             );
 
             // plugin.execute received {...options, execContext, onLogEntry}.
@@ -144,6 +145,7 @@ describe('FullPipelineExecutorService', () => {
                 signal,
                 undefined,
                 undefined,
+                undefined, // no memorySessionId
             );
         });
 
@@ -218,6 +220,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 bundle,
                 undefined,
+                undefined, // no memorySessionId
             );
         });
 
@@ -246,6 +249,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // no memorySessionId
             );
         });
 
@@ -281,6 +285,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // no memorySessionId
             );
         });
     });
