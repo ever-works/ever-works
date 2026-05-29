@@ -149,9 +149,7 @@ export class NotificationEventTypeBootstrap implements OnApplicationBootstrap {
         // 2. Seed plugin-contributed events (skipped if plugin registry
         //    isn't wired — e.g. CLI / test contexts).
         if (!this.registry) {
-            this.logger.debug(
-                'Plugin registry not wired; skipping plugin event bootstrap',
-            );
+            this.logger.debug('Plugin registry not wired; skipping plugin event bootstrap');
             return;
         }
 

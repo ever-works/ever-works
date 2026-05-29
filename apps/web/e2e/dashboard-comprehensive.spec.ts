@@ -73,7 +73,9 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         // /works/new → /new (unified picker). Accept either route +
         // both locale-prefix shapes so this stays green either way.
         const newCta = page
-            .locator('a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]')
+            .locator(
+                'a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]',
+            )
             .first();
         await expect(newCta, 'sidebar "+ New" CTA present').toBeVisible({
             timeout: 10_000,
@@ -167,7 +169,9 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         // picker). The legacy /works/new route still exists for deep
         // links / AI Chat pivots, so we accept either destination.
         const newCta = page
-            .locator('a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]')
+            .locator(
+                'a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]',
+            )
             .first();
         await expect(newCta).toBeVisible({ timeout: 10_000 });
         await newCta.click();

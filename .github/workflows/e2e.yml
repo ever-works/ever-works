@@ -3,16 +3,18 @@ name: E2E Tests
 # Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope: only the release branches stage / main. Skipping PRs, feature
-# branches, AND develop deliberately — Playwright on ubicloud-standard-8
-# is expensive (the full suite can take 90+ minutes), so we restrict it
-# to release gates (merges to stage and main). The existing CI workflow
-# still lints + builds + unit-tests every push to develop/stage/main and
-# on PR; only the heavy E2E pass is reserved for the release path.
+# Scope:
+#   - push to `stage` / `main`            → run (release gate)
+#   - pull_request to `develop`/`stage`/`main` → run (pre-merge validation)
+#   - workflow_dispatch on any branch     → run (one-off verification)
+#
+# The full suite is sharded 4× across the matrix (~25 min wall-clock per
+# shard on ubicloud-standard-8). PR pre-validation was added because
+# stage/main-only triggers let test debt accumulate undetected until the
+# release cut. If PR cost proves too high, narrow the `pull_request:`
+# branches list to `[stage, main]` only.
 #
 # See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
-#
-# Trigger via "Run workflow" on any branch when you want a one-off run.
 
 on:
   push:
@@ -289,7 +291,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # Per-shard artifact name so the 4 parallel uploads don't clobber.
-          name: playwright-report-${{ github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
+          # `github.ref_name` is `<PR#>/merge` on pull_request events (contains
+          # `/`, which actions/upload-artifact rejects). Fall back to the head
+          # branch name (sanitized) on PRs and the ref_name everywhere else.
+          name: playwright-report-${{ github.head_ref || github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             apps/web/playwright-report
             apps/web/e2e/test-results
@@ -300,7 +305,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: server-logs-${{ github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
+          name: server-logs-${{ github.head_ref || github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             /tmp/api.log
             /tmp/web.log
