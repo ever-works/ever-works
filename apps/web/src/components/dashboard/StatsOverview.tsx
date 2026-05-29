@@ -82,8 +82,7 @@ export function StatsOverview({
         icon: LucideIcon;
         change: string;
         changeType: 'positive' | 'negative' | 'neutral';
-        iconColor?: string;
-        dotColor?: string;
+        dotColor: string;
         /** When set, the tile renders as a Link. */
         href?: string;
         /** Optional secondary line under the title (e.g. "2 active"). */
@@ -93,7 +92,6 @@ export function StatsOverview({
             title: t('totalMissions'),
             value: totalMissions,
             icon: Target,
-            iconColor: 'text-amber-500',
             dotColor: 'bg-amber-500',
             change: '+0%',
             changeType: 'neutral',
@@ -103,7 +101,6 @@ export function StatsOverview({
             title: t('totalIdeas'),
             value: totalIdeas,
             icon: Lightbulb,
-            iconColor: 'text-yellow-500',
             dotColor: 'bg-yellow-500',
             change: '+0%',
             changeType: 'neutral',
@@ -113,7 +110,6 @@ export function StatsOverview({
             title: t('totalWorks'),
             value: totalWorks,
             icon: FolderClosed,
-            iconColor: 'text-blue-500',
             dotColor: 'bg-blue-500',
             change: '+12%',
             changeType: 'positive',
@@ -123,7 +119,6 @@ export function StatsOverview({
             title: t('totalItems'),
             value: totalItems,
             icon: ListTodo,
-            iconColor: 'text-violet-500',
             dotColor: 'bg-violet-500',
             change: '+23%',
             changeType: 'positive',
@@ -132,7 +127,6 @@ export function StatsOverview({
             title: t('activeWebsites'),
             value: activeWebsites,
             icon: Globe,
-            iconColor: 'text-emerald-500',
             dotColor: 'bg-emerald-500',
             change: '0%',
             changeType: 'neutral',
@@ -141,7 +135,6 @@ export function StatsOverview({
             title: t('monthSpend'),
             value: formatMoney(monthSpendCents, monthSpendCurrency),
             icon: Wallet,
-            iconColor: 'text-rose-500',
             dotColor: 'bg-rose-500',
             change: '+0%',
             changeType: 'neutral',
@@ -151,7 +144,6 @@ export function StatsOverview({
             title: t('agents'),
             value: agentsTotal,
             icon: Bot,
-            iconColor: 'text-primary',
             dotColor: 'bg-primary',
             change: '+0%',
             changeType: 'neutral',
@@ -162,7 +154,6 @@ export function StatsOverview({
             title: t('tasksInFlight'),
             value: tasksInProgress,
             icon: ListChecks,
-            iconColor: 'text-info',
             dotColor: 'bg-info',
             change: '+0%',
             changeType: 'neutral',
@@ -180,7 +171,7 @@ export function StatsOverview({
                 const tileBody = (
                     <div
                         className={cn(
-                            'group relative flex flex-col gap-4 rounded-xl px-4 py-4 h-full overflow-hidden',
+                            'group relative flex flex-col gap-2 rounded-xl px-4 py-4 h-full overflow-hidden',
                             'bg-card dark:bg-surface-secondary-dark',
                             'border border-card-border dark:border-border-dark',
                             'transition-all duration-200',
@@ -193,14 +184,9 @@ export function StatsOverview({
 
                         {/* Icon + Value */}
                         <div className="flex items-end gap-2 min-w-0">
-                            <div
-                                className={cn(
-                                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                                    'bg-surface dark:bg-white/6',
-                                )}
-                            >
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-surface-secondary dark:bg-white/6 border border-border/40 dark:border-white/8">
                                 <stat.icon
-                                    className={cn('w-4 h-4', stat.iconColor)}
+                                    className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark"
                                     strokeWidth={1.4}
                                 />
                             </div>
@@ -211,10 +197,8 @@ export function StatsOverview({
 
                         {/* Label */}
                         <div className="min-w-0">
-                            <div className="mt-2 flex items-center gap-1.5">
-                                <span
-                                    className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)}
-                                />
+                            <div className="flex items-center gap-1.5">
+                                <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)} />
                                 <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
                                     {stat.title}
                                 </p>
