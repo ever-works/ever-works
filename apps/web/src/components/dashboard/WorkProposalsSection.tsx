@@ -260,10 +260,10 @@ export function WorkProposalsSection({
                             variant="secondary"
                             size="sm"
                             className={cn(
-                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
                                 'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
                                 'text-text-secondary dark:text-text-secondary-dark',
-                                'hover:border-primary/40 hover:text-primary',
+                                'hover:border-border dark:hover:border-white/16',
                             )}
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}

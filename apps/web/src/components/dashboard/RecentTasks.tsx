@@ -79,10 +79,10 @@ export function RecentTasks({ tasks, total }: { tasks: Task[]; total?: number })
                     <Link
                         href={ROUTES.DASHBOARD_TASK_NEW}
                         className={cn(
-                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                            'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
                             'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
                             'text-text-secondary dark:text-text-secondary-dark',
-                            'hover:border-primary/40 hover:text-primary',
+                            'hover:border-border dark:hover:border-white/16',
                         )}
                     >
                         <Plus className="w-3.5 h-3.5" />
@@ -193,10 +193,11 @@ function TaskCard({ task }: { task: Task }) {
         <Link
             href={ROUTES.DASHBOARD_TASK(task.id)}
             className={cn(
-                'flex flex-col gap-2 rounded-lg p-3 no-underline transition-colors h-full',
+                'group flex flex-col gap-2 rounded-lg p-3 no-underline h-full',
                 'bg-card dark:bg-card-primary-dark/60',
                 'border border-card-border dark:border-white/8',
-                'hover:border-primary/40 hover:bg-card-hover dark:hover:bg-white/3',
+                'hover:border-border dark:hover:border-white/16',
+                'transition-colors duration-150',
             )}
         >
             <div className="flex items-center justify-between gap-2">
