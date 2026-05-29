@@ -176,7 +176,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                 icon={Lightbulb}
                 title={t('title')}
                 subtitle={t('subtitle')}
-                tone="warning"
+                tone="idea"
                 actions={
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -350,8 +350,8 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
             {/* Sorted list */}
             {visibleIdeas.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/70 dark:border-border-dark/70 bg-surface/40 dark:bg-surface-dark/30 p-8 text-center">
-                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-warning/20 bg-warning/10">
-                        <Lightbulb className="w-4 h-4 text-warning" />
+                    <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-concept-ideas/20 bg-concept-ideas/10">
+                        <Lightbulb className="w-4 h-4 text-concept-ideas" />
                     </div>
                     <p className="text-sm font-medium text-text dark:text-text-dark">
                         {t('empty.title')}
