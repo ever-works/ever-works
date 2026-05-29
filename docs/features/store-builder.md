@@ -24,6 +24,14 @@ flowchart LR
 
 You can start a Store directly when you know exactly what you want, or let a [Mission](./missions.md) propose it as one of several Works needed for a bigger commerce goal.
 
+## Storefront templates and backends
+
+A Store is a **Work of type "Store"** — you choose how it's built:
+
+- **Many storefront templates** — pick from a catalog of eCommerce [templates](./website-templates.md), or bring your own **Custom** template.
+- **The backend you choose** — a self-hostable **open-source commerce backend** deployed for you, **Shopify**, or your own — connected through deployment plugins, so you're never locked to one commerce stack.
+- **Grow it over time** — start small and let the Store expand its catalog, content, and experiments as it runs, the same way any [Work](./creating-a-work.md) keeps improving.
+
 ## What the Store builder is planned to do
 
 - **Research the catalog** — find products, suppliers, and pricing signals relevant to the store's niche, with sources recorded in the [Knowledge Base](./knowledge-base.md).

@@ -77,7 +77,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     /**
      * Empty state: even with zero orgs the switcher renders the
      * spinning favicon + wordmark + chevron trigger so the user can
-     * still reach "+ Create Organization". The previous behaviour
+     * still reach "Create Organization". The previous behaviour
      * (bare logo, no trigger) silently broke the create flow.
      */
     it('renders favicon + wordmark + trigger when the user has zero organizations', () => {
@@ -93,9 +93,9 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
 
     /**
      * Empty state popover: opening the trigger surfaces the
-     * "+ Create Organization" row even when no orgs exist.
+     * "Create Organization" row even when no orgs exist.
      */
-    it('shows "+ Create Organization" in the popover when zero orgs', () => {
+    it('shows "Create Organization" in the popover when zero orgs', () => {
         __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
 
         render(<WorkspaceSwitcher />);
@@ -106,10 +106,12 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     });
 
     /**
-     * Active state with 1 org: the trigger shows the spinning favicon
-     * + the org's display name (no wordmark) + chevron.
+     * Active state with 1 org: the trigger swaps the EverWorks favicon
+     * for the org's initial-letter avatar and shows the org's display
+     * name (no wordmark) + chevron. The favicon stays in the empty
+     * state only.
      */
-    it('renders favicon + org name + trigger when the user has 1 organization', () => {
+    it('renders org avatar + org name + trigger when the user has 1 organization', () => {
         const org = makeOrg({ displayName: 'Acme Inc', slug: 'acme' });
         __seedOrganizationsStoreForTests({
             data: [org],
@@ -119,7 +121,8 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
 
         render(<WorkspaceSwitcher />);
 
-        expect(screen.getByTestId('favicon-everwork-image')).toBeInTheDocument();
+        // Brand favicon is replaced by the org avatar in the trigger.
+        expect(screen.queryByTestId('favicon-everwork-image')).toBeNull();
         expect(screen.getAllByText('Acme Inc').length).toBeGreaterThanOrEqual(1);
         // Wordmark is replaced by the active-org label.
         expect(screen.queryByTestId('logo-everwork-image')).toBeNull();
@@ -127,7 +130,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
 
     /**
      * 3 orgs — when the popover opens, all three list rows are
-     * present plus the "+ Create Organization" footer row.
+     * present plus the "Create Organization" footer row.
      */
     it('renders all 3 orgs in the popover list when the user has 3 organizations', () => {
         const orgs = [
@@ -167,5 +170,55 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         render(<WorkspaceSwitcher />);
 
         expect(screen.getAllByText('fallback-org').length).toBeGreaterThanOrEqual(1);
+    });
+
+    /**
+     * Collapsed variant — empty state: the trigger renders only the
+     * leading icon (favicon, no wordmark/label/chevron) and clicking
+     * it still opens the popover. Replaces the pre-fix collapsed
+     * sidebar's `<FaviconEverWork>` link to `siteConfig.website`
+     * (localhost:3000 in dev).
+     */
+    it('renders icon-only trigger and still opens the popover when isCollapsed (empty state)', () => {
+        __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
+
+        render(<WorkspaceSwitcher isCollapsed />);
+
+        // Empty-state icon = favicon. No label, no chevron, no wordmark.
+        expect(screen.getByTestId('favicon-everwork-image')).toBeInTheDocument();
+        expect(screen.queryByTestId('logo-everwork-image')).toBeNull();
+
+        const trigger = screen.getAllByRole('button')[0];
+        fireEvent.click(trigger);
+        expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
+    });
+
+    /**
+     * Collapsed variant — active org: the favicon is swapped for the
+     * org-initial avatar; the wordmark and the inline org-name label
+     * are both suppressed (collapsed = icon-only). Clicking still
+     * opens the popover listing the org and the create row.
+     */
+    it('renders the org-initial avatar and no label/wordmark when isCollapsed + active org', () => {
+        const org = makeOrg({ displayName: 'Acme Inc', slug: 'acme' });
+        __seedOrganizationsStoreForTests({
+            data: [org],
+            isLoading: false,
+            error: null,
+        });
+
+        render(<WorkspaceSwitcher isCollapsed />);
+
+        // Active-org icon = OrgAvatar — favicon and wordmark both absent.
+        expect(screen.queryByTestId('favicon-everwork-image')).toBeNull();
+        expect(screen.queryByTestId('logo-everwork-image')).toBeNull();
+        // The closed trigger has no inline label either.
+        expect(screen.queryByText('Acme Inc')).toBeNull();
+
+        const trigger = screen.getAllByRole('button')[0];
+        fireEvent.click(trigger);
+        // After opening, the org list row + create row both show.
+        expect(screen.getAllByText('Acme Inc').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
     });
 });
