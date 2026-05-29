@@ -96,7 +96,7 @@ export function AgentsList({ agents, templates = [], userTemplates = [] }: Agent
     };
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             <PageHeader icon={Bot} title={t('title')} subtitle={t('subtitle')} tone="agent" />
 
             {/* Prompt-first surface — describe the Agent you want. Chips

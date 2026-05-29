@@ -168,7 +168,7 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     void dismissProposalAction;
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             {/* Header — title + subtitle take the full row width and
                 the gears menu floats to the far right so the subtitle
                 isn't truncated next to it. */}

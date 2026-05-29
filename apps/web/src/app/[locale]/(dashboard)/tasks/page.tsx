@@ -24,7 +24,7 @@ export default async function TasksPage() {
         .catch(() => ({ data: [] as Task[], meta: { total: 0, limit: 50, offset: 0 } }));
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             <PageHeader
                 icon={ListChecks}
                 title={t('title')}
