@@ -5,7 +5,8 @@ import { createAgentAction } from '@/app/actions/agents';
 import { missionsAPI } from '@/lib/api/missions';
 import { workAPI } from '@/lib/api/work';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
-import { listAstTemplates, type AstTemplateEntry } from '@/lib/api/agent-templates';
+import type { AstTemplateEntry } from '@/lib/api/agent-templates';
+import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
 import type { Mission } from '@/lib/api/missions';
 import type { Work } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -38,7 +39,7 @@ export default async function NewAgentPage() {
             .catch(() => [] as WorkProposal[]),
         // Optional template-pick step (spec FR-23). Defensive so a cold
         // catalog never 500s the create page.
-        listAstTemplates('agent').catch(() => [] as AstTemplateEntry[]),
+        fetchAgentTemplateCatalog('agent').catch(() => [] as AstTemplateEntry[]),
     ]);
 
     const missionOptions = missions.map((m) => ({ id: m.id, label: m.title }));

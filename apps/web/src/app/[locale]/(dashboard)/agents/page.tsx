@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
-import { listAstTemplates, type AstTemplateEntry } from '@/lib/api/agent-templates';
+import type { AstTemplateEntry } from '@/lib/api/agent-templates';
+import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
 import { AgentsList } from '@/components/agents';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -26,7 +27,7 @@ export default async function AgentsPage() {
             data: [] as Agent[],
             meta: { total: 0, limit: 50, offset: 0 },
         })),
-        listAstTemplates('agent').catch(() => [] as AstTemplateEntry[]),
+        fetchAgentTemplateCatalog('agent').catch(() => [] as AstTemplateEntry[]),
     ]);
 
     // "Your templates" — the user's existing Agents as reusable
