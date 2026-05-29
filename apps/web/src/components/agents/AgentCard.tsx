@@ -52,11 +52,13 @@ export function AgentCard({ agent }: { agent: Agent }) {
             className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
         >
             <div className="flex items-start gap-3">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-agents/10 border border-concept-agents/20 flex items-center justify-center">
                     {agent.avatarMode === 'initials' ? (
-                        <span className="text-xs font-semibold text-primary">{initials}</span>
+                        <span className="text-xs font-semibold text-concept-agents">
+                            {initials}
+                        </span>
                     ) : (
-                        <Bot className="w-4 h-4 text-primary" />
+                        <Bot className="w-4 h-4 text-concept-agents" />
                     )}
                 </div>
                 <div className="min-w-0 flex-1">
