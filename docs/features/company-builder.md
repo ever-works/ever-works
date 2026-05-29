@@ -18,7 +18,7 @@ In Ever Works, **Workspace = Company = Organization** — one top-level containe
 - **Everything lives inside the selected company.** Your [Missions](./missions.md), [Ideas](./ideas.md), [Works](./creating-a-work.md), [Agents](./agents.md), and [Knowledge Base](./knowledge-base.md) are all scoped to the company you have picked. Switch companies and the whole workspace context switches with you.
 - **Register it for real — as a Work.** When you're ready to incorporate, registering the legal entity (in many countries, including the US) runs through formation **provider plugins** and is itself a **kind of Work** the platform builds for you — so going from workspace to a real company is part of the same flow.
 
-This is the product-facing expression of the platform's [Tenants & Organizations](../advanced/multi-tenancy.md) foundation.
+(See [How it relates to Tenants & Organizations](#how-it-relates-to-tenants--organizations) below for the underlying multi-tenancy foundation.)
 
 ## From idea to operating company
 
