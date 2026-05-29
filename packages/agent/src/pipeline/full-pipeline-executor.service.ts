@@ -139,6 +139,7 @@ export class FullPipelineExecutorService {
                 options?.signal,
                 kbContext,
                 kbTools,
+                options?.memorySessionId,
             );
 
             // Delegate to the plugin's execute method with execContext

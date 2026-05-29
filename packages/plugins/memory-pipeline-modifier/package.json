@@ -61,7 +61,8 @@
 			"autoEnable": false,
 			"visibility": "public",
 			"targetPipelines": [
-				"*"
+				"standard-pipeline",
+				"agent-pipeline"
 			]
 		}
 	}
