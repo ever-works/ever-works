@@ -33,6 +33,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { IdeaCard } from '@/components/ideas';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const POLL_INTERVAL_MS = 2_500;
 const POLL_MAX_MS = 10 * 60_000;
@@ -375,25 +376,17 @@ export function WorkProposalsSection({
             </div>
 
             {/* Phase 5 PR O — toggles row (sub-header). */}
-            <div className="flex flex-wrap items-center gap-3 mb-3 text-sm text-text-secondary dark:text-text-secondary-dark">
-                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={showAccepted}
-                        onChange={(e) => handleToggleAccepted(e.target.checked)}
-                        className="rounded border-border dark:border-border-dark"
-                    />
-                    {tPage('toggles.showAccepted')}
-                </label>
-                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={showDismissed}
-                        onChange={(e) => handleToggleDismissed(e.target.checked)}
-                        className="rounded border-border dark:border-border-dark"
-                    />
-                    {tPage('toggles.showDismissed')}
-                </label>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Checkbox
+                    label={tPage('toggles.showAccepted')}
+                    checked={showAccepted}
+                    onChange={(e) => handleToggleAccepted(e.target.checked)}
+                />
+                <Checkbox
+                    label={tPage('toggles.showDismissed')}
+                    checked={showDismissed}
+                    onChange={(e) => handleToggleDismissed(e.target.checked)}
+                />
             </div>
 
             {/* Phase 5 PR O — collapsible quick-add. */}
