@@ -68,7 +68,7 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
     };
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             {/* Header */}
             <PageHeader icon={Target} title={t('title')} subtitle={t('subtitle')} tone="mission" />
 

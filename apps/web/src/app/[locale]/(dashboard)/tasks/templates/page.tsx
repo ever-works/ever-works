@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default async function TaskTemplatesPage() {
     const entries = await listAstTemplates('task');
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
             <Link href={ROUTES.DASHBOARD_TASKS} className="text-xs text-text-muted hover:text-text">
                 ← Tasks
             </Link>

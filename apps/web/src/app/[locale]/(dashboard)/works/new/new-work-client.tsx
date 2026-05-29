@@ -254,7 +254,7 @@ export default function NewWorkClient({
         // Mirrors the global `/new` page but with Work-only chips
         // (no Mission/Idea) so the user can stay focused on a Work.
         return (
-            <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-6">
+            <div className="w-full space-y-6">
                 <PageHeader
                     icon={FolderKanban}
                     title={t('title')}

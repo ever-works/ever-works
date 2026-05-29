@@ -881,12 +881,26 @@ export function TemplatesCatalog({
         <div className="w-full">
             <div className="mb-8 flex flex-col gap-4 @lg/main:flex-row @lg/main:items-start @lg/main:justify-between">
                 <div className="min-w-0">
-                    <h1 className="text-3xl font-bold text-text dark:text-text-dark">
-                        {t('title')}
-                    </h1>
-                    <p className="mt-2 text-text-secondary dark:text-text-secondary-dark">
-                        {t('subtitle')}
-                    </p>
+                    {/* UI consistency (2026-05-29) — page header matches the
+                        Missions / Ideas / Works / Tasks / Agents catalog
+                        pages: 9×9 rounded icon tile in the page tone +
+                        title + subtitle. Templates aren't tied to a single
+                        concept (the KindSwitcher below flips between
+                        Mission / Work / Website), so we use the neutral
+                        `primary` tone rather than a concept color. */}
+                    <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                            <LayoutTemplate className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                            <h1 className="text-2xl font-semibold text-text dark:text-text-dark truncate">
+                                {t('title')}
+                            </h1>
+                            <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark max-w-2xl">
+                                {t('subtitle')}
+                            </p>
+                        </div>
+                    </div>
                     {/* Phase 8 PR W — kind-switch segmented control.
                         Mission Templates default per spec §10, Work
                         Templates secondary, Website third. Navigation
