@@ -36,9 +36,6 @@ export class ComposioTriggerDto {
     @ApiProperty() deliveriesRejected!: number;
     @ApiPropertyOptional({ type: String }) lastFiredAt?: string | null;
     @ApiProperty() createdAt!: string;
-
-    /** Only returned on initial creation. Never re-fetched. */
-    @ApiPropertyOptional() webhookSecret?: string;
 }
 
 export class ComposioTriggerListDto {

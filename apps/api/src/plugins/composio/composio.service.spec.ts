@@ -17,6 +17,7 @@ jest.mock('@composio/core', () => ({
     Composio: jest.fn().mockImplementation(() => ({
         toolkits: { get: jest.fn() },
         connectedAccounts: { list: jest.fn(), initiate: jest.fn() },
+        triggers: { create: jest.fn(), delete: jest.fn(), verifyWebhook: jest.fn() },
     })),
 }));
 
@@ -27,6 +28,7 @@ function buildSdkStub(): ComposioSdkLike {
     return {
         toolkits: { get: jest.fn() },
         connectedAccounts: { list: jest.fn(), initiate: jest.fn() },
+        triggers: { create: jest.fn(), delete: jest.fn(), verifyWebhook: jest.fn() },
     } as unknown as ComposioSdkLike;
 }
 
@@ -268,6 +270,110 @@ describe('ComposioService', () => {
                     authConfigId: 'ac_xyz',
                 }),
             ).rejects.toBeInstanceOf(BadRequestException);
+        });
+    });
+
+    describe('triggers — upstream enable + webhook verification', () => {
+        it('createTrigger calls the SDK and returns the tg_* id', async () => {
+            const sdk = buildSdkStub();
+            (sdk.triggers.create as jest.Mock).mockResolvedValue({ triggerId: 'tg_real_1' });
+            injectSdk(service, sdk);
+
+            const result = await service.createTrigger('user-1', {
+                triggerSlug: 'GMAIL_NEW_EMAIL',
+                connectedAccountId: 'ca_1',
+                config: { labelIds: ['INBOX'] },
+            });
+
+            expect(result).toEqual({ triggerId: 'tg_real_1' });
+            expect(sdk.triggers.create).toHaveBeenCalledWith('user-1', 'GMAIL_NEW_EMAIL', {
+                triggerConfig: { labelIds: ['INBOX'] },
+                connectedAccountId: 'ca_1',
+            });
+        });
+
+        it('createTrigger throws when the SDK returns no trigger id', async () => {
+            const sdk = buildSdkStub();
+            (sdk.triggers.create as jest.Mock).mockResolvedValue({});
+            injectSdk(service, sdk);
+            await expect(
+                service.createTrigger('user-1', { triggerSlug: 'X' }),
+            ).rejects.toBeInstanceOf(Error);
+        });
+
+        it('deleteTrigger returns true on success, false (swallowed) on failure', async () => {
+            const sdk = buildSdkStub();
+            (sdk.triggers.delete as jest.Mock).mockResolvedValue({ triggerId: 'tg_1' });
+            injectSdk(service, sdk);
+            await expect(service.deleteTrigger('user-1', 'tg_1')).resolves.toBe(true);
+
+            (sdk.triggers.delete as jest.Mock).mockRejectedValue(new Error('already gone'));
+            await expect(service.deleteTrigger('user-1', 'tg_1')).resolves.toBe(false);
+        });
+
+        it('verifyWebhook fails closed when no webhook secret is configured', async () => {
+            settingsService.getResolvedSettings.mockResolvedValue(buildResolvedSettings());
+            const prevEnv = process.env.COMPOSIO_WEBHOOK_SECRET;
+            delete process.env.COMPOSIO_WEBHOOK_SECRET;
+            try {
+                await expect(
+                    service.verifyWebhook('user-1', {
+                        id: 'wh_1',
+                        rawBody: '{}',
+                        signature: 'v1,sig',
+                        timestamp: '123',
+                    }),
+                ).rejects.toBeInstanceOf(UnauthorizedException);
+            } finally {
+                if (prevEnv !== undefined) process.env.COMPOSIO_WEBHOOK_SECRET = prevEnv;
+            }
+        });
+
+        it('verifyWebhook delegates to the SDK with the resolved project secret', async () => {
+            settingsService.getResolvedSettings.mockResolvedValue(
+                buildResolvedSettings({ webhookSecret: 'whsec_project' }),
+            );
+            const sdk = buildSdkStub();
+            (sdk.triggers.verifyWebhook as jest.Mock).mockResolvedValue({
+                version: 'V3',
+                payload: { ok: true },
+                rawPayload: '{}',
+            });
+            injectSdk(service, sdk);
+
+            const result = await service.verifyWebhook('user-1', {
+                id: 'wh_1',
+                rawBody: '{"a":1}',
+                signature: 'v1,sig',
+                timestamp: '1700000000',
+            });
+
+            expect(result).toEqual({ version: 'V3', payload: { ok: true } });
+            expect(sdk.triggers.verifyWebhook).toHaveBeenCalledWith({
+                id: 'wh_1',
+                payload: '{"a":1}',
+                signature: 'v1,sig',
+                timestamp: '1700000000',
+                secret: 'whsec_project',
+            });
+        });
+
+        it('verifyWebhook maps SDK verification failure to UnauthorizedException', async () => {
+            settingsService.getResolvedSettings.mockResolvedValue(
+                buildResolvedSettings({ webhookSecret: 'whsec_project' }),
+            );
+            const sdk = buildSdkStub();
+            (sdk.triggers.verifyWebhook as jest.Mock).mockRejectedValue(new Error('bad signature'));
+            injectSdk(service, sdk);
+
+            await expect(
+                service.verifyWebhook('user-1', {
+                    id: 'wh_1',
+                    rawBody: '{}',
+                    signature: 'v1,bad',
+                    timestamp: '1700000000',
+                }),
+            ).rejects.toBeInstanceOf(UnauthorizedException);
         });
     });
 });
