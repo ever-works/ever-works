@@ -77,6 +77,18 @@
     --color-accent-indigo: #6763ee;
     --color-accent-indigo-rgb: 103, 99, 238;
 
+    /* Dashboard concept accents. One distinct hue per top-level
+       concept (Missions / Ideas / Works / Tasks / Agents) so the
+       five preview sections and their matching StatsOverview tiles
+       read as visually distinct rather than three near-blues plus
+       two yellows. Hues are spread ~80°+ apart in HSL so they stay
+       distinguishable in both light and dark mode. */
+    --color-concept-missions: #8b5cf6;
+    --color-concept-ideas: #f59e0b;
+    --color-concept-works: #10b981;
+    --color-concept-tasks: #0ea5e9;
+    --color-concept-agents: #f43f5e;
+
     /* UI element colors */
     --color-toggle-dark: #3b4454;
     --color-surface-deeper-dark: #0f1729;

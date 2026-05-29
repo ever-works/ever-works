@@ -40,8 +40,8 @@ export function RecentTasks({ tasks, total }: { tasks: Task[]; total?: number })
         <section className="mt-8" aria-labelledby="recent-tasks-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-info/10 border border-info/20 flex items-center justify-center">
-                        <ListChecks className="w-4 h-4 text-info" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-tasks/10 border border-concept-tasks/20 flex items-center justify-center">
+                        <ListChecks className="w-4 h-4 text-concept-tasks" />
                     </div>
                     <h2
                         id="recent-tasks-heading"
