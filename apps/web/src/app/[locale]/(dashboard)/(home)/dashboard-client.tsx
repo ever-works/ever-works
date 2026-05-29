@@ -119,7 +119,7 @@ export default function DashboardClient({
                     <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
                 </div>
 
-                <div className="py-8 lg:py-10">
+                <div className="py-8">
                     <WorkProposalsSection
                         initialProposals={initialProposals}
                         initiallyResearching={initiallyResearching}
