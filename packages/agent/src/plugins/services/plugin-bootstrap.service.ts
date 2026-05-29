@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PluginLoaderService } from './plugin-loader.service';
 import { PluginLifecycleManagerService } from './plugin-lifecycle-manager.service';
 import { PluginContextFactoryService } from './plugin-context-factory.service';
+import { PluginRegistryService } from './plugin-registry.service';
 
 /**
  * Result of the bootstrap operation
@@ -44,6 +45,7 @@ export class PluginBootstrapService {
         private readonly pluginLoader: PluginLoaderService,
         private readonly lifecycleManager: PluginLifecycleManagerService,
         private readonly contextFactory: PluginContextFactoryService,
+        private readonly registry: PluginRegistryService,
     ) {}
 
     /**
@@ -85,15 +87,29 @@ export class PluginBootstrapService {
         // Connect the context factory to the lifecycle manager
         this.lifecycleManager.setContextFactory(this.contextFactory);
 
-        // Discover and load plugins
+        // Wire lazy-materialization hook: when a filesystem-discovered plugin
+        // is touched for the first time, the proxy invokes this callback so
+        // the lifecycle manager fires onLoad bookkeeping (event emit, state
+        // history) exactly as it would have done at boot.
+        this.pluginLoader.setOnFirstMaterialize(async (pluginId) => {
+            await this.lifecycleManager.callOnLoad(pluginId);
+        });
+
+        // Discover and register plugins. Built-ins still load eagerly (their
+        // modules are bundled); discovered plugins are registered as manifest
+        // stubs and materialize on first method call.
         const result = await this.pluginLoader.discoverAndLoadAll();
         this.logger.log(
-            `Plugin discovery complete: ${result.loaded} loaded, ${result.failed} failed`,
+            `Plugin registration complete: ${result.loaded} ready, ${result.failed} failed`,
         );
 
-        // Call onLoad for all loaded plugins
+        // Call onLoad for built-in plugins immediately — they have no entry
+        // module to defer. Lazy-registered (filesystem) plugins skip this:
+        // their onLoad runs on first materialization via the hook above.
         for (const loadResult of result.results) {
-            if (loadResult.success && loadResult.pluginId) {
+            if (!loadResult.success || !loadResult.pluginId) continue;
+            const registered = this.registry.get(loadResult.pluginId);
+            if (registered?.builtIn) {
                 await this.lifecycleManager.callOnLoad(loadResult.pluginId);
             }
         }
