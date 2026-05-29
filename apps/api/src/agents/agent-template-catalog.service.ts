@@ -13,10 +13,14 @@ import { GitFacadeService } from '@ever-works/agent/facades';
  * layer then falls back to its built-in catalog, so the chips +
  * `View All` panel never break.
  *
- * Auth: the repo is currently private, so a token is required. It is
- * resolved from `EVER_WORKS_AGENTS_TOKEN` (preferred) or `GITHUB_TOKEN`
- * (shared platform PAT). When neither is set the service logs once and
- * returns []. Pin a ref with `EVER_WORKS_AGENTS_REF` (default `main`).
+ * Auth: the repo is private. The token is resolved in priority order:
+ *   1. The platform GitHub App's installation on the `ever-works` org —
+ *      the same App that already lets the platform create repos there.
+ *      No extra secret needed in the standard hosted deployment.
+ *   2. `EVER_WORKS_AGENTS_TOKEN` / `GITHUB_TOKEN` env override — for
+ *      self-hosted installs that don't run the GitHub App, or local dev.
+ * When none resolve, the service logs once and returns []. Pin a ref
+ * with `EVER_WORKS_AGENTS_REF` (default `main`).
  */
 
 export type AstTemplateEntityType = 'agent' | 'skill' | 'task';
@@ -111,13 +115,26 @@ export class AgentTemplateCatalogService {
         return templates;
     }
 
+    /**
+     * Resolve a GitHub token that can read `ever-works/agents`. Prefer
+     * the platform GitHub App's installation on the org (no extra
+     * secret); fall back to an explicit env override.
+     */
+    private async resolveToken(): Promise<string | null> {
+        const appToken = await this.git
+            .getInstallationTokenForOwner(AGENTS_REPO_OWNER)
+            .catch(() => null);
+        if (appToken) return appToken;
+        return process.env.EVER_WORKS_AGENTS_TOKEN || process.env.GITHUB_TOKEN || null;
+    }
+
     private async fetchFromRepo(ref: string): Promise<AstTemplateEntry[]> {
-        const token = process.env.EVER_WORKS_AGENTS_TOKEN || process.env.GITHUB_TOKEN;
+        const token = await this.resolveToken();
         if (!token) {
             if (!this.warnedNoToken) {
                 this.warnedNoToken = true;
                 this.logger.warn(
-                    'No EVER_WORKS_AGENTS_TOKEN / GITHUB_TOKEN set — agent-template catalog is unavailable; the web app falls back to its built-in list.',
+                    'No GitHub App installation on the ever-works org and no EVER_WORKS_AGENTS_TOKEN / GITHUB_TOKEN set — agent-template catalog is unavailable; the web app falls back to its built-in list.',
                 );
             }
             return [];

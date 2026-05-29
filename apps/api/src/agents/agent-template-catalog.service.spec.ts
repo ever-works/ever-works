@@ -43,8 +43,11 @@ describe('AgentTemplateCatalogService', () => {
         ],
     });
 
-    function make(getFileContent: jest.Mock) {
-        const git = { getFileContent } as any;
+    function make(
+        getFileContent: jest.Mock,
+        getInstallationTokenForOwner: jest.Mock = jest.fn(async () => null),
+    ) {
+        const git = { getFileContent, getInstallationTokenForOwner } as any;
         const store = new Map<string, unknown>();
         const cache = {
             get: jest.fn(async (k: string) => store.get(k)),
@@ -60,6 +63,23 @@ describe('AgentTemplateCatalogService', () => {
         await expect(svc.list('skill')).resolves.toEqual([]);
         await expect(svc.list('task')).resolves.toEqual([]);
         expect(git.getFileContent).not.toHaveBeenCalled();
+    });
+
+    it('uses the platform GitHub App installation token when available (no env needed)', async () => {
+        delete process.env.EVER_WORKS_AGENTS_TOKEN;
+        delete process.env.GITHUB_TOKEN;
+        const getFileContent = jest.fn(async () => ({ content: MANIFEST, encoding: 'utf-8' }));
+        const getInstallationTokenForOwner = jest.fn(async () => 'app-installation-token');
+        const { svc } = make(getFileContent, getInstallationTokenForOwner);
+        const rows = await svc.list('agent');
+        expect(getInstallationTokenForOwner).toHaveBeenCalledWith('ever-works');
+        expect(rows.map((r) => r.slug)).toEqual(['ceo', 'starter-coder']);
+        // The App installation token is the one used to read the repo.
+        const callArgs = getFileContent.mock.calls[0] as unknown[];
+        expect(callArgs[3]).toEqual({
+            token: 'app-installation-token',
+            providerId: 'github',
+        });
     });
 
     it('returns [] and does not call git when no token is configured', async () => {
