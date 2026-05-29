@@ -108,7 +108,12 @@ export function AgentTemplateChips({
                 return;
             }
             const tpl = findBySlug(next);
-            if (tpl) onPick(tpl);
+            if (tpl) {
+                onPick(tpl);
+                // If the catalog panel was open, collapse it so a chip
+                // pick behaves the same as a catalog-card pick.
+                setExpanded(false);
+            }
         },
         [findBySlug, onPick],
     );
@@ -186,7 +191,9 @@ function CatalogSection({
                 {title}
             </h3>
             {entries.length === 0 ? (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{emptyHint}</p>
+                emptyHint ? (
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{emptyHint}</p>
+                ) : null
             ) : (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-3">
                     {entries.map((tpl) => {
