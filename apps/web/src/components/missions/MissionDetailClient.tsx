@@ -286,8 +286,8 @@ export function MissionDetailClient({
                 </Link>
                 <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                        <div className="shrink-0 w-10 h-10 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                            <Target className="w-5 h-5 text-warning" />
+                        <div className="shrink-0 w-10 h-10 rounded-lg bg-concept-missions/10 border border-concept-missions/20 flex items-center justify-center">
+                            <Target className="w-5 h-5 text-concept-missions" />
                         </div>
                         <div className="min-w-0 flex-1">
                             <h1 className="text-2xl font-semibold text-text dark:text-text-dark leading-tight">

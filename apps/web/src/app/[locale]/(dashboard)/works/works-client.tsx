@@ -234,7 +234,7 @@ export default function WorksClient({ initialWorks, totalWorks, initialStats }: 
                 icon={FolderKanban}
                 title={t('title')}
                 subtitle={t('subtitle')}
-                tone="accent"
+                tone="work"
                 actions={
                     <div className="flex flex-wrap gap-2">
                         {summaryCards.map((card) => (
