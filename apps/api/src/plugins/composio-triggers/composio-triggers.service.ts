@@ -1,28 +1,23 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ComposioTriggerSubscription } from '@ever-works/agent/entities';
 import type { CreateComposioTriggerDto } from './dto/composio-trigger.dto';
 
 /**
- * CRUD + webhook-verification service for `composio_trigger_subscriptions`.
+ * CRUD + delivery-bookkeeping service for `composio_trigger_subscriptions`.
  *
- * Triggers are created via `POST /api/plugins/composio/triggers`. The
- * service generates a per-subscription HMAC secret server-side and
- * returns it ONCE in the create response. Subsequent reads never
- * include the secret.
- *
- * Webhook deliveries arrive at `POST /api/plugins/composio/webhook`
- * with the Composio trigger id in the JSON body (`tg_*`) plus an
- * `x-composio-signature` header — the controller resolves the
- * subscription by trigger id, then `verifyDelivery` HMAC-checks the
- * raw request body against the stored secret in constant time.
+ * Triggers are enabled upstream on Composio (via the SDK in
+ * `ComposioService`) and stored here keyed by the returned `tg_*` id.
+ * Webhook deliveries arrive at `POST /api/plugins/composio/webhook`; the
+ * controller resolves the subscription by trigger id and verifies the
+ * delivery via the official Composio SDK against the project webhook
+ * secret (see `ComposioService.verifyWebhook`). This service then records
+ * the accepted/rejected outcome.
  */
 @Injectable()
 export class ComposioTriggersService {
-    private readonly logger = new Logger(ComposioTriggersService.name);
-
     constructor(
         @InjectRepository(ComposioTriggerSubscription)
         private readonly repo: Repository<ComposioTriggerSubscription>,
@@ -36,10 +31,15 @@ export class ComposioTriggersService {
     }
 
     /**
-     * Creates a trigger subscription row. In a follow-up PR this will
-     * also call Composio's `POST /triggers` to enable the trigger
-     * upstream — for now the controller layer wires the upstream call
-     * and passes us the resulting `composioTriggerId`.
+     * Persist a trigger subscription row keyed by the real Composio
+     * `tg_*` id (the controller enables the trigger upstream via the SDK
+     * first and passes the returned id here).
+     *
+     * `webhookSecret` is retained as an internal random value only to
+     * satisfy the column's NOT NULL constraint — it is **no longer** the
+     * verification secret. Composio signs deliveries with the project
+     * webhook secret (resolved from plugin settings at verify time), so
+     * the per-subscription value is vestigial and never surfaced.
      */
     async create(
         userId: string,
@@ -62,57 +62,21 @@ export class ComposioTriggersService {
         return this.repo.save(entity);
     }
 
-    async remove(userId: string, id: string): Promise<void> {
+    /**
+     * Remove the local subscription row and return its Composio `tg_*` id
+     * so the caller can tear the trigger down upstream (best-effort).
+     */
+    async remove(userId: string, id: string): Promise<string> {
         const subscription = await this.repo.findOne({ where: { id, userId } });
         if (!subscription) throw new NotFoundException('Trigger subscription not found');
         await this.repo.delete({ id });
+        return subscription.composioTriggerId;
     }
 
     async findByComposioTriggerId(
         composioTriggerId: string,
     ): Promise<ComposioTriggerSubscription | null> {
         return this.repo.findOne({ where: { composioTriggerId } });
-    }
-
-    /**
-     * Verifies an inbound Composio webhook delivery against the stored
-     * per-subscription HMAC secret. Composio signs deliveries with
-     * HMAC-SHA256 of the raw JSON body; the signature is sent as the
-     * hex digest in the `x-composio-signature` header.
-     *
-     * Uses `crypto.timingSafeEqual` to defeat timing attacks. Throws
-     * `UnauthorizedException` on mismatch.
-     */
-    verifyDelivery(
-        subscription: Pick<ComposioTriggerSubscription, 'webhookSecret'>,
-        rawBody: string,
-        signature: string | undefined,
-    ): void {
-        if (!signature || typeof signature !== 'string') {
-            throw new UnauthorizedException('Missing x-composio-signature header');
-        }
-
-        const computed = createHmac('sha256', subscription.webhookSecret)
-            .update(rawBody)
-            .digest('hex');
-
-        const provided = signature
-            .trim()
-            .toLowerCase()
-            .replace(/^sha256=/, '');
-        if (provided.length !== computed.length) {
-            throw new UnauthorizedException('Invalid Composio webhook signature');
-        }
-
-        let equal = false;
-        try {
-            equal = timingSafeEqual(Buffer.from(provided, 'hex'), Buffer.from(computed, 'hex'));
-        } catch {
-            equal = false;
-        }
-        if (!equal) {
-            throw new UnauthorizedException('Invalid Composio webhook signature');
-        }
     }
 
     async recordDelivery(subscriptionId: string, outcome: 'accepted' | 'rejected'): Promise<void> {
