@@ -90,7 +90,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
             </button>
 
             <div className="flex items-center gap-3 mb-2 pr-6 min-w-0">
-                <div className="min-h-[2lh] flex items-center min-w-0">
+                <div className="min-h-[lh] flex items-center min-w-0">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
                         {proposal.title}
                     </h3>
