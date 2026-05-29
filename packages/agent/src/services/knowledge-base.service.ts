@@ -1363,8 +1363,10 @@ export class KnowledgeBaseService {
         // extract path updates the row but returns only the document, so
         // `current` still carries the pre-extract RUNNING status. Re-read
         // so callers (and the API response) see the terminal state.
-        const refreshed = await this.uploadRepository.findById(workId, upload.id);
-        return { upload: refreshed ?? current, document };
+        // (Named `terminalUpload` to avoid shadowing the `refreshed` const
+        // from the earlier RUNNING-write at line 1342.)
+        const terminalUpload = await this.uploadRepository.findById(workId, upload.id);
+        return { upload: terminalUpload ?? current, document };
     }
 
     /**
