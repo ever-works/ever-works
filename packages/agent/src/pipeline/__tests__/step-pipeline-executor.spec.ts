@@ -708,6 +708,7 @@ describe('StepPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // 7th: memorySessionId (no orchestrator session)
             );
         });
 
@@ -722,6 +723,7 @@ describe('StepPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // 7th: memorySessionId
             );
         });
 
@@ -741,6 +743,7 @@ describe('StepPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // 7th: memorySessionId
             );
         });
 
@@ -774,6 +777,7 @@ describe('StepPipelineExecutorService', () => {
                 undefined,
                 bundle,
                 undefined,
+                undefined, // 7th: memorySessionId
             );
         });
 
@@ -796,6 +800,7 @@ describe('StepPipelineExecutorService', () => {
                 undefined,
                 undefined,
                 undefined,
+                undefined, // 7th: memorySessionId
             );
         });
 

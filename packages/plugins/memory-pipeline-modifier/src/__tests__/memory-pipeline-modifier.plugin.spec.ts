@@ -449,5 +449,135 @@ describe('MemoryPipelineModifierPlugin', () => {
 				expect.anything()
 			);
 		});
+
+		it('opens a per-run session on fetch when none supplied and threads it into buildContext', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-1',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: 'x' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			expect(memoryFacade.openSession).toHaveBeenCalledTimes(1);
+			expect(memoryFacade.buildContext).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-self-1' }),
+				expect.anything()
+			);
+			expect((context as Record<string, unknown>).__memoryModifierSessionId).toBe('sess-self-1');
+		});
+
+		it('reuses the self-opened session on save (no second open) and closes it once', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-2',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-2' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContext() }
+			});
+			expect(memoryFacade.openSession).toHaveBeenCalledTimes(1);
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-self-2' }),
+				expect.anything()
+			);
+			expect(memoryFacade.closeSession).toHaveBeenCalledTimes(1);
+			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-2', expect.anything());
+		});
+
+		it('closes the self-opened session even when saveSummary is disabled', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-3',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			const context = makeContext({
+				stepSettings: { 'memory-pipeline-modifier': { enabled: true, saveSummary: false } }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContext() }
+			});
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-3', expect.anything());
+		});
+
+		it('closes the self-opened session via rollback on failure', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-4',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-rb' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			await plugin.rollback(context, new Error('boom'));
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-self-4' }),
+				expect.anything()
+			);
+			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-4', expect.anything());
+		});
+
+		it('closes the self-opened session on rollback even when saveSummary is disabled', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockResolvedValue({
+				id: 'sess-self-5',
+				startedAt: 'now'
+			});
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			const context = makeContext({
+				stepSettings: { 'memory-pipeline-modifier': { enabled: true, saveSummary: false } }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+			});
+			await plugin.rollback(context, new Error('boom'));
+			// saveSummary off → no failure digest persisted, but the session
+			// we opened in fetch-context must still be closed.
+			expect(memoryFacade.saveMemory).not.toHaveBeenCalled();
+			expect(memoryFacade.closeSession).toHaveBeenCalledWith('sess-self-5', expect.anything());
+		});
+
+		it('does NOT open or close a session when the orchestrator supplies one', async () => {
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: '' });
+			(memoryFacade.saveMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'mem-o' });
+			const context = makeContext();
+			await plugin.execute(context, {
+				settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContextWithSession('sess-orch') }
+			});
+			await plugin.execute(context, {
+				settings: { stepId: SAVE_MEMORY_STEP_ID, execContext: makeExecContextWithSession('sess-orch') }
+			});
+			expect(memoryFacade.openSession).not.toHaveBeenCalled();
+			expect(memoryFacade.closeSession).not.toHaveBeenCalled();
+			expect(memoryFacade.saveMemory).toHaveBeenCalledWith(
+				expect.objectContaining({ sessionId: 'sess-orch' }),
+				expect.anything()
+			);
+		});
+
+		it('swallows a session-open failure and continues session-less', async () => {
+			(memoryFacade.openSession as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('session server down'));
+			(memoryFacade.buildContext as ReturnType<typeof vi.fn>).mockResolvedValue({ content: 'x' });
+			const context = makeContext();
+			await expect(
+				plugin.execute(context, {
+					settings: { stepId: FETCH_CONTEXT_STEP_ID, execContext: makeExecContext() }
+				})
+			).resolves.toBeDefined();
+			expect(logger.warn).toHaveBeenCalledWith(expect.stringMatching(/failed to open session/));
+			const buildArg = (memoryFacade.buildContext as ReturnType<typeof vi.fn>).mock.calls[0][0];
+			expect(buildArg).not.toHaveProperty('sessionId');
+		});
 	});
 });
