@@ -32,6 +32,67 @@ export interface AstTemplateEntry {
 }
 
 const AGENT_TEMPLATES: AstTemplateEntry[] = [
+    // Named-role starters the operator asked to surface as quick-pick
+    // chips on /agents (CEO, CTO, Lead Engineer, Copywriter, Sales,
+    // Brand Specialist, …). These are the built-in FALLBACK shown until
+    // the `ever-works/agents` repo (ADR-011) is the live source — they
+    // keep the chip row populated even with a cold/unreachable catalog
+    // (spec E2). Additive: the original PM/Coder/Researcher starters
+    // stay below.
+    {
+        slug: 'ceo',
+        title: 'CEO',
+        description:
+            'Chief Executive — keeps every Mission laddering up to a clear goal, sets priorities, and nudges stalled work forward.',
+        category: 'Leadership',
+        tags: ['strategy', 'roadmap', 'coordination'],
+        iconName: 'Crown',
+    },
+    {
+        slug: 'cto',
+        title: 'CTO',
+        description:
+            'Chief Technology Officer — owns technical direction, reviews architecture decisions, and guards delivery quality.',
+        category: 'Leadership',
+        tags: ['architecture', 'engineering', 'review'],
+        iconName: 'Cpu',
+    },
+    {
+        slug: 'lead-engineer',
+        title: 'Lead Engineer',
+        description:
+            'Breaks features into tasks, implements the hard parts end-to-end, and unblocks the rest of the team. Requires git permissions.',
+        category: 'Engineering',
+        tags: ['git', 'pr', 'implementation'],
+        iconName: 'Wrench',
+    },
+    {
+        slug: 'copywriter',
+        title: 'Copywriter',
+        description:
+            'Writes and rewrites marketing + product copy in a consistent brand voice — landing pages, descriptions, release notes.',
+        category: 'Content',
+        tags: ['content', 'marketing', 'voice'],
+        iconName: 'PenLine',
+    },
+    {
+        slug: 'sales',
+        title: 'Sales',
+        description:
+            'Drafts outreach, qualifies inbound interest, and keeps a pipeline of follow-ups moving with timely nudges.',
+        category: 'Go-to-market',
+        tags: ['outreach', 'pipeline', 'crm'],
+        iconName: 'TrendingUp',
+    },
+    {
+        slug: 'brand-specialist',
+        title: 'Brand Specialist',
+        description:
+            'Guards brand consistency across copy, naming, and visuals — flags off-voice content and proposes on-brand alternatives.',
+        category: 'Content',
+        tags: ['brand', 'voice', 'design'],
+        iconName: 'Sparkles',
+    },
     {
         slug: 'starter-pm',
         title: 'Project Manager',
@@ -137,8 +198,28 @@ const FALLBACK: Record<AstTemplateEntityType, AstTemplateEntry[]> = {
  * pure-data path avoids the bundle pollution; the catalog-swap path
  * moves to a dedicated server action when ADR-010 lands.
  */
+/**
+ * Session-scoped catalog cache (spec FR-30). Keeps the template chips
+ * + `View All` catalog instant across re-renders and route revisits
+ * without refetching within the TTL. Keyed by entity type. On the
+ * client this persists for the tab session; on the server it's a
+ * per-process cache — both are correct because the agent-template
+ * catalog is a public, non-request-scoped resource (so this does not
+ * violate the "no shared module state for request data" rule). When
+ * the ADR-010/ADR-011 server-action swap lands, the fetch+fallback
+ * goes here behind the same cache; the return type stays stable.
+ */
+const CLIENT_CACHE_TTL_MS = 5 * 60_000;
+const catalogCache = new Map<AstTemplateEntityType, { at: number; data: AstTemplateEntry[] }>();
+
 export async function listAstTemplates(entity: AstTemplateEntityType): Promise<AstTemplateEntry[]> {
-    return FALLBACK[entity] ?? [];
+    const cached = catalogCache.get(entity);
+    if (cached && Date.now() - cached.at < CLIENT_CACHE_TTL_MS) {
+        return cached.data;
+    }
+    const data = FALLBACK[entity] ?? [];
+    catalogCache.set(entity, { at: Date.now(), data });
+    return data;
 }
 
 /**

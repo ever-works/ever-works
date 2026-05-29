@@ -13,9 +13,16 @@ import type { AgentScope, CreateAgentInput } from '@/lib/api/agents';
 // never read searchParams. Pre-fill name + title from the fallback
 // template catalog so the templates flow has an actual on-ramp into
 // Agent creation.
-import { listAstTemplates } from '@/lib/api/agent-templates';
+import { listAstTemplates, type AstTemplateEntry } from '@/lib/api/agent-templates';
 
 type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
+
+/**
+ * Wizard steps. `template` (optional) → `scope` → `details`. The
+ * `template` step is skipped when the dialog is `pinned` to a parent
+ * entity or when no templates are available, so it never shows empty.
+ */
+type WizardStep = 'template' | 'scope' | 'details';
 
 export interface ScopeParentOption {
     id: string;
@@ -23,12 +30,15 @@ export interface ScopeParentOption {
 }
 
 /**
- * Agents/Skills/Tasks PR #1017 — Phase 5. 2-step create form per
- * UX-DESIGN §10. Step 1 picks a scope (now including
- * Mission/Work/Idea — when the page passes the corresponding
- * catalog lists), step 2 collects a name + optional title.
- * Defaults the rest from CreateAgentDto so the server can fill in
- * the safe permissions baseline.
+ * Manual create wizard per UX-DESIGN §10, extended by
+ * agent-prompt-first-creation. Steps: an optional `template` step
+ * (shown only when templates are passed and the dialog isn't pinned)
+ * → `scope` (picks Tenant/Mission/Work/Idea — Mission/Work/Idea require
+ * the page to pass the corresponding catalog lists) → `details` (name +
+ * optional title). Defaults the rest from CreateAgentDto so the server
+ * fills the safe permissions baseline. The `scope` step never
+ * dead-ends: when a non-tenant scope has no parent candidates, the
+ * disabled Next is explained and Workspace scope always advances.
  */
 export interface NewAgentDialogPinnedScope {
     scope: Exclude<AgentScope, 'tenant'>;
@@ -55,6 +65,13 @@ export interface NewAgentDialogProps {
     missions?: ScopeParentOption[];
     works?: ScopeParentOption[];
     ideas?: ScopeParentOption[];
+    /**
+     * Optional agent-template catalog (spec FR-23). When non-empty and
+     * the dialog isn't `pinned`, the wizard opens on an optional
+     * template-pick step; picking one pre-fills name + title. Empty →
+     * the step is skipped entirely so it never renders blank.
+     */
+    templates?: AstTemplateEntry[];
 }
 
 export function NewAgentDialog({
@@ -63,11 +80,14 @@ export function NewAgentDialog({
     missions = [],
     works = [],
     ideas = [],
+    templates = [],
 }: NewAgentDialogProps) {
     const t = useTranslations('dashboard.agentsPage.newDialog');
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [step, setStep] = useState<1 | 2>(pinned ? 2 : 1);
+    const [step, setStep] = useState<WizardStep>(
+        pinned ? 'details' : templates.length > 0 ? 'template' : 'scope',
+    );
     const [scope, setScope] = useState<AgentScope>(pinned?.scope ?? 'tenant');
     const [parentId, setParentId] = useState<string>(
         pinned?.missionId ?? pinned?.workId ?? pinned?.ideaId ?? '',
@@ -97,7 +117,7 @@ export function NewAgentDialog({
                     setTemplateSlug(from);
                     if (!name) setName(entry.title);
                     if (!title && entry.description) setTitle(entry.description.slice(0, 80));
-                    setStep(2);
+                    setStep('details');
                 }
             } catch {
                 // Best-effort — fall back to a blank form.
@@ -173,6 +193,19 @@ export function NewAgentDialog({
     const canAdvance =
         scope === 'tenant' || (!!parentId && parentOptions.some((o) => o.id === parentId));
 
+    // Optional template step (FR-23/24). Picking a template pre-fills
+    // name + title (without clobbering anything the user already
+    // typed); "Start from scratch" passes null. Either way we advance
+    // to the scope step.
+    const handlePickTemplate = (tpl: AstTemplateEntry | null) => {
+        if (tpl) {
+            setTemplateSlug(tpl.slug);
+            if (!name) setName(tpl.title);
+            if (!title && tpl.description) setTitle(tpl.description.slice(0, 80));
+        }
+        setStep('scope');
+    };
+
     const handleSubmit = () => {
         if (!name.trim()) return;
         if (scope !== 'tenant' && !parentId) {
@@ -213,7 +246,47 @@ export function NewAgentDialog({
                 </h1>
             </div>
 
-            {step === 1 && (
+            {step === 'template' && (
+                <section>
+                    <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                        {t('templateStepTitle')}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {templates.map((tpl) => (
+                            <button
+                                key={tpl.slug}
+                                type="button"
+                                onClick={() => handlePickTemplate(tpl)}
+                                className="text-left rounded-lg border border-border/60 dark:border-border-dark/60 p-3 transition-colors hover:border-primary"
+                                data-testid={`agent-template-step-${tpl.slug}`}
+                            >
+                                <div className="text-sm font-medium text-text dark:text-text-dark">
+                                    {tpl.title}
+                                </div>
+                                <div className="mt-0.5 text-xs text-text-muted dark:text-text-muted-dark line-clamp-2">
+                                    {tpl.description}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-6">
+                        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handlePickTemplate(null)}
+                            className="gap-1.5"
+                        >
+                            {t('startFromScratch')}
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
+                </section>
+            )}
+
+            {step === 'scope' && (
                 <section>
                     <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
                         {t('step1Title')}
@@ -276,24 +349,48 @@ export function NewAgentDialog({
                         </div>
                     )}
 
-                    <div className="flex items-center justify-end gap-2 mt-6">
-                        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-                            {t('cancel')}
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={() => setStep(2)}
-                            disabled={!canAdvance}
-                            className="gap-1.5"
-                        >
-                            {t('next')}
-                            <ChevronRight className="w-3.5 h-3.5" />
-                        </Button>
+                    <div className="flex items-center justify-between gap-2 mt-6">
+                        {templates.length > 0 ? (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setStep('template')}
+                                className="gap-1.5"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                                {t('back')}
+                            </Button>
+                        ) : (
+                            <Button variant="ghost" size="sm" onClick={() => router.back()}>
+                                {t('cancel')}
+                            </Button>
+                        )}
+                        {/* Spec FR-20/21 — when a non-tenant scope has no
+                            valid parent, Next is disabled; surface WHY so
+                            the flow isn't a silent dead-end. Workspace
+                            scope always advances. */}
+                        <div className="flex flex-col items-end gap-1">
+                            {!canAdvance && (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark text-right">
+                                    {t('pickParentHint', { scope })}
+                                </p>
+                            )}
+                            <Button
+                                size="sm"
+                                onClick={() => setStep('details')}
+                                disabled={!canAdvance}
+                                title={canAdvance ? undefined : t('nextDisabledReason')}
+                                className="gap-1.5"
+                            >
+                                {t('next')}
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </Button>
+                        </div>
                     </div>
                 </section>
             )}
 
-            {step === 2 && (
+            {step === 'details' && (
                 <section>
                     {pinned && (
                         <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
@@ -364,7 +461,7 @@ export function NewAgentDialog({
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setStep(1)}
+                                onClick={() => setStep('scope')}
                                 className="gap-1.5"
                             >
                                 <ChevronLeft className="w-3.5 h-3.5" />
