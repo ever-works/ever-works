@@ -39,7 +39,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { FaviconEverWork } from '../logos';
 import { WorkspaceSwitcher } from '../layout/WorkspaceSwitcher';
 import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
@@ -153,20 +152,18 @@ export function DashboardSidebar({
                 >
                     <div className="w-full relative">
                         {/*
-                            Expanded sidebar renders `<WorkspaceSwitcher>`,
-                            which always shows `[spinning favicon] [active
-                            org name OR Ever Works wordmark] [chevron]` and
-                            opens a popover with the org list + "+ Create
-                            Organization". The collapsed sidebar keeps the
-                            bare favicon — there's no room for a chip at
-                            16px column width.
+                            `<WorkspaceSwitcher>` is the single trigger
+                            for both states: expanded shows `[icon]
+                            [active org name OR Ever Works wordmark]
+                            [chevron]`, collapsed shows just `[icon]`.
+                            The icon is the active org's avatar when
+                            one is selected, otherwise the spinning
+                            Ever Works favicon — clicking either opens
+                            the same popover with org list + "Create
+                            Organization".
                         */}
                         <div className="flex items-center pr-6">
-                            {isCollapsed ? (
-                                <FaviconEverWork config={config} className={cn('w-11 ml-[5px]')} />
-                            ) : (
-                                <WorkspaceSwitcher config={config} />
-                            )}
+                            <WorkspaceSwitcher config={config} isCollapsed={isCollapsed} />
                         </div>
                         <div
                             className={cn(

@@ -25,6 +25,11 @@ interface WorkspaceSwitcherProps {
     config?: WorkConfig | null;
     /** Tailwind class for the inline wordmark image. */
     logoClassName?: string;
+    /**
+     * Collapsed sidebar variant — renders only the icon trigger (no
+     * label, no chevron). The popover behaviour is identical.
+     */
+    isCollapsed?: boolean;
 }
 
 function pickInitial(org: OrganizationResponse): string {
@@ -41,8 +46,14 @@ function pickLabel(org: OrganizationResponse): string {
  * TeamSwitcher's visual: a colored square with the first initial.
  * `Building2` is used as a fallback when the initial would be empty.
  */
-function OrgAvatar({ org, size = 'sm' }: { org: OrganizationResponse; size?: 'sm' | 'xs' }) {
+function OrgAvatar({ org, size = 'sm' }: { org: OrganizationResponse; size?: 'sm' | 'xs' | 'md' }) {
     const initial = pickInitial(org);
+    const sizeClass =
+        size === 'md'
+            ? 'w-6 h-6 text-[11px]'
+            : size === 'sm'
+              ? 'w-7 h-7 text-xs'
+              : 'w-5 h-5 text-[10px]';
     return (
         <div
             className={cn(
@@ -50,7 +61,7 @@ function OrgAvatar({ org, size = 'sm' }: { org: OrganizationResponse; size?: 'sm
                 'bg-surface-tertiary dark:bg-surface-tertiary-dark',
                 'text-text dark:text-text-dark',
                 'font-semibold',
-                size === 'sm' ? 'w-7 h-7 text-xs' : 'w-5 h-5 text-[10px]',
+                sizeClass,
             )}
             aria-hidden="true"
         >
@@ -67,21 +78,25 @@ function OrgAvatar({ org, size = 'sm' }: { org: OrganizationResponse; size?: 'sm
  *
  * The whole row is a single dropdown trigger:
  *
- *   [spinning favicon] [label] [chevron]
+ *   [favicon OR org avatar] [label] [chevron]
  *
  * The trigger renders in every state (including zero-org), so the user
  * can always reach "+ Create Organization" — pre-fix, the zero-org
  * branch fell back to a bare logo with no popover and clicking it did
  * nothing useful.
  *
- * Trigger label by state:
- *
- * | Org count | Label                | Popover                         |
- * |-----------|----------------------|---------------------------------|
- * | 0         | Wordmark image       | "+ Create Organization" only    |
- * | 1+        | Active org name      | Org list + "+ Create"           |
+ * When `isCollapsed`, the trigger renders just the leading icon — the
+ * label + chevron are hidden and the dropdown still opens on click.
+ * That replaces the pre-fix collapsed-sidebar `<FaviconEverWork>`,
+ * which wrapped the favicon in a `<Link>` pointing at the configured
+ * site URL (localhost:3000 in dev) and silently swallowed clicks
+ * instead of opening the org switcher.
  */
-export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({
+    config,
+    logoClassName,
+    isCollapsed = false,
+}: WorkspaceSwitcherProps) {
     const t = useTranslations('organizations.switcher');
     const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
@@ -104,44 +119,56 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
         setIsCreateOpen(true);
     };
 
+    // Leading icon: the active org's avatar when one exists, otherwise
+    // the spinning Ever Works favicon. Same 24px footprint in both
+    // states so the row height doesn't shift when the user picks an org.
+    const leadingIcon = triggerOrg ? (
+        <OrgAvatar org={triggerOrg} size="md" />
+    ) : (
+        <FaviconEverWorkImage config={config} className="w-6 h-6 max-h-none shrink-0" />
+    );
+
     return (
         <>
             <DropdownMenu>
                 <DropdownMenuTrigger
                     className={cn(
-                        'w-full rounded-md transition-colors cursor-pointer',
+                        'rounded-md transition-colors cursor-pointer',
                         'focus:outline-none focus-visible:outline-none',
                         'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                        'px-1.5 py-1',
+                        isCollapsed ? 'inline-flex p-1' : 'w-full px-1.5 py-1',
                     )}
                     aria-label={t('heading')}
                 >
-                    <div className="flex items-center gap-1.5 w-full min-w-0">
-                        <FaviconEverWorkImage
-                            config={config}
-                            className="w-9 h-9 max-h-none shrink-0"
-                        />
-                        {triggerOrg ? (
-                            <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
-                                {pickLabel(triggerOrg)}
-                            </span>
-                        ) : (
-                            <LogoEverWorkImage
-                                config={config}
-                                className={cn('flex-1 min-w-0', logoClassName)}
+                    <div
+                        className={cn(
+                            'flex items-center min-w-0',
+                            isCollapsed ? 'justify-center' : 'gap-1.5 w-full',
+                        )}
+                    >
+                        {leadingIcon}
+                        {!isCollapsed &&
+                            (triggerOrg ? (
+                                <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
+                                    {pickLabel(triggerOrg)}
+                                </span>
+                            ) : (
+                                <LogoEverWorkImage
+                                    config={config}
+                                    className={cn('flex-1 min-w-0', logoClassName)}
+                                />
+                            ))}
+                        {!isCollapsed && (
+                            <ChevronsUpDown
+                                className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
+                                strokeWidth={1.5}
+                                aria-hidden="true"
                             />
                         )}
-                        <ChevronsUpDown
-                            className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
-                            strokeWidth={1.5}
-                            aria-hidden="true"
-                        />
                     </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="bottom" align="start" className="w-60">
-                    <DropdownMenuLabel>
-                        {hasOrgs ? t('heading') : t('bareTenant')}
-                    </DropdownMenuLabel>
+                    <DropdownMenuLabel>{t('heading')}</DropdownMenuLabel>
                     {hasOrgs &&
                         organizations.map((org) => {
                             const isActive = activeOrganization?.id === org.id;
