@@ -3,6 +3,7 @@ import { EmailFacadeService, EmailFacadeError } from '../email.facade';
 import { PluginRegistryService } from '../../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../../plugins/services/plugin-settings.service';
 import { TenantEmailAddressRepository } from '../../database/repositories/tenant-email-address.repository';
+import { EmailMessageRepository } from '../../database/repositories/email-message.repository';
 
 /**
  * EW-668 / T11 — EmailFacadeService construction + resolution coverage.
@@ -13,6 +14,7 @@ describe('EmailFacadeService', () => {
     let registry: jest.Mocked<PluginRegistryService>;
     let settings: jest.Mocked<PluginSettingsService>;
     let emailAddresses: { findByAddress: jest.Mock };
+    let emailMessages: { findByProviderMessageId: jest.Mock; updateDeliveryStatus: jest.Mock };
     let facade: EmailFacadeService;
 
     beforeEach(async () => {
@@ -24,6 +26,10 @@ describe('EmailFacadeService', () => {
             getSettings: jest.fn().mockResolvedValue({}),
         } as unknown as jest.Mocked<PluginSettingsService>;
         emailAddresses = { findByAddress: jest.fn().mockResolvedValue(null) };
+        emailMessages = {
+            findByProviderMessageId: jest.fn().mockResolvedValue(null),
+            updateDeliveryStatus: jest.fn().mockResolvedValue(undefined),
+        };
 
         const moduleRef = await Test.createTestingModule({
             providers: [
@@ -31,6 +37,7 @@ describe('EmailFacadeService', () => {
                 { provide: PluginRegistryService, useValue: registry },
                 { provide: PluginSettingsService, useValue: settings },
                 { provide: TenantEmailAddressRepository, useValue: emailAddresses },
+                { provide: EmailMessageRepository, useValue: emailMessages },
             ],
         }).compile();
 
@@ -170,6 +177,90 @@ describe('EmailFacadeService', () => {
                 'postmark',
                 expect.objectContaining({ userId: 'caller-1' }),
             );
+        });
+    });
+
+    describe('delivery-event webhook (parseEventWebhook + recordDeliveryEvents)', () => {
+        function makeInboundPlugin(overrides: Record<string, unknown> = {}) {
+            return {
+                id: 'postmark',
+                capabilities: ['email-inbound'],
+                verifyWebhookSignature: jest.fn(),
+                parseInboundWebhook: jest.fn(),
+                parseEventWebhook: jest.fn(),
+                ...overrides,
+            };
+        }
+
+        it('verifies then decodes events via the plugin', async () => {
+            const plugin = makeInboundPlugin();
+            (plugin.parseEventWebhook as jest.Mock).mockResolvedValue([
+                {
+                    provider: 'postmark',
+                    providerMessageId: 'pm-1',
+                    type: 'delivered',
+                    occurredAt: new Date(),
+                },
+            ]);
+            registry.getByCapability.mockImplementation(((cap: string) =>
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+
+            const events = await facade.parseEventWebhook('postmark', Buffer.from('{}'), {});
+            expect(plugin.verifyWebhookSignature).toHaveBeenCalled();
+            expect(events).toHaveLength(1);
+        });
+
+        it('returns [] when the plugin does not publish delivery events', async () => {
+            const plugin = makeInboundPlugin({ parseEventWebhook: undefined });
+            registry.getByCapability.mockImplementation(((cap: string) =>
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+            await expect(
+                facade.parseEventWebhook('postmark', Buffer.from('{}'), {}),
+            ).resolves.toEqual([]);
+        });
+
+        it('records each event onto the matching message (latest-status-wins) and counts updates', async () => {
+            emailMessages.findByProviderMessageId
+                .mockResolvedValueOnce({ id: 'msg-1' })
+                .mockResolvedValueOnce(null); // second event has no matching row
+            const recorded = await facade.recordDeliveryEvents('postmark', [
+                {
+                    provider: 'postmark',
+                    providerMessageId: 'pm-1',
+                    type: 'bounced',
+                    occurredAt: new Date(),
+                },
+                {
+                    provider: 'postmark',
+                    providerMessageId: 'pm-unknown',
+                    type: 'opened',
+                    occurredAt: new Date(),
+                },
+            ] as never);
+            expect(recorded).toBe(1);
+            expect(emailMessages.updateDeliveryStatus).toHaveBeenCalledWith('msg-1', 'bounced');
+        });
+
+        it('swallows a per-event update failure and continues the batch', async () => {
+            emailMessages.findByProviderMessageId.mockResolvedValue({ id: 'msg-1' });
+            emailMessages.updateDeliveryStatus
+                .mockRejectedValueOnce(new Error('db hiccup'))
+                .mockResolvedValueOnce(undefined);
+            const recorded = await facade.recordDeliveryEvents('postmark', [
+                {
+                    provider: 'postmark',
+                    providerMessageId: 'pm-1',
+                    type: 'bounced',
+                    occurredAt: new Date(),
+                },
+                {
+                    provider: 'postmark',
+                    providerMessageId: 'pm-2',
+                    type: 'delivered',
+                    occurredAt: new Date(),
+                },
+            ] as never);
+            expect(recorded).toBe(1);
         });
     });
 });

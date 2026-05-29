@@ -8,6 +8,7 @@ import {
     type EmailSendInput,
     type EmailSendResult,
     type EmailInboundMessage,
+    type EmailDeliveryEvent,
     type EmailOptions,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -187,6 +188,67 @@ export class EmailFacadeService extends BaseFacadeService {
         };
         plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
         return plugin.parseInboundWebhook(rawBody, headers, emailOpts);
+    }
+
+    /**
+     * Verify + decode a provider delivery-event webhook (bounces, opens,
+     * clicks, complaints). Verification uses the admin/env-scoped secret
+     * (delivery events reference a `providerMessageId`, not a recipient,
+     * so per-user owner resolution isn't possible up front). Returns an
+     * empty array when the plugin doesn't publish delivery events.
+     */
+    async parseEventWebhook(
+        pluginId: string,
+        rawBody: Buffer,
+        headers: Readonly<Record<string, string>>,
+        options?: FacadeOptions,
+    ): Promise<readonly EmailDeliveryEvent[]> {
+        const plugin = this.getInboundPluginById(pluginId);
+        if (!plugin.parseEventWebhook) return [];
+        const settings = await this.resolveSettings(pluginId, options);
+        const emailOpts: EmailOptions = {
+            userId: options?.userId,
+            workId: options?.workId,
+            agentId: options?.agentId,
+            taskId: options?.taskId,
+            settings,
+        };
+        plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
+        return plugin.parseEventWebhook(rawBody, headers, emailOpts);
+    }
+
+    /**
+     * Persist delivery-event outcomes onto the matching `email_messages`
+     * rows (latest-status-wins). Looks each event up by
+     * `(pluginId, providerMessageId)`; unknown ids are skipped (the
+     * message may predate audit-row persistence). Returns how many rows
+     * were updated. Best-effort per event — one failed update never
+     * aborts the batch.
+     */
+    async recordDeliveryEvents(
+        pluginId: string,
+        events: readonly EmailDeliveryEvent[],
+    ): Promise<number> {
+        if (!this.emailMessages || events.length === 0) return 0;
+        let updated = 0;
+        for (const event of events) {
+            try {
+                const message = await this.emailMessages.findByProviderMessageId(
+                    pluginId,
+                    event.providerMessageId,
+                );
+                if (!message) continue;
+                await this.emailMessages.updateDeliveryStatus(message.id, event.type);
+                updated += 1;
+            } catch (err) {
+                this.logger.warn(
+                    `recordDeliveryEvents: failed to record ${event.type} for ${event.providerMessageId} — ${
+                        (err as Error).message
+                    }`,
+                );
+            }
+        }
+        return updated;
     }
 
     /**
