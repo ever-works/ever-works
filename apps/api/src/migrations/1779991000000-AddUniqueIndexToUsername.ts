@@ -80,7 +80,7 @@ export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface
             ).map((r) => r.lname),
         );
 
-        const renames: Array<{ id: string; from: string; to: string }> = [];
+        let renames: Array<{ id: string; from: string; to: string }> = [];
 
         for (const bucket of buckets) {
             const rows = (await queryRunner.query(
