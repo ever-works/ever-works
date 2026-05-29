@@ -153,22 +153,19 @@ export function DashboardSidebar({
                 >
                     <div className="w-full relative">
                         {/*
-                            EW-660 (Tenants & Organizations Phase 8) —
-                            the expanded sidebar swaps `<LogoEverWork>`
-                            for `<WorkspaceSwitcher>`, which itself
-                            renders the unmodified logo when the user
-                            has zero Organizations (NN #20 — extension,
-                            not replacement). The collapsed sidebar
-                            keeps the bare favicon: there's no room for
-                            a chip+chevron at 16px column width, and
-                            users in that mode already expand the
-                            sidebar before reaching for the switcher.
+                            Expanded sidebar renders `<WorkspaceSwitcher>`,
+                            which always shows `[spinning favicon] [active
+                            org name OR Ever Works wordmark] [chevron]` and
+                            opens a popover with the org list + "+ Create
+                            Organization". The collapsed sidebar keeps the
+                            bare favicon — there's no room for a chip at
+                            16px column width.
                         */}
-                        <div className={cn('flex items-center -ml-2')}>
+                        <div className="flex items-center pr-6">
                             {isCollapsed ? (
                                 <FaviconEverWork config={config} className={cn('w-11 ml-[5px]')} />
                             ) : (
-                                <WorkspaceSwitcher config={config} logoClassName="" />
+                                <WorkspaceSwitcher config={config} />
                             )}
                         </div>
                         <div

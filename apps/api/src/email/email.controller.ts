@@ -301,10 +301,19 @@ export class EmailController {
     @Throttle({ default: { ttl: 60_000, limit: 600 } })
     @HttpCode(HttpStatus.ACCEPTED)
     @ApiOperation({ summary: 'Provider delivery-event webhook (bounces, opens, clicks)' })
-    async eventsWebhook(@Param('pluginId') pluginId: string) {
-        // Per spec §7: events go through the facade's parseEventWebhook
-        // hook on the inbound plugin; for now we accept + return 202 so
-        // providers stop retrying while the full impl lands.
-        return { received: true, pluginId };
+    async eventsWebhook(
+        @Param('pluginId') pluginId: string,
+        @Req() req: WebhookRequest,
+        @Headers() headers: Record<string, string>,
+    ) {
+        const rawBody = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
+        // Verify + decode the provider delivery-event payload, then fold
+        // each event's outcome onto the matching email_messages row
+        // (latest-status-wins). Always 202s so the provider stops
+        // retrying; a signature failure throws (mapped to 401 by the
+        // plugin's verifyWebhookSignature).
+        const events = await this.emailFacade.parseEventWebhook(pluginId, rawBody, headers);
+        const recorded = await this.emailFacade.recordDeliveryEvents(pluginId, events);
+        return { received: true, pluginId, events: events.length, recorded };
     }
 }

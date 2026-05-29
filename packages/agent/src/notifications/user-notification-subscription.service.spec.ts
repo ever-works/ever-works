@@ -8,6 +8,9 @@ import {
     UserNotificationSubscriptionRepository,
     UserNotificationPreferenceRepository,
     UserNotificationCategoryMuteRepository,
+    OrganizationNotificationDefaultRepository,
+    OrganizationRepository,
+    UserRepository,
 } from '@src/database';
 
 /**
@@ -185,6 +188,105 @@ describe('UserNotificationSubscriptionService', () => {
         expect(plan.immediate).toEqual(['in-app', 'channel-1']);
         expect(plan.deferred).toEqual([]);
         expect(plan.deferUntil).toBeUndefined();
+    });
+});
+
+describe('UserNotificationSubscriptionService — organisation defaults', () => {
+    let service: UserNotificationSubscriptionService;
+    let eventTypes: { findByKey: jest.Mock };
+    let subscriptions: { findForEvent: jest.Mock };
+    let orgDefaults: { findByOrg: jest.Mock };
+    let organizations: { findByTenantId: jest.Mock };
+    let users: { findById: jest.Mock };
+
+    beforeEach(async () => {
+        eventTypes = {
+            findByKey: jest.fn().mockResolvedValue({
+                key: 'work_generation_finished',
+                category: 'work',
+                urgent: false,
+                defaultChannels: ['in-app'],
+            }),
+        };
+        subscriptions = { findForEvent: jest.fn().mockResolvedValue(null) };
+        orgDefaults = { findByOrg: jest.fn() };
+        organizations = { findByTenantId: jest.fn() };
+        users = { findById: jest.fn() };
+
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                UserNotificationSubscriptionService,
+                { provide: NotificationEventTypeRepository, useValue: eventTypes },
+                { provide: UserNotificationSubscriptionRepository, useValue: subscriptions },
+                { provide: OrganizationNotificationDefaultRepository, useValue: orgDefaults },
+                { provide: OrganizationRepository, useValue: organizations },
+                { provide: UserRepository, useValue: users },
+            ],
+        }).compile();
+        service = moduleRef.get(UserNotificationSubscriptionService);
+    });
+
+    it('applies the org default when the tenant owns exactly one org', async () => {
+        users.findById.mockResolvedValue({ id: 'u', tenantId: 't1' });
+        organizations.findByTenantId.mockResolvedValue([{ id: 'org-1' }]);
+        orgDefaults.findByOrg.mockResolvedValue({
+            organizationId: 'org-1',
+            defaults: { work_generation_finished: ['in-app', 'email'] },
+        });
+
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+            'email',
+        ]);
+        expect(organizations.findByTenantId).toHaveBeenCalledWith('t1');
+        expect(orgDefaults.findByOrg).toHaveBeenCalledWith('org-1');
+    });
+
+    it('falls through to event defaults when the tenant owns multiple orgs (ambiguous)', async () => {
+        users.findById.mockResolvedValue({ id: 'u', tenantId: 't1' });
+        organizations.findByTenantId.mockResolvedValue([{ id: 'org-1' }, { id: 'org-2' }]);
+
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+        ]);
+        expect(orgDefaults.findByOrg).not.toHaveBeenCalled();
+    });
+
+    it('falls through when the single org has no default for this event', async () => {
+        users.findById.mockResolvedValue({ id: 'u', tenantId: 't1' });
+        organizations.findByTenantId.mockResolvedValue([{ id: 'org-1' }]);
+        orgDefaults.findByOrg.mockResolvedValue({
+            organizationId: 'org-1',
+            defaults: { some_other_event: ['email'] },
+        });
+
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+        ]);
+    });
+
+    it('falls through when the user has no tenant', async () => {
+        users.findById.mockResolvedValue({ id: 'u', tenantId: null });
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+        ]);
+        expect(organizations.findByTenantId).not.toHaveBeenCalled();
+    });
+
+    it('per-user subscription still wins over the org default', async () => {
+        subscriptions.findForEvent.mockResolvedValue({ channelIds: ['in-app', 'slack'] });
+        users.findById.mockResolvedValue({ id: 'u', tenantId: 't1' });
+        organizations.findByTenantId.mockResolvedValue([{ id: 'org-1' }]);
+        orgDefaults.findByOrg.mockResolvedValue({
+            organizationId: 'org-1',
+            defaults: { work_generation_finished: ['in-app', 'email'] },
+        });
+
+        await expect(service.resolveChannels('u', 'work_generation_finished')).resolves.toEqual([
+            'in-app',
+            'slack',
+        ]);
+        expect(users.findById).not.toHaveBeenCalled();
     });
 });
 

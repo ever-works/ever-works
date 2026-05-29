@@ -1,10 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
     NotificationEventTypeRepository,
     UserNotificationSubscriptionRepository,
     UserNotificationPreferenceRepository,
     UserNotificationCategoryMuteRepository,
+    NotificationChannelRepository,
 } from '@ever-works/agent/database';
+
+/**
+ * Channel ids that are not rows in `notification_channels` — always
+ * available to every user and therefore exempt from the ownership check.
+ */
+const BUILT_IN_CHANNEL_IDS = new Set<string>(['in-app']);
 import type {
     NotificationEventType,
     UserNotificationSubscription,
@@ -32,6 +39,7 @@ export class NotificationPreferencesService {
         private readonly subscriptions: UserNotificationSubscriptionRepository,
         private readonly preferences: UserNotificationPreferenceRepository,
         private readonly mutes: UserNotificationCategoryMuteRepository,
+        private readonly channels: NotificationChannelRepository,
     ) {}
 
     async listEventTypes(): Promise<NotificationEventType[]> {
@@ -62,7 +70,31 @@ export class NotificationPreferencesService {
         eventTypeKey: string,
         channelIds: string[],
     ): Promise<UserNotificationSubscription> {
-        await this.subscriptions.upsert(userId, eventTypeKey, channelIds);
+        // Reject unknown event types so a typo can't persist a dead
+        // subscription row that silently never resolves.
+        const eventType = await this.eventTypes.findByKey(eventTypeKey);
+        if (!eventType) {
+            throw new BadRequestException(`Unknown notification event type: ${eventTypeKey}`);
+        }
+
+        // Validate channel ownership: every non-built-in channel id must
+        // be a notification_channels row owned by this user. Without this
+        // a caller could persist arbitrary (or another user's) channel
+        // UUIDs into their subscription row. Send-time scoping already
+        // blocks cross-tenant *delivery*, but storing foreign ids is a
+        // storage-integrity / info-leak gap. Dedupe first.
+        const unique = [...new Set(channelIds)];
+        for (const id of unique) {
+            if (BUILT_IN_CHANNEL_IDS.has(id)) continue;
+            const owned = await this.channels.findByIdForUser(id, userId);
+            if (!owned) {
+                throw new BadRequestException(
+                    `Unknown or unauthorized notification channel: ${id}`,
+                );
+            }
+        }
+
+        await this.subscriptions.upsert(userId, eventTypeKey, unique);
         return (await this.subscriptions.findForEvent(
             userId,
             eventTypeKey,

@@ -48,8 +48,16 @@ const sidebars: SidebarsConfig = {
 				'features/creating-a-work',
 				'features/missions',
 				'features/ideas',
+				'features/agents',
+				'features/agent-email',
 				'features/mission-templates',
 				'features/budgets-and-usage',
+				'features/knowledge-base',
+				'features/autonomous-operation',
+				'features/workers',
+				'features/store-builder',
+				'features/company-builder',
+				'features/desktop-app',
 				'features/community-pr-processing',
 				'features/work-changelog',
 				'features/collections',
@@ -65,10 +73,16 @@ const sidebars: SidebarsConfig = {
 				'features/taxonomy-system',
 				'features/api-keys',
 				'features/custom-domains',
+				'features/website-templates',
 				'features/k8s-deployment',
 				'features/mcp-server',
 				'features/data-management'
 			]
+		},
+		{
+			type: 'category',
+			label: 'Guides',
+			items: ['guides/founder-journey']
 		},
 		{
 			type: 'category',

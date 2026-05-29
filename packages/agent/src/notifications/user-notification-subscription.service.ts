@@ -4,6 +4,9 @@ import {
     UserNotificationSubscriptionRepository,
     UserNotificationPreferenceRepository,
     UserNotificationCategoryMuteRepository,
+    OrganizationNotificationDefaultRepository,
+    OrganizationRepository,
+    UserRepository,
 } from '@src/database';
 
 /**
@@ -13,8 +16,10 @@ import {
  * with full fallback semantics:
  *
  * 1. Per-user subscription row, if any.
- * 2. Event-type default channels.
- * 3. `['in-app']` as the ultimate fallback (matches v1 behaviour).
+ * 2. Organisation default channel map (when the user's tenant owns
+ *    exactly one organisation — see `resolveOrgDefaultChannels`).
+ * 3. Event-type default channels.
+ * 4. `['in-app']` as the ultimate fallback (matches v1 behaviour).
  *
  * Then applies two filters:
  *
@@ -26,9 +31,6 @@ import {
  *    drop all non-`in-app` channels.
  *
  * **Deferred from v1**:
- * - Organisation defaults fallback (between steps 1 and 2). The
- *   `OrganizationNotificationDefaultRepository` exists; wiring the
- *   user→organization lookup is a follow-up.
  * - BullMQ delayed-delivery: quiet-hours-caught non-urgent events
  *   currently get dropped to in-app only. v2 will queue them for
  *   delivery at end-of-quiet-window. The `deferredAt` / `dueAt`
@@ -59,6 +61,13 @@ export class UserNotificationSubscriptionService {
         private readonly subscriptions: UserNotificationSubscriptionRepository,
         @Optional() private readonly preferences?: UserNotificationPreferenceRepository,
         @Optional() private readonly mutes?: UserNotificationCategoryMuteRepository,
+        // Org-default resolution deps — all @Optional() so the resolver
+        // keeps constructing in deployments / unit tests that don't wire
+        // the org stack. When any is missing, org defaults are skipped and
+        // resolution falls through to event-type defaults (prior behaviour).
+        @Optional() private readonly orgDefaults?: OrganizationNotificationDefaultRepository,
+        @Optional() private readonly organizations?: OrganizationRepository,
+        @Optional() private readonly users?: UserRepository,
     ) {}
 
     /**
@@ -134,10 +143,52 @@ export class UserNotificationSubscriptionService {
         if (sub?.channelIds && sub.channelIds.length > 0) {
             return [...sub.channelIds];
         }
+        // Organisation defaults sit between the per-user subscription and
+        // the event-type defaults: a user with no explicit subscription
+        // inherits their organisation's default channel map for this event.
+        const orgChannels = await this.resolveOrgDefaultChannels(userId, eventTypeKey);
+        if (orgChannels && orgChannels.length > 0) {
+            return [...orgChannels];
+        }
         if (eventDefaults && eventDefaults.length > 0) {
             return [...eventDefaults];
         }
         return ['in-app'];
+    }
+
+    /**
+     * Resolve the organisation default channel list for `(userId,
+     * eventTypeKey)`. The resolver runs in a scope-less background fanout
+     * (no "active org" in context), and a tenant may own several orgs, so
+     * we only apply org defaults when the user's tenant has **exactly one**
+     * organisation — an unambiguous mapping. Multi-org tenants need an
+     * active-org signal the fanout doesn't have, so they fall through to
+     * event-type defaults (a future enhancement can thread the active org).
+     *
+     * Best-effort: any failure (missing deps, DB hiccup) returns
+     * `undefined` so notification resolution never breaks on org lookup.
+     */
+    private async resolveOrgDefaultChannels(
+        userId: string,
+        eventTypeKey: string,
+    ): Promise<string[] | undefined> {
+        if (!this.orgDefaults || !this.organizations || !this.users) return undefined;
+        try {
+            const user = await this.users.findById(userId);
+            if (!user?.tenantId) return undefined;
+            const orgs = await this.organizations.findByTenantId(user.tenantId);
+            if (orgs.length !== 1) return undefined;
+            const def = await this.orgDefaults.findByOrg(orgs[0].id);
+            const channels = def?.defaults?.[eventTypeKey];
+            return Array.isArray(channels) && channels.length > 0 ? channels : undefined;
+        } catch (err) {
+            this.logger.debug(
+                `Org-default resolution failed for user=${userId} event=${eventTypeKey}: ${
+                    (err as Error).message
+                }. Falling through to event-type defaults.`,
+            );
+            return undefined;
+        }
     }
 }
 

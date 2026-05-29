@@ -19,6 +19,7 @@ import { AuthenticatedUser } from '../../auth/types/auth.types';
 import {
     BuildContextDto,
     ListSessionsQueryDto,
+    MemoryScopeQueryDto,
     OpenSessionDto,
     SaveMemoryDto,
     SearchMemoryDto,
@@ -104,10 +105,12 @@ export class AgentMemoryController {
     async closeSession(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('sessionId') sessionId: string,
+        @Query() query: MemoryScopeQueryDto,
     ) {
         if (!sessionId) throw new BadRequestException('sessionId is required');
+        await this.assertWorkAccess(auth, query.workId);
         try {
-            await this.agentMemory.closeSession(sessionId, this.facadeOptions(auth));
+            await this.agentMemory.closeSession(sessionId, this.facadeOptions(auth, query.workId));
             return { status: 'success' };
         } catch (error) {
             throw this.toHttpError(error, 'closeSession');
@@ -202,10 +205,15 @@ export class AgentMemoryController {
     @Delete('/entries/:entryId')
     @ApiOperation({ summary: 'Forget a single memory record' })
     @ApiResponse({ status: 200, description: 'Deleted' })
-    async deleteEntry(@CurrentUser() auth: AuthenticatedUser, @Param('entryId') entryId: string) {
+    async deleteEntry(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('entryId') entryId: string,
+        @Query() query: MemoryScopeQueryDto,
+    ) {
         if (!entryId) throw new BadRequestException('entryId is required');
+        await this.assertWorkAccess(auth, query.workId);
         try {
-            await this.agentMemory.deleteEntry(entryId, this.facadeOptions(auth));
+            await this.agentMemory.deleteEntry(entryId, this.facadeOptions(auth, query.workId));
             return { status: 'success' };
         } catch (error) {
             throw this.toHttpError(error, 'deleteEntry');

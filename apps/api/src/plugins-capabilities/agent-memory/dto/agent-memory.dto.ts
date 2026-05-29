@@ -146,6 +146,15 @@ export class OpenSessionDto extends WorkScopedDto {
     metadata?: Record<string, unknown>;
 }
 
+/**
+ * Query scope for the id-addressed mutations (`DELETE /entries/:id`,
+ * `POST /sessions/:id/close`). Supplying `workId` runs the same
+ * `WorkOwnershipService.ensureCanView` check the other mutations use and
+ * scopes provider/project resolution to that Work, so a user can't
+ * close/forget another user's Work-scoped memory by guessing an id.
+ */
+export class MemoryScopeQueryDto extends WorkScopedDto {}
+
 export class ListSessionsQueryDto extends WorkScopedDto {
     @ApiPropertyOptional({ description: 'Max sessions to return.', minimum: 1, maximum: 100 })
     @IsOptional()
