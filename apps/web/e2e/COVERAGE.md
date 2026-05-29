@@ -499,6 +499,43 @@ Concurrency + OAuth provider isolation + markdown sanitization + UX/i18n hygiene
 - [ ] `viewport-meta-shape.spec.ts` — `<meta name="viewport">` declares width=device-width AND initial-scale=1 (no fixed-zoom locks)
 - [ ] `cron-cancellation-flow.spec.ts` — cancelling a queued cron run returns 4xx if not running, 2xx if cancelled; idempotent
 
+## Pass 22 — `session/e2e-coverage-loop` — new-feature DEEP coverage (in progress)
+
+Closes the biggest real gap: the Agents/Skills/Tasks build and the
+Mission→Idea hierarchy shipped UI + API but had **zero or only shallow**
+e2e coverage, while most recent passes piled up permissive
+`status < 500` smoke probes that don't catch broken features. This pass
+adds **deep, assertive** specs verified against a live stack (Postgres +
+Redis + API + Web), pinning real response shapes and real UX flows.
+
+New feature areas (previously uncovered):
+
+| Feature | Status | Spec(s) |
+| ------- | ------ | ------- |
+| Tasks (CRUD, state machine, chat, scoping) | [x] | tasks.spec.ts |
+| Skills (custom create, bindings, catalog, detail UI) | [x] | skills.spec.ts |
+| Agents (CRUD, pause/resume, instructions, inbox) | [ ] | _next_ |
+| Missions/Ideas UI flows + unified `/new` (cross-entity) | [ ] | _next_ (deepens existing API-contract specs) |
+| settings/integrations (channels, emails, notifications, work-agent) + magic-link | [ ] | _next_ |
+
+- `tasks.spec.ts` — auth gating; create (`T-<n>` slug, `backlog` default,
+  echoed fields); list `{data, meta}` + status filter/pagination; status
+  **state-machine** (valid chain backlog→todo→in_progress→in_review→done,
+  illegal `todo→done` rejected 400); chat round-trip; `?missionId`
+  scoping; cross-user 403/404; delete→404; UI create→detail + API→UI list.
+- `skills.spec.ts` — custom create (ownerType+ownerId, slug lowercased,
+  v1.0.0, frontmatter); ownerType/ownerId validation; PATCH recomputes
+  contentHash; bindings (tenant + mission create, agent-needs-targetId
+  400, both listed); catalog `{entries,total}`; cross-user 404;
+  delete→`{deleted:true}`; UI hub + detail-page render.
+
+Method note: each spec is written after probing the **live** API for
+exact shapes (recon surfaced several stale assumptions — e.g. Task
+default is `backlog` not `todo`; Skills require an explicit `ownerId`
+even for tenant scope). Specs run green against the local stack before
+commit. Local bring-up mirrors `.github/workflows/e2e.yml`
+(`REQUIRE_EMAIL_VERIFICATION=false`, etc.).
+
 ## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions
