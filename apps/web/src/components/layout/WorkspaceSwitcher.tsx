@@ -15,15 +15,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { useActiveScope } from '@/lib/hooks/use-active-scope';
-import { LogoEverWork } from '../logos';
+import { FaviconEverWorkImage, LogoEverWorkImage } from '../logos';
 import { CreateOrganizationModal } from '../organizations/CreateOrganizationModal';
 import type { WorkConfig } from '@/lib/api';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
 interface WorkspaceSwitcherProps {
-    /** Site config passed through to the empty-state `<LogoEverWork>`. */
+    /** Site config passed through to the inline logo / favicon. */
     config?: WorkConfig | null;
-    /** Tailwind class for the empty-state logo. Lets the sidebar size it. */
+    /** Tailwind class for the inline wordmark image. */
     logoClassName?: string;
 }
 
@@ -61,67 +61,40 @@ function OrgAvatar({ org, size = 'sm' }: { org: OrganizationResponse; size?: 'sm
 
 /**
  * EW-660 (Tenants & Organizations Phase 8) — top-of-sidebar component
- * showing the active Organization (or the bare Ever Works logo when
- * the user has zero Orgs) with a popover to switch between Orgs.
+ * showing the spinning favicon + the active Organization (or the
+ * Ever Works wordmark when the user has zero Orgs) with a popover to
+ * switch between Orgs or create a new one.
  *
- * Behavior matrix:
+ * The whole row is a single dropdown trigger:
  *
- * | Org count | Trigger UI                       | Popover                   |
- * |-----------|----------------------------------|---------------------------|
- * | 0         | `<LogoEverWork />` unmodified    | none (no chevron)         |
- * | 1+        | Chip: [avatar] [name] [chevron]  | List of orgs + create row |
+ *   [spinning favicon] [label] [chevron]
  *
- * The empty-state branch renders `<LogoEverWork />` AS-IS so the
- * sidebar visuals for the no-org majority of users stay pixel-identical
- * (NN #20 — extension, not replacement).
+ * The trigger renders in every state (including zero-org), so the user
+ * can always reach "+ Create Organization" — pre-fix, the zero-org
+ * branch fell back to a bare logo with no popover and clicking it did
+ * nothing useful.
  *
- * Clicking an Org row navigates to `/{org.slug}/dashboard`. Clicking
- * "+ Create Organization" is a stub for Phase 9 — it `console.log`s
- * and the modal lands in EW-661.
+ * Trigger label by state:
+ *
+ * | Org count | Label                | Popover                         |
+ * |-----------|----------------------|---------------------------------|
+ * | 0         | Wordmark image       | "+ Create Organization" only    |
+ * | 1+        | Active org name      | Org list + "+ Create"           |
  */
 export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherProps) {
     const t = useTranslations('organizations.switcher');
     const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
     const { activeOrganization } = useActiveScope();
-    // Phase 9 — EW-661 — lifts the create-Org modal state into the
-    // switcher. `+ Create Organization` opens it; on success the modal
-    // routes to `/{slug}/dashboard` and (if first Org) chains into the
-    // upgrade-or-empty dialog.
     const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    // Empty state: no orgs yet → render the existing logo unmodified.
-    // We intentionally treat `isLoading` as empty for the initial
-    // render so we don't flash a "Loading…" chip in the most common
-    // case (zero orgs). Once the fetch resolves and orgs > 0, the
-    // chip appears.
-    if (!isLoading && organizations.length === 0) {
-        return <LogoEverWork config={config} className={logoClassName} />;
-    }
-
-    // Loading state, but only on the very first fetch when we don't
-    // yet know whether the user has orgs. Render a minimal skeleton
-    // (same width as the chip) so layout doesn't jump.
-    if (isLoading && organizations.length === 0) {
-        return (
-            <div
-                className={cn(
-                    'flex items-center gap-2 px-2 py-1.5 rounded-md',
-                    'text-text-muted dark:text-text-muted-dark',
-                    'text-sm',
-                )}
-                aria-busy="true"
-            >
-                <span className="w-7 h-7 rounded-md bg-surface-tertiary/60 dark:bg-surface-tertiary-dark/60 animate-pulse" />
-                <span className="truncate">{t('loading')}</span>
-            </div>
-        );
-    }
-
-    // Active state: 1+ orgs. Pick the trigger label — if we know the
-    // active Org from the URL slug, use it; otherwise fall back to the
-    // first org in the list so the chip never shows up empty.
-    const triggerOrg = activeOrganization ?? organizations[0];
+    const hasOrgs = organizations.length > 0;
+    // Pick the trigger label org — use the active one (from URL slug) if
+    // resolved, otherwise fall back to the first org so the chip never
+    // shows up empty when orgs exist.
+    const triggerOrg: OrganizationResponse | null = hasOrgs
+        ? (activeOrganization ?? organizations[0])
+        : null;
 
     const handleSelectOrg = (org: OrganizationResponse) => {
         router.push(`/${org.slug}/dashboard`);
@@ -139,14 +112,25 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
                         'w-full rounded-md transition-colors cursor-pointer',
                         'focus:outline-none focus-visible:outline-none',
                         'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                        'px-2 py-1.5',
+                        'px-1.5 py-1',
                     )}
+                    aria-label={t('heading')}
                 >
-                    <div className="flex items-center gap-2 w-full">
-                        <OrgAvatar org={triggerOrg} />
-                        <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
-                            {pickLabel(triggerOrg)}
-                        </span>
+                    <div className="flex items-center gap-1.5 w-full min-w-0">
+                        <FaviconEverWorkImage
+                            config={config}
+                            className="w-9 h-9 max-h-none shrink-0"
+                        />
+                        {triggerOrg ? (
+                            <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
+                                {pickLabel(triggerOrg)}
+                            </span>
+                        ) : (
+                            <LogoEverWorkImage
+                                config={config}
+                                className={cn('flex-1 min-w-0', logoClassName)}
+                            />
+                        )}
                         <ChevronsUpDown
                             className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
                             strokeWidth={1.5}
@@ -155,32 +139,40 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
                     </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="bottom" align="start" className="w-60">
-                    <DropdownMenuLabel>{t('heading')}</DropdownMenuLabel>
-                    {organizations.map((org) => {
-                        const isActive = activeOrganization?.id === org.id;
-                        return (
-                            <DropdownMenuItem
-                                key={org.id}
-                                onClick={() => handleSelectOrg(org)}
-                                className="cursor-pointer"
-                            >
-                                <div className="flex items-center gap-2 w-full">
-                                    <OrgAvatar org={org} size="xs" />
-                                    <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
-                                        {pickLabel(org)}
-                                    </span>
-                                    {isActive && (
-                                        <Check
-                                            className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
-                                            strokeWidth={1.5}
-                                            aria-label="Active organization"
-                                        />
-                                    )}
-                                </div>
-                            </DropdownMenuItem>
-                        );
-                    })}
-                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>
+                        {hasOrgs ? t('heading') : t('bareTenant')}
+                    </DropdownMenuLabel>
+                    {hasOrgs &&
+                        organizations.map((org) => {
+                            const isActive = activeOrganization?.id === org.id;
+                            return (
+                                <DropdownMenuItem
+                                    key={org.id}
+                                    onClick={() => handleSelectOrg(org)}
+                                    className="cursor-pointer"
+                                >
+                                    <div className="flex items-center gap-2 w-full">
+                                        <OrgAvatar org={org} size="xs" />
+                                        <span className="flex-1 min-w-0 truncate text-text dark:text-text-dark">
+                                            {pickLabel(org)}
+                                        </span>
+                                        {isActive && (
+                                            <Check
+                                                className="w-4 h-4 shrink-0 text-text-muted dark:text-text-muted-dark"
+                                                strokeWidth={1.5}
+                                                aria-label="Active organization"
+                                            />
+                                        )}
+                                    </div>
+                                </DropdownMenuItem>
+                            );
+                        })}
+                    {hasOrgs && <DropdownMenuSeparator />}
+                    {isLoading && !hasOrgs && (
+                        <DropdownMenuItem disabled className="text-text-muted">
+                            {t('loading')}
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={handleCreateOrg} className="cursor-pointer">
                         <div className="flex items-center gap-2 w-full">
                             <span className="w-5 h-5 inline-flex items-center justify-center shrink-0">
