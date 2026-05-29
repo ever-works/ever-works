@@ -48,8 +48,31 @@ export function resolvePluginEnabled(ctx: PluginEnableContext): boolean {
     return ctx.autoEnable ?? false;
 }
 
+/**
+ * Loader callback used by lazy-registered plugins. Returns the
+ * fully-constructed IPlugin instance — invoked at most once per
+ * plugin id (memoized by `ensureLoaded`), the first time something
+ * actually needs the runtime.
+ */
+export type LazyPluginLoader = (pluginId: string) => Promise<IPlugin>;
+
+/**
+ * Optional hook the bootstrap layer wires onto the registry so the
+ * lazy-load path can fire `onLoad` lifecycle after `ensureLoaded`
+ * constructs the plugin. Kept as an injected callback (not a direct
+ * dep on PluginLifecycleManagerService) so the registry stays a
+ * leaf-level service with no upward NestJS dependency.
+ */
+export type PluginPostLoadHook = (pluginId: string) => Promise<void>;
+
 export interface RegisteredPlugin {
-    plugin: IPlugin;
+    /**
+     * The plugin runtime instance. Eager-registered plugins always
+     * have this set; lazy-registered plugins leave it `undefined`
+     * until `ensureLoaded` fires the deferred `import()` and stores
+     * the constructed instance here.
+     */
+    plugin?: IPlugin;
     manifest: PluginManifest;
     state: PluginState;
     builtIn: boolean;
@@ -70,11 +93,174 @@ export class PluginRegistryService {
     private readonly byCategory = new Map<PluginCategory, Set<string>>();
     private readonly byCapability = new Map<string, Set<string>>();
 
+    /**
+     * Lazy-load support: deferred constructor + memoised resolution
+     * promise per plugin id. Populated by `registerLazy`; drained by
+     * `ensureLoaded`. Eager-registered plugins (system plugins, tests,
+     * pre-constructed built-ins) never touch these maps.
+     */
+    private readonly lazyLoaders = new Map<string, LazyPluginLoader>();
+    private readonly loadPromises = new Map<string, Promise<IPlugin>>();
+    private postLoadHook: PluginPostLoadHook | null = null;
+
     constructor(
         private readonly eventEmitter: EventEmitter2,
         @Optional() private readonly workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
+
+    /**
+     * Wire the post-load hook (typically `lifecycleManager.callOnLoad`)
+     * so lazy-loaded plugins fire `onLoad` after construction. Eager
+     * mode doesn't use this — the bootstrap iterates `callOnLoad` itself.
+     */
+    setPostLoadHook(hook: PluginPostLoadHook | null): void {
+        this.postLoadHook = hook;
+    }
+
+    /**
+     * Register a plugin manifest with a deferred loader. The plugin
+     * code is NOT imported here — the entry is added to the indices
+     * (by-id / by-category / by-capability) using manifest fields only,
+     * and the `loader` is parked for the first `ensureLoaded(id)` call.
+     *
+     * Use this in place of `register()` for any plugin you don't need
+     * fully constructed at boot. The first runtime consumer (typically
+     * a facade calling `ensureLoaded` from `resolvePlugin`) triggers
+     * the deferred `import()`.
+     */
+    registerLazy(
+        manifest: PluginManifest,
+        loader: LazyPluginLoader,
+        options?: {
+            builtIn?: boolean;
+            installPath?: string;
+        },
+    ): RegisteredPlugin {
+        const pluginId = manifest.id;
+
+        if (this.plugins.has(pluginId)) {
+            throw new Error(`Plugin "${pluginId}" is already registered`);
+        }
+
+        const registered: RegisteredPlugin = {
+            plugin: undefined,
+            manifest,
+            state: 'unloaded',
+            builtIn: options?.builtIn || false,
+            installPath: options?.installPath,
+            registeredAt: Date.now(),
+            stateHistory: [
+                {
+                    from: 'unloaded',
+                    to: 'unloaded',
+                    timestamp: Date.now(),
+                },
+            ],
+        };
+
+        this.plugins.set(pluginId, registered);
+        this.lazyLoaders.set(pluginId, loader);
+
+        if (!this.byCategory.has(manifest.category)) {
+            this.byCategory.set(manifest.category, new Set());
+        }
+        this.byCategory.get(manifest.category)!.add(pluginId);
+
+        for (const capability of manifest.capabilities) {
+            if (!this.byCapability.has(capability)) {
+                this.byCapability.set(capability, new Set());
+            }
+            this.byCapability.get(capability)!.add(pluginId);
+        }
+
+        this.logger.debug(`Registered lazy plugin: ${pluginId} v${manifest.version}`);
+
+        this.eventEmitter.emit(PluginEvents.REGISTERED, {
+            pluginId,
+            version: manifest.version,
+            category: manifest.category,
+            capabilities: manifest.capabilities,
+            timestamp: Date.now(),
+            lazy: true,
+        });
+
+        return registered;
+    }
+
+    /**
+     * Materialise a lazy-registered plugin: invoke the deferred loader,
+     * attach the resulting IPlugin to the registry entry, transition
+     * state to `loaded`, and fire the post-load hook (typically
+     * `onLoad`). Subsequent calls return the cached instance instantly.
+     *
+     * Throws if the plugin id is unknown, or rejects with the loader's
+     * error if the deferred import fails (state transitions to `error`).
+     * Failed loads are NOT retried — the rejected promise is kept so
+     * repeat callers see the same failure deterministically.
+     *
+     * For eager-registered plugins this is a no-op fast path: the
+     * cached `plugin` is returned without any extra work.
+     */
+    async ensureLoaded(pluginId: string): Promise<IPlugin> {
+        const registered = this.plugins.get(pluginId);
+        if (!registered) {
+            throw new Error(`Plugin "${pluginId}" is not registered`);
+        }
+
+        if (registered.state === 'loaded' && registered.plugin) {
+            return registered.plugin;
+        }
+
+        if (registered.state === 'error') {
+            throw new Error(
+                `Plugin "${pluginId}" previously failed to load: ${
+                    registered.error instanceof Error
+                        ? registered.error.message
+                        : registered.error ?? 'unknown error'
+                }`,
+            );
+        }
+
+        const cached = this.loadPromises.get(pluginId);
+        if (cached) return cached;
+
+        const loader = this.lazyLoaders.get(pluginId);
+        if (!loader) {
+            throw new Error(
+                `Plugin "${pluginId}" has no lazy loader registered ` +
+                    `(state=${registered.state}, plugin=${registered.plugin ? 'present' : 'missing'})`,
+            );
+        }
+
+        this.updateState(pluginId, 'loading');
+
+        const promise = (async () => {
+            const plugin = await loader(pluginId);
+            registered.plugin = plugin;
+            this.updateState(pluginId, 'loaded');
+            if (this.postLoadHook) {
+                await this.postLoadHook(pluginId);
+            }
+            return plugin;
+        })().catch((error) => {
+            this.loadPromises.delete(pluginId);
+            this.updateState(pluginId, 'error', error as Error);
+            throw error;
+        });
+
+        this.loadPromises.set(pluginId, promise);
+        return promise;
+    }
+
+    /**
+     * `true` when the plugin id was registered lazily (has a parked
+     * loader). Caller-side gate for "should I call ensureLoaded
+     * before reading `.plugin`?". Eager registrations return `false`.
+     */
+    isLazy(pluginId: string): boolean {
+        return this.lazyLoaders.has(pluginId);
+    }
 
     register(
         plugin: IPlugin,
@@ -159,6 +345,8 @@ export class PluginRegistryService {
         }
 
         this.plugins.delete(pluginId);
+        this.lazyLoaders.delete(pluginId);
+        this.loadPromises.delete(pluginId);
 
         this.logger.log(`Unregistered plugin: ${pluginId}`);
 
@@ -334,6 +522,8 @@ export class PluginRegistryService {
         this.plugins.clear();
         this.byCategory.clear();
         this.byCapability.clear();
+        this.lazyLoaders.clear();
+        this.loadPromises.clear();
         this.logger.warn('Registry cleared');
     }
 

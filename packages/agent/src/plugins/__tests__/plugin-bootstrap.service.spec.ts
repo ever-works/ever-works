@@ -4,6 +4,7 @@ import { PluginBootstrapService } from '../services/plugin-bootstrap.service';
 import { PluginLoaderService } from '../services/plugin-loader.service';
 import { PluginLifecycleManagerService } from '../services/plugin-lifecycle-manager.service';
 import { PluginContextFactoryService } from '../services/plugin-context-factory.service';
+import { PluginRegistryService } from '../services/plugin-registry.service';
 
 // Silence Logger output during tests
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -48,6 +49,18 @@ describe('PluginBootstrapService', () => {
                 {
                     provide: PluginContextFactoryService,
                     useValue: {},
+                },
+                {
+                    provide: PluginRegistryService,
+                    useValue: {
+                        // Lazy-mode plumbing: bootstrap consults the
+                        // registry to wire `setPostLoadHook` and to
+                        // ask `isLazy(id)` per result. Defaults here
+                        // (no-op hook setter, all eager) preserve the
+                        // pre-lazy assertions in this suite.
+                        setPostLoadHook: jest.fn(),
+                        isLazy: jest.fn().mockReturnValue(false),
+                    },
                 },
             ],
         }).compile();

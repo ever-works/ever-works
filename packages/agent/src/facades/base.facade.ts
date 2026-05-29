@@ -73,8 +73,17 @@ export abstract class BaseFacadeService {
     }
 
     isConfigured(): boolean {
+        // Lazy-safe: `unloaded` plugins with a parked loader ARE
+        // configured — they'll materialise on first use. Eager-mode
+        // plugins in `unloaded` state (no parked loader) are still
+        // treated as not-configured to preserve existing semantics.
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
+        return (
+            plugins.length > 0 &&
+            plugins.some(
+                (p) => p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            )
+        );
     }
 
     getAvailableProviders(): Array<{
@@ -84,9 +93,17 @@ export abstract class BaseFacadeService {
     }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: this.getProviderName(p.plugin),
-            enabled: p.state === 'loaded',
+            id: p.manifest.id,
+            // Plugin instance may not be loaded yet under lazy mode —
+            // fall back to manifest.name (which is the same value in
+            // practice; runtime `providerName` overrides aren't
+            // available until the plugin is materialised).
+            name: p.plugin ? this.getProviderName(p.plugin) : p.manifest.name,
+            // Lazy-registered plugins report as enabled even before
+            // first load (they're available; `ensureLoaded` will
+            // materialise on demand). Eager `unloaded` plugins remain
+            // not-enabled to preserve existing semantics.
+            enabled: p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
         }));
     }
 
@@ -102,11 +119,14 @@ export abstract class BaseFacadeService {
         return enabled
             .filter((p) => !p.manifest.supplementary)
             .map((p) => ({
-                id: p.plugin.id,
-                name: p.manifest.name ?? p.plugin.id,
+                id: p.manifest.id,
+                name: p.manifest.name ?? p.manifest.id,
                 description: p.manifest.description,
                 icon: p.manifest.icon,
-                providerName: this.getProviderName(p.plugin),
+                // Plugin instance may not be loaded yet under lazy
+                // mode — fall back to manifest.name when the runtime
+                // `providerName` override isn't available yet.
+                providerName: p.plugin ? this.getProviderName(p.plugin) : p.manifest.name,
                 enabled: true,
                 isDefault: p.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ?? false,
                 selectableProviderCategories: p.manifest.selectableProviderCategories ?? [],
@@ -126,7 +146,15 @@ export abstract class BaseFacadeService {
 
                 if (activePlugin) {
                     const registered = this.registry.get(activePlugin.pluginId);
-                    if (registered && registered.state === 'loaded') {
+                    // Lazy-aware: `unloaded` plugins with a parked
+                    // loader ARE valid defaults; the caller
+                    // materialises them on demand. Eager `unloaded`
+                    // entries remain ineligible.
+                    if (
+                        registered &&
+                        (registered.state === 'loaded' ||
+                            (this.registry.isLazy?.(registered.manifest.id) ?? false))
+                    ) {
                         // Verify plugin is enabled for this scope (work + user)
                         const isEnabled = await this.isPluginEnabled(
                             activePlugin.pluginId,
@@ -135,8 +163,10 @@ export abstract class BaseFacadeService {
                         );
                         if (isEnabled) {
                             return {
-                                id: registered.plugin.id,
-                                name: this.getProviderName(registered.plugin),
+                                id: registered.manifest.id,
+                                name: registered.plugin
+                                    ? this.getProviderName(registered.plugin)
+                                    : registered.manifest.name,
                             };
                         }
                     }
@@ -149,9 +179,12 @@ export abstract class BaseFacadeService {
         const enabledPlugins = await this.getEnabledPlugins(workId, userId);
 
         if (enabledPlugins.length > 0) {
+            const first = enabledPlugins[0];
             return {
-                id: enabledPlugins[0].plugin.id,
-                name: this.getProviderName(enabledPlugins[0].plugin),
+                id: first.manifest.id,
+                name: first.plugin
+                    ? this.getProviderName(first.plugin)
+                    : first.manifest.name,
             };
         }
 
@@ -257,7 +290,15 @@ export abstract class BaseFacadeService {
 
             if (activePlugin) {
                 const registered = this.registry.get(activePlugin.pluginId);
-                if (registered && registered.state === 'loaded') {
+                // Lazy-aware: `unloaded` plugins with a parked loader
+                // ARE valid candidates; the caller (`resolvePlugin`)
+                // materialises them on demand. Eager `unloaded`
+                // entries remain ineligible.
+                if (
+                    registered &&
+                    (registered.state === 'loaded' ||
+                        (this.registry.isLazy?.(registered.manifest.id) ?? false))
+                ) {
                     return registered;
                 }
             }
@@ -273,9 +314,16 @@ export abstract class BaseFacadeService {
         const result: RegisteredPlugin[] = [];
 
         for (const p of plugins) {
-            if (p.state !== 'loaded') continue;
+            // Lazy-aware: plugins with a parked loader (registered
+            // lazily, state==='unloaded') ARE eligible — the caller
+            // will materialise on demand. Eager `unloaded` plugins
+            // (no loader) stay ineligible, matching pre-lazy
+            // behaviour exactly.
+            if (p.state !== 'loaded' && !(this.registry.isLazy?.(p.manifest.id) ?? false)) {
+                continue;
+            }
 
-            const isEnabled = await this.isPluginEnabled(p.plugin.id, workId, userId);
+            const isEnabled = await this.isPluginEnabled(p.manifest.id, workId, userId);
             if (isEnabled) {
                 result.push(p);
             }
@@ -315,24 +363,37 @@ export abstract class BaseFacadeService {
             if (
                 registered &&
                 registered.manifest.capabilities.includes(this.CAPABILITY) &&
-                registered.state === 'loaded'
+                (registered.state === 'loaded' || (this.registry.isLazy?.(effectiveOverride) ?? false))
             ) {
                 const isEnabled = await this.isPluginEnabled(effectiveOverride, workId, userId);
-                if (isEnabled) return registered.plugin as T;
+                if (isEnabled) return (await this.materialize(registered)) as T;
             }
             throw new ProviderNotFoundError(effectiveOverride, this.CAPABILITY);
         }
 
         if (workId) {
             const activePlugin = await this.findActivePluginForWork(workId);
-            if (activePlugin) return activePlugin.plugin as T;
+            if (activePlugin) return (await this.materialize(activePlugin)) as T;
         }
 
         const enabledPlugins = await this.getEnabledPlugins(workId, userId);
         if (enabledPlugins.length > 0) {
-            return enabledPlugins[0].plugin as T;
+            return (await this.materialize(enabledPlugins[0])) as T;
         }
 
         throw new NoProviderError(this.CAPABILITY);
+    }
+
+    /**
+     * Backward-compatible plugin instance resolver. In eager mode the
+     * registered entry already carries the IPlugin instance (no
+     * `ensureLoaded` round-trip needed; existing test mocks keep
+     * working). In lazy mode the instance is undefined until first
+     * use, so we delegate to `registry.ensureLoaded()` which fires
+     * the deferred `import()` + `onLoad` exactly once per plugin id.
+     */
+    private async materialize(registered: RegisteredPlugin): Promise<IPlugin> {
+        if (registered.plugin) return registered.plugin;
+        return this.registry.ensureLoaded(registered.manifest.id);
     }
 }

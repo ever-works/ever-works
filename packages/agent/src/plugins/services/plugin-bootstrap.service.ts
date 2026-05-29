@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PluginLoaderService } from './plugin-loader.service';
 import { PluginLifecycleManagerService } from './plugin-lifecycle-manager.service';
 import { PluginContextFactoryService } from './plugin-context-factory.service';
+import { PluginRegistryService } from './plugin-registry.service';
 
 /**
  * Result of the bootstrap operation
@@ -44,6 +45,7 @@ export class PluginBootstrapService {
         private readonly pluginLoader: PluginLoaderService,
         private readonly lifecycleManager: PluginLifecycleManagerService,
         private readonly contextFactory: PluginContextFactoryService,
+        private readonly registry: PluginRegistryService,
     ) {}
 
     /**
@@ -80,12 +82,75 @@ export class PluginBootstrapService {
             };
         }
 
-        this.logger.log('Bootstrapping plugin system...');
+        // Lazy-load mode (opt-in via `PLUGIN_LAZY_LOAD=true`): only
+        // discover manifests at boot, defer each plugin's `await
+        // import()` + `onLoad` until the first `registry.ensureLoaded`
+        // call (typically from a facade's `resolvePlugin`). Reduces
+        // API process RSS by the sum of every plugin's SDK weight —
+        // material when many notification-channel + email-provider +
+        // pipeline plugins ship but the API process only ever invokes
+        // a handful of them at runtime (most channel/email delivery
+        // happens inside the Trigger.dev hosted sandbox, not the API).
+        //
+        // Default stays eager so existing behaviour is unchanged for
+        // any environment that doesn't flip the flag.
+        const lazyLoad = process.env.PLUGIN_LAZY_LOAD === 'true';
+
+        this.logger.log(
+            `Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode)`,
+        );
 
         // Connect the context factory to the lifecycle manager
         this.lifecycleManager.setContextFactory(this.contextFactory);
 
-        // Discover and load plugins
+        if (lazyLoad) {
+            // Wire the post-load hook so the registry fires `onLoad`
+            // after `ensureLoaded` constructs each plugin. Without
+            // this, lazy-loaded plugins would never get their lifecycle
+            // hook called.
+            this.registry.setPostLoadHook(async (pluginId: string) => {
+                const result = await this.lifecycleManager.callOnLoad(pluginId);
+                if (!result.success) {
+                    // Don't throw — the plugin instance is already
+                    // attached and `state=loaded`. Surface as a log;
+                    // the caller still gets the plugin.
+                    this.logger.error(
+                        `Post-load onLoad failed for "${pluginId}": ${result.error}`,
+                    );
+                }
+            });
+
+            const result = await this.pluginLoader.discoverAndRegisterAll();
+            this.logger.log(
+                `Plugin lazy-discovery complete: ${result.loaded} registered (${result.discovered} lazy), ${result.failed} failed. ` +
+                    `Heavy import() deferred until first use.`,
+            );
+
+            // Built-in plugins (small, pre-constructed instances) ARE
+            // already loaded by discoverAndRegisterAll(). Fire their
+            // onLoad now to preserve existing eager semantics for the
+            // built-in subset — only the lazy-registered filesystem
+            // plugins defer.
+            for (const loadResult of result.results) {
+                if (
+                    loadResult.success &&
+                    loadResult.pluginId &&
+                    !this.registry.isLazy(loadResult.pluginId)
+                ) {
+                    await this.lifecycleManager.callOnLoad(loadResult.pluginId);
+                }
+            }
+
+            PluginBootstrapService.initialized = true;
+            this.logger.log('Plugin system bootstrapped successfully (lazy mode)');
+            return {
+                executed: true,
+                loaded: result.loaded,
+                failed: result.failed,
+            };
+        }
+
+        // Eager (default) path — unchanged.
         const result = await this.pluginLoader.discoverAndLoadAll();
         this.logger.log(
             `Plugin discovery complete: ${result.loaded} loaded, ${result.failed} failed`,

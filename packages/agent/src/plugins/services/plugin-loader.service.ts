@@ -475,6 +475,201 @@ export class PluginLoaderService {
     }
 
     /**
+     * Lazy-load variant of `discoverAndLoadAll`. Built-in plugins
+     * (passed via `PluginsModuleOptions.builtInPlugins`) are still
+     * eagerly loaded — they're already pre-constructed in memory, so
+     * registering them lazily would save nothing. Filesystem-discovered
+     * plugins are registered via `registry.registerLazy` so their
+     * heavy `await import()` is deferred until the first
+     * `registry.ensureLoaded(id)` call.
+     *
+     * Used by the lazy bootstrap path when `PLUGIN_LAZY_LOAD=true`.
+     * Returns the same shape as the eager variant so callers can swap
+     * paths without rewriting telemetry.
+     */
+    async discoverAndRegisterAll(): Promise<{
+        discovered: number;
+        loaded: number;
+        failed: number;
+        results: LoadResult[];
+    }> {
+        const discovered = await this.discover();
+        const results: LoadResult[] = [];
+        let loaded = 0;
+        let failed = 0;
+
+        // Built-in plugins remain eager: they're already constructed
+        // instances, so there's no `import()` cost to defer.
+        if (this.options.builtInPlugins) {
+            for (const pluginModule of this.options.builtInPlugins) {
+                const result = await this.loadBuiltIn(pluginModule);
+                results.push(result);
+                if (result.success) loaded++;
+                else {
+                    failed++;
+                    this.logger.warn(
+                        `Failed to load built-in plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
+                    );
+                }
+            }
+        }
+
+        // Filesystem-discovered plugins register lazily.
+        for (const discoveredPlugin of discovered) {
+            const result = await this.registerLazy(discoveredPlugin);
+            results.push(result);
+            if (result.success) loaded++;
+            else {
+                failed++;
+                this.logger.warn(
+                    `Failed to lazy-register plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
+                );
+            }
+        }
+
+        this.logger.log(
+            `Plugin registration complete: ${loaded} registered (${discovered.length} lazy), ${failed} failed`,
+        );
+
+        return {
+            discovered: discovered.length,
+            loaded,
+            failed,
+            results,
+        };
+    }
+
+    /**
+     * Lazy-register a discovered plugin. Runs only the cheap pre-flight
+     * checks (duplicate-id, version-compat from manifest) and parks a
+     * loader closure with the registry. The plugin's main module is
+     * NOT imported here — that happens on the first
+     * `registry.ensureLoaded(id)` call, typically from a facade's
+     * `resolvePlugin` path.
+     */
+    async registerLazy(discovered: DiscoveredPlugin): Promise<LoadResult> {
+        const { manifest, path: pluginPath } = discovered;
+
+        try {
+            if (this.registry.has(manifest.id)) {
+                return {
+                    success: false,
+                    pluginId: manifest.id,
+                    error: `Plugin "${manifest.id}" is already registered`,
+                };
+            }
+
+            const versionResult = this.versionChecker.check(
+                manifest,
+                this.registry.getVersionsMap(),
+            );
+            if (!versionResult.valid) {
+                return {
+                    success: false,
+                    pluginId: manifest.id,
+                    error: `Version check failed: ${versionResult.errors?.map((e) => e.message).join(', ')}`,
+                };
+            }
+
+            const warnings: string[] = [];
+            if (versionResult.warnings) {
+                warnings.push(...versionResult.warnings.map((w) => w.message));
+            }
+
+            // Loader closure: invoked at most once per plugin id by
+            // PluginRegistryService.ensureLoaded(). Owns the deferred
+            // import + class validation + DB state transition; the
+            // registry handles attach-plugin + state=loaded + the
+            // post-load onLoad hook.
+            const loader = async (): Promise<IPlugin> => {
+                const plugin = await this.loadPluginModule(pluginPath, manifest);
+                if (!plugin) {
+                    throw new Error(
+                        `Failed to load plugin module for "${manifest.id}" from ${pluginPath}`,
+                    );
+                }
+
+                // Merge runtime manifest (icon, readme, etc.) — same
+                // logic as the eager `load()` path.
+                let resolvedManifest = manifest;
+                if (typeof plugin.getManifest === 'function') {
+                    const runtimeManifest = plugin.getManifest();
+                    const definedManifest = pickBy(
+                        manifest as unknown as Record<string, unknown>,
+                        (v) => v !== undefined,
+                    );
+                    resolvedManifest = {
+                        ...runtimeManifest,
+                        ...definedManifest,
+                    } as typeof manifest;
+                }
+
+                const classValidation = this.classValidator.validate(plugin, resolvedManifest);
+                if (!classValidation.valid) {
+                    throw new Error(
+                        `Plugin validation failed: ${classValidation.errors?.map((e) => e.message).join(', ')}`,
+                    );
+                }
+
+                // Persist DB state — the row was upserted as 'unloaded'
+                // at lazy-register time; update to 'loaded' now.
+                await this.pluginRepository.upsert({
+                    pluginId: resolvedManifest.id,
+                    name: resolvedManifest.name,
+                    version: resolvedManifest.version,
+                    description: resolvedManifest.description,
+                    category: resolvedManifest.category,
+                    capabilities: [...resolvedManifest.capabilities],
+                    manifest: resolvedManifest as unknown as Record<string, unknown>,
+                    builtIn: discovered.builtIn,
+                    installPath: pluginPath,
+                    state: 'loaded',
+                });
+
+                this.logger.log(
+                    `Lazy-loaded plugin: ${resolvedManifest.id} v${resolvedManifest.version}`,
+                );
+                return plugin;
+            };
+
+            this.registry.registerLazy(manifest, loader, {
+                builtIn: discovered.builtIn,
+                installPath: pluginPath,
+            });
+
+            // Persist a manifest-only row so the DB reflects "known but
+            // not loaded yet" — admin tooling reading `plugins` table
+            // sees every discovered plugin even before first use.
+            await this.pluginRepository.upsert({
+                pluginId: manifest.id,
+                name: manifest.name,
+                version: manifest.version,
+                description: manifest.description,
+                category: manifest.category,
+                capabilities: [...manifest.capabilities],
+                manifest: manifest as unknown as Record<string, unknown>,
+                builtIn: discovered.builtIn,
+                installPath: pluginPath,
+                state: 'unloaded',
+            });
+
+            return {
+                success: true,
+                pluginId: manifest.id,
+                warnings: warnings.length > 0 ? warnings : undefined,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to lazy-register plugin ${manifest.id}:`, error);
+            return {
+                success: false,
+                pluginId: manifest.id,
+                error: message,
+            };
+        }
+    }
+
+    /**
      * Discover and load all plugins with dependency resolution
      */
     async discoverAndLoadAll(): Promise<{
