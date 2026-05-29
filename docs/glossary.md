@@ -39,6 +39,60 @@ The overall classification system for a work, encompassing categories, tags, and
 
 A URL-friendly, human-readable identifier derived from an entity's name. Slugs are used in URLs instead of numeric IDs. For example, an item named "Visual Studio Code" might have the slug `visual-studio-code`. Slugs are unique within their scope (e.g., item slugs are unique per work).
 
+## Missions, Ideas, Agents & Autonomy
+
+### Mission
+
+An ambitious, ongoing goal that the platform keeps pursuing for you — bigger than any single website (e.g. "run the best cats business worldwide"). A Mission generates [Ideas](/features/ideas) and, optionally, auto-builds them into Works on a schedule. See [Missions](/features/missions).
+
+### Idea
+
+A one-shot proposal for a single Work — one Idea becomes one Work, then is marked done. Ideas can be suggested by the platform, added by you, or spawned by a Mission. Useful as a lightweight "plan" you can research before committing to a build. See [Ideas](/features/ideas).
+
+### Agent (AI Employee)
+
+A named, persistent, user-defined AI worker scoped to a Tenant, Mission, Idea, or Work — for example a "CEO", "CTO", or "Researcher". Distinct from the pipeline **Agent** below: this is a standing team member with its own identity files, provider, heartbeat schedule, budget, permissions, skills, tasks, and optional mailboxes. See [Agents](/features/agents).
+
+### Work Agent
+
+The built-in, platform-managed engine that turns a Goal into Ideas and Ideas into Works with zero setup. It is the default zero-friction path and stands alongside user-defined Agents.
+
+### Heartbeat
+
+An Agent's scheduled "what should I do next?" tick. On each heartbeat the Agent chooses one action — create a task, advance one, update its own instructions, or observe. The mechanism behind 24/7 [autonomous operation](/features/autonomous-operation).
+
+### Skill
+
+A reusable capability that can be bound to an Agent (or inherited from its scope), delivered through a skills-provider plugin. Skills extend what an Agent can do without changing core code.
+
+### Task
+
+A unit of work assigned to an Agent (or human), with a lifecycle and chat. Tasks are the canonical channel for Agent-to-Agent collaboration, giving every interaction an audit trail and correct cost attribution.
+
+### Knowledge Base (KB)
+
+A per-Work, typed, Git-backed store of institutional context — brand voice, legal copy, SEO conventions, glossary, competitors, personas, research, and agent outputs — that every generation run reads from. The platform's built-in memory and wiki layer. See [Knowledge Base](/features/knowledge-base).
+
+### Email Address / Inbox
+
+A tenant-registered email address (outbound, inbound, or both) backed by an email-provider plugin, assignable to an Agent / Mission / Idea / Work. Inbound mail becomes Tasks or conversations; outbound mail is sent by Agents. See [Agent Email & Inboxes](/features/agent-email).
+
+### Work Template / Mission Template
+
+A **Work Template** is the codebase a Work's website is generated from (the [website templates](/features/website-templates) catalog). A **Mission Template** is a curated playbook (docs, prompts, cadence, pre-declared Agents) for an ambitious goal. See [Mission Templates](/features/mission-templates).
+
+### Store / Company
+
+Planned [Work](/features/creating-a-work) shapes. A **Store** is a self-maintaining eCommerce storefront; a **Company** is a whole AI-staffed organization that runs Works toward a Mission. See [Store Builder](/features/store-builder) and [Company Builder](/features/company-builder).
+
+### Worker
+
+The background-execution layer (Trigger.dev plus internal queues) that runs Agent heartbeats, generation pipelines, scheduled updates, and Mission ticks in parallel, with retries. See [Workers](/features/workers).
+
+### Tenant / Organization
+
+The multi-tenancy containers that own addresses, Agents, Works, and inheritable KB policy. The foundation under the [Company Builder](/features/company-builder). See [Multi-Tenancy](/advanced/multi-tenancy).
+
 ## AI and Automation
 
 ### Pipeline
