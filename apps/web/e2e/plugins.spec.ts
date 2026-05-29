@@ -8,10 +8,14 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Plugins', () => {
     test('should load plugins page', async ({ page }) => {
-        await page.goto('/en/plugins');
+        const response = await page.goto('/en/plugins');
 
         await expect(page).toHaveURL(/\/plugins/);
-        await expect(page.locator('body')).not.toContainText('500');
+        // Assert against the HTTP status, not the body — the page's catalog
+        // copy now includes "500+ third-party apps" (Composio plugin
+        // description) which triggers a false positive when scanning body
+        // text for "500".
+        expect(response?.status(), '/en/plugins should not 5xx').toBeLessThan(500);
     });
 
     test('should display plugin cards or list', async ({ page }) => {
