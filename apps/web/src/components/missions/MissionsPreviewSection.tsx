@@ -71,8 +71,8 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
         <section className="mt-8" aria-labelledby="missions-preview-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                        <Target className="w-4 h-4 text-warning" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-missions/10 border border-concept-missions/20 flex items-center justify-center">
+                        <Target className="w-4 h-4 text-concept-missions" />
                     </div>
                     <h2
                         id="missions-preview-heading"
@@ -170,8 +170,8 @@ function MissionPreviewCard({
             )}
         >
             <div className="flex items-start gap-2 min-w-0">
-                <div className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center bg-warning/10 border border-warning/20">
-                    <Target className="w-3.5 h-3.5 text-warning" strokeWidth={1.6} />
+                <div className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center bg-concept-missions/10 border border-concept-missions/20">
+                    <Target className="w-3.5 h-3.5 text-concept-missions" strokeWidth={1.6} />
                 </div>
                 <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">

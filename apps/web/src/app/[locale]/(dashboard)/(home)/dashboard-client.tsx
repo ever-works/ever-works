@@ -142,8 +142,8 @@ export default function DashboardClient({
                         otherwise default to Mission/Idea. */}
                     <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2 min-w-0">
-                            <div className="shrink-0 w-9 h-9 rounded-lg bg-accent-indigo/10 border border-accent-indigo/20 flex items-center justify-center">
-                                <FolderKanban className="w-4 h-4 text-accent-indigo" />
+                            <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-works/10 border border-concept-works/20 flex items-center justify-center">
+                                <FolderKanban className="w-4 h-4 text-concept-works" />
                             </div>
                             <h2 className="text-xl font-semibold text-text dark:text-text-dark truncate">
                                 {t('works.recent')}
