@@ -143,4 +143,59 @@ describe('lazy-plugin-proxy', () => {
         expect(loader).toHaveBeenCalledTimes(2);
         expect(stub.__isMaterialized).toBe(true);
     });
+
+    it('fires onMaterializeError when the loader throws', async () => {
+        const loader = jest.fn<Promise<IPlugin | null>, []>().mockRejectedValue(new Error('boom'));
+        const onMaterializeError = jest.fn().mockResolvedValue(undefined);
+
+        const stub = createLazyPluginProxy(
+            makeManifest('p7'),
+            loader,
+            undefined,
+            onMaterializeError,
+        );
+
+        await expect(stub.onLoad({} as never)).rejects.toThrow('boom');
+
+        expect(onMaterializeError).toHaveBeenCalledTimes(1);
+        expect(onMaterializeError).toHaveBeenCalledWith(
+            'p7',
+            expect.objectContaining({ message: 'boom' }),
+        );
+    });
+
+    it('fires onMaterializeError when the loader returns null', async () => {
+        const loader = jest.fn<Promise<IPlugin | null>, []>().mockResolvedValue(null);
+        const onMaterializeError = jest.fn().mockResolvedValue(undefined);
+
+        const stub = createLazyPluginProxy(
+            makeManifest('p8'),
+            loader,
+            undefined,
+            onMaterializeError,
+        );
+
+        await expect(stub.onLoad({} as never)).rejects.toThrow(/Failed to materialize plugin/);
+        expect(onMaterializeError).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not let onMaterializeError swallow the original loader error', async () => {
+        const loader = jest
+            .fn<Promise<IPlugin | null>, []>()
+            .mockRejectedValue(new Error('original'));
+        const onMaterializeError = jest
+            .fn<Promise<void>, [string, Error]>()
+            .mockRejectedValue(new Error('hook-failure'));
+
+        const stub = createLazyPluginProxy(
+            makeManifest('p9'),
+            loader,
+            undefined,
+            onMaterializeError,
+        );
+
+        // Caller should see the ORIGINAL loader error, not the hook's error —
+        // the hook is best-effort bookkeeping and must not mask the cause.
+        await expect(stub.onLoad({} as never)).rejects.toThrow('original');
+    });
 });

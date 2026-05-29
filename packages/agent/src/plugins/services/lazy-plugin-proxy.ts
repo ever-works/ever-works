@@ -30,9 +30,22 @@ export interface LazyPluginStub extends IPlugin {
  */
 export type OnFirstMaterialize = (pluginId: string, real: IPlugin) => Promise<void>;
 
+/**
+ * Optional hook fired when materialization fails (loader throws or returns
+ * null). Without this, a persistently-failing plugin holds a `'loaded'` slot
+ * in the registry forever — readiness filters still return it and every
+ * subsequent call re-throws into application code. Bootstrap wires this to
+ * `registry.updateState(id, 'error')` + DB upsert so the failure surfaces.
+ */
+export type OnMaterializeError = (pluginId: string, error: Error) => Promise<void>;
+
+/**
+ * Lifecycle methods that should fall through to the materialized plugin if
+ * defined. `onUnload` is handled separately (it must NOT force materialization
+ * for a plugin that was never used), so it's intentionally omitted here.
+ */
 const FORWARDED_LIFECYCLE_METHODS = new Set<keyof IPlugin>([
     'onLoad',
-    'onUnload',
     'healthCheck',
     'getManifest',
     'validateSettings',
@@ -49,6 +62,7 @@ export function createLazyPluginProxy(
     manifest: PluginManifest,
     loader: PluginInstanceLoader,
     onFirstMaterialize?: OnFirstMaterialize,
+    onMaterializeError?: OnMaterializeError,
 ): LazyPluginStub {
     let materialized: IPlugin | null = null;
     let importPromise: Promise<IPlugin> | null = null;
@@ -66,9 +80,23 @@ export function createLazyPluginProxy(
                     await onFirstMaterialize(manifest.id, real);
                 }
                 return real;
-            })().catch((err) => {
+            })().catch(async (err) => {
                 // Reset so a later call can retry (e.g. transient FS error).
                 importPromise = null;
+                if (onMaterializeError) {
+                    // Best-effort: surface the failure to the registry / DB so
+                    // readiness filters stop returning the broken stub. We
+                    // swallow hook errors so the original loader failure is
+                    // what reaches the caller.
+                    try {
+                        await onMaterializeError(
+                            manifest.id,
+                            err instanceof Error ? err : new Error(String(err)),
+                        );
+                    } catch {
+                        // ignore
+                    }
+                }
                 throw err;
             });
         }
@@ -130,8 +158,8 @@ export function createLazyPluginProxy(
 
             return (...args: unknown[]) => {
                 return ensureMaterialized().then((real) => {
-                    const target = real as unknown as Record<string | symbol, unknown>;
-                    const fn = target[prop];
+                    const realPlugin = real as unknown as Record<string | symbol, unknown>;
+                    const fn = realPlugin[prop];
                     if (typeof fn !== 'function') {
                         if (isLifecycle) {
                             // Optional lifecycle method missing on real plugin —
