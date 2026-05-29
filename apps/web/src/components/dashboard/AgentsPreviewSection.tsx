@@ -30,8 +30,8 @@ export function AgentsPreviewSection({ agents, totalAgents }: AgentsPreviewSecti
         <section className="mt-8" aria-labelledby="agents-preview-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-primary" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-agents/10 border border-concept-agents/20 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-concept-agents" />
                     </div>
                     <h2
                         id="agents-preview-heading"
