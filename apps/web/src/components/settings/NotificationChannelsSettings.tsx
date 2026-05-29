@@ -104,12 +104,22 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
     const [channels, setChannels] = useState<NotificationChannel[]>(initialChannels);
     const [wizardOpen, setWizardOpen] = useState(false);
     const [testResults, setTestResults] = useState<Record<string, TestState>>({});
-    const [pendingTestId, setPendingTestId] = useState<string | null>(null);
-    const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
+    // Per-channel pending sets — multiple rows can run Test/Remove
+    // concurrently, so a single id can't be shared (Greptile P1).
+    const [pendingTestIds, setPendingTestIds] = useState<ReadonlySet<string>>(new Set());
+    const [pendingRemoveIds, setPendingRemoveIds] = useState<ReadonlySet<string>>(new Set());
+    const [removeErrors, setRemoveErrors] = useState<Record<string, string>>({});
     const [, startTransition] = useTransition();
 
+    function withId(set: ReadonlySet<string>, id: string, present: boolean): Set<string> {
+        const next = new Set(set);
+        if (present) next.add(id);
+        else next.delete(id);
+        return next;
+    }
+
     function handleTest(id: string) {
-        setPendingTestId(id);
+        setPendingTestIds((prev) => withId(prev, id, true));
         startTransition(async () => {
             const result = await sendNotificationChannelTest(id);
             setTestResults((prev) => ({
@@ -121,12 +131,17 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
                       }
                     : { status: 'error', message: result.error ?? 'Test failed' },
             }));
-            setPendingTestId(null);
+            setPendingTestIds((prev) => withId(prev, id, false));
         });
     }
 
     function handleRemove(id: string) {
-        setPendingRemoveId(id);
+        setPendingRemoveIds((prev) => withId(prev, id, true));
+        setRemoveErrors((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
         startTransition(async () => {
             const result = await deleteNotificationChannel(id);
             if (result.success) {
@@ -136,8 +151,13 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
                     delete next[id];
                     return next;
                 });
+            } else {
+                setRemoveErrors((prev) => ({
+                    ...prev,
+                    [id]: result.error ?? 'Failed to remove channel',
+                }));
             }
-            setPendingRemoveId(null);
+            setPendingRemoveIds((prev) => withId(prev, id, false));
         });
     }
 
@@ -180,6 +200,9 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
                     <tbody>
                         {channels.map((c) => {
                             const test = testResults[c.id];
+                            const removeError = removeErrors[c.id];
+                            const testing = pendingTestIds.has(c.id);
+                            const removing = pendingRemoveIds.has(c.id);
                             return (
                                 <tr key={c.id} className="border-b">
                                     <td className="py-2 font-medium">{c.name}</td>
@@ -187,6 +210,11 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
                                     <td className="py-2">{c.verified ? '✓' : '—'}</td>
                                     <td className="py-2 text-right">
                                         <div className="flex items-center justify-end gap-3">
+                                            {removeError && (
+                                                <span className="text-xs text-red-600">
+                                                    ✗ {removeError}
+                                                </span>
+                                            )}
                                             {test && (
                                                 <span
                                                     className={
@@ -202,18 +230,18 @@ export function NotificationChannelsSettings({ initialChannels }: Props) {
                                             <button
                                                 type="button"
                                                 className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
-                                                disabled={pendingTestId === c.id}
+                                                disabled={testing}
                                                 onClick={() => handleTest(c.id)}
                                             >
-                                                {pendingTestId === c.id ? 'Testing…' : 'Test'}
+                                                {testing ? 'Testing…' : 'Test'}
                                             </button>
                                             <button
                                                 type="button"
                                                 className="text-sm text-red-600 hover:text-red-700 disabled:opacity-50"
-                                                disabled={pendingRemoveId === c.id}
+                                                disabled={removing}
                                                 onClick={() => handleRemove(c.id)}
                                             >
-                                                {pendingRemoveId === c.id ? 'Removing…' : 'Remove'}
+                                                {removing ? 'Removing…' : 'Remove'}
                                             </button>
                                         </div>
                                     </td>
@@ -272,7 +300,9 @@ function AddChannelWizard({
             setError('Name is required.');
             return;
         }
-        const targetConfig: Record<string, string> = {};
+        // `let` (not const) per the team style rule for objects whose
+        // properties are assigned after declaration (Greptile).
+        let targetConfig: Record<string, string> = {};
         for (const field of provider.fields) {
             const v = (values[field.key] ?? '').trim();
             if (!v) {

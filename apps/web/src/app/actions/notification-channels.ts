@@ -1,10 +1,22 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import {
     notificationChannelsAPI,
     type NotificationChannel,
     type CreateChannelDto,
 } from '@/lib/api/notification-channels';
+
+/**
+ * Revalidate cached server components that render channel state (e.g. the
+ * channels settings page + any layout that counts channels) after a
+ * create/delete. Mirrors the `revalidatePath` calls in
+ * `app/actions/notifications.ts`. `'layout'` scope invalidates nested
+ * routes too, which covers the locale-prefixed dashboard tree.
+ */
+function revalidateChannels(): void {
+    revalidatePath('/', 'layout');
+}
 
 export interface ChannelMutationResult {
     success: boolean;
@@ -25,6 +37,7 @@ export async function createNotificationChannel(
 ): Promise<ChannelMutationResult> {
     try {
         const channel = await notificationChannelsAPI.create(input);
+        revalidateChannels();
         return { success: true, channel };
     } catch (error) {
         return {
@@ -59,6 +72,7 @@ export async function sendNotificationChannelTest(id: string): Promise<ChannelTe
 export async function deleteNotificationChannel(id: string): Promise<ChannelMutationResult> {
     try {
         await notificationChannelsAPI.remove(id);
+        revalidateChannels();
         return { success: true };
     } catch (error) {
         return {
