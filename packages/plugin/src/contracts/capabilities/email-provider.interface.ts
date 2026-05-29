@@ -210,6 +210,18 @@ export interface IEmailInboundPlugin extends IPlugin {
 	verifyWebhookSignature(rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void;
 
 	/**
+	 * Optional: best-effort extraction of the recipient mailbox
+	 * address(es) from the raw webhook payload, WITHOUT verifying the
+	 * signature. The facade uses this to map an inbound webhook to its
+	 * owning tenant address *before* signature verification, so a
+	 * per-user `inboundWebhookSecret` is resolved at the right scope
+	 * rather than only at admin/env scope. MUST NOT throw — return an
+	 * empty array when the recipient can't be determined. Plugins that
+	 * omit this fall back to admin/env-scoped secret resolution.
+	 */
+	extractInboundRecipients?(rawBody: Buffer, headers: Readonly<Record<string, string>>): readonly string[];
+
+	/**
 	 * Optional: decode a provider's delivery-event webhook (separate
 	 * shape from inbound on most providers). Plugins that don't
 	 * publish delivery events may omit this — the controller skips

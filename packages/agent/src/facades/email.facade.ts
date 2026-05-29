@@ -162,16 +162,78 @@ export class EmailFacadeService extends BaseFacadeService {
         options?: FacadeOptions,
     ): Promise<EmailInboundMessage> {
         const plugin = this.getInboundPluginById(pluginId);
-        const settings = await this.resolveSettings(pluginId, options);
+
+        // EW-670 follow-up — resolve the recipient address's OWNER before
+        // verifying the signature. The inbound webhook controller can't
+        // know the owning user up front (the recipient lives in the
+        // payload), so without this the secret resolves at admin/env
+        // scope only and a per-user `inboundWebhookSecret` is never
+        // loaded — meaning a Postmark/Mailgun `if (!expected) return`
+        // accept-all path silently skips verification for user-scoped
+        // secrets. Map recipient → owning tenant address → userId, then
+        // resolve settings (and therefore the secret) at that scope.
+        // Best-effort and additive: when the caller already supplies a
+        // userId, the plugin omits `extractInboundRecipients`, or no
+        // owner matches, this falls back to the previous behaviour.
+        const scope = await this.resolveInboundScope(plugin, rawBody, headers, options);
+
+        const settings = await this.resolveSettings(pluginId, scope);
         const emailOpts: EmailOptions = {
-            userId: options?.userId,
-            workId: options?.workId,
-            agentId: options?.agentId,
-            taskId: options?.taskId,
+            userId: scope.userId,
+            workId: scope.workId,
+            agentId: scope.agentId,
+            taskId: scope.taskId,
             settings,
         };
         plugin.verifyWebhookSignature(rawBody, headers, emailOpts);
         return plugin.parseInboundWebhook(rawBody, headers, emailOpts);
+    }
+
+    /**
+     * Best-effort: widen the inbound FacadeOptions with the owning user
+     * resolved from the payload's recipient address, so signature
+     * verification reads the owner's per-user secret. Never throws —
+     * returns the original options on any failure.
+     */
+    private async resolveInboundScope(
+        plugin: IEmailInboundPlugin,
+        rawBody: Buffer,
+        headers: Readonly<Record<string, string>>,
+        options?: FacadeOptions,
+    ): Promise<FacadeOptions> {
+        const base: FacadeOptions = { ...options };
+        if (base.userId || !plugin.extractInboundRecipients || !this.emailAddresses) {
+            return base;
+        }
+        try {
+            const recipients = plugin.extractInboundRecipients(rawBody, headers);
+            for (const recipient of recipients) {
+                if (!recipient) continue;
+                const owner = await this.emailAddresses.findByAddress(recipient);
+                // Only adopt the resolved owner when the matched address is
+                // registered to THIS plugin — a mailbox can be registered by
+                // multiple tenants/providers, so an address-only match could
+                // otherwise attribute the verification scope to the wrong
+                // owner (Codex/Greptile on PR #1115). When it doesn't match we
+                // fall back to the base (admin/env) scope below.
+                //
+                // Note: widening the scope to the owner's userId never
+                // *weakens* verification — `getSettings({ userId })` resolves
+                // the admin→user hierarchy, so an admin-level
+                // `inboundWebhookSecret` is still present (and enforced) at
+                // owner scope; the user's own secret only layers on top.
+                if (owner?.userId && owner.pluginId === plugin.id) {
+                    return { ...base, userId: owner.userId };
+                }
+            }
+        } catch (err) {
+            this.logger.warn(
+                `parseInbound: recipient-owner resolution failed, falling back to default scope — ${
+                    (err as Error).message
+                }`,
+            );
+        }
+        return base;
     }
 
     /**
