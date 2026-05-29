@@ -89,13 +89,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 <X className="w-4 h-4" />
             </button>
 
-            <div className="flex items-center gap-3 mb-3 pr-6 min-w-0">
-                <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-white/5">
-                    <Sparkles
-                        strokeWidth={1.4}
-                        className="w-4 h-4 text-primary dark:text-gray-300"
-                    />
-                </div>
+            <div className="flex items-center gap-3 mb-2 pr-6 min-w-0">
                 <div className="min-h-[2lh] flex items-center min-w-0">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
                         {proposal.title}
@@ -174,14 +168,14 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                     type="button"
                     onClick={handleAccept}
                     className={cn(
-                        'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
+                        'flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
                         // Phase 5 PR P — Done state uses the success
                         // color and a checkmark icon. Visually distinct
                         // from the primary-blue Build CTA so a finished
                         // Idea reads as "completed" at a glance.
                         isDone
                             ? 'bg-success hover:bg-success/90'
-                            : 'bg-primary hover:bg-primary-hover',
+                            : 'bg-black dark:bg-white/6 hover:dark:bg-white/10',
                     )}
                 >
                     {isDone ? (
