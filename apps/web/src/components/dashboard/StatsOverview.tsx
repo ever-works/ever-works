@@ -175,79 +175,59 @@ export function StatsOverview({
     ];
 
     return (
-        // 8 tiles. Grid shapes itself to the available width:
-        //   1 col on the narrowest viewport.
-        //   2 cols starting at @lg.
-        //   4 cols starting at @3xl — typical width when the chat
-        //     panel is open (two rows of four).
-        //   8 cols starting at @7xl — the chat panel is collapsed
-        //     and the main column has room for a single row of eight.
-        <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-4 @7xl/main:grid-cols-8 gap-4">
+        <div className="grid grid-cols-2 @xl/main:grid-cols-4 gap-3">
             {statCards.map((stat) => {
                 const tileBody = (
                     <div
                         className={cn(
-                            'group relative rounded-md p-1 transition-shadow duration-200 overflow-hidden h-full',
+                            'group relative flex flex-col gap-4 rounded-xl px-4 py-4 h-full overflow-hidden',
+                            'bg-card dark:bg-surface-secondary-dark',
                             'border border-card-border dark:border-border-dark',
-                            stat.href && 'hover:border-primary-500/50 dark:hover:border-white/20',
+                            'transition-all duration-200',
+                            stat.href &&
+                                'hover:border-primary/30 dark:hover:border-white/15 hover:shadow-sm',
                         )}
                     >
-                        <div
-                            className={cn(
-                                'group relative rounded-sm p-5 transition-shadow duration-200 overflow-hidden h-full',
-                                'bg-card dark:bg-surface-secondary-dark',
-                                'border border-card-border dark:border-border-dark',
-                            )}
-                        >
-                            {/* Decorative short top border accent with fading edges */}
-                            <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-1/2 h-px z-20 opacity-40 rounded-full" />
+                        {/* Decorative top-center glow accent */}
+                        <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-2/5 h-px z-10 opacity-30 rounded-full" />
 
-                            <div className="flex items-end space-x-2">
-                                <div
-                                    className={cn(
-                                        'rounded-md w-8 h-8 flex items-center justify-center',
-                                        'bg-surface dark:bg-white/6',
-                                    )}
-                                >
-                                    <stat.icon
-                                        className={cn('w-4.5 h-4.5', stat.iconColor)}
-                                        strokeWidth={1.3}
-                                    />
-                                </div>
-                                <p className="text-3xl text-text dark:text-text-dark truncate">
-                                    {stat.value}
-                                </p>
+                        {/* Icon + Value */}
+                        <div className="flex items-end gap-2 min-w-0">
+                            <div
+                                className={cn(
+                                    'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                                    'bg-surface dark:bg-white/6',
+                                )}
+                            >
+                                <stat.icon
+                                    className={cn('w-4 h-4', stat.iconColor)}
+                                    strokeWidth={1.4}
+                                />
                             </div>
-                            <div className="mt-1 flex items-center space-x-2">
-                                <div className={cn('w-1 h-1 rounded-full mt-0.5', stat.dotColor)} />
-                                <p className="text-xs text-gray-500 dark:text-text-muted-dark truncate">
+                            <p className="text-2xl font-semibold tracking-tight tabular-nums text-text dark:text-text-dark leading-none truncate">
+                                {stat.value}
+                            </p>
+                        </div>
+
+                        {/* Label */}
+                        <div className="min-w-0">
+                            <div className="mt-2 flex items-center gap-1.5">
+                                <span
+                                    className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)}
+                                />
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
                                     {stat.title}
                                 </p>
                             </div>
                             {stat.sublabel ? (
-                                <p className="mt-1 ml-3 text-[11px] text-text-muted dark:text-text-muted-dark truncate">
+                                <p className="mt-0.5 pl-3 text-[11px] text-text-muted dark:text-text-muted-dark truncate opacity-70">
                                     {stat.sublabel}
                                 </p>
                             ) : null}
-                            <div className="mt-4 items-center hidden">
-                                <span
-                                    className={cn(
-                                        'text-sm font-medium',
-                                        stat.changeType === 'positive' && 'text-success',
-                                        stat.changeType === 'negative' && 'text-danger',
-                                        stat.changeType === 'neutral' &&
-                                            'text-text-muted dark:text-text-muted-dark',
-                                    )}
-                                >
-                                    {stat.change}
-                                </span>
-                                <span className="text-sm text-text-muted dark:text-text-muted-dark ml-2">
-                                    {t('fromLastMonth')}
-                                </span>
-                            </div>
                         </div>
                     </div>
                 );
+
                 if (stat.href) {
                     return (
                         <Link key={stat.title} href={stat.href} className="block no-underline">
