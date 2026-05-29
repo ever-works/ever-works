@@ -238,8 +238,8 @@ export function NewAgentDialog({
     return (
         <div className="max-w-xl mx-auto p-6">
             <div className="flex items-center gap-3 mb-6">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-primary" />
+                <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-agents/10 border border-concept-agents/20 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-concept-agents" />
                 </div>
                 <h1 className="text-xl font-semibold text-text dark:text-text-dark">
                     {t('title')}

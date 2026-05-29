@@ -45,8 +45,8 @@ export function MissionCard({ mission }: { mission: Mission }) {
             )}
         >
             <div className="flex items-start gap-3 mb-3 pr-6 min-w-0">
-                <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-warning/10 border border-warning/20">
-                    <Target strokeWidth={1.4} className="w-4 h-4 text-warning" />
+                <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-concept-missions/10 border border-concept-missions/20">
+                    <Target strokeWidth={1.4} className="w-4 h-4 text-concept-missions" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">

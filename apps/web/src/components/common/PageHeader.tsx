@@ -12,7 +12,18 @@ import { cn } from '@/lib/utils/cn';
  * right side of the header row (e.g. "+ New X" CTA) and stays
  * pinned right when the title block shrinks.
  */
-export type PageHeaderTone = 'primary' | 'success' | 'info' | 'warning' | 'danger' | 'accent';
+export type PageHeaderTone =
+    | 'primary'
+    | 'success'
+    | 'info'
+    | 'warning'
+    | 'danger'
+    | 'accent'
+    | 'mission'
+    | 'idea'
+    | 'work'
+    | 'task'
+    | 'agent';
 
 interface PageHeaderProps {
     icon: LucideIcon;
@@ -53,6 +64,31 @@ const toneClasses: Record<PageHeaderTone, { bg: string; border: string; text: st
         bg: 'bg-accent-indigo/10',
         border: 'border-accent-indigo/20',
         text: 'text-accent-indigo',
+    },
+    mission: {
+        bg: 'bg-concept-missions/10',
+        border: 'border-concept-missions/20',
+        text: 'text-concept-missions',
+    },
+    idea: {
+        bg: 'bg-concept-ideas/10',
+        border: 'border-concept-ideas/20',
+        text: 'text-concept-ideas',
+    },
+    work: {
+        bg: 'bg-concept-works/10',
+        border: 'border-concept-works/20',
+        text: 'text-concept-works',
+    },
+    task: {
+        bg: 'bg-concept-tasks/10',
+        border: 'border-concept-tasks/20',
+        text: 'text-concept-tasks',
+    },
+    agent: {
+        bg: 'bg-concept-agents/10',
+        border: 'border-concept-agents/20',
+        text: 'text-concept-agents',
     },
 };
 

@@ -259,7 +259,7 @@ export default function NewWorkClient({
                     icon={FolderKanban}
                     title={t('title')}
                     subtitle={t('subtitle')}
-                    tone="accent"
+                    tone="work"
                 />
 
                 <PromptComposer
