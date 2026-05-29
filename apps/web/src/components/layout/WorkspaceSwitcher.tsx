@@ -136,7 +136,10 @@ export function WorkspaceSwitcher({
                         'rounded-md transition-colors cursor-pointer',
                         'focus:outline-none focus-visible:outline-none',
                         'hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark',
-                        isCollapsed ? 'inline-flex p-1' : 'w-full px-1.5 py-1',
+                        // Collapsed: fill the column and center the icon so it
+                        // sits in the same x position as the "+ New" button
+                        // beneath it. Expanded keeps the chip layout.
+                        isCollapsed ? 'flex justify-center p-1' : 'w-full px-1.5 py-1',
                     )}
                     aria-label={t('heading')}
                 >

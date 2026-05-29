@@ -162,7 +162,12 @@ export function DashboardSidebar({
                             the same popover with org list + "Create
                             Organization".
                         */}
-                        <div className="flex items-center pr-6">
+                        <div
+                            className={cn(
+                                'flex items-center',
+                                isCollapsed ? 'justify-center' : 'pr-6',
+                            )}
+                        >
                             <WorkspaceSwitcher config={config} isCollapsed={isCollapsed} />
                         </div>
                         <div

@@ -173,13 +173,13 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     });
 
     /**
-     * Collapsed variant: the trigger renders only the leading icon —
-     * no wordmark, no org-name label, no chevron — and clicking it
-     * still opens the popover. Replaces the pre-fix collapsed-sidebar
-     * `<FaviconEverWork>` link to `siteConfig.website` (localhost:3000
-     * in dev).
+     * Collapsed variant — empty state: the trigger renders only the
+     * leading icon (favicon, no wordmark/label/chevron) and clicking
+     * it still opens the popover. Replaces the pre-fix collapsed
+     * sidebar's `<FaviconEverWork>` link to `siteConfig.website`
+     * (localhost:3000 in dev).
      */
-    it('renders icon-only trigger and still opens the popover when isCollapsed', () => {
+    it('renders icon-only trigger and still opens the popover when isCollapsed (empty state)', () => {
         __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
 
         render(<WorkspaceSwitcher isCollapsed />);
@@ -190,6 +190,35 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
 
         const trigger = screen.getAllByRole('button')[0];
         fireEvent.click(trigger);
+        expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
+    });
+
+    /**
+     * Collapsed variant — active org: the favicon is swapped for the
+     * org-initial avatar; the wordmark and the inline org-name label
+     * are both suppressed (collapsed = icon-only). Clicking still
+     * opens the popover listing the org and the create row.
+     */
+    it('renders the org-initial avatar and no label/wordmark when isCollapsed + active org', () => {
+        const org = makeOrg({ displayName: 'Acme Inc', slug: 'acme' });
+        __seedOrganizationsStoreForTests({
+            data: [org],
+            isLoading: false,
+            error: null,
+        });
+
+        render(<WorkspaceSwitcher isCollapsed />);
+
+        // Active-org icon = OrgAvatar — favicon and wordmark both absent.
+        expect(screen.queryByTestId('favicon-everwork-image')).toBeNull();
+        expect(screen.queryByTestId('logo-everwork-image')).toBeNull();
+        // The closed trigger has no inline label either.
+        expect(screen.queryByText('Acme Inc')).toBeNull();
+
+        const trigger = screen.getAllByRole('button')[0];
+        fireEvent.click(trigger);
+        // After opening, the org list row + create row both show.
+        expect(screen.getAllByText('Acme Inc').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
     });
 });
