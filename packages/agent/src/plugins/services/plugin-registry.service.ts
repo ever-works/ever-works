@@ -12,6 +12,12 @@ import { PluginEvents } from '../plugins.constants';
 import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { hasActiveCapability } from '../utils/active-capabilities.util';
+import {
+    createLazyPluginProxy,
+    LazyPluginStub,
+    OnFirstMaterialize,
+    PluginInstanceLoader,
+} from './lazy-plugin-proxy';
 
 export interface PluginEnableContext {
     systemPlugin?: boolean;
@@ -75,6 +81,41 @@ export class PluginRegistryService {
         @Optional() private readonly workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
+
+    /**
+     * Register a manifest-only stub backed by a lazy loader. The real plugin
+     * module is not imported until the first method call on the returned
+     * stub (or an explicit `__materialize()` call), at which point
+     * `onFirstMaterialize` runs exactly once to drive the lifecycle hooks.
+     *
+     * Category / capability indexes are populated immediately so discovery
+     * queries (`getByCapability`, `getByCategory`) work without forcing a
+     * load. The registered state is `'loaded'` so existing readiness filters
+     * keep working — lazy materialization is invisible to consumers.
+     */
+    registerLazy(
+        manifest: PluginManifest,
+        loader: PluginInstanceLoader,
+        options?: {
+            builtIn?: boolean;
+            installPath?: string;
+            onFirstMaterialize?: OnFirstMaterialize;
+        },
+    ): RegisteredPlugin {
+        if (this.plugins.has(manifest.id)) {
+            throw new Error(`Plugin "${manifest.id}" is already registered`);
+        }
+        const stub: LazyPluginStub = createLazyPluginProxy(
+            manifest,
+            loader,
+            options?.onFirstMaterialize,
+        );
+        return this.register(stub, manifest, {
+            builtIn: options?.builtIn,
+            installPath: options?.installPath,
+            state: 'loaded',
+        });
+    }
 
     register(
         plugin: IPlugin,
