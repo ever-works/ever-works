@@ -60,8 +60,8 @@ export function LogoEverWork({
     priority = true,
     config: configProps,
 }: LogoEverWorkProps) {
-    const siteConfig = getSiteConfig(configProps);
-    const logoHref = siteConfig.website || '/';
+    // Derive only what this wrapper needs; LogoEverWorkImage derives its own.
+    const logoHref = getSiteConfig(configProps).website || '/';
 
     return (
         <Link href={logoHref} className={cn('relative flex items-center', className)}>

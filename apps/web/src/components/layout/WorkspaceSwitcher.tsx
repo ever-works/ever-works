@@ -117,7 +117,10 @@ export function WorkspaceSwitcher({ config, logoClassName }: WorkspaceSwitcherPr
                     aria-label={t('heading')}
                 >
                     <div className="flex items-center gap-1.5 w-full min-w-0">
-                        <FaviconEverWorkImage config={config} className="w-9 h-9 shrink-0" />
+                        <FaviconEverWorkImage
+                            config={config}
+                            className="w-9 h-9 max-h-none shrink-0"
+                        />
                         {triggerOrg ? (
                             <span className="flex-1 min-w-0 text-left text-sm font-medium text-text dark:text-text-dark truncate">
                                 {pickLabel(triggerOrg)}
