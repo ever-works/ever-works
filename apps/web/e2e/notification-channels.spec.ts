@@ -45,8 +45,17 @@ test.describe('Notification channels — preferences endpoint', () => {
         }
         if (!body) test.skip(true, 'no preferences endpoint accessible');
         // Look for channel-ish keys somewhere in the response tree.
+        // The Notifications v2 endpoint returns a structural shape for fresh
+        // users — `{subscriptions: [], preference: null, mutes: []}` — with
+        // no channel names embedded until subscriptions exist. Accept either
+        // (a) named channels (email/in-app/push/…) anywhere in the tree, or
+        // (b) the v2 envelope (`subscriptions` + `mutes` keys), so we don't
+        // regress on legacy preference endpoints but also stop false-failing
+        // on the modern empty-state shape.
         const serialised = JSON.stringify(body).toLowerCase();
-        const looksChannelShaped = /email|in-?app|inapp|push|webhook|sms|slack/.test(serialised);
+        const hasNamedChannel = /email|in-?app|inapp|push|webhook|sms|slack/.test(serialised);
+        const hasV2Envelope = /"subscriptions"/.test(serialised) && /"mutes"/.test(serialised);
+        const looksChannelShaped = hasNamedChannel || hasV2Envelope;
         expect(
             looksChannelShaped,
             `preferences body has no channel-ish keys: ${serialised.slice(0, 200)}`,

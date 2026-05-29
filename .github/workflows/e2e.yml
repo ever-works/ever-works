@@ -206,6 +206,14 @@ jobs:
           # MailHog HTTP API for specs that want to read back sent mail
           # to extract verification / reset tokens for end-to-end flows.
           MAILHOG_URL: http://127.0.0.1:8025
+          # KB upload cap — match the kb.controller's KB_UPLOAD_MAX_BYTES
+          # (200 MiB default). The local-fs storage plugin defaults its
+          # own `maxBytes` to 5 MiB and rejects anything bigger with a
+          # 500 before the controller's per-feature cap applies. The
+          # row-A14 kb-viewer-size-cap specs intentionally upload >5 MiB
+          # binaries to exercise the viewer's download-fallback path,
+          # so the storage cap needs to match. 209715200 = 200 * 1024 * 1024.
+          UPLOADS_MAX_BYTES: '209715200'
           # Redis — wire up the throttler so distributed rate-limit
           # specs see cross-replica behaviour instead of the in-memory
           # fallback. Per @nest-lab/throttler-storage-redis we just

@@ -8,24 +8,34 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Work listing', () => {
     test('should load the works page', async ({ page }) => {
-        await page.goto('/en/works');
+        const response = await page.goto('/en/works');
 
         await expect(page).toHaveURL(/\/works/);
-        // Page should render without server error
-        await expect(page.locator('body')).not.toContainText('500');
+        // Assert against HTTP status — the body now includes "500+ third-
+        // party apps" copy (Composio plugin description) when the Plugins
+        // panel is in view, which false-positives a body substring check.
+        expect(response?.status(), '/en/works should not 5xx').toBeLessThan(500);
     });
 
     test('should show "new work" button or link', async ({ page }) => {
         await page.goto('/en/works');
 
-        const newDirLink = page.locator('a[href*="/works/new"]');
+        // PR DD repointed primary "+ New" CTAs from /works/new → /new (the
+        // unified picker). Accept either destination; both shapes also with
+        // the legacy /en locale prefix.
+        const newDirLink = page.locator(
+            'a[href$="/new"]:not([href*="/works/"]), a[href$="/works/new"], a[href*="/works/new?"]',
+        );
         await expect(newDirLink.first()).toBeVisible({ timeout: 10_000 });
     });
 });
 
 test.describe('Work creation', () => {
     test('should show creation mode selector on new work page', async ({ page }) => {
-        await page.goto('/en/works/new');
+        // PR DD — /works/new without ?mode/?proposal 307s to the unified
+        // /new picker. Force `?mode=ai` so the legacy mode-card selector
+        // assertion still applies.
+        await page.goto('/en/works/new?mode=ai');
 
         // Should show 3 creation mode cards: AI, Manual, Import
         // Each is a <button> with descriptive text
@@ -36,15 +46,9 @@ test.describe('Work creation', () => {
     });
 
     test('should navigate to manual creation mode', async ({ page }) => {
-        await page.goto('/en/works/new');
-
-        // Click the manual creation card (second button with PenLine icon)
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await expect(manualCard).toBeVisible({ timeout: 10_000 });
-        await manualCard.click();
+        // Land directly on manual mode — PR DD redirect now means a bare
+        // /works/new goes to /new; `?mode=manual` keeps us on the form.
+        await page.goto('/en/works/new?mode=manual');
 
         // Should show the manual form with name, slug, description fields
         await expect(page.locator('input[placeholder]').first()).toBeVisible({ timeout: 5_000 });
@@ -53,14 +57,7 @@ test.describe('Work creation', () => {
     test('should create a work via manual form', async ({ page }) => {
         const slug = `e2e-test-${Date.now().toString(36)}`;
 
-        await page.goto('/en/works/new');
-
-        // Select manual mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await manualCard.click();
+        await page.goto('/en/works/new?mode=manual');
 
         // Wait for the work creation form (scoped to avoid the AI chat input form)
         const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
@@ -90,24 +87,21 @@ test.describe('Work creation', () => {
     });
 
     test('should navigate back from manual form to mode selector', async ({ page }) => {
-        await page.goto('/en/works/new');
-
-        // Enter manual mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await manualCard.click();
+        // Land on manual mode directly (see comment on the previous test).
+        await page.goto('/en/works/new?mode=manual');
 
         // Wait for the work creation form (scoped to avoid AI chat input form)
         const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
         await expect(workForm).toBeVisible({ timeout: 10_000 });
 
-        // Click back button
+        // Click back button → returns to the mode-card selector on /works/new.
         const backButton = page.locator('button').filter({ hasText: /back/i }).first();
         if (await backButton.isVisible()) {
             await backButton.click();
-            // Should show mode selector again with 3 cards
+            const manualCard = page
+                .locator('button')
+                .filter({ hasText: /Configure|Manual/i })
+                .first();
             await expect(manualCard).toBeVisible({ timeout: 5_000 });
         }
     });
@@ -124,8 +118,13 @@ test.describe('Work detail', () => {
         if (await workLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
             await workLink.click();
             await expect(page).toHaveURL(/\/works\/.+/);
-            // Should render without error
-            await expect(page.locator('body')).not.toContainText('500');
+            // Assert via HTTP status rather than body text — the plugins panel
+            // copy can contain "500+ third-party apps".
+            const status = (await page.evaluate(() => performance.getEntriesByType('navigation')[0]))
+                ?.responseStatus;
+            if (typeof status === 'number') {
+                expect(status, 'work detail navigation should not 5xx').toBeLessThan(500);
+            }
         }
     });
 });
