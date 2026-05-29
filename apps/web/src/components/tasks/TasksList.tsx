@@ -56,6 +56,7 @@ const STATUS_FILTERS: { key: TaskStatus | 'all'; label: string }[] = [
     { key: 'cancelled', label: 'Cancelled' },
 ];
 
+
 export function TasksList({ tasks }: { tasks: Task[] }) {
     const t = useTranslations('dashboard.tasksPage');
     const [view, setView] = useState<ViewKey>('cards');
@@ -108,10 +109,10 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                             type="button"
                             onClick={() => setStatusFilter(key)}
                             className={cn(
-                                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border whitespace-nowrap transition-colors shrink-0',
+                                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border whitespace-nowrap transition-colors shrink-0',
                                 isActive
-                                    ? 'border-primary/40 bg-primary/10 text-primary dark:border-primary/30 dark:bg-primary/10'
-                                    : 'border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark',
+                                    ? 'border-border dark:border-border-dark bg-white dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                    : 'border-border/60 dark:border-border-dark/60 text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark',
                             )}
                         >
                             {key !== 'all' && (
