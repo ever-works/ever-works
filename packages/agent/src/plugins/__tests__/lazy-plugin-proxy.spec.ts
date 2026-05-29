@@ -90,7 +90,10 @@ describe('lazy-plugin-proxy', () => {
         await Promise.all([stub.onLoad({} as never), stub.healthCheck?.()]);
 
         expect(onFirstMaterialize).toHaveBeenCalledTimes(1);
-        expect(onFirstMaterialize).toHaveBeenCalledWith('p3', expect.objectContaining({ id: 'p3' }));
+        expect(onFirstMaterialize).toHaveBeenCalledWith(
+            'p3',
+            expect.objectContaining({ id: 'p3' }),
+        );
         expect(loader).toHaveBeenCalledTimes(1);
     });
 
@@ -100,8 +103,9 @@ describe('lazy-plugin-proxy', () => {
         const loader = jest.fn().mockResolvedValue(real);
 
         const stub = createLazyPluginProxy(makeManifest('p4'), loader);
-        const customResult = await (stub as unknown as { customMethod: () => Promise<string> })
-            .customMethod();
+        const customResult = await (
+            stub as unknown as { customMethod: () => Promise<string> }
+        ).customMethod();
 
         expect(customResult).toBe('result');
         expect((real as unknown as { customMethod: jest.Mock }).customMethod).toHaveBeenCalledTimes(
