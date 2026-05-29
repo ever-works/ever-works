@@ -102,15 +102,17 @@ test.describe('Complete user journey', () => {
         }
 
         // The previously separate "Create Manually" flow was merged into
-        // the unified WorkAICreator (new-work-client.tsx:405-426), which
-        // uses discrete <Input>/<Textarea> components rather than a single
-        // <form> wrapper. Target the inputs directly by their `name`s.
+        // the unified WorkAICreator (new-work-client.tsx:405-426). The shared
+        // ui/Input wrapper drops the `name` prop between JSX and the rendered
+        // `<input>` (verified against the failing-run aria-snapshot — the
+        // textbox is present but `input[name="name"]` returns 0). Target by
+        // accessible role + label instead.
         const dirSlug = `journey-${suffix}`;
-        const nameInput = page.locator('input[name="name"]').first();
-        await expect(nameInput).toBeVisible({ timeout: 10_000 });
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
         await nameInput.fill(`Journey Dir ${dirSlug}`);
 
-        const descriptionTextarea = page.locator('textarea[name="prompt"], textarea').first();
+        const descriptionTextarea = page.getByRole('textbox', { name: /Describe Your Work/i });
         await descriptionTextarea.fill('Full journey test work');
 
         // Submit via the primary CTA (WorkAICreator uses an onClick handler,

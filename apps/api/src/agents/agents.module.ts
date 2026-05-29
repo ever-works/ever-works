@@ -65,6 +65,8 @@ import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
+import { AgentTemplatesController } from './agent-templates.controller';
+import { AgentTemplateCatalogService } from './agent-template-catalog.service';
 
 /**
  * Agents/Skills/Tasks PR #1017 — api-side AgentsModule (Phase 3 + 15.5 + 16.10).
@@ -110,8 +112,9 @@ import { AgentsController } from './agents.controller';
         // consumed by the AGENT_EMAIL_FACADE binding below.
         EmailModule,
     ],
-    controllers: [AgentsController],
+    controllers: [AgentsController, AgentTemplatesController],
     providers: [
+        AgentTemplateCatalogService,
         {
             provide: AGENT_RUN_CHAT_BACK_POSTER,
             inject: [TaskChatService],

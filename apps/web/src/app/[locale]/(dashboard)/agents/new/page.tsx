@@ -5,6 +5,8 @@ import { createAgentAction } from '@/app/actions/agents';
 import { missionsAPI } from '@/lib/api/missions';
 import { workAPI } from '@/lib/api/work';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
+import type { AstTemplateEntry } from '@/lib/api/agent-templates';
+import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
 import type { Mission } from '@/lib/api/missions';
 import type { Work } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -23,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * tenant-scope only.
  */
 export default async function NewAgentPage() {
-    const [missions, worksResp, ideas] = await Promise.all([
+    const [missions, worksResp, ideas, templates] = await Promise.all([
         missionsAPI.list().catch(() => [] as Mission[]),
         workAPI.getAll({ limit: 100 }).catch(
             () =>
@@ -35,6 +37,9 @@ export default async function NewAgentPage() {
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted'])
             .catch(() => [] as WorkProposal[]),
+        // Optional template-pick step (spec FR-23). Defensive so a cold
+        // catalog never 500s the create page.
+        fetchAgentTemplateCatalog('agent').catch(() => [] as AstTemplateEntry[]),
     ]);
 
     const missionOptions = missions.map((m) => ({ id: m.id, label: m.title }));
@@ -53,6 +58,7 @@ export default async function NewAgentPage() {
             missions={missionOptions}
             works={workOptions}
             ideas={ideaOptions}
+            templates={templates}
         />
     );
 }
