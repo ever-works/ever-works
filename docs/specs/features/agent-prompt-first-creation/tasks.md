@@ -36,7 +36,7 @@ Tracks [spec.md](./spec.md) / [plan.md](./plan.md). Jira Epic [EW-705](https://e
 - [x] T4.4 `server-only` `fetchAgentTemplateCatalog()` helper (used by `/agents` + `/agents/new` server pages) calling the endpoint with built-in fallback on error. `agent-templates.ts` stays isomorphic for client imports.
 - [x] T4.5 Backend Jest tests (cache-hit / no-token / repo-throw / malformed-manifest / missing-file / invalid-row-drop).
 - [x] T4.6 ~~Operator action (Q4): create + seed `ever-works/agents`~~ — **done** (seeded by a separate agent; repo is private).
-- [ ] T4.7 **Operator deploy action:** set `EVER_WORKS_AGENTS_TOKEN` (or rely on the shared `GITHUB_TOKEN`) on the API so the catalog reads live data. Until then chips render the built-in fallback.
+- [x] T4.7 Token resolution reuses the platform GitHub App installation on the `ever-works` org (`getInstallationTokenForOwner`) — no new secret. `EVER_WORKS_AGENTS_TOKEN`/`GITHUB_TOKEN` env is an optional self-hosted override. (Live data requires the App to be installed on the `ever-works` org, which it already is for repo creation.)
 
 ## Cross-cutting
 
