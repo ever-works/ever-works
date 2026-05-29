@@ -1245,10 +1245,15 @@ describe('KnowledgeBaseService', () => {
             storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.bin', url: '' });
             const uploadRow = buildUpload({ mimeType: 'application/pdf' });
             uploadRepo.create.mockResolvedValue(uploadRow);
-            uploadRepo.update.mockResolvedValue({
+            const skippedRow = {
                 ...uploadRow,
                 extractionStatus: 'skipped' as KbUploadExtractionStatus,
-            });
+            };
+            uploadRepo.update.mockResolvedValue(skippedRow);
+            // The terminal-state re-read at the bottom of createUpload —
+            // ensures `result.upload` reflects the post-extract status
+            // ('skipped'), not the create-time status ('running').
+            uploadRepo.findById.mockResolvedValueOnce(skippedRow);
 
             const result = await service.createUpload({
                 ...buildUploadInput({ mimeType: 'application/pdf', originalFilename: 'spec.pdf' }),
@@ -1256,10 +1261,16 @@ describe('KnowledgeBaseService', () => {
             });
 
             expect(result.document).toBeNull();
+            // Without the terminal re-read the response would carry the
+            // 'running' row from uploadRepo.create — the e2e A16 suite
+            // (kb-extraction-retry.spec.ts:81) asserts on this field
+            // directly, no settle-poll.
+            expect(result.upload.extractionStatus).toBe('skipped');
             expect(uploadRepo.update).toHaveBeenCalledWith(
                 uploadRow.id,
                 expect.objectContaining({ extractionStatus: 'skipped' }),
             );
+            expect(uploadRepo.findById).toHaveBeenCalledWith(WORK_ID, uploadRow.id);
             const kinds = activityLog.log.mock.calls.map(
                 (c) => (c[0] as { actionType: string }).actionType,
             );
