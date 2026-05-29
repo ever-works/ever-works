@@ -69,7 +69,10 @@ export function AgentsPreviewSection({ agents, totalAgents }: AgentsPreviewSecti
                 <div className="rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 text-sm text-text-secondary dark:text-text-secondary-dark">
                     <p>{t('empty.title')}</p>
                     <p className="mt-1 text-xs">
-                        <Link href={ROUTES.DASHBOARD_AGENT_NEW} className="text-primary hover:underline">
+                        <Link
+                            href={ROUTES.DASHBOARD_AGENT_NEW}
+                            className="text-primary hover:underline"
+                        >
                             {t('empty.subtitleLink')}
                         </Link>{' '}
                         {t('empty.subtitleSuffix')}

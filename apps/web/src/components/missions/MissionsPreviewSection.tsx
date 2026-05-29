@@ -205,8 +205,12 @@ function MissionPreviewCard({
 function MissionStat({ label, value }: { label: string; value: number }) {
     return (
         <div className="flex items-baseline gap-1.5 min-w-0">
-            <span className="text-sm font-bold text-text dark:text-text-dark tabular-nums">{value}</span>
-            <span className="text-xs text-text-muted dark:text-text-muted-dark truncate">{label}</span>
+            <span className="text-sm font-bold text-text dark:text-text-dark tabular-nums">
+                {value}
+            </span>
+            <span className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                {label}
+            </span>
         </div>
     );
 }

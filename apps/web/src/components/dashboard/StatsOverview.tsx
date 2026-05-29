@@ -198,7 +198,12 @@ export function StatsOverview({
                         {/* Label */}
                         <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
-                                <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)} />
+                                <span
+                                    className={cn(
+                                        'w-1.5 h-1.5 rounded-full shrink-0',
+                                        stat.dotColor,
+                                    )}
+                                />
                                 <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
                                     {stat.title}
                                 </p>

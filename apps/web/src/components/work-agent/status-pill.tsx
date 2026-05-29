@@ -25,7 +25,8 @@ export function StatusPill({ status }: { status: string }) {
         <span
             className={cn(
                 'shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-normal capitalize',
-                STATUS_STYLES[status] ?? 'bg-surface-secondary dark:bg-surface-secondary/4 text-text-muted border-border/70',
+                STATUS_STYLES[status] ??
+                    'bg-surface-secondary dark:bg-surface-secondary/4 text-text-muted border-border/70',
             )}
         >
             {status.replaceAll('-', ' ')}

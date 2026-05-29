@@ -115,7 +115,6 @@ export default function DashboardClient({
 
             {/* Content sections — divided by a subtle rule for visual rhythm */}
             <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
-
                 <div className="py-8 lg:py-10">
                     <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
                 </div>
@@ -186,7 +185,6 @@ export default function DashboardClient({
                 <div className="py-8 lg:py-10">
                     <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
                 </div>
-
             </div>
         </div>
     );

@@ -75,7 +75,10 @@ export function RecentTasks({ tasks, total }: { tasks: Task[]; total?: number })
             ) : (
                 <ul className="rounded-xl overflow-hidden border border-card-border dark:border-white/8 divide-y divide-border/40 dark:divide-white/6">
                     {tasks.map((task) => (
-                        <li key={task.id} className="bg-card dark:bg-card-primary-dark/60 first:rounded-t-xl last:rounded-b-xl">
+                        <li
+                            key={task.id}
+                            className="bg-card dark:bg-card-primary-dark/60 first:rounded-t-xl last:rounded-b-xl"
+                        >
                             <Link
                                 href={ROUTES.DASHBOARD_TASK(task.id)}
                                 className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-card-hover dark:hover:bg-white/3 transition-colors no-underline"

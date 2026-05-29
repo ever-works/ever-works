@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { CreditCard, Hammer, Lightbulb, Loader2, Plus, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import {
+    CreditCard,
+    Hammer,
+    Lightbulb,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Settings as SettingsIcon,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
@@ -251,10 +259,11 @@ export function WorkProposalsSection({
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className={cn('inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
-                                           'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
-                                           'text-text-secondary dark:text-text-secondary-dark',
-                                           'hover:border-primary/40 hover:text-primary',
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                'text-text-secondary dark:text-text-secondary-dark',
+                                'hover:border-primary/40 hover:text-primary',
                             )}
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}
@@ -286,25 +295,37 @@ export function WorkProposalsSection({
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
-                                <Link href="/settings/work-agent#auto-generate-ideas" className="flex items-center gap-2 text-xs hover:text-primary">
+                                <Link
+                                    href="/settings/work-agent#auto-generate-ideas"
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
+                                >
                                     <Lightbulb className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoGenerate')}
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <Link href="/settings/work-agent#auto-build-works" className="flex items-center gap-2 text-xs hover:text-primary">
+                                <Link
+                                    href="/settings/work-agent#auto-build-works"
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
+                                >
                                     <Hammer className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoBuild')}
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <Link href="/settings/work-agent#auto-retry" className="flex items-center gap-2 text-xs hover:text-primary">
+                                <Link
+                                    href="/settings/work-agent#auto-retry"
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
+                                >
                                     <RefreshCw className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoRetry')}
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                                <Link href="/settings/work-agent#account-budgets" className="flex items-center gap-2 text-xs hover:text-primary">
+                                <Link
+                                    href="/settings/work-agent#account-budgets"
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
+                                >
                                     <CreditCard className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.accountBudgets')}
                                 </Link>
