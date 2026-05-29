@@ -174,9 +174,6 @@ function MissionPreviewCard({
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
                     {mission.title}
                 </h3>
-                {/* <div className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-warning/10">
-                    <Target className="w-3.5 h-3.5 text-warning" strokeWidth={1.5} />
-                </div> */}
             </div>
 
             {/* Badges */}

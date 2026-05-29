@@ -175,7 +175,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                         // Idea reads as "completed" at a glance.
                         isDone
                             ? 'bg-success hover:bg-success/90'
-                            : 'bg-black dark:bg-white/6 hover:dark:bg-white/10',
+                            : 'bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10',
                     )}
                 >
                     {isDone ? (

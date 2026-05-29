@@ -266,7 +266,6 @@ export function MissionDetailClient({
 
     return (
         <div className="w-full p-6 max-w-screen-2xl mx-auto space-y-6">
-
             {/* ── Header ───────────────────────────────────────────────────── */}
             <div>
                 <Link

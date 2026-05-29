@@ -18,11 +18,11 @@ export function TasksInProgressTile({
     return (
         <Link
             href={`${ROUTES.DASHBOARD_TASKS}`}
-            className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-info/40 transition-colors"
+            className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-concept-tasks/40 transition-colors"
         >
             <div className="flex items-start gap-3">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-info/10 border border-info/20 flex items-center justify-center">
-                    <ListChecks className="w-4 h-4 text-info" />
+                <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-tasks/10 border border-concept-tasks/20 flex items-center justify-center">
+                    <ListChecks className="w-4 h-4 text-concept-tasks" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <h3 className="text-xs text-text-secondary dark:text-text-secondary-dark uppercase tracking-wide">

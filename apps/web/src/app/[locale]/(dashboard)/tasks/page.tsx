@@ -24,12 +24,12 @@ export default async function TasksPage() {
         .catch(() => ({ data: [] as Task[], meta: { total: 0, limit: 50, offset: 0 } }));
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             <PageHeader
                 icon={ListChecks}
                 title={t('title')}
                 subtitle={t('subtitle')}
-                tone="info"
+                tone="task"
                 actions={
                     <Button href={ROUTES.DASHBOARD_TASK_NEW} size="sm" className="gap-1.5 shrink-0">
                         <Plus className="w-3.5 h-3.5" />

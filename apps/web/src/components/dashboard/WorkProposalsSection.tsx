@@ -231,7 +231,7 @@ export function WorkProposalsSection({
     const showRefreshButton = canRefresh || researching;
 
     return (
-        <section className="mt-8 lg:mt-16" aria-labelledby="work-proposals-heading">
+        <section aria-labelledby="work-proposals-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">

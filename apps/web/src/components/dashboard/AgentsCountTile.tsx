@@ -13,11 +13,11 @@ export function AgentsCountTile({ total, active }: { total: number; active: numb
     return (
         <Link
             href={ROUTES.DASHBOARD_AGENTS}
-            className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-primary/40 transition-colors"
+            className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-concept-agents/40 transition-colors"
         >
             <div className="flex items-start gap-3">
-                <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <Bot className="w-4 h-4 text-primary" />
+                <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-agents/10 border border-concept-agents/20 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-concept-agents" />
                 </div>
                 <div className="min-w-0 flex-1">
                     <h3 className="text-xs text-text-secondary dark:text-text-secondary-dark uppercase tracking-wide">
