@@ -75,6 +75,11 @@ export function createLazyPluginProxy(
         return importPromise;
     };
 
+    // PluginManifest (the package.json `everworks.plugin` block) does not
+    // carry the JSON-Schema or configurationMode today — those live on the
+    // plugin class. Until a sync caller forces materialization, expose an
+    // empty schema. See PR body "Known caveat — settingsSchema sync access".
+    const manifestExt = manifest as unknown as Record<string, unknown>;
     const stub = {
         get id() {
             return manifest.id;
@@ -92,10 +97,10 @@ export function createLazyPluginProxy(
             return manifest.capabilities;
         },
         get settingsSchema() {
-            return manifest.settingsSchema ?? {};
+            return manifestExt.settingsSchema ?? {};
         },
         get configurationMode() {
-            return manifest.configurationMode;
+            return manifestExt.configurationMode;
         },
         get __isMaterialized() {
             return materialized !== null;
