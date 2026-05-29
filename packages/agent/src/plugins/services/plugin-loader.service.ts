@@ -13,7 +13,7 @@ import type {
     PluginsModuleOptions,
     PluginModule,
 } from '../interfaces/plugins-module-options.interface';
-import type { OnFirstMaterialize } from './lazy-plugin-proxy';
+import type { OnFirstMaterialize, OnMaterializeError } from './lazy-plugin-proxy';
 
 /**
  * Result of plugin discovery
@@ -77,6 +77,12 @@ export class PluginLoaderService {
      * first real use rather than at boot.
      */
     private onFirstMaterialize?: OnFirstMaterialize;
+    /**
+     * Hook invoked when a lazily-registered plugin's loader throws. Wired by
+     * PluginBootstrapService to mark the plugin's state as `'error'` so
+     * readiness filters stop returning the broken stub.
+     */
+    private onMaterializeError?: OnMaterializeError;
 
     constructor(
         @Inject(PLUGINS_MODULE_OPTIONS)
@@ -92,6 +98,10 @@ export class PluginLoaderService {
 
     setOnFirstMaterialize(hook: OnFirstMaterialize): void {
         this.onFirstMaterialize = hook;
+    }
+
+    setOnMaterializeError(hook: OnMaterializeError): void {
+        this.onMaterializeError = hook;
     }
 
     /**
@@ -575,6 +585,49 @@ export class PluginLoaderService {
     }
 
     /**
+     * Merge the runtime manifest from the plugin class with the package.json
+     * manifest stored in the registry + DB. Mirrors the eager `load()` path's
+     * inline merge at lines 237–246; runs at first materialization for lazy
+     * plugins so fields like icon, homepage, readme don't go missing in the
+     * admin UI for the lifetime of the install.
+     */
+    private async enrichManifestAfterMaterialize(
+        pluginId: string,
+        real: IPlugin,
+        discovered: DiscoveredPlugin,
+    ): Promise<void> {
+        if (typeof real.getManifest !== 'function') return;
+        try {
+            const runtimeManifest = real.getManifest();
+            const definedManifest = pickBy(
+                discovered.manifest as unknown as Record<string, unknown>,
+                (v) => v !== undefined,
+            );
+            const merged = { ...runtimeManifest, ...definedManifest } as typeof discovered.manifest;
+
+            this.registry.updateRegisteredManifest(pluginId, merged);
+            await this.pluginRepository.upsert({
+                pluginId: merged.id,
+                name: merged.name,
+                version: merged.version,
+                description: merged.description,
+                category: merged.category,
+                capabilities: [...merged.capabilities],
+                manifest: merged as unknown as Record<string, unknown>,
+                builtIn: discovered.builtIn,
+                installPath: discovered.path,
+                state: 'loaded',
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enrich manifest for plugin ${pluginId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
      * Register a discovered plugin as a lazy stub. The plugin's entry module
      * is not imported here — that happens on first method call via the proxy.
      */
@@ -607,15 +660,30 @@ export class PluginLoaderService {
                 warnings.push(...versionResult.warnings.map((w) => w.message));
             }
 
+            // Capture hooks by value so unit tests can swap them.
+            const userOnFirstMaterialize = this.onFirstMaterialize;
+            const userOnMaterializeError = this.onMaterializeError;
+
             const loader = () => this.loadPluginModule(pluginPath, manifest);
 
-            // Capture loader hook by value so unit tests can swap it.
-            const onFirstMaterialize = this.onFirstMaterialize;
+            // Wrap onFirstMaterialize to fold the runtime manifest from the
+            // plugin class (icon, homepage, readme, runtime overrides) into
+            // both the in-memory registry entry and the DB row. The eager
+            // load() path used to do this inline before the upsert; for lazy
+            // loading we have to defer it to first materialization so we don't
+            // lose those fields for the lifetime of the install.
+            const onFirstMaterialize = async (id: string, real: IPlugin) => {
+                await this.enrichManifestAfterMaterialize(id, real, discovered);
+                if (userOnFirstMaterialize) {
+                    await userOnFirstMaterialize(id, real);
+                }
+            };
 
             this.registry.registerLazy(manifest, loader, {
                 builtIn: discovered.builtIn,
                 installPath: pluginPath,
                 onFirstMaterialize,
+                onMaterializeError: userOnMaterializeError,
             });
 
             await this.pluginRepository.upsert({

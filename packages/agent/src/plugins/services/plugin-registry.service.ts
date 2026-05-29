@@ -16,6 +16,7 @@ import {
     createLazyPluginProxy,
     LazyPluginStub,
     OnFirstMaterialize,
+    OnMaterializeError,
     PluginInstanceLoader,
 } from './lazy-plugin-proxy';
 
@@ -100,6 +101,7 @@ export class PluginRegistryService {
             builtIn?: boolean;
             installPath?: string;
             onFirstMaterialize?: OnFirstMaterialize;
+            onMaterializeError?: OnMaterializeError;
         },
     ): RegisteredPlugin {
         if (this.plugins.has(manifest.id)) {
@@ -109,12 +111,27 @@ export class PluginRegistryService {
             manifest,
             loader,
             options?.onFirstMaterialize,
+            options?.onMaterializeError,
         );
         return this.register(stub, manifest, {
             builtIn: options?.builtIn,
             installPath: options?.installPath,
             state: 'loaded',
         });
+    }
+
+    /**
+     * Replace the in-memory manifest for a registered plugin. Used after
+     * lazy materialization to fold in fields the plugin class fills in
+     * via `getManifest()` (icon, homepage, readme, etc.) that the package.json
+     * manifest didn't carry. Capability / category indexes are not touched —
+     * the runtime manifest can only enrich, not change those.
+     */
+    updateRegisteredManifest(pluginId: string, manifest: PluginManifest): boolean {
+        const registered = this.plugins.get(pluginId);
+        if (!registered) return false;
+        registered.manifest = manifest;
+        return true;
     }
 
     register(

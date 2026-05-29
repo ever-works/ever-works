@@ -3,6 +3,7 @@ import { PluginLoaderService } from './plugin-loader.service';
 import { PluginLifecycleManagerService } from './plugin-lifecycle-manager.service';
 import { PluginContextFactoryService } from './plugin-context-factory.service';
 import { PluginRegistryService } from './plugin-registry.service';
+import { PluginRepository } from '../repositories/plugin.repository';
 
 /**
  * Result of the bootstrap operation
@@ -46,6 +47,7 @@ export class PluginBootstrapService {
         private readonly lifecycleManager: PluginLifecycleManagerService,
         private readonly contextFactory: PluginContextFactoryService,
         private readonly registry: PluginRegistryService,
+        private readonly pluginRepository: PluginRepository,
     ) {}
 
     /**
@@ -93,6 +95,22 @@ export class PluginBootstrapService {
         // history) exactly as it would have done at boot.
         this.pluginLoader.setOnFirstMaterialize(async (pluginId) => {
             await this.lifecycleManager.callOnLoad(pluginId);
+        });
+        // Wire failure hook: when a lazy plugin's loader throws, mark the
+        // registry state as 'error' + persist to DB so readiness filters stop
+        // returning the broken stub. Without this a permanently-failing
+        // plugin would hold a 'loaded' slot forever.
+        this.pluginLoader.setOnMaterializeError(async (pluginId, error) => {
+            this.registry.updateState(pluginId, 'error', error);
+            try {
+                await this.pluginRepository.updateState(pluginId, 'error', error.message);
+            } catch (dbErr) {
+                this.logger.warn(
+                    `Failed to persist error state for plugin ${pluginId}: ${
+                        dbErr instanceof Error ? dbErr.message : String(dbErr)
+                    }`,
+                );
+            }
         });
 
         // Discover and register plugins. Built-ins still load eagerly (their
