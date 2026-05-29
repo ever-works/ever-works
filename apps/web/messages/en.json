@@ -566,6 +566,11 @@
             "empty": {
                 "title": "No Tasks yet.",
                 "subtitle": "Create one to start tracking work."
+            },
+            "view": {
+                "label": "Switch task view",
+                "list": "List view",
+                "cards": "Card view"
             }
         },
         "missionsPage": {
