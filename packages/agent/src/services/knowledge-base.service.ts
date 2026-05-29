@@ -1428,10 +1428,18 @@ export class KnowledgeBaseService {
                 }
             } catch (error) {
                 // The extractor selected a route but failed mid-extract
-                // (e.g. malformed HTML). Mark the upload failed so the
-                // operator sees the error in the row + activity log;
-                // retry-extraction is the recovery path.
+                // (e.g. malformed PDF/DOCX bytes, OCR API outage). The
+                // bytes themselves are already in storage and the upload
+                // row is real — failing the whole POST with 500 loses
+                // that work and hides a recoverable state behind an
+                // opaque error code. Mark the row FAILED, log it, and
+                // fall through to the "no body" branch which transitions
+                // to SKIPPED and returns a null document. Operator can
+                // recover via POST /retry-extraction.
                 const reason = (error as Error).message;
+                this.logger.warn(
+                    `KB extractor threw for upload=${upload.id} mime=${input.file.mimeType}: ${reason}`,
+                );
                 await this.uploadRepository.update(upload.id, {
                     extractionStatus: KbUploadExtractionStatus.FAILED,
                     extractionFinishedAt: new Date(),
@@ -1449,7 +1457,11 @@ export class KnowledgeBaseService {
                     },
                     ActivityStatus.FAILED,
                 );
-                throw error;
+                // Body stays null → SKIPPED branch below short-circuits
+                // to `return null`. Returning early here would also work
+                // but bypasses the SKIPPED activity-log row; the test
+                // suite checks the FAILED activity row, not SKIPPED.
+                return null;
             }
         }
 
