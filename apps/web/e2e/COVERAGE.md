@@ -514,7 +514,7 @@ New feature areas (previously uncovered):
 | ------- | ------ | ------- |
 | Tasks (CRUD, state machine, chat, scoping) | [x] | tasks.spec.ts |
 | Skills (custom create, bindings, catalog, detail UI) | [x] | skills.spec.ts |
-| Agents (CRUD, pause/resume, instructions, inbox) | [ ] | _next_ |
+| Agents (CRUD, state-machine, instructions, budget/runs, scoping) | [x] | agents.spec.ts |
 | Missions/Ideas UI flows + unified `/new` (cross-entity) | [ ] | _next_ (deepens existing API-contract specs) |
 | settings/integrations (channels, emails, notifications, work-agent) + magic-link | [ ] | _next_ |
 
