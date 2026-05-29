@@ -68,7 +68,7 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
     const previewMissions = missions.slice(0, PREVIEW_LIMIT);
 
     return (
-        <section className="mt-8" aria-labelledby="missions-preview-heading">
+        <section className="mt-8 lg:mt-16" aria-labelledby="missions-preview-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
@@ -101,7 +101,7 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
                     {totalMissions > 0 && (
                         <Link
                             href={ROUTES.DASHBOARD_MISSIONS}
-                            className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
+                            className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1 whitespace-nowrap"
                         >
                             {t('viewAll', { n: totalMissions })}
                         </Link>
@@ -117,7 +117,7 @@ export function MissionsPreviewSection({ missions, allIdeas }: MissionsPreviewSe
                             link: (chunks) => (
                                 <Link
                                     href={`/new?type=mission`}
-                                    className="text-primary hover:underline"
+                                    className="text-primary text-xs hover:underline"
                                 >
                                     {chunks}
                                 </Link>
@@ -162,53 +162,51 @@ function MissionPreviewCard({
         <Link
             href={ROUTES.DASHBOARD_MISSION(mission.id)}
             className={cn(
-                'group relative flex min-h-[10rem] flex-col overflow-hidden rounded-lg p-4 shadow-xs',
-                'bg-card dark:bg-card-primary-dark/70',
-                'border border-card-border dark:border-white/9',
-                'hover:border-primary-500/50 dark:hover:border-white/20',
-                'transition-colors no-underline',
+                'group flex flex-col gap-3 rounded-xl p-4 no-underline',
+                'bg-card dark:bg-card-primary-dark/60',
+                'border border-card-border dark:border-white/8',
+                'hover:border-border dark:hover:border-white/16',
+                'transition-colors duration-150',
             )}
         >
-            <div className="flex items-start gap-2 min-w-0">
-                <div className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center bg-warning/10 border border-warning/20">
-                    <Target className="w-3.5 h-3.5 text-warning" strokeWidth={1.6} />
-                </div>
-                <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
-                        {mission.title}
-                    </h3>
-                </div>
+            {/* Title + icon */}
+            <div className="flex items-start justify-between gap-3">
+                <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
+                    {mission.title}
+                </h3>
+                {/* <div className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center bg-warning/10">
+                    <Target className="w-3.5 h-3.5 text-warning" strokeWidth={1.5} />
+                </div> */}
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {/* Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
                 <StatusPill status={mission.status} />
                 {isScheduled && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-info/30 bg-info/5 dark:bg-info/10 px-1.5 py-0.5 text-[10px] font-medium text-info">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-info/25 bg-info/8 dark:bg-info/12 px-1.5 py-0.5 text-[10px] font-normal text-info">
                         <CalendarClock className="w-3 h-3" />
                         {t('badges.scheduled')}
                     </span>
                 )}
             </div>
 
-            {/* Counter strip — Ideas / Works / Sites. Reserves all
-                three columns even when Sites is 0 so brand-new
-                accounts see the same layout as fully-utilized ones. */}
-            <div className="mt-auto grid grid-cols-3 gap-1.5 pt-3">
-                <CounterChip label={t('counters.ideas')} value={ideasCount} />
-                <CounterChip label={t('counters.works')} value={worksCount} />
-                <CounterChip label={t('counters.sites')} value={sitesCount} />
+            {/* Stats row */}
+            <div className="flex items-center gap-3 pt-1 border-t border-card-border/50 dark:border-white/6">
+                <MissionStat label={t('counters.ideas')} value={ideasCount} />
+                <div className="w-px h-3.5 bg-card-border dark:bg-white/10 shrink-0" />
+                <MissionStat label={t('counters.works')} value={worksCount} />
+                <div className="w-px h-3.5 bg-card-border dark:bg-white/10 shrink-0" />
+                <MissionStat label={t('counters.sites')} value={sitesCount} />
             </div>
         </Link>
     );
 }
 
-function CounterChip({ label, value }: { label: string; value: number }) {
+function MissionStat({ label, value }: { label: string; value: number }) {
     return (
-        <div className="rounded-md border border-border/60 dark:border-border-dark/60 px-2 py-1.5 text-center">
-            <div className="text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                {label}
-            </div>
-            <div className="text-sm font-semibold text-text dark:text-text-dark">{value}</div>
+        <div className="flex items-baseline gap-1.5 min-w-0">
+            <span className="text-sm font-bold text-text dark:text-text-dark tabular-nums">{value}</span>
+            <span className="text-xs text-text-muted dark:text-text-muted-dark truncate">{label}</span>
         </div>
     );
 }
