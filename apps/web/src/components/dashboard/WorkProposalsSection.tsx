@@ -225,8 +225,8 @@ export function WorkProposalsSection({
         <section className="mt-8" aria-labelledby="work-proposals-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                        <Lightbulb className="w-4 h-4 text-warning" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-ideas/10 border border-concept-ideas/20 flex items-center justify-center">
+                        <Lightbulb className="w-4 h-4 text-concept-ideas" />
                     </div>
                     <h2
                         id="work-proposals-heading"
@@ -243,38 +243,48 @@ export function WorkProposalsSection({
                 <div className="flex flex-nowrap items-center gap-2 shrink-0">
                     {/* Phase 5 PR O — quick-add trigger. Hidden while the form is open
                         so the header and form don't show duplicate Add controls.
-                        Dashboard polish (2026-05-27) — label collapses to icon-
-                        only below `@xl/main` so the action row fits one line
-                        when the chat panel is open. */}
+                        Dashboard polish (2026-05-29) — restyled from the chunky
+                        `secondary` Button to the same thin pill used by every
+                        other section header (Missions / Works / Tasks / Agents)
+                        so the Ideas action row reads as part of the same family. */}
                     {!quickAddOpen && (
-                        <Button
+                        <button
                             type="button"
-                            variant="secondary"
-                            size="sm"
-                            className="gap-1.5"
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}
                             aria-label={tPage('quickAdd.submit')}
                             title={tPage('quickAdd.submit')}
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                'text-text-secondary dark:text-text-secondary-dark',
+                                'hover:border-primary/40 hover:text-primary',
+                            )}
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            <span className="hidden @xl/main:inline">
-                                {tPage('quickAdd.submit')}
-                            </span>
-                        </Button>
+                            {tPage('quickAdd.submit')}
+                        </button>
                     )}
 
-                    {/* Phase 5 PR O — gears dropdown linking to settings anchors */}
+                    {/* Phase 5 PR O — gears dropdown linking to settings anchors.
+                        Dashboard polish (2026-05-29) — icon-only square pill that
+                        matches the `+ Add` pill height so the two sit on a clean
+                        baseline next to View all. */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button
+                            <button
                                 type="button"
-                                variant="secondary"
-                                size="sm"
                                 aria-label={tPage('gears.menuLabel')}
+                                title={tPage('gears.menuLabel')}
+                                className={cn(
+                                    'inline-flex items-center justify-center rounded-md border h-7 w-7 transition-colors whitespace-nowrap',
+                                    'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                    'text-text-secondary dark:text-text-secondary-dark',
+                                    'hover:border-primary/40 hover:text-primary',
+                                )}
                             >
-                                <SettingsIcon className="w-4 h-4" />
-                            </Button>
+                                <SettingsIcon className="w-3.5 h-3.5" />
+                            </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64">
                             <DropdownMenuLabel>{tPage('gears.menuLabel')}</DropdownMenuLabel>
