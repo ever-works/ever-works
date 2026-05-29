@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 export default async function AgentTemplatesPage() {
     const entries = await listAstTemplates('agent');
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto space-y-5">
+        <div className="w-full space-y-5">
             <Link
                 href={ROUTES.DASHBOARD_AGENTS}
                 className="text-xs text-text-muted hover:text-text"
