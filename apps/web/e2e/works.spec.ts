@@ -60,20 +60,23 @@ test.describe('Work creation', () => {
         await page.goto('/en/works/new?mode=manual');
 
         // The previously separate "Create Manually" flow was merged into the
-        // unified WorkAICreator (new-work-client.tsx:405-426), which uses
-        // discrete <Input>/<Textarea> components rather than a single <form>
-        // wrapper. Target the inputs directly via their `name` attributes
-        // instead of scoping by form element.
-        const nameInput = page.locator('input[name="name"]').first();
-        await expect(nameInput).toBeVisible({ timeout: 10_000 });
+        // unified WorkAICreator (new-work-client.tsx:405-426). The shared
+        // ui/Input wrapper drops `name` between the JSX prop and the rendered
+        // `<input>` — verified against the failing run's aria-snapshot, which
+        // shows `textbox "Work Name *"` but `locator('input[name="name"]')`
+        // returning 0. Targeting by accessible role + name is stable across
+        // that wrapper.
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
         await nameInput.fill(`E2E Test Dir ${slug}`);
 
         // Slug auto-populates from name; just verify it picked something up.
-        const slugInput = page.locator('input[name="slug"]').first();
+        const slugInput = page.getByRole('textbox', { name: /Work Slug/i });
         await expect(slugInput).toHaveValue(/.+/);
 
-        // Description / prompt textarea (the AI/manual flow shares one).
-        const promptTextarea = page.locator('textarea[name="prompt"], textarea').first();
+        // Description / prompt textarea — same wrapper drops `name`, so use
+        // the accessible label.
+        const promptTextarea = page.getByRole('textbox', { name: /Describe Your Work/i });
         await promptTextarea.fill('Automated E2E test work for Playwright testing');
 
         // Submit — the primary CTA on the page. WorkAICreator handles submit
@@ -95,10 +98,9 @@ test.describe('Work creation', () => {
         // Land on manual mode directly (see comment on the previous test).
         await page.goto('/en/works/new?mode=manual');
 
-        // Same selector update — the unified WorkAICreator no longer wraps
-        // its fields in `<form className="space-y-6" autocomplete="off">`.
-        const nameInput = page.locator('input[name="name"]').first();
-        await expect(nameInput).toBeVisible({ timeout: 10_000 });
+        // Same wrapper drops `name`; target by accessible role + label.
+        const nameInput = page.getByRole('textbox', { name: /Work Name/i });
+        await expect(nameInput).toBeVisible({ timeout: 30_000 });
 
         // Click back button → returns to the mode-card selector on /works/new.
         const backButton = page.locator('button').filter({ hasText: /back/i }).first();
