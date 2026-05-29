@@ -34,7 +34,7 @@ export default async function SkillsPage() {
     ]);
 
     return (
-        <div className="w-full overflow-auto p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
             <PageHeader
                 icon={Sparkles}
                 title={t('title')}
