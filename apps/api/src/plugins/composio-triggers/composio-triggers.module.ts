@@ -7,7 +7,11 @@ import { ComposioTriggersService } from './composio-triggers.service';
 import { ComposioApiModule } from '../composio/composio.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([ComposioTriggerSubscription]), AuthModule, ComposioApiModule],
+    imports: [
+        TypeOrmModule.forFeature([ComposioTriggerSubscription]),
+        AuthModule,
+        ComposioApiModule,
+    ],
     controllers: [ComposioTriggersController],
     providers: [ComposioTriggersService],
     exports: [ComposioTriggersService],
