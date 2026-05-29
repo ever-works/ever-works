@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { Lightbulb, Loader2, Plus, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { CreditCard, Hammer, Lightbulb, Loader2, Plus, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
@@ -222,11 +222,11 @@ export function WorkProposalsSection({
     const showRefreshButton = canRefresh || researching;
 
     return (
-        <section className="mt-8" aria-labelledby="work-proposals-heading">
+        <section className="mt-8 lg:mt-16" aria-labelledby="work-proposals-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-warning/10 border border-warning/20 flex items-center justify-center">
-                        <Lightbulb className="w-4 h-4 text-warning" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
+                        <Lightbulb className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                     </div>
                     <h2
                         id="work-proposals-heading"
@@ -240,7 +240,7 @@ export function WorkProposalsSection({
                     vertically when the chat panel narrows the column.
                     `shrink-0` keeps each control measured so the title
                     truncates first. */}
-                <div className="flex flex-nowrap items-center gap-2 shrink-0">
+                <div className="flex flex-nowrap items-center gap-4 shrink-0">
                     {/* Phase 5 PR O — quick-add trigger. Hidden while the form is open
                         so the header and form don't show duplicate Add controls.
                         Dashboard polish (2026-05-27) — label collapses to icon-
@@ -251,7 +251,11 @@ export function WorkProposalsSection({
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className="gap-1.5"
+                            className={cn('inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                           'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                           'text-text-secondary dark:text-text-secondary-dark',
+                                           'hover:border-primary/40 hover:text-primary',
+                            )}
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}
                             aria-label={tPage('quickAdd.submit')}
@@ -264,66 +268,46 @@ export function WorkProposalsSection({
                         </Button>
                     )}
 
-                    {/* Phase 5 PR O — gears dropdown linking to settings anchors */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
                                 type="button"
-                                variant="secondary"
+                                variant="ghost"
                                 size="sm"
                                 aria-label={tPage('gears.menuLabel')}
+                                className="h-7 w-7 p-0 text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark"
                             >
-                                <SettingsIcon className="w-4 h-4" />
+                                <SettingsIcon className="w-3.5 h-3.5" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64">
-                            <DropdownMenuLabel>{tPage('gears.menuLabel')}</DropdownMenuLabel>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tPage('gears.menuLabel')}
+                            </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    router.push('/settings/work-agent#auto-generate-ideas')
-                                }
-                            >
-                                <a
-                                    href="/settings/work-agent#auto-generate-ideas"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
-                                >
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings/work-agent#auto-generate-ideas" className="flex items-center gap-2 text-xs hover:text-primary">
+                                    <Lightbulb className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoGenerate')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-build-works')}
-                            >
-                                <a
-                                    href="/settings/work-agent#auto-build-works"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
-                                >
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings/work-agent#auto-build-works" className="flex items-center gap-2 text-xs hover:text-primary">
+                                    <Hammer className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoBuild')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-retry')}
-                            >
-                                <a
-                                    href="/settings/work-agent#auto-retry"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
-                                >
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings/work-agent#auto-retry" className="flex items-center gap-2 text-xs hover:text-primary">
+                                    <RefreshCw className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoRetry')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#account-budgets')}
-                            >
-                                <a
-                                    href="/settings/work-agent#account-budgets"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
-                                >
+                            <DropdownMenuItem asChild>
+                                <Link href="/settings/work-agent#account-budgets" className="flex items-center gap-2 text-xs hover:text-primary">
+                                    <CreditCard className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.accountBudgets')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -341,12 +325,12 @@ export function WorkProposalsSection({
                             disabled={pendingRefresh || researching}
                             title={t('actions.refresh')}
                             aria-label={t('actions.refresh')}
-                            className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 text-xs text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
                             {pendingRefresh || researching ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                                <RefreshCw className="w-4 h-4" />
+                                <RefreshCw className="w-3.5 h-3.5" />
                             )}
                             <span className="hidden @xl/main:inline">{t('actions.refresh')}</span>
                         </button>
@@ -359,7 +343,7 @@ export function WorkProposalsSection({
                         <Link
                             href={ROUTES.DASHBOARD_IDEAS}
                             className={cn(
-                                'text-sm font-medium text-primary hover:underline whitespace-nowrap',
+                                'text-xs font-medium text-primary hover:underline whitespace-nowrap',
                                 'inline-flex items-center gap-1',
                             )}
                         >
