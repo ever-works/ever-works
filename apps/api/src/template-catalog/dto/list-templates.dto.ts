@@ -1,20 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
 
-const TEMPLATE_KINDS = ['website', 'work'] as const;
+// Must mirror `TemplateKind` in packages/agent/src/entities/template.entity.ts.
+// Phase 8 PR W/X added 'mission' (Mission Templates catalog filter); Phase 11
+// added 'company'. Keeping both kinds here lets the catalog/fork endpoints
+// accept them; the repository's findVisibleByKind() does the actual lookup.
+const TEMPLATE_KINDS = ['website', 'work', 'mission', 'company'] as const;
+type TemplateKindLiteral = (typeof TEMPLATE_KINDS)[number];
 
 export class ListTemplatesQueryDto {
-    @ApiProperty({ enum: TEMPLATE_KINDS })
+    // Back-compat: pre-PR-W callers hit `/api/templates` with no kind and
+    // got Work templates. PR-W added the `kind=mission` filter as an
+    // extension — `kind` is optional, defaulting to 'work'.
+    @ApiPropertyOptional({ enum: TEMPLATE_KINDS, default: 'work' })
+    @IsOptional()
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral = 'work';
 }
 
 export class AddCustomTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 
     @ApiProperty()
     @IsString()
@@ -62,7 +71,7 @@ export class SetDefaultTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 
     @ApiProperty()
     @IsString()
@@ -73,7 +82,7 @@ export class UpdateCustomTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 
     @ApiProperty({ required: false })
     @IsOptional()
@@ -113,14 +122,14 @@ export class ArchiveCustomTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 }
 
 export class ForkTemplateDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 
     @ApiProperty()
     @IsString()
@@ -135,7 +144,7 @@ export class RefreshTemplatesDto {
     @ApiProperty({ enum: TEMPLATE_KINDS })
     @IsString()
     @IsIn(TEMPLATE_KINDS)
-    kind: 'website' | 'work';
+    kind: TemplateKindLiteral;
 }
 
 export class CustomizeTemplateFromBaseDto {

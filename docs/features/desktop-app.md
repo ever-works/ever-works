@@ -12,7 +12,7 @@ The **Desktop App** will let you run all of Ever Works **locally as a single app
 
 ## What "all local" means
 
-- **Full stack in one app** — the API, frontend, background-jobs runtime, and database ship together. No separate services to wire up.
+- **Full stack in one app** — the API, frontend dashboard, the background-jobs runtime (Trigger.dev-style, powering schedules and Agents), and the database ship together as a single installable application. No separate services to wire up.
 - **Your data on your machine** — repositories, Knowledge Base, and configuration stay local by default.
 - **Works offline-first** — the platform keeps working without a constant connection to a cloud backend.
 
