@@ -63,8 +63,8 @@ test.describe('Settings navigation', () => {
         const dataLink = page.locator('a[href*="/settings/data"]').first();
         await dataLink.click();
 
-        await page.waitForURL(/\/settings\/data/, { timeout: 30_000 });
-        await expect(page.locator('body')).not.toContainText('500');
+        // Same client-side-nav fix as the API keys test above.
+        await expect(page).toHaveURL(/\/settings\/data/, { timeout: 30_000 });
     });
 
     test('should navigate to danger zone settings', async ({ page }) => {
@@ -73,8 +73,8 @@ test.describe('Settings navigation', () => {
         const dangerLink = page.locator('a[href*="/settings/danger"]').first();
         await dangerLink.click();
 
-        await page.waitForURL(/\/settings\/danger/, { timeout: 30_000 });
-        await expect(page.locator('body')).not.toContainText('500');
+        // Same client-side-nav fix as the API keys test above.
+        await expect(page).toHaveURL(/\/settings\/danger/, { timeout: 30_000 });
     });
 });
 

@@ -89,21 +89,17 @@ test.describe('Complete user journey', () => {
             await page.waitForTimeout(500);
         }
 
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // PR DD — bare /works/new now 307s to the unified /new picker.
+        // Pin `?mode=manual` so we land directly on the manual form (which
+        // is what the rest of this journey drives) without needing to
+        // click through a chooser that no longer exists at /works/new.
+        await page.goto('/en/works/new?mode=manual', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
         // Also dismiss on /works/new in case the modal re-renders there.
         if (await dismissGithubModal.isVisible({ timeout: 3_000 }).catch(() => false)) {
             await dismissGithubModal.click();
             await page.waitForTimeout(500);
         }
-
-        // Select manual creation mode
-        const manualCard = page
-            .locator('button')
-            .filter({ hasText: /Configure|Manual/i })
-            .first();
-        await expect(manualCard).toBeVisible({ timeout: 10_000 });
-        await manualCard.click();
 
         // Fill work form (scope to the work creation form, not the AI chat input form)
         const dirSlug = `journey-${suffix}`;
