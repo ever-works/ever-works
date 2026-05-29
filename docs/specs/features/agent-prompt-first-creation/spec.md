@@ -205,7 +205,7 @@ Numbered, atomic, testable. `MUST` / `SHOULD` / `MUST NOT` per Spec Kit conventi
 - **[NEEDS CLARIFICATION: Q1]** Chip seed semantics when the prompt box is non-empty — prepend role label vs. append vs. replace-with-confirm. **Default for v1:** seed fully if empty, prepend `"<Role> — "` if non-empty (E5).
 - **[NEEDS CLARIFICATION: Q2]** "Your templates" source in v1 — derive from `agentsAPI.list()` (all the user's Agents as re-usable starting points) vs. only Agents explicitly marked `isTemplate`. **Default:** show the user's existing Agents as starting points; refine when save-as-template ships (FR-29).
 - **[NEEDS CLARIFICATION: Q3]** Does clicking a catalog card seed the prompt or jump straight to the wizard pre-filled? **Default:** seed the prompt (keeps the prompt-first flow primary); offer a secondary "Open in wizard" affordance on the card.
-- **[NEEDS CLARIFICATION: Q4]** Should the `ever-works/agents` repo be created + seeded with the named roles (CEO, CTO, …) as part of this work, or is the fallback list sufficient for v1 launch while the repo is populated separately? **Operator decision needed** — repo creation is a shared-state action.
+- **[RESOLVED: Q4]** The `ever-works/agents` repo has been created + seeded (separate agent; private, with a `manifest.json` index). The backend (`AgentTemplateCatalogService` + `GET /api/agent-templates`) reads it live and falls back to the built-in list. **Remaining operator step:** set `EVER_WORKS_AGENTS_TOKEN` (or the shared `GITHUB_TOKEN`) on the API so the private repo is reachable; until then chips render the built-in fallback.
 
 ## 9. Constitution Gates
 

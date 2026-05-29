@@ -28,16 +28,19 @@ Tracks [spec.md](./spec.md) / [plan.md](./plan.md). Jira Epic [EW-705](https://e
 
 ## Story 4 — Catalog backend: `AgentTemplateService` + endpoint (FR-26…FR-30) — [EW-709](https://evertech.atlassian.net/browse/EW-709)
 
-- [ ] T4.1 Extend `agent-templates.ts` fallback with CEO/CTO/Lead Engineer/Copywriter/Sales/Brand Specialist (+ keep existing) and add module-level client cache.
-- [ ] T4.2 `AgentTemplateService`: clone `ever-works/agents` (`EVER_WORKS_AGENTS_REF`/`_PATH`), parse + Zod-validate folders, cache in `cache_entries` 1h, fallback→[] on failure.
-- [ ] T4.3 `GET /agent-templates?entity=agent` controller (`@Public()` read) → service.
-- [ ] T4.4 `listAstTemplatesFromCatalogAction` server action + swap `listAstTemplates` to use it with built-in fallback on error.
-- [ ] T4.5 Backend tests (cache-hit / clone-miss / invalid-skip / unreachable).
-- [ ] T4.6 **Operator action (Q4):** create + seed `ever-works/agents` with the named role templates. Shared-state — needs approval; not done by the agent unilaterally.
+> **Implemented in PR [#1131](https://github.com/ever-works/ever-works/pull/1131).** The `ever-works/agents` repo now exists (private, `manifest.json` index). `AgentTemplateCatalogService` reads the manifest (not a folder walk), so the backend was simpler than the original clone-and-walk plan.
+
+- [x] T4.1 Extend `agent-templates.ts` fallback with CEO/CTO/Lead Engineer/Copywriter/Sales/Brand Specialist (+ keep existing) and add session catalog cache.
+- [x] T4.2 `AgentTemplateCatalogService`: read `manifest.json` from `ever-works/agents` via `GitFacadeService` (`EVER_WORKS_AGENTS_REF`, default `main`), map `templates[]` → `AstTemplateEntry`, cache in `cache_entries` 1h, fallback→[] on any failure.
+- [x] T4.3 `GET /api/agent-templates?entity=agent` controller (`@Public()` read) → service, wired into `AgentsModule`.
+- [x] T4.4 `server-only` `fetchAgentTemplateCatalog()` helper (used by `/agents` + `/agents/new` server pages) calling the endpoint with built-in fallback on error. `agent-templates.ts` stays isomorphic for client imports.
+- [x] T4.5 Backend Jest tests (cache-hit / no-token / repo-throw / malformed-manifest / missing-file / invalid-row-drop).
+- [x] T4.6 ~~Operator action (Q4): create + seed `ever-works/agents`~~ — **done** (seeded by a separate agent; repo is private).
+- [ ] T4.7 **Operator deploy action:** set `EVER_WORKS_AGENTS_TOKEN` (or rely on the shared `GITHUB_TOKEN`) on the API so the catalog reads live data. Until then chips render the built-in fallback.
 
 ## Cross-cutting
 
-- [ ] X.1 i18n: add new keys to all 21 `apps/web/messages/*.json` (English placeholder where untranslated).
+- [x] X.1 i18n: new keys added to `en.json`. The loader does `deepmerge(en, locale)`, so every locale inherits them with English fallback — and the non-English files carry pre-existing duplicate keys, so a full round-trip would drop translations. Per-locale translation is a separate pass.
 - [ ] X.2 `pnpm lint && pnpm type-check` clean for touched packages.
 - [ ] X.3 Drive PR(s) through bot review + CI green (NN #14/#18/#19).
 
