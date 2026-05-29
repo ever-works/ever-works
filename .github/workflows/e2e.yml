@@ -294,15 +294,28 @@ jobs:
           CI: 'true'
           PLAYWRIGHT_BASE_URL: http://localhost:3000
 
+      - name: Sanitize branch tag for artifact names
+        # GitHub Actions expressions have no `replace()` function, and
+        # actions/upload-artifact rejects `/` (and other path chars) in
+        # artifact names. Branch names like `session/<id>-e2e-followup`
+        # and the `<PR#>/merge` ref on pull_request events both contain
+        # slashes, so compute a sanitized tag once in a shell step and
+        # reuse it for both upload steps below.
+        id: tag
+        run: |
+          RAW="${HEAD_REF:-$REF_NAME}"
+          SAFE="${RAW//[^A-Za-z0-9._-]/-}"
+          echo "tag=${SAFE}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           # Per-shard artifact name so the 4 parallel uploads don't clobber.
-          # `github.ref_name` is `<PR#>/merge` on pull_request events (contains
-          # `/`, which actions/upload-artifact rejects). Fall back to the head
-          # branch name (sanitized) on PRs and the ref_name everywhere else.
-          name: playwright-report-${{ github.head_ref || github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
+          name: playwright-report-${{ steps.tag.outputs.tag }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             apps/web/playwright-report
             apps/web/e2e/test-results
@@ -313,7 +326,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: server-logs-${{ github.head_ref || github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
+          name: server-logs-${{ steps.tag.outputs.tag }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             /tmp/api.log
             /tmp/web.log
@@ -421,11 +434,24 @@ jobs:
           # stay in 'development' while the served pages are prod.
           E2E_PROD_BUILD: '1'
 
+      - name: Sanitize branch tag for artifact names
+        # Same rationale as the sharded e2e job above — `github.ref_name`
+        # is `<PR#>/merge` on pull_request events, which actions/upload-
+        # artifact rejects.
+        id: tag
+        run: |
+          RAW="${HEAD_REF:-$REF_NAME}"
+          SAFE="${RAW//[^A-Za-z0-9._-]/-}"
+          echo "tag=${SAFE}" >> "$GITHUB_OUTPUT"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+
       - name: Upload Playwright prod-build report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-prod-build-report-${{ github.ref_name }}-${{ github.run_attempt }}
+          name: playwright-prod-build-report-${{ steps.tag.outputs.tag }}-${{ github.run_attempt }}
           path: |
             apps/web/playwright-report
             apps/web/e2e/test-results

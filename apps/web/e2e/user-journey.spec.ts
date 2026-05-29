@@ -101,19 +101,24 @@ test.describe('Complete user journey', () => {
             await page.waitForTimeout(500);
         }
 
-        // Fill work form (scope to the work creation form, not the AI chat input form)
+        // The previously separate "Create Manually" flow was merged into
+        // the unified WorkAICreator (new-work-client.tsx:405-426), which
+        // uses discrete <Input>/<Textarea> components rather than a single
+        // <form> wrapper. Target the inputs directly by their `name`s.
         const dirSlug = `journey-${suffix}`;
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
-
-        const nameInput = workForm.locator('input[type="text"]').first();
+        const nameInput = page.locator('input[name="name"]').first();
+        await expect(nameInput).toBeVisible({ timeout: 10_000 });
         await nameInput.fill(`Journey Dir ${dirSlug}`);
 
-        const descriptionTextarea = workForm.locator('textarea').first();
+        const descriptionTextarea = page.locator('textarea[name="prompt"], textarea').first();
         await descriptionTextarea.fill('Full journey test work');
 
-        // Submit
-        const submitButton = workForm.locator('button[type="submit"]');
+        // Submit via the primary CTA (WorkAICreator uses an onClick handler,
+        // not form onSubmit — no `button[type="submit"]` to scope to).
+        const submitButton = page
+            .locator('button')
+            .filter({ hasText: /(create|submit|build|generate)/i })
+            .first();
         await submitButton.click();
 
         // Wait for redirect or error

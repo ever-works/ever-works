@@ -59,30 +59,35 @@ test.describe('Work creation', () => {
 
         await page.goto('/en/works/new?mode=manual');
 
-        // Wait for the work creation form (scoped to avoid the AI chat input form)
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
-
-        // Fill in the work form
-        const nameInput = workForm.locator('input[type="text"]').first();
+        // The previously separate "Create Manually" flow was merged into the
+        // unified WorkAICreator (new-work-client.tsx:405-426), which uses
+        // discrete <Input>/<Textarea> components rather than a single <form>
+        // wrapper. Target the inputs directly via their `name` attributes
+        // instead of scoping by form element.
+        const nameInput = page.locator('input[name="name"]').first();
+        await expect(nameInput).toBeVisible({ timeout: 10_000 });
         await nameInput.fill(`E2E Test Dir ${slug}`);
 
-        // Slug should auto-populate, but let's verify it exists
-        const slugInput = workForm.locator('input[type="text"]').nth(1);
+        // Slug auto-populates from name; just verify it picked something up.
+        const slugInput = page.locator('input[name="slug"]').first();
         await expect(slugInput).toHaveValue(/.+/);
 
-        // Description — textarea
-        const descriptionTextarea = workForm.locator('textarea').first();
-        await descriptionTextarea.fill('Automated E2E test work for Playwright testing');
+        // Description / prompt textarea (the AI/manual flow shares one).
+        const promptTextarea = page.locator('textarea[name="prompt"], textarea').first();
+        await promptTextarea.fill('Automated E2E test work for Playwright testing');
 
-        // Submit the form
-        const submitButton = workForm.locator('button[type="submit"]');
+        // Submit — the primary CTA on the page. WorkAICreator handles submit
+        // via an onClick handler on a Button, not a form's onSubmit.
+        const submitButton = page
+            .locator('button')
+            .filter({ hasText: /(create|submit|build|generate)/i })
+            .first();
         await submitButton.click();
 
-        // Should either redirect to the new work or show success
-        // Wait for navigation away from /new page or for a toast success
+        // Should either redirect to the new work or show success.
         await page.waitForURL(/\/works\/(?!new)/, { timeout: 15_000 }).catch(() => {
-            // If no redirect, check for error toast
+            // If no redirect, check for error toast — assertion below is
+            // loose because git-provider-less E2E may surface a soft error.
         });
     });
 
@@ -90,9 +95,10 @@ test.describe('Work creation', () => {
         // Land on manual mode directly (see comment on the previous test).
         await page.goto('/en/works/new?mode=manual');
 
-        // Wait for the work creation form (scoped to avoid AI chat input form)
-        const workForm = page.locator('form.space-y-6, form[autocomplete="off"]').first();
-        await expect(workForm).toBeVisible({ timeout: 10_000 });
+        // Same selector update — the unified WorkAICreator no longer wraps
+        // its fields in `<form className="space-y-6" autocomplete="off">`.
+        const nameInput = page.locator('input[name="name"]').first();
+        await expect(nameInput).toBeVisible({ timeout: 10_000 });
 
         // Click back button → returns to the mode-card selector on /works/new.
         const backButton = page.locator('button').filter({ hasText: /back/i }).first();
