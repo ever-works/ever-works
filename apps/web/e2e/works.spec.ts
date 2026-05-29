@@ -116,14 +116,27 @@ test.describe('Work detail', () => {
         const workLink = page.locator('a[href*="/works/"]').first();
 
         if (await workLink.isVisible({ timeout: 5_000 }).catch(() => false)) {
-            await workLink.click();
+            // Capture the actual work-detail navigation response (works with
+            // Next.js soft routing — the RSC fetch is a real HTTP request).
+            // `performance.getEntriesByType('navigation')` only reflects the
+            // initial /en/works load and would always be 200 on a soft nav,
+            // silently passing even if the detail page 5xx'd.
+            const [response] = await Promise.all([
+                page
+                    .waitForResponse(
+                        (r) =>
+                            /\/works\/[^/?#]+/.test(new URL(r.url()).pathname) &&
+                            r.request().method() === 'GET',
+                        { timeout: 10_000 },
+                    )
+                    .catch(() => null),
+                workLink.click(),
+            ]);
             await expect(page).toHaveURL(/\/works\/.+/);
-            // Assert via HTTP status rather than body text — the plugins panel
-            // copy can contain "500+ third-party apps".
-            const status = (await page.evaluate(() => performance.getEntriesByType('navigation')[0]))
-                ?.responseStatus;
-            if (typeof status === 'number') {
-                expect(status, 'work detail navigation should not 5xx').toBeLessThan(500);
+            if (response) {
+                expect(response.status(), 'work detail navigation should not 5xx').toBeLessThan(
+                    500,
+                );
             }
         }
     });

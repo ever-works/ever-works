@@ -54,7 +54,12 @@ test.describe('Notification channels — preferences endpoint', () => {
         // on the modern empty-state shape.
         const serialised = JSON.stringify(body).toLowerCase();
         const hasNamedChannel = /email|in-?app|inapp|push|webhook|sms|slack/.test(serialised);
-        const hasV2Envelope = /"subscriptions"/.test(serialised) && /"mutes"/.test(serialised);
+        // Match the v2 envelope keys as JSON property names (followed by `:`),
+        // not as string values. A response like `{"error":"subscriptions
+        // channel not configured","mutes":[]}` would falsely satisfy the
+        // looser substring check and mask a non-channel-shaped body.
+        const hasV2Envelope =
+            /"subscriptions"\s*:/.test(serialised) && /"mutes"\s*:/.test(serialised);
         const looksChannelShaped = hasNamedChannel || hasV2Envelope;
         expect(
             looksChannelShaped,
