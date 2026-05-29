@@ -567,19 +567,15 @@ export function MissionDetailClient({
             {/* ── Inherited Works (cloned missions only) ───────────────────── */}
             {mission.sourceMissionId && (
                 <section className={sectionCard}>
-                    <div className="flex items-center gap-2.5 mb-1">
-                        <div className="w-7 h-7 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark border border-border/60 dark:border-border-dark/60 flex items-center justify-center shrink-0">
-                            <GitFork className="w-3.5 h-3.5 text-text-secondary dark:text-text-secondary-dark" />
-                        </div>
-                        <h2 className="text-sm font-semibold text-text dark:text-text-dark">
-                            {t('sections.inheritedWorks')}
-                            <span className="ml-2 text-[11px] font-normal text-text-muted dark:text-text-muted-dark">
-                                ({inheritedWorkLinks.length})
-                            </span>
-                        </h2>
-                    </div>
+                    <SectionHeader
+                        icon={GitFork}
+                        title={t('sections.inheritedWorks')}
+                        count={inheritedWorkLinks.length}
+                        tileClass="bg-surface-secondary dark:bg-surface-secondary-dark border-border/60 dark:border-border-dark/60"
+                        iconClass="text-text-secondary dark:text-text-secondary-dark"
+                    />
                     {sourceMission && (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark mb-4">
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark -mt-2 mb-4">
                             {t('inherited.fromSource')}{' '}
                             <Link
                                 href={ROUTES.DASHBOARD_MISSION(sourceMission.id)}
