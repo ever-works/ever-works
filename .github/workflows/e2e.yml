@@ -17,6 +17,14 @@ name: E2E Tests
 on:
   push:
     branches: [stage, main]
+  # Pre-validate PRs heading into the release pipeline so test debt
+  # surfaces BEFORE the merge instead of after. Sharded across 4
+  # runners (~25 min wall-clock), so the cost is bearable to catch
+  # regressions before they reach `stage`. If this proves too
+  # expensive, narrow to `[stage, main]` only and rely on push for
+  # `develop`-merged regressions.
+  pull_request:
+    branches: [develop, stage, main]
   workflow_dispatch:
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.
@@ -30,17 +38,25 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubicloud-standard-8
-    # 150 min covers the current 1-worker × 333-spec suite even with retries
-    # and slow specs. The prior 45-min ceiling was too tight: a single full
-    # run on develop hit the wall partway through. Keep the headroom while
-    # we work through suite-level test debt; revisit downward only once the
-    # suite consistently finishes well under it.
-    timeout-minutes: 150
+    # Each shard runs ~1/E2E_SHARDS of the 1670-test suite. 90 min keeps
+    # plenty of headroom for the slowest shard (cold dev-mode compile +
+    # retries) while letting GitHub kill genuine hangs reasonably fast.
+    # Bump back to ~150 if you reduce shard count below 4.
+    timeout-minutes: 90
 
     strategy:
+      # Shard the Playwright suite across multiple machines. Each shard
+      # boots its own API + sqlite in-memory DB, so they're fully isolated
+      # — no shared-state races. Wall-clock = single-shard runtime
+      # (~90/N min) rather than sum-of-all (~90 min × 1 worker).
+      #
+      # 4 shards × ubicloud-standard-8 = 4× infra cost but ~4× faster.
+      # Adjust by editing the `shard` array AND the `--shard=X/Y` totals
+      # in the playwright invocation below; they MUST stay in sync.
       fail-fast: false
       matrix:
         node-version: [22.x]
+        shard: [1, 2, 3, 4]
 
     # Service containers — let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
@@ -144,7 +160,11 @@ jobs:
             tail -n 200 /tmp/web.log || true
             echo "::endgroup::"
           }' EXIT
-          pnpm exec playwright test
+          # --shard=N/M splits the test suite across M machines, deterministic.
+          # Each shard runs its own subset; combined across the matrix they
+          # cover every test exactly once. Keep --shard total in sync with
+          # the `shard:` matrix length above.
+          pnpm exec playwright test --shard=${{ matrix.shard }}/4
           echo "::endgroup::"
         env:
           # API
@@ -268,7 +288,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ github.ref_name }}-${{ github.run_attempt }}
+          # Per-shard artifact name so the 4 parallel uploads don't clobber.
+          name: playwright-report-${{ github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             apps/web/playwright-report
             apps/web/e2e/test-results
@@ -279,7 +300,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: server-logs-${{ github.ref_name }}-${{ github.run_attempt }}
+          name: server-logs-${{ github.ref_name }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
             /tmp/api.log
             /tmp/web.log

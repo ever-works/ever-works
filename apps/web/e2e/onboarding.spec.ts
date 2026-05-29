@@ -45,7 +45,11 @@ test.describe('Onboarding — dismissal persists', () => {
     });
 
     test('"Connect GitHub" modal does not block navigation on /works/new', async ({ page }) => {
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // Phase 6.5 PR DD — /works/new now 307s to the unified picker at
+        // /new unless `?mode=` is supplied. Force a mode so the legacy
+        // mode-card selectors apply (still validates the original intent:
+        // the "Connect GitHub" modal doesn't intercept the form).
+        await page.goto('/en/works/new?mode=ai', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
         // We should still be able to interact with the page — at minimum, see

@@ -65,12 +65,17 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         await expect(worksLink, 'sidebar Works link present').toBeVisible({ timeout: 10_000 });
     });
 
-    test('sidebar "New Work" CTA is present', async ({ page }) => {
+    test('sidebar "+ New" CTA is present', async ({ page }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const newWorkLink = page.locator('a[href="/works/new"], a[href="/en/works/new"]').first();
-        await expect(newWorkLink, 'sidebar New Work CTA present').toBeVisible({
+        // Phase 6.5 PR DD repointed the sidebar primary CTA from
+        // /works/new → /new (unified picker). Accept either route +
+        // both locale-prefix shapes so this stays green either way.
+        const newCta = page
+            .locator('a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]')
+            .first();
+        await expect(newCta, 'sidebar "+ New" CTA present').toBeVisible({
             timeout: 10_000,
         });
     });
@@ -94,11 +99,14 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
     });
 
     test('new work page shows three creation modes', async ({ page }) => {
-        await page.goto('/en/works/new', { waitUntil: 'domcontentloaded' });
+        // Phase 6.5 PR DD — /works/new without ?mode/?proposal now 307s to
+        // the unified picker at /new. Force a mode so the mode selector
+        // actually renders.
+        await page.goto('/en/works/new?mode=ai', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
         const body = await page.locator('body').innerText();
-        expect(body).toMatch(/new work/i);
+        expect(body).toMatch(/new work|create with ai|build with ai/i);
 
         expect(body, 'mode selector mentions Create/Configure/Import').toMatch(
             /create with ai|configure|manual|import existing/i,
@@ -150,14 +158,19 @@ test.describe('Dashboard — comprehensive (authenticated)', () => {
         expect(page.url()).toMatch(/(?:\/en)?\/works/);
     });
 
-    test('clicking sidebar "New Work" link navigates to /works/new', async ({ page }) => {
+    test('clicking sidebar "+ New" link navigates to the unified picker', async ({ page }) => {
         test.setTimeout(60_000);
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_000);
 
-        const newWorkLink = page.locator('a[href="/works/new"], a[href="/en/works/new"]').first();
-        await expect(newWorkLink).toBeVisible({ timeout: 10_000 });
-        await newWorkLink.click();
-        await page.waitForURL(/(?:\/en)?\/works\/new/, { timeout: 30_000 });
+        // Phase 6.5 PR DD — sidebar "+ New" now points at /new (unified
+        // picker). The legacy /works/new route still exists for deep
+        // links / AI Chat pivots, so we accept either destination.
+        const newCta = page
+            .locator('a[href="/new"], a[href="/en/new"], a[href="/works/new"], a[href="/en/works/new"]')
+            .first();
+        await expect(newCta).toBeVisible({ timeout: 10_000 });
+        await newCta.click();
+        await page.waitForURL(/(?:\/en)?\/(?:new|works\/new)(?:\?|$|\/)/, { timeout: 30_000 });
     });
 });
