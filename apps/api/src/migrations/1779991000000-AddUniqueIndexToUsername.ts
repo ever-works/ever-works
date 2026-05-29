@@ -68,6 +68,18 @@ export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface
             ? `UPDATE "users" SET "username" = $1 WHERE "id" = $2`
             : `UPDATE "users" SET "username" = ? WHERE "id" = ?`;
 
+        // Build a case-insensitive set of every username currently in use so
+        // generated rename targets cannot collide with an existing row that
+        // a prior manual cleanup already produced (e.g. prod's
+        // `paradoxe35-289966` from the 2026-05-28 incident).
+        const taken = new Set<string>(
+            (
+                (await queryRunner.query(
+                    `SELECT lower("username") AS lname FROM "users" WHERE "username" IS NOT NULL`,
+                )) as Array<{ lname: string }>
+            ).map((r) => r.lname),
+        );
+
         const renames: Array<{ id: string; from: string; to: string }> = [];
 
         for (const bucket of buckets) {
@@ -78,29 +90,18 @@ export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface
                 [bucket.lname],
             )) as Array<{ id: string; username: string; createdAt: Date | string }>;
 
-            // Keep rows[0] (oldest) as canonical; rename the rest.
+            // Keep rows[0] (oldest) as canonical; rename the rest. The first
+            // bucket-row keeps the lname slot in `taken`; each rename adds the
+            // new target to `taken` so subsequent renames in the same pass
+            // cannot collide with one we just produced either.
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                const suffix = String(row.id).replace(/-/g, '').slice(0, 6);
-                const renamed = `${row.username}-${suffix}`;
+                const renamed = this.allocateRenameTarget(row.username, row.id, taken);
                 await queryRunner.query(updateSql, [renamed, row.id]);
+                taken.delete(row.username.toLowerCase());
+                taken.add(renamed.toLowerCase());
                 renames.push({ id: row.id, from: row.username, to: renamed });
             }
-        }
-
-        // Re-check: the rename suffix uses the UUID prefix so collisions are
-        // astronomically unlikely, but be defensive — surface the problem
-        // loudly rather than swallowing it before the index attempt.
-        const stillDupes = (await queryRunner.query(
-            `SELECT lower("username") AS lname, COUNT(*) AS cnt FROM "users" WHERE "username" IS NOT NULL GROUP BY lower("username") HAVING COUNT(*) > 1`,
-        )) as Array<{ lname: string; cnt: number | string }>;
-
-        if (stillDupes.length > 0) {
-            throw new Error(
-                `AddUniqueIndexToUsername: dedup pass left ${stillDupes.length} ` +
-                    `case-insensitive duplicate bucket(s); rename-by-id-suffix collided. ` +
-                    `Resolve manually. Sample: ${JSON.stringify(stillDupes.slice(0, 5))}`,
-            );
         }
 
         if (renames.length > 0) {
@@ -110,6 +111,27 @@ export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface
                     JSON.stringify(renames),
             );
         }
+    }
+
+    private allocateRenameTarget(username: string, id: string, taken: Set<string>): string {
+        const hex = String(id).replace(/-/g, '');
+        // Try increasing prefix length 6 → full UUID; any collision falls back
+        // to the next longer suffix. Stops at the full hex string, which is
+        // guaranteed unique (UUID PKs are unique by the table contract).
+        for (let len = 6; len <= hex.length; len++) {
+            const candidate = `${username}-${hex.slice(0, len)}`;
+            if (!taken.has(candidate.toLowerCase())) {
+                return candidate;
+            }
+        }
+        // Defensive: if even the full UUID is taken (impossible unless a row
+        // somewhere is already named `<username>-<full-uuid>`), append the
+        // numeric suffix `-2`, `-3`, ... like AddSlugToUsers does.
+        let n = 2;
+        while (taken.has(`${username}-${hex}-${n}`.toLowerCase())) {
+            n += 1;
+        }
+        return `${username}-${hex}-${n}`;
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

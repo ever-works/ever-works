@@ -137,6 +137,31 @@ describe('AddUniqueIndexToUsername1779991000000 (EW-652)', () => {
         expect(await indexExists()).toBe(true);
     });
 
+    it('falls back to longer id-prefix when rename target collides with existing user', async () => {
+        // A prior manual cleanup already produced `paradoxe35-bbbbbb` — the
+        // exact name the 6-char suffix would otherwise generate. The
+        // migration must avoid collision instead of throwing.
+        const oldId = uuid('aaaaaa');
+        const newId = uuid('bbbbbb');
+        const collidingId = uuid('999999');
+        await insert(oldId, 'paradoxe35', '2025-09-25');
+        await insert(newId, 'paradoxe35', '2026-04-13');
+        await insert(collidingId, 'paradoxe35-bbbbbb', '2026-04-14');
+
+        const runner = dataSource.createQueryRunner();
+        await migration.up(runner);
+        await runner.release();
+
+        const after = await usernamesById();
+        expect(after[oldId]).toBe('paradoxe35');
+        expect(after[collidingId]).toBe('paradoxe35-bbbbbb');
+        // newId's rename target collided → migration extends suffix until free.
+        expect(after[newId]).not.toBe('paradoxe35');
+        expect(after[newId]).not.toBe('paradoxe35-bbbbbb');
+        expect(after[newId]).toMatch(/^paradoxe35-bbbbbb[a-z0-9]+/);
+        expect(await indexExists()).toBe(true);
+    });
+
     it('down() drops the index', async () => {
         await insert(uuid('111111'), 'alice', '2026-01-01');
 
