@@ -12,8 +12,6 @@ export interface ComposioTrigger {
     deliveriesRejected: number;
     lastFiredAt?: string | null;
     createdAt: string;
-    /** Returned only on create — never on subsequent reads. */
-    webhookSecret?: string;
 }
 
 export interface CreateComposioTriggerInput {

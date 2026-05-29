@@ -68,10 +68,14 @@ test.describe('Dark mode — pinning persists', () => {
     test('no FOUC — html element carries theme class before first paint', async ({ page }) => {
         await pinDarkMode(page);
         // Stop at the very earliest event so we can inspect the initial
-        // HTML state before client JS hydrates.
+        // HTML state before client JS hydrates. `commit` fires before
+        // the parser runs, so `document.documentElement` can briefly
+        // be null on Windows/CI — the evaluate guards against that
+        // rather than throwing TypeError.
         await page.goto('/en', { waitUntil: 'commit' });
         const initial = await page.evaluate(() => {
             const html = document.documentElement;
+            if (!html) return { cls: '', dataTheme: '' };
             return {
                 cls: html.className,
                 dataTheme: html.getAttribute('data-theme') || '',

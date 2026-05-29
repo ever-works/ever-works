@@ -31,6 +31,19 @@ export class GitHubAppInstallationRepository {
         return this.repository.findOne({ where: { installationId } });
     }
 
+    /**
+     * Find the active (not deleted, not suspended) GitHub App installation
+     * for an account login (org or user) — e.g. the `ever-works` org's
+     * installation. Used for system-level reads of org-owned repos
+     * (agent-template catalog) without a Work context. Newest first.
+     */
+    async findActiveByAccountLogin(accountLogin: string): Promise<GitHubAppInstallation | null> {
+        return this.repository.findOne({
+            where: { accountLogin, deletedAt: IsNull(), suspendedAt: IsNull() },
+            order: { createdAt: 'DESC' },
+        });
+    }
+
     async listAll(): Promise<GitHubAppInstallation[]> {
         return this.repository.find({
             order: {

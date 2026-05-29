@@ -193,6 +193,34 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 		}
 	}
 
+	extractInboundRecipients(rawBody: Buffer, _headers: Readonly<Record<string, string>>): readonly string[] {
+		// Best-effort recipient extraction WITHOUT verifying the
+		// signature — used by the facade to resolve the owning user's
+		// scope before verification. Must never throw.
+		try {
+			const body = decodeBody(rawBody);
+			const raw =
+				(typeof body['recipient'] === 'string' ? (body['recipient'] as string) : undefined) ??
+				(typeof body['To'] === 'string' ? (body['To'] as string) : undefined) ??
+				'';
+			// `recipient` is a bare address, but the `To` fallback is the raw
+			// RFC 2822 header (may be `"Name" <a@b>`), so strip the display
+			// name / angle brackets before matching.
+			return raw
+				? raw
+						.split(',')
+						.map((s) => {
+							const trimmed = s.trim();
+							const match = trimmed.match(/<([^>]+)>/);
+							return (match ? match[1] : trimmed).trim();
+						})
+						.filter((s) => s.length > 0)
+				: [];
+		} catch {
+			return [];
+		}
+	}
+
 	async parseInboundWebhook(
 		rawBody: Buffer,
 		_headers: Readonly<Record<string, string>>,

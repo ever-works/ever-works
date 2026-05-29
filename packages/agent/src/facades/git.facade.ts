@@ -1030,6 +1030,25 @@ export class GitFacadeService implements IGitFacade {
         throw new GitProviderNotFoundError(providerId);
     }
 
+    /**
+     * System-level installation token for an org/user login (no Work
+     * context). Reuses the platform GitHub App: looks up the active
+     * installation for `ownerLogin` (e.g. the `ever-works` org — the
+     * same App that lets the platform create repos there) and mints an
+     * installation access token. Returns null when the App isn't
+     * installed on that account or app credentials are unset, so callers
+     * can fall back to other auth. Used for reading org-owned catalog
+     * repos like `ever-works/agents` from system endpoints.
+     */
+    async getInstallationTokenForOwner(ownerLogin: string): Promise<string | null> {
+        const installation =
+            await this.gitHubAppInstallationRepository.findActiveByAccountLogin(ownerLogin);
+        if (!installation || installation.deletedAt || installation.suspendedAt) {
+            return null;
+        }
+        return this.createGitHubAppInstallationToken(installation.installationId);
+    }
+
     private async getInstallationTokenForWork(options: GitFacadeOptions): Promise<string | null> {
         if (!options.workId || options.providerId !== 'github') {
             return null;

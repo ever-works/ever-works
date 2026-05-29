@@ -72,14 +72,23 @@ test.describe('Works list page — interactive surface', () => {
         await expect(search).toHaveValue('zzznonexistent-search-needle-zzz');
     });
 
-    test('"+ New Work" CTA on the works list navigates to /works/new', async ({ page }) => {
+    test('"+ New Work" CTA on the works list navigates to the new-work picker', async ({
+        page,
+    }) => {
         await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const newWorkLink = page.locator('a[href$="/works/new"], a[href*="/works/new?"]').first();
+        // Phase 6.5 PR DD repointed primary "+ New" CTAs from /works/new to
+        // the unified /new picker; the legacy /works/new route still exists
+        // for deep links. Accept either destination.
+        const newWorkLink = page
+            .locator(
+                'a[href$="/new"]:not([href*="/works/"]), a[href$="/works/new"], a[href*="/works/new?"], a[href$="/en/new"]',
+            )
+            .first();
         await expect(newWorkLink).toBeVisible({ timeout: 10_000 });
         await newWorkLink.click();
-        await page.waitForURL(/(?:\/en)?\/works\/new/, { timeout: 30_000 });
+        await page.waitForURL(/(?:\/en)?\/(?:new|works\/new)(?:\?|$|\/)/, { timeout: 30_000 });
     });
 });
 

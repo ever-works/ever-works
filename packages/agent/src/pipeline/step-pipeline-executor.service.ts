@@ -613,6 +613,7 @@ export class StepPipelineExecutorService {
             options?.signal,
             kbContext,
             kbTools,
+            options?.memorySessionId,
         );
 
         if (executor.type === 'builtin') {

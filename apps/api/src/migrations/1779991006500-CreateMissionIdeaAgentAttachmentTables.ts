@@ -24,8 +24,18 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  *
  * Idempotent: each `CREATE TABLE` is guarded by `hasTable`, each index
  * by name lookup. Re-runs are no-ops.
+ *
+ * Timestamp note: PR #1050 renamed this file to `1779991006000-…` to clear
+ * a *filename* collision but left the class timestamp at `1779991000000`,
+ * which still collided with `AddUniqueIndexToUsername1779991000000` at the
+ * level TypeORM actually orders on (the trailing digits of the class name).
+ * Both file and class are now `1779991006500`: unique, ordered right after
+ * `AddTenantIdAndOrganizationIdToTierA1779991006000` and before
+ * `UpgradeWorkOrganizationIdToFk1779991007000`. Because every statement is
+ * idempotent, environments that already applied the old class name simply
+ * re-run this as a no-op.
  */
-export class CreateMissionIdeaAgentAttachmentTables1779991000000 implements MigrationInterface {
+export class CreateMissionIdeaAgentAttachmentTables1779991006500 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         await this.createAttachmentTable(queryRunner, {
             tableName: 'mission_attachments',

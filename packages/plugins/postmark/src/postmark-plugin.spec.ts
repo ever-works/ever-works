@@ -104,6 +104,27 @@ describe('PostmarkPlugin', () => {
 		});
 	});
 
+	describe('extractInboundRecipients', () => {
+		it('returns ToFull emails as bare addresses', () => {
+			const payload = { ToFull: [{ Email: 'inbox@acme.com' }, { Email: 'team@acme.com' }] };
+			expect(plugin.extractInboundRecipients(Buffer.from(JSON.stringify(payload)), {})).toEqual([
+				'inbox@acme.com',
+				'team@acme.com'
+			]);
+		});
+
+		it('strips the display name from the raw To header fallback', () => {
+			const payload = { To: '"Acme Inbox" <inbox@acme.com>' };
+			expect(plugin.extractInboundRecipients(Buffer.from(JSON.stringify(payload)), {})).toEqual([
+				'inbox@acme.com'
+			]);
+		});
+
+		it('returns [] on malformed JSON (never throws)', () => {
+			expect(plugin.extractInboundRecipients(Buffer.from('not json'), {})).toEqual([]);
+		});
+	});
+
 	describe('verifyWebhookSignature', () => {
 		it('throws on Authorization header mismatch when secret is set', () => {
 			expect(() =>
