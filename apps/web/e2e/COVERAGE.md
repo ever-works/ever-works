@@ -510,14 +510,14 @@ Redis + API + Web), pinning real response shapes and real UX flows.
 
 New feature areas (previously uncovered):
 
-| Feature                                                             | Status | Spec(s)                                      |
-| ------------------------------------------------------------------- | ------ | -------------------------------------------- |
-| Tasks (CRUD, state machine, chat, scoping)                          | [x]    | tasks.spec.ts                                |
-| Skills (custom create, bindings, catalog, detail UI)                | [x]    | skills.spec.ts                               |
-| Agents (CRUD, state-machine, instructions, budget/runs, scoping)    | [x]    | agents.spec.ts                               |
-| Missions/Ideas UI flows + unified `/new` (cross-entity)             | [ ]    | _next_ (deepens existing API-contract specs) |
-| settings/integrations (channels, emails, notifications, work-agent) | [x]    | settings-integrations.spec.ts                |
-| magic-link auth (issuance no-enumeration, redeem)                   | [x]    | magic-link.spec.ts (pre-existing)            |
+| Feature                                                                   | Status | Spec(s)                           |
+| ------------------------------------------------------------------------- | ------ | --------------------------------- |
+| Tasks (CRUD, state machine, chat, scoping)                                | [x]    | tasks.spec.ts                     |
+| Skills (custom create, bindings, catalog, detail UI)                      | [x]    | skills.spec.ts                    |
+| Agents (CRUD, state-machine, instructions, budget/runs, scoping)          | [x]    | agents.spec.ts                    |
+| Missions/Ideas hierarchy: clone, idea lifecycle, Agent/Task cross-scoping | [x]    | missions-ideas-hierarchy.spec.ts  |
+| settings/integrations (channels, emails, notifications, work-agent)       | [x]    | settings-integrations.spec.ts     |
+| magic-link auth (issuance no-enumeration, redeem)                         | [x]    | magic-link.spec.ts (pre-existing) |
 
 - `tasks.spec.ts` — auth gating; create (`T-<n>` slug, `backlog` default,
   echoed fields); list `{data, meta}` + status filter/pagination; status
