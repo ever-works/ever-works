@@ -70,12 +70,20 @@ export class ScopeModule implements NestModule {
     configure(consumer: MiddlewareConsumer): void {
         consumer
             .apply(ScopeResolverMiddleware)
+            // NB: use the path-to-regexp v8 named-wildcard syntax (`{*splat}`),
+            // NOT the legacy `(.*)`. Under NestJS 11 / Express 5, path-to-regexp
+            // 8.x THROWS on `(.*)` ("Unexpected ("), so Nest falls back to an
+            // auto-conversion that compiles to a pathological regex — a crafted
+            // request path then blows the V8 RegExp compiler
+            // (`RegExpCompiler Allocation failed - process out of memory`) and
+            // crashes the whole API process. `{*splat}` compiles to a clean,
+            // linear `^(?:api\/([^]+)|api\/)(?:\/$)?$` and matches the same paths.
             .exclude(
-                { path: 'api/auth/(.*)', method: RequestMethod.ALL },
+                { path: 'api/auth/{*splat}', method: RequestMethod.ALL },
                 { path: 'api/auth', method: RequestMethod.ALL },
                 { path: 'api/users/check-username', method: RequestMethod.GET },
                 { path: 'api/organizations/check-slug', method: RequestMethod.GET },
             )
-            .forRoutes({ path: 'api/(.*)', method: RequestMethod.ALL });
+            .forRoutes({ path: 'api/{*splat}', method: RequestMethod.ALL });
     }
 }
