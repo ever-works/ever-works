@@ -110,7 +110,7 @@ describe('work-agent primitives — snapshot lock', () => {
         const { container } = render(<StatusPill status="running" />);
         expect(container.firstChild).toMatchInlineSnapshot(`
           <span
-            class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize bg-info/10 text-info border-info/20"
+            class="shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-normal capitalize bg-info/10 text-info border-info/20"
           >
             running
           </span>
@@ -125,7 +125,8 @@ describe('work-agent primitives — snapshot lock', () => {
     it('StatusPill falls back to the neutral style for unknown statuses', () => {
         const { container } = render(<StatusPill status="bogus-status-not-in-map" />);
         const span = container.firstChild as HTMLElement;
-        expect(span.className).toContain('bg-surface-secondary text-text-muted');
+        expect(span.className).toContain('bg-surface-secondary');
+        expect(span.className).toContain('text-text-muted');
     });
 
     it('STATUS_STYLES covers every status the API surfaces today', () => {

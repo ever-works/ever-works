@@ -88,7 +88,8 @@ export default function DashboardClient({
 
     return (
         <div className="w-full">
-            <div className="mb-8">
+            {/* Page header */}
+            <div className="mb-10">
                 <h1 className="text-3xl font-bold text-text dark:text-text-dark">
                     {t('header.welcome', { username: user.username })}
                 </h1>
@@ -97,10 +98,7 @@ export default function DashboardClient({
                 </p>
             </div>
 
-            {/* Dashboard polish (2026-05-27) — single grid of 8 tiles.
-                Agents + Tasks-in-flight moved into StatsOverview so the
-                whole strip collapses to one row when the chat panel is
-                hidden (`@7xl/main:grid-cols-8`). */}
+            {/* Stats strip */}
             <StatsOverview
                 totalMissions={totalMissions}
                 totalIdeas={totalIdeas}
@@ -115,35 +113,27 @@ export default function DashboardClient({
                 tasksBlocked={tasksBlocked}
             />
 
-            {/* Phase 6 PR S — Missions preview ABOVE Ideas so the home
-                page reads Missions → Ideas → Works in the same
-                direction as the stats tiles + sidebar nav. */}
-            <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
+            {/* Content sections — divided by a subtle rule for visual rhythm */}
+            <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
+                <div className="py-8 lg:py-10">
+                    <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
+                </div>
 
-            <WorkProposalsSection
-                initialProposals={initialProposals}
-                initiallyResearching={initiallyResearching}
-                initiallyCanRefresh={initiallyCanRefresh}
-                username={user.username}
-                autoStart={autoStartProposals}
-            />
+                <div className="py-8">
+                    <WorkProposalsSection
+                        initialProposals={initialProposals}
+                        initiallyResearching={initiallyResearching}
+                        initiallyCanRefresh={initiallyCanRefresh}
+                        username={user.username}
+                        autoStart={autoStartProposals}
+                    />
+                </div>
 
-            <div className="grid grid-cols-1 @3xl/main:grid-cols-3 gap-8 mt-8">
-                <div className="@3xl/main:col-span-3">
-                    {/* Dashboard polish (2026-05-27) — header is always
-                        rendered (outside the `hasWorks ?` branch) so the
-                        `+ Add` button stays visible for users with zero
-                        Works, matching every other section on the page.
-                        `+ Add` routes to `/new?type=website` (the
-                        unified chip entry point with a Work shape pre-
-                        selected) so the user lands in a Work-creation
-                        surface — `/works/new` without `mode` or
-                        `proposal` redirects back to `/new` and would
-                        otherwise default to Mission/Idea. */}
+                <div className="py-8 lg:py-10">
                     <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                         <div className="flex items-center gap-2 min-w-0">
-                            <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-works/10 border border-concept-works/20 flex items-center justify-center">
-                                <FolderKanban className="w-4 h-4 text-concept-works" />
+                            <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
+                                <FolderKanban className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                             </div>
                             <h2 className="text-xl font-semibold text-text dark:text-text-dark truncate">
                                 {t('works.recent')}
@@ -160,12 +150,12 @@ export default function DashboardClient({
                                 )}
                             >
                                 <Plus className="w-3.5 h-3.5" />
-                                Add
+                                {t('works.add')}
                             </Link>
                             {totalWorks > 5 && (
                                 <Link
                                     href={ROUTES.DASHBOARD_WORKS}
-                                    className="text-sm font-medium text-primary hover:underline whitespace-nowrap"
+                                    className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
                                 >
                                     {t('works.viewAll', { count: totalWorks })}
                                 </Link>
@@ -187,20 +177,15 @@ export default function DashboardClient({
                         />
                     )}
                 </div>
+
+                <div className="py-8 lg:py-10">
+                    <RecentTasks tasks={initialRecentTasks} total={tasksInProgress} />
+                </div>
+
+                <div className="py-8 lg:py-10">
+                    <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
+                </div>
             </div>
-
-            {/* Phase 18.2 — Tasks block sits directly below Recent
-                Works. Dashboard polish (2026-05-27) — always render
-                so the dashboard reads Missions → Ideas → Works →
-                Tasks → Agents in a consistent strip even on a
-                brand-new account; the section's own empty state
-                handles the "no Tasks yet" copy. */}
-            <RecentTasks tasks={initialRecentTasks} total={tasksInProgress} />
-
-            {/* Dashboard polish (2026-05-27) — Agents preview below
-                Tasks. Same shape as the other sections so the user
-                sees the same icon-title-actions-grid rhythm. */}
-            <AgentsPreviewSection agents={initialAgents} totalAgents={agentsTotal} />
         </div>
     );
 }

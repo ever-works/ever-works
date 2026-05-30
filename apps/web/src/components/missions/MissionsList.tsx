@@ -76,10 +76,10 @@ export function MissionsList({ missions }: { missions: Mission[] }) {
                 landing prompt. Used by both empty and populated
                 states so the entry point doesn't move around as the
                 user's catalog grows. */}
-            <div className="mb-6">
+            <div className="mb-6 lg:mb-20 mt-8">
                 <label
                     htmlFor="missions-quick-add"
-                    className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-2"
+                    className="block text-xs mb-4 font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
                 >
                     {t('quickAdd.label')}
                 </label>

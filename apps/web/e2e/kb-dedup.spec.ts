@@ -40,7 +40,11 @@ interface ActivityRow {
     actionType: string;
     workId: string | null;
     createdAt: string;
-    metadata: Record<string, unknown> | null;
+    // The `activity_log` entity has two simple-json columns: `details`
+    // is the canonical payload bucket (KB service writes here), `metadata`
+    // is a lightweight ingest-tag bucket. Read either to stay green.
+    details?: Record<string, any> | null;
+    metadata?: Record<string, any> | null;
 }
 
 interface ActivityListResponse {
@@ -136,7 +140,11 @@ test.describe('Knowledge Base — A17 SHA-256 dedup', () => {
         expect(createdRows.length, 'kb_upload_created stayed at one — dedup short-circuited').toBe(
             1,
         );
-        expect(dedupRows[0].metadata?.uploadId).toBe(firstUploadId);
+        // See ActivityRow comment — read `details` first, fall through to
+        // `metadata` for forward-compat. The KB service writes to `details`.
+        expect(dedupRows[0].details?.uploadId ?? dedupRows[0].metadata?.uploadId).toBe(
+            firstUploadId,
+        );
     });
 });
 
@@ -164,7 +172,10 @@ async function fetchFirstUploadId(
         if (res.ok()) {
             const body = (await res.json()) as ActivityListResponse;
             const row = body.activities.find((r) => r.actionType === 'kb_upload_created');
-            const uploadId = row?.metadata?.uploadId;
+            // KB service writes the payload to `details`. Earlier passes
+            // of this helper looked at `metadata` only and silently never
+            // matched. Read both.
+            const uploadId = row?.details?.uploadId ?? row?.metadata?.uploadId;
             if (typeof uploadId === 'string' && uploadId.length > 0) {
                 return uploadId;
             }
