@@ -84,50 +84,65 @@ export class PluginBootstrapService {
             };
         }
 
-        this.logger.log('Bootstrapping plugin system...');
+        // Lazy mode is on by default — boot cost is small (manifest reads
+        // only) and the Proxy makes the change invisible to existing
+        // consumers. `PLUGIN_LAZY_LOAD=false` is a runtime kill switch
+        // that reverts to the pre-#1156 eager path without a redeploy:
+        // every filesystem plugin's entry module is `await import()`-ed
+        // at boot, exactly as it was on develop before this PR. Useful if
+        // first-call latency on a cold path causes problems we didn't
+        // anticipate in stage observation.
+        const lazyLoad = process.env.PLUGIN_LAZY_LOAD !== 'false';
+
+        this.logger.log(
+            `Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode)`,
+        );
 
         // Connect the context factory to the lifecycle manager
         this.lifecycleManager.setContextFactory(this.contextFactory);
 
-        // Wire lazy-materialization hook: when a filesystem-discovered plugin
-        // is touched for the first time, the proxy invokes this callback so
-        // the lifecycle manager fires onLoad bookkeeping (event emit, state
-        // history) exactly as it would have done at boot.
-        this.pluginLoader.setOnFirstMaterialize(async (pluginId) => {
-            await this.lifecycleManager.callOnLoad(pluginId);
-        });
-        // Wire failure hook: when a lazy plugin's loader throws, mark the
-        // registry state as 'error' + persist to DB so readiness filters stop
-        // returning the broken stub. Without this a permanently-failing
-        // plugin would hold a 'loaded' slot forever.
-        this.pluginLoader.setOnMaterializeError(async (pluginId, error) => {
-            this.registry.updateState(pluginId, 'error', error);
-            try {
-                await this.pluginRepository.updateState(pluginId, 'error', error.message);
-            } catch (dbErr) {
-                this.logger.warn(
-                    `Failed to persist error state for plugin ${pluginId}: ${
-                        dbErr instanceof Error ? dbErr.message : String(dbErr)
-                    }`,
-                );
-            }
-        });
+        if (lazyLoad) {
+            // Wire lazy-materialization hook: when a filesystem-discovered plugin
+            // is touched for the first time, the proxy invokes this callback so
+            // the lifecycle manager fires onLoad bookkeeping (event emit, state
+            // history) exactly as it would have done at boot.
+            this.pluginLoader.setOnFirstMaterialize(async (pluginId) => {
+                await this.lifecycleManager.callOnLoad(pluginId);
+            });
+            // Wire failure hook: when a lazy plugin's loader throws, mark the
+            // registry state as 'error' + persist to DB so readiness filters stop
+            // returning the broken stub. Without this a permanently-failing
+            // plugin would hold a 'loaded' slot forever.
+            this.pluginLoader.setOnMaterializeError(async (pluginId, error) => {
+                this.registry.updateState(pluginId, 'error', error);
+                try {
+                    await this.pluginRepository.updateState(pluginId, 'error', error.message);
+                } catch (dbErr) {
+                    this.logger.warn(
+                        `Failed to persist error state for plugin ${pluginId}: ${
+                            dbErr instanceof Error ? dbErr.message : String(dbErr)
+                        }`,
+                    );
+                }
+            });
+        }
 
         // Discover and register plugins. Built-ins still load eagerly (their
-        // modules are bundled); discovered plugins are registered as manifest
-        // stubs and materialize on first method call.
-        const result = await this.pluginLoader.discoverAndLoadAll();
+        // modules are bundled); discovered plugins go through the lazy proxy
+        // unless PLUGIN_LAZY_LOAD=false flipped us into eager mode.
+        const result = await this.pluginLoader.discoverAndLoadAll({ lazy: lazyLoad });
         this.logger.log(
-            `Plugin registration complete: ${result.loaded} ready, ${result.failed} failed`,
+            `Plugin ${lazyLoad ? 'registration' : 'load'} complete: ${result.loaded} ready, ${result.failed} failed`,
         );
 
-        // Call onLoad for built-in plugins immediately — they have no entry
-        // module to defer. Lazy-registered (filesystem) plugins skip this:
-        // their onLoad runs on first materialization via the hook above.
+        // Lazy mode: only built-ins fire onLoad here — lazy plugins fire
+        // theirs on first materialisation via the hook above.
+        // Eager mode: every successfully loaded plugin gets onLoad now,
+        // matching pre-#1156 behaviour.
         for (const loadResult of result.results) {
             if (!loadResult.success || !loadResult.pluginId) continue;
             const registered = this.registry.get(loadResult.pluginId);
-            if (registered?.builtIn) {
+            if (!lazyLoad || registered?.builtIn) {
                 await this.lifecycleManager.callOnLoad(loadResult.pluginId);
             }
         }

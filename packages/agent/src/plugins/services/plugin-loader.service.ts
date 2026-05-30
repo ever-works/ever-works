@@ -506,12 +506,13 @@ export class PluginLoaderService {
      * rather than at boot. Cuts API boot RSS for installs where most
      * plugins (39 on develop) are never exercised in a given session.
      */
-    async discoverAndLoadAll(): Promise<{
+    async discoverAndLoadAll(opts?: { lazy?: boolean }): Promise<{
         discovered: number;
         loaded: number;
         failed: number;
         results: LoadResult[];
     }> {
+        const lazy = opts?.lazy ?? true;
         const discovered = await this.discover();
         const results: LoadResult[] = [];
         let loaded = 0;
@@ -553,13 +554,20 @@ export class PluginLoaderService {
         // Build dependency graph and perform topological sort
         const sortedPlugins = this.topologicalSort(allPlugins);
 
-        // Register plugins in dependency order
+        // Register plugins in dependency order. Built-ins always use the
+        // eager path (they're pre-constructed instances bundled with the
+        // app — there's no entry-point import to defer). Filesystem-
+        // discovered plugins use the lazy proxy unless the caller
+        // explicitly asks for eager loading (PLUGIN_LAZY_LOAD=false kill
+        // switch from bootstrap).
         for (const pluginInfo of sortedPlugins) {
             let result: LoadResult;
             if (pluginInfo.builtIn) {
                 result = await this.loadBuiltIn(pluginInfo.plugin as PluginModule);
-            } else {
+            } else if (lazy) {
                 result = await this.registerLazy(pluginInfo.plugin as DiscoveredPlugin);
+            } else {
+                result = await this.load(pluginInfo.plugin as DiscoveredPlugin);
             }
             results.push(result);
             if (result.success) {
@@ -567,13 +575,15 @@ export class PluginLoaderService {
             } else {
                 failed++;
                 this.logger.warn(
-                    `Failed to register plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
+                    `Failed to ${lazy ? 'register' : 'load'} plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
                 );
             }
         }
 
         this.logger.log(
-            `Plugin registration complete: ${loaded} registered, ${failed} failed out of ${allPlugins.length} total (discovered plugins materialize on first use)`,
+            lazy
+                ? `Plugin registration complete: ${loaded} registered, ${failed} failed out of ${allPlugins.length} total (discovered plugins materialize on first use)`
+                : `Plugin loading complete: ${loaded} loaded, ${failed} failed out of ${allPlugins.length} total`,
         );
 
         return {
