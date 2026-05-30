@@ -141,6 +141,25 @@ export function createLazyPluginProxy(
             if (prop in target) {
                 return Reflect.get(target, prop, receiver);
             }
+            // The stub is a plain object, NOT a Promise/thenable. When a
+            // caller `await`s this proxy (or passes it to Promise.resolve, or
+            // returns it from an async function), the runtime reads `then` to
+            // detect a thenable. If the forwarding wrapper below were returned
+            // for `then`, the proxy would look thenable: the runtime would
+            // invoke `then(resolve, reject)`, materialize, find no real `then`
+            // method, and throw `TypeError: Plugin "<id>" has no method "then"`
+            // from an async tick — an UNCAUGHT rejection that crashes the whole
+            // API process. The same hazard applies to inspection/coercion via
+            // well-known symbols. Return undefined for those so the proxy is
+            // treated as an ordinary value and is never spuriously invoked.
+            if (
+                prop === 'then' ||
+                prop === 'catch' ||
+                prop === 'finally' ||
+                typeof prop === 'symbol'
+            ) {
+                return undefined;
+            }
             // Special-case onUnload: skip materialization if never loaded —
             // a plugin that was never used has no resources to release.
             if (prop === 'onUnload') {

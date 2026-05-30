@@ -1977,6 +1977,10 @@ describe('PluginOperationsService', () => {
         const createDeviceAuthPlugin = (): IPlugin & IDeviceAuthProvider =>
             ({
                 ...createMockPlugin(),
+                // Declare the capability so the operations service's capability
+                // gate (added to stop a lazy proxy from duck-typing as a
+                // device-auth provider and 500-ing) treats this as a real one.
+                capabilities: ['device-auth'],
                 getDeviceAuthStatus: jest.fn().mockResolvedValue({
                     installed: true,
                     connected: true,
