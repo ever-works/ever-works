@@ -41,13 +41,13 @@ export function BudgetOverviewCard({
     return (
         <div
             className={cn(
-                'relative rounded-md p-1 transition-shadow duration-200 overflow-hidden',
+                'relative rounded-md p-1 transition-shadow duration-200 overflow-hidden h-full flex flex-col',
                 'border border-card-border dark:border-border-dark',
             )}
         >
             <div
                 className={cn(
-                    'rounded-sm p-5 overflow-hidden',
+                    'rounded-sm p-5 overflow-hidden flex-1',
                     'bg-card dark:bg-surface-secondary-dark',
                     'border border-card-border dark:border-border-dark',
                 )}
