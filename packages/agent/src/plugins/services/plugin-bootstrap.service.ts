@@ -94,9 +94,7 @@ export class PluginBootstrapService {
         // anticipate in stage observation.
         const lazyLoad = process.env.PLUGIN_LAZY_LOAD !== 'false';
 
-        this.logger.log(
-            `Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode)`,
-        );
+        this.logger.log(`Bootstrapping plugin system... (${lazyLoad ? 'lazy' : 'eager'} mode)`);
 
         // Connect the context factory to the lifecycle manager
         this.lifecycleManager.setContextFactory(this.contextFactory);
