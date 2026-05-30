@@ -77,6 +77,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
     output: BUILD_OUTPUT as NextConfig['output'],
+    // Dev-only (Next ignores this in production builds): let the e2e/CI
+    // harness reach the dev server over 127.0.0.1. The self-hosted CI
+    // runner resolves `localhost` to IPv6 `::1`, where the dev servers
+    // don't listen, so the harness pins IPv4 (127.0.0.1) for every URL.
+    // Next 16 otherwise treats 127.0.0.1 as a cross-origin host and blocks
+    // its own dev resources / server actions from it — which silently
+    // stalls the post-login server-action redirect (waitForURL timeout).
+    allowedDevOrigins: ['127.0.0.1', 'localhost'],
     images: {
         remotePatterns: [
             {
