@@ -38,41 +38,48 @@ const PDF_MIME = 'application/pdf';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /**
- * Build a minimal-but-valid PDF (Catalog → Pages → one empty Page) with
- * correctly computed xref byte offsets. The agent-side extractor uses
- * `pdfjs-dist`, which rejects PDFs without a real `/Root` reference and
- * a populated `/Pages` tree (hence the previous "Invalid root reference"
- * failure with a hand-rolled 73-byte stub). We're asserting only on the
- * viewer dispatcher's `data-mode`, not on the rendered PDF, so a tiny
- * 1-page empty body is plenty.
+ * Build a minimal-but-valid PDF with one page that draws "Hello, World!"
+ * via a Type1 Helvetica font. The agent's pdfjs-dist extractor needs
+ * BOTH (a) a parseable `/Catalog` + `/Pages` tree and (b) at least one
+ * page that yields > 0 characters when text-extracted — otherwise the
+ * extractor reports `"KB PDF extraction produced no text — likely an
+ * image-only PDF; OCR is Phase 3"` and marks the upload row failed.
+ *
+ * We're asserting only on the viewer dispatcher's `data-mode`, not on
+ * the rendered PDF, so a single 13-character page is plenty.
  */
 function makeMinimalValidPdf(): Buffer {
-    const header = '%PDF-1.4\n';
-    const obj1 = '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n';
-    const obj2 = '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n';
-    const obj3 = '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n';
+    // Page content stream: BT/ET delimit a text block; Tf sets font;
+    // Td positions the cursor; Tj draws the literal string.
+    const streamData = 'BT /F1 24 Tf 100 700 Td (Hello, World!) Tj ET\n';
+    const objs: string[] = [
+        '<</Type/Catalog/Pages 2 0 R>>',
+        '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+        '<</Type/Page/Parent 2 0 R/Resources<</Font<</F1 5 0 R>>>>/MediaBox[0 0 612 792]/Contents 4 0 R>>',
+        `<</Length ${streamData.length}>>\nstream\n${streamData}endstream`,
+        '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
+    ];
 
-    let pos = header.length;
-    const off1 = pos;
-    pos += obj1.length;
-    const off2 = pos;
-    pos += obj2.length;
-    const off3 = pos;
-    pos += obj3.length;
-    const xrefPos = pos;
+    const header = '%PDF-1.4\n';
+    let body = header;
+    const offsets: number[] = [];
+    for (let i = 0; i < objs.length; i++) {
+        offsets.push(body.length);
+        body += `${i + 1} 0 obj\n${objs[i]}\nendobj\n`;
+    }
+    const xrefPos = body.length;
 
     const pad = (n: number): string => n.toString().padStart(10, '0');
     // Each xref entry must be exactly 20 bytes (10-digit offset + ' ' +
     // 5-digit generation + ' ' + 'n'/'f' + ' ' + '\n'). pdfjs validates
     // the slot width and bails if it sees fewer bytes.
-    const xref =
-        `xref\n0 4\n0000000000 65535 f \n` +
-        `${pad(off1)} 00000 n \n` +
-        `${pad(off2)} 00000 n \n` +
-        `${pad(off3)} 00000 n \n`;
-    const trailer = `trailer<</Size 4/Root 1 0 R>>\nstartxref\n${xrefPos}\n%%EOF\n`;
+    let xref = `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+    for (const o of offsets) {
+        xref += `${pad(o)} 00000 n \n`;
+    }
+    const trailer = `trailer<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xrefPos}\n%%EOF\n`;
 
-    return Buffer.from(header + obj1 + obj2 + obj3 + xref + trailer, 'utf8');
+    return Buffer.from(body + xref + trailer, 'utf8');
 }
 
 /**
@@ -89,7 +96,26 @@ function makeMinimalValidPdf(): Buffer {
  *    `data-mode="download"`).
  */
 async function makeOversizeXlsx(targetBytes: number): Promise<Buffer> {
-    const ExcelJS = await import('exceljs');
+    // exceljs ships as CJS; under Node ESM `await import('exceljs')`
+    // returns `{ default: ExcelJSObject }` and the `.Workbook` constructor
+    // lives on the default export — `new ExcelJS.Workbook()` directly on
+    // the namespace throws "is not a constructor". The production
+    // `load-exceljs-workbook.ts` only works because webpack flattens the
+    // interop in the browser bundle; in Playwright (raw Node) we have to
+    // unwrap the default ourselves. Fall through to the namespace for
+    // ESM-native builds that do not wrap.
+    interface ExcelJsCtorHost {
+        Workbook: new () => {
+            addWorksheet(name: string): {
+                getCell(addr: string): { value: string };
+            };
+            xlsx: { writeBuffer(): Promise<ArrayBuffer> };
+        };
+    }
+    const mod = (await import('exceljs')) as unknown as {
+        default?: ExcelJsCtorHost;
+    } & ExcelJsCtorHost;
+    const ExcelJS: ExcelJsCtorHost = mod.default ?? mod;
     const { randomBytes } = await import('node:crypto');
     const wb = new ExcelJS.Workbook();
     const sheet = wb.addWorksheet('Sheet1');
