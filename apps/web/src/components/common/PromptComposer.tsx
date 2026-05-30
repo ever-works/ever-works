@@ -584,7 +584,10 @@ export function PromptComposer({
                                         className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 dark:border-white/10 bg-foreground/[0.04] dark:bg-white/[0.04] px-2.5 py-1 text-xs text-text dark:text-text-dark"
                                         title={a.url}
                                     >
-                                        <Github className="size-3 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
+                                        <Github
+                                            className="size-3 text-text-muted dark:text-text-muted-dark"
+                                            aria-hidden="true"
+                                        />
                                         <span className="max-w-[12rem] truncate" title={a.url}>
                                             {a.displayName}
                                         </span>
@@ -628,7 +631,10 @@ export function PromptComposer({
                                             aria-hidden="true"
                                         />
                                     ) : a.kind === 'folder-file' ? (
-                                        <Folder className="size-3 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
+                                        <Folder
+                                            className="size-3 text-text-muted dark:text-text-muted-dark"
+                                            aria-hidden="true"
+                                        />
                                     ) : (
                                         <FileIcon
                                             className="size-3 text-text-muted dark:text-text-muted-dark"
