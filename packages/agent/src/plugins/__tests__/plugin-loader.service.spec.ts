@@ -63,6 +63,8 @@ describe('PluginLoaderService', () => {
                         has: jest.fn().mockReturnValue(false),
                         get: jest.fn(),
                         register: jest.fn().mockReturnValue({}),
+                        registerLazy: jest.fn().mockReturnValue({}),
+                        updateRegisteredManifest: jest.fn().mockReturnValue(true),
                         unregister: jest.fn().mockReturnValue(true),
                         getVersionsMap: jest.fn().mockReturnValue(new Map()),
                     },
