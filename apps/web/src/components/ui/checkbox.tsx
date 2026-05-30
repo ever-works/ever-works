@@ -44,7 +44,8 @@ const Checkbox = ({
                         'text-primary focus:ring-primary focus:ring-2 focus:ring-offset-0',
                         'disabled:opacity-50 disabled:cursor-not-allowed',
                         variant === 'form' && 'bg-surface dark:bg-surface-dark',
-                        variant === 'default' && 'bg-surface-secondary dark:bg-surface-secondary-dark',
+                        variant === 'default' &&
+                            'bg-surface-secondary dark:bg-surface-secondary-dark',
                         error && 'border-danger/50 focus:ring-danger/20',
                         className,
                     )}

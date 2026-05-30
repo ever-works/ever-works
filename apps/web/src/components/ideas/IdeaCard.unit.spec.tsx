@@ -257,7 +257,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="flex items-center gap-3 mb-2 pr-6 min-w-0"
             >
               <div
-                class="min-h-[2lh] flex items-center min-w-0"
+                class="min-h-[lh] flex items-center min-w-0"
               >
                 <h3
                   class="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2"
