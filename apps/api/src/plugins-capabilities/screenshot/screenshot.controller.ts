@@ -46,13 +46,17 @@ export class ScreenshotController {
         activePluginId: string | null,
         configured: boolean,
     ): ProviderOption {
+        // id/name come from the manifest (class-validated to equal
+        // the runtime plugin's id/name) so we don't have to
+        // materialise the plugin instance just to render the picker.
+        const pluginId = registered.manifest.id;
         return {
-            id: registered.plugin.id,
-            name: registered.plugin.name,
+            id: pluginId,
+            name: registered.manifest.name ?? pluginId,
             description: registered.manifest.description,
             configured,
             isDefault: activePluginId
-                ? registered.plugin.id === activePluginId
+                ? pluginId === activePluginId
                 : registered.manifest.defaultForCapabilities?.includes(
                       PLUGIN_CAPABILITIES.SCREENSHOT,
                   ) || registered.manifest.systemPlugin,
@@ -71,21 +75,24 @@ export class ScreenshotController {
             workId,
             userId,
         );
-        const activePluginId = activeProvider?.plugin.id ?? null;
+        const activePluginId = activeProvider?.manifest.id ?? null;
 
         const providers: ProviderOption[] = [];
 
         for (const registered of enabledPlugins) {
-            const settings = await this.pluginSettings.getSettings(registered.plugin.id, {
+            const pluginId = registered.manifest.id;
+            const settings = await this.pluginSettings.getSettings(pluginId, {
                 userId,
                 workId,
                 includeSecrets: true,
             });
 
-            const configured = this.hasAllRequiredSettings(
-                registered.plugin.settingsSchema,
-                settings,
-            );
+            // `settingsSchema` is an instance-only property — it
+            // doesn't live on the manifest, so we materialise here.
+            // Eager mode returns the cached instance instantly; lazy
+            // mode fires the deferred import + onLoad once per id.
+            const plugin = await this.pluginRegistry.ensureLoaded(pluginId);
+            const configured = this.hasAllRequiredSettings(plugin.settingsSchema, settings);
             providers.push(this.toProviderOption(registered, activePluginId, configured));
         }
 

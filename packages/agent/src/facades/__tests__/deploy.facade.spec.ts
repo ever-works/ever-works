@@ -29,6 +29,12 @@ describe('DeployFacadeService', () => {
         const registry = {
             get: jest.fn((id: string) => (id === pluginId ? registered : undefined)),
             getByCapability: jest.fn(() => [registered]),
+            // Lazy-mode shim — eager plugins go through ensureLoaded
+            // too in resolvePluginAndTokenWithWork.
+            isLazy: jest.fn(() => false),
+            ensureLoaded: jest.fn(async (id: string) =>
+                id === pluginId ? plugin : undefined,
+            ),
         };
         const settingsService = {
             getResolvedSettings: jest.fn().mockResolvedValue(args.settings ?? {}),

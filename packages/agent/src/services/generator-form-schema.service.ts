@@ -92,8 +92,14 @@ export class GeneratorFormSchemaService {
         let handledConfigFields: readonly string[] = [];
         let defaultValues: Record<string, unknown> | undefined;
 
-        if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
-            const provider = pipelinePlugin.plugin;
+        // Materialise the pipeline plugin once — eager mode returns
+        // the cached instance instantly. We need the runtime instance
+        // for `isFormSchemaProvider` + the form schema methods.
+        const pipelinePluginInstance = pipelinePlugin
+            ? await this.pluginRegistry.ensureLoaded(pipelinePlugin.manifest.id)
+            : undefined;
+        if (pipelinePluginInstance && isFormSchemaProvider(pipelinePluginInstance)) {
+            const provider = pipelinePluginInstance;
 
             pluginFields = provider.getFormFields();
             pluginGroups = provider.getFormGroups?.();
@@ -101,7 +107,7 @@ export class GeneratorFormSchemaService {
             defaultValues = provider.getDefaultValues?.();
 
             this.logger.debug(
-                `Resolved ${pluginFields.length} form fields from pipeline: ${pipelinePlugin.plugin.id}`,
+                `Resolved ${pluginFields.length} form fields from pipeline: ${pipelinePlugin?.manifest.id}`,
             );
         }
 
@@ -124,13 +130,19 @@ export class GeneratorFormSchemaService {
         let enforcedPipelineId: string | undefined;
         if (userGlobalDefault?.enforce) {
             const enforced = this.pluginRegistry.get(userGlobalDefault.pluginId);
-            if (enforced && enforced.state === 'loaded') {
+            // Lazy-aware: parked-but-unloaded plugins ARE valid here
+            // — the form schema just needs the id, not the instance.
+            if (
+                enforced &&
+                (enforced.state === 'loaded' ||
+                    (this.pluginRegistry.isLazy?.(userGlobalDefault.pluginId) ?? false))
+            ) {
                 enforcedPipelineId = userGlobalDefault.pluginId;
             }
         }
 
         return {
-            resolvedPipelineId: pipelinePlugin?.plugin.id,
+            resolvedPipelineId: pipelinePlugin?.manifest.id,
             enforcedPipelineId,
             providers,
             pluginFields,
@@ -150,17 +162,26 @@ export class GeneratorFormSchemaService {
     ): Promise<ValidationResult> {
         const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
 
-        if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
-            const result = await pipelinePlugin.plugin.validateFormInput(values);
-            if (!result.valid) return result;
+        if (pipelinePlugin) {
+            // Materialise — eager mode returns the cached instance
+            // instantly; lazy mode fires the deferred import + onLoad.
+            const pipelineInstance = await this.pluginRegistry.ensureLoaded(
+                pipelinePlugin.manifest.id,
+            );
+            if (isFormSchemaProvider(pipelineInstance)) {
+                const result = await pipelineInstance.validateFormInput(values);
+                if (!result.valid) return result;
+            }
         }
 
         // Validate form-schema-provider plugin form values
         const dsPlugins = await this.getEnabledFormSchemaPlugins(options);
         for (const registered of dsPlugins) {
-            if (!isFormSchemaProvider(registered.plugin)) continue;
-            const pluginValues = (values[registered.plugin.id] as Record<string, unknown>) ?? {};
-            const result = await registered.plugin.validateFormInput(pluginValues);
+            const pluginId = registered.manifest.id;
+            const pluginInstance = await this.pluginRegistry.ensureLoaded(pluginId);
+            if (!isFormSchemaProvider(pluginInstance)) continue;
+            const pluginValues = (values[pluginId] as Record<string, unknown>) ?? {};
+            const result = await pluginInstance.validateFormInput(pluginValues);
             if (!result.valid) return result;
         }
 
@@ -184,23 +205,28 @@ export class GeneratorFormSchemaService {
 
         // Let the pipeline plugin transform first
         const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
-        if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
-            const transform = pipelinePlugin.plugin.transformFormValues;
-            if (transform) {
-                config = transform.call(pipelinePlugin.plugin, config);
+        if (pipelinePlugin) {
+            const pipelineInstance = await this.pluginRegistry.ensureLoaded(
+                pipelinePlugin.manifest.id,
+            );
+            if (isFormSchemaProvider(pipelineInstance)) {
+                const transform = pipelineInstance.transformFormValues;
+                if (transform) {
+                    config = transform.call(pipelineInstance, config);
+                }
             }
         }
 
         // Let each form-schema-provider plugin transform the full config, then extract its nested key
         const dsPlugins = await this.getEnabledFormSchemaPlugins(options);
         for (const registered of dsPlugins) {
-            if (!isFormSchemaProvider(registered.plugin)) continue;
-
-            const pluginId = registered.plugin.id;
+            const pluginId = registered.manifest.id;
+            const pluginInstance = await this.pluginRegistry.ensureLoaded(pluginId);
+            if (!isFormSchemaProvider(pluginInstance)) continue;
 
             // Call transformFormValues on full config — this produces the nested key
-            if (registered.plugin.transformFormValues) {
-                const transformed = registered.plugin.transformFormValues(config);
+            if (pluginInstance.transformFormValues) {
+                const transformed = pluginInstance.transformFormValues(config);
                 const nested = transformed[pluginId];
 
                 if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
@@ -232,16 +258,24 @@ export class GeneratorFormSchemaService {
         const pipelineIds = new Set(
             this.pluginRegistry
                 .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
-                .map((p) => p.plugin.id),
+                .map((p) => p.manifest.id),
         );
         const errors: string[] = [];
 
         for (const registered of plugins) {
-            if (registered.state !== 'loaded') continue;
-            if (pipelineIds.has(registered.plugin.id)) continue;
+            const pluginId = registered.manifest.id;
+            // Lazy-aware: parked-but-unloaded plugins ARE eligible —
+            // `isPluginConfigured` below materialises on demand.
+            if (
+                registered.state !== 'loaded' &&
+                !(this.pluginRegistry.isLazy?.(pluginId) ?? false)
+            ) {
+                continue;
+            }
+            if (pipelineIds.has(pluginId)) continue;
 
             const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
-                registered.plugin.id,
+                pluginId,
                 options.workId,
                 options.userId,
             );
@@ -294,7 +328,12 @@ export class GeneratorFormSchemaService {
         options?: FormSchemaOptions,
     ): Promise<ProviderOption[]> {
         const plugins = this.pluginRegistry.getByCapability(capability);
-        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
+        // Lazy-aware filter — see resolveExtractorCandidates() in
+        // content-extractor.facade.ts for the same pattern.
+        const enabledPlugins = plugins.filter(
+            (p) =>
+                p.state === 'loaded' || (this.pluginRegistry.isLazy?.(p.manifest.id) ?? false),
+        );
         const result: ProviderOption[] = [];
 
         // Get the active (default) plugin for this capability in the work
@@ -321,7 +360,7 @@ export class GeneratorFormSchemaService {
             // Check if plugin is enabled for this context
             if (options?.workId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
-                    registered.plugin.id,
+                    registered.manifest.id,
                     options.workId,
                     options.userId,
                 );
@@ -355,23 +394,27 @@ export class GeneratorFormSchemaService {
         capability?: string,
         options?: FormSchemaOptions,
     ): Promise<ProviderOption> {
-        const { plugin, manifest } = registered;
+        const { manifest } = registered;
+        const pluginId = manifest.id;
 
         // Mark as default if:
         // 1. It's the active plugin for the work.
         // 2. OR it declares this capability in defaultForCapabilities
         // 3. OR it's a system plugin (fallback if no capability provided)
         const isDefault = activePluginId
-            ? plugin.id === activePluginId
+            ? pluginId === activePluginId
             : capability
               ? manifest.defaultForCapabilities?.includes(capability) || false
               : manifest.systemPlugin || false;
 
+        // AI provider model summaries need the instance's
+        // settingsSchema (instance-only property). Materialise on
+        // demand — eager mode returns the cached instance instantly.
         const models =
             capability === PLUGIN_CAPABILITIES.AI_PROVIDER && this.pluginSettingsService
                 ? buildProviderModelSummaries(
-                      plugin.settingsSchema,
-                      await this.pluginSettingsService.getResolvedSettings(plugin.id, {
+                      (await this.pluginRegistry.ensureLoaded(pluginId)).settingsSchema,
+                      await this.pluginSettingsService.getResolvedSettings(pluginId, {
                           userId: options?.userId,
                           workId: options?.workId,
                       }),
@@ -379,7 +422,7 @@ export class GeneratorFormSchemaService {
                 : undefined;
 
         return {
-            id: plugin.id,
+            id: pluginId,
             name: manifest.name,
             description: manifest.description,
             configured,
@@ -401,7 +444,11 @@ export class GeneratorFormSchemaService {
             return true;
         }
 
-        const schema = registered.plugin.settingsSchema;
+        const pluginId = registered.manifest.id;
+        // `settingsSchema` is an instance-only property — materialise
+        // to read it. Eager mode returns the cached instance instantly.
+        const plugin = await this.pluginRegistry.ensureLoaded(pluginId);
+        const schema = plugin.settingsSchema;
         if (
             !schema?.properties ||
             (!schema.required?.length && !schema['x-requiredGroups']?.length)
@@ -410,14 +457,11 @@ export class GeneratorFormSchemaService {
         }
 
         try {
-            const resolved = await this.pluginSettingsService.getResolvedSettings(
-                registered.plugin.id,
-                {
-                    userId: options?.userId,
-                    workId: options?.workId,
-                    includeSecrets: true,
-                },
-            );
+            const resolved = await this.pluginSettingsService.getResolvedSettings(pluginId, {
+                userId: options?.userId,
+                workId: options?.workId,
+                includeSecrets: true,
+            });
 
             if (!this.checkRequiredFields(schema, resolved)) return false;
             if (!this.checkRequiredGroups(schema, resolved)) return false;
@@ -425,7 +469,7 @@ export class GeneratorFormSchemaService {
             return true;
         } catch (error) {
             this.logger.warn(
-                `Failed to check configured status for plugin ${registered.plugin.id}: ${error}`,
+                `Failed to check configured status for plugin ${pluginId}: ${error}`,
             );
             return true;
         }
@@ -523,7 +567,7 @@ export class GeneratorFormSchemaService {
     ): Promise<void> {
         const providerErrors: Record<string, string> = {};
         const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
-        const resolvedPipelineId = pipelinePlugin?.plugin.id ?? pipelineId;
+        const resolvedPipelineId = pipelinePlugin?.manifest.id ?? pipelineId;
 
         if (resolvedPipelineId) {
             const error = await this.validateSingleProvider(resolvedPipelineId, options);
@@ -603,7 +647,12 @@ export class GeneratorFormSchemaService {
         if (!registered) {
             return `Provider "${pluginId}" is not registered.`;
         }
-        if (registered.state !== 'loaded') {
+        // Lazy-aware: parked-but-unloaded plugins ARE valid here —
+        // `isPluginConfigured` will materialise on demand.
+        if (
+            registered.state !== 'loaded' &&
+            !(this.pluginRegistry.isLazy?.(pluginId) ?? false)
+        ) {
             return `Provider "${pluginId}" is not loaded (state: ${registered.state}).`;
         }
 
@@ -638,8 +687,9 @@ export class GeneratorFormSchemaService {
         const plugins = await this.getEnabledFormSchemaPlugins(options);
 
         for (const registered of plugins) {
-            if (!isFormSchemaProvider(registered.plugin)) continue;
-            const provider = registered.plugin;
+            const pluginId = registered.manifest.id;
+            const provider = await this.pluginRegistry.ensureLoaded(pluginId);
+            if (!isFormSchemaProvider(provider)) continue;
 
             fields.push(...provider.getFormFields());
 
@@ -651,7 +701,7 @@ export class GeneratorFormSchemaService {
                 defaultValues = { ...defaultValues, ...providerDefaults };
             }
 
-            this.logger.debug(`Collected form fields from plugin: ${provider.id}`);
+            this.logger.debug(`Collected form fields from plugin: ${pluginId}`);
         }
 
         return { fields, groups, defaultValues };
@@ -667,17 +717,26 @@ export class GeneratorFormSchemaService {
         const pipelineIds = new Set(
             this.pluginRegistry
                 .getByCapability(PLUGIN_CAPABILITIES.PIPELINE)
-                .map((p) => p.plugin.id),
+                .map((p) => p.manifest.id),
         );
         const result: RegisteredPlugin[] = [];
 
         for (const registered of plugins) {
-            if (registered.state !== 'loaded') continue;
-            if (pipelineIds.has(registered.plugin.id)) continue;
+            const pluginId = registered.manifest.id;
+            // Lazy-aware: parked-but-unloaded plugins ARE eligible
+            // — the caller materialises via ensureLoaded before
+            // touching the instance.
+            if (
+                registered.state !== 'loaded' &&
+                !(this.pluginRegistry.isLazy?.(pluginId) ?? false)
+            ) {
+                continue;
+            }
+            if (pipelineIds.has(pluginId)) continue;
 
             if (options?.workId || options?.userId) {
                 const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
-                    registered.plugin.id,
+                    pluginId,
                     options.workId,
                     options.userId,
                 );
@@ -697,10 +756,13 @@ export class GeneratorFormSchemaService {
         // 1. Explicit pipelineId — from .works/works.yml or user click in the form
         if (pipelineId) {
             const registered = this.pluginRegistry.get(pipelineId);
+            // Lazy-aware: parked-but-unloaded plugins are valid here.
+            // The caller materialises via ensureLoaded when needed.
             if (
                 registered &&
-                registered.state === 'loaded' &&
-                (await this.isEnabledForScope(registered.plugin.id, options))
+                (registered.state === 'loaded' ||
+                    (this.pluginRegistry.isLazy?.(pipelineId) ?? false)) &&
+                (await this.isEnabledForScope(registered.manifest.id, options))
             ) {
                 return registered;
             }
@@ -718,8 +780,9 @@ export class GeneratorFormSchemaService {
                     const registered = this.pluginRegistry.get(activePlugin.pluginId);
                     if (
                         registered &&
-                        registered.state === 'loaded' &&
-                        (await this.isEnabledForScope(registered.plugin.id, options))
+                        (registered.state === 'loaded' ||
+                            (this.pluginRegistry.isLazy?.(activePlugin.pluginId) ?? false)) &&
+                        (await this.isEnabledForScope(registered.manifest.id, options))
                     ) {
                         return registered;
                     }
@@ -733,9 +796,15 @@ export class GeneratorFormSchemaService {
         const pipelines = this.pluginRegistry.getByCapability(PLUGIN_CAPABILITIES.PIPELINE);
 
         for (const registered of pipelines) {
-            if (registered.state !== 'loaded') continue;
+            const pluginId = registered.manifest.id;
+            if (
+                registered.state !== 'loaded' &&
+                !(this.pluginRegistry.isLazy?.(pluginId) ?? false)
+            ) {
+                continue;
+            }
             if (registered.manifest.defaultForCapabilities?.includes('pipeline')) {
-                if (await this.isEnabledForScope(registered.plugin.id, options)) {
+                if (await this.isEnabledForScope(pluginId, options)) {
                     return registered;
                 }
             }
@@ -743,9 +812,11 @@ export class GeneratorFormSchemaService {
 
         // 4. Fallback: first loaded pipeline
         for (const registered of pipelines) {
+            const pluginId = registered.manifest.id;
             if (
-                registered.state === 'loaded' &&
-                (await this.isEnabledForScope(registered.plugin.id, options))
+                (registered.state === 'loaded' ||
+                    (this.pluginRegistry.isLazy?.(pluginId) ?? false)) &&
+                (await this.isEnabledForScope(pluginId, options))
             ) {
                 return registered;
             }

@@ -274,6 +274,30 @@ describe('GitFacadeService', () => {
                         get: jest.fn(),
                         getByCapability: jest.fn().mockReturnValue([]),
                         isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
+                        // Lazy-mode shim — eager plugins from get(id)
+                        // also pass through resolvePlugin's ensureLoaded
+                        // call. Fall back to a getByCapability scan so
+                        // older test fixtures that only set the
+                        // by-capability mock still resolve.
+                        isLazy: jest.fn(() => false),
+                        ensureLoaded: jest.fn(async (id: string) => {
+                            const direct = registry.get(id);
+                            if (direct?.plugin) return direct.plugin as any;
+                            const calls = (registry.getByCapability as jest.Mock).mock
+                                .results;
+                            for (const r of calls) {
+                                const arr = (r.value as Array<{
+                                    plugin?: { id: string };
+                                    manifest?: { id: string };
+                                }>) || [];
+                                const found = arr.find(
+                                    (p) => p.manifest?.id === id || p.plugin?.id === id,
+                                );
+                                if (found && (found as any).plugin)
+                                    return (found as any).plugin;
+                            }
+                            return undefined as never;
+                        }),
                     },
                 },
                 {

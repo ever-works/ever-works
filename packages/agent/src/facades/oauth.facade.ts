@@ -81,15 +81,22 @@ export class OAuthFacadeService implements IOAuthFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
+        // Lazy-aware: parked-but-unloaded plugins ARE configured.
+        return (
+            plugins.length > 0 &&
+            plugins.some(
+                (p) =>
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            )
+        );
     }
 
     getAvailableProviders(): OAuthProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => ({
-            id: p.plugin.id,
+            id: p.manifest.id,
             name: p.manifest.name,
-            enabled: p.state === 'loaded',
+            enabled: p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
         }));
     }
 
@@ -181,9 +188,15 @@ export class OAuthFacadeService implements IOAuthFacade {
     private getPluginSync(providerId: string): IOAuthPlugin {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
 
+        // Sync method — the OAuth capability is fulfilled by
+        // built-in (eager) providers in the current monorepo, so we
+        // only return already-loaded plugin instances. If lazy OAuth
+        // providers are introduced later, this needs a sibling async
+        // path; for now matching the existing IOAuthFacade interface
+        // (sync `getAuthorizationUrl`) is the priority.
         if (providerId) {
-            const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'loaded') {
+            const registered = plugins.find((p) => p.manifest.id === providerId);
+            if (registered?.state === 'loaded' && registered.plugin) {
                 if (!isOAuthPlugin(registered.plugin)) {
                     throw new OAuthNotSupportedError(providerId, 'getPlugin');
                 }
@@ -192,12 +205,12 @@ export class OAuthFacadeService implements IOAuthFacade {
         }
 
         // If no specific provider requested, try to find any enabled OAuth provider
-        const enabled = plugins.find((p) => p.state === 'loaded');
-        if (!enabled) {
+        const enabled = plugins.find((p) => p.state === 'loaded' && p.plugin);
+        if (!enabled || !enabled.plugin) {
             throw new NoOAuthProviderError();
         }
         if (!isOAuthPlugin(enabled.plugin)) {
-            throw new OAuthNotSupportedError(enabled.plugin.id, 'getPlugin');
+            throw new OAuthNotSupportedError(enabled.manifest.id, 'getPlugin');
         }
         return enabled.plugin as IOAuthPlugin;
     }

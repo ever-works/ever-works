@@ -231,11 +231,19 @@ export class ContentExtractorFacadeService
 
     override getAvailableProviders(): Array<{ id: string; name: string; enabled: boolean }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: (p.plugin as IContentExtractorPlugin).providerName,
-            enabled: p.state === 'loaded',
-        }));
+        return plugins.map((p) => {
+            // Sync method — fall back to the manifest name when the
+            // plugin instance isn't materialised yet (lazy mode).
+            // Runtime `providerName` overrides are only available
+            // after first load.
+            const plugin = p.plugin as IContentExtractorPlugin | undefined;
+            return {
+                id: p.manifest.id,
+                name: plugin?.providerName ?? p.manifest.name ?? p.manifest.id,
+                enabled:
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            };
+        });
     }
 
     /**
@@ -254,19 +262,29 @@ export class ContentExtractorFacadeService
         userId?: string,
         workId?: string,
     ): Promise<ExtractorCandidate[]> {
+        // Lazy-aware: include parked-but-unloaded plugins. Their
+        // instance is materialised on demand below; eager `unloaded`
+        // entries stay excluded (no parked loader = nothing to load).
         const loadedPlugins = this.registry
             .getByCapability(this.CAPABILITY)
-            .filter((p) => p.state === 'loaded');
+            .filter(
+                (p) =>
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            );
         const candidates: ExtractorCandidate[] = [];
         const seen = new Set<string>();
 
-        const addCandidate = (registered: RegisteredPlugin): void => {
-            if (seen.has(registered.plugin.id)) return;
-            seen.add(registered.plugin.id);
+        const addCandidate = (
+            registered: RegisteredPlugin,
+            plugin: IContentExtractorPlugin,
+        ): void => {
+            const pluginId = registered.manifest.id;
+            if (seen.has(pluginId)) return;
+            seen.add(pluginId);
             candidates.push({
-                plugin: registered.plugin as IContentExtractorPlugin,
-                id: registered.plugin.id,
-                name: this.getProviderName(registered.plugin),
+                plugin,
+                id: pluginId,
+                name: this.getProviderName(plugin),
             });
         };
 
@@ -276,9 +294,9 @@ export class ContentExtractorFacadeService
             if (!registered.manifest.supplementary) continue;
             if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
-            const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
-                addCandidate(registered);
+            const plugin = (await this.materialize(registered)) as IContentExtractorPlugin;
+            if (await this.canExtractSafe(plugin, url, registered.manifest.id)) {
+                addCandidate(registered, plugin);
             }
         }
 
@@ -288,7 +306,8 @@ export class ContentExtractorFacadeService
             if (
                 !registered ||
                 !registered.manifest.capabilities.includes(this.CAPABILITY) ||
-                registered.state !== 'loaded'
+                (registered.state !== 'loaded' &&
+                    !(this.registry.isLazy?.(providerOverride) ?? false))
             ) {
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
@@ -297,18 +316,18 @@ export class ContentExtractorFacadeService
                 throw new ContentExtractorProviderNotFoundError(providerOverride);
             }
 
-            const plugin = registered.plugin as IContentExtractorPlugin;
+            const plugin = (await this.materialize(registered)) as IContentExtractorPlugin;
             await this.assertCanExtractForOverride(plugin, url, providerOverride);
-            addCandidate(registered);
+            addCandidate(registered, plugin);
         }
 
         // 2. Work's configured default
         if (workId) {
             const active = await this.findActivePluginForWork(workId);
             if (active && (await this.isPluginUsableForScope(active, userId, workId))) {
-                const plugin = active.plugin as IContentExtractorPlugin;
-                if (await this.canExtractSafe(plugin, url, active.plugin.id)) {
-                    addCandidate(active);
+                const plugin = (await this.materialize(active)) as IContentExtractorPlugin;
+                if (await this.canExtractSafe(plugin, url, active.manifest.id)) {
+                    addCandidate(active, plugin);
                 }
             }
         }
@@ -323,9 +342,9 @@ export class ContentExtractorFacadeService
         for (const registered of general) {
             if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
-            const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
-                addCandidate(registered);
+            const plugin = (await this.materialize(registered)) as IContentExtractorPlugin;
+            if (await this.canExtractSafe(plugin, url, registered.manifest.id)) {
+                addCandidate(registered, plugin);
             }
         }
 
@@ -334,9 +353,9 @@ export class ContentExtractorFacadeService
             if (!registered.manifest.defaultForCapabilities?.includes(this.CAPABILITY)) continue;
             if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
-            const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
-                addCandidate(registered);
+            const plugin = (await this.materialize(registered)) as IContentExtractorPlugin;
+            if (await this.canExtractSafe(plugin, url, registered.manifest.id)) {
+                addCandidate(registered, plugin);
             }
         }
 
@@ -344,9 +363,9 @@ export class ContentExtractorFacadeService
         for (const registered of loadedPlugins) {
             if (!(await this.isPluginUsableForScope(registered, userId, workId))) continue;
 
-            const plugin = registered.plugin as IContentExtractorPlugin;
-            if (await this.canExtractSafe(plugin, url, registered.plugin.id)) {
-                addCandidate(registered);
+            const plugin = (await this.materialize(registered)) as IContentExtractorPlugin;
+            if (await this.canExtractSafe(plugin, url, registered.manifest.id)) {
+                addCandidate(registered, plugin);
             }
         }
 
@@ -377,13 +396,17 @@ export class ContentExtractorFacadeService
         userId?: string,
         workId?: string,
     ): Promise<boolean> {
-        if (!(await this.isPluginEnabled(registered.plugin.id, workId, userId))) return false;
+        const pluginId = registered.manifest.id;
+        if (!(await this.isPluginEnabled(pluginId, workId, userId))) return false;
 
-        const settings = await this.getResolvedSettings(registered.plugin.id, {
+        const settings = await this.getResolvedSettings(pluginId, {
             userId,
             workId,
         });
-        return this.hasAllRequiredSettings(registered.plugin.settingsSchema, settings);
+        // `settingsSchema` is an instance-only property — materialise
+        // to read it. Eager mode returns the cached instance instantly.
+        const plugin = await this.materialize(registered);
+        return this.hasAllRequiredSettings(plugin.settingsSchema, settings);
     }
 
     /**

@@ -162,7 +162,7 @@ export class EmailFacadeService extends BaseFacadeService {
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
     ): Promise<EmailInboundMessage> {
-        const plugin = this.getInboundPluginById(pluginId);
+        const plugin = await this.getInboundPluginById(pluginId);
 
         // EW-670 follow-up — resolve the recipient address's OWNER before
         // verifying the signature. The inbound webhook controller can't
@@ -203,7 +203,7 @@ export class EmailFacadeService extends BaseFacadeService {
         headers: Readonly<Record<string, string>>,
         options?: FacadeOptions,
     ): Promise<readonly EmailDeliveryEvent[]> {
-        const plugin = this.getInboundPluginById(pluginId);
+        const plugin = await this.getInboundPluginById(pluginId);
         if (!plugin.parseEventWebhook) return [];
         const settings = await this.resolveSettings(pluginId, options);
         const emailOpts: EmailOptions = {
@@ -310,7 +310,7 @@ export class EmailFacadeService extends BaseFacadeService {
         if (options.addressId && this.emailAddresses) {
             const address = await this.emailAddresses.findById(options.addressId);
             if (address?.pluginId) {
-                const plugin = this.getOutboundPluginByIdSafe(address.pluginId);
+                const plugin = await this.getOutboundPluginByIdSafe(address.pluginId);
                 if (plugin) return plugin;
             }
         }
@@ -324,40 +324,71 @@ export class EmailFacadeService extends BaseFacadeService {
             for (const assignment of assignments) {
                 const address = await this.emailAddresses.findById(assignment.emailAddressId);
                 if (address?.pluginId) {
-                    const plugin = this.getOutboundPluginByIdSafe(address.pluginId);
+                    const plugin = await this.getOutboundPluginByIdSafe(address.pluginId);
                     if (plugin) return plugin;
                 }
             }
         }
+        // Lazy-aware: include parked-but-unloaded entries (they
+        // materialise via this.materialize below).
         const fallback = this.registry
             .getByCapability(this.CAPABILITY)
-            .find((p) => p.state === 'loaded');
-        if (!fallback || !isEmailOutboundPlugin(fallback.plugin)) {
+            .find(
+                (p) =>
+                    p.state === 'loaded' ||
+                    (this.registry.isLazy?.(p.manifest.id) ?? false),
+            );
+        if (!fallback) {
             throw new NoProviderError(this.CAPABILITY);
         }
-        return fallback.plugin;
+        const plugin = await this.materialize(fallback);
+        if (!isEmailOutboundPlugin(plugin)) {
+            throw new NoProviderError(this.CAPABILITY);
+        }
+        return plugin;
     }
 
-    private getOutboundPluginByIdSafe(pluginId: string): IEmailOutboundPlugin | undefined {
+    private async getOutboundPluginByIdSafe(
+        pluginId: string,
+    ): Promise<IEmailOutboundPlugin | undefined> {
         const registered = this.registry
             .getByCapability(this.CAPABILITY)
-            .find((p) => p.plugin.id === pluginId && p.state === 'loaded');
+            .find(
+                (p) =>
+                    p.manifest.id === pluginId &&
+                    (p.state === 'loaded' ||
+                        (this.registry.isLazy?.(p.manifest.id) ?? false)),
+            );
         if (!registered) return undefined;
-        return isEmailOutboundPlugin(registered.plugin) ? registered.plugin : undefined;
+        const plugin = await this.materialize(registered);
+        return isEmailOutboundPlugin(plugin) ? plugin : undefined;
     }
 
-    private getInboundPluginById(pluginId: string): IEmailInboundPlugin {
+    private async getInboundPluginById(pluginId: string): Promise<IEmailInboundPlugin> {
         const registered = this.registry
             .getByCapability(PLUGIN_CAPABILITIES.EMAIL_INBOUND)
-            .find((p) => p.plugin.id === pluginId && p.state === 'loaded');
-        if (!registered || !isEmailInboundPlugin(registered.plugin)) {
+            .find(
+                (p) =>
+                    p.manifest.id === pluginId &&
+                    (p.state === 'loaded' ||
+                        (this.registry.isLazy?.(p.manifest.id) ?? false)),
+            );
+        if (!registered) {
             throw new EmailFacadeError(
                 `Inbound email plugin not found or disabled: ${pluginId}`,
                 'parseInbound',
                 pluginId,
             );
         }
-        return registered.plugin;
+        const plugin = await this.materialize(registered);
+        if (!isEmailInboundPlugin(plugin)) {
+            throw new EmailFacadeError(
+                `Inbound email plugin not found or disabled: ${pluginId}`,
+                'parseInbound',
+                pluginId,
+            );
+        }
+        return plugin;
     }
 
     private async resolveSettings(

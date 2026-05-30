@@ -28,6 +28,8 @@ describe('ScreenshotController', () => {
     let pluginRegistry: {
         getEnabledPluginsScoped: jest.Mock;
         getDefaultForCapabilityScoped: jest.Mock;
+        isLazy: jest.Mock;
+        ensureLoaded: jest.Mock;
     };
     let pluginSettings: { getSettings: jest.Mock };
     let controller: ScreenshotController;
@@ -38,6 +40,26 @@ describe('ScreenshotController', () => {
         pluginRegistry = {
             getEnabledPluginsScoped: jest.fn(),
             getDefaultForCapabilityScoped: jest.fn(),
+            // Lazy-mode shim — tests pass `state: 'loaded'`
+            // RegisteredPlugin shapes via getEnabledPluginsScoped, so
+            // ensureLoaded looks the eager instance up by id from the
+            // most recent return value.
+            isLazy: jest.fn(() => false),
+            ensureLoaded: jest.fn(async (id: string) => {
+                const calls = pluginRegistry.getEnabledPluginsScoped.mock.results;
+                for (const r of calls) {
+                    const arr = (await r.value) as Array<{
+                        plugin?: { id?: string };
+                        manifest?: { id?: string };
+                    }>;
+                    if (!arr) continue;
+                    const found = arr.find(
+                        (p) => p.manifest?.id === id || p.plugin?.id === id,
+                    );
+                    if (found && (found as any).plugin) return (found as any).plugin;
+                }
+                return undefined;
+            }),
         };
         pluginSettings = { getSettings: jest.fn() };
         controller = new ScreenshotController(
@@ -75,6 +97,8 @@ describe('ScreenshotController', () => {
                 : undefined,
         },
         manifest: {
+            id,
+            name: opts.name ?? id,
             description: opts.description,
             icon: opts.icon,
             defaultForCapabilities: opts.isDefault ? ['screenshot'] : undefined,

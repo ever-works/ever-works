@@ -144,6 +144,48 @@ describe('PluginOperationsService', () => {
                         getAll: jest.fn().mockReturnValue([createRegisteredPlugin()]),
                         getAvailableCategories: jest.fn().mockReturnValue(['utility']),
                         getAvailableCapabilities: jest.fn().mockReturnValue(['test']),
+                        // Lazy-mode shim — tests register plugins
+                        // with `state: 'loaded'` and the eager
+                        // `plugin` instance. We try the by-id `get`
+                        // mock first (the most-specific override
+                        // tests use) and fall back to a scan of
+                        // getAll(). Per-test
+                        // `jest.spyOn(...).mockReturnValue(...)`
+                        // continues to drive ensureLoaded.
+                        isLazy: jest.fn(() => false),
+                        ensureLoaded: jest.fn(async function (
+                            this: PluginRegistryService,
+                            id: string,
+                        ) {
+                            // Prefer the by-id `get` mock when its
+                            // returned plugin matches the requested
+                            // id (most tests use that as the direct
+                            // override). Otherwise fall back to a
+                            // scan of getAll() (handles list-shaped
+                            // tests that drive everything via getAll).
+                            // Final fallback is whatever `get(id)`
+                            // returned — many beforeEach mocks
+                            // ignore the id argument and always
+                            // return the default registered plugin.
+                            const reg = this.get(id);
+                            if (
+                                reg?.plugin &&
+                                ((reg as any).manifest?.id === id ||
+                                    (reg as any).plugin?.id === id)
+                            ) {
+                                return reg.plugin as any;
+                            }
+                            const all =
+                                (this.getAll() as Array<{
+                                    plugin?: { id?: string };
+                                    manifest?: { id?: string };
+                                }>) || [];
+                            const fromAll = all.find(
+                                (p) => p.manifest?.id === id || p.plugin?.id === id,
+                            );
+                            if (fromAll?.plugin) return fromAll.plugin as any;
+                            return reg?.plugin as any;
+                        }),
                     },
                 },
                 {
@@ -2075,6 +2117,15 @@ describe('PluginOperationsService', () => {
                         useValue: {
                             get: jest.fn(),
                             getAll: jest.fn().mockReturnValue([]),
+                            // Lazy-mode shim — see beforeEach above.
+                            isLazy: jest.fn(() => false),
+                            ensureLoaded: jest.fn(async function (
+                                this: PluginRegistryService,
+                                id: string,
+                            ) {
+                                const reg = this.get(id);
+                                return reg?.plugin as any;
+                            }),
                         },
                     },
                     {

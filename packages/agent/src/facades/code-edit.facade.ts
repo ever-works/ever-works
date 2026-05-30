@@ -63,20 +63,32 @@ export class CodeEditFacadeService extends BaseFacadeService {
         const registered = this.registry.get(providerId);
         if (
             !registered ||
-            registered.state !== 'loaded' ||
             !registered.manifest.capabilities.includes(this.CAPABILITY) ||
             registered.manifest.supplementary
         ) {
             return null;
         }
+        // Lazy-aware eligibility: `unloaded` plugins with a parked
+        // loader ARE valid (they materialise on demand). Eager
+        // `unloaded` entries remain ineligible — matches base.facade.
+        if (
+            registered.state !== 'loaded' &&
+            !(this.registry.isLazy?.(providerId) ?? false)
+        ) {
+            return null;
+        }
         const enabled = await this.registry.isPluginEnabledForScope(providerId, workId, userId);
         if (!enabled) return null;
+        // For runtime `providerName` we need the instance; everything
+        // else comes from the manifest so we don't force a load when
+        // the plugin is still parked.
+        const plugin = registered.plugin ?? null;
         return {
-            id: registered.plugin.id,
-            name: registered.manifest.name ?? registered.plugin.id,
+            id: registered.manifest.id,
+            name: registered.manifest.name ?? registered.manifest.id,
             description: registered.manifest.description,
             icon: registered.manifest.icon,
-            providerName: this.getProviderName(registered.plugin),
+            providerName: plugin ? this.getProviderName(plugin) : registered.manifest.name,
             enabled: true,
             isDefault:
                 registered.manifest.defaultForCapabilities?.includes(this.CAPABILITY) ?? false,

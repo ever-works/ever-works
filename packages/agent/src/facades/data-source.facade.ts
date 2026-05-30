@@ -34,7 +34,13 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
     async queryAll(options: DataSourceFacadeOptions): Promise<DataSourceFacadeResult> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
+        // Lazy-aware: include parked-but-unloaded plugins (they
+        // materialise on demand below). Eager `unloaded` entries
+        // (no parked loader) stay excluded.
+        const enabledPlugins = plugins.filter(
+            (p) =>
+                p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+        );
 
         const allItems: MutableItemData[] = [];
         const sourceMap = new Map<string, string>();
@@ -44,7 +50,7 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         const allBrands: Brand[] = [];
 
         for (const registered of enabledPlugins) {
-            const pluginId = registered.plugin.id;
+            const pluginId = registered.manifest.id;
 
             const isEnabled = await this.isPluginEnabledForWork(
                 pluginId,
@@ -63,7 +69,12 @@ export class DataSourceFacadeService implements IDataSourceFacade {
                 | undefined;
 
             try {
-                const plugin = registered.plugin as IDataSourcePlugin;
+                // Materialise via the registry — eager mode returns
+                // the cached instance instantly; lazy mode fires the
+                // deferred import + onLoad exactly once.
+                const plugin = (await this.registry.ensureLoaded(
+                    pluginId,
+                )) as IDataSourcePlugin;
 
                 const isAvailable = await plugin.isAvailable();
                 if (!isAvailable) {
@@ -121,16 +132,27 @@ export class DataSourceFacadeService implements IDataSourceFacade {
         if (!workId) return [];
 
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        const enabledPlugins = plugins.filter((p) => p.state === 'loaded');
+        // Lazy-aware filter — see queryAll().
+        const enabledPlugins = plugins.filter(
+            (p) =>
+                p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+        );
         const result: EnabledDataSource[] = [];
 
         for (const registered of enabledPlugins) {
-            const plugin = registered.plugin as IDataSourcePlugin;
-            const isEnabled = await this.isPluginEnabledForWork(plugin.id, workId, userId);
+            const pluginId = registered.manifest.id;
+            const isEnabled = await this.isPluginEnabledForWork(pluginId, workId, userId);
 
             if (isEnabled) {
+                // `sourceName` is an instance-only override (set on
+                // the plugin class, not the manifest), so we need to
+                // materialise here. `id` and `name` would otherwise
+                // be manifest-only reads.
+                const plugin = (await this.registry.ensureLoaded(
+                    pluginId,
+                )) as IDataSourcePlugin;
                 result.push({
-                    id: plugin.id,
+                    id: pluginId,
                     name: plugin.name,
                     sourceName: plugin.sourceName,
                 });
@@ -142,7 +164,14 @@ export class DataSourceFacadeService implements IDataSourceFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
+        // Lazy-aware: parked-but-unloaded plugins ARE configured.
+        return (
+            plugins.length > 0 &&
+            plugins.some(
+                (p) =>
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            )
+        );
     }
 
     getAvailableProviders(): Array<{
@@ -153,12 +182,18 @@ export class DataSourceFacadeService implements IDataSourceFacade {
     }> {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
         return plugins.map((p) => {
-            const plugin = p.plugin as IDataSourcePlugin;
+            // Fall back to manifest fields when the plugin instance
+            // hasn't been materialised yet (lazy mode). `sourceName`
+            // is an instance-only override — there's no manifest
+            // equivalent, so we return the manifest id as a stable
+            // placeholder until first use.
+            const plugin = p.plugin as IDataSourcePlugin | undefined;
             return {
-                id: plugin.id,
-                name: plugin.name,
-                sourceName: plugin.sourceName,
-                enabled: p.state === 'loaded',
+                id: p.manifest.id,
+                name: plugin?.name ?? p.manifest.name ?? p.manifest.id,
+                sourceName: plugin?.sourceName ?? p.manifest.name ?? p.manifest.id,
+                enabled:
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
             };
         });
     }
@@ -187,7 +222,13 @@ export class DataSourceFacadeService implements IDataSourceFacade {
             userId,
         );
         if (registered) {
-            return { id: registered.plugin.id, name: registered.plugin.name };
+            // id/name are manifest-equivalent (class-validated on
+            // load) — no need to materialise the plugin instance
+            // just to read them.
+            return {
+                id: registered.manifest.id,
+                name: registered.plugin?.name ?? registered.manifest.name ?? registered.manifest.id,
+            };
         }
         return null;
     }

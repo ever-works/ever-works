@@ -139,7 +139,14 @@ export class GitFacadeService implements IGitFacade {
 
     isConfigured(): boolean {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.length > 0 && plugins.some((p) => p.state === 'loaded');
+        // Lazy-aware: parked-but-unloaded plugins ARE configured.
+        return (
+            plugins.length > 0 &&
+            plugins.some(
+                (p) =>
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+            )
+        );
     }
 
     /**
@@ -171,14 +178,21 @@ export class GitFacadeService implements IGitFacade {
 
     getAvailableProviders(): GitProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: (p.plugin as IGitProviderPlugin).providerName,
-            enabled: p.state === 'loaded',
-            icon: p.manifest.icon,
-            description: p.manifest.description,
-            homepage: p.manifest.homepage,
-        }));
+        return plugins.map((p) => {
+            // Sync method — fall back to the manifest when the
+            // plugin instance hasn't been materialised yet. Runtime
+            // `providerName` overrides are only available post-load.
+            const plugin = p.plugin as IGitProviderPlugin | undefined;
+            return {
+                id: p.manifest.id,
+                name: plugin?.providerName ?? p.manifest.name ?? p.manifest.id,
+                enabled:
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+                icon: p.manifest.icon,
+                description: p.manifest.description,
+                homepage: p.manifest.homepage,
+            };
+        });
     }
 
     async hasValidCredentials(options: GitFacadeOptions): Promise<boolean> {
@@ -862,15 +876,21 @@ export class GitFacadeService implements IGitFacade {
     private getPluginSync(providerId: string): IGitProviderPlugin {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
 
+        // Sync method — only returns plugins whose instance is
+        // already loaded. The git-provider capability is fulfilled
+        // by the built-in `github` plugin which is always eager, so
+        // this stays a hot path that never has to await a lazy load.
+        // If lazy git providers are introduced later, the caller
+        // must go through `resolvePlugin` (async) instead.
         if (providerId) {
-            const registered = plugins.find((p) => p.plugin.id === providerId);
-            if (registered?.state === 'loaded') {
+            const registered = plugins.find((p) => p.manifest.id === providerId);
+            if (registered?.state === 'loaded' && registered.plugin) {
                 return registered.plugin as IGitProviderPlugin;
             }
         }
 
-        const enabled = plugins.find((p) => p.state === 'loaded');
-        if (!enabled) {
+        const enabled = plugins.find((p) => p.state === 'loaded' && p.plugin);
+        if (!enabled || !enabled.plugin) {
             throw new NoGitProviderError();
         }
         return enabled.plugin as IGitProviderPlugin;
@@ -1013,10 +1033,14 @@ export class GitFacadeService implements IGitFacade {
         }
 
         const registered = this.registry.get(providerId);
+        // Lazy-aware: parked-but-unloaded plugins are valid here —
+        // `ensureLoaded` materialises on demand below. Eager
+        // `unloaded` entries (no parked loader) remain ineligible.
         if (
             registered &&
             registered.manifest.capabilities.includes(this.CAPABILITY) &&
-            registered.state === 'loaded'
+            (registered.state === 'loaded' ||
+                (this.registry.isLazy?.(providerId) ?? false))
         ) {
             const isEnabled = await this.registry.isPluginEnabledForScope(
                 providerId,
@@ -1024,7 +1048,7 @@ export class GitFacadeService implements IGitFacade {
                 userId,
             );
             if (isEnabled) {
-                return registered.plugin as IGitProviderPlugin;
+                return (await this.registry.ensureLoaded(providerId)) as IGitProviderPlugin;
             }
         }
         throw new GitProviderNotFoundError(providerId);

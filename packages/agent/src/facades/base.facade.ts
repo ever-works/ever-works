@@ -391,8 +391,12 @@ export abstract class BaseFacadeService {
      * working). In lazy mode the instance is undefined until first
      * use, so we delegate to `registry.ensureLoaded()` which fires
      * the deferred `import()` + `onLoad` exactly once per plugin id.
+     *
+     * `protected` so subclass facades (Search/Deploy/Email/etc.) can
+     * use the same materialise-on-demand pattern without each
+     * re-implementing the eager-vs-lazy branching.
      */
-    private async materialize(registered: RegisteredPlugin): Promise<IPlugin> {
+    protected async materialize(registered: RegisteredPlugin): Promise<IPlugin> {
         if (registered.plugin) return registered.plugin;
         return this.registry.ensureLoaded(registered.manifest.id);
     }

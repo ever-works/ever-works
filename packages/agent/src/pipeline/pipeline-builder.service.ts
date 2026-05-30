@@ -134,7 +134,7 @@ export class PipelineBuilderService {
 
         // 4. Process each modifier's step contributions
         for (const { registered, modifierPlugin } of modifiers) {
-            this.processModifierSteps(modifierPlugin, registered.plugin.id, buildContext);
+            this.processModifierSteps(modifierPlugin, registered.manifest.id, buildContext);
         }
 
         // 5. Apply modifications in order
@@ -228,20 +228,33 @@ export class PipelineBuilderService {
         );
 
         for (const registered of pluginsWithCapability) {
-            if (registered.state !== 'loaded') continue;
+            const pluginId = registered.manifest.id;
+            // Lazy-aware: parked-but-unloaded plugins ARE eligible
+            // — `ensureLoaded` materialises them below before any
+            // instance method is touched. Eager `unloaded` entries
+            // (no parked loader) stay ineligible.
+            if (
+                registered.state !== 'loaded' &&
+                !(this.registry.isLazy?.(pluginId) ?? false)
+            ) {
+                continue;
+            }
 
             const isEnabled = await this.registry.isPluginEnabledForScope(
-                registered.plugin.id,
+                pluginId,
                 workId,
                 userId,
             );
             if (!isEnabled) continue;
 
-            if (!isPipelineModifierPlugin(registered.plugin)) continue;
+            // Materialise via the registry — eager mode returns the
+            // cached instance instantly; lazy mode fires the
+            // deferred import + onLoad exactly once per id.
+            const modifierPlugin = await this.registry.ensureLoaded(pluginId);
+            if (!isPipelineModifierPlugin(modifierPlugin)) continue;
 
             // Check targetPipelines
-            const targets =
-                registered.plugin.targetPipelines ?? registered.manifest.targetPipelines;
+            const targets = modifierPlugin.targetPipelines ?? registered.manifest.targetPipelines;
             if (!targets?.includes(pipelineId) && !targets?.includes('*')) continue;
 
             // PR #1087 — KB option B. If the modifier implements
@@ -251,17 +264,17 @@ export class PipelineBuilderService {
             // `execute()` after their steps were already injected.
             // Fail-open: a thrown error is treated as "don't skip" so
             // a buggy modifier doesn't silently disappear.
-            if (typeof registered.plugin.canSkipAtBuildTime === 'function') {
+            if (typeof modifierPlugin.canSkipAtBuildTime === 'function') {
                 let skip = false;
                 try {
                     const settings = this.settingsService
-                        ? await this.settingsService.getSettings(registered.plugin.id, {
+                        ? await this.settingsService.getSettings(pluginId, {
                               userId,
                               workId,
                               includeSecrets: true,
                           })
                         : {};
-                    skip = await registered.plugin.canSkipAtBuildTime({
+                    skip = await modifierPlugin.canSkipAtBuildTime({
                         settings,
                         ...(workId ? { workId } : {}),
                         ...(userId ? { userId } : {}),
@@ -269,12 +282,12 @@ export class PipelineBuilderService {
                     });
                 } catch (err) {
                     this.logger.warn(
-                        `Modifier "${registered.plugin.id}".canSkipAtBuildTime threw — treating as don't-skip: ${(err as Error).message}`,
+                        `Modifier "${pluginId}".canSkipAtBuildTime threw — treating as don't-skip: ${(err as Error).message}`,
                     );
                 }
                 if (skip) {
                     this.logger.debug(
-                        `Modifier "${registered.plugin.id}" requested skip for pipeline=${pipelineId} work=${workId ?? '-'} user=${userId ?? '-'}`,
+                        `Modifier "${pluginId}" requested skip for pipeline=${pipelineId} work=${workId ?? '-'} user=${userId ?? '-'}`,
                     );
                     continue;
                 }
@@ -282,7 +295,7 @@ export class PipelineBuilderService {
 
             result.push({
                 registered,
-                modifierPlugin: registered.plugin,
+                modifierPlugin,
             });
         }
 

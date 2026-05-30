@@ -104,7 +104,7 @@ export class PluginOperationsService {
         // When filtering by category (settings page), only show enabled plugins
         if (category) {
             filteredPlugins = filteredPlugins.filter((registered) => {
-                const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
+                const userPlugin = userPluginMap.get(registered.manifest.id) ?? null;
                 return resolvePluginEnabled({
                     systemPlugin: registered.manifest?.systemPlugin,
                     autoEnable: registered.manifest?.autoEnable,
@@ -118,7 +118,7 @@ export class PluginOperationsService {
         // Map to response
         const plugins = await Promise.all(
             filteredPlugins.map((registered) => {
-                const userPlugin = userPluginMap.get(registered.plugin.id);
+                const userPlugin = userPluginMap.get(registered.manifest.id);
                 return this.toUserPluginResponseWithResolvedSettings(
                     registered,
                     userPlugin,
@@ -157,16 +157,19 @@ export class PluginOperationsService {
         // 2. Are installed and enabled by the user
         // 3. Have user-configurable settings (configurationMode !== 'admin-only')
         // 4. Have settings schema with properties
-        const configurablePlugins = allPlugins.filter((registered) => {
+        //
+        // Lazy-safe note: `capabilities` come off the manifest;
+        // `configurationMode` + `settingsSchema` are instance-only.
+        // We materialise once per plugin via ensureLoaded — eager
+        // mode is a hot path (cached instance, no I/O), lazy mode
+        // fires the deferred import + onLoad exactly once per id.
+        const configurablePluginsAsync = allPlugins.map(async (registered) => {
             const visibility = registered.manifest?.visibility ?? 'public';
-            if (visibility === 'hidden') return false;
+            if (visibility === 'hidden') return null;
 
-            const hasOAuth = registered.plugin.capabilities?.includes('oauth') ?? false;
+            const hasOAuth = registered.manifest.capabilities?.includes('oauth') ?? false;
 
-            const configMode = registered.plugin.configurationMode || 'hybrid';
-            if (configMode === 'admin-only' && !hasOAuth) return false;
-
-            const userPlugin = userPluginMap.get(registered.plugin.id) ?? null;
+            const userPlugin = userPluginMap.get(registered.manifest.id) ?? null;
             const isEnabled = resolvePluginEnabled({
                 systemPlugin: registered.manifest?.systemPlugin,
                 autoEnable: registered.manifest?.autoEnable,
@@ -174,11 +177,15 @@ export class PluginOperationsService {
                 workPlugin: null,
                 hasWorkContext: false,
             });
-            if (!isEnabled) return false;
+            if (!isEnabled) return null;
+
+            const plugin = await this.pluginRegistryService.ensureLoaded(registered.manifest.id);
+            const configMode = plugin.configurationMode || 'hybrid';
+            if (configMode === 'admin-only' && !hasOAuth) return null;
 
             // Check if plugin has user-configurable settings
-            const schema = registered.plugin.settingsSchema;
-            if (!schema?.properties && !hasOAuth) return false;
+            const schema = plugin.settingsSchema;
+            if (!schema?.properties && !hasOAuth) return null;
 
             // Check if there are any non-admin-only settings visible to users
             const hasUserSettings = Object.values(schema?.properties || {}).some((prop) => {
@@ -188,24 +195,29 @@ export class PluginOperationsService {
                 return scope === 'global' || scope === 'user';
             });
 
-            return hasUserSettings || hasOAuth;
+            if (!hasUserSettings && !hasOAuth) return null;
+            return { registered, schema };
         });
+        const configurablePlugins = (await Promise.all(configurablePluginsAsync)).filter(
+            (entry): entry is { registered: RegisteredPlugin; schema: JsonSchema | undefined } =>
+                entry !== null,
+        );
 
         // Group by category
         const categoryMap = new Map<string, SettingsMenuPlugin[]>();
 
-        for (const registered of configurablePlugins) {
+        for (const { registered, schema } of configurablePlugins) {
             const category = registered.manifest.category;
-            const userPlugin = userPluginMap.get(registered.plugin.id);
+            const userPlugin = userPluginMap.get(registered.manifest.id);
 
             const hasRequiredSettings = await this.hasUnconfiguredRequiredSettings(
-                registered.plugin.id,
-                registered.plugin.settingsSchema,
+                registered.manifest.id,
+                schema,
                 userId,
             );
 
             const pluginItem: SettingsMenuPlugin = {
-                pluginId: registered.plugin.id,
+                pluginId: registered.manifest.id,
                 name: registered.manifest.name,
                 icon: this.extractIcon(registered.manifest),
                 enabled: resolvePluginEnabled({
@@ -388,12 +400,19 @@ export class PluginOperationsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
+        // `settingsSchema` + `configurationMode` are instance-only —
+        // materialise once and reuse. Eager mode returns the cached
+        // instance instantly.
+        const pluginInstance = settings || secretSettings
+            ? await this.pluginRegistryService.ensureLoaded(pluginId)
+            : undefined;
+
         // Enforce configurationMode — admin-only plugins cannot have user settings
-        if (settings || secretSettings) {
-            this.enforceConfigurationMode(registered, 'user');
+        if ((settings || secretSettings) && pluginInstance) {
+            this.enforceConfigurationModeFromInstance(pluginInstance, 'user');
         }
 
-        const schema = registered.plugin.settingsSchema;
+        const schema = pluginInstance?.settingsSchema;
 
         // Validate combined settings+secretSettings together against schema
         if (settings || secretSettings) {
@@ -401,7 +420,7 @@ export class PluginOperationsService {
                 ...(settings || {}),
                 ...(secretSettings || {}),
             };
-            await this.validateSettingsOrThrow(allSettings, schema, 'user', registered.plugin);
+            await this.validateSettingsOrThrow(allSettings, schema, 'user', pluginInstance);
         }
 
         // Get the plugin entity from database
@@ -529,7 +548,7 @@ export class PluginOperationsService {
 
         // Enforce configurationMode — admin-only plugins cannot have user settings
         if (settings || secretSettings) {
-            this.enforceConfigurationMode(registered, 'user');
+            await this.enforceConfigurationMode(registered, 'user');
         }
 
         let userPlugin = await this.userPluginRepository.findOne({
@@ -561,7 +580,11 @@ export class PluginOperationsService {
             });
         }
 
-        const schema = registered.plugin.settingsSchema;
+        // `settingsSchema` is instance-only — materialise to read it.
+        // Eager mode returns the cached instance instantly; the same
+        // instance feeds `validateSettings` below.
+        const plugin = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const schema = plugin.settingsSchema;
 
         // Validate combined settings+secretSettings together against schema
         if (settings || secretSettings) {
@@ -573,7 +596,7 @@ export class PluginOperationsService {
             };
             // Strip null values before validation — null means "cleared"
             const cleanedSettings = this.stripNullValues(allSettings);
-            await this.validateSettingsOrThrow(cleanedSettings, schema, 'user', registered.plugin);
+            await this.validateSettingsOrThrow(cleanedSettings, schema, 'user', plugin);
         }
 
         // Strip masked placeholders then merge settings, clearing null keys
@@ -635,7 +658,10 @@ export class PluginOperationsService {
         if (!target) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
-        if (!target.plugin.capabilities.includes(PLUGIN_CAPABILITIES.PIPELINE)) {
+        // Capabilities live on the manifest (class-validated against
+        // the plugin instance at load) so we can answer this without
+        // forcing the lazy import.
+        if (!target.manifest.capabilities.includes(PLUGIN_CAPABILITIES.PIPELINE)) {
             throw new BadRequestException(`Plugin "${pluginId}" is not a pipeline plugin`);
         }
 
@@ -700,7 +726,7 @@ export class PluginOperationsService {
         const workPluginMap = new Map(workPlugins.map((dp) => [dp.pluginId, dp]));
 
         // Build registry map for quick supplementary lookups
-        const registryMap = new Map(allPlugins.map((p) => [p.plugin.id, p]));
+        const registryMap = new Map(allPlugins.map((p) => [p.manifest.id, p]));
 
         // Build capability providers mapping (exclude supplementary plugins)
         const capabilityProviders: Record<string, string> = {};
@@ -725,8 +751,8 @@ export class PluginOperationsService {
         // Map to response
         const plugins: WorkPluginResponse[] = await Promise.all(
             visiblePlugins.map((registered) => {
-                const userPlugin = userPluginMap.get(registered.plugin.id);
-                const workPlugin = workPluginMap.get(registered.plugin.id);
+                const userPlugin = userPluginMap.get(registered.manifest.id);
+                const workPlugin = workPluginMap.get(registered.manifest.id);
                 return this.toWorkPluginResponse(registered, userPlugin, workPlugin, {
                     userId,
                     workId,
@@ -761,10 +787,14 @@ export class PluginOperationsService {
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (options?.settings) {
-            this.enforceConfigurationMode(registered, 'work');
+            await this.enforceConfigurationMode(registered, 'work');
         }
 
-        const schema = registered.plugin.settingsSchema;
+        // Materialise once — both validateUserLevelRequiredFields
+        // and validateSettingsOrThrow need the instance + schema.
+        // Eager mode returns the cached instance instantly.
+        const pluginInstance = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const schema = pluginInstance.settingsSchema;
 
         // Check if user has the plugin enabled (or plugin is autoEnabled)
         const userPlugin = await this.userPluginRepository.findOne({
@@ -778,7 +808,7 @@ export class PluginOperationsService {
             );
         }
 
-        this.validateUserLevelRequiredFields(userPlugin, registered.plugin.settingsSchema);
+        this.validateUserLevelRequiredFields(userPlugin, schema);
 
         // Validate settings against schema if provided, using merged (user + new) settings
         if (options?.settings) {
@@ -787,7 +817,7 @@ export class PluginOperationsService {
                 ...(userPlugin?.secretSettings || {}),
                 ...options.settings,
             };
-            await this.validateSettingsOrThrow(allSettings, schema, 'work', registered.plugin);
+            await this.validateSettingsOrThrow(allSettings, schema, 'work', pluginInstance);
         }
 
         // Get the plugin entity
@@ -935,7 +965,7 @@ export class PluginOperationsService {
 
         // Enforce configurationMode — admin-only plugins cannot have work settings
         if (settings || secretSettings) {
-            this.enforceConfigurationMode(registered, 'work');
+            await this.enforceConfigurationMode(registered, 'work');
         }
 
         const userPlugin = await this.userPluginRepository.findOne({
@@ -949,7 +979,10 @@ export class PluginOperationsService {
             registered.manifest,
         );
 
-        const schema = registered.plugin.settingsSchema;
+        // Materialise once — `settingsSchema` is instance-only and
+        // we also pass the instance into validateSettingsOrThrow.
+        const pluginInstance = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const schema = pluginInstance.settingsSchema;
 
         this.validateUserLevelRequiredFields(userPlugin, schema);
 
@@ -978,7 +1011,7 @@ export class PluginOperationsService {
                 allSettingsForValidation,
                 schema,
                 'work',
-                registered.plugin,
+                pluginInstance,
             );
         }
 
@@ -1122,17 +1155,20 @@ export class PluginOperationsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
-        const plugin = registered.plugin as any;
-        if (typeof plugin.listModels !== 'function') {
-            return [];
-        }
-
+        // Capabilities live on the manifest — answer the AI-provider
+        // short-circuit without materialising. The fallback branch
+        // needs `listModels`, which is instance-only.
         try {
-            if (registered.plugin.capabilities.includes('ai-provider')) {
+            if (registered.manifest.capabilities.includes('ai-provider')) {
                 return await this.aiFacade.getAvailableModels({
                     providerOverride: pluginId,
                     userId,
                 });
+            }
+
+            const plugin = (await this.pluginRegistryService.ensureLoaded(pluginId)) as any;
+            if (typeof plugin.listModels !== 'function') {
+                return [];
             }
 
             const settings = await this.settingsService.getResolvedSettings(pluginId, {
@@ -1227,18 +1263,26 @@ export class PluginOperationsService {
      */
     private toPluginResponse(registered: RegisteredPlugin): PluginResponse {
         const manifest = registered.manifest;
+        // Sync method — fall back to safe defaults when the plugin
+        // instance hasn't been materialised yet (lazy mode). The
+        // dynamic shapes here (`configurationMode`, `settingsSchema`)
+        // are filled in by the lazy-aware callers below
+        // (`toUserPluginResponseWithResolvedSettings`,
+        // `toWorkPluginResponse`) before this response is returned to
+        // the API.
+        const plugin = registered.plugin;
         return {
             ...manifest,
-            id: registered.plugin.id,
-            pluginId: registered.plugin.id,
+            id: manifest.id,
+            pluginId: manifest.id,
             capabilities: [...manifest.capabilities],
-            configurationMode: registered.plugin.configurationMode || 'hybrid',
+            configurationMode: plugin?.configurationMode || 'hybrid',
             builtIn: registered.builtIn,
             systemPlugin: manifest.systemPlugin ?? false,
             visibility: manifest.visibility ?? 'public',
             state: registered.state,
             icon: this.extractIcon(manifest),
-            settingsSchema: this.extractSettingsSchema(registered.plugin.settingsSchema),
+            settingsSchema: this.extractSettingsSchema(plugin?.settingsSchema),
             autoEnable: manifest.autoEnable ?? false,
             supplementary: manifest.supplementary ?? false,
         };
@@ -1250,10 +1294,10 @@ export class PluginOperationsService {
      * For plugins with autoEnable=true, they are considered installed and enabled
      * even without a UserPluginEntity record (unless explicitly disabled).
      */
-    private toUserPluginResponse(
+    private async toUserPluginResponse(
         registered: RegisteredPlugin,
         userPlugin?: UserPluginEntity | null,
-    ): UserPluginResponse {
+    ): Promise<UserPluginResponse> {
         const baseResponse = this.toPluginResponse(registered);
         const enabled = resolvePluginEnabled({
             systemPlugin: registered.manifest?.systemPlugin,
@@ -1267,11 +1311,22 @@ export class PluginOperationsService {
             ? { ...userPlugin.settings, ...userPlugin.secretSettings }
             : undefined;
 
+        // Need the instance for `settingsSchema` (instance-only) so
+        // secret masking is correct. Eager mode returns the cached
+        // instance instantly; lazy mode fires the deferred import
+        // exactly once per id.
+        const plugin = await this.pluginRegistryService.ensureLoaded(registered.manifest.id);
+
         return {
             ...baseResponse,
+            // Re-emit the dynamic fields with the now-materialised
+            // instance — toPluginResponse fell back to defaults when
+            // the instance was still parked.
+            configurationMode: plugin.configurationMode || 'hybrid',
+            settingsSchema: this.extractSettingsSchema(plugin.settingsSchema),
             installed: !!userPlugin || enabled,
             enabled,
-            settings: this.maskSecretSettings(mergedSettings, registered.plugin.settingsSchema),
+            settings: this.maskSecretSettings(mergedSettings, plugin.settingsSchema),
             metadata: userPlugin?.metadata ?? {},
             userPluginId: userPlugin?.id,
             autoEnableForWorks: userPlugin?.autoEnableForWorks ?? false,
@@ -1284,7 +1339,7 @@ export class PluginOperationsService {
         userId: string,
         options: { includeConnectionStatus?: boolean } = {},
     ): Promise<UserPluginResponse> {
-        const response = this.toUserPluginResponse(registered, userPlugin);
+        const response = await this.toUserPluginResponse(registered, userPlugin);
 
         // Fan out the two independent reads in parallel:
         //   (1) resolve the user-scope settings (used for the display
@@ -1302,10 +1357,17 @@ export class PluginOperationsService {
         // original concurrency on the opt-in path while preserving
         // the list-path savings (the probe is `Promise.resolve(undefined)`
         // when `includeConnectionStatus` is false, so no extra work).
-        const schema = registered.plugin.settingsSchema;
+        //
+        // `toUserPluginResponse` above already materialised the
+        // instance (eager mode is a cache hit), so reading
+        // `registered.plugin.settingsSchema` here is safe — it's
+        // populated by the time we get here in both eager and lazy
+        // modes.
+        const schema = registered.plugin?.settingsSchema;
+        const pluginId = registered.manifest.id;
         const needsResolved = !!schema?.properties || this.hasAiProviderCapability(registered);
         const resolvedP = needsResolved
-            ? this.settingsService.getResolvedSettings(registered.plugin.id, { userId })
+            ? this.settingsService.getResolvedSettings(pluginId, { userId })
             : Promise.resolve(undefined);
         const connectionStatusP = options.includeConnectionStatus
             ? this.getConnectionStatus(registered, userId)
@@ -1333,7 +1395,10 @@ export class PluginOperationsService {
     }
 
     private hasAiProviderCapability(registered: RegisteredPlugin): boolean {
-        return registered.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER);
+        // Capabilities live on the manifest (class-validated to
+        // equal the runtime instance's capabilities at load), so no
+        // need to materialise the plugin instance for this check.
+        return registered.manifest.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER);
     }
 
     /**
@@ -1362,16 +1427,24 @@ export class PluginOperationsService {
             return undefined;
         }
 
-        if (registered.plugin.capabilities.includes('oauth')) {
+        // Capabilities live on the manifest — answer the OAuth
+        // short-circuit without materialising.
+        if (registered.manifest.capabilities.includes('oauth')) {
             return undefined;
         }
 
-        const settings = await this.settingsService.getSettings(registered.plugin.id, {
+        const pluginId = registered.manifest.id;
+        // Materialise the plugin instance — eager mode returns the
+        // cached instance instantly. The rest of this function reads
+        // instance-only methods (`getDeviceAuthStatus`,
+        // `validateConnection`, `isAvailable`).
+        const pluginInstance = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const settings = await this.settingsService.getSettings(pluginId, {
             userId,
             includeSecrets: true,
         });
 
-        if (isDeviceAuthProvider(registered.plugin)) {
+        if (isDeviceAuthProvider(pluginInstance)) {
             const authModeField =
                 registered.manifest.uiHints?.deviceAuth?.authModeField ?? 'authMode';
             const authMode =
@@ -1380,7 +1453,7 @@ export class PluginOperationsService {
 
             if (prefersDeviceAuth) {
                 try {
-                    const deviceAuthStatus = await registered.plugin.getDeviceAuthStatus(userId);
+                    const deviceAuthStatus = await pluginInstance.getDeviceAuthStatus(userId);
 
                     if (
                         deviceAuthStatus.connected ||
@@ -1396,20 +1469,20 @@ export class PluginOperationsService {
                     }
                 } catch (error) {
                     this.logger.warn(
-                        `Failed to read device auth status for plugin "${registered.plugin.id}": ${error}`,
+                        `Failed to read device auth status for plugin "${pluginId}": ${error}`,
                     );
                 }
             }
         }
 
-        const plugin = registered.plugin as unknown as Record<string, unknown>;
-        const validateConnection = plugin.validateConnection as
+        const pluginAsAny = pluginInstance as unknown as Record<string, unknown>;
+        const validateConnection = pluginAsAny.validateConnection as
             | ((s: Record<string, unknown>) => Promise<{ success: boolean; message: string }>)
             | undefined;
 
         if (typeof validateConnection === 'function') {
             try {
-                const result = await validateConnection.call(registered.plugin, settings);
+                const result = await validateConnection.call(pluginInstance, settings);
                 return {
                     connected: result.success,
                     scope: 'user',
@@ -1417,33 +1490,33 @@ export class PluginOperationsService {
                 };
             } catch (error) {
                 this.logger.warn(
-                    `Failed to validate onboarding connection for plugin "${registered.plugin.id}": ${error}`,
+                    `Failed to validate onboarding connection for plugin "${pluginId}": ${error}`,
                 );
                 return {
                     connected: false,
                     scope: 'user',
-                    message: `${registered.plugin.name} is not configured yet.`,
+                    message: `${pluginInstance.name} is not configured yet.`,
                 };
             }
         }
 
-        const isAvailable = plugin.isAvailable as
+        const isAvailable = pluginAsAny.isAvailable as
             | ((s?: Record<string, unknown>) => Promise<boolean>)
             | undefined;
 
         if (typeof isAvailable === 'function') {
             try {
-                const available = await isAvailable.call(registered.plugin, settings);
+                const available = await isAvailable.call(pluginInstance, settings);
                 return {
                     connected: available,
                     scope: 'user',
                     message: available
-                        ? `${registered.plugin.name} is configured.`
-                        : `${registered.plugin.name} is not configured yet.`,
+                        ? `${pluginInstance.name} is configured.`
+                        : `${pluginInstance.name} is not configured yet.`,
                 };
             } catch (error) {
                 this.logger.warn(
-                    `Failed to resolve availability for plugin "${registered.plugin.id}": ${error}`,
+                    `Failed to resolve availability for plugin "${pluginId}": ${error}`,
                 );
             }
         }
@@ -1455,12 +1528,15 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         userId: string,
     ): Promise<Record<string, unknown> | undefined> {
-        const schema = registered.plugin.settingsSchema;
+        // `settingsSchema` is instance-only — materialise to read it.
+        // Eager mode returns the cached instance instantly.
+        const plugin = await this.pluginRegistryService.ensureLoaded(registered.manifest.id);
+        const schema = plugin.settingsSchema;
         if (!schema?.properties) {
             return undefined;
         }
 
-        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+        const resolved = await this.settingsService.getResolvedSettings(registered.manifest.id, {
             userId,
         });
 
@@ -1479,7 +1555,11 @@ export class PluginOperationsService {
         registered: RegisteredPlugin,
         resolved: ResolvedSettings,
     ): Record<string, unknown> | undefined {
-        const schema = registered.plugin.settingsSchema;
+        // Sync projection — both callers ensure the instance is
+        // materialised before reaching us (toUserPluginResponseWithResolvedSettings
+        // and getResolvedDisplaySettings both call ensureLoaded
+        // earlier in their pipelines).
+        const schema = registered.plugin?.settingsSchema;
         if (!schema?.properties) {
             return undefined;
         }
@@ -1518,10 +1598,16 @@ export class PluginOperationsService {
         workPlugin?: WorkPluginEntity | null,
         options?: { userId: string; workId: string },
     ): Promise<WorkPluginResponse> {
-        const userResponse = this.toUserPluginResponse(registered, userPlugin);
+        const userResponse = await this.toUserPluginResponse(registered, userPlugin);
+        // Materialise via the registry — eager mode returns the
+        // cached instance; needed to read `settingsSchema` for the
+        // secret-mask projection below.
+        const pluginInstance = await this.pluginRegistryService.ensureLoaded(
+            registered.manifest.id,
+        );
         const rawWorkSettings = this.maskSecretSettings(
             workPlugin ? { ...workPlugin.settings, ...workPlugin.secretSettings } : undefined,
-            registered.plugin.settingsSchema,
+            pluginInstance.settingsSchema,
         );
         const [resolvedSettings, models, workSettings] = options
             ? await Promise.all([
@@ -1557,12 +1643,15 @@ export class PluginOperationsService {
             return undefined;
         }
 
-        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+        const pluginId = registered.manifest.id;
+        // `settingsSchema` is instance-only — materialise to read it.
+        const plugin = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const resolved = await this.settingsService.getResolvedSettings(pluginId, {
             userId: options.userId,
             workId: options.workId,
         });
 
-        return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
+        return buildProviderModelSummaries(plugin.settingsSchema, resolved);
     }
 
     /**
@@ -1578,19 +1667,24 @@ export class PluginOperationsService {
         if (!this.hasAiProviderCapability(registered)) {
             return undefined;
         }
-        return buildProviderModelSummaries(registered.plugin.settingsSchema, resolved);
+        // Caller already materialised the instance — see
+        // toUserPluginResponseWithResolvedSettings.
+        return buildProviderModelSummaries(registered.plugin?.settingsSchema, resolved);
     }
 
     private async getWorkOverrideDisplaySettings(
         registered: RegisteredPlugin,
         options: { userId: string; workId: string },
     ): Promise<Record<string, unknown> | undefined> {
-        const schema = registered.plugin.settingsSchema;
+        const pluginId = registered.manifest.id;
+        // `settingsSchema` is instance-only — materialise to read it.
+        const plugin = await this.pluginRegistryService.ensureLoaded(pluginId);
+        const schema = plugin.settingsSchema;
         if (!schema?.properties) {
             return undefined;
         }
 
-        const resolved = await this.settingsService.getResolvedSettings(registered.plugin.id, {
+        const resolved = await this.settingsService.getResolvedSettings(pluginId, {
             userId: options.userId,
             workId: options.workId,
             includeSecrets: true,
@@ -1787,16 +1881,32 @@ export class PluginOperationsService {
     }
 
     /**
-     * Enforce configurationMode restrictions.
-     * Throws ForbiddenException if the plugin is admin-only and the caller is trying
-     * to modify settings at user or work scope.
+     * Enforce configurationMode restrictions from an already-loaded
+     * plugin instance. Pair with `ensureLoaded` at the call site.
      */
-    private enforceConfigurationMode(registered: RegisteredPlugin, scope: 'user' | 'work'): void {
-        const configMode = registered.plugin.configurationMode || 'hybrid';
+    private enforceConfigurationModeFromInstance(
+        plugin: IPlugin,
+        scope: 'user' | 'work',
+    ): void {
+        const configMode = plugin.configurationMode || 'hybrid';
         if (configMode === 'admin-only') {
             throw new ForbiddenException(
-                `Plugin "${registered.plugin.id}" is admin-only and cannot be configured at ${scope} level`,
+                `Plugin "${plugin.id}" is admin-only and cannot be configured at ${scope} level`,
             );
         }
+    }
+
+    /**
+     * Lazy-aware wrapper around enforceConfigurationModeFromInstance.
+     * Materialises the plugin via the registry — eager mode returns
+     * the cached instance instantly. Use when the call site already
+     * has a `registered` ref and doesn't otherwise need the instance.
+     */
+    private async enforceConfigurationMode(
+        registered: RegisteredPlugin,
+        scope: 'user' | 'work',
+    ): Promise<void> {
+        const plugin = await this.pluginRegistryService.ensureLoaded(registered.manifest.id);
+        this.enforceConfigurationModeFromInstance(plugin, scope);
     }
 }

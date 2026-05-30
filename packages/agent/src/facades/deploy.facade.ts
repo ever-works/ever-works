@@ -103,9 +103,13 @@ export class DeployFacadeService implements IDeployFacade {
 
         const resolvedProviderId = resolvePluginProviderId(providerId);
         const registered = this.registry.get(resolvedProviderId);
-        const plugin = registered?.plugin as IDeploymentPlugin | undefined;
-
-        return plugin?.name || plugin?.providerName || providerId;
+        if (!registered) return providerId;
+        // Sync method — return manifest.name when the plugin instance
+        // isn't materialised yet (lazy mode). Manifest.name is the
+        // class-validated equivalent of plugin.name; runtime
+        // `providerName` overrides are only available after load.
+        const plugin = registered.plugin as IDeploymentPlugin | undefined;
+        return plugin?.name || plugin?.providerName || registered.manifest.name || providerId;
     }
 
     /**
@@ -120,7 +124,14 @@ export class DeployFacadeService implements IDeployFacade {
 
             const pluginProviderId = resolvePluginProviderId(work.deployProvider);
             const registered = this.registry.get(pluginProviderId);
-            if (!registered || registered.state !== 'loaded') {
+            // Lazy-aware eligibility: parked-but-unloaded plugins ARE
+            // configured (the work just needs a valid token below);
+            // they'll materialise on first use.
+            if (
+                !registered ||
+                (registered.state !== 'loaded' &&
+                    !(this.registry.isLazy?.(pluginProviderId) ?? false))
+            ) {
                 return false;
             }
 
@@ -148,7 +159,12 @@ export class DeployFacadeService implements IDeployFacade {
     ): Promise<boolean> {
         const resolvedProviderId = resolvePluginProviderId(providerId);
         const registered = this.registry.get(resolvedProviderId);
-        if (!registered || registered.state !== 'loaded') {
+        if (!registered) return false;
+        // Lazy-aware: parked-but-unloaded plugins ARE valid.
+        if (
+            registered.state !== 'loaded' &&
+            !(this.registry.isLazy?.(resolvedProviderId) ?? false)
+        ) {
             return false;
         }
         if (!registered.manifest.capabilities.includes(this.CAPABILITY)) {
@@ -162,14 +178,25 @@ export class DeployFacadeService implements IDeployFacade {
      */
     getAvailableProviders(): DeployProviderInfo[] {
         const plugins = this.registry.getByCapability(this.CAPABILITY);
-        return plugins.map((p) => ({
-            id: p.plugin.id,
-            name: p.plugin.name || (p.plugin as IDeploymentPlugin).providerName || p.plugin.id,
-            enabled: p.state === 'loaded',
-            icon: p.manifest.icon,
-            description: p.manifest.description,
-            homepage: p.manifest.homepage,
-        }));
+        return plugins.map((p) => {
+            // Sync method — fall back to manifest fields when the
+            // plugin instance hasn't been materialised yet. Runtime
+            // `providerName` overrides only apply post-load.
+            const plugin = p.plugin as IDeploymentPlugin | undefined;
+            return {
+                id: p.manifest.id,
+                name:
+                    plugin?.name ||
+                    plugin?.providerName ||
+                    p.manifest.name ||
+                    p.manifest.id,
+                enabled:
+                    p.state === 'loaded' || (this.registry.isLazy?.(p.manifest.id) ?? false),
+                icon: p.manifest.icon,
+                description: p.manifest.description,
+                homepage: p.manifest.homepage,
+            };
+        });
     }
 
     /**
@@ -751,7 +778,12 @@ export class DeployFacadeService implements IDeployFacade {
             throw new DeployProviderNotFoundError(providerId);
         }
 
-        if (registered.state !== 'loaded') {
+        // Lazy-aware: parked-but-unloaded plugins are valid; the
+        // ensureLoaded call below will materialise on demand.
+        if (
+            registered.state !== 'loaded' &&
+            !(this.registry.isLazy?.(pluginProviderId) ?? false)
+        ) {
             throw new DeployProviderNotFoundError(providerId);
         }
 
@@ -762,14 +794,19 @@ export class DeployFacadeService implements IDeployFacade {
             options.workId,
         );
 
+        // Materialise the plugin instance now — both the error path
+        // (providerName for the credentials error) and the success
+        // return need the IPlugin runtime. Eager mode returns the
+        // cached instance instantly.
+        const plugin = (await this.registry.ensureLoaded(pluginProviderId)) as IDeploymentPlugin;
+
         if (!token) {
-            const providerName =
-                (registered.plugin as IDeploymentPlugin).providerName || registered.plugin.name;
+            const providerName = plugin.providerName || plugin.name;
             throw new NoDeployCredentialsError(providerId, options.userId, providerName);
         }
 
         return {
-            plugin: registered.plugin as IDeploymentPlugin,
+            plugin,
             token,
             work,
         };

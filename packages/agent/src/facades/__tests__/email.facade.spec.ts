@@ -20,6 +20,19 @@ describe('EmailFacadeService', () => {
     beforeEach(async () => {
         registry = {
             getByCapability: jest.fn().mockReturnValue([]),
+            // Lazy-mode shim — tests register plugins via getByCapability
+            // with eager `state: 'loaded'`, so ensureLoaded just looks
+            // up by id in the most recent getByCapability return value.
+            isLazy: jest.fn(() => false),
+            ensureLoaded: jest.fn(async (id: string) => {
+                const calls = (registry.getByCapability as jest.Mock).mock.results;
+                for (const r of calls) {
+                    const arr = (r.value as Array<{ plugin: { id: string } }>) || [];
+                    const found = arr.find((p) => p.plugin?.id === id);
+                    if (found) return (found as any).plugin;
+                }
+                return undefined as never;
+            }),
         } as unknown as jest.Mocked<PluginRegistryService>;
         settings = {
             getResolvedSettings: jest.fn().mockResolvedValue({}),
@@ -100,7 +113,7 @@ describe('EmailFacadeService', () => {
         it('resolves the recipient owner and verifies with the owner-scoped secret', async () => {
             const plugin = makeInboundPlugin();
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
             (settings.getSettings as jest.Mock).mockResolvedValue({
                 inboundWebhookSecret: 'owner-secret',
             });
@@ -132,7 +145,7 @@ describe('EmailFacadeService', () => {
         it('falls back to default scope when no owner matches the recipient', async () => {
             const plugin = makeInboundPlugin();
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
             emailAddresses.findByAddress.mockResolvedValue(null);
 
             await facade.parseInbound('postmark', Buffer.from('{}'), {});
@@ -149,7 +162,7 @@ describe('EmailFacadeService', () => {
         it('falls back to default scope when the matched address belongs to a different plugin', async () => {
             const plugin = makeInboundPlugin();
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
             // Address is registered to mailgun, not the postmark webhook in flight.
             emailAddresses.findByAddress.mockResolvedValue({
                 userId: 'owner-9',
@@ -167,7 +180,7 @@ describe('EmailFacadeService', () => {
         it('skips recipient resolution when the caller already supplies a userId', async () => {
             const plugin = makeInboundPlugin();
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
 
             await facade.parseInbound('postmark', Buffer.from('{}'), {}, { userId: 'caller-1' });
 
@@ -203,7 +216,7 @@ describe('EmailFacadeService', () => {
                 },
             ]);
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
 
             const events = await facade.parseEventWebhook('postmark', Buffer.from('{}'), {});
             expect(plugin.verifyWebhookSignature).toHaveBeenCalled();
@@ -213,7 +226,7 @@ describe('EmailFacadeService', () => {
         it('returns [] when the plugin does not publish delivery events', async () => {
             const plugin = makeInboundPlugin({ parseEventWebhook: undefined });
             registry.getByCapability.mockImplementation(((cap: string) =>
-                cap === 'email-inbound' ? [{ plugin, state: 'loaded' }] : []) as never);
+                cap === 'email-inbound' ? [{ plugin, state: 'loaded', manifest: { id: plugin.id, name: plugin.id, capabilities: ['email-inbound'] } }] : []) as never);
             await expect(
                 facade.parseEventWebhook('postmark', Buffer.from('{}'), {}),
             ).resolves.toEqual([]);

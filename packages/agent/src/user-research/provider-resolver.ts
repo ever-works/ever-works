@@ -68,16 +68,21 @@ export async function resolveSearchProviderIds(
 
     for (const candidate of chain) {
         if (settingsService) {
-            const settings = await settingsService.getSettings(candidate.plugin.id, {
+            const pluginId = candidate.manifest.id;
+            const settings = await settingsService.getSettings(pluginId, {
                 userId,
                 includeSecrets: true,
             });
-            if (!hasAllRequiredSettings(candidate.plugin.settingsSchema, settings)) continue;
+            // `settingsSchema` is an instance-only property — it
+            // doesn't live on the manifest, so we have to materialise.
+            // Eager mode returns the cached instance instantly.
+            const plugin = await registry.ensureLoaded(pluginId);
+            if (!hasAllRequiredSettings(plugin.settingsSchema, settings)) continue;
         }
         configured.push(candidate);
     }
 
-    return capChain(configured, DEFAULT_PROVIDER_FALLBACK_MAX).map((p) => p.plugin.id);
+    return capChain(configured, DEFAULT_PROVIDER_FALLBACK_MAX).map((p) => p.manifest.id);
 }
 
 /**
@@ -150,7 +155,7 @@ async function resolveAiProvidersFromChain(
         try {
             const cfg = await aiFacade.getProviderConfig({
                 userId,
-                providerOverride: candidate.plugin.id,
+                providerOverride: candidate.manifest.id,
             });
             if (!cfg.baseUrl || !cfg.apiKey) continue;
             const modelName =
@@ -170,7 +175,9 @@ async function resolveAiProvidersFromChain(
             });
         } catch (err) {
             if (isAuthOrConfigError(err)) throw err;
-            logger?.warn(`ai-provider ${candidate.plugin.id} unusable: ${(err as Error).message}`);
+            logger?.warn(
+                `ai-provider ${candidate.manifest.id} unusable: ${(err as Error).message}`,
+            );
         }
     }
     return resolved;

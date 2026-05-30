@@ -240,7 +240,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         config: ChannelTargetConfig,
         options: FacadeOptions,
     ): Promise<ChannelVerification> {
-        const plugin = this.getChannelPluginById(pluginId);
+        const plugin = await this.getChannelPluginById(pluginId);
         const settings = await this.resolveSettings(pluginId, options);
         return plugin.verifyTarget(config, {
             userId: options.userId,
@@ -322,7 +322,7 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         }
 
         try {
-            const plugin = this.getChannelPluginById(channel.pluginId);
+            const plugin = await this.getChannelPluginById(channel.pluginId);
             const settings = await this.resolveSettings(channel.pluginId, options);
             const channelOpts: ChannelOptions = {
                 userId: options.userId,
@@ -376,18 +376,34 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         }
     }
 
-    private getChannelPluginById(pluginId: string): INotificationChannelPlugin {
+    private async getChannelPluginById(pluginId: string): Promise<INotificationChannelPlugin> {
+        // Lazy-aware: a parked-but-unloaded plugin is a valid match.
+        // We compare by manifest.id (the id is class-validated to
+        // equal plugin.id), then materialise via the registry.
         const registered = this.registry
             .getByCapability(this.CAPABILITY)
-            .find((p) => p.plugin.id === pluginId && p.state === 'loaded');
-        if (!registered || !isNotificationChannelPlugin(registered.plugin)) {
+            .find(
+                (p) =>
+                    p.manifest.id === pluginId &&
+                    (p.state === 'loaded' ||
+                        (this.registry.isLazy?.(p.manifest.id) ?? false)),
+            );
+        if (!registered) {
             throw new NotificationChannelFacadeError(
                 `Notification channel plugin not found or disabled: ${pluginId}`,
                 'send',
                 pluginId,
             );
         }
-        return registered.plugin;
+        const plugin = await this.materialize(registered);
+        if (!isNotificationChannelPlugin(plugin)) {
+            throw new NotificationChannelFacadeError(
+                `Notification channel plugin not found or disabled: ${pluginId}`,
+                'send',
+                pluginId,
+            );
+        }
+        return plugin;
     }
 
     private async resolveSettings(

@@ -24,6 +24,7 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
     return {
         plugin: { id: p.id, settingsSchema: p.settingsSchema } as RegisteredPlugin['plugin'],
         manifest: {
+            id: p.id,
             defaultForCapabilities: p.defaultForCapabilities,
             capabilities: p.capabilities ?? ['ai-provider', 'search'],
         } as unknown as RegisteredPlugin['manifest'],
@@ -32,8 +33,21 @@ function makeRegistered(p: FakePlugin): RegisteredPlugin {
 }
 
 function makeRegistry(plugins: FakePlugin[]): PluginRegistryService {
+    const registered = plugins.map(makeRegistered);
     return {
-        getEnabledPluginsScoped: jest.fn().mockResolvedValue(plugins.map(makeRegistered)),
+        getEnabledPluginsScoped: jest.fn().mockResolvedValue(registered),
+        // Lazy-mode shim — tests register plugins with eager
+        // `state: 'loaded'` and the eager `plugin` instance, so
+        // ensureLoaded just returns the cached instance.
+        isLazy: jest.fn(() => false),
+        ensureLoaded: jest.fn(async (id: string) => {
+            const found = registered.find(
+                (p) =>
+                    (p.plugin as { id?: string })?.id === id ||
+                    (p.manifest as { id?: string })?.id === id,
+            );
+            return found?.plugin as any;
+        }),
     } as unknown as PluginRegistryService;
 }
 

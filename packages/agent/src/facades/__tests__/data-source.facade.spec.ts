@@ -68,6 +68,29 @@ describe('DataSourceFacadeService', () => {
                         getByCapability: jest.fn().mockReturnValue([]),
                         isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
                         getDefaultForCapabilityScoped: jest.fn().mockResolvedValue(undefined),
+                        // Lazy-mode shim — eager-only tests register
+                        // plugins with `state: 'loaded'` and the
+                        // eager `plugin` instance. The shim scans the
+                        // by-capability and by-id mocks for a match.
+                        isLazy: jest.fn(() => false),
+                        ensureLoaded: jest.fn(async (id: string) => {
+                            // Try the by-id mock first; fall back to
+                            // a scan of the most recent
+                            // getByCapability return values so tests
+                            // that only set up getByCapability still
+                            // pass.
+                            const direct = registry.get(id);
+                            if (direct?.plugin) return direct.plugin as any;
+                            const calls = (registry.getByCapability as jest.Mock).mock.results;
+                            for (const r of calls) {
+                                const arr = (r.value as RegisteredPlugin[]) || [];
+                                const found = arr.find(
+                                    (p: RegisteredPlugin) => p.manifest.id === id,
+                                );
+                                if (found?.plugin) return found.plugin as any;
+                            }
+                            return undefined as any;
+                        }),
                     },
                 },
                 {

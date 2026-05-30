@@ -80,6 +80,26 @@ describe('GeneratorFormSchemaService', () => {
             get: jest.fn(),
             getByCapability: jest.fn().mockReturnValue([]),
             isPluginEnabledForScope: jest.fn().mockResolvedValue(true),
+            // Lazy-mode shim — eager-only tests register plugins
+            // with `state: 'loaded'` and the eager `plugin` instance.
+            // Scan recent by-id / by-capability calls for the match.
+            isLazy: jest.fn(() => false),
+            ensureLoaded: jest.fn(async (id: string) => {
+                const direct = mockRegistry.get(id);
+                if (direct?.plugin) return direct.plugin as any;
+                const calls = (mockRegistry.getByCapability as jest.Mock).mock.results;
+                for (const r of calls) {
+                    const arr = (r.value as Array<{
+                        plugin?: { id: string };
+                        manifest?: { id: string };
+                    }>) || [];
+                    const found = arr.find(
+                        (p) => p.manifest?.id === id || p.plugin?.id === id,
+                    );
+                    if (found && (found as any).plugin) return (found as any).plugin;
+                }
+                return undefined as never;
+            }),
         } as unknown as jest.Mocked<PluginRegistryService>;
 
         service = new GeneratorFormSchemaService(mockRegistry);
