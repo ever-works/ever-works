@@ -15,6 +15,13 @@
  * `KbVideoViewer`, `KbAudioViewer`) take over only when the MIME is
  * unambiguously theirs.
  *
+ * Server mirror: the API decides whether to create a viewable "stub" KB
+ * document for a non-text-extractable upload using the SAME binary-viewer
+ * MIME set — see `KnowledgeBaseService.hasBinaryViewer`
+ * (`packages/agent/src/services/knowledge-base.service.ts`). Keep the two
+ * in lock-step: a stub is only useful if `pickKbViewer` mounts a viewer
+ * for that MIME here.
+ *
  * Caller note: dispatch on a non-`'text'` result ONLY when the doc has a
  * non-null `sourceUploadId` (otherwise there's no URL to point the viewer
  * at). Markdown / plain MIMEs always fall through to `'text'` because the
