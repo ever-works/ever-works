@@ -499,6 +499,71 @@ Concurrency + OAuth provider isolation + markdown sanitization + UX/i18n hygiene
 - [ ] `viewport-meta-shape.spec.ts` — `<meta name="viewport">` declares width=device-width AND initial-scale=1 (no fixed-zoom locks)
 - [ ] `cron-cancellation-flow.spec.ts` — cancelling a queued cron run returns 4xx if not running, 2xx if cancelled; idempotent
 
+## Pass 22 — `session/e2e-coverage-loop` — new-feature DEEP coverage (in progress)
+
+Closes the biggest real gap: the Agents/Skills/Tasks build and the
+Mission→Idea hierarchy shipped UI + API but had **zero or only shallow**
+e2e coverage, while most recent passes piled up permissive
+`status < 500` smoke probes that don't catch broken features. This pass
+adds **deep, assertive** specs verified against a live stack (Postgres +
+Redis + API + Web), pinning real response shapes and real UX flows.
+
+New feature areas (previously uncovered):
+
+| Feature                                                                   | Status | Spec(s)                           |
+| ------------------------------------------------------------------------- | ------ | --------------------------------- |
+| Tasks (CRUD, state machine, chat, scoping)                                | [x]    | tasks.spec.ts                     |
+| Skills (custom create, bindings, catalog, detail UI)                      | [x]    | skills.spec.ts                    |
+| Agents (CRUD, state-machine, instructions, budget/runs, scoping)          | [x]    | agents.spec.ts                    |
+| Missions/Ideas hierarchy: clone, idea lifecycle, Agent/Task cross-scoping | [x]    | missions-ideas-hierarchy.spec.ts  |
+| settings/integrations (channels, emails, notifications, work-agent)       | [x]    | settings-integrations.spec.ts     |
+| magic-link auth (issuance no-enumeration, redeem)                         | [x]    | magic-link.spec.ts (pre-existing) |
+
+- `tasks.spec.ts` — auth gating; create (`T-<n>` slug, `backlog` default,
+  echoed fields); list `{data, meta}` + status filter/pagination; status
+  **state-machine** (valid chain backlog→todo→in_progress→in_review→done,
+  illegal `todo→done` rejected 400); chat round-trip; `?missionId`
+  scoping; cross-user 403/404; delete→404; UI create→detail + API→UI list.
+- `skills.spec.ts` — custom create (ownerType+ownerId, slug lowercased,
+  v1.0.0, frontmatter); ownerType/ownerId validation; PATCH recomputes
+  contentHash; bindings (tenant + mission create, agent-needs-targetId
+  400, both listed); catalog `{entries,total}`; cross-user 404;
+  delete→`{deleted:true}`; UI hub + detail-page render.
+
+Additional clusters landed on this branch (all verified green against the
+live stack):
+
+- `agents.spec.ts` — draft→active⇄paused state machine, SOUL.md file
+  hash round-trip, budget/runs defaults, mission-scope validation.
+- `agents-advanced.spec.ts` — PATCH metadata, JSON export envelope
+  (`version:1` + identity + runtime.permissions), attachments, the
+  archive→hard-delete lifecycle, run-endpoint auth gates.
+- `settings-integrations.spec.ts` — notification-channel CRUD+test,
+  Work-Agent preferences PUT round-trip + guardrails, event-types
+  catalog, email-address registry.
+- `notifications-preferences.spec.ts` — Notifications v2: per-event
+  channel subscription round-trip, channel disable (`disabledAt`),
+  category mute/unmute, quiet-hours persistence.
+- `missions-ideas-hierarchy.spec.ts` — mission clone (full fork), Idea
+  (work-proposal) lifecycle + idea-scoped budget, Agent/Task scoping
+  across Mission/Idea.
+- `tasks-collaboration.spec.ts` — assignees (human + agent), reviewers
+    - approvers pending states, RFC-5545 RRULE recurrence (set/clear +
+      parse-error rejection).
+
+Real product issues surfaced while pinning live behavior (candidates for
+follow-up, not codified as "correct" here): `POST /api/notification-channels`
+missing `pluginId` → 500 (not 400); `GET /api/tasks?ideaId=<garbage>` → 500;
+`/api/agents/:id/run-now` + `/assign-task` → 500 (not 503) when Trigger.dev
+is unbound.
+
+Method note: each spec is written after probing the **live** API for
+exact shapes (recon surfaced several stale assumptions — e.g. Task
+default is `backlog` not `todo`; Skills require an explicit `ownerId`
+even for tenant scope). Specs run green against the local stack before
+commit. Local bring-up mirrors `.github/workflows/e2e.yml`
+(`REQUIRE_EMAIL_VERIFICATION=false`, etc.).
+
 ## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions

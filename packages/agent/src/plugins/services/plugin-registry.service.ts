@@ -12,6 +12,13 @@ import { PluginEvents } from '../plugins.constants';
 import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { hasActiveCapability } from '../utils/active-capabilities.util';
+import {
+    createLazyPluginProxy,
+    LazyPluginStub,
+    OnFirstMaterialize,
+    OnMaterializeError,
+    PluginInstanceLoader,
+} from './lazy-plugin-proxy';
 
 export interface PluginEnableContext {
     systemPlugin?: boolean;
@@ -75,6 +82,57 @@ export class PluginRegistryService {
         @Optional() private readonly workPluginRepository?: WorkPluginRepository,
         @Optional() private readonly userPluginRepository?: UserPluginRepository,
     ) {}
+
+    /**
+     * Register a manifest-only stub backed by a lazy loader. The real plugin
+     * module is not imported until the first method call on the returned
+     * stub (or an explicit `__materialize()` call), at which point
+     * `onFirstMaterialize` runs exactly once to drive the lifecycle hooks.
+     *
+     * Category / capability indexes are populated immediately so discovery
+     * queries (`getByCapability`, `getByCategory`) work without forcing a
+     * load. The registered state is `'loaded'` so existing readiness filters
+     * keep working — lazy materialization is invisible to consumers.
+     */
+    registerLazy(
+        manifest: PluginManifest,
+        loader: PluginInstanceLoader,
+        options?: {
+            builtIn?: boolean;
+            installPath?: string;
+            onFirstMaterialize?: OnFirstMaterialize;
+            onMaterializeError?: OnMaterializeError;
+        },
+    ): RegisteredPlugin {
+        if (this.plugins.has(manifest.id)) {
+            throw new Error(`Plugin "${manifest.id}" is already registered`);
+        }
+        const stub: LazyPluginStub = createLazyPluginProxy(
+            manifest,
+            loader,
+            options?.onFirstMaterialize,
+            options?.onMaterializeError,
+        );
+        return this.register(stub, manifest, {
+            builtIn: options?.builtIn,
+            installPath: options?.installPath,
+            state: 'loaded',
+        });
+    }
+
+    /**
+     * Replace the in-memory manifest for a registered plugin. Used after
+     * lazy materialization to fold in fields the plugin class fills in
+     * via `getManifest()` (icon, homepage, readme, etc.) that the package.json
+     * manifest didn't carry. Capability / category indexes are not touched —
+     * the runtime manifest can only enrich, not change those.
+     */
+    updateRegisteredManifest(pluginId: string, manifest: PluginManifest): boolean {
+        const registered = this.plugins.get(pluginId);
+        if (!registered) return false;
+        registered.manifest = manifest;
+        return true;
+    }
 
     register(
         plugin: IPlugin,
