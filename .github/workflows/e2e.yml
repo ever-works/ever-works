@@ -139,12 +139,12 @@ jobs:
           echo "::endgroup::"
 
           echo "Waiting for API on :3100 ..."
-          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done' \
+          timeout 180 bash -c 'until curl -sSf http://127.0.0.1:3100/api/health > /dev/null; do sleep 3; done' \
             || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
           echo "API ready."
 
           echo "Waiting for Web on :3000 ..."
-          timeout 240 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done' \
+          timeout 240 bash -c 'until curl -sSf http://127.0.0.1:3000/en/login > /dev/null; do sleep 3; done' \
             || { echo "Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
           echo "Web ready."
 
@@ -277,9 +277,16 @@ jobs:
             /5OiPgoTdSy7bcF9IGpSE8ZgGKzgYQVZeN97YE00
             -----END RSA PRIVATE KEY-----
           # Web
-          API_URL: http://localhost:3100
-          NEXT_PUBLIC_API_URL: http://localhost:3100/api
-          WEB_URL: http://localhost:3000
+          # NOTE: use 127.0.0.1 (not `localhost`) for every in-cluster HTTP
+          # URL the test harness connects to. Node 18+/undici resolve
+          # `localhost` to IPv6 `::1` first, but the dev API/web bind IPv4
+          # only — so Playwright's apiRequestContext hit `::1:3100` and
+          # failed every API-touching spec with `connect ECONNREFUSED
+          # ::1:3100` (the curl health-gate uses IPv4 and passed, masking
+          # it). Pinning IPv4 also keeps origins/cookies/callbacks aligned.
+          API_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3100/api
+          WEB_URL: http://127.0.0.1:3000
           # CORS — declare the dev server origin explicitly so:
           # 1. cors-origin-allowlist e2e contract sees a non-default
           #    allowlist (the fallback `localhost:3000` works fine but
@@ -288,11 +295,11 @@ jobs:
           #    ALLOWED_CALLBACK_HOSTS keeps the host allow-list aligned
           #    so reset/verify links built against the web origin pass
           #    the C-04 host check.
-          ALLOWED_ORIGINS: http://localhost:3000
-          ALLOWED_CALLBACK_HOSTS: localhost:3000
+          ALLOWED_ORIGINS: http://127.0.0.1:3000
+          ALLOWED_CALLBACK_HOSTS: 127.0.0.1:3000
           # Playwright
           CI: 'true'
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
 
       - name: Sanitize branch tag for artifact names
         # GitHub Actions expressions have no `replace()` function, and
@@ -393,11 +400,11 @@ jobs:
           echo "::endgroup::"
 
           echo "Waiting for API on :3100 ..."
-          timeout 180 bash -c 'until curl -sSf http://localhost:3100/api/health > /dev/null; do sleep 3; done' \
+          timeout 180 bash -c 'until curl -sSf http://127.0.0.1:3100/api/health > /dev/null; do sleep 3; done' \
             || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
 
           echo "Waiting for prod Web on :3000 ..."
-          timeout 240 bash -c 'until curl -sSf http://localhost:3000/en/login > /dev/null; do sleep 3; done' \
+          timeout 240 bash -c 'until curl -sSf http://127.0.0.1:3000/en/login > /dev/null; do sleep 3; done' \
             || { echo "Prod Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
 
           echo "::group::Running prod-only Playwright specs"
@@ -422,11 +429,12 @@ jobs:
           NODE_ENV: development # API stays in dev for in-memory DB
           DATABASE_AUTOMIGRATE: 'true'
           REQUIRE_EMAIL_VERIFICATION: 'false'
-          API_URL: http://localhost:3100
-          NEXT_PUBLIC_API_URL: http://localhost:3100/api
-          WEB_URL: http://localhost:3000
+          # 127.0.0.1 (not localhost) — force IPv4; see the e2e job's note.
+          API_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:3100/api
+          WEB_URL: http://127.0.0.1:3000
           CI: 'true'
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           # E2E_PROD_BUILD signals the prod-only specs that the web
           # server is running under `next start` (so bundle-size +
           # static-asset-fingerprint should run their full assertions,
