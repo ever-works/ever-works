@@ -1241,9 +1241,12 @@ describe('KnowledgeBaseService', () => {
             expect(extractedCall?.[0].details?.extractedVia).toBe('html-turndown');
         });
 
-        it('unsupported MIME: marks upload skipped + emits kb_upload_extraction_skipped', async () => {
+        it('non-viewable MIME (octet-stream): marks upload skipped, no stub doc', async () => {
             storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.bin', url: '' });
-            const uploadRow = buildUpload({ mimeType: 'application/pdf' });
+            const uploadRow = buildUpload({
+                mimeType: 'application/octet-stream',
+                originalFilename: 'spec.bin',
+            });
             uploadRepo.create.mockResolvedValue(uploadRow);
             const skippedRow = {
                 ...uploadRow,
@@ -1256,7 +1259,10 @@ describe('KnowledgeBaseService', () => {
             uploadRepo.findById.mockResolvedValueOnce(skippedRow);
 
             const result = await service.createUpload({
-                ...buildUploadInput({ mimeType: 'application/pdf', originalFilename: 'spec.pdf' }),
+                ...buildUploadInput({
+                    mimeType: 'application/octet-stream',
+                    originalFilename: 'spec.bin',
+                }),
                 targetClass: undefined,
             });
 
@@ -1271,11 +1277,193 @@ describe('KnowledgeBaseService', () => {
                 expect.objectContaining({ extractionStatus: 'skipped' }),
             );
             expect(uploadRepo.findById).toHaveBeenCalledWith(WORK_ID, uploadRow.id);
+            // octet-stream has no row-21b viewer → no stub document created.
+            expect(docRepo.create).not.toHaveBeenCalled();
             const kinds = activityLog.log.mock.calls.map(
                 (c) => (c[0] as { actionType: string }).actionType,
             );
             expect(kinds).toContain(ActivityActionType.KB_UPLOAD_EXTRACTION_SKIPPED);
             expect(kinds).not.toContain(ActivityActionType.KB_DOCUMENT_CREATED);
+        });
+
+        it('viewable binary with no extractor route (image): SKIPPED branch creates a viewable stub doc', async () => {
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.png', url: '' });
+            const uploadRow = buildUpload({
+                mimeType: 'image/png',
+                originalFilename: 'diagram.png',
+                storagePath: 'kb-originals/freeform/abc.png',
+            });
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            const skippedRow = {
+                ...uploadRow,
+                extractionStatus: 'skipped' as KbUploadExtractionStatus,
+                extractedDocumentId: '00000000-0000-0000-0000-000000000050',
+            };
+            uploadRepo.update.mockResolvedValue(skippedRow);
+            uploadRepo.findById.mockResolvedValue(skippedRow);
+            const stubDoc = buildDocument({
+                id: '00000000-0000-0000-0000-000000000050',
+                path: 'freeform/diagram.md',
+                kbDocumentClass: 'freeform' as KbDocumentClass,
+                source: 'imported' as KbDocumentSource,
+                sourceUploadId: uploadRow.id,
+            });
+            docRepo.create.mockResolvedValue(stubDoc);
+            docRepo.findById.mockResolvedValue(stubDoc);
+
+            const result = await service.createUpload({
+                ...buildUploadInput({ mimeType: 'image/png', originalFilename: 'diagram.png' }),
+                targetClass: undefined,
+            });
+
+            // The image MIME has no text extractor → upload stays skipped,
+            // but the row-21b viewer can render it, so a body-less stub doc
+            // is created + linked so the viewer surfaces in the tree.
+            expect(result.upload.extractionStatus).toBe('skipped');
+            expect(result.document?.id).toBe(stubDoc.id);
+            expect(docRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    path: 'freeform/diagram.md',
+                    source: 'imported',
+                    sourceUploadId: uploadRow.id,
+                    // createDocument nests the body under `metadata.body`,
+                    // not a top-level field.
+                    metadata: expect.objectContaining({ body: '' }),
+                }),
+            );
+            expect(uploadRepo.update).toHaveBeenCalledWith(
+                uploadRow.id,
+                expect.objectContaining({ extractedDocumentId: stubDoc.id }),
+            );
+            const kinds = activityLog.log.mock.calls.map(
+                (c) => (c[0] as { actionType: string }).actionType,
+            );
+            expect(kinds).toContain(ActivityActionType.KB_UPLOAD_EXTRACTION_SKIPPED);
+            expect(kinds).toContain(ActivityActionType.KB_DOCUMENT_CREATED);
+        });
+
+        it('viewable binary whose extraction FAILS (pdf): FAILED branch creates a viewable stub doc', async () => {
+            const throwingExtractor = {
+                extract: jest
+                    .fn()
+                    .mockRejectedValue(
+                        new Error('KB PDF extraction failed: Invalid PDF structure'),
+                    ),
+                supports: jest.fn().mockReturnValue(true),
+            };
+            const module3: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    { provide: KnowledgeBaseBufferExtractorService, useValue: throwingExtractor },
+                ],
+            }).compile();
+            const wired = module3.get(KnowledgeBaseService);
+
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.pdf', url: '' });
+            const uploadRow = buildUpload({
+                mimeType: 'application/pdf',
+                originalFilename: 'broken.pdf',
+            });
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            const failedRow = {
+                ...uploadRow,
+                extractionStatus: 'failed' as KbUploadExtractionStatus,
+                extractedDocumentId: '00000000-0000-0000-0000-000000000060',
+            };
+            uploadRepo.update.mockResolvedValue(failedRow);
+            uploadRepo.findById.mockResolvedValue(failedRow);
+            const stubDoc = buildDocument({
+                id: '00000000-0000-0000-0000-000000000060',
+                path: 'freeform/broken.md',
+                kbDocumentClass: 'freeform' as KbDocumentClass,
+                source: 'imported' as KbDocumentSource,
+                sourceUploadId: uploadRow.id,
+            });
+            docRepo.create.mockResolvedValue(stubDoc);
+            docRepo.findById.mockResolvedValue(stubDoc);
+
+            const result = await wired.createUpload({
+                workId: WORK_ID,
+                userId: USER_ID,
+                file: {
+                    buffer: Buffer.from('%PDF-broken', 'utf-8'),
+                    originalFilename: 'broken.pdf',
+                    mimeType: 'application/pdf',
+                    size: 11,
+                },
+                targetClass: undefined,
+            });
+
+            // Extraction threw → upload marked FAILED, but the PDF viewer
+            // can still render the bytes, so a stub doc is created + linked.
+            expect(result.upload.extractionStatus).toBe('failed');
+            expect(result.document?.id).toBe(stubDoc.id);
+            expect(docRepo.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    source: 'imported',
+                    sourceUploadId: uploadRow.id,
+                    metadata: expect.objectContaining({ body: '' }),
+                }),
+            );
+            const kinds = activityLog.log.mock.calls.map(
+                (c) => (c[0] as { actionType: string }).actionType,
+            );
+            expect(kinds).toContain(ActivityActionType.KB_UPLOAD_EXTRACTION_FAILED);
+            expect(kinds).toContain(ActivityActionType.KB_DOCUMENT_CREATED);
+        });
+
+        it('viewable binary on retry: reuses the existing stub instead of duplicating', async () => {
+            // `extractAndMaterialize` is also the retry-extraction workhorse.
+            // When the upload already links a stub (extractedDocumentId set),
+            // a second pass must reuse it — never create a duplicate doc.
+            const existingStub = buildDocument({
+                id: '00000000-0000-0000-0000-000000000070',
+                path: 'freeform/diagram.md',
+                source: 'imported' as KbDocumentSource,
+            });
+            docRepo.findById.mockResolvedValue(existingStub);
+            const upload = {
+                ...buildUpload(),
+                mimeType: 'image/png',
+                originalFilename: 'diagram.png',
+                extractionStatus: 'skipped' as KbUploadExtractionStatus,
+                extractedDocumentId: existingStub.id,
+            } as WorkKnowledgeUpload;
+
+            const result = await (
+                service as unknown as {
+                    extractAndMaterialize: (
+                        u: WorkKnowledgeUpload,
+                        input: {
+                            workId: string;
+                            userId: string;
+                            file: { buffer: Buffer; mimeType: string; originalFilename: string };
+                        },
+                    ) => Promise<WorkKnowledgeDocument | null>;
+                }
+            ).extractAndMaterialize(upload, {
+                workId: WORK_ID,
+                userId: USER_ID,
+                file: {
+                    buffer: Buffer.from('PNGDATA', 'utf-8'),
+                    mimeType: 'image/png',
+                    originalFilename: 'diagram.png',
+                },
+            });
+
+            expect(result).toBe(existingStub);
+            expect(docRepo.create).not.toHaveBeenCalled();
+            expect(docRepo.findById).toHaveBeenCalledWith(WORK_ID, existingStub.id);
         });
 
         it('rejects when storage plugin is not configured', async () => {

@@ -1457,11 +1457,14 @@ export class KnowledgeBaseService {
                     },
                     ActivityStatus.FAILED,
                 );
-                // Body stays null → SKIPPED branch below short-circuits
-                // to `return null`. Returning early here would also work
-                // but bypasses the SKIPPED activity-log row; the test
-                // suite checks the FAILED activity row, not SKIPPED.
-                return null;
+                // The extractor selected a route but failed mid-parse.
+                // The bytes still live in storage and the upload row stays
+                // FAILED (set above) so retry-extraction keeps applying.
+                // For a MIME the row-21b viewer can render (PDF / XLSX /
+                // DOCX / image / video / audio) surface a viewable stub
+                // document so the binary is still reachable in the tree +
+                // viewer; opaque types (octet-stream, unknown) get none.
+                return this.maybeCreateViewableUploadStub(upload, input);
             }
         }
 
@@ -1487,7 +1490,12 @@ export class KnowledgeBaseService {
                 `Extraction skipped for ${input.file.originalFilename}`,
                 { uploadId: upload.id, mimeType: input.file.mimeType },
             );
-            return null;
+            // Non-text-extractable MIME (image / video / audio, or a
+            // binary with no extractor route yet). For a MIME the row-21b
+            // viewer can render, surface a viewable stub document so the
+            // bytes render via the viewer dispatcher; opaque types
+            // (octet-stream, unknown) stay document-less.
+            return this.maybeCreateViewableUploadStub(upload, input);
         }
 
         const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
@@ -1562,6 +1570,157 @@ export class KnowledgeBaseService {
                 ActivityStatus.FAILED,
             );
             throw error;
+        }
+    }
+
+    /**
+     * EW-641 row 21b — MIME types the web KB viewer dispatcher
+     * (`pickKbViewer`, apps/web/src/components/works/detail/kb/viewers/pick-viewer.ts)
+     * mounts a dedicated binary viewer for. Keep this set in lock-step
+     * with `pickKbViewer`: a stub created here is only useful if the web
+     * side renders a `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer` for the
+     * same MIME. Anything not here falls through to `'text'` on the web
+     * (the markdown editor), where a body-less stub would render as an
+     * empty doc with no download affordance — so opaque types
+     * (application/octet-stream, application/zip, unknown) are NOT stubbed.
+     *
+     * Legacy binary office formats (.xls / .doc / .ppt) are excluded on
+     * purpose, mirroring both `pickKbViewer` and the buffer extractor:
+     * exceljs / mammoth / jszip can't read them, so there's no viewer to
+     * mount.
+     */
+    private static readonly VIEWABLE_STUB_MIME_TYPES: ReadonlySet<string> = new Set([
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+
+    private static readonly VIEWABLE_STUB_MIME_PREFIXES: readonly string[] = [
+        'image/',
+        'video/',
+        'audio/',
+    ];
+
+    /**
+     * True iff `pickKbViewer` would mount a dedicated binary viewer for
+     * this MIME (i.e. returns a non-`'text'` kind). Normalises the same
+     * way `pickKbViewer` does — strip `; charset=…` params, trim, lower.
+     */
+    private hasBinaryViewer(mimeType: string): boolean {
+        const bare = mimeType.split(';')[0].trim().toLowerCase();
+        if (bare.length === 0) {
+            return false;
+        }
+        if (KnowledgeBaseService.VIEWABLE_STUB_MIME_TYPES.has(bare)) {
+            return true;
+        }
+        return KnowledgeBaseService.VIEWABLE_STUB_MIME_PREFIXES.some((prefix) =>
+            bare.startsWith(prefix),
+        );
+    }
+
+    /**
+     * EW-641 row 21b — gate + idempotency wrapper around
+     * {@link createViewableUploadStub}. Called from the SKIPPED and
+     * FAILED branches of {@link extractAndMaterialize}.
+     *
+     *  - Non-viewable MIME (octet-stream, zip, unknown) → return null so
+     *    the upload stays document-less. This preserves the A16
+     *    retry-extraction spec invariant that an `application/octet-stream`
+     *    upload has a null `extractedDocumentId`.
+     *  - Retry-idempotent: if a prior attempt already linked a document to
+     *    this upload (`extractedDocumentId` set) reuse it instead of
+     *    creating a duplicate — `extractAndMaterialize` is also reachable
+     *    from `retryUploadExtraction`.
+     */
+    private async maybeCreateViewableUploadStub(
+        upload: WorkKnowledgeUpload,
+        input: {
+            workId: string;
+            userId: string;
+            file: { buffer: Buffer; mimeType: string; originalFilename: string };
+            targetClass?: KbDocumentClass;
+            tags?: string[];
+            description?: string | null;
+            title?: string;
+        },
+    ): Promise<WorkKnowledgeDocument | null> {
+        if (!this.hasBinaryViewer(input.file.mimeType)) {
+            return null;
+        }
+        if (upload.extractedDocumentId) {
+            // Already materialised (stub or real doc) on a prior pass —
+            // reuse it rather than creating a duplicate row.
+            return this.documentRepository.findById(input.workId, upload.extractedDocumentId);
+        }
+        return this.createViewableUploadStub(upload, input);
+    }
+
+    /**
+     * EW-641 row 21b — create a viewable "stub" KB document for an upload
+     * whose bytes carry no extractable text: a non-text MIME the extractor
+     * skips (image / video / audio), or an extractable MIME whose parse
+     * FAILED (e.g. a malformed PDF). The binary already lives in storage;
+     * the web viewer dispatcher (`pickKbViewer`) renders it from the
+     * upload's MIME / size via `sourceUploadId`, so the upload needs a
+     * `WorkKnowledgeDocument` row to surface in the tree and mount a
+     * `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer`.
+     *
+     * Body is empty — no text was extracted. The upload's terminal
+     * `extractionStatus` (SKIPPED / FAILED) is left exactly as the caller
+     * set it; only `extractedDocumentId` is linked to the stub, so
+     * retry-extraction still applies. Returns null (and logs) if the stub
+     * itself can't be created so a viewer gap never fails the POST.
+     */
+    private async createViewableUploadStub(
+        upload: WorkKnowledgeUpload,
+        input: {
+            workId: string;
+            userId: string;
+            file: { buffer: Buffer; mimeType: string; originalFilename: string };
+            targetClass?: KbDocumentClass;
+            tags?: string[];
+            description?: string | null;
+            title?: string;
+        },
+    ): Promise<WorkKnowledgeDocument | null> {
+        const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
+        const slug = this.slugFromFilename(input.file.originalFilename) || 'document';
+        const path = `${klass}/${slug}.md`;
+        const title = input.title?.trim() || this.humanizeFilename(input.file.originalFilename);
+        try {
+            const doc = await this.createDocument({
+                workId: input.workId,
+                userId: input.userId,
+                path,
+                title,
+                class: klass,
+                body: '',
+                description: input.description ?? null,
+                tags: input.tags,
+                source: 'imported' as KbDocumentSource,
+                sourceUploadId: upload.id,
+            });
+            const docRow = await this.documentRepository.findById(input.workId, doc.id);
+            if (!docRow) {
+                return null;
+            }
+            await this.uploadRepository.update(upload.id, {
+                extractedDocumentId: docRow.id,
+            });
+            await this.recordUploadActivity(
+                input.workId,
+                input.userId,
+                ActivityActionType.KB_DOCUMENT_CREATED,
+                `Created KB document ${path}`,
+                { documentId: docRow.id, path, class: klass, source: 'imported' },
+            );
+            return docRow;
+        } catch (error) {
+            this.logger.warn(
+                `KB viewable-stub creation failed for upload=${upload.id} mime=${input.file.mimeType}: ${(error as Error).message}`,
+            );
+            return null;
         }
     }
 

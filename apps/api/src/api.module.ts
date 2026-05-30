@@ -14,6 +14,7 @@ import { NotificationChannelsModule } from './notification-channels/notification
 import { LoggingInterceptor } from './logging.interceptor';
 import { MonitoringModule, SentryInterceptor, PostHogInterceptor } from '@ever-works/monitoring';
 import { APIController } from './api.controller';
+import { HealthModule } from './health/health.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
@@ -83,6 +84,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
                 host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
             },
         }),
+        // Standard Terminus health/readiness + build-version endpoints
+        // (/api/version, /api/health/live, /api/health/ready). Additive —
+        // the trivial /api/health + / in APIController are unchanged.
+        HealthModule,
         AuthModule,
         // KbStorageModule MUST be listed before WorksModule so the
         // @Global() KB_STORAGE_PLUGIN provider is registered before
