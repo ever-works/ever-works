@@ -334,7 +334,19 @@ export class PluginOperationsService {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
         }
 
-        if (!isDeviceAuthProvider(plugin)) {
+        // Gate on the DECLARED capability, not just method existence. A lazy
+        // plugin proxy forwards every method name (its `get` trap returns a
+        // wrapper for any prop), so `isDeviceAuthProvider`'s
+        // `typeof fn === 'function'` duck-typing always passes for an
+        // un-materialized plugin — the subsequent call then materializes the
+        // real plugin, finds no such method, throws "has no method", and
+        // surfaces as a 500 instead of a clean 400. The manifest
+        // `capabilities` array is the source of truth (validated at
+        // registration), so check it first.
+        const supportsDeviceAuth =
+            (plugin.capabilities?.includes(PLUGIN_CAPABILITIES.DEVICE_AUTH) ?? false) &&
+            isDeviceAuthProvider(plugin);
+        if (!supportsDeviceAuth) {
             throw new BadRequestException(`Plugin "${pluginId}" does not support device auth`);
         }
 
