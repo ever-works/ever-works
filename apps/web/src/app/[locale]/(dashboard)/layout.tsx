@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
-import { authAPI } from '@/lib/api';
+import { authAPI, versionAPI } from '@/lib/api';
 import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { onboardingAPI } from '@/lib/api/onboarding';
@@ -32,17 +32,27 @@ export default async function DashboardLayout({ children }: { children: React.Re
         return null;
     }
 
-    const [profile, statsResponse, pluginsResponse, onboardingState, onboardingCatalog] =
-        await Promise.all([
-            authAPI.getFreshProfile().catch(() => null),
-            getWorkStats().catch(() => ({
-                success: false,
-                totalWorks: 0,
-            })),
-            pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
-            onboardingAPI.getState().catch(() => FALLBACK_STATE),
-            onboardingAPI.getCatalog().catch(() => FALLBACK_CATALOG),
-        ]);
+    const [
+        profile,
+        statsResponse,
+        pluginsResponse,
+        onboardingState,
+        onboardingCatalog,
+        apiVersion,
+    ] = await Promise.all([
+        authAPI.getFreshProfile().catch(() => null),
+        getWorkStats().catch(() => ({
+            success: false,
+            totalWorks: 0,
+        })),
+        pluginsAPI.list().catch(() => ({ plugins: [] as UserPlugin[], total: 0 })),
+        onboardingAPI.getState().catch(() => FALLBACK_STATE),
+        onboardingAPI.getCatalog().catch(() => FALLBACK_CATALOG),
+        // Build/release identity of the API — fetched once here (cached
+        // 5 min) and surfaced in the footer. Returns null on failure;
+        // the footer just hides the API chip.
+        versionAPI.get(),
+    ]);
 
     const hasGithubConnected =
         profile?.oauthTokens?.some((token) => token.provider === 'github') ?? false;
@@ -85,6 +95,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             initialOnboardingDeviceAuthStatuses={onboardingDeviceAuthStatuses}
             initialOnboardingState={onboardingState}
             initialOnboardingCatalog={onboardingCatalog}
+            apiVersion={apiVersion}
         >
             {children}
         </DashboardLayoutClient>

@@ -38,6 +38,21 @@ ARG NEXT_PUBLIC_POSTHOG_HOST=
 ENV NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY
 ENV NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST
 
+# Build / release identity baked into the client bundle (footer "Web" chip).
+# Same build-time rule as the PostHog vars above — NEXT_PUBLIC_* must be ENV
+# before `next build`. Injected via --build-arg by the docker-build-publish-*
+# workflows; empty defaults make the footer show a `dev` build.
+ARG NEXT_PUBLIC_BUILD_VERSION=
+ARG NEXT_PUBLIC_BUILD_SHA=
+ARG NEXT_PUBLIC_BUILD_REF=
+ARG NEXT_PUBLIC_BUILD_RUN=
+ARG NEXT_PUBLIC_BUILD_TIME=
+ENV NEXT_PUBLIC_BUILD_VERSION=$NEXT_PUBLIC_BUILD_VERSION
+ENV NEXT_PUBLIC_BUILD_SHA=$NEXT_PUBLIC_BUILD_SHA
+ENV NEXT_PUBLIC_BUILD_REF=$NEXT_PUBLIC_BUILD_REF
+ENV NEXT_PUBLIC_BUILD_RUN=$NEXT_PUBLIC_BUILD_RUN
+ENV NEXT_PUBLIC_BUILD_TIME=$NEXT_PUBLIC_BUILD_TIME
+
 # Install python3
 RUN apk add --no-cache python3 pkgconfig build-base
 RUN apk add --no-cache pixman-dev cairo-dev pango-dev jpeg-dev giflib-dev

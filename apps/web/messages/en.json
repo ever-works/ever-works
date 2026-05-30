@@ -4698,6 +4698,11 @@
         "visibility": {
             "private": "Private",
             "public": "Public"
+        },
+        "footer": {
+            "build": "Build",
+            "web": "Web",
+            "api": "API"
         }
     },
     "organizations": {

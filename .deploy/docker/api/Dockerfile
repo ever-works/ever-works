@@ -55,6 +55,21 @@ ENV PORT=3100
 # should not touch the schema.
 ENV RUN_MIGRATIONS=true
 
+# Build / release identity surfaced at GET /api/version + /api/health/ready.
+# Injected by the docker-build-publish-* workflows via --build-arg; empty
+# defaults keep a plain `docker build` working (the API then reports a `dev`
+# version). These are runtime ENV, so no rebuild is needed to read them.
+ARG BUILD_VERSION=
+ARG GIT_SHA=
+ARG GIT_REF=
+ARG BUILD_RUN=
+ARG BUILD_TIME=
+ENV BUILD_VERSION=$BUILD_VERSION \
+    GIT_SHA=$GIT_SHA \
+    GIT_REF=$GIT_REF \
+    BUILD_RUN=$BUILD_RUN \
+    BUILD_TIME=$BUILD_TIME
+
 COPY --from=installer --chown=node:node /app/deploy/dist ./dist
 COPY --from=installer --chown=node:node /app/deploy/node_modules ./node_modules
 COPY --from=installer --chown=node:node /app/deploy/package.json ./

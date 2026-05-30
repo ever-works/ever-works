@@ -26,6 +26,7 @@ import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
+import type { ApiVersion } from '@/lib/api/version';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -42,6 +43,8 @@ interface DashboardLayoutClientProps {
     initialOnboardingDeviceAuthStatuses: Record<string, PluginDeviceAuthStatus | null>;
     initialOnboardingState: OnboardingStateResponse;
     initialOnboardingCatalog: OnboardingCatalogResponse;
+    /** Build/release identity of the API, fetched once in the server layout. */
+    apiVersion?: ApiVersion | null;
 }
 
 const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
@@ -58,6 +61,7 @@ export function DashboardLayoutClient({
     initialOnboardingDeviceAuthStatuses,
     initialOnboardingState,
     initialOnboardingCatalog,
+    apiVersion,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
@@ -497,7 +501,7 @@ export function DashboardLayoutClient({
                                 </ChatPanelProvider>
                             </div>
 
-                            <Footer />
+                            <Footer apiVersion={apiVersion} />
                         </main>
                     </div>
                 </div>

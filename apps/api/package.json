@@ -54,6 +54,7 @@
         "@nestjs/platform-express": "^11.1.18",
         "@nestjs/schedule": "^6.1.0",
         "@nestjs/swagger": "^11.2.5",
+        "@nestjs/terminus": "^11.0.0",
         "@nestjs/throttler": "^6.5.0",
         "@nestjs/typeorm": "^11.0.1",
         "@scalar/nestjs-api-reference": "^1.1.6",
