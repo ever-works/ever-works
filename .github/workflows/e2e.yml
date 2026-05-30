@@ -300,8 +300,13 @@ jobs:
           #    ALLOWED_CALLBACK_HOSTS keeps the host allow-list aligned
           #    so reset/verify links built against the web origin pass
           #    the C-04 host check.
-          ALLOWED_ORIGINS: http://127.0.0.1:3000
-          ALLOWED_CALLBACK_HOSTS: 127.0.0.1:3000
+          # Allow BOTH the 127.0.0.1 harness origin AND localhost, so specs
+          # that hard-code an `Origin: http://localhost:3000` preflight header
+          # are still recognized as a known origin (CORS allow-list is
+          # comma-split). Without localhost here, those preflights fall through
+          # to routing and 404 instead of returning 204.
+          ALLOWED_ORIGINS: http://127.0.0.1:3000,http://localhost:3000
+          ALLOWED_CALLBACK_HOSTS: 127.0.0.1:3000,localhost:3000
           # Playwright
           CI: 'true'
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
