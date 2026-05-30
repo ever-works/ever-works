@@ -27,7 +27,6 @@ export const versionAPI = {
     get: cache(async (): Promise<ApiVersion | null> => {
         try {
             const res = await fetch(`${API_URL}/version`, {
-                headers: { 'Content-Type': 'application/json' },
                 next: { revalidate: 300 },
             });
             if (!res.ok) return null;
