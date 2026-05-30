@@ -56,7 +56,6 @@ const STATUS_FILTERS: { key: TaskStatus | 'all'; label: string }[] = [
     { key: 'cancelled', label: 'Cancelled' },
 ];
 
-
 export function TasksList({ tasks }: { tasks: Task[] }) {
     const t = useTranslations('dashboard.tasksPage');
     const [view, setView] = useState<ViewKey>('cards');
@@ -93,44 +92,55 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                     ))}
                 </div>
 
-                {/* Count badge */}
+                {/* Count badge — kanban shows all tasks across columns, so
+                    only the list-level filter ratio is meaningful in
+                    cards/table. */}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark bg-card dark:bg-card-primary-dark self-start @sm/main:self-auto">
-                    {filtered.length} / {tasks.length}
+                    {view === 'kanban' ? tasks.length : `${filtered.length} / ${tasks.length}`}
                 </span>
             </div>
 
             {/* ── Status filter pills ──────────────────────────────────────── */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-                {STATUS_FILTERS.map(({ key, label }) => {
-                    const isActive = statusFilter === key;
-                    return (
-                        <button
-                            key={key}
-                            type="button"
-                            onClick={() => setStatusFilter(key)}
-                            className={cn(
-                                'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border whitespace-nowrap transition-colors shrink-0',
-                                isActive
-                                    ? 'border-border dark:border-border-dark bg-white dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
-                                    : 'border-border/60 dark:border-border-dark/60 text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark',
-                            )}
-                        >
-                            {key !== 'all' && (
-                                <span
-                                    className={cn(
-                                        'w-1.5 h-1.5 rounded-full shrink-0',
-                                        STATUS_DOT[key as TaskStatus],
-                                    )}
-                                />
-                            )}
-                            {label}
-                        </button>
-                    );
-                })}
-            </div>
+            {/* Hidden in kanban view — the columns already group by status, so
+                the pills would just empty most columns when one is selected. */}
+            {view !== 'kanban' && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    {STATUS_FILTERS.map(({ key, label }) => {
+                        const isActive = statusFilter === key;
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setStatusFilter(key)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border whitespace-nowrap transition-colors shrink-0',
+                                    isActive
+                                        ? 'border-border dark:border-border-dark bg-white dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'border-border/60 dark:border-border-dark/60 text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark',
+                                )}
+                            >
+                                {key !== 'all' && (
+                                    <span
+                                        className={cn(
+                                            'w-1.5 h-1.5 rounded-full shrink-0',
+                                            STATUS_DOT[key as TaskStatus],
+                                        )}
+                                    />
+                                )}
+                                {label}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* ── Content ─────────────────────────────────────────────────── */}
-            {filtered.length === 0 ? (
+            {view === 'kanban' ? (
+                // Kanban always gets the full set — its own columns are the
+                // status filter. The list-level `statusFilter` only governs
+                // cards/table.
+                <TasksKanbanView tasks={tasks} />
+            ) : filtered.length === 0 ? (
                 <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-8 text-center">
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
                         {statusFilter === 'all'
@@ -144,8 +154,6 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                         <TaskCard key={t.id} task={t} />
                     ))}
                 </div>
-            ) : view === 'kanban' ? (
-                <TasksKanbanView tasks={filtered} />
             ) : (
                 <TaskTable tasks={filtered} />
             )}

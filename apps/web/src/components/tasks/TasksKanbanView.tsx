@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -116,8 +116,7 @@ const COLUMNS: ColumnDef[] = [
         label: 'Cancelled',
         icon: XCircle,
         dotClass: 'bg-text-muted',
-        headerClass:
-            'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-700/40',
+        headerClass: 'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-700/40',
         countClass: 'bg-slate-100 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400',
         cardBorderClass:
             'border-slate-200/60 dark:border-slate-700/30 hover:border-slate-300 dark:hover:border-slate-600/50',
@@ -403,6 +402,13 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
     const [errors, setErrors] = useState<Record<string, string | null>>({});
     const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
     const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+
+    // `useState(initialTasks)` only seeds on the first render, so any later
+    // change to the `tasks` prop (filter swap, parent refetch) would never
+    // reach the board. Sync explicitly when the prop reference changes.
+    useEffect(() => {
+        setTasks(initialTasks);
+    }, [initialTasks]);
 
     const grouped = useMemo(() => {
         const map = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.key, []]));
