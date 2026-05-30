@@ -1,4 +1,6 @@
 import { Injectable, Inject, Logger, OnModuleInit } from '@nestjs/common';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { McpConfigService } from '../config/mcp-config.service.js';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import type { JsonSchema, OpenApiParam } from './schema-converter.service.js';
@@ -66,6 +68,27 @@ export class OpenApiLoaderService implements OnModuleInit {
 	}
 
 	private async loadSpec() {
+		// Prefer a spec bundled into the image at build time
+		// (EVER_WORKS_OPENAPI_SPEC_PATH). C-09 disables the live
+		// /api/openapi.json endpoint whenever NODE_ENV=production — which is
+		// every deployed env — so the bundled file is the ONLY source there.
+		// We fall back to fetching the API for local dev, where the endpoint
+		// is served (NODE_ENV !== 'production').
+		const specPath = this.config.specPath;
+		if (specPath && existsSync(specPath)) {
+			const spec = await this.readFileAndDereference(specPath);
+			this.operations = this.extractOperations(spec);
+			this.logger.log(
+				`Loaded ${this.operations.length} operations from bundled OpenAPI spec at ${specPath}`
+			);
+			return;
+		}
+		if (specPath) {
+			this.logger.warn(
+				`EVER_WORKS_OPENAPI_SPEC_PATH="${specPath}" not found on disk; falling back to fetching the API.`
+			);
+		}
+
 		const url = `${this.config.apiUrl}/openapi.json`;
 
 		let spec: OpenApiSpec;
@@ -96,6 +119,11 @@ export class OpenApiLoaderService implements OnModuleInit {
 			throw new Error(`Failed to fetch OpenAPI spec: HTTP ${response.status}`);
 		}
 		const rawSpec = (await response.json()) as Record<string, unknown>;
+		return (await SwaggerParser.dereference(rawSpec as never)) as unknown as OpenApiSpec;
+	}
+
+	private async readFileAndDereference(specPath: string): Promise<OpenApiSpec> {
+		const rawSpec = JSON.parse(await readFile(specPath, 'utf8')) as Record<string, unknown>;
 		return (await SwaggerParser.dereference(rawSpec as never)) as unknown as OpenApiSpec;
 	}
 

@@ -24,9 +24,18 @@ export class McpConfigService {
 	readonly httpPort: number;
 	readonly transport: string;
 	readonly authMode: McpAuthMode;
+	/**
+	 * Absolute path to an OpenAPI spec bundled into the image at build time.
+	 * When set and present, OpenApiLoaderService reads it instead of fetching
+	 * the live API — required in deployed envs where C-09 disables the live
+	 * /api/openapi.json endpoint (NODE_ENV=production). Null = fetch the API
+	 * (local dev). See EVER_WORKS_OPENAPI_SPEC_PATH.
+	 */
+	readonly specPath: string | null;
 
 	constructor() {
 		this.authMode = parseAuthMode(process.env.EVER_WORKS_MCP_AUTH_MODE);
+		this.specPath = process.env.EVER_WORKS_OPENAPI_SPEC_PATH?.trim() || null;
 
 		// H-21: the shared API key is OPTIONAL in `per-user-jwt` mode. In any
 		// mode that may accept it (`shared-key`, `shared-key-jwt`, `hybrid`)
