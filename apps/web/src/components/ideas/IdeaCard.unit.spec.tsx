@@ -254,40 +254,8 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               </svg>
             </button>
             <div
-              class="flex items-center gap-3 mb-3 pr-6 min-w-0"
+              class="flex items-center gap-3 mb-2 pr-6 min-w-0"
             >
-              <div
-                class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 dark:bg-white/5"
-              >
-                <svg
-                  aria-hidden="true"
-                  class="lucide lucide-sparkles w-4 h-4 text-primary dark:text-gray-300"
-                  fill="none"
-                  height="24"
-                  stroke="currentColor"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="1.4"
-                  viewBox="0 0 24 24"
-                  width="24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"
-                  />
-                  <path
-                    d="M20 2v4"
-                  />
-                  <path
-                    d="M22 4h-4"
-                  />
-                  <circle
-                    cx="4"
-                    cy="20"
-                    r="2"
-                  />
-                </svg>
-              </div>
               <div
                 class="min-h-[2lh] flex items-center min-w-0"
               >
@@ -335,7 +303,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="mt-auto flex items-center gap-2"
             >
               <button
-                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-primary hover:bg-primary-hover"
+                class="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
                 type="button"
               >
                 actions.accept

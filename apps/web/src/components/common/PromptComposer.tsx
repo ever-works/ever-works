@@ -544,14 +544,13 @@ export function PromptComposer({
         <div className={cn('w-full space-y-3', className)}>
             <div
                 className={cn(
-                    // Rounded composer card. No solid background — the page's
-                    // dark surface shows through, matching the website's
-                    // landing prompt. The subtle ring + border give it shape
-                    // without making it feel like a separate panel.
-                    'relative flex flex-col rounded-2xl border border-border/60 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur',
-                    'shadow-sm ring-1 ring-black/[0.02] dark:ring-white/[0.04]',
-                    'transition focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/30',
-                    submitting && 'opacity-70 pointer-events-none',
+                    'relative flex flex-col rounded-2xl overflow-hidden',
+                    'border border-border/60 dark:border-white/10',
+                    'bg-background dark:bg-zinc-900/50',
+                    'shadow-sm',
+                    'transition-all duration-200',
+                    'focus-within:border-border dark:focus-within:border-white/20',
+                    submitting && 'opacity-60 pointer-events-none',
                 )}
             >
                 <textarea
@@ -568,12 +567,12 @@ export function PromptComposer({
                     disabled={inputDisabled}
                     aria-label={ariaLabel}
                     data-testid={testId}
-                    className="block w-full resize-none rounded-2xl bg-transparent px-5 pt-4 pb-2 text-base outline-none placeholder:text-text-muted dark:placeholder:text-text-muted-dark text-text dark:text-text-dark"
+                    className="block w-full resize-none bg-transparent px-4 pt-4 pb-3 text-base leading-relaxed outline-none placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 text-text dark:text-text-dark"
                 />
 
                 {attachments.length > 0 ? (
                     <div
-                        className="flex flex-wrap gap-2 px-5 pb-2"
+                        className="flex flex-wrap gap-2 px-4 pb-2"
                         aria-label="Attached files"
                         data-testid={testId ? `${testId}-attachments` : undefined}
                     >
@@ -582,10 +581,10 @@ export function PromptComposer({
                                 return (
                                     <div
                                         key={a.localId}
-                                        className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs border-border/60 dark:border-white/10 bg-foreground/[0.03]"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 dark:border-white/10 bg-foreground/[0.04] dark:bg-white/[0.04] px-2.5 py-1 text-xs text-text dark:text-text-dark"
                                         title={a.url}
                                     >
-                                        <Github className="size-3 opacity-70" aria-hidden="true" />
+                                        <Github className="size-3 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
                                         <span className="max-w-[12rem] truncate" title={a.url}>
                                             {a.displayName}
                                         </span>
@@ -593,7 +592,7 @@ export function PromptComposer({
                                             type="button"
                                             onClick={() => removeAttachment(a.localId)}
                                             aria-label={`Remove ${a.displayName}`}
-                                            className="rounded-full p-0.5 hover:bg-foreground/10"
+                                            className="ml-0.5 rounded p-0.5 text-text-muted dark:text-text-muted-dark hover:bg-foreground/10 hover:text-text dark:hover:text-text-dark transition-colors"
                                         >
                                             <X className="size-3" aria-hidden="true" />
                                         </button>
@@ -605,10 +604,10 @@ export function PromptComposer({
                             //   error: red ring + tooltip
                             //   ready: default
                             const variant = a.error
-                                ? 'border-red-500/40 bg-red-500/5 text-red-700 dark:text-red-300'
+                                ? 'border-red-500/30 bg-red-500/[0.06] text-red-700 dark:text-red-300'
                                 : a.uploading
-                                  ? 'border-border/60 dark:border-white/10 bg-foreground/[0.03] opacity-80'
-                                  : 'border-border/60 dark:border-white/10 bg-foreground/[0.03]';
+                                  ? 'border-border/50 dark:border-white/10 bg-foreground/[0.04] dark:bg-white/[0.04] text-text-muted dark:text-text-muted-dark opacity-75'
+                                  : 'border-border/50 dark:border-white/10 bg-foreground/[0.04] dark:bg-white/[0.04] text-text dark:text-text-dark';
                             const stateTag = a.error
                                 ? 'error'
                                 : a.uploading
@@ -617,7 +616,7 @@ export function PromptComposer({
                             return (
                                 <div
                                     key={a.localId}
-                                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${variant}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs ${variant}`}
                                     title={a.error || a.displayName}
                                     data-testid={
                                         testId ? `${testId}-attachment-${stateTag}` : undefined
@@ -625,14 +624,14 @@ export function PromptComposer({
                                 >
                                     {a.uploading ? (
                                         <Loader2
-                                            className="size-3 animate-spin opacity-70"
+                                            className="size-3 animate-spin text-text-muted dark:text-text-muted-dark"
                                             aria-hidden="true"
                                         />
                                     ) : a.kind === 'folder-file' ? (
-                                        <Folder className="size-3 opacity-60" aria-hidden="true" />
+                                        <Folder className="size-3 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
                                     ) : (
                                         <FileIcon
-                                            className="size-3 opacity-60"
+                                            className="size-3 text-text-muted dark:text-text-muted-dark"
                                             aria-hidden="true"
                                         />
                                     )}
@@ -641,14 +640,14 @@ export function PromptComposer({
                                     </span>
                                     {a.uploading ? (
                                         <span
-                                            className="text-[10px] tabular-nums opacity-70"
+                                            className="text-[10px] tabular-nums text-text-muted dark:text-text-muted-dark"
                                             aria-label={`Uploading ${a.progress} percent`}
                                         >
                                             {a.progress}%
                                         </span>
                                     ) : null}
                                     {a.error ? (
-                                        <span className="text-[10px] uppercase tracking-wide">
+                                        <span className="text-[10px] font-medium uppercase tracking-wider">
                                             failed
                                         </span>
                                     ) : null}
@@ -656,7 +655,7 @@ export function PromptComposer({
                                         type="button"
                                         onClick={() => removeAttachment(a.localId)}
                                         aria-label={`Remove ${a.displayName}`}
-                                        className="rounded-full p-0.5 hover:bg-foreground/10"
+                                        className="ml-0.5 rounded p-0.5 text-text-muted dark:text-text-muted-dark hover:bg-foreground/10 hover:text-text dark:hover:text-text-dark transition-colors"
                                     >
                                         <X className="size-3" aria-hidden="true" />
                                     </button>
@@ -666,7 +665,7 @@ export function PromptComposer({
                     </div>
                 ) : null}
 
-                <div className="flex items-center gap-1 px-3 pb-2">
+                <div className="flex items-center gap-0.5 px-2 pb-2.5 pt-1.5 border-t border-border/[0.15] dark:border-white/[0.06]">
                     {attachmentsEnabled ? (
                         <>
                             {/* Hidden file pickers driven by the popover menu. */}
@@ -711,10 +710,17 @@ export function PromptComposer({
                                     aria-haspopup="menu"
                                     aria-expanded={attachMenuOpen}
                                     disabled={inputDisabled}
-                                    className="rounded-full p-2 text-text-muted dark:text-text-muted-dark hover:bg-foreground/5 hover:text-text dark:hover:text-text-dark disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className={cn(
+                                        'rounded-lg p-2 transition-colors',
+                                        'text-text-muted dark:text-text-muted-dark',
+                                        'hover:bg-foreground/[0.06] hover:text-text dark:hover:text-text-dark',
+                                        'disabled:opacity-40 disabled:cursor-not-allowed',
+                                        attachMenuOpen &&
+                                            'bg-foreground/[0.06] text-text dark:text-text-dark',
+                                    )}
                                     data-testid={testId ? `${testId}-attach` : undefined}
                                 >
-                                    <Plus className="size-5" aria-hidden="true" />
+                                    <Plus className="size-4" aria-hidden="true" />
                                 </button>
 
                                 {attachMenuOpen ? (
@@ -727,17 +733,17 @@ export function PromptComposer({
                                         // menu stays visible without clipping —
                                         // page content below the composer is
                                         // typically dense.
-                                        className="absolute bottom-full left-0 z-50 mb-2 min-w-[14rem] rounded-xl border border-border/60 dark:border-white/10 bg-background dark:bg-zinc-900 shadow-lg ring-1 ring-black/[0.04] dark:ring-white/[0.04]"
+                                        className="absolute bottom-full left-0 z-50 mb-2 min-w-[15rem] rounded-xl border border-border/60 dark:border-white/10 bg-background dark:bg-zinc-900 shadow-xl ring-1 ring-black/[0.04] dark:ring-white/[0.04] overflow-hidden"
                                     >
                                         {githubFormOpen ? (
-                                            <div className="flex flex-col gap-2 p-2">
+                                            <div className="flex flex-col gap-3 p-3">
                                                 <label
                                                     htmlFor={
                                                         testId
                                                             ? `${testId}-attach-github-input`
                                                             : undefined
                                                     }
-                                                    className="px-2 pt-1 text-[11px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
+                                                    className="text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark"
                                                 >
                                                     GitHub repo URL
                                                 </label>
@@ -769,21 +775,21 @@ export function PromptComposer({
                                                         }
                                                     }}
                                                     placeholder="https://github.com/owner/repo"
-                                                    className="w-full rounded-md border border-border/60 dark:border-white/10 bg-transparent px-2 py-1 text-xs outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+                                                    className="w-full rounded-lg border border-border/60 dark:border-white/10 bg-foreground/[0.03] dark:bg-white/[0.03] px-3 py-1.5 text-xs text-text dark:text-text-dark placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
                                                 />
                                                 {githubError ? (
                                                     <p
                                                         role="alert"
-                                                        className="px-1 text-[11px] text-red-600 dark:text-red-400"
+                                                        className="text-[11px] text-red-600 dark:text-red-400"
                                                     >
                                                         {githubError}
                                                     </p>
                                                 ) : null}
-                                                <div className="flex items-center justify-end gap-2 px-1 pb-1">
+                                                <div className="flex items-center justify-end gap-2">
                                                     <button
                                                         type="button"
                                                         onClick={onCancelGithub}
-                                                        className="rounded-md px-2 py-1 text-xs text-text-muted dark:text-text-muted-dark hover:bg-foreground/5"
+                                                        className="rounded-lg px-3 py-1.5 text-xs text-text-muted dark:text-text-muted-dark hover:bg-foreground/[0.06] transition-colors"
                                                     >
                                                         Cancel
                                                     </button>
@@ -795,14 +801,14 @@ export function PromptComposer({
                                                                 ? `${testId}-attach-github-add`
                                                                 : undefined
                                                         }
-                                                        className="rounded-md bg-primary px-2 py-1 text-xs text-white hover:bg-primary/90"
+                                                        className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90 transition-colors"
                                                     >
                                                         Add
                                                     </button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <ul className="flex flex-col py-1">
+                                            <ul className="flex flex-col py-1.5">
                                                 <li>
                                                     <button
                                                         type="button"
@@ -813,10 +819,10 @@ export function PromptComposer({
                                                                 ? `${testId}-attach-file`
                                                                 : undefined
                                                         }
-                                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-foreground/5"
+                                                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-text dark:text-text-dark hover:bg-foreground/[0.05] transition-colors"
                                                     >
                                                         <FileIcon
-                                                            className="size-4 opacity-70"
+                                                            className="size-4 text-text-muted dark:text-text-muted-dark"
                                                             aria-hidden="true"
                                                         />
                                                         Upload a file
@@ -832,10 +838,10 @@ export function PromptComposer({
                                                                 ? `${testId}-attach-folder`
                                                                 : undefined
                                                         }
-                                                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-foreground/5"
+                                                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-text dark:text-text-dark hover:bg-foreground/[0.05] transition-colors"
                                                     >
                                                         <Folder
-                                                            className="size-4 opacity-70"
+                                                            className="size-4 text-text-muted dark:text-text-muted-dark"
                                                             aria-hidden="true"
                                                         />
                                                         Upload a folder
@@ -852,10 +858,10 @@ export function PromptComposer({
                                                                     ? `${testId}-attach-github`
                                                                     : undefined
                                                             }
-                                                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-foreground/5"
+                                                            className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm text-text dark:text-text-dark hover:bg-foreground/[0.05] transition-colors"
                                                         >
                                                             <Github
-                                                                className="size-4 opacity-70"
+                                                                className="size-4 text-text-muted dark:text-text-muted-dark"
                                                                 aria-hidden="true"
                                                             />
                                                             Import GitHub Repo
@@ -879,20 +885,27 @@ export function PromptComposer({
                             aria-pressed={speech.listening}
                             disabled={inputDisabled}
                             className={cn(
-                                'rounded-full p-2 hover:bg-foreground/5 disabled:opacity-40 disabled:cursor-not-allowed',
+                                'rounded-lg p-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
                                 speech.listening
-                                    ? 'text-red-500 animate-pulse'
-                                    : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark',
+                                    ? 'text-red-500 bg-red-500/10'
+                                    : 'text-text-muted dark:text-text-muted-dark hover:bg-foreground/[0.06] hover:text-text dark:hover:text-text-dark',
                             )}
                             data-testid={testId ? `${testId}-mic` : undefined}
                         >
-                            <Mic className="size-5" aria-hidden="true" />
+                            <Mic className="size-4" aria-hidden="true" />
                         </button>
                     ) : null}
 
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-auto flex items-center gap-3">
                         {showCounter ? (
-                            <span className="text-xs tabular-nums text-text-muted dark:text-text-muted-dark">
+                            <span
+                                className={cn(
+                                    'text-[11px] tabular-nums transition-colors',
+                                    trimmed.length > maxLength * 0.9
+                                        ? 'text-amber-500 dark:text-amber-400'
+                                        : 'text-text-muted/60 dark:text-text-muted-dark/60',
+                                )}
+                            >
                                 {trimmed.length}/{maxLength}
                             </span>
                         ) : null}
@@ -904,9 +917,12 @@ export function PromptComposer({
                             aria-label={submitTitle || ariaLabel}
                             data-testid={testId ? `${testId}-submit` : undefined}
                             className={cn(
-                                'inline-flex items-center justify-center rounded-full p-2.5 shadow-md transition',
-                                'bg-primary text-white hover:bg-primary/90',
-                                'disabled:cursor-not-allowed disabled:opacity-40',
+                                'inline-flex items-center justify-center rounded-full p-2.5',
+                                'bg-primary text-white',
+                                'shadow-sm hover:bg-primary/90 hover:shadow-md',
+                                'active:scale-95',
+                                'transition-all duration-150',
+                                'disabled:cursor-not-allowed disabled:opacity-35',
                             )}
                         >
                             {submitting ? (

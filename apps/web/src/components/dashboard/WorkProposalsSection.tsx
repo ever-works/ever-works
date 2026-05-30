@@ -1,7 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { Lightbulb, Loader2, Plus, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import {
+    CreditCard,
+    Hammer,
+    Lightbulb,
+    Loader2,
+    Plus,
+    RefreshCw,
+    Settings as SettingsIcon,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
@@ -25,6 +33,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { IdeaCard } from '@/components/ideas';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const POLL_INTERVAL_MS = 2_500;
 const POLL_MAX_MS = 10 * 60_000;
@@ -222,11 +231,11 @@ export function WorkProposalsSection({
     const showRefreshButton = canRefresh || researching;
 
     return (
-        <section className="mt-8" aria-labelledby="work-proposals-heading">
+        <section aria-labelledby="work-proposals-heading">
             <div className="flex flex-nowrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-ideas/10 border border-concept-ideas/20 flex items-center justify-center">
-                        <Lightbulb className="w-4 h-4 text-concept-ideas" />
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-surface-secondary dark:bg-white/6 border border-border/50 dark:border-white/10 flex items-center justify-center">
+                        <Lightbulb className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
                     </div>
                     <h2
                         id="work-proposals-heading"
@@ -240,100 +249,87 @@ export function WorkProposalsSection({
                     vertically when the chat panel narrows the column.
                     `shrink-0` keeps each control measured so the title
                     truncates first. */}
-                <div className="flex flex-nowrap items-center gap-2 shrink-0">
+                <div className="flex flex-nowrap items-center gap-4 shrink-0">
                     {/* Phase 5 PR O — quick-add trigger. Hidden while the form is open
                         so the header and form don't show duplicate Add controls.
-                        Dashboard polish (2026-05-29) — restyled from the chunky
-                        `secondary` Button to the same thin pill used by every
-                        other section header (Missions / Works / Tasks / Agents)
-                        so the Ideas action row reads as part of the same family. */}
+                        Dashboard polish (2026-05-27) — label collapses to icon-
+                        only below `@xl/main` so the action row fits one line
+                        when the chat panel is open. */}
                     {!quickAddOpen && (
-                        <button
+                        <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
+                            className={cn(
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
+                                'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
+                                'text-text-secondary dark:text-text-secondary-dark',
+                                'hover:border-border dark:hover:border-white/16',
+                            )}
                             onClick={() => setQuickAddOpen(true)}
                             aria-expanded={quickAddOpen}
                             aria-label={tPage('quickAdd.submit')}
                             title={tPage('quickAdd.submit')}
-                            className={cn(
-                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
-                                'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
-                                'text-text-secondary dark:text-text-secondary-dark',
-                                'hover:border-primary/40 hover:text-primary',
-                            )}
                         >
                             <Plus className="w-3.5 h-3.5" />
-                            {tPage('quickAdd.submit')}
-                        </button>
+                            <span className="hidden @xl/main:inline">
+                                {tPage('quickAdd.submit')}
+                            </span>
+                        </Button>
                     )}
 
-                    {/* Phase 5 PR O — gears dropdown linking to settings anchors.
-                        Dashboard polish (2026-05-29) — icon-only square pill that
-                        matches the `+ Add` pill height so the two sit on a clean
-                        baseline next to View all. */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
+                                size="sm"
                                 aria-label={tPage('gears.menuLabel')}
-                                title={tPage('gears.menuLabel')}
-                                className={cn(
-                                    'inline-flex items-center justify-center rounded-md border h-7 w-7 transition-colors whitespace-nowrap',
-                                    'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
-                                    'text-text-secondary dark:text-text-secondary-dark',
-                                    'hover:border-primary/40 hover:text-primary',
-                                )}
+                                className="h-7 w-7 p-0 text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark"
                             >
                                 <SettingsIcon className="w-3.5 h-3.5" />
-                            </button>
+                            </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64">
-                            <DropdownMenuLabel>{tPage('gears.menuLabel')}</DropdownMenuLabel>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                {tPage('gears.menuLabel')}
+                            </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    router.push('/settings/work-agent#auto-generate-ideas')
-                                }
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-generate-ideas"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
                                 >
+                                    <Lightbulb className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoGenerate')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-build-works')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-build-works"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
                                 >
+                                    <Hammer className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoBuild')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-retry')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-retry"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
                                 >
+                                    <RefreshCw className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.autoRetry')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#account-budgets')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#account-budgets"
-                                    className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center gap-2 text-xs hover:text-primary"
                                 >
+                                    <CreditCard className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                     {tPage('gears.accountBudgets')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -351,12 +347,12 @@ export function WorkProposalsSection({
                             disabled={pendingRefresh || researching}
                             title={t('actions.refresh')}
                             aria-label={t('actions.refresh')}
-                            className="inline-flex items-center gap-1.5 text-sm text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center gap-1.5 text-xs text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
                             {pendingRefresh || researching ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                                <RefreshCw className="w-4 h-4" />
+                                <RefreshCw className="w-3.5 h-3.5" />
                             )}
                             <span className="hidden @xl/main:inline">{t('actions.refresh')}</span>
                         </button>
@@ -369,7 +365,7 @@ export function WorkProposalsSection({
                         <Link
                             href={ROUTES.DASHBOARD_IDEAS}
                             className={cn(
-                                'text-sm font-medium text-primary hover:underline whitespace-nowrap',
+                                'text-xs font-medium text-primary hover:underline whitespace-nowrap',
                                 'inline-flex items-center gap-1',
                             )}
                         >
@@ -380,25 +376,17 @@ export function WorkProposalsSection({
             </div>
 
             {/* Phase 5 PR O — toggles row (sub-header). */}
-            <div className="flex flex-wrap items-center gap-3 mb-3 text-sm text-text-secondary dark:text-text-secondary-dark">
-                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={showAccepted}
-                        onChange={(e) => handleToggleAccepted(e.target.checked)}
-                        className="rounded border-border dark:border-border-dark"
-                    />
-                    {tPage('toggles.showAccepted')}
-                </label>
-                <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                        type="checkbox"
-                        checked={showDismissed}
-                        onChange={(e) => handleToggleDismissed(e.target.checked)}
-                        className="rounded border-border dark:border-border-dark"
-                    />
-                    {tPage('toggles.showDismissed')}
-                </label>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+                <Checkbox
+                    label={tPage('toggles.showAccepted')}
+                    checked={showAccepted}
+                    onChange={(e) => handleToggleAccepted(e.target.checked)}
+                />
+                <Checkbox
+                    label={tPage('toggles.showDismissed')}
+                    checked={showDismissed}
+                    onChange={(e) => handleToggleDismissed(e.target.checked)}
+                />
             </div>
 
             {/* Phase 5 PR O — collapsible quick-add. */}

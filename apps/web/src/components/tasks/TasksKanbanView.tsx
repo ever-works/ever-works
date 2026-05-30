@@ -1,52 +1,132 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
+import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
 import { transitionTaskAction } from '@/app/actions/tasks';
+import {
+    Inbox,
+    Circle,
+    Loader2,
+    Eye,
+    Ban,
+    CheckCircle2,
+    XCircle,
+    ChevronDown,
+    type LucideIcon,
+} from 'lucide-react';
 
-const COLUMN_ORDER: TaskStatus[] = [
-    'backlog',
-    'todo',
-    'in_progress',
-    'in_review',
-    'blocked',
-    'done',
-    'cancelled',
+const MAX_VISIBLE = 15;
+
+// ─── Column definitions ────────────────────────────────────────────────────
+
+interface ColumnDef {
+    key: TaskStatus;
+    label: string;
+    icon: LucideIcon;
+    spinning?: boolean;
+    dotClass: string;
+    headerClass: string;
+    countClass: string;
+    cardBorderClass: string;
+    iconBgClass: string;
+    iconColorClass: string;
+}
+
+const COLUMNS: ColumnDef[] = [
+    {
+        key: 'backlog',
+        label: 'Backlog',
+        icon: Inbox,
+        dotClass: 'bg-slate-400',
+        headerClass: 'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-700/40',
+        countClass: 'bg-slate-100 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300',
+        cardBorderClass:
+            'border-slate-200/60 dark:border-slate-700/30 hover:border-slate-300 dark:hover:border-slate-600/50',
+        iconBgClass: 'bg-slate-50 dark:bg-slate-800/20',
+        iconColorClass: 'text-slate-500 dark:text-slate-400',
+    },
+    {
+        key: 'todo',
+        label: 'Todo',
+        icon: Circle,
+        dotClass: 'bg-info',
+        headerClass: 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/40',
+        countClass: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        cardBorderClass:
+            'border-blue-200/60 dark:border-blue-800/30 hover:border-blue-300 dark:hover:border-blue-700/50',
+        iconBgClass: 'bg-blue-50 dark:bg-blue-900/20',
+        iconColorClass: 'text-info dark:text-blue-400',
+    },
+    {
+        key: 'in_progress',
+        label: 'In Progress',
+        icon: Loader2,
+        spinning: true,
+        dotClass: 'bg-warning animate-pulse',
+        headerClass: 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40',
+        countClass: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+        cardBorderClass:
+            'border-amber-200/60 dark:border-amber-800/30 hover:border-amber-300 dark:hover:border-amber-700/50',
+        iconBgClass: 'bg-amber-50 dark:bg-amber-900/20',
+        iconColorClass: 'text-warning dark:text-amber-400',
+    },
+    {
+        key: 'in_review',
+        label: 'In Review',
+        icon: Eye,
+        dotClass: 'bg-violet-500',
+        headerClass:
+            'bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/40',
+        countClass: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+        cardBorderClass:
+            'border-violet-200/60 dark:border-violet-800/30 hover:border-violet-300 dark:hover:border-violet-700/50',
+        iconBgClass: 'bg-violet-50 dark:bg-violet-900/20',
+        iconColorClass: 'text-violet-600 dark:text-violet-400',
+    },
+    {
+        key: 'blocked',
+        label: 'Blocked',
+        icon: Ban,
+        dotClass: 'bg-danger',
+        headerClass: 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/40',
+        countClass: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+        cardBorderClass:
+            'border-red-200/60 dark:border-red-800/30 hover:border-red-300 dark:hover:border-red-700/50',
+        iconBgClass: 'bg-red-50 dark:bg-red-900/20',
+        iconColorClass: 'text-danger dark:text-red-400',
+    },
+    {
+        key: 'done',
+        label: 'Done',
+        icon: CheckCircle2,
+        dotClass: 'bg-success',
+        headerClass:
+            'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40',
+        countClass: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+        cardBorderClass:
+            'border-emerald-200/60 dark:border-emerald-800/30 hover:border-emerald-300 dark:hover:border-emerald-700/50',
+        iconBgClass: 'bg-emerald-50 dark:bg-emerald-900/20',
+        iconColorClass: 'text-success dark:text-emerald-400',
+    },
+    {
+        key: 'cancelled',
+        label: 'Cancelled',
+        icon: XCircle,
+        dotClass: 'bg-text-muted',
+        headerClass: 'bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-700/40',
+        countClass: 'bg-slate-100 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400',
+        cardBorderClass:
+            'border-slate-200/60 dark:border-slate-700/30 hover:border-slate-300 dark:hover:border-slate-600/50',
+        iconBgClass: 'bg-slate-50 dark:bg-slate-800/20',
+        iconColorClass: 'text-text-muted dark:text-slate-500',
+    },
 ];
 
-const COLUMN_LABELS: Record<TaskStatus, string> = {
-    backlog: 'Backlog',
-    todo: 'Todo',
-    in_progress: 'In progress',
-    in_review: 'In review',
-    blocked: 'Blocked',
-    done: 'Done',
-    cancelled: 'Cancelled',
-};
-
-const COLUMN_TONES: Record<TaskStatus, string> = {
-    backlog: 'border-text-muted/30 bg-surface-secondary/40',
-    todo: 'border-info/30 bg-info/5',
-    in_progress: 'border-warning/30 bg-warning/5',
-    in_review: 'border-warning/30 bg-warning/5',
-    blocked: 'border-danger/30 bg-danger/5',
-    done: 'border-success/30 bg-success/5',
-    cancelled: 'border-text-muted/30 bg-text-muted/5',
-};
-
-const PRIORITY_TONES: Record<TaskPriority, string> = {
-    p0: 'bg-danger/20 text-danger',
-    p1: 'bg-danger/10 text-danger',
-    p2: 'bg-warning/10 text-warning',
-    p3: 'bg-surface-secondary text-text-secondary',
-    p4: 'bg-text-muted/10 text-text-muted',
-};
-
 // Mirror of TaskTransitionService.canTransition() lattice (client-side
-// for the move-menu affordance). Server still authoritative — the
-// PATCH /tasks/:id/transition call rejects illegal jumps.
+// for the move-menu affordance). Server still authoritative.
 const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
     backlog: ['todo', 'cancelled'],
     todo: ['in_progress', 'blocked', 'cancelled'],
@@ -57,156 +137,26 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
     cancelled: [],
 };
 
-/**
- * Tasks feature — Phase 14.1.
- *
- * Kanban view modeled on WorksKanbanView.tsx — columns per status,
- * Cards inside each. v1 ships click-to-transition (popover menu on
- * each card) instead of drag-drop, so we don't take a dnd library
- * dependency this tick. The server's PATCH /tasks/:id/transition
- * endpoint is the same whether the move came from a drag-drop or a
- * click; drag-drop wires in later via a thin keyboard-accessible
- * wrapper.
- *
- * Transitions are optimistic-update: the card moves to the target
- * column immediately, and reverts on server rejection.
- */
-export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
-    const [tasks, setTasks] = useState(initialTasks);
-    const [errors, setErrors] = useState<Record<string, string | null>>({});
-    const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
-    const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+const PRIORITY_TONES: Record<TaskPriority, string> = {
+    p0: 'bg-danger/20 text-danger',
+    p1: 'bg-danger/10 text-danger',
+    p2: 'bg-warning/10 text-warning',
+    p3: 'bg-surface-secondary text-text-secondary',
+    p4: 'bg-text-muted/10 text-text-muted',
+};
 
-    const columns = useMemo(() => {
-        const out: Record<TaskStatus, Task[]> = {
-            backlog: [],
-            todo: [],
-            in_progress: [],
-            in_review: [],
-            blocked: [],
-            done: [],
-            cancelled: [],
-        };
-        for (const t of tasks) out[t.status].push(t);
-        return out;
-    }, [tasks]);
+// ─── Kanban card ───────────────────────────────────────────────────────────
 
-    const handleMove = (taskId: string, to: TaskStatus) => {
-        const before = tasks.find((t) => t.id === taskId);
-        if (!before) return;
-        // Optimistic update — flip status locally.
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: to } : t)));
-        setErrors((e) => ({ ...e, [taskId]: null }));
-        void (async () => {
-            try {
-                const updated = await transitionTaskAction(taskId, to);
-                setTasks((prev) =>
-                    prev.map((t) => (t.id === taskId ? { ...t, status: updated.status } : t)),
-                );
-            } catch (err) {
-                // Revert on failure.
-                setTasks((prev) =>
-                    prev.map((t) => (t.id === taskId ? { ...t, status: before.status } : t)),
-                );
-                setErrors((e) => ({
-                    ...e,
-                    [taskId]: err instanceof Error ? err.message : 'Transition failed',
-                }));
-            }
-        })();
-    };
-
-    return (
-        <div className="grid grid-flow-col auto-cols-[260px] gap-3 overflow-x-auto pb-4">
-            {COLUMN_ORDER.map((status) => {
-                const isDropActive = dropTargetStatus === status && draggingTaskId !== null;
-                return (
-                    <div
-                        key={status}
-                        onDragOver={(e) => {
-                            // FU-9 — only highlight columns the drag is
-                            // allowed to drop into so users get an
-                            // immediate visual signal for illegal moves.
-                            if (!draggingTaskId) return;
-                            const src = tasks.find((t) => t.id === draggingTaskId);
-                            if (!src) return;
-                            if (src.status === status) return;
-                            if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
-                            e.preventDefault();
-                            setDropTargetStatus(status);
-                        }}
-                        onDragLeave={(e) => {
-                            // Only clear if the leave is truly out of the column,
-                            // not just hovering into a child element.
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            if (
-                                e.clientX < rect.left ||
-                                e.clientX > rect.right ||
-                                e.clientY < rect.top ||
-                                e.clientY > rect.bottom
-                            ) {
-                                setDropTargetStatus((prev) => (prev === status ? null : prev));
-                            }
-                        }}
-                        onDrop={(e) => {
-                            e.preventDefault();
-                            const taskId =
-                                draggingTaskId ?? e.dataTransfer.getData('text/x-task-id');
-                            setDropTargetStatus(null);
-                            setDraggingTaskId(null);
-                            if (!taskId) return;
-                            const src = tasks.find((t) => t.id === taskId);
-                            if (!src || src.status === status) return;
-                            if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
-                            handleMove(taskId, status);
-                        }}
-                        className={`rounded-lg border ${COLUMN_TONES[status]} p-3 flex flex-col gap-2 min-h-[200px] transition-shadow ${
-                            isDropActive
-                                ? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                                : ''
-                        }`}
-                    >
-                        <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium text-text dark:text-text-dark">
-                                {COLUMN_LABELS[status]}
-                            </span>
-                            <span className="text-text-muted">{columns[status].length}</span>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            {columns[status].map((task) => (
-                                <KanbanCard
-                                    key={task.id}
-                                    task={task}
-                                    onMove={(to) => handleMove(task.id, to)}
-                                    error={errors[task.id] ?? null}
-                                    onDragStart={() => setDraggingTaskId(task.id)}
-                                    onDragEnd={() => {
-                                        setDraggingTaskId(null);
-                                        setDropTargetStatus(null);
-                                    }}
-                                />
-                            ))}
-                            {columns[status].length === 0 && (
-                                <p className="text-[11px] text-text-muted italic text-center py-4">
-                                    empty
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-function KanbanCard({
+function TaskKanbanCard({
     task,
+    col,
     onMove,
     error,
     onDragStart,
     onDragEnd,
 }: {
     task: Task;
+    col: ColumnDef;
     onMove: (to: TaskStatus) => void;
     error: string | null;
     onDragStart?: () => void;
@@ -221,10 +171,6 @@ function KanbanCard({
         <div
             draggable
             onDragStart={(e) => {
-                // FU-9 — HTML5 drag-drop. dataTransfer fallback supports
-                // the rare case where parent state didn't track the
-                // drag (e.g. drop fired before onDragStart's React
-                // setState committed — drop reads from dataTransfer).
                 e.dataTransfer.setData('text/x-task-id', task.id);
                 e.dataTransfer.effectAllowed = 'move';
                 setDragging(true);
@@ -234,74 +180,321 @@ function KanbanCard({
                 setDragging(false);
                 onDragEnd?.();
             }}
-            className={`rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-xs transition-opacity cursor-grab active:cursor-grabbing ${
-                dragging ? 'opacity-50' : ''
-            }`}
+            className={cn(
+                'group flex flex-col gap-2 p-3.5 rounded-lg border',
+                'bg-card dark:bg-card-primary-dark/70',
+                'transition-all duration-150 cursor-grab active:cursor-grabbing',
+                col.cardBorderClass,
+                dragging && 'opacity-50',
+            )}
         >
-            <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-text-muted">
-                <Link href={ROUTES.DASHBOARD_TASK(task.id)} className="hover:text-text">
+            {/* Header: slug + priority */}
+            <div className="flex items-center justify-between gap-2">
+                <Link
+                    href={ROUTES.DASHBOARD_TASK(task.id)}
+                    className="text-[10px] font-mono text-text-muted hover:text-primary"
+                >
                     {task.slug}
                 </Link>
                 <span
-                    className={`uppercase tracking-wide px-1 py-0.5 rounded ${PRIORITY_TONES[task.priority]}`}
+                    className={cn(
+                        'text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded shrink-0',
+                        PRIORITY_TONES[task.priority],
+                    )}
                 >
                     {task.priority}
                 </span>
             </div>
+
+            {/* Title */}
             <Link
                 href={ROUTES.DASHBOARD_TASK(task.id)}
-                className="block text-text dark:text-text-dark mt-1 line-clamp-2 hover:text-primary"
+                className="text-xs font-semibold text-text dark:text-text-dark leading-snug line-clamp-2 hover:text-primary"
             >
                 {task.title}
             </Link>
+
+            {/* Labels */}
             {(task.labels ?? []).length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                    {(task.labels ?? []).slice(0, 3).map((l) => (
+                <div className="flex flex-wrap gap-1">
+                    {(task.labels ?? []).slice(0, 3).map((label) => (
                         <span
-                            key={l}
+                            key={label}
                             className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary"
                         >
-                            {l}
+                            {label}
                         </span>
                     ))}
                 </div>
             )}
-            {targets.length > 0 && (
-                <div className="mt-2">
-                    <button
-                        type="button"
-                        onClick={() => setMenuOpen((v) => !v)}
-                        className="text-[10px] text-text-muted hover:text-primary underline"
-                        aria-expanded={menuOpen}
-                    >
-                        Move →
-                    </button>
-                    {menuOpen && (
-                        <ul className="mt-1 flex flex-wrap gap-1">
-                            {targets.map((to) => (
-                                <li key={to}>
-                                    <button
-                                        type="button"
-                                        disabled={pending}
-                                        onClick={() => {
-                                            startTransition(() => onMove(to));
-                                            setMenuOpen(false);
-                                        }}
-                                        className="text-[10px] px-1.5 py-0.5 rounded border border-border/60 dark:border-border-dark/60 hover:border-primary hover:text-primary"
-                                    >
-                                        {to.replace('_', ' ')}
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            )}
+
+            {/* Footer: move menu + updated */}
+            <div className="flex items-center justify-between pt-2 border-t border-border dark:border-border-dark mt-auto">
+                {targets.length > 0 ? (
+                    <div className="relative">
+                        <button
+                            type="button"
+                            onClick={() => setMenuOpen((v) => !v)}
+                            className="text-[10px] text-text-muted hover:text-primary underline"
+                            aria-expanded={menuOpen}
+                        >
+                            Move →
+                        </button>
+                        {menuOpen && (
+                            <ul className="absolute bottom-full left-0 mb-1 flex flex-col gap-0.5 z-10 bg-card dark:bg-card-primary-dark border border-border/60 dark:border-border-dark/60 rounded-md p-1 shadow-sm min-w-[110px]">
+                                {targets.map((to) => (
+                                    <li key={to}>
+                                        <button
+                                            type="button"
+                                            disabled={pending}
+                                            onClick={() => {
+                                                startTransition(() => onMove(to));
+                                                setMenuOpen(false);
+                                            }}
+                                            className="w-full text-left text-[10px] px-2 py-1 rounded hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-primary disabled:opacity-50"
+                                        >
+                                            {to.replace('_', ' ')}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                ) : (
+                    <span />
+                )}
+                <span className="text-[10px] text-text-muted dark:text-text-muted-dark shrink-0 ml-2">
+                    {new Date(task.updatedAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                    })}
+                </span>
+            </div>
+
             {error && (
-                <p className="text-[10px] text-danger mt-1" role="alert">
+                <p className="text-[10px] text-danger" role="alert">
                     {error}
                 </p>
             )}
+        </div>
+    );
+}
+
+// ─── Column ────────────────────────────────────────────────────────────────
+
+function TaskKanbanColumn({
+    col,
+    tasks,
+    errors,
+    draggingTaskId,
+    dropTargetStatus,
+    onMove,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDragLeave,
+    onDrop,
+}: {
+    col: ColumnDef;
+    tasks: Task[];
+    errors: Record<string, string | null>;
+    draggingTaskId: string | null;
+    dropTargetStatus: TaskStatus | null;
+    onMove: (taskId: string, to: TaskStatus) => void;
+    onDragStart: (taskId: string) => void;
+    onDragEnd: () => void;
+    onDragOver: (e: React.DragEvent, status: TaskStatus) => void;
+    onDragLeave: (e: React.DragEvent, status: TaskStatus) => void;
+    onDrop: (e: React.DragEvent, status: TaskStatus) => void;
+}) {
+    const [visibleCount, setVisibleCount] = useState(MAX_VISIBLE);
+    const Icon = col.icon;
+
+    const visibleTasks = tasks.slice(0, visibleCount);
+    const remaining = tasks.length - visibleCount;
+    const hasMore = remaining > 0;
+    const isDropActive = dropTargetStatus === col.key && draggingTaskId !== null;
+
+    return (
+        <div className="flex flex-col min-w-[220px] w-full flex-1">
+            {/* Column header */}
+            <div
+                className={cn(
+                    'flex items-center gap-2 px-3 py-2.5 rounded-t-lg border border-b-0',
+                    col.headerClass,
+                )}
+            >
+                <span className={cn('w-2 h-2 rounded-full shrink-0', col.dotClass)} />
+                <Icon className={cn('w-3.5 h-3.5 shrink-0', col.iconColorClass)} />
+                <span className="text-xs font-semibold text-text dark:text-text-dark flex-1 truncate">
+                    {col.label}
+                </span>
+                <span
+                    className={cn(
+                        'min-w-5 text-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
+                        col.countClass,
+                    )}
+                >
+                    {tasks.length}
+                </span>
+            </div>
+
+            {/* Card list — fixed height, scrollable */}
+            <div
+                onDragOver={(e) => onDragOver(e, col.key)}
+                onDragLeave={(e) => onDragLeave(e, col.key)}
+                onDrop={(e) => onDrop(e, col.key)}
+                className={cn(
+                    'flex flex-col gap-2 p-2 overflow-y-auto border border-t-0',
+                    'border-slate-200/60 dark:border-white/8',
+                    'bg-slate-50/50 dark:bg-white/1.5',
+                    'min-h-[120px] h-[600px]',
+                    !hasMore && 'rounded-b-lg',
+                    isDropActive && 'ring-2 ring-inset ring-primary/40',
+                )}
+            >
+                {tasks.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center py-6">
+                        <p className="text-[11px] text-text-muted dark:text-text-muted-dark text-center italic">
+                            empty
+                        </p>
+                    </div>
+                ) : (
+                    visibleTasks.map((task) => (
+                        <TaskKanbanCard
+                            key={task.id}
+                            task={task}
+                            col={col}
+                            onMove={(to) => onMove(task.id, to)}
+                            error={errors[task.id] ?? null}
+                            onDragStart={() => onDragStart(task.id)}
+                            onDragEnd={onDragEnd}
+                        />
+                    ))
+                )}
+            </div>
+
+            {/* Load more */}
+            {hasMore && (
+                <button
+                    onClick={() => setVisibleCount((v) => v + MAX_VISIBLE)}
+                    className={cn(
+                        'flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-b-lg border border-t-0',
+                        'border-slate-200/60 dark:border-white/8',
+                        'bg-slate-50 dark:bg-white/2',
+                        'text-[11px] font-medium text-text-muted dark:text-text-muted-dark',
+                        'hover:bg-slate-100 dark:hover:bg-white/4 hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                        'transition-colors',
+                    )}
+                >
+                    <ChevronDown className="w-3 h-3" />
+                    Show {Math.min(remaining, MAX_VISIBLE)} more
+                </button>
+            )}
+        </div>
+    );
+}
+
+// ─── Main export ───────────────────────────────────────────────────────────
+
+export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
+    const [tasks, setTasks] = useState(initialTasks);
+    const [errors, setErrors] = useState<Record<string, string | null>>({});
+    const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+    const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+
+    // `useState(initialTasks)` only seeds on the first render, so any later
+    // change to the `tasks` prop (filter swap, parent refetch) would never
+    // reach the board. Sync explicitly when the prop reference changes.
+    useEffect(() => {
+        setTasks(initialTasks);
+    }, [initialTasks]);
+
+    const grouped = useMemo(() => {
+        const map = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.key, []]));
+        for (const t of tasks) map.get(t.status)?.push(t);
+        return map;
+    }, [tasks]);
+
+    const handleMove = (taskId: string, to: TaskStatus) => {
+        const before = tasks.find((t) => t.id === taskId);
+        if (!before) return;
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: to } : t)));
+        setErrors((e) => ({ ...e, [taskId]: null }));
+        void (async () => {
+            try {
+                const updated = await transitionTaskAction(taskId, to);
+                setTasks((prev) =>
+                    prev.map((t) => (t.id === taskId ? { ...t, status: updated.status } : t)),
+                );
+            } catch (err) {
+                setTasks((prev) =>
+                    prev.map((t) => (t.id === taskId ? { ...t, status: before.status } : t)),
+                );
+                setErrors((e) => ({
+                    ...e,
+                    [taskId]: err instanceof Error ? err.message : 'Transition failed',
+                }));
+            }
+        })();
+    };
+
+    const handleDragOver = (e: React.DragEvent, status: TaskStatus) => {
+        if (!draggingTaskId) return;
+        const src = tasks.find((t) => t.id === draggingTaskId);
+        if (!src || src.status === status) return;
+        if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
+        e.preventDefault();
+        setDropTargetStatus(status);
+    };
+
+    const handleDragLeave = (e: React.DragEvent, status: TaskStatus) => {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        if (
+            e.clientX < rect.left ||
+            e.clientX > rect.right ||
+            e.clientY < rect.top ||
+            e.clientY > rect.bottom
+        ) {
+            setDropTargetStatus((prev) => (prev === status ? null : prev));
+        }
+    };
+
+    const handleDrop = (e: React.DragEvent, status: TaskStatus) => {
+        e.preventDefault();
+        const taskId = draggingTaskId ?? e.dataTransfer.getData('text/x-task-id');
+        setDropTargetStatus(null);
+        setDraggingTaskId(null);
+        if (!taskId) return;
+        const src = tasks.find((t) => t.id === taskId);
+        if (!src || src.status === status) return;
+        if (!(NEXT_STATUS[src.status] ?? []).includes(status)) return;
+        handleMove(taskId, status);
+    };
+
+    return (
+        <div className="w-full overflow-x-auto pb-2">
+            <div className="flex gap-3 min-w-[900px]">
+                {COLUMNS.map((col) => (
+                    <TaskKanbanColumn
+                        key={col.key}
+                        col={col}
+                        tasks={grouped.get(col.key)!}
+                        errors={errors}
+                        draggingTaskId={draggingTaskId}
+                        dropTargetStatus={dropTargetStatus}
+                        onMove={handleMove}
+                        onDragStart={setDraggingTaskId}
+                        onDragEnd={() => {
+                            setDraggingTaskId(null);
+                            setDropTargetStatus(null);
+                        }}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    />
+                ))}
+            </div>
         </div>
     );
 }

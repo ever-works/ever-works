@@ -99,6 +99,7 @@ interface DropdownMenuItemProps {
     onClick?: () => void;
     disabled?: boolean;
     className?: string;
+    asChild?: boolean;
 }
 
 export function DropdownMenuItem({
@@ -106,24 +107,43 @@ export function DropdownMenuItem({
     onClick,
     disabled,
     className,
+    asChild,
 }: DropdownMenuItemProps) {
     return (
         <MenuItem disabled={disabled}>
-            {({ active, disabled: itemDisabled }) => (
-                <button
-                    onClick={onClick}
-                    disabled={itemDisabled}
-                    className={cn(
-                        'relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none',
-                        'transition-colors',
-                        active && !itemDisabled && 'bg-surface-hover dark:bg-surface-hover-dark',
-                        itemDisabled && 'opacity-50 cursor-not-allowed',
-                        className,
-                    )}
-                >
-                    {children}
-                </button>
-            )}
+            {({ active, disabled: itemDisabled }) => {
+                const itemClassName = cn(
+                    'relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none',
+                    'transition-colors',
+                    active && !itemDisabled && 'bg-surface-hover dark:bg-surface-hover-dark',
+                    // `pointer-events-none` blocks navigation on the asChild
+                    // `<Link>` path where the native `disabled` attribute
+                    // wouldn't apply. Harmless on the `<button>` path below.
+                    itemDisabled && 'opacity-50 cursor-not-allowed pointer-events-none',
+                    className,
+                );
+
+                if (asChild && React.isValidElement(children)) {
+                    const child = children as React.ReactElement<{
+                        className?: string;
+                        onClick?: () => void;
+                        'aria-disabled'?: boolean;
+                        tabIndex?: number;
+                    }>;
+                    return React.cloneElement(child, {
+                        className: cn(itemClassName, child.props.className),
+                        onClick: child.props.onClick ?? onClick,
+                        'aria-disabled': itemDisabled || undefined,
+                        tabIndex: itemDisabled ? -1 : child.props.tabIndex,
+                    });
+                }
+
+                return (
+                    <button onClick={onClick} disabled={itemDisabled} className={itemClassName}>
+                        {children}
+                    </button>
+                );
+            }}
         </MenuItem>
     );
 }
