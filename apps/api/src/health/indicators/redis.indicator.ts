@@ -31,6 +31,10 @@ export class RedisHealthIndicator {
             client = new Redis(url, {
                 lazyConnect: true,
                 connectTimeout: 2000,
+                // Cap the PING itself, not just the TCP handshake — a Redis
+                // that accepts the socket but stops processing commands (hung
+                // replica / bad proxy) would otherwise hang /health/ready.
+                commandTimeout: 2000,
                 maxRetriesPerRequest: 1,
                 enableOfflineQueue: false,
                 retryStrategy: () => null,
