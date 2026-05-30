@@ -1346,7 +1346,9 @@ describe('KnowledgeBaseService', () => {
             const throwingExtractor = {
                 extract: jest
                     .fn()
-                    .mockRejectedValue(new Error('KB PDF extraction failed: Invalid PDF structure')),
+                    .mockRejectedValue(
+                        new Error('KB PDF extraction failed: Invalid PDF structure'),
+                    ),
                 supports: jest.fn().mockReturnValue(true),
             };
             const module3: TestingModule = await Test.createTestingModule({
