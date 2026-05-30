@@ -53,6 +53,16 @@ spec:
           env:
             - name: EVER_WORKS_API_URL
               value: "http://ever-works-api-stage:3100"
+            # Auth mode for incoming MCP requests. `per-user-jwt` requires each
+            # caller to present their own Ever Works JWT (forwarded upstream to
+            # the API for verification) and needs NO shared key. The default
+            # (`hybrid`) REQUIRES EVER_WORKS_API_KEY; since the
+            # $EVER_WORKS_MCP_API_KEY deploy secret was never provisioned,
+            # McpConfigService threw at boot and the pod crashlooped in every
+            # env since #816 (2026-05-17 audit). To re-enable shared-key auth,
+            # set this to `hybrid` AND provision EVER_WORKS_MCP_API_KEY.
+            - name: EVER_WORKS_MCP_AUTH_MODE
+              value: "per-user-jwt"
             - name: EVER_WORKS_API_KEY
               value: "$EVER_WORKS_MCP_API_KEY"
             - name: EVER_WORKS_MCP_PORT
