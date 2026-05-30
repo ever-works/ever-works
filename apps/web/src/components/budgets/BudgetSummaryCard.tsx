@@ -73,7 +73,10 @@ export function BudgetSummaryCard({ summary }: BudgetSummaryCardProps) {
                 <div className="space-y-2">
                     <div className="h-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark overflow-hidden">
                         <div
-                            className={cn('h-full rounded-full transition-all duration-500', barTone)}
+                            className={cn(
+                                'h-full rounded-full transition-all duration-500',
+                                barTone,
+                            )}
                             style={{ width: `${clampedPercent}%` }}
                         />
                     </div>

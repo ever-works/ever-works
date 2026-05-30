@@ -28,11 +28,11 @@ function mkSummary(overrides: Partial<OwnerBudgetSummary> = {}): OwnerBudgetSumm
 describe('BudgetSummaryCard (Phase 7 PR V)', () => {
     it('renders the period header derived from periodStart', () => {
         const { container } = render(<BudgetSummaryCard summary={mkSummary()} />);
-        // The mock surfaces the t-key with the interpolation payload
-        // inline. With jsdom's en-US locale defaults, periodStart
+        // The component renders the formatted month-year period label
+        // directly via formatPeriod() (toLocaleDateString month:long,
+        // year:numeric) — no i18n key wrapper. Under UTC, periodStart
         // 2026-05-01 formats as "May 2026".
-        expect(container.textContent).toContain('period');
-        expect(container.textContent).toContain('"period":"May 2026"');
+        expect(container.textContent).toContain('May 2026');
     });
 
     it('formats currentSpend as a USD money string', () => {
