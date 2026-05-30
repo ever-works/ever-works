@@ -13,6 +13,7 @@ import type {
     PluginsModuleOptions,
     PluginModule,
 } from '../interfaces/plugins-module-options.interface';
+import type { OnFirstMaterialize, OnMaterializeError } from './lazy-plugin-proxy';
 
 /**
  * Result of plugin discovery
@@ -69,6 +70,19 @@ interface DependencyNode {
 export class PluginLoaderService {
     private readonly logger = new Logger(PluginLoaderService.name);
     private readonly pluginPaths: string[];
+    /**
+     * Hook invoked the first time a lazily-registered plugin materializes.
+     * Wired by PluginBootstrapService so the lifecycle manager can fire its
+     * onLoad bookkeeping (event emit, state history, error capture) on the
+     * first real use rather than at boot.
+     */
+    private onFirstMaterialize?: OnFirstMaterialize;
+    /**
+     * Hook invoked when a lazily-registered plugin's loader throws. Wired by
+     * PluginBootstrapService to mark the plugin's state as `'error'` so
+     * readiness filters stop returning the broken stub.
+     */
+    private onMaterializeError?: OnMaterializeError;
 
     constructor(
         @Inject(PLUGINS_MODULE_OPTIONS)
@@ -80,6 +94,14 @@ export class PluginLoaderService {
         private readonly pluginRepository: PluginRepository,
     ) {
         this.pluginPaths = options.pluginPaths || DEFAULT_PLUGIN_PATHS;
+    }
+
+    setOnFirstMaterialize(hook: OnFirstMaterialize): void {
+        this.onFirstMaterialize = hook;
+    }
+
+    setOnMaterializeError(hook: OnMaterializeError): void {
+        this.onMaterializeError = hook;
     }
 
     /**
@@ -475,14 +497,22 @@ export class PluginLoaderService {
     }
 
     /**
-     * Discover and load all plugins with dependency resolution
+     * Discover and lazily register all plugins with dependency resolution.
+     *
+     * Manifest-only stubs are registered up-front (cheap fs reads only) so
+     * capability / category queries work immediately. The actual `import()`
+     * of each plugin's entry module is deferred until first use via the
+     * lazy proxy; the lifecycle `onLoad` hook fires at first materialization
+     * rather than at boot. Cuts API boot RSS for installs where most
+     * plugins (39 on develop) are never exercised in a given session.
      */
-    async discoverAndLoadAll(): Promise<{
+    async discoverAndLoadAll(opts?: { lazy?: boolean }): Promise<{
         discovered: number;
         loaded: number;
         failed: number;
         results: LoadResult[];
     }> {
+        const lazy = opts?.lazy ?? true;
         const discovered = await this.discover();
         const results: LoadResult[] = [];
         let loaded = 0;
@@ -495,7 +525,9 @@ export class PluginLoaderService {
             builtIn: boolean;
         }> = [];
 
-        // Add built-in plugins
+        // Add built-in plugins — instantiating just to read the manifest id;
+        // they stay eagerly loaded because they're already bundled and have
+        // no separate entry-point import to defer.
         if (this.options.builtInPlugins) {
             for (const pluginModule of this.options.builtInPlugins) {
                 const plugin =
@@ -522,11 +554,18 @@ export class PluginLoaderService {
         // Build dependency graph and perform topological sort
         const sortedPlugins = this.topologicalSort(allPlugins);
 
-        // Load plugins in dependency order
+        // Register plugins in dependency order. Built-ins always use the
+        // eager path (they're pre-constructed instances bundled with the
+        // app — there's no entry-point import to defer). Filesystem-
+        // discovered plugins use the lazy proxy unless the caller
+        // explicitly asks for eager loading (PLUGIN_LAZY_LOAD=false kill
+        // switch from bootstrap).
         for (const pluginInfo of sortedPlugins) {
             let result: LoadResult;
             if (pluginInfo.builtIn) {
                 result = await this.loadBuiltIn(pluginInfo.plugin as PluginModule);
+            } else if (lazy) {
+                result = await this.registerLazy(pluginInfo.plugin as DiscoveredPlugin);
             } else {
                 result = await this.load(pluginInfo.plugin as DiscoveredPlugin);
             }
@@ -536,13 +575,15 @@ export class PluginLoaderService {
             } else {
                 failed++;
                 this.logger.warn(
-                    `Failed to load plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
+                    `Failed to ${lazy ? 'register' : 'load'} plugin "${result.pluginId || 'unknown'}": ${result.error || 'unknown error'}`,
                 );
             }
         }
 
         this.logger.log(
-            `Plugin loading complete: ${loaded} loaded, ${failed} failed out of ${allPlugins.length} total`,
+            lazy
+                ? `Plugin registration complete: ${loaded} registered, ${failed} failed out of ${allPlugins.length} total (discovered plugins materialize on first use)`
+                : `Plugin loading complete: ${loaded} loaded, ${failed} failed out of ${allPlugins.length} total`,
         );
 
         return {
@@ -551,6 +592,139 @@ export class PluginLoaderService {
             failed,
             results,
         };
+    }
+
+    /**
+     * Merge the runtime manifest from the plugin class with the package.json
+     * manifest stored in the registry + DB. Mirrors the eager `load()` path's
+     * inline merge at lines 237–246; runs at first materialization for lazy
+     * plugins so fields like icon, homepage, readme don't go missing in the
+     * admin UI for the lifetime of the install.
+     */
+    private async enrichManifestAfterMaterialize(
+        pluginId: string,
+        real: IPlugin,
+        discovered: DiscoveredPlugin,
+    ): Promise<void> {
+        if (typeof real.getManifest !== 'function') return;
+        try {
+            const runtimeManifest = real.getManifest();
+            const definedManifest = pickBy(
+                discovered.manifest as unknown as Record<string, unknown>,
+                (v) => v !== undefined,
+            );
+            const merged = { ...runtimeManifest, ...definedManifest } as typeof discovered.manifest;
+
+            this.registry.updateRegisteredManifest(pluginId, merged);
+            await this.pluginRepository.upsert({
+                pluginId: merged.id,
+                name: merged.name,
+                version: merged.version,
+                description: merged.description,
+                category: merged.category,
+                capabilities: [...merged.capabilities],
+                manifest: merged as unknown as Record<string, unknown>,
+                builtIn: discovered.builtIn,
+                installPath: discovered.path,
+                state: 'loaded',
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enrich manifest for plugin ${pluginId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Register a discovered plugin as a lazy stub. The plugin's entry module
+     * is not imported here — that happens on first method call via the proxy.
+     */
+    async registerLazy(discovered: DiscoveredPlugin): Promise<LoadResult> {
+        const { manifest, path: pluginPath } = discovered;
+        const warnings: string[] = [];
+
+        try {
+            if (this.registry.has(manifest.id)) {
+                return {
+                    success: false,
+                    pluginId: manifest.id,
+                    error: `Plugin "${manifest.id}" is already loaded`,
+                };
+            }
+
+            const versionResult = this.versionChecker.check(
+                manifest,
+                this.registry.getVersionsMap(),
+            );
+
+            if (!versionResult.valid) {
+                return {
+                    success: false,
+                    pluginId: manifest.id,
+                    error: `Version check failed: ${versionResult.errors?.map((e) => e.message).join(', ')}`,
+                };
+            }
+            if (versionResult.warnings) {
+                warnings.push(...versionResult.warnings.map((w) => w.message));
+            }
+
+            // Capture hooks by value so unit tests can swap them.
+            const userOnFirstMaterialize = this.onFirstMaterialize;
+            const userOnMaterializeError = this.onMaterializeError;
+
+            const loader = () => this.loadPluginModule(pluginPath, manifest);
+
+            // Wrap onFirstMaterialize to fold the runtime manifest from the
+            // plugin class (icon, homepage, readme, runtime overrides) into
+            // both the in-memory registry entry and the DB row. The eager
+            // load() path used to do this inline before the upsert; for lazy
+            // loading we have to defer it to first materialization so we don't
+            // lose those fields for the lifetime of the install.
+            const onFirstMaterialize = async (id: string, real: IPlugin) => {
+                await this.enrichManifestAfterMaterialize(id, real, discovered);
+                if (userOnFirstMaterialize) {
+                    await userOnFirstMaterialize(id, real);
+                }
+            };
+
+            this.registry.registerLazy(manifest, loader, {
+                builtIn: discovered.builtIn,
+                installPath: pluginPath,
+                onFirstMaterialize,
+                onMaterializeError: userOnMaterializeError,
+            });
+
+            await this.pluginRepository.upsert({
+                pluginId: manifest.id,
+                name: manifest.name,
+                version: manifest.version,
+                description: manifest.description,
+                category: manifest.category,
+                capabilities: [...manifest.capabilities],
+                manifest: manifest as unknown as Record<string, unknown>,
+                builtIn: discovered.builtIn,
+                installPath: pluginPath,
+                state: 'loaded',
+            });
+
+            this.logger.debug(`Registered lazy plugin: ${manifest.id} v${manifest.version}`);
+
+            return {
+                success: true,
+                pluginId: manifest.id,
+                warnings: warnings.length > 0 ? warnings : undefined,
+            };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to register plugin ${manifest.id}:`, error);
+            return {
+                success: false,
+                pluginId: manifest.id,
+                error: message,
+            };
+        }
     }
 
     /**

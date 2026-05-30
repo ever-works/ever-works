@@ -1,5 +1,6 @@
 export * from './plugin-registry.service';
 export * from './plugin-loader.service';
+export * from './lazy-plugin-proxy';
 export * from './plugin-manifest-validator.service';
 export * from './plugin-version-checker.service';
 export * from './plugin-class-validator.service';
