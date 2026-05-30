@@ -102,7 +102,7 @@ spec:
             # the 4 GiB cgroup limit (#1145). Raise old-space to 3 GiB — fits
             # comfortably under the limit and lets bootstrap complete.
             - name: NODE_OPTIONS
-              value: "--max-old-space-size=3072"
+              value: "--max-old-space-size=6144"
 
             # Trigger.dev
             - name: TRIGGER_ENABLED
@@ -307,10 +307,10 @@ spec:
 
           resources:
             requests:
-              memory: "1Gi"
+              memory: "2Gi"
               cpu: "500m"
             limits:
-              memory: "4Gi"
+              memory: "8Gi"
               cpu: "2"
 
           ports:
