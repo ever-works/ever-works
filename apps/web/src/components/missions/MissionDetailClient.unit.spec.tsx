@@ -198,8 +198,10 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
     it('Ideas list renders one IdeaCard per child Idea + the per-section count', () => {
         const ideas = [mkIdea('p1'), mkIdea('p2'), mkIdea('p3')];
         render(<MissionDetailClient mission={mkMission()} ideas={ideas} />);
-        // Count in the section header.
-        expect(screen.getByText(/sections\.ideas/).textContent).toMatch(/3/);
+        // Per-section count now renders as a separate badge pill in the
+        // SectionHeader (not inline in the title text), so assert the badge.
+        const ideasSection = screen.getByText(/sections\.ideas/).closest('section') as HTMLElement;
+        expect(within(ideasSection).getByText('3')).toBeTruthy();
         expect(screen.getByText('Idea p1')).toBeTruthy();
         expect(screen.getByText('Idea p2')).toBeTruthy();
         expect(screen.getByText('Idea p3')).toBeTruthy();
@@ -222,8 +224,8 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
         expect(links).toHaveLength(2);
         const hrefs = links.map((l) => l.getAttribute('href'));
         expect(hrefs).toEqual(expect.arrayContaining(['/works/work-A', '/works/work-B']));
-        // count badge says 2.
-        expect(worksSection.textContent).toMatch(/\(2\)/);
+        // count badge says 2 (a separate pill in SectionHeader, no parens).
+        expect(within(worksSection).getByText('2')).toBeTruthy();
         void container;
     });
 
@@ -337,9 +339,11 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
                     inheritedIdeas={inheritedIdeas}
                 />,
             );
-            // Section heading + count badge.
-            const heading = screen.getByText(/sections\.inheritedWorks/);
-            expect(heading.textContent).toMatch(/2/);
+            // Section heading + count badge (a separate pill in SectionHeader).
+            const inheritedSection = screen
+                .getByText(/sections\.inheritedWorks/)
+                .closest('section') as HTMLElement;
+            expect(within(inheritedSection).getByText('2')).toBeTruthy();
             // From-source link points at the source Mission detail page.
             const sourceLink = screen.getByText('Source Mission').closest('a');
             expect(sourceLink?.getAttribute('href')).toBe('/missions/src');
