@@ -4,8 +4,10 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { cn } from '@/lib/utils/cn';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
 import { TasksKanbanView } from './TasksKanbanView';
+import { LayoutGrid, Table2, Kanban } from 'lucide-react';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
     backlog: 'bg-surface-secondary text-text-secondary',
@@ -25,15 +27,38 @@ const PRIORITY_TONES: Record<TaskPriority, string> = {
     p4: 'bg-text-muted/10 text-text-muted',
 };
 
-/**
- * Agents/Skills/Tasks PR #1017 — Phase 12.6 client. View-mode
- * switch (Cards / Table) + status filter. v1 ships both views;
- * Kanban + drag-drop transitions land in Phase 14.
- */
+const STATUS_DOT: Record<TaskStatus, string> = {
+    backlog: 'bg-slate-400',
+    todo: 'bg-info',
+    in_progress: 'bg-warning',
+    in_review: 'bg-violet-500',
+    blocked: 'bg-danger',
+    done: 'bg-success',
+    cancelled: 'bg-text-muted',
+};
+
+const VIEW_TABS = [
+    { key: 'cards', icon: LayoutGrid, label: 'Cards' },
+    { key: 'table', icon: Table2, label: 'Table' },
+    { key: 'kanban', icon: Kanban, label: 'Kanban' },
+] as const;
+
+type ViewKey = (typeof VIEW_TABS)[number]['key'];
+
+const STATUS_FILTERS: { key: TaskStatus | 'all'; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'backlog', label: 'Backlog' },
+    { key: 'todo', label: 'Todo' },
+    { key: 'in_progress', label: 'In progress' },
+    { key: 'in_review', label: 'In review' },
+    { key: 'blocked', label: 'Blocked' },
+    { key: 'done', label: 'Done' },
+    { key: 'cancelled', label: 'Cancelled' },
+];
+
 export function TasksList({ tasks }: { tasks: Task[] }) {
     const t = useTranslations('dashboard.tasksPage');
-    const tStatus = useTranslations('dashboard.tasksPage.status');
-    const [view, setView] = useState<'cards' | 'table' | 'kanban'>('cards');
+    const [view, setView] = useState<ViewKey>('cards');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
     const filtered = useMemo(
@@ -43,48 +68,85 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1">
-                    {(['cards', 'table', 'kanban'] as const).map((v) => (
+            {/* ── Toolbar ─────────────────────────────────────────────────── */}
+            <div className="flex flex-col gap-3 @sm/main:flex-row @sm/main:items-center @sm/main:justify-between">
+                {/* View mode segmented control */}
+                <div className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5 self-start">
+                    {VIEW_TABS.map(({ key, icon: Icon, label }) => (
                         <button
-                            key={v}
+                            key={key}
                             type="button"
-                            onClick={() => setView(v)}
-                            className={`text-xs px-2.5 py-1 rounded border transition-colors capitalize ${
-                                view === v
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border/60 dark:border-border-dark/60 text-text-secondary hover:text-text'
-                            }`}
+                            onClick={() => setView(key)}
+                            aria-pressed={view === key}
+                            title={label}
+                            className={cn(
+                                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150',
+                                view === key
+                                    ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                    : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark',
+                            )}
                         >
-                            {v}
+                            <Icon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="hidden @xs/main:inline">{label}</span>
                         </button>
                     ))}
                 </div>
-                <span className="text-xs text-text-muted">·</span>
-                <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value as TaskStatus | 'all')}
-                    className="text-xs px-2.5 py-1 rounded border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark text-text dark:text-text-dark"
-                >
-                    <option value="all">{t('list.filter.all')}</option>
-                    <option value="backlog">{tStatus('backlog')}</option>
-                    <option value="todo">{tStatus('todo')}</option>
-                    <option value="in_progress">{tStatus('in_progress')}</option>
-                    <option value="in_review">{tStatus('in_review')}</option>
-                    <option value="blocked">{tStatus('blocked')}</option>
-                    <option value="done">{tStatus('done')}</option>
-                    <option value="cancelled">{tStatus('cancelled')}</option>
-                </select>
-                <span className="text-xs text-text-muted ml-auto">
-                    {filtered.length} of {tasks.length}
+
+                {/* Count badge — kanban shows all tasks across columns, so
+                    only the list-level filter ratio is meaningful in
+                    cards/table. */}
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark bg-card dark:bg-card-primary-dark self-start @sm/main:self-auto">
+                    {view === 'kanban' ? tasks.length : `${filtered.length} / ${tasks.length}`}
                 </span>
             </div>
 
-            {filtered.length === 0 ? (
-                <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                    {statusFilter === 'all'
-                        ? t('empty.title')
-                        : `${t('empty.title')} (${tStatus(statusFilter)})`}
+            {/* ── Status filter pills ──────────────────────────────────────── */}
+            {/* Hidden in kanban view — the columns already group by status, so
+                the pills would just empty most columns when one is selected. */}
+            {view !== 'kanban' && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    {STATUS_FILTERS.map(({ key, label }) => {
+                        const isActive = statusFilter === key;
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setStatusFilter(key)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border whitespace-nowrap transition-colors shrink-0',
+                                    isActive
+                                        ? 'border-border dark:border-border-dark bg-white dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'border-border/60 dark:border-border-dark/60 text-text-muted dark:text-text-muted-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark',
+                                )}
+                            >
+                                {key !== 'all' && (
+                                    <span
+                                        className={cn(
+                                            'w-1.5 h-1.5 rounded-full shrink-0',
+                                            STATUS_DOT[key as TaskStatus],
+                                        )}
+                                    />
+                                )}
+                                {label}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── Content ─────────────────────────────────────────────────── */}
+            {view === 'kanban' ? (
+                // Kanban always gets the full set — its own columns are the
+                // status filter. The list-level `statusFilter` only governs
+                // cards/table.
+                <TasksKanbanView tasks={tasks} />
+            ) : filtered.length === 0 ? (
+                <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-8 text-center">
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {statusFilter === 'all'
+                            ? t('empty.title')
+                            : `${t('empty.title')} (${statusFilter.replace('_', ' ')})`}
+                    </p>
                 </div>
             ) : view === 'cards' ? (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
@@ -92,8 +154,6 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                         <TaskCard key={t.id} task={t} />
                     ))}
                 </div>
-            ) : view === 'kanban' ? (
-                <TasksKanbanView tasks={filtered} />
             ) : (
                 <TaskTable tasks={filtered} />
             )}
@@ -148,42 +208,54 @@ function TaskTable({ tasks }: { tasks: Task[] }) {
             <table className="w-full text-sm">
                 <thead className="bg-surface-secondary/50 dark:bg-surface-secondary-dark/50 text-xs text-text-secondary">
                     <tr>
-                        <th className="text-left px-4 py-2 font-medium">Slug</th>
-                        <th className="text-left px-4 py-2 font-medium">Title</th>
-                        <th className="text-left px-4 py-2 font-medium">Status</th>
-                        <th className="text-left px-4 py-2 font-medium">Priority</th>
-                        <th className="text-left px-4 py-2 font-medium">Updated</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Slug</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Title</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Status</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Priority</th>
+                        <th className="text-left px-4 py-2.5 font-medium">Updated</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 dark:divide-border-dark/60">
                     {tasks.map((t) => (
-                        <tr key={t.id} className="hover:bg-surface-secondary/30">
-                            <td className="px-4 py-2 font-mono text-xs text-text-muted">
+                        <tr
+                            key={t.id}
+                            className="hover:bg-surface-secondary/30 dark:hover:bg-surface-secondary-dark/20 transition-colors"
+                        >
+                            <td className="px-4 py-2.5 font-mono text-xs text-text-muted">
                                 {t.slug}
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-2.5">
                                 <Link
                                     href={ROUTES.DASHBOARD_TASK(t.id)}
-                                    className="text-text dark:text-text-dark hover:text-primary"
+                                    className="text-text dark:text-text-dark hover:text-primary transition-colors"
                                 >
                                     {t.title}
                                 </Link>
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-2.5">
                                 <span
-                                    className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${STATUS_TONES[t.status]}`}
+                                    className={cn(
+                                        'inline-flex items-center gap-1 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded',
+                                        STATUS_TONES[t.status],
+                                    )}
                                 >
+                                    <span
+                                        className={cn(
+                                            'w-1.5 h-1.5 rounded-full shrink-0',
+                                            STATUS_DOT[t.status],
+                                        )}
+                                    />
                                     {t.status.replace('_', ' ')}
                                 </span>
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-2.5">
                                 <span
                                     className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${PRIORITY_TONES[t.priority]}`}
                                 >
                                     {t.priority}
                                 </span>
                             </td>
-                            <td className="px-4 py-2 text-xs text-text-muted">
+                            <td className="px-4 py-2.5 text-xs text-text-muted">
                                 {new Date(t.updatedAt).toLocaleDateString()}
                             </td>
                         </tr>

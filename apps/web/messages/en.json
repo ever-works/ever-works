@@ -542,6 +542,37 @@
                 "sites": "Sites"
             }
         },
+        "agentsPreview": {
+            "title": "Agents",
+            "add": "Add",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Agents yet.",
+                "subtitleLink": "Create your first Agent",
+                "subtitleSuffix": "to delegate recurring work."
+            },
+            "scope": {
+                "tenant": "Workspace",
+                "mission": "Mission",
+                "work": "Work",
+                "idea": "Idea"
+            },
+            "cadence": "every {cadence}"
+        },
+        "recentTasks": {
+            "title": "Tasks",
+            "add": "Add",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Tasks yet.",
+                "subtitle": "Create one to start tracking work."
+            },
+            "view": {
+                "label": "Switch task view",
+                "list": "List view",
+                "cards": "Card view"
+            }
+        },
         "missionsPage": {
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
@@ -1063,6 +1094,7 @@
                 "totalItems": "Total Items"
             },
             "recent": "Works",
+            "add": "Add",
             "viewAll": "View all ({count})",
             "search": "Search works...",
             "create": "New Work",

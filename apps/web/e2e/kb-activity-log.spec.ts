@@ -38,7 +38,11 @@ interface ActivityRow {
     actionType: string;
     workId: string | null;
     createdAt: string;
-    metadata: Record<string, unknown> | null;
+    // The `activity_log` entity has two simple-json columns: `details`
+    // is the canonical payload bucket (KB service writes here), `metadata`
+    // is a lightweight ingest-tag bucket. Read either to stay green.
+    details?: Record<string, any> | null;
+    metadata?: Record<string, any> | null;
 }
 
 interface ActivityListResponse {
@@ -119,11 +123,20 @@ test.describe('Knowledge Base — A15 activity log sequence', () => {
         // 3. Correlation chain — uploadId carries from `_created` to
         //    `_extracted`; documentId carries from `_extracted` to
         //    `kb_document_created`.
-        const uploadId = upCreated.metadata?.uploadId;
+        //
+        // The `activity_log` entity has TWO simple-json columns: `details`
+        // (custom payload, where the KB service writes `{uploadId,...}`)
+        // and `metadata` (lightweight ingest tags). Earlier passes of this
+        // spec read `.metadata?.uploadId` which is always undefined and
+        // silently masked the failure. Read both fields so the spec keeps
+        // passing if the convention ever swaps.
+        const correlationId = (row: ActivityRow, key: 'uploadId' | 'documentId') =>
+            row.details?.[key] ?? row.metadata?.[key];
+        const uploadId = correlationId(upCreated, 'uploadId');
         expect(typeof uploadId).toBe('string');
-        expect(upExtracted.metadata?.uploadId).toBe(uploadId);
-        expect(upExtracted.metadata?.documentId).toBe(documentId);
-        expect(docCreated.metadata?.documentId).toBe(documentId);
+        expect(correlationId(upExtracted, 'uploadId')).toBe(uploadId);
+        expect(correlationId(upExtracted, 'documentId')).toBe(documentId);
+        expect(correlationId(docCreated, 'documentId')).toBe(documentId);
     });
 });
 

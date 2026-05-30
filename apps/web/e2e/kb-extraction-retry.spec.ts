@@ -37,11 +37,15 @@ import { seedKbSkippedUpload } from './helpers/kb-fixtures';
  * Workspace/knowledge/runbooks/KNOWLEDGE_BASE_HANDOFF.md).
  */
 
+// The `activity_log` entity has two simple-json columns: `details`
+// is the canonical payload bucket (KB service writes here), `metadata`
+// is a lightweight ingest-tag bucket. Read either to stay green.
 interface ActivityRow {
     actionType: string;
     workId: string | null;
     createdAt: string;
-    metadata: Record<string, unknown> | null;
+    details?: Record<string, any> | null;
+    metadata?: Record<string, any> | null;
 }
 
 interface ActivityListResponse {
@@ -128,7 +132,9 @@ test.describe('Knowledge Base — A16 retry-extraction', () => {
         );
         expect(skippedRows.length).toBeGreaterThanOrEqual(2);
         for (const row of skippedRows) {
-            expect(row.metadata?.uploadId).toBe(uploadId);
+            // KB service stamps the upload payload into `details`. See
+            // ActivityRow comment.
+            expect(row.details?.uploadId ?? row.metadata?.uploadId).toBe(uploadId);
         }
     });
 });
@@ -156,7 +162,9 @@ async function pollForSkippedRows(
         );
         if (res.ok()) {
             const body = (await res.json()) as ActivityListResponse;
-            const ours = body.activities.filter((r) => r.metadata?.uploadId === uploadId);
+            const ours = body.activities.filter(
+                (r) => (r.details?.uploadId ?? r.metadata?.uploadId) === uploadId,
+            );
             if (ours.length >= minCount) {
                 return ours.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
             }

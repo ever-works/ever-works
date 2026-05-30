@@ -172,8 +172,8 @@ describe('MissionsPreviewSection (Phase 6 PR S)', () => {
         );
         // Find the counter chip labeled "counters.sites".
         const sitesChip = screen.getByText('counters.sites').closest('div')!;
-        // The value is the next-sibling div.
-        const valueEl = sitesChip.parentElement?.querySelector('.text-sm.font-semibold');
+        // The value span lives inside the same MissionStat wrapper as the label.
+        const valueEl = sitesChip.querySelector('.text-sm.font-bold');
         expect(valueEl?.textContent).toBe('0');
         void container;
     });
