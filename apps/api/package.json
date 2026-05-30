@@ -16,6 +16,7 @@
         "start:debug": "nest start -b swc --debug --watch",
         "start:prod": "node dist/main",
         "build": "nest build -b swc",
+        "generate:openapi": "node dist/openapi/generate-openapi.js",
         "type-check": "tsc -p tsconfig.build.json --noEmit",
         "format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\"",
         "test": "jest --maxWorkers=2",
