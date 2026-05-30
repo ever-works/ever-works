@@ -198,4 +198,54 @@ describe('lazy-plugin-proxy', () => {
         // the hook is best-effort bookkeeping and must not mask the cause.
         await expect(stub.onLoad({} as never)).rejects.toThrow('original');
     });
+
+    // Regression: the stub is a plain object, NOT a thenable. Before the fix,
+    // `get` returned a materialize-and-forward wrapper for ANY unknown prop —
+    // including `then`. So `await stub` (or returning it from an async fn, or
+    // Promise.resolve(stub)) made the runtime see a thenable, call
+    // `then(resolve, reject)`, materialize, find no real `then` method, and
+    // throw `TypeError: Plugin "<id>" has no method "then"` from an async tick
+    // — an uncaught rejection that crashed the API process and ECONNREFUSED'd
+    // the rest of the e2e suite.
+    it('does not expose Promise-detection keys (then/catch/finally are undefined)', () => {
+        const loader = jest.fn().mockResolvedValue(makeRealPlugin('github', jest.fn()));
+        const stub = createLazyPluginProxy(makeManifest('github'), loader);
+        const asRecord = stub as unknown as Record<string, unknown>;
+
+        expect(asRecord.then).toBeUndefined();
+        expect(asRecord.catch).toBeUndefined();
+        expect(asRecord.finally).toBeUndefined();
+        expect(loader).not.toHaveBeenCalled();
+    });
+
+    it('`await stub` resolves to the stub without materializing or throwing', async () => {
+        const loader = jest.fn().mockResolvedValue(makeRealPlugin('github', jest.fn()));
+        const stub = createLazyPluginProxy(makeManifest('github'), loader);
+
+        // Must NOT throw `Plugin "github" has no method "then"`.
+        const awaited = await stub;
+
+        expect(awaited).toBe(stub);
+        expect(stub.__isMaterialized).toBe(false);
+        expect(loader).not.toHaveBeenCalled();
+    });
+
+    it('Promise.resolve(stub) does not trigger materialization', async () => {
+        const loader = jest.fn().mockResolvedValue(makeRealPlugin('github', jest.fn()));
+        const stub = createLazyPluginProxy(makeManifest('github'), loader);
+
+        await Promise.resolve(stub);
+
+        expect(loader).not.toHaveBeenCalled();
+    });
+
+    it('well-known symbol access returns undefined (no spurious materialization)', () => {
+        const loader = jest.fn().mockResolvedValue(makeRealPlugin('github', jest.fn()));
+        const stub = createLazyPluginProxy(makeManifest('github'), loader);
+        const asSym = stub as unknown as Record<symbol, unknown>;
+
+        expect(asSym[Symbol.iterator]).toBeUndefined();
+        expect(asSym[Symbol.asyncIterator]).toBeUndefined();
+        expect(loader).not.toHaveBeenCalled();
+    });
 });

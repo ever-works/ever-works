@@ -169,6 +169,11 @@ jobs:
           pnpm exec playwright test --shard=${{ matrix.shard }}/4
           echo "::endgroup::"
         env:
+          # Give every Node process (API, web, the swc/tsc type-checker, and
+          # Playwright) generous heap headroom on the 32 GB
+          # ubicloud-standard-8 runner instead of V8's ~2 GB default old-space,
+          # so a heavy dev-mode e2e run never starves for memory.
+          NODE_OPTIONS: --max-old-space-size=8192
           # API
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
@@ -419,6 +424,9 @@ jobs:
           pnpm exec playwright test bundle-size-budget static-asset-fingerprint
           echo "::endgroup::"
         env:
+          # Heap headroom on the 32 GB runner — see the dev-mode job's
+          # NODE_OPTIONS note above.
+          NODE_OPTIONS: --max-old-space-size=8192
           # API + web env mirror the dev-mode job above; the only delta
           # is NODE_ENV=production for the web server (set inline on
           # the `start` command) so the asset-fingerprint / bundle-
