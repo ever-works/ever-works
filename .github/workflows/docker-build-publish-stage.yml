@@ -29,6 +29,13 @@ jobs:
         with:
           driver: docker
 
+      - name: Prepare build metadata
+        id: meta
+        run: |
+          VERSION=$(grep -m1 '"version"' apps/api/package.json | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
@@ -44,6 +51,11 @@ jobs:
           cache-to: type=inline
           build-args: |
             NODE_ENV=development
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            GIT_REF=${{ github.ref_name }}
+            BUILD_RUN=${{ github.run_number }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
 
       - name: Docker images list
         run: |
@@ -112,6 +124,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
+      - name: Prepare build metadata
+        id: meta
+        run: |
+          VERSION=$(grep -m1 '"version"' apps/web/package.json | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
       - name: Build
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25  # v5
         with:
@@ -132,6 +151,11 @@ jobs:
             NODE_ENV=production
             NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_API_KEY }}
             NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
+            NEXT_PUBLIC_BUILD_VERSION=${{ steps.meta.outputs.version }}
+            NEXT_PUBLIC_BUILD_SHA=${{ github.sha }}
+            NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
+            NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
+            NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
 
       - name: Docker images list
         run: |

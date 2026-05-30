@@ -6,6 +6,7 @@ export * from './website';
 export * from './server-api';
 export * from './settings';
 export * from './health';
+export * from './version';
 export * from './members';
 export * from './invitations';
 export * from './claim';
