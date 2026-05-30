@@ -95,6 +95,14 @@ spec:
               value: "$AUTH_SECRET"
             - name: JWT_SECRET
               value: "$JWT_SECRET"
+            # V8 heap: bootstrap (TypeORM ~150 entities + Nest DI graph +
+            # transitively-imported plugin packages) exceeds Node 22's default
+            # ~1.7 GiB old-space BEFORE #1156's lazy deferral runs in
+            # onApplicationBootstrap(), so the pod V8-OOM crashloops even under
+            # the 4 GiB cgroup limit (#1145). Raise old-space to 3 GiB — fits
+            # comfortably under the limit and lets bootstrap complete.
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=3072"
 
             # Trigger.dev
             - name: TRIGGER_ENABLED
