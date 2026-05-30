@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { configDotenv } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
+import { buildOpenApiConfig } from './openapi/openapi-document.config';
 import helmet from 'helmet';
 import { initSentry, initPostHog, PostHogLoggerService } from '@ever-works/monitoring';
 import { IncomingMessage, ServerResponse } from 'http';
@@ -118,34 +119,9 @@ async function bootstrap() {
         }),
     );
 
-    // OpenAPI/Swagger configuration
-    const config = new DocumentBuilder()
-        .setTitle('Ever Works API')
-        .setDescription(
-            'The Ever Works Platform API - Build and manage AI-powered works with automated content generation, deployment, and integrations.',
-        )
-        .setVersion('1.0')
-        .addBearerAuth(
-            {
-                type: 'http',
-                scheme: 'bearer',
-                bearerFormat: 'JWT',
-                name: 'Authorization',
-                description: 'Enter your JWT token',
-                in: 'header',
-            },
-            'JWT-auth',
-        )
-        .addTag('Health', 'API health check endpoints')
-        .addTag('Auth', 'Authentication and authorization endpoints')
-        .addTag('Works', 'Work management endpoints')
-        .addTag('Deploy', 'Deployment endpoints')
-        .addTag('AI Conversation', 'AI-powered conversation and content generation')
-        .addTag('Screenshot', 'Screenshot capture and smart image preview')
-        .addTag('Subscriptions', 'Subscription and billing management')
-        .addTag('Notifications', 'User notifications')
-        .addTag('Members', 'Work member management')
-        .build();
+    // OpenAPI/Swagger configuration (shared with the build-time
+    // `generate-openapi` script that bundles the spec into the MCP image).
+    const config = buildOpenApiConfig();
 
     // C-09: never expose Swagger UI, the Scalar reference, or the OpenAPI JSON spec
     // in production. The OpenAPI document hands attackers a full inventory of public,

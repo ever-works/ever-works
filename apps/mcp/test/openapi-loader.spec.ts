@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { OpenApiLoaderService } from '../src/openapi-tools/openapi-loader.service.js';
 import { McpConfigService } from '../src/config/mcp-config.service.js';
 
@@ -8,6 +10,14 @@ vi.mock('@apidevtools/swagger-parser', () => ({
 		dereference: vi.fn((spec: unknown) => Promise.resolve(spec))
 	}
 }));
+
+// Mock fs so the bundled-spec branch is controllable per-test. Default:
+// no bundled file present, so existing tests fall through to fetch.
+vi.mock('fs', () => ({ existsSync: vi.fn(() => false) }));
+vi.mock('fs/promises', () => ({ readFile: vi.fn() }));
+
+const existsSyncMock = vi.mocked(existsSync);
+const readFileMock = vi.mocked(readFile);
 
 describe('OpenApiLoaderService', () => {
 	let service: OpenApiLoaderService;
@@ -71,6 +81,8 @@ describe('OpenApiLoaderService', () => {
 		service = new OpenApiLoaderService(config);
 		fetchSpy = vi.fn();
 		globalThis.fetch = fetchSpy;
+		existsSyncMock.mockReturnValue(false);
+		readFileMock.mockReset();
 	});
 
 	afterEach(() => {
@@ -146,5 +158,37 @@ describe('OpenApiLoaderService', () => {
 		mockFetchSpec({ openapi: '3.0.0', info: { title: 'Empty', version: '1.0' }, paths: {} });
 		await service.onModuleInit();
 		expect(service.getOperations()).toHaveLength(0);
+	});
+
+	it('loads from the bundled spec file when specPath is set and present (no fetch)', async () => {
+		const config = {
+			apiUrl: 'http://localhost:3100/api',
+			specPath: '/app/openapi.json'
+		} as McpConfigService;
+		service = new OpenApiLoaderService(config);
+		existsSyncMock.mockReturnValue(true);
+		readFileMock.mockResolvedValue(JSON.stringify(minimalSpec));
+
+		await service.onModuleInit();
+
+		expect(readFileMock).toHaveBeenCalledWith('/app/openapi.json', 'utf8');
+		expect(fetchSpy).not.toHaveBeenCalled();
+		expect(service.getOperations().length).toBe(3);
+	});
+
+	it('falls back to fetching the API when the bundled spec path is missing', async () => {
+		const config = {
+			apiUrl: 'http://localhost:3100/api',
+			specPath: '/app/openapi.json'
+		} as McpConfigService;
+		service = new OpenApiLoaderService(config);
+		existsSyncMock.mockReturnValue(false);
+		mockFetchSpec();
+
+		await service.onModuleInit();
+
+		expect(readFileMock).not.toHaveBeenCalled();
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+		expect(service.getOperations().length).toBe(3);
 	});
 });
