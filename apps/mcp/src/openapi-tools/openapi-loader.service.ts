@@ -78,9 +78,7 @@ export class OpenApiLoaderService implements OnModuleInit {
 		if (specPath && existsSync(specPath)) {
 			const spec = await this.readFileAndDereference(specPath);
 			this.operations = this.extractOperations(spec);
-			this.logger.log(
-				`Loaded ${this.operations.length} operations from bundled OpenAPI spec at ${specPath}`
-			);
+			this.logger.log(`Loaded ${this.operations.length} operations from bundled OpenAPI spec at ${specPath}`);
 			return;
 		}
 		if (specPath) {
