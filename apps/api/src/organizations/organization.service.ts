@@ -529,20 +529,17 @@ export class OrganizationService {
             // rows where it's still NULL. Idempotent — re-running this
             // is a no-op once all rows have tenantId set.
             const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
+            // Emit driver-correct positional placeholders. Postgres uses `$1/$2`;
+            // better-sqlite3 (the e2e in-memory driver) uses `?`. The previously
+            // hard-coded `$1/$2` raw query threw `RangeError: Too many parameter
+            // values were provided` under sqlite, which 500'd the whole
+            // create-Organization transaction. Behaviour on Postgres is unchanged.
+            const isPostgres = manager.connection?.options?.type === 'postgres';
             for (const { table, userColumn } of allTables) {
-                // Use the query builder rather than a raw `$1/$2` string so the
-                // placeholders are emitted in the driver's own dialect. The raw
-                // Postgres-style `$n` form throws `RangeError: Too many parameter
-                // values were provided` under better-sqlite3 (the e2e in-memory
-                // driver), which 500'd the whole create-Organization transaction.
-                // The generated SQL is identical to the previous raw form on
-                // Postgres, so production behaviour is unchanged.
-                await manager
-                    .createQueryBuilder()
-                    .update(table)
-                    .set({ tenantId: tenant.id })
-                    .where(`"${userColumn}" = :userId AND "tenantId" IS NULL`, { userId })
-                    .execute();
+                const sql = isPostgres
+                    ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
+                    : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`;
+                await manager.query(sql, [tenant.id, userId]);
             }
 
             this.logger.log(
