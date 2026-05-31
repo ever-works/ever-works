@@ -79,7 +79,14 @@ export interface KanbanArtifact {
  * Each maps to a React component in `canvas/components.tsx`. Extend both in
  * lockstep when adding to the canvas catalog.
  */
-export const CANVAS_COMPONENT_KEYS = ['progress', 'timeline', 'gauge', 'comparison'] as const;
+export const CANVAS_COMPONENT_KEYS = [
+    'progress',
+    'timeline',
+    'gauge',
+    'comparison',
+    'markdown',
+    'gallery',
+] as const;
 export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
 
 export interface ComponentArtifact {

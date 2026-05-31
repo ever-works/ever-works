@@ -137,7 +137,9 @@ export const showComponent = tool({
         'Components — "progress": props { bars: [{ label, percent, caption? }] } (labeled percent bars); ' +
         '"gauge": props { label, percent, caption? } (one big % dial, great for budget/cap usage); ' +
         '"timeline": props { items: [{ title, subtitle?, status? }] } (vertical event history); ' +
-        '"comparison": props { left: { title, fields: [{ label, value }] }, right: {…} } (side-by-side compare). ' +
+        '"comparison": props { left: { title, fields: [{ label, value }] }, right: {…} } (side-by-side compare); ' +
+        '"markdown": props { content } (render a KB doc / README / item body); ' +
+        '"gallery": props { images: [string | { url, caption? }] } (image / screenshot grid). ' +
         'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),

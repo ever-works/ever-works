@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils/cn';
+import { ChatMarkdown } from '../ChatMarkdown';
 import type { CanvasComponentKey } from './types';
 
 /**
@@ -168,6 +169,56 @@ function Comparison({ props }: { props: Record<string, unknown> }) {
     );
 }
 
+/** props: { content } — render markdown (KB doc, README, item body) in the canvas. */
+function Markdown({ props }: { props: Record<string, unknown> }) {
+    const content = str(props.content);
+    if (!content.trim()) return <Empty label="No content" />;
+    return (
+        <div className="text-xs leading-relaxed text-text dark:text-text-dark">
+            <ChatMarkdown content={content} />
+        </div>
+    );
+}
+
+/** props: { images: [string | { url, caption? }] } — image / screenshot grid. */
+function Gallery({ props }: { props: Record<string, unknown> }) {
+    const raw = Array.isArray(props.images) ? (props.images as unknown[]) : [];
+    const images = raw
+        .map((item) => {
+            if (typeof item === 'string') return { url: item, caption: '' };
+            if (item && typeof item === 'object') {
+                const o = item as Record<string, unknown>;
+                return { url: str(o.url ?? o.src), caption: str(o.caption ?? o.label) };
+            }
+            return { url: '', caption: '' };
+        })
+        .filter((i) => i.url);
+    if (!images.length) return <Empty label="No images" />;
+    return (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {images.map((img, i) => (
+                <figure
+                    key={i}
+                    className="overflow-hidden rounded-lg border border-border dark:border-border-dark"
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary external URLs, not a known domain */}
+                    <img
+                        src={img.url}
+                        alt={img.caption || `image ${i + 1}`}
+                        loading="lazy"
+                        className="h-28 w-full object-cover"
+                    />
+                    {img.caption ? (
+                        <figcaption className="truncate px-2 py-1 text-[10px] text-text-muted dark:text-text-muted-dark">
+                            {img.caption}
+                        </figcaption>
+                    ) : null}
+                </figure>
+            ))}
+        </div>
+    );
+}
+
 function Empty({ label }: { label: string }) {
     return (
         <div className="flex h-24 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
@@ -184,6 +235,8 @@ const REGISTRY: Record<
     timeline: Timeline,
     gauge: Gauge,
     comparison: Comparison,
+    markdown: Markdown,
+    gallery: Gallery,
 };
 
 export function renderCanvasComponent(
