@@ -48,20 +48,23 @@ export function chatSendButton(page: Page): Locator {
  * Navigates to a dashboard route if the current page isn't one.
  */
 export async function openChatPanel(page: Page, dashboardRoute = '/works'): Promise<void> {
-    const onDashboard = /\/(works|tasks|agents|skills|missions|ideas|plugins|settings|activity|dashboard)/.test(
-        new URL(page.url() || 'http://localhost').pathname || '',
-    );
-    if (!onDashboard) {
+    // Open the panel server-side via the chat-panel-open cookie BEFORE the
+    // first navigation, so the composer is present on the first authenticated
+    // render (no reload dance). The dashboard layout reads this cookie.
+    const base = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
+    await page.context().addCookies([
+        { name: 'chat-panel-open', value: '1', url: new URL(base).origin },
+    ]);
+
+    // Navigate, recovering from a transient cold auth-redirect to /login (the
+    // stored session occasionally isn't applied on the very first hit under
+    // `next dev` in CI — a fresh navigation with the same storageState authenticates).
+    for (let attempt = 0; attempt < 3; attempt++) {
         await page.goto(dashboardRoute, { waitUntil: 'domcontentloaded' });
+        if (!/\/login(\?|$)/.test(page.url())) break;
+        await page.waitForTimeout(1_500);
     }
 
-    if (await chatComposer(page).isVisible({ timeout: 3_000 }).catch(() => false)) return;
-
-    const origin = new URL(page.url()).origin;
-    await page.context().addCookies([
-        { name: 'chat-panel-open', value: '1', url: origin },
-    ]);
-    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(chatComposer(page)).toBeVisible({ timeout: 45_000 });
 }
 
