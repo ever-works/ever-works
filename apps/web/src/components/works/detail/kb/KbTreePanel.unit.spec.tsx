@@ -307,13 +307,18 @@ describe('KbTreePanel', () => {
                     workId: 'work-1',
                     documents: [],
                     inheritedDocuments: [
-                        // Seed order is intentionally noisy.
+                        // Seed order is intentionally noisy. Inherited docs are
+                        // org-scoped (workId === null) — the tree's inherited
+                        // section only renders genuine org docs (overrides are
+                        // Work-owned and filtered out).
                         doc({
                             id: '1',
                             title: 'zebra',
                             class: 'style',
                             slug: 'z',
                             path: 'style/z.md',
+                            workId: null,
+                            organizationId: 'org-1',
                         }),
                         doc({
                             id: '2',
@@ -321,6 +326,8 @@ describe('KbTreePanel', () => {
                             class: 'legal',
                             slug: 'a',
                             path: 'legal/a.md',
+                            workId: null,
+                            organizationId: 'org-1',
                         }),
                         doc({
                             id: '3',
@@ -328,6 +335,8 @@ describe('KbTreePanel', () => {
                             class: 'legal',
                             slug: 'b',
                             path: 'legal/b.md',
+                            workId: null,
+                            organizationId: 'org-1',
                         }),
                         doc({
                             id: '4',
@@ -335,6 +344,8 @@ describe('KbTreePanel', () => {
                             class: 'style',
                             slug: 'c',
                             path: 'style/c.md',
+                            workId: null,
+                            organizationId: 'org-1',
                         }),
                     ],
                 }),
@@ -360,6 +371,8 @@ describe('KbTreePanel', () => {
                             class: 'legal',
                             slug: 'privacy',
                             path: 'legal/privacy.md',
+                            workId: null,
+                            organizationId: 'org-1',
                         }),
                     ],
                 }),
@@ -373,6 +386,95 @@ describe('KbTreePanel', () => {
             expect(screen.getByTestId('kb-tree-inherited-description').textContent).toBe(
                 'panes.tree.inheritedSection.description',
             );
+        });
+
+        // ─── EW-641 Phase 2/e row 38d — override masks the inherited row ───
+        // `inheritedDocuments` is the MERGED effective set from
+        // `resolveInheritableDocuments` (org docs with Work overrides applied
+        // by path). Once a Work overrides an inherited doc, that path comes
+        // back Work-OWNED (`workId !== null`) and must NOT appear in the
+        // "Inherited from organization" section — the Work-owned copy lives in
+        // the per-class groups instead. (kb-inherited.spec.ts step 7.)
+        it('excludes Work-overridden docs (workId !== null) from the inherited section', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [
+                        // The override surfaces here as a normal Work-owned doc.
+                        doc({
+                            id: 'work-privacy',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: 'work-1',
+                            organizationId: null,
+                        }),
+                    ],
+                    inheritedDocuments: [
+                        // Merged set: the privacy path is now Work-owned (overridden)…
+                        doc({
+                            id: 'work-privacy',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: 'work-1',
+                            organizationId: null,
+                        }),
+                        // …while terms is still a genuine org-scoped inherited doc.
+                        doc({
+                            id: 'org-terms',
+                            title: 'Terms',
+                            class: 'legal',
+                            slug: 'terms',
+                            path: 'legal/terms.md',
+                            workId: null,
+                            organizationId: 'org-1',
+                        }),
+                    ],
+                }),
+            );
+
+            // The overridden privacy row must NOT show in the inherited section.
+            expect(screen.queryByTestId('kb-tree-inherited-legal-privacy')).toBeNull();
+            // The still-inherited terms row remains.
+            expect(screen.getByTestId('kb-tree-inherited-legal-terms')).toBeTruthy();
+        });
+
+        it('hides the inherited section entirely when every inherited doc is overridden', async () => {
+            render(
+                await KbTreePanel({
+                    workId: 'work-1',
+                    documents: [
+                        doc({
+                            id: 'work-privacy',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: 'work-1',
+                            organizationId: null,
+                        }),
+                    ],
+                    inheritedDocuments: [
+                        doc({
+                            id: 'work-privacy',
+                            title: 'Privacy',
+                            class: 'legal',
+                            slug: 'privacy',
+                            path: 'legal/privacy.md',
+                            workId: 'work-1',
+                            organizationId: null,
+                        }),
+                    ],
+                }),
+            );
+
+            // Only an overridden (Work-owned) entry remains → no inherited section.
+            expect(screen.queryByTestId('kb-tree-inherited')).toBeNull();
+            // The Work-owned copy still renders in its class group.
+            expect(screen.getByTestId('kb-tree-group-legal')).toBeTruthy();
         });
     });
 });

@@ -108,22 +108,22 @@ spec:
               value: "$AUTH_SECRET"
             - name: JWT_SECRET
               value: "$JWT_SECRET"
-            # V8 heap: bootstrap (TypeORM ~150 entities + Nest DI graph +
-            # transitively-imported plugin packages) exceeds Node 22's default
-            # ~1.7 GiB old-space BEFORE #1156's lazy deferral runs in
-            # onApplicationBootstrap(), so the pod V8-OOM crashloops under a
-            # too-small heap (#1145). Old-space is kept at 6 GiB (#1169) to
-            # clear the bootstrap peak.
+            # V8 heap cap right-sized to 2 GiB (was 6 GiB / #1169). Measured
+            # footprint of the compiled API after #1156 lazy plugin loading +
+            # the #1190 lazy-proxy materialize fix: ~370 MiB at boot, ~0.4-1.2
+            # GiB under chat/normal load, ~540 MiB with every plugin eagerly
+            # imported. Verified: clean boot, no V8-OOM under a 2 GiB cap.
             #
-            # IMPORTANT: a 6 GiB heap means the pod RSS can climb to ~6 GiB, so
-            # `resources.requests.memory` below MUST match (6Gi). Otherwise the
-            # scheduler reserves only the nominal request (was 2Gi) and
-            # over-packs nodes; the pod then balloons past what the node can
-            # back and the kubelet evicts it under memory pressure — the
-            # 2026-05-30 chat outage (api crashloop, a node at 102% mem).
-            # Lasting footprint fix: EW-693 (plugins imported eagerly at boot).
+            # Keep `--max-old-space-size` ~= 2/3 of `resources.limits.memory`
+            # (3Gi below) so V8 GCs before the container OOM-kills, and keep
+            # `resources.requests.memory` (2Gi) close to real steady-state so
+            # the scheduler reserves accurately without over-packing nodes.
+            # History: #1145/#1169 raised heap+request to 6 GiB during the
+            # 2026-05-30 "OOM" — which was actually the lazy-proxy chat
+            # regression (fixed in #1190), not a true leak. Lasting plugin
+            # footprint work: EW-693.
             - name: NODE_OPTIONS
-              value: "--max-old-space-size=6144"
+              value: "--max-old-space-size=2048"
 
             # Trigger.dev
             - name: TRIGGER_ENABLED
@@ -328,15 +328,15 @@ spec:
 
           resources:
             requests:
-              # Sized to the 6 GiB V8 heap (NODE_OPTIONS above): the pod RSS can
-              # reach ~6 GiB, so reserve it honestly — otherwise the scheduler
-              # over-packs the node and the kubelet evicts the pod under memory
-              # pressure (the 2026-05-30 chat outage). Needs node capacity to
-              # back 4 api pods (prod x2 + stage + dev) at this reservation.
-              memory: "6Gi"
+              # Right-sized to measured steady-state (~370 MiB boot, ~0.4-1.2
+              # GiB under load) with headroom — see the NODE_OPTIONS note above.
+              # Reserves honestly without over-packing the node (the previous
+              # 6 GiB reservation needlessly held ~24 GiB across the 4 api pods:
+              # prod x2 + stage + dev).
+              memory: "2Gi"
               cpu: "500m"
             limits:
-              memory: "8Gi"
+              memory: "3Gi"
               cpu: "2"
 
           ports:

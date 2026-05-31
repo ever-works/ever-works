@@ -529,11 +529,17 @@ export class OrganizationService {
             // rows where it's still NULL. Idempotent — re-running this
             // is a no-op once all rows have tenantId set.
             const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
+            // Emit driver-correct positional placeholders. Postgres uses `$1/$2`;
+            // better-sqlite3 (the e2e in-memory driver) uses `?`. The previously
+            // hard-coded `$1/$2` raw query threw `RangeError: Too many parameter
+            // values were provided` under sqlite, which 500'd the whole
+            // create-Organization transaction. Behaviour on Postgres is unchanged.
+            const isPostgres = manager.connection?.options?.type === 'postgres';
             for (const { table, userColumn } of allTables) {
-                await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
-                    [tenant.id, userId],
-                );
+                const sql = isPostgres
+                    ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
+                    : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`;
+                await manager.query(sql, [tenant.id, userId]);
             }
 
             this.logger.log(

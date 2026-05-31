@@ -14,6 +14,7 @@ const MenuButtonCompat = MenuButton as unknown as React.ComponentType<{
     children?: React.ReactNode;
     as?: React.ElementType;
     className?: string;
+    'aria-label'?: string;
 }>;
 
 const MenuItemsCompat = MenuItems as unknown as React.ComponentType<{
@@ -40,15 +41,31 @@ interface DropdownMenuTriggerProps {
     children: React.ReactNode;
     asChild?: boolean;
     className?: string;
+    /**
+     * Accessible name for the trigger button. Previously dropped on the
+     * floor (the headlessui MenuButton never received it), leaving
+     * icon-only triggers like the org WorkspaceSwitcher with no accessible
+     * name. Now forwarded so screen readers — and role-based test
+     * locators — can find the control.
+     */
+    'aria-label'?: string;
 }
 
-export function DropdownMenuTrigger({ children, asChild, className }: DropdownMenuTriggerProps) {
+export function DropdownMenuTrigger({
+    children,
+    asChild,
+    className,
+    'aria-label': ariaLabel,
+}: DropdownMenuTriggerProps) {
     if (asChild && React.isValidElement(children)) {
         return <MenuButtonCompat as={React.Fragment}>{children}</MenuButtonCompat>;
     }
 
     return (
-        <MenuButtonCompat className={cn('inline-flex items-center justify-center', className)}>
+        <MenuButtonCompat
+            className={cn('inline-flex items-center justify-center', className)}
+            aria-label={ariaLabel}
+        >
             {children}
         </MenuButtonCompat>
     );
