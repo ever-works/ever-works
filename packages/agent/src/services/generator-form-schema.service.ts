@@ -318,28 +318,42 @@ export class GeneratorFormSchemaService {
             // canExtract() URL matching in the facade — they are not user-selectable providers.
             if (registered.manifest.supplementary) continue;
 
-            // Check if plugin is enabled for this context
-            if (options?.workId || options?.userId) {
-                const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
-                    registered.plugin.id,
-                    options.workId,
-                    options.userId,
-                );
-                if (!isEnabled) {
-                    continue;
+            // Resilience: a single plugin whose enable-check / settings
+            // resolution / model-summary build throws must NOT 500 the whole
+            // provider list — that breaks the dashboard's "load AI providers"
+            // call entirely (the chat then shows "failed to load AI
+            // providers"). Skip the offending plugin instead, mirroring the
+            // fault-tolerance isPluginConfigured already applies internally.
+            try {
+                // Check if plugin is enabled for this context
+                if (options?.workId || options?.userId) {
+                    const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
+                        registered.plugin.id,
+                        options.workId,
+                        options.userId,
+                    );
+                    if (!isEnabled) {
+                        continue;
+                    }
                 }
-            }
 
-            const configured = await this.isPluginConfigured(registered, options);
-            result.push(
-                await this.toProviderOption(
-                    registered,
-                    activePluginId,
-                    configured,
-                    capability,
-                    options,
-                ),
-            );
+                const configured = await this.isPluginConfigured(registered, options);
+                result.push(
+                    await this.toProviderOption(
+                        registered,
+                        activePluginId,
+                        configured,
+                        capability,
+                        options,
+                    ),
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
         }
 
         return result;
