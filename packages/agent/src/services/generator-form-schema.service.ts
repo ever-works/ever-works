@@ -348,10 +348,15 @@ export class GeneratorFormSchemaService {
                     ),
                 );
             } catch (error) {
+                // Pass the stack as the 2nd arg so the NestJS logger attaches
+                // the full call chain — without it (once the PostHog logger
+                // fix #1183 restores logging) only the bare message would
+                // surface, making the originally-throwing plugin hard to trace.
                 this.logger.warn(
                     `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${
                         error instanceof Error ? error.message : String(error)
                     }`,
+                    error instanceof Error ? error.stack : undefined,
                 );
             }
         }
