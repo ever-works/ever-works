@@ -852,18 +852,24 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 - Long-running/async actions (generate_items, deploy_work, customize_template, refresh_work_proposals, account export/sync) return job handles not final results; canvas needs polling/streaming progress components (GenerationProgressCard, ExportProgressCard) and the model must not fabricate completion.
 - Reports engine has no dedicated aggregation endpoints for most of the 95 reports; run_report must derive aggregates from list endpoints, risking heavy fan-out, pagination limits, and inconsistent metrics; needs a defined aggregation contract and caching.
 
-## 10. Shipped in this PR (Wave 1 foundation)
+## 10. Shipped in this PR (Waves 1-3)
 
 - **Engine:** `apps/web/src/lib/ai/tools/generated/{api-call,registry,factory}.ts` - manifest-driven tool generator with the no-bulk guard + confirmation gate baked in.
 
-- **Seed registry:** ~80 single-entity tools across agents, tasks, skills, notifications, work members, API keys, budgets/usage, webhooks, organizations, knowledge base, templates, and plugins - domains the chat did not previously cover. (Works/items/missions/ideas/deploy/schedule already ship as hand-written tools.)
+- **Registry (Waves 1-3, ~300 generated tools):**
+    - Wave 1 (`registry.ts`) - ~80 hand-curated single-entity tools across agents, tasks, skills, notifications, work members, API keys, budgets/usage, webhooks, organizations, knowledge base, templates, plugins.
+    - Wave 2 (`registry.wave2.ts`) - +200 tools across 13 domains with **real DTO-derived body hints** (works config/website/taxonomy, comparisons, deploy domains/rollback, git/github/oauth reads, agent runs/files/attachments, task relations/blocks, mission/idea attachments, work-agent goals, composio/device-auth, KB uploads/locks/inheritable, auth/account/onboarding/subscriptions, notification prefs, email, activity log, templates, screenshot/search/agent-memory).
+    - Wave 3 (`registry.wave3.ts`) - the remaining read/report GET tools, generated deterministically from the inventory.
+    - `registry.all.ts` merges and dedupes all three (earlier waves win). Works/items/missions/ideas/deploy/schedule already ship as hand-written tools and are not duplicated.
+
+- **Per-turn tool gating** (`tool-selection.ts`): the full ~300-tool set stays available, but each turn surfaces only an always-on core (navigation, canvas, search, user, works) plus the tools whose domain matches the latest message / current page, capped at 90 - keeping the schema payload bounded and well under provider function-count limits.
 
 - **Canvas:** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts chart + table + stat + detail renderers); `lib/ai/tools/canvas.tools.ts`.
 
-- **Wiring:** merged into `buildChatTools()`; system prompt updated with the safety + canvas rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
+- **Wiring:** merged into `buildChatTools()`; `agent.ts` gates tools per turn; system prompt updated with the safety + canvas rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
 
-- **Verified:** `tsc --noEmit` clean, `eslint` clean on all new/touched files.
+- **Verified:** web `tsc --noEmit` clean, `eslint` clean, `prettier` clean; CI green on each push.
 
 ### Next waves
 
-Waves 2-7 (above) extend the registry to the full chat-tool set, add the canvas catalog + `show_component` embedding, and implement `run_report`. Each wave is a registry-data + renderer addition on this engine - parallelizable across agents.
+Remaining: the richer per-domain **canvas catalog** (113 components in section 6) + `show_component` embedding of existing dashboard components, and `run_report` against the 95 catalogued reports (section 7). Plus the small tail of mutation endpoints not yet registered. Each is a registry-data + renderer addition on this engine - parallelizable across agents.
