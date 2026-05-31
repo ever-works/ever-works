@@ -97,4 +97,62 @@ describe('CanvasArtifactView', () => {
             'https://example.com/a.png',
         );
     });
+
+    // Wave 9/10/18/20 bespoke components — render without crashing + show content.
+    const componentCases: Array<{
+        component: ComponentArtifact['component'];
+        props: Record<string, unknown>;
+        expect: string;
+    }> = [
+        { component: 'gauge', props: { label: 'Cap', percent: 55 }, expect: '55%' },
+        {
+            component: 'comparison',
+            props: {
+                left: { title: 'A', fields: [{ label: 'x', value: '1' }] },
+                right: { title: 'B', fields: [] },
+            },
+            expect: 'A',
+        },
+        {
+            component: 'funnel',
+            props: { stages: [{ label: 'Visits', value: 100 }] },
+            expect: 'Visits',
+        },
+        {
+            component: 'metric_delta',
+            props: { metrics: [{ label: 'MRR', value: '$10', delta: 3 }] },
+            expect: 'MRR',
+        },
+        { component: 'donut', props: { segments: [{ label: 'Open', value: 3 }] }, expect: 'Open' },
+        { component: 'bars', props: { items: [{ label: 'tasks', value: 5 }] }, expect: 'tasks' },
+        { component: 'kpi', props: { label: 'Total', value: 42 }, expect: '42' },
+        {
+            component: 'steps',
+            props: { steps: [{ label: 'Connect git', done: true }] },
+            expect: 'Connect git',
+        },
+        {
+            component: 'badges',
+            props: { badges: [{ label: 'Active', tone: 'success' }] },
+            expect: 'Active',
+        },
+        {
+            component: 'code',
+            props: { code: 'const x = 1', language: 'ts' },
+            expect: 'const x = 1',
+        },
+    ];
+    componentCases.forEach(({ component, props, expect: text }) => {
+        it(`renders the "${component}" bespoke component`, () => {
+            const artifact: ComponentArtifact = {
+                id: '1',
+                kind: 'component',
+                title: 't',
+                component,
+                props,
+            };
+            render(<CanvasArtifactView artifact={artifact} />);
+            expect(screen.getByText((c) => c.includes(text))).toBeTruthy();
+        });
+    });
 });
