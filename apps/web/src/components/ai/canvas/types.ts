@@ -86,6 +86,8 @@ export const CANVAS_COMPONENT_KEYS = [
     'comparison',
     'markdown',
     'gallery',
+    'funnel',
+    'metric_delta',
 ] as const;
 export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
 

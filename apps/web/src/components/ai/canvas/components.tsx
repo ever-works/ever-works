@@ -219,6 +219,76 @@ function Gallery({ props }: { props: Record<string, unknown> }) {
     );
 }
 
+/** props: { stages: [{ label, value }] } — funnel where each bar is sized vs the first stage. */
+function Funnel({ props }: { props: Record<string, unknown> }) {
+    const stages = asArray(props.stages).map((s) => ({ label: str(s.label), value: num(s.value) }));
+    if (!stages.length) return <Empty label="No stages" />;
+    const top = Math.max(stages[0].value, 1);
+    return (
+        <div className="space-y-2">
+            {stages.map((stage, i) => {
+                const pct = Math.max(2, Math.round((stage.value / top) * 100));
+                const conv = i === 0 ? 100 : Math.round((stage.value / top) * 100);
+                return (
+                    <div key={i}>
+                        <div className="mb-0.5 flex items-center justify-between text-[11px]">
+                            <span className="text-text dark:text-text-dark">{stage.label}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {stage.value} · {conv}%
+                            </span>
+                        </div>
+                        <div
+                            className="mx-auto h-5 rounded bg-primary/80"
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/** props: { metrics: [{ label, value, delta?, deltaLabel? }] } — stat tiles with up/down deltas. */
+function MetricDelta({ props }: { props: Record<string, unknown> }) {
+    const metrics = asArray(props.metrics);
+    if (!metrics.length) return <Empty label="No metrics" />;
+    return (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {metrics.map((m, i) => {
+                const delta = m.delta === undefined || m.delta === null ? null : num(m.delta);
+                const tone =
+                    delta === null
+                        ? 'text-text-muted dark:text-text-muted-dark'
+                        : delta > 0
+                          ? 'text-success'
+                          : delta < 0
+                            ? 'text-danger'
+                            : 'text-text-muted dark:text-text-muted-dark';
+                const arrow = delta === null ? '' : delta > 0 ? '▲' : delta < 0 ? '▼' : '–';
+                return (
+                    <div
+                        key={i}
+                        className="rounded-lg border border-border bg-surface-secondary/40 px-4 py-3 dark:border-border-dark dark:bg-white/[0.03]"
+                    >
+                        <p className="text-xl font-semibold text-text dark:text-white">
+                            {str(m.value)}
+                        </p>
+                        <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                            {str(m.label)}
+                        </p>
+                        {delta !== null ? (
+                            <p className={cn('mt-0.5 text-[10px]', tone)}>
+                                {arrow} {Math.abs(delta)}
+                                {m.deltaLabel ? ` ${str(m.deltaLabel)}` : ''}
+                            </p>
+                        ) : null}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 function Empty({ label }: { label: string }) {
     return (
         <div className="flex h-24 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
@@ -237,6 +307,8 @@ const REGISTRY: Record<
     comparison: Comparison,
     markdown: Markdown,
     gallery: Gallery,
+    funnel: Funnel,
+    metric_delta: MetricDelta,
 };
 
 export function renderCanvasComponent(

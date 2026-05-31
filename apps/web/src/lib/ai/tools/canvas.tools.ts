@@ -139,7 +139,9 @@ export const showComponent = tool({
         '"timeline": props { items: [{ title, subtitle?, status? }] } (vertical event history); ' +
         '"comparison": props { left: { title, fields: [{ label, value }] }, right: {…} } (side-by-side compare); ' +
         '"markdown": props { content } (render a KB doc / README / item body); ' +
-        '"gallery": props { images: [string | { url, caption? }] } (image / screenshot grid). ' +
+        '"gallery": props { images: [string | { url, caption? }] } (image / screenshot grid); ' +
+        '"funnel": props { stages: [{ label, value }] } (conversion funnel sized vs the first stage); ' +
+        '"metric_delta": props { metrics: [{ label, value, delta?, deltaLabel? }] } (stat tiles with up/down deltas). ' +
         'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),
