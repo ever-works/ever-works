@@ -62,14 +62,35 @@ import {
     dismissIdea,
     acceptIdea,
 } from './ideas.tools';
+// Manifest-driven generated tools (agents, tasks, skills, notifications,
+// members, api-keys, budgets/usage, webhooks, orgs, KB, templates, plugins …).
+// One registry entry per platform operation — see ./generated/registry.ts.
+import { buildGeneratedTools } from './generated/factory';
+import { ALL_OPERATIONS } from './generated/registry.all';
+// Canvas rendering tools (charts / tables / stat tiles / detail panels).
+import { buildCanvasTools } from './canvas.tools';
+// Built-in report tools (fetch + aggregate + render to canvas).
+import { buildReportTools } from './reports';
 
 /**
  * Build the full tool set for the chat agent.
  * The model parameter is needed by the suggestWorks subagent
  * which runs its own generateText loop internally.
+ *
+ * Three sources are merged:
+ *  1. hand-written domain tools (works / items / missions / ideas / deploy …),
+ *  2. generated single-entity tools from the operation registry,
+ *  3. canvas rendering tools.
+ *
+ * Hand-written tools are spread LAST so they win any name collision with a
+ * generated entry (they carry richer, bespoke UX).
  */
 export function buildChatTools(model: LanguageModel) {
     return {
+        ...buildGeneratedTools(ALL_OPERATIONS),
+        ...buildCanvasTools(),
+        ...buildReportTools(),
+
         // Read
         listWorks,
         getWorkDetails,
