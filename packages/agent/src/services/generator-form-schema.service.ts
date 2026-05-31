@@ -95,7 +95,15 @@ export class GeneratorFormSchemaService {
         if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
             const provider = pipelinePlugin.plugin;
 
-            pluginFields = provider.getFormFields();
+            // Defensive: getFormFields() is typed `FormFieldDefinition[]`, but a
+            // misbehaving pipeline plugin (observed: agent-pipeline) can return a
+            // non-array at runtime — which made `pluginFields.map(...)` below throw
+            // `TypeError: pluginFields.map is not a function` and 500 the whole
+            // GET /generator-form endpoint. Coerce to [] so one bad plugin can't
+            // take down form-schema resolution (same resilience stance as the
+            // per-plugin try/catch in getProvidersForCapability, #1184).
+            const resolvedFields = provider.getFormFields();
+            pluginFields = Array.isArray(resolvedFields) ? resolvedFields : [];
             pluginGroups = provider.getFormGroups?.();
             handledConfigFields = provider.handledConfigFields ?? [];
             defaultValues = provider.getDefaultValues?.();
