@@ -106,6 +106,46 @@ async function fetchArray(
 
 const STATUS_ORDER = ['draft', 'pending', 'in_progress', 'blocked', 'completed', 'archived'];
 
+function boardArtifact(
+    title: string,
+    rows: Record<string, unknown>[],
+    statusField: string,
+): CanvasArtifact {
+    const byStatus = new Map<string, Record<string, unknown>[]>();
+    for (const row of rows) {
+        const key = String(row[statusField] ?? 'unknown');
+        if (!byStatus.has(key)) byStatus.set(key, []);
+        byStatus.get(key)!.push(row);
+    }
+    const keys = [
+        ...STATUS_ORDER.filter((s) => byStatus.has(s)),
+        ...[...byStatus.keys()].filter((s) => !STATUS_ORDER.includes(s)),
+    ];
+    return {
+        id: randomUUID(),
+        kind: 'kanban',
+        title,
+        columns: keys.map((key) => ({
+            key,
+            label: labelize(key),
+            cards: (byStatus.get(key) ?? []).map((row) => ({
+                title: String(row.title ?? row.name ?? row.slug ?? 'Untitled'),
+                subtitle: row.priority ? `Priority: ${labelize(row.priority)}` : undefined,
+            })),
+        })),
+        description: `${rows.length} item(s).`,
+    };
+}
+
+function countStat(title: string, rows: Record<string, unknown>[], label: string): CanvasArtifact {
+    return {
+        id: randomUUID(),
+        kind: 'stat',
+        title,
+        stats: [{ label, value: rows.length }],
+    };
+}
+
 // ── report definitions ───────────────────────────────────────────
 
 const REPORTS: ReportDef[] = [
@@ -307,6 +347,101 @@ const REPORTS: ReportDef[] = [
                     stats: stats.slice(0, 6),
                 },
             };
+        },
+    },
+
+    // ── Wave 6: more catalogue reports ───────────────────────────
+    {
+        id: 'works_by_status',
+        title: 'Works by status',
+        description: 'Bar chart of your works grouped by status.',
+        run: async () => {
+            const rows = await fetchArray('/api/works');
+            if ('error' in rows) return rows;
+            return { artifact: groupCountChart('Works by status', rows, 'status', 'bar') };
+        },
+    },
+    {
+        id: 'ideas_by_status',
+        title: 'Ideas by status',
+        description: 'Bar chart of your ideas (work proposals) grouped by status.',
+        run: async () => {
+            const rows = await fetchArray('/api/me/work-proposals');
+            if ('error' in rows) return rows;
+            return { artifact: groupCountChart('Ideas by status', rows, 'status', 'bar') };
+        },
+    },
+    {
+        id: 'agents_board',
+        title: 'Agents kanban board',
+        description: 'Kanban board of your agents grouped into status columns.',
+        run: async () => {
+            const rows = await fetchArray('/api/agents');
+            if ('error' in rows) return rows;
+            return { artifact: boardArtifact('Agents board', rows, 'status') };
+        },
+    },
+    {
+        id: 'missions_board',
+        title: 'Missions kanban board',
+        description: 'Kanban board of your missions grouped into status columns.',
+        run: async () => {
+            const rows = await fetchArray('/api/me/missions');
+            if ('error' in rows) return rows;
+            return { artifact: boardArtifact('Missions board', rows, 'status') };
+        },
+    },
+    {
+        id: 'notifications_by_type',
+        title: 'Notifications by type',
+        description: 'Bar chart of your notifications grouped by type.',
+        run: async () => {
+            const rows = await fetchArray('/api/notifications');
+            if ('error' in rows) return rows;
+            return { artifact: groupCountChart('Notifications by type', rows, 'type', 'bar') };
+        },
+    },
+    {
+        id: 'webhook_deliveries_by_status',
+        title: 'Webhook deliveries by status',
+        description: 'Bar chart of recent webhook deliveries grouped by status.',
+        run: async () => {
+            const rows = await fetchArray('/api/webhooks/deliveries');
+            if ('error' in rows) return rows;
+            return {
+                artifact: groupCountChart('Webhook deliveries by status', rows, 'status', 'bar'),
+            };
+        },
+    },
+    {
+        id: 'skills_count',
+        title: 'Skills total',
+        description: 'How many skills you have.',
+        run: async () => {
+            const rows = await fetchArray('/api/skills');
+            if ('error' in rows) return rows;
+            return { artifact: countStat('Skills', rows, 'Skills') };
+        },
+    },
+    {
+        id: 'api_keys_count',
+        title: 'API keys total',
+        description: 'How many API keys you have.',
+        run: async () => {
+            const rows = await fetchArray('/api/auth/api-keys');
+            if ('error' in rows) return rows;
+            return { artifact: countStat('API keys', rows, 'API keys') };
+        },
+    },
+    {
+        id: 'work_members_by_role',
+        title: 'Work members by role',
+        description: 'Bar chart of a work’s members grouped by role. Needs a workId.',
+        needsWorkId: true,
+        run: async ({ workId }) => {
+            const rows = await fetchArray('/api/works/{workId}/members', workId);
+            if ('error' in rows) return rows;
+            return { artifact: groupCountChart('Members by role', rows, 'role', 'bar') };
         },
     },
 ];
