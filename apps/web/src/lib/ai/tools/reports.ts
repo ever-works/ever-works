@@ -501,6 +501,18 @@ const REPORT_SOURCES: Record<
         scopeParam: 'id',
         label: 'knowledge-base documents',
     },
+    plugins: { path: '/api/plugins', label: 'plugins' },
+    organizations: { path: '/api/organizations', label: 'organizations' },
+    notification_channels: { path: '/api/notification-channels', label: 'notification channels' },
+    webhooks: { path: '/api/webhooks', label: 'webhooks' },
+    api_keys: { path: '/api/auth/api-keys', label: 'API keys' },
+    templates: { path: '/api/templates', label: 'templates' },
+    comparisons: { path: '/api/works/{id}/comparisons', scopeParam: 'id', label: 'comparisons' },
+    deployments: {
+        path: '/api/deploy/works/{id}/deployments',
+        scopeParam: 'id',
+        label: 'deployments',
+    },
 };
 const SOURCE_KEYS = Object.keys(REPORT_SOURCES);
 
