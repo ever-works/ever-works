@@ -220,6 +220,33 @@ describe('GeneratorFormSchemaService', () => {
             expect(pipelineFields).toHaveLength(1);
             expect(apifyFields).toHaveLength(1);
         });
+
+        it('does not 500 when a pipeline plugin getFormFields() returns a non-array', async () => {
+            // Regression: agent-pipeline's getFormFields() returned a non-array
+            // at runtime despite its FormFieldDefinition[] type, so the
+            // `pluginFields.map(...)` in getFormSchema threw
+            // `TypeError: pluginFields.map is not a function` and 500'd the
+            // whole GET /works/:id/generator-form endpoint. getFormSchema must
+            // coerce a non-array to [] so one misbehaving plugin can't take
+            // down form-schema resolution.
+            const brokenPipeline = createFormSchemaPlugin('agent-pipeline', [], {
+                category: 'pipeline',
+                capabilities: ['pipeline', 'form-schema-provider'],
+            });
+            // getFormFields stays a function (so isFormSchemaProvider passes) but
+            // returns undefined — the exact misbehaving runtime contract.
+            (brokenPipeline as { getFormFields: () => unknown }).getFormFields = () => undefined;
+            const registered = createRegistered(brokenPipeline);
+
+            mockRegistry.get.mockImplementation((id: string) =>
+                id === 'agent-pipeline' ? registered : undefined,
+            );
+
+            const schema = await service.getFormSchema('agent-pipeline');
+
+            expect(Array.isArray(schema.pluginFields)).toBe(true);
+            expect(schema.pluginFields).toHaveLength(0);
+        });
     });
 
     describe('processFormConfig', () => {
