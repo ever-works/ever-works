@@ -7,6 +7,7 @@ import { ApiModule } from './api.module';
 import helmet from 'helmet';
 import { initSentry, initPostHog, PostHogLoggerService } from '@ever-works/monitoring';
 import { IncomingMessage, ServerResponse } from 'http';
+import { appendFileSync } from 'fs'; // [E2E-DIAGNOSTIC, remove before merge]
 import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
@@ -60,16 +61,42 @@ async function bootstrap() {
 
     // [E2E-DIAGNOSTIC, remove before merge] Request tracer. The e2e suite
     // intermittently aborts the API with a V8 `RegExpCompiler Allocation
-    // failed` fatal (uncatchable in JS) and the PostHogLoggerService swallows
-    // request logs, so we can't see which endpoint triggers it. When
-    // E2E_REQ_TRACE=1, write each request line to stderr BEFORE handling so
-    // the last line before the abort in the uploaded server log names the
-    // exact METHOD + URL. Gated on an env var so it never runs in prod.
+    // failed` fatal (uncatchable in JS), and NestJS does not log requests by
+    // default, so we can't see which endpoint triggers it. stderr/stdout
+    // redirected to a file is block-buffered and lost when the process is
+    // killed at suite end, so we use SYNCHRONOUS fs.appendFileSync to a
+    // dedicated file (uploaded as an always() CI artifact): `>>` is written
+    // BEFORE handling (survives a mid-request abort and names the trigger),
+    // and `<<` after, with status + duration (so we can also see whether,
+    // e.g., the inheritable-docs GET returned the seeded row). Gated on
+    // E2E_REQ_TRACE=1 so it never runs in prod.
     if (process.env.E2E_REQ_TRACE === '1') {
-        app.use((req: IncomingMessage & { url?: string; method?: string }, _res, next) => {
-            process.stderr.write(`[REQTRACE] ${req.method} ${req.url}\n`);
-            (next as () => void)();
-        });
+        const traceFile = process.env.E2E_REQ_TRACE_FILE || '/tmp/reqtrace.log';
+        app.use(
+            (
+                req: IncomingMessage & { url?: string; method?: string },
+                res: ServerResponse,
+                next: () => void,
+            ) => {
+                const started = Date.now();
+                try {
+                    appendFileSync(traceFile, `>> ${req.method} ${req.url}\n`);
+                } catch {
+                    // best-effort diagnostic only
+                }
+                res.on('finish', () => {
+                    try {
+                        appendFileSync(
+                            traceFile,
+                            `<< ${req.method} ${req.url} ${res.statusCode} ${Date.now() - started}ms\n`,
+                        );
+                    } catch {
+                        // best-effort diagnostic only
+                    }
+                });
+                next();
+            },
+        );
     }
 
     // Security configurations
