@@ -852,7 +852,7 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 - Long-running/async actions (generate_items, deploy_work, customize_template, refresh_work_proposals, account export/sync) return job handles not final results; canvas needs polling/streaming progress components (GenerationProgressCard, ExportProgressCard) and the model must not fabricate completion.
 - Reports engine has no dedicated aggregation endpoints for most of the 95 reports; run_report must derive aggregates from list endpoints, risking heavy fan-out, pagination limits, and inconsistent metrics; needs a defined aggregation contract and caching.
 
-## 10. Shipped in this PR (Waves 1-4)
+## 10. Shipped in this PR (Waves 1-8)
 
 - **Engine:** `apps/web/src/lib/ai/tools/generated/{api-call,registry,factory}.ts` - manifest-driven tool generator with the no-bulk guard + confirmation gate baked in.
 
@@ -860,18 +860,21 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
     - Wave 1 (`registry.ts`) - ~80 hand-curated single-entity tools across agents, tasks, skills, notifications, work members, API keys, budgets/usage, webhooks, organizations, knowledge base, templates, plugins.
     - Wave 2 (`registry.wave2.ts`) - +200 tools across 13 domains with **real DTO-derived body hints** (works config/website/taxonomy, comparisons, deploy domains/rollback, git/github/oauth reads, agent runs/files/attachments, task relations/blocks, mission/idea attachments, work-agent goals, composio/device-auth, KB uploads/locks/inheritable, auth/account/onboarding/subscriptions, notification prefs, email, activity log, templates, screenshot/search/agent-memory).
     - Wave 3 (`registry.wave3.ts`) - the remaining read/report GET tools, generated deterministically from the inventory.
-    - `registry.all.ts` merges and dedupes all three (earlier waves win). Works/items/missions/ideas/deploy/schedule already ship as hand-written tools and are not duplicated.
+    - Wave 5 (`registry.wave5.ts`) - the single-entity **mutation tail** (generate_work_details, cancel_generation, register_company, leave_work, task attachments, event subscription, …). After Wave 5, every `includeInChat` operation has a tool except the deliberately policy-excluded ones (bulk, anonymous uploads, logout-all, redundant aliases).
+    - `registry.all.ts` merges and dedupes all waves (earlier waves win). Works/items/missions/ideas/deploy/schedule already ship as hand-written tools and are not duplicated.
 
 - **Per-turn tool gating** (`tool-selection.ts`): the full ~300-tool set stays available, but each turn surfaces only an always-on core (navigation, canvas, search, user, works) plus the tools whose domain matches the latest message / current page, capped at 90 - keeping the schema payload bounded and well under provider function-count limits.
 
-- **Canvas:** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts chart + table + stat + detail + **kanban** renderers); `lib/ai/tools/canvas.tools.ts`.
+- **Canvas (6 artifact kinds):** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts **chart + table + stat + detail + kanban** renderers) and `components.tsx` (a **bespoke component registry**: `progress` bars, `timeline`); `lib/ai/tools/canvas.tools.ts` (`renderChart/Table/StatCards/Detail` + **`showComponent`** for the bespoke registry — Wave 7).
 
-- **Reports engine (Wave 4):** `lib/ai/tools/reports.ts` - `run_report` fetches data as the logged-in user, aggregates it, and renders a chart/stat/kanban into the canvas in one call (turnkey analytics); `list_reports` exposes the catalogue. Ships ~9 reports against real endpoints (tasks by status/priority, tasks kanban board, agents/missions by status, work spend trend, spend by plugin, usage overview, account spend overview). Both are always-on core tools.
+- **Reports engine (Waves 4, 6, 8):** `lib/ai/tools/reports.ts` - `run_report` fetches data as the logged-in user, aggregates it, and renders a chart/stat/kanban into the canvas in one call (turnkey analytics); `list_reports` exposes the catalogue. **~19 reports** against real endpoints, including the flagship **`work_items_per_day`** (new items per day from generation history), spend trend/by-plugin, usage/account overviews, tasks/agents/missions/ideas/works by status, kanban boards, members by role, notifications/webhook-deliveries breakdowns, counts. Always-on core tools.
 
 - **Wiring:** merged into `buildChatTools()`; `agent.ts` gates tools per turn; system prompt updated with the safety + canvas + report rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
 
 - **Verified:** web `tsc --noEmit` clean, `eslint` clean, `prettier` clean; CI green on each push.
 
-### Next waves
+### Status & next waves
 
-Remaining: the richer per-domain **canvas catalog** (113 components in section 6) + `show_component` embedding of existing dashboard components, more of the 95 catalogued reports (section 7) on the Wave-4 engine, and the small tail of mutation endpoints not yet registered. Each is a registry-data + renderer addition on this engine - parallelizable across agents.
+**Done:** every single-entity operation has a chat tool (Waves 1-5); confirm-before-destructive + no-bulk + per-turn gating; canvas with 6 artifact kinds + a bespoke-component registry; ~19 turnkey reports. This realises the core goal — _use chat instead of the UI for the operations the platform exposes_.
+
+**Remaining (incremental, best validated with live QA):** filling out the rest of the **canvas catalog** (section 6) as bespoke `show_component` entries beyond `progress`/`timeline`; the rest of the 95 catalogued **reports** (section 7) on the Wave-4 engine; richer body schemas for a few generated mutations (currently a generic `body` object + DTO hint). Each is a registry-data + renderer addition on this engine - parallelizable across agents. The highest-value next gate is a **live smoke test** of the chat against this branch (the model/tool loop can't be exercised from CI).

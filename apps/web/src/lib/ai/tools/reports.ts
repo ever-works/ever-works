@@ -34,6 +34,7 @@ const LIST_KEYS = [
     'results',
     'rows',
     'entries',
+    'history',
     'tasks',
     'agents',
     'works',
@@ -442,6 +443,47 @@ const REPORTS: ReportDef[] = [
             const rows = await fetchArray('/api/works/{workId}/members', workId);
             if ('error' in rows) return rows;
             return { artifact: groupCountChart('Members by role', rows, 'role', 'bar') };
+        },
+    },
+    {
+        id: 'work_items_per_day',
+        title: 'Items generated per day',
+        description:
+            'Line chart of new items generated per day for a work, from its generation history. Needs a workId.',
+        needsWorkId: true,
+        run: async ({ workId }) => {
+            const res = await callApi({
+                method: 'GET',
+                path: '/api/works/{id}/history',
+                pathParams: { id: workId! },
+            });
+            if (!res.success) return { error: res.error ?? 'Request failed' };
+            const history = toArray(res.data) as Array<{
+                createdAt?: string;
+                newItemsCount?: number;
+            }>;
+            const perDay = new Map<string, number>();
+            for (const entry of history) {
+                const day = String(entry.createdAt ?? '').slice(0, 10);
+                if (!day) continue;
+                perDay.set(day, (perDay.get(day) ?? 0) + (Number(entry.newItemsCount) || 0));
+            }
+            const data = [...perDay.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([day, items]) => ({ day, items }));
+            if (!data.length) return { error: 'No generation history yet for this work.' };
+            return {
+                artifact: {
+                    id: randomUUID(),
+                    kind: 'chart',
+                    title: 'Items generated per day',
+                    chartType: 'line',
+                    xKey: 'day',
+                    series: [{ key: 'items', label: 'New items' }],
+                    data,
+                    description: `${history.length} generation run(s).`,
+                },
+            };
         },
     },
 ];
