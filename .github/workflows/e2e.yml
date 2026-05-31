@@ -124,8 +124,27 @@ jobs:
         run: |
           set -e
 
-          echo "::group::Starting API on :3100"
-          nohup pnpm --filter ever-works-api dev > /tmp/api.log 2>&1 &
+          echo "::group::Starting API on :3100 (prebuilt dist — no watch/typecheck)"
+          # Run the API from the prebuilt `dist/` (the "Build all packages"
+          # step above already compiled apps/api) via `start:prod`
+          # (`node dist/main`), NOT `nest start -b swc --watch`.
+          #
+          # Why: `nest start --watch` runs a concurrent TSC type-checker
+          # (nest-cli.json `typeCheck: true`) plus a file watcher alongside
+          # the booting app. Under that extra memory pressure V8's RegExp
+          # compiler intermittently fails to allocate while the route table
+          # is compiled at startup —
+          #   FATAL ERROR: RegExpCompiler Allocation failed - process out of
+          #   memory   (RegExpCapture::ToNode -> RegExpDisjunction::ToNode)
+          # — which ABORTS the whole API process mid-suite. Every later spec
+          # in that shard then fails with `connect ECONNREFUSED
+          # 127.0.0.1:3100`, and because the timing is nondeterministic the
+          # casualty shard moves run-to-run (the classic "random" e2e red).
+          # The prebuilt server has no watcher and no typechecker, so it
+          # boots once and stays up. Runtime behaviour is identical — the
+          # dev-vs-prod code branches key off env vars (NODE_ENV,
+          # DATABASE_*), not the build/start mode.
+          nohup pnpm --filter ever-works-api start:prod > /tmp/api.log 2>&1 &
           API_PID=$!
           disown $API_PID
           echo "API pid=$API_PID"
@@ -396,8 +415,13 @@ jobs:
         run: |
           set -e
 
-          echo "::group::Starting API on :3100"
-          nohup pnpm --filter ever-works-api dev > /tmp/api.log 2>&1 &
+          echo "::group::Starting API on :3100 (prebuilt dist — no watch/typecheck)"
+          # Same rationale as the sharded e2e job: run the prebuilt API via
+          # `start:prod` (`node dist/main`) rather than `nest start --watch`,
+          # so the concurrent TSC type-checker + file watcher can't pressure
+          # V8 into a `RegExpCompiler Allocation failed` abort during route
+          # registration. The build step above already produced apps/api/dist.
+          nohup pnpm --filter ever-works-api start:prod > /tmp/api.log 2>&1 &
           disown $!
           echo "::endgroup::"
 
