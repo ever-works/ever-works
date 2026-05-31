@@ -852,11 +852,11 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 - Long-running/async actions (generate_items, deploy_work, customize_template, refresh_work_proposals, account export/sync) return job handles not final results; canvas needs polling/streaming progress components (GenerationProgressCard, ExportProgressCard) and the model must not fabricate completion.
 - Reports engine has no dedicated aggregation endpoints for most of the 95 reports; run_report must derive aggregates from list endpoints, risking heavy fan-out, pagination limits, and inconsistent metrics; needs a defined aggregation contract and caching.
 
-## 10. Shipped in this PR (Waves 1-8)
+## 10. Shipped in this PR (Waves 1-13)
 
 - **Engine:** `apps/web/src/lib/ai/tools/generated/{api-call,registry,factory}.ts` - manifest-driven tool generator with the no-bulk guard + confirmation gate baked in.
 
-- **Registry (Waves 1-3, ~300 generated tools):**
+- **Registry (Waves 1-5, ~300 generated tools):**
     - Wave 1 (`registry.ts`) - ~80 hand-curated single-entity tools across agents, tasks, skills, notifications, work members, API keys, budgets/usage, webhooks, organizations, knowledge base, templates, plugins.
     - Wave 2 (`registry.wave2.ts`) - +200 tools across 13 domains with **real DTO-derived body hints** (works config/website/taxonomy, comparisons, deploy domains/rollback, git/github/oauth reads, agent runs/files/attachments, task relations/blocks, mission/idea attachments, work-agent goals, composio/device-auth, KB uploads/locks/inheritable, auth/account/onboarding/subscriptions, notification prefs, email, activity log, templates, screenshot/search/agent-memory).
     - Wave 3 (`registry.wave3.ts`) - the remaining read/report GET tools, generated deterministically from the inventory.
@@ -865,16 +865,20 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 
 - **Per-turn tool gating** (`tool-selection.ts`): the full ~300-tool set stays available, but each turn surfaces only an always-on core (navigation, canvas, search, user, works) plus the tools whose domain matches the latest message / current page, capped at 90 - keeping the schema payload bounded and well under provider function-count limits.
 
-- **Canvas (6 artifact kinds):** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts **chart + table + stat + detail + kanban** renderers) and `components.tsx` (a **bespoke component registry**: `progress` bars, `timeline`); `lib/ai/tools/canvas.tools.ts` (`renderChart/Table/StatCards/Detail` + **`showComponent`** for the bespoke registry — Wave 7).
+- **Canvas (5 artifact kinds + bespoke registry):** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts **chart + table + stat + detail + kanban** renderers) and `components.tsx` (a **bespoke component registry**: `progress`, `gauge`, `timeline`, `comparison`, `markdown`, `gallery` — Waves 7, 9, 10); `lib/ai/tools/canvas.tools.ts` (`renderChart/Table/StatCards/Detail` + **`showComponent`**).
 
-- **Reports engine (Waves 4, 6, 8):** `lib/ai/tools/reports.ts` - `run_report` fetches data as the logged-in user, aggregates it, and renders a chart/stat/kanban into the canvas in one call (turnkey analytics); `list_reports` exposes the catalogue. **~19 reports** against real endpoints, including the flagship **`work_items_per_day`** (new items per day from generation history), spend trend/by-plugin, usage/account overviews, tasks/agents/missions/ideas/works by status, kanban boards, members by role, notifications/webhook-deliveries breakdowns, counts. Always-on core tools.
+- **Reports engine (Waves 4, 6, 8, 11, 12):** `lib/ai/tools/reports.ts` - `run_report` fetches data as the logged-in user, aggregates it, and renders a chart/stat/kanban into the canvas in one call. **~21 named reports** against real endpoints, including the flagship **`work_items_per_day`** (new items per day from generation history), `activity_per_day`, spend trend/by-plugin, usage/account/work overviews, tasks/agents/missions/ideas/works by status, kanban boards, members by role, notifications/webhook breakdowns, counts. Plus **`build_report`** — a generic builder that group-by-charts ANY of 11 list sources by ANY field, covering the long tail without hardcoding. `list_reports` lists the catalogue. All always-on core tools.
 
 - **Wiring:** merged into `buildChatTools()`; `agent.ts` gates tools per turn; system prompt updated with the safety + canvas + report rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
 
-- **Verified:** web `tsc --noEmit` clean, `eslint` clean, `prettier` clean; CI green on each push.
+- **Tests (Wave 13):** Vitest unit specs for the safety-critical logic — `factory` (path/query routing, body forwarding, **destructive-without-confirmed → no API call**, confirmed → proceeds, **bulk id-array rejection**) and `tool-selection` (core always-on, keyword/page domain matching, cap). 11 tests green.
 
-### Status & next waves
+- **Verified:** web `tsc --noEmit` clean, `eslint` clean, `prettier` clean, unit tests green; CI green on each push.
 
-**Done:** every single-entity operation has a chat tool (Waves 1-5); confirm-before-destructive + no-bulk + per-turn gating; canvas with 6 artifact kinds + a bespoke-component registry; ~19 turnkey reports. This realises the core goal — _use chat instead of the UI for the operations the platform exposes_.
+### Status & next steps
 
-**Remaining (incremental, best validated with live QA):** filling out the rest of the **canvas catalog** (section 6) as bespoke `show_component` entries beyond `progress`/`timeline`; the rest of the 95 catalogued **reports** (section 7) on the Wave-4 engine; richer body schemas for a few generated mutations (currently a generic `body` object + DTO hint). Each is a registry-data + renderer addition on this engine - parallelizable across agents. The highest-value next gate is a **live smoke test** of the chat against this branch (the model/tool loop can't be exercised from CI).
+**Done — the goal is functionally met:** every single-entity operation the UI exposes is a chat tool (Waves 1-5), auth-scoped, with **confirm-before-destructive**, **no-bulk**, and per-turn gating; the canvas renders charts/tables/stats/detail/kanban + six bespoke components; analytics are turnkey (~21 reports) **and** generalized (`build_report`); the safety logic is unit-tested. A user can drive the platform's operations and reporting from chat instead of the UI.
+
+**What's deliberately NOT mass-produced:** the literal remainder of the 113-component catalog and 95 named reports (sections 6-7) is now **covered by the generalized mechanisms** — `show_component`'s extensible registry and `build_report` — so hardcoding each remaining entry adds catalogue breadth, not new capability. Add bespoke entries where a domain genuinely needs a tailored layout. Some generated mutations use a generic `body` object + DTO hint rather than a field-level schema.
+
+**Highest-value next gate:** a **live smoke test** of the chat against this branch — the model/tool loop (tool selection, confirmation handshake, canvas rendering) can't be exercised from CI and should be QA'd before broad rollout.
