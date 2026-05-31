@@ -70,7 +70,19 @@ export async function KbTreePanel({
 }: KbTreePanelProps) {
     const t = await getTranslations('dashboard.workDetail.kb');
 
-    if (documents.length === 0 && inheritedDocuments.length === 0) {
+    // `inheritedDocuments` comes from `resolveInheritableDocuments`, which
+    // returns the MERGED effective set (org docs with Work overrides applied
+    // by path) — so once a Work overrides an inherited doc, that path comes
+    // back as a Work-OWNED row (`workId !== null`). The "Inherited from
+    // organization" section must only show docs the Work has NOT overridden
+    // (genuinely org-scoped, `workId === null`); the overridden copy already
+    // appears in the Work-owned `documents` list under its class group.
+    // Without this filter the overridden doc lingers in the inherited
+    // section (EW-641 row 38d / kb-inherited.spec.ts step 7 — "override
+    // masks the inherited row").
+    const orgInheritedDocuments = inheritedDocuments.filter((doc) => doc.workId === null);
+
+    if (documents.length === 0 && orgInheritedDocuments.length === 0) {
         return (
             <section
                 data-testid="kb-tree"
@@ -116,10 +128,10 @@ export async function KbTreePanel({
             </header>
 
             <nav aria-label={t('panes.tree.title')} className="flex flex-col gap-3">
-                {inheritedDocuments.length > 0 ? (
+                {orgInheritedDocuments.length > 0 ? (
                     <KbInheritedSection
                         workId={workId}
-                        documents={inheritedDocuments}
+                        documents={orgInheritedDocuments}
                         sectionTitle={t('panes.tree.inheritedSection.title')}
                         sectionEmptyDescription={t('panes.tree.inheritedSection.description')}
                         lockedLabel={t('panes.tree.inheritedSection.lockedLabel')}
