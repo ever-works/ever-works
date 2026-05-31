@@ -515,6 +515,101 @@ function CodeBlock({ props }: { props: Record<string, unknown> }) {
     );
 }
 
+/** props: { rows: [{ label, values: number[] }], columns?: string[] } — intensity grid. */
+function Heatmap({ props }: { props: Record<string, unknown> }) {
+    const rows = asArray(props.rows).map((r) => ({
+        label: str(r.label),
+        values: (Array.isArray(r.values) ? r.values : []).map((v) => num(v)),
+    }));
+    if (!rows.length) return <Empty label="No data" />;
+    const columns = Array.isArray(props.columns) ? props.columns.map((c) => str(c)) : [];
+    const max = Math.max(1, ...rows.flatMap((r) => r.values));
+    return (
+        <div className="overflow-auto">
+            <table className="border-separate" style={{ borderSpacing: 2 }}>
+                {columns.length ? (
+                    <thead>
+                        <tr>
+                            <th />
+                            {columns.map((c, i) => (
+                                <th
+                                    key={i}
+                                    className="px-1 text-[9px] text-text-muted dark:text-text-muted-dark"
+                                >
+                                    {c}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                ) : null}
+                <tbody>
+                    {rows.map((r, ri) => (
+                        <tr key={ri}>
+                            <td className="pr-2 text-[10px] text-text dark:text-text-dark">
+                                {r.label}
+                            </td>
+                            {r.values.map((v, ci) => (
+                                <td key={ci}>
+                                    <div
+                                        title={String(v)}
+                                        className="h-5 w-5 rounded-sm"
+                                        style={{
+                                            backgroundColor: `rgba(99,102,241,${Math.max(0.06, v / max)})`,
+                                        }}
+                                    />
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+/** props: { value, max?, label? } — star rating. */
+function Rating({ props }: { props: Record<string, unknown> }) {
+    const max = Math.max(1, Math.round(num(props.max, 5)));
+    const value = Math.max(0, Math.min(max, num(props.value)));
+    return (
+        <div className="flex items-center gap-2 py-2">
+            <span className="text-lg tracking-tight">
+                {Array.from({ length: max }, (_, i) => (
+                    <span
+                        key={i}
+                        className={i < Math.round(value) ? 'text-warning' : 'text-text-muted/40'}
+                    >
+                        ★
+                    </span>
+                ))}
+            </span>
+            <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                {value}/{max}
+                {props.label ? ` · ${str(props.label)}` : ''}
+            </span>
+        </div>
+    );
+}
+
+/** props: { days: [{ date, value }] } — contribution-graph style day grid. */
+function Calendar({ props }: { props: Record<string, unknown> }) {
+    const days = asArray(props.days).map((d) => ({ date: str(d.date), value: num(d.value) }));
+    if (!days.length) return <Empty label="No days" />;
+    const max = Math.max(1, ...days.map((d) => d.value));
+    return (
+        <div className="flex flex-wrap gap-1">
+            {days.map((d, i) => (
+                <div
+                    key={i}
+                    title={`${d.date}: ${d.value}`}
+                    className="h-3.5 w-3.5 rounded-sm"
+                    style={{ backgroundColor: `rgba(34,197,94,${Math.max(0.08, d.value / max)})` }}
+                />
+            ))}
+        </div>
+    );
+}
+
 function Empty({ label }: { label: string }) {
     return (
         <div className="flex h-24 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
@@ -543,6 +638,9 @@ const REGISTRY: Record<
     badges: Badges,
     json: JsonView,
     code: CodeBlock,
+    heatmap: Heatmap,
+    rating: Rating,
+    calendar: Calendar,
 };
 
 export function renderCanvasComponent(

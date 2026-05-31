@@ -945,6 +945,87 @@ REPORTS.push(
     ),
 );
 
+REPORTS.push(
+    groupReport(
+        'skills_by_status',
+        'Skills by status',
+        'Your skills grouped by status.',
+        '/api/skills',
+        'status',
+        'pie',
+    ),
+    groupReport(
+        'works_by_template',
+        'Works by website template',
+        'Your works grouped by selected website template.',
+        '/api/works',
+        'websiteTemplate',
+        'bar',
+    ),
+    groupReport(
+        'tasks_by_scope',
+        'Tasks by scope',
+        'Your tasks grouped by scope.',
+        '/api/tasks',
+        'scope',
+        'bar',
+    ),
+    groupReport(
+        'webhooks_by_enabled',
+        'Webhooks by enabled state',
+        'Your webhooks grouped by enabled state.',
+        '/api/webhooks',
+        'enabled',
+        'pie',
+    ),
+    groupReport(
+        'channels_by_enabled',
+        'Notification channels by enabled state',
+        'Your channels grouped by enabled state.',
+        '/api/notification-channels',
+        'enabled',
+        'pie',
+    ),
+    groupReport(
+        'email_messages_by_status',
+        'Email messages by status',
+        'Your email messages grouped by status.',
+        '/api/email/messages',
+        'status',
+        'pie',
+    ),
+    groupReport(
+        'agents_by_model',
+        'Agents by model',
+        'Your agents grouped by model.',
+        '/api/agents',
+        'model',
+        'bar',
+    ),
+    countReport(
+        'plugins_count',
+        'Plugins total',
+        'How many plugins are available.',
+        '/api/plugins',
+        'Plugins',
+    ),
+    countReport(
+        'activity_count',
+        'Activity entries total',
+        'How many recent activity-log entries there are.',
+        '/api/activity-log',
+        'Activity entries',
+    ),
+    timeseriesReport(
+        'deployments_per_day',
+        'Deployments per day',
+        'Deployment volume per day for a work. Needs a workId.',
+        '/api/deploy/works/{id}/deployments',
+        'createdAt',
+        'id',
+    ),
+);
+
 const REPORT_IDS = REPORTS.map((r) => r.id);
 
 export const runReport = tool({

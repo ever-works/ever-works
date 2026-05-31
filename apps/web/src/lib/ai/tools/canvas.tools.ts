@@ -148,7 +148,10 @@ export const showComponent = tool({
         '"kpi": props { label, value, caption? } (one big number); ' +
         '"steps": props { steps: [{ label, done? }] } (stepper/checklist); ' +
         '"badges": props { badges: [{ label, tone? }] } (status badge wrap); ' +
-        '"json": props { data } (pretty JSON); "code": props { code, language? } (code block). ' +
+        '"json": props { data } (pretty JSON); "code": props { code, language? } (code block); ' +
+        '"heatmap": props { rows: [{ label, values: number[] }], columns? } (intensity grid); ' +
+        '"rating": props { value, max?, label? } (star rating); ' +
+        '"calendar": props { days: [{ date, value }] } (contribution-graph day grid). ' +
         'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),

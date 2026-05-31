@@ -141,6 +141,12 @@ describe('CanvasArtifactView', () => {
             props: { code: 'const x = 1', language: 'ts' },
             expect: 'const x = 1',
         },
+        {
+            component: 'heatmap',
+            props: { rows: [{ label: 'Mon', values: [1, 2, 3] }] },
+            expect: 'Mon',
+        },
+        { component: 'rating', props: { value: 4, max: 5 }, expect: '4/5' },
     ];
     componentCases.forEach(({ component, props, expect: text }) => {
         it(`renders the "${component}" bespoke component`, () => {

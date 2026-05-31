@@ -96,6 +96,9 @@ export const CANVAS_COMPONENT_KEYS = [
     'badges',
     'json',
     'code',
+    'heatmap',
+    'rating',
+    'calendar',
 ] as const;
 export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
 
