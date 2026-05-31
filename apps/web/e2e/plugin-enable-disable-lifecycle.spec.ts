@@ -46,7 +46,7 @@ const PLUGIN_ID = 'notion-extractor';
 async function seededToken(request: APIRequestContext): Promise<string> {
     const seeded = loadSeededTestUser();
     const res = await request.post(`${API_BASE}/api/auth/login`, {
-        data: { email: seeded.email, password: seeded.password }
+        data: { email: seeded.email, password: seeded.password },
     });
     expect(res.status(), `seed login body=${await res.text().catch(() => '')}`).toBe(200);
     return (await res.json()).access_token;
@@ -106,7 +106,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await expect
             .poll(async () => isEnabled(await getPluginViaAPI(request, token, PLUGIN_ID)), {
                 timeout: 15_000,
-                message: 'plugin should report enabled:true after enable'
+                message: 'plugin should report enabled:true after enable',
             })
             .toBe(true);
 
@@ -116,14 +116,14 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await expect
             .poll(async () => isEnabled(await getPluginViaAPI(request, token, PLUGIN_ID)), {
                 timeout: 15_000,
-                message: 'plugin should report enabled:false after disable'
+                message: 'plugin should report enabled:false after disable',
             })
             .toBe(false);
     });
 
     test('UI toggle enables then disables the plugin and persists across reload + API', async ({
         page,
-        request
+        request,
     }) => {
         const token = await seededToken(request);
 
@@ -132,7 +132,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await disablePluginViaAPI(request, token, PLUGIN_ID).catch(() => undefined);
         await expect
             .poll(async () => isEnabled(await getPluginViaAPI(request, token, PLUGIN_ID)), {
-                timeout: 15_000
+                timeout: 15_000,
             })
             .toBe(false);
 
@@ -159,7 +159,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await expect(async () => {
             await enableBtn.click();
             await expect(
-                page.getByRole('dialog').getByRole('button', { name: /^Enable$/ })
+                page.getByRole('dialog').getByRole('button', { name: /^Enable$/ }),
             ).toBeVisible({ timeout: 4_000 });
         }).toPass({ timeout: 30_000 });
         await confirmInDialog(page, /^Enable$/);
@@ -172,7 +172,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await expect
             .poll(async () => isEnabled(await getPluginViaAPI(request, token, PLUGIN_ID)), {
                 timeout: 15_000,
-                message: 'UI enable should persist as enabled:true via the API'
+                message: 'UI enable should persist as enabled:true via the API',
             })
             .toBe(true);
 
@@ -182,7 +182,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         const cardAfterEnable = pluginCard(page, pluginName);
         await expect(
             cardAfterEnable.getByRole('button', { name: /^Disable$/ }),
-            'enabled state should survive a reload'
+            'enabled state should survive a reload',
         ).toBeVisible({ timeout: 20_000 });
 
         // --- DISABLE via UI ----------------------------------------------
@@ -191,7 +191,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await expect(async () => {
             await cardAfterEnable.getByRole('button', { name: /^Disable$/ }).click();
             await expect(
-                page.getByRole('dialog').getByRole('button', { name: /Confirm Disable/i })
+                page.getByRole('dialog').getByRole('button', { name: /Confirm Disable/i }),
             ).toBeVisible({ timeout: 4_000 });
         }).toPass({ timeout: 30_000 });
         await confirmInDialog(page, /Confirm Disable/i);
@@ -199,14 +199,14 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         // The card's optimistic state flips back to "Enable".
         await expect(
             cardAfterEnable.getByRole('button', { name: /^Enable$/ }),
-            'card should return to Enable after disabling'
+            'card should return to Enable after disabling',
         ).toBeVisible({ timeout: 20_000 });
 
         // Persisted server-side.
         await expect
             .poll(async () => isEnabled(await getPluginViaAPI(request, token, PLUGIN_ID)), {
                 timeout: 15_000,
-                message: 'UI disable should persist as enabled:false via the API'
+                message: 'UI disable should persist as enabled:false via the API',
             })
             .toBe(false);
 
@@ -215,13 +215,13 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         await searchForPlugin(page, pluginName);
         await expect(
             pluginCard(page, pluginName).getByRole('button', { name: /^Enable$/ }),
-            'disabled state should survive a reload'
+            'disabled state should survive a reload',
         ).toBeVisible({ timeout: 20_000 });
     });
 
     test('plugin detail route renders the name and a settings/description surface', async ({
         page,
-        request
+        request,
     }) => {
         const token = await seededToken(request);
         const plugin = await getPluginViaAPI(request, token, PLUGIN_ID);
@@ -233,7 +233,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
         // The detail page renders the plugin name as the page <h1>.
         await expect(
             page.getByRole('heading', { level: 1, name: pluginName }),
-            'detail page should render the plugin name as its title'
+            'detail page should render the plugin name as its title',
         ).toBeVisible({ timeout: 30_000 });
 
         // A settings/description surface must be present. notion-extractor ships
@@ -260,7 +260,7 @@ test.describe('Plugins — enable/disable lifecycle', () => {
 
         expect(
             sawSettings || sawBack || sawDescription,
-            'detail page should surface settings, description, or the back-to-plugins control'
+            'detail page should surface settings, description, or the back-to-plugins control',
         ).toBeTruthy();
     });
 });

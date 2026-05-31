@@ -52,9 +52,9 @@ export async function openChatPanel(page: Page, dashboardRoute = '/works'): Prom
     // first navigation, so the composer is present on the first authenticated
     // render (no reload dance). The dashboard layout reads this cookie.
     const base = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
-    await page.context().addCookies([
-        { name: 'chat-panel-open', value: '1', url: new URL(base).origin },
-    ]);
+    await page
+        .context()
+        .addCookies([{ name: 'chat-panel-open', value: '1', url: new URL(base).origin }]);
 
     // Navigate, recovering from a transient cold auth-redirect to /login (the
     // stored session occasionally isn't applied on the very first hit under

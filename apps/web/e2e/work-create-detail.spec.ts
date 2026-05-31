@@ -43,113 +43,110 @@ const WORK_SLUG = `e2e-create-detail-${SUFFIX}`;
 const WORK_DESCRIPTION = `Playwright create+detail integration work ${SUFFIX}`;
 
 test.describe('Work create + detail (core domain)', () => {
-	test('creates a Work, persists it via the API, and renders it in the list + detail UI', async ({
-		page,
-		request,
-	}) => {
-		test.setTimeout(90_000);
+    test('creates a Work, persists it via the API, and renders it in the list + detail UI', async ({
+        page,
+        request,
+    }) => {
+        test.setTimeout(90_000);
 
-		// --- Authenticate as the SAME user the browser is logged in as, so
-		// the API-created Work lands on the UI's seeded account. ---
-		const seeded = loadSeededTestUser();
-		// The login DTO is whitelisted — send ONLY email+password (passing the
-		// full seeded object's `name` field 400s "property name should not exist").
-		const loginRes = await request.post(`${API_BASE}/api/auth/login`, {
-			data: { email: seeded.email, password: seeded.password },
-		});
-		expect(loginRes.ok(), 'seeded user login should succeed').toBeTruthy();
-		const { access_token: token } = await loginRes.json();
-		expect(token, 'login returns an access token').toBeTruthy();
+        // --- Authenticate as the SAME user the browser is logged in as, so
+        // the API-created Work lands on the UI's seeded account. ---
+        const seeded = loadSeededTestUser();
+        // The login DTO is whitelisted — send ONLY email+password (passing the
+        // full seeded object's `name` field 400s "property name should not exist").
+        const loginRes = await request.post(`${API_BASE}/api/auth/login`, {
+            data: { email: seeded.email, password: seeded.password },
+        });
+        expect(loginRes.ok(), 'seeded user login should succeed').toBeTruthy();
+        const { access_token: token } = await loginRes.json();
+        expect(token, 'login returns an access token').toBeTruthy();
 
-		// --- Step 1: create the Work via the documented POST /api/works. ---
-		const created = await createWorkViaAPI(request, token, {
-			name: WORK_NAME,
-			slug: WORK_SLUG,
-			description: WORK_DESCRIPTION,
-		});
-		expect(created.id, 'created work should have an id').toBeTruthy();
-		const workId = created.id;
+        // --- Step 1: create the Work via the documented POST /api/works. ---
+        const created = await createWorkViaAPI(request, token, {
+            name: WORK_NAME,
+            slug: WORK_SLUG,
+            description: WORK_DESCRIPTION,
+        });
+        expect(created.id, 'created work should have an id').toBeTruthy();
+        const workId = created.id;
 
-		// --- Step 2: assert persistence via the API. ---
-		// 2a. GET /api/works lists the new work (tolerate pre-existing rows;
-		// scope the query with ?search so it surfaces even past page-1).
-		const listRes = await request.get(
-			`${API_BASE}/api/works?search=${encodeURIComponent(SUFFIX)}`,
-			{ headers: authedHeaders(token) },
-		);
-		expect(listRes.status(), 'authenticated GET /api/works').toBe(200);
-		const listBody = await listRes.json();
-		const listedNames: string[] = (listBody.works ?? []).map(
-			(w: { name: string }) => w.name,
-		);
-		expect(listedNames, 'GET /api/works contains the new work').toContain(WORK_NAME);
+        // --- Step 2: assert persistence via the API. ---
+        // 2a. GET /api/works lists the new work (tolerate pre-existing rows;
+        // scope the query with ?search so it surfaces even past page-1).
+        const listRes = await request.get(
+            `${API_BASE}/api/works?search=${encodeURIComponent(SUFFIX)}`,
+            { headers: authedHeaders(token) },
+        );
+        expect(listRes.status(), 'authenticated GET /api/works').toBe(200);
+        const listBody = await listRes.json();
+        const listedNames: string[] = (listBody.works ?? []).map((w: { name: string }) => w.name);
+        expect(listedNames, 'GET /api/works contains the new work').toContain(WORK_NAME);
 
-		// 2b. GET /api/works/:id returns exactly this work.
-		const detailRes = await request.get(`${API_BASE}/api/works/${workId}`, {
-			headers: authedHeaders(token),
-		});
-		expect(detailRes.status(), 'GET /api/works/:id').toBe(200);
-		const detailBody = await detailRes.json();
-		expect(detailBody.work?.id, 'detail id matches').toBe(workId);
-		expect(detailBody.work?.name, 'detail name matches').toBe(WORK_NAME);
-		expect(detailBody.work?.slug, 'detail slug matches').toBe(WORK_SLUG);
+        // 2b. GET /api/works/:id returns exactly this work.
+        const detailRes = await request.get(`${API_BASE}/api/works/${workId}`, {
+            headers: authedHeaders(token),
+        });
+        expect(detailRes.status(), 'GET /api/works/:id').toBe(200);
+        const detailBody = await detailRes.json();
+        expect(detailBody.work?.id, 'detail id matches').toBe(workId);
+        expect(detailBody.work?.name, 'detail name matches').toBe(WORK_NAME);
+        expect(detailBody.work?.slug, 'detail slug matches').toBe(WORK_SLUG);
 
-		// --- Step 3a: the /works list UI shows the new work. ---
-		// The list search filters server-side (getWorks({ search })), debounced
-		// 300ms, min 3 chars — typing the unique suffix surfaces only our work
-		// regardless of how many works the seeded account has accrued.
-		await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
+        // --- Step 3a: the /works list UI shows the new work. ---
+        // The list search filters server-side (getWorks({ search })), debounced
+        // 300ms, min 3 chars — typing the unique suffix surfaces only our work
+        // regardless of how many works the seeded account has accrued.
+        await page.goto('/en/works', { waitUntil: 'domcontentloaded' });
 
-		const searchInput = page.locator('input[placeholder="Search works..."]').first();
-		await expect(searchInput, 'works list search input is present').toBeVisible({
-			timeout: 30_000,
-		});
-		await searchInput.fill(SUFFIX);
+        const searchInput = page.locator('input[placeholder="Search works..."]').first();
+        await expect(searchInput, 'works list search input is present').toBeVisible({
+            timeout: 30_000,
+        });
+        await searchInput.fill(SUFFIX);
 
-		// The card links to /works/<id> and shows the name in an <h3>. Poll the
-		// card link (filtered by the work id) until the debounced search lands.
-		const workCardLink = page.locator(`a[href*="/works/${workId}"]`).first();
-		await expect(workCardLink, 'work card appears in filtered list').toBeVisible({
-			timeout: 30_000,
-		});
-		await expect(
-			workCardLink,
-			'work card shows the work name',
-		).toContainText(WORK_NAME, { timeout: 15_000 });
+        // The card links to /works/<id> and shows the name in an <h3>. Poll the
+        // card link (filtered by the work id) until the debounced search lands.
+        const workCardLink = page.locator(`a[href*="/works/${workId}"]`).first();
+        await expect(workCardLink, 'work card appears in filtered list').toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(workCardLink, 'work card shows the work name').toContainText(WORK_NAME, {
+            timeout: 15_000,
+        });
 
-		// --- Step 3b: navigate to the detail page and assert it renders. ---
-		// Capture the detail navigation response to assert it didn't 5xx
-		// (Next soft-nav RSC fetch is a real HTTP request).
-		const [detailNav] = await Promise.all([
-			page
-				.waitForResponse(
-					(r) =>
-						new URL(r.url()).pathname.includes(`/works/${workId}`) &&
-						r.request().method() === 'GET',
-					{ timeout: 30_000 },
-				)
-				.catch(() => null),
-			workCardLink.click(),
-		]);
-		await expect(page).toHaveURL(new RegExp(`/works/${workId}`), { timeout: 30_000 });
-		if (detailNav) {
-			expect(detailNav.status(), 'work detail nav should not 5xx').toBeLessThan(500);
-		}
+        // --- Step 3b: navigate to the detail page and assert it renders. ---
+        // Capture the detail navigation response to assert it didn't 5xx
+        // (Next soft-nav RSC fetch is a real HTTP request).
+        const [detailNav] = await Promise.all([
+            page
+                .waitForResponse(
+                    (r) =>
+                        new URL(r.url()).pathname.includes(`/works/${workId}`) &&
+                        r.request().method() === 'GET',
+                    { timeout: 30_000 },
+                )
+                .catch(() => null),
+            workCardLink.click(),
+        ]);
+        await expect(page).toHaveURL(new RegExp(`/works/${workId}`), { timeout: 30_000 });
+        if (detailNav) {
+            expect(detailNav.status(), 'work detail nav should not 5xx').toBeLessThan(500);
+        }
 
-		// WorkHeader renders the name in an <h1> and the slug in a <code>.
-		await expect(
-			page.getByRole('heading', { level: 1, name: WORK_NAME }),
-			'detail page renders the work name as an <h1>',
-		).toBeVisible({ timeout: 30_000 });
+        // WorkHeader renders the name in an <h1> and the slug in a <code>.
+        await expect(
+            page.getByRole('heading', { level: 1, name: WORK_NAME }),
+            'detail page renders the work name as an <h1>',
+        ).toBeVisible({ timeout: 30_000 });
 
-		// A real detail surface beyond the title: the slug, rendered in the
-		// header meta row (WorkHeader.tsx <code>{work.slug}</code>).
-		await expect(
-			page.locator('code', { hasText: WORK_SLUG }).first(),
-			'detail page renders the work slug (detail surface)',
-		).toBeVisible({ timeout: 30_000 });
+        // A real detail surface beyond the title: the slug, rendered in the
+        // header meta row (WorkHeader.tsx <code>{work.slug}</code>).
+        await expect(
+            page.locator('code', { hasText: WORK_SLUG }).first(),
+            'detail page renders the work slug (detail surface)',
+        ).toBeVisible({ timeout: 30_000 });
 
-		// Sanity: we did not bounce to /login (still authenticated).
-		await expect(page, 'detail page should not redirect to /login').not.toHaveURL(/\/login/);
-	});
+        // Sanity: we did not bounce to /login (still authenticated).
+        await expect(page, 'detail page should not redirect to /login').not.toHaveURL(/\/login/);
+    });
 });

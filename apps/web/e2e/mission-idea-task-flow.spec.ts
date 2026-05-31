@@ -219,9 +219,9 @@ test.describe('Mission → Idea → Task hierarchy (seeded user)', () => {
 
         // /missions/:id detail renders the Mission title (the <h1> header).
         await page.goto(`/missions/${mission.id}`, { waitUntil: 'domcontentloaded' });
-        await expect(
-            page.getByRole('heading', { name: missionTitle }).first(),
-        ).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole('heading', { name: missionTitle }).first()).toBeVisible({
+            timeout: 30_000,
+        });
 
         // /missions/:id/tasks renders the Mission-scoped Task (TaskCard).
         // The Tasks tab filters the global list by missionId, so only this

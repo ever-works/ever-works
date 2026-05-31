@@ -84,14 +84,18 @@ test.describe('AI Chat — UI round-trip', () => {
         });
 
         if (completion.status === 200) {
-            expect(completion.content, 'a configured provider returns message content').toBeTruthy();
+            expect(
+                completion.content,
+                'a configured provider returns message content',
+            ).toBeTruthy();
             expect(completion.model, 'completion echoes the model used').toBeTruthy();
         } else {
             // Unconfigured environment → the OpenAI-compat controller returns a
             // clean 422 provider_unavailable (never a 5xx).
-            expect(completion.status, `unexpected status; body=${JSON.stringify(completion.raw)}`).toBe(
-                422,
-            );
+            expect(
+                completion.status,
+                `unexpected status; body=${JSON.stringify(completion.raw)}`,
+            ).toBe(422);
             const errType = (completion.raw as { error?: { type?: string } })?.error?.type;
             expect(errType).toBe('provider_unavailable');
         }

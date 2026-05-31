@@ -199,10 +199,9 @@ test.describe('Agent instruction files — edit + persist', () => {
 
         // Cross-check: the API now returns the UI-entered body.
         await expect
-            .poll(
-                async () => (await readAgentFile(request, token, agent.id, 'SOUL.md')).body,
-                { timeout: 30_000 },
-            )
+            .poll(async () => (await readAgentFile(request, token, agent.id, 'SOUL.md')).body, {
+                timeout: 30_000,
+            })
             .toBe(edited);
 
         // Reload the page — the edit must survive (read back from the DB on SSR).

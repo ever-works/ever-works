@@ -572,29 +572,29 @@ observable, truthful outcomes). All green locally on a fresh CI-mirrored
 sqlite stack (`--workers=1`, two consecutive all-green runs).
 
 - [x] `organization-create-switch` — create orgs through the real
-  WorkspaceSwitcher modal; both become selectable header entries; API-cross-checked.
+      WorkspaceSwitcher modal; both become selectable header entries; API-cross-checked.
 - [x] `chat-ui-roundtrip` — send a message in the real chat panel; assert a
-  genuine `/api/chat` round-trip (real reply when a provider is configured,
-  truthful provider-unavailable state otherwise) + an API completion check.
+      genuine `/api/chat` round-trip (real reply when a provider is configured,
+      truthful provider-unavailable state otherwise) + an API completion check.
 - [x] `avatar-change` — change the user avatar URL; assert it persists and the
-  sidebar avatar `<img>` re-renders.
+      sidebar avatar `<img>` re-renders.
 - [x] `agent-task-assignment-flow` — Work → agent (scoped) → task → assign →
-  AgentRun/assignee records (run dispatch records even without a Trigger.dev worker).
+      AgentRun/assignee records (run dispatch records even without a Trigger.dev worker).
 - [x] `openrouter-enable-model-selection` — enable OpenRouter, pick a model,
-  persist it, assert chat uses the provider/model (environment-adaptive); system
-  plugin can't be disabled (real contract).
+      persist it, assert chat uses the provider/model (environment-adaptive); system
+      plugin can't be disabled (real contract).
 - [x] `plugin-enable-disable-lifecycle` — enable → configure → disable a safe
-  plugin via API + the `/plugins` UI toggle; persists across reload.
+      plugin via API + the `/plugins` UI toggle; persists across reload.
 - [x] `conversation-history-persistence` — conversations persist, list, rename,
-  and surface in the in-panel chat history.
+      and surface in the in-panel chat history.
 - [x] `mission-idea-task-flow` — Mission + Idea (work-proposal) + scoped Tasks;
-  scoped filtering; UI render.
+      scoped filtering; UI render.
 - [x] `agent-instruction-files-ui` — edit an agent's SOUL.md in the real editor;
-  autosave persists across reload (API-cross-checked).
+      autosave persists across reload (API-cross-checked).
 - [x] `task-board-lifecycle` — task status state-machine via API + a UI "Move to"
-  transition; illegal hops rejected.
+      transition; illegal hops rejected.
 - [x] `agent-lifecycle-status` — draft → active ⇄ paused via API + the agent
-  detail UI.
+      detail UI.
 - [x] `work-create-detail` — create a Work and view it in the list + detail UI.
 
 Two enabling fixes shipped alongside (both real): `organization.service.ts`

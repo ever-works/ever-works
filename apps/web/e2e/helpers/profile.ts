@@ -48,9 +48,3 @@ export async function updateProfileViaAPI(
     const body = await res.json();
     return body.user ?? body;
 }
-
-/** A stable, obviously-distinct avatar URL for change-detection assertions. */
-export function uniqueAvatarUrl(seed = ''): string {
-    const tag = `${seed}${Date.now().toString(36)}`;
-    return `https://avatars.e2e.ever.works/${tag}.png`;
-}
