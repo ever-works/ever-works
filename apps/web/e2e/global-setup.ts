@@ -176,11 +176,34 @@ setup('authenticate', async ({ page, baseURL }) => {
         '/en/settings/integrations/channels',
         '/en/works/new',
     ];
+    //
+    //    Bound the whole loop so it can NEVER blow the 600s setup budget: a
+    //    degraded dev server that hangs every route at the per-route timeout
+    //    would otherwise accumulate 17 × 60s ≈ 17min and trip
+    //    `setup.setTimeout(600_000)` mid-loop — which would fail the entire
+    //    setup project (including the already-saved auth artifacts) and block
+    //    every dependent spec. So: (a) a 30s per-route cap (cold compile is
+    //    ~10-25s; a route that needs more just warms during its first spec,
+    //    which has its own 90s budget), and (b) a hard cumulative deadline well
+    //    under the setup budget, after which we stop early and log what was
+    //    skipped (never a silent truncation). Codex/Greptile P2 on PR #1196.
+    const WARMUP_BUDGET_MS = 240_000;
+    const warmupDeadline = Date.now() + WARMUP_BUDGET_MS;
+    let warmed = 0;
     for (const route of warmupRoutes) {
+        if (Date.now() > warmupDeadline) {
+            console.warn(
+                `[e2e global-setup] warm-up budget (${WARMUP_BUDGET_MS}ms) exhausted after ` +
+                    `${warmed}/${warmupRoutes.length} routes; skipping the rest. Auth artifacts ` +
+                    `are already saved (steps 5-6); remaining routes warm on first spec hit.`,
+            );
+            break;
+        }
         try {
-            await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+            await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 30_000 });
         } catch {
             // Best-effort warm-up — never block the suite on a slow compile.
         }
+        warmed++;
     }
 });
