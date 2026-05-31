@@ -127,6 +127,7 @@ const STATIC_TOOL_DOMAINS: Record<string, string> = {
     showComponent: 'core',
     runReport: 'core',
     listReports: 'core',
+    buildReport: 'core',
     webSearch: 'core',
     getUserInfo: 'core',
     suggestWorks: 'core',

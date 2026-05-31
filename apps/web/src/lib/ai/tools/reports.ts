@@ -533,6 +533,80 @@ export const listReports = tool({
     }),
 });
 
+/**
+ * Generic, parameterised report builder. Covers the long tail of "group X by
+ * field Y as a chart" reports without a hardcoded entry for each — the model
+ * picks a known-safe list source + a field. Path params are resolved from the
+ * source's declared scope (id vs workId).
+ */
+const REPORT_SOURCES: Record<
+    string,
+    { path: string; scopeParam?: 'id' | 'workId'; label: string }
+> = {
+    tasks: { path: '/api/tasks', label: 'tasks' },
+    agents: { path: '/api/agents', label: 'agents' },
+    missions: { path: '/api/me/missions', label: 'missions' },
+    ideas: { path: '/api/me/work-proposals', label: 'ideas' },
+    works: { path: '/api/works', label: 'works' },
+    skills: { path: '/api/skills', label: 'skills' },
+    notifications: { path: '/api/notifications', label: 'notifications' },
+    webhook_deliveries: { path: '/api/webhooks/deliveries', label: 'webhook deliveries' },
+    work_members: {
+        path: '/api/works/{workId}/members',
+        scopeParam: 'workId',
+        label: 'work members',
+    },
+    work_items: { path: '/api/works/{id}/items', scopeParam: 'id', label: 'work items' },
+    kb_documents: {
+        path: '/api/works/{id}/kb/documents',
+        scopeParam: 'id',
+        label: 'knowledge-base documents',
+    },
+};
+const SOURCE_KEYS = Object.keys(REPORT_SOURCES);
+
+export const buildReport = tool({
+    description:
+        'Build an ad-hoc report by grouping a list of your entities by a field and rendering a ' +
+        'bar/pie chart in the canvas. Use when no built-in run_report fits. ' +
+        `Sources: ${SOURCE_KEYS.join(', ')}. Work-scoped sources (work_members, work_items, ` +
+        'kb_documents) need workId. groupBy is the field to count by (e.g. status, priority, role, ' +
+        'category, type). After calling, give a one-line summary.',
+    inputSchema: z.object({
+        source: z
+            .enum(SOURCE_KEYS as [string, ...string[]])
+            .describe('Which list of entities to group'),
+        groupBy: z.string().describe('Field name to group/count by (e.g. status, priority, role)'),
+        chartType: z.enum(['bar', 'pie']).optional(),
+        workId: z.string().optional().describe('Required for work-scoped sources'),
+    }),
+    execute: async ({ source, groupBy, chartType, workId }) => {
+        const src = REPORT_SOURCES[source];
+        if (!src) return { success: false, error: `Unknown source "${source}".` };
+        if (src.scopeParam && !workId) {
+            return {
+                success: false,
+                error: `Source "${source}" needs a workId — ask the user which work.`,
+            };
+        }
+        const res = await callApi({
+            method: 'GET',
+            path: src.path,
+            pathParams: src.scopeParam ? { [src.scopeParam]: workId! } : undefined,
+        });
+        if (!res.success) return { success: false, error: res.error ?? 'Request failed' };
+        const rows = toArray(res.data);
+        if (!rows.length) return { success: false, error: `No ${src.label} found.` };
+        const artifact = groupCountChart(
+            `${labelize(src.label)} by ${labelize(groupBy)}`,
+            rows,
+            groupBy,
+            chartType ?? 'bar',
+        );
+        return { __canvas: true, artifact };
+    },
+});
+
 export function buildReportTools() {
-    return { runReport, listReports };
+    return { runReport, listReports, buildReport };
 }
