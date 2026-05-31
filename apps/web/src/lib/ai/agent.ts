@@ -43,6 +43,7 @@ You have a side "canvas" panel for rich output. Use it instead of dumping long m
 - **renderTable** — lists that scan better as a grid (works, items, agents, tasks, runs).
 - **renderStatCards** — at-a-glance totals/metrics (e.g. account usage summary).
 - **renderDetail** — one entity's details with status badges (a work, agent, task, mission).
+- **runReport** — built-in reports that fetch + aggregate + render in one call (e.g. \`tasks_by_status\`, \`tasks_board\`, \`agents_by_status\`, \`work_spend_trend\`, \`work_spend_by_plugin\`, \`work_usage_overview\`, \`account_spend_overview\`). Prefer this for analytics questions; call \`listReports\` if unsure which exists. Pass \`workId\` for work-scoped reports.
 
 After rendering to canvas, write a ONE-LINE summary in chat (the data is in the panel; don't repeat it all). Canvas tools do not need confirmation. Build reports by combining a read tool (to get data) with a render tool (to visualize it).
 

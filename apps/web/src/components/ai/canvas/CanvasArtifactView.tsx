@@ -24,6 +24,7 @@ import type {
     TableArtifact,
     StatArtifact,
     DetailArtifact,
+    KanbanArtifact,
 } from './types';
 
 const PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#ef4444'];
@@ -42,6 +43,8 @@ export function CanvasArtifactView({ artifact }: { artifact: CanvasArtifact }) {
             return <StatView artifact={artifact} />;
         case 'detail':
             return <DetailView artifact={artifact} />;
+        case 'kanban':
+            return <KanbanView artifact={artifact} />;
         default:
             return null;
     }
@@ -228,6 +231,44 @@ function DetailView({ artifact }: { artifact: DetailArtifact }) {
                     </div>
                 ))}
             </dl>
+        </div>
+    );
+}
+
+function KanbanView({ artifact }: { artifact: KanbanArtifact }) {
+    if (!artifact.columns?.length) return <EmptyState label="No columns" />;
+    return (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+            {artifact.columns.map((col) => (
+                <div
+                    key={col.key}
+                    className="flex w-56 shrink-0 flex-col rounded-lg border border-border bg-surface-secondary/40 dark:border-border-dark dark:bg-white/[0.03]"
+                >
+                    <div className="flex items-center justify-between border-b border-border px-3 py-2 dark:border-border-dark">
+                        <span className="text-[11px] font-medium text-text dark:text-text-dark">
+                            {col.label}
+                        </span>
+                        <span className="rounded-full bg-surface-secondary px-1.5 text-[10px] text-text-muted dark:bg-white/[0.06] dark:text-text-muted-dark">
+                            {col.cards.length}
+                        </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5 p-2">
+                        {col.cards.map((card, i) => (
+                            <div
+                                key={i}
+                                className="rounded-md border border-border bg-surface px-2.5 py-1.5 text-[11px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+                            >
+                                <p className="truncate font-medium">{card.title}</p>
+                                {card.subtitle ? (
+                                    <p className="truncate text-[10px] text-text-muted dark:text-text-muted-dark">
+                                        {card.subtitle}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }

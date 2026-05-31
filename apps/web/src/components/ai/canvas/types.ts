@@ -62,7 +62,24 @@ export interface DetailArtifact {
     badges?: Array<{ label: string; tone?: 'default' | 'success' | 'warning' | 'danger' }>;
 }
 
-export type CanvasArtifact = ChartArtifact | TableArtifact | StatArtifact | DetailArtifact;
+export interface KanbanArtifact {
+    id: string;
+    kind: 'kanban';
+    title: string;
+    columns: Array<{
+        key: string;
+        label: string;
+        cards: Array<{ title: string; subtitle?: string }>;
+    }>;
+    description?: string;
+}
+
+export type CanvasArtifact =
+    | ChartArtifact
+    | TableArtifact
+    | StatArtifact
+    | DetailArtifact
+    | KanbanArtifact;
 
 export interface CanvasToolOutput {
     __canvas: true;

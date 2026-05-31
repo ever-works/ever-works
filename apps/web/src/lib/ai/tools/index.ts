@@ -69,6 +69,8 @@ import { buildGeneratedTools } from './generated/factory';
 import { ALL_OPERATIONS } from './generated/registry.all';
 // Canvas rendering tools (charts / tables / stat tiles / detail panels).
 import { buildCanvasTools } from './canvas.tools';
+// Built-in report tools (fetch + aggregate + render to canvas).
+import { buildReportTools } from './reports';
 
 /**
  * Build the full tool set for the chat agent.
@@ -87,6 +89,7 @@ export function buildChatTools(model: LanguageModel) {
     return {
         ...buildGeneratedTools(ALL_OPERATIONS),
         ...buildCanvasTools(),
+        ...buildReportTools(),
 
         // Read
         listWorks,
