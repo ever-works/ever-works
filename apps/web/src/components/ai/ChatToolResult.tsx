@@ -236,7 +236,13 @@ export function ChatToolResult({
     // Confirmation gate — a destructive tool was called without `confirmed`.
     const confirmation = output as ConfirmationOutput | null;
     if (confirmation?.__confirmationRequired) {
-        return <ConfirmCard action={confirmation.action ?? ''} target={confirmation.target} />;
+        return (
+            <ConfirmCard
+                confirmToolName={confirmation.toolName ?? toolName}
+                action={confirmation.action ?? ''}
+                target={confirmation.target}
+            />
+        );
     }
 
     // Canvas artifact — the agent rendered rich output into the side panel.
@@ -303,26 +309,37 @@ export function ChatToolResult({
  * `confirmed: true`; cancelling tells it to stand down. The mutation never runs
  * until the user clicks Confirm.
  */
-function ConfirmCard({ action, target }: { action: string; target?: string }) {
+function ConfirmCard({
+    confirmToolName,
+    action,
+    target,
+}: {
+    confirmToolName: string;
+    action: string;
+    target?: string;
+}) {
     const { sendMessage } = useChatContext();
     const [resolved, setResolved] = useState<null | 'confirmed' | 'cancelled'>(null);
 
     if (resolved) {
+        // "Confirming…" is intentionally a pending state, not a success claim:
+        // the destructive tool only re-runs after the model processes the
+        // confirmation message, so we can't assert it completed here.
         return (
             <span
                 className={cn(
                     'inline-flex items-center gap-1 mt-1 text-[10px]',
                     resolved === 'confirmed'
-                        ? 'text-success'
+                        ? 'text-text-muted dark:text-text-muted-dark'
                         : 'text-text-muted dark:text-text-muted-dark',
                 )}
             >
                 {resolved === 'confirmed' ? (
-                    <Check className="w-2.5 h-2.5" />
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
                 ) : (
                     <X className="w-2.5 h-2.5" />
                 )}
-                {resolved === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+                {resolved === 'confirmed' ? 'Confirming…' : 'Cancelled'}
             </span>
         );
     }
@@ -343,7 +360,11 @@ function ConfirmCard({ action, target }: { action: string; target?: string }) {
                 <button
                     onClick={() => {
                         setResolved('confirmed');
-                        sendMessage('Yes, I confirm — please proceed with that action.');
+                        // Name the exact operation + target so that, if several
+                        // confirmation cards are pending, the model re-calls the
+                        // right tool with `confirmed: true`.
+                        const ref = target ? `${confirmToolName} for ${target}` : confirmToolName;
+                        sendMessage(`Yes, I confirm — proceed with ${ref} (confirmed: true).`);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors cursor-pointer"
                 >
@@ -353,7 +374,8 @@ function ConfirmCard({ action, target }: { action: string; target?: string }) {
                 <button
                     onClick={() => {
                         setResolved('cancelled');
-                        sendMessage('No, cancel that — do not proceed.');
+                        const ref = target ? `${confirmToolName} for ${target}` : confirmToolName;
+                        sendMessage(`No, cancel ${ref} — do not proceed.`);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-surface-secondary text-text dark:bg-surface-secondary-dark dark:text-text-dark hover:opacity-80 transition-opacity cursor-pointer"
                 >

@@ -214,7 +214,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         summary: 'Create a new task.',
         kind: 'create',
         body: true,
-        bodyHint: 'name, description, priority, dueDate, scope, scopeId, assigneeIds (single).',
+        bodyHint:
+            'title (required), description, priority, dueDate, labels, missionId, ideaId, workId, parentTaskId.',
     },
     {
         toolName: 'update_task',
@@ -224,7 +225,7 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'update',
         params: [id('Task id')],
         body: true,
-        bodyHint: 'Any of: name, description, priority, dueDate, status.',
+        bodyHint: 'Any of: title, description, priority, dueDate, status, labels.',
     },
     {
         toolName: 'delete_task',
@@ -736,7 +737,16 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/organizations/check-slug',
         summary: 'Check if an organization slug is available.',
         kind: 'read',
-        params: [{ name: 'slug', in: 'query', required: true, type: 'string' }],
+        // The controller declares the query param as `value` (CheckSlugQueryDto.value).
+        params: [
+            {
+                name: 'value',
+                in: 'query',
+                required: true,
+                type: 'string',
+                description: 'The slug to check for availability',
+            },
+        ],
     },
 
     // ── Knowledge base ───────────────────────────────────────────
