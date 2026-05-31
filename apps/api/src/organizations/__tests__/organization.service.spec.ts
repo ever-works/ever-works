@@ -85,6 +85,10 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 }
                 return undefined;
             }),
+            // The createOrganization backfill emits driver-correct placeholders;
+            // simulate a Postgres connection so it uses the `$1/$2` form the
+            // assertions below expect (matches the "Simulate Postgres" shape above).
+            connection: { options: { type: 'postgres' } },
         };
 
         const dataSource = {
@@ -514,6 +518,7 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                     }
                     return undefined;
                 }),
+                connection: { options: { type: 'postgres' } },
             };
             const dataSource = {
                 transaction: jest.fn(async (cb: (m: typeof manager) => Promise<unknown>) =>

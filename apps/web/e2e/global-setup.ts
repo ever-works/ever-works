@@ -14,8 +14,10 @@ const credentialsFile = 'e2e/.auth/test-user.json';
  */
 setup('authenticate', async ({ page, baseURL }) => {
     // Dev-mode compilation of the dashboard route on first hit can take a
-    // long time, so the whole setup needs a generous budget.
-    setup.setTimeout(300_000);
+    // long time, and step 7 below additionally pre-compiles the heavy
+    // dashboard routes (10-25s EACH on a cold runner), so the whole setup
+    // needs a very generous budget.
+    setup.setTimeout(600_000);
 
     // 1. Register the user via API (fast)
     try {
@@ -140,4 +142,68 @@ setup('authenticate', async ({ page, baseURL }) => {
         JSON.stringify({ ...TEST_USER, generatedAt: new Date().toISOString() }, null, 2),
         'utf8',
     );
+
+    // 7. Warm up the heavy dashboard routes. The sharded e2e job runs the
+    //    web tier under `next dev`, which compiles each route LAZILY on its
+    //    first visit — a 10-25s cold compile. The first spec to hit an
+    //    un-warmed route can blow past its own navigation timeout, which is
+    //    the intermittent "random" flakiness seen on /tasks/new,
+    //    /settings/*, /missions and /ideas. Pre-visiting them here — while
+    //    the browser is still authenticated (storageState saved in step 5)
+    //    so the auth-gated routes actually COMPILE instead of redirecting
+    //    to /login — moves that one-time compile into setup, before any
+    //    assertions run, so every spec hits an already-warm route.
+    //
+    //    Best-effort: every artifact above is already written, so a slow or
+    //    failing warm-up must NEVER fail setup or block the suite. Each
+    //    visit is individually guarded.
+    const warmupRoutes = [
+        '/en/works',
+        '/en/tasks',
+        '/en/tasks/new',
+        '/en/missions',
+        '/en/ideas',
+        '/en/skills',
+        '/en/agents',
+        '/en/activity',
+        '/en/plugins',
+        '/en/settings',
+        '/en/settings/api-keys',
+        '/en/settings/security',
+        '/en/settings/data',
+        '/en/settings/danger',
+        '/en/settings/notifications',
+        '/en/settings/integrations/channels',
+        '/en/works/new',
+    ];
+    //
+    //    Bound the whole loop so it can NEVER blow the 600s setup budget: a
+    //    degraded dev server that hangs every route at the per-route timeout
+    //    would otherwise accumulate 17 × 60s ≈ 17min and trip
+    //    `setup.setTimeout(600_000)` mid-loop — which would fail the entire
+    //    setup project (including the already-saved auth artifacts) and block
+    //    every dependent spec. So: (a) a 30s per-route cap (cold compile is
+    //    ~10-25s; a route that needs more just warms during its first spec,
+    //    which has its own 90s budget), and (b) a hard cumulative deadline well
+    //    under the setup budget, after which we stop early and log what was
+    //    skipped (never a silent truncation). Codex/Greptile P2 on PR #1196.
+    const WARMUP_BUDGET_MS = 240_000;
+    const warmupDeadline = Date.now() + WARMUP_BUDGET_MS;
+    let warmed = 0;
+    for (const route of warmupRoutes) {
+        if (Date.now() > warmupDeadline) {
+            console.warn(
+                `[e2e global-setup] warm-up budget (${WARMUP_BUDGET_MS}ms) exhausted after ` +
+                    `${warmed}/${warmupRoutes.length} routes; skipping the rest. Auth artifacts ` +
+                    `are already saved (steps 5-6); remaining routes warm on first spec hit.`,
+            );
+            break;
+        }
+        try {
+            await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+        } catch {
+            // Best-effort warm-up — never block the suite on a slow compile.
+        }
+        warmed++;
+    }
 });
