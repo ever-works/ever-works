@@ -1,4 +1,4 @@
-import { Logger, LoggerService } from '@nestjs/common';
+import { ConsoleLogger, LoggerService } from '@nestjs/common';
 import { getPostHogClient } from './posthog.config';
 import { getSentryInstance } from '../sentry/sentry.config';
 
@@ -40,14 +40,21 @@ type LogLevel = 'log' | 'warn' | 'error' | 'debug' | 'verbose';
  * Wired into the API in `apps/api/src/main.ts` via `app.useLogger(...)`.
  */
 export class PostHogLoggerService implements LoggerService {
-    private readonly fallbackLogger: Logger;
+    private readonly fallbackLogger: ConsoleLogger;
     private readonly defaultContext?: string;
     private readonly distinctId: string;
 
     constructor(context?: string, distinctId: string = 'system') {
         this.defaultContext = context;
         this.distinctId = distinctId;
-        this.fallbackLogger = new Logger(context ?? 'PostHogLogger');
+        // MUST be ConsoleLogger, NOT Logger. This service is installed as the
+        // global app logger via `app.useLogger(...)`; NestJS's `Logger` facade
+        // delegates back to whatever global logger is registered — i.e. THIS
+        // service — so `new Logger().log()` here would recurse into
+        // dispatch() → stack overflow on every emit, killing ALL logging
+        // ("fallback logger threw ..." then silence). ConsoleLogger writes to
+        // stdout directly and never delegates, breaking the cycle.
+        this.fallbackLogger = new ConsoleLogger(context ?? 'PostHogLogger');
     }
 
     log(message: unknown, context?: string): void {
