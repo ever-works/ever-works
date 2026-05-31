@@ -318,21 +318,56 @@ export abstract class BaseFacadeService {
                 registered.state === 'loaded'
             ) {
                 const isEnabled = await this.isPluginEnabled(effectiveOverride, workId, userId);
-                if (isEnabled) return registered.plugin as T;
+                if (isEnabled) return this.materializeForUse<T>(registered.plugin);
             }
             throw new ProviderNotFoundError(effectiveOverride, this.CAPABILITY);
         }
 
         if (workId) {
             const activePlugin = await this.findActivePluginForWork(workId);
-            if (activePlugin) return activePlugin.plugin as T;
+            if (activePlugin) return this.materializeForUse<T>(activePlugin.plugin);
         }
 
         const enabledPlugins = await this.getEnabledPlugins(workId, userId);
         if (enabledPlugins.length > 0) {
-            return enabledPlugins[0].plugin as T;
+            return this.materializeForUse<T>(enabledPlugins[0].plugin);
         }
 
         throw new NoProviderError(this.CAPABILITY);
+    }
+
+    /**
+     * Materialize a (possibly lazy) plugin before an operation uses it.
+     *
+     * Under lazy plugin loading (PR #1156) the registry hands out a proxy whose
+     * synchronous getters — notably `settingsSchema` — only reflect the real
+     * plugin AFTER materialization. `resolvePlugin` is the operation path: the
+     * caller is about to use this plugin (chat / search / deploy / …) and will
+     * immediately read its resolved settings, which depend on the schema's
+     * `x-envVar` bindings (e.g. `PLUGIN_OPENROUTER_API_KEY`). If we hand back a
+     * cold proxy, `settingsSchema` is `{}`, the env var is never read, and the
+     * provider call fails with `401 Missing Authentication header`. Forcing
+     * materialization here is cheap — only the single plugin actually being
+     * used is imported, not the whole registry, so lazy-load's memory win is
+     * preserved.
+     */
+    private async materializeForUse<T extends IPlugin>(plugin: IPlugin): Promise<T> {
+        const stub = plugin as unknown as {
+            __materialize?: () => Promise<IPlugin>;
+        };
+        if (typeof stub.__materialize === 'function') {
+            // Return the REAL instance, not the lazy proxy. The proxy forwards
+            // every method through `ensureMaterialized().then(...)`, so it wraps
+            // results in a Promise — which silently breaks methods that must
+            // return a value synchronously, notably the streaming generator
+            // `createStreamingChatCompletion()` (a `Promise<AsyncGenerator>` is
+            // not itself async-iterable → "is not a function or its return
+            // value is not async iterable"). Handing back the materialized
+            // instance lets the facade call real methods directly. Settings
+            // resolution is unaffected: it looks the plugin up by id in the
+            // registry (still the proxy) and reads its now-materialized schema.
+            return (await stub.__materialize()) as T;
+        }
+        return plugin as T;
     }
 }

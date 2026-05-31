@@ -95,7 +95,15 @@ export class GeneratorFormSchemaService {
         if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
             const provider = pipelinePlugin.plugin;
 
-            pluginFields = provider.getFormFields();
+            // Defensive: getFormFields() is typed `FormFieldDefinition[]`, but a
+            // misbehaving pipeline plugin (observed: agent-pipeline) can return a
+            // non-array at runtime — which made `pluginFields.map(...)` below throw
+            // `TypeError: pluginFields.map is not a function` and 500 the whole
+            // GET /generator-form endpoint. Coerce to [] so one bad plugin can't
+            // take down form-schema resolution (same resilience stance as the
+            // per-plugin try/catch in getProvidersForCapability, #1184).
+            const resolvedFields = provider.getFormFields();
+            pluginFields = Array.isArray(resolvedFields) ? resolvedFields : [];
             pluginGroups = provider.getFormGroups?.();
             handledConfigFields = provider.handledConfigFields ?? [];
             defaultValues = provider.getDefaultValues?.();
@@ -348,10 +356,18 @@ export class GeneratorFormSchemaService {
                     ),
                 );
             } catch (error) {
+                // Embed the stack INSIDE the message rather than passing it as
+                // the 2nd arg: NestJS `Logger.warn(message, context?)` treats
+                // the 2nd arg as the context prefix, and PostHogLoggerService
+                // hard-codes warn's trace to undefined — so a 2nd-arg stack
+                // would clobber the "GeneratorFormSchemaService" context without
+                // recording a trace. Embedding keeps the context AND surfaces
+                // the full call chain (error.stack starts with the message)
+                // once the PostHog logger fix (#1183) restores prod logging.
+                const reason =
+                    error instanceof Error ? (error.stack ?? error.message) : String(error);
                 this.logger.warn(
-                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
+                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${reason}`,
                 );
             }
         }
