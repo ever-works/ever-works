@@ -1716,7 +1716,13 @@ export class PluginOperationsService {
 
         if (plugin?.validateSettings) {
             const pluginResult = await plugin.validateSettings(settings);
-            if (!pluginResult.valid) {
+            // Under lazy plugin loading the proxy exposes optional lifecycle
+            // methods (validateSettings is optional) as a forwarding wrapper
+            // even when the real plugin doesn't implement them; calling it then
+            // resolves to `undefined`. Treat a missing/undefined result as "no
+            // custom validation" instead of dereferencing `.valid` — that threw
+            // `Cannot read properties of undefined (reading 'valid')` → HTTP 500.
+            if (pluginResult && !pluginResult.valid) {
                 throw new BadRequestException({
                     message: 'Invalid plugin settings',
                     errors: pluginResult.errors?.map((e) => e.message) ?? [

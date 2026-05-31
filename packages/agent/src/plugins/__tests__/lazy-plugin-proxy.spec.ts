@@ -50,6 +50,30 @@ describe('lazy-plugin-proxy', () => {
         expect(stub.__isMaterialized).toBe(true);
     });
 
+    it('exposes the real plugin settingsSchema only after materialization', async () => {
+        // Regression for the lazy-load PR #1156 chat outage: while cold the
+        // proxy returned `{}` for settingsSchema (the package.json manifest
+        // carries no JSON-Schema), and it kept returning `{}` even AFTER
+        // materialization. Settings resolution then found no x-envVar-bound
+        // fields (e.g. the OpenRouter apiKey), never read PLUGIN_OPENROUTER_API_KEY,
+        // and AI calls failed with "401 Missing Authentication header".
+        const onLoad = jest.fn().mockResolvedValue(undefined);
+        const loader = jest.fn().mockResolvedValue(makeRealPlugin('p-schema', onLoad));
+        const stub = createLazyPluginProxy(makeManifest('p-schema'), loader);
+
+        // Cold: no import cost, empty schema from the manifest.
+        expect(stub.settingsSchema).toEqual({});
+        expect(loader).not.toHaveBeenCalled();
+
+        // After materialization the proxy must delegate to the real plugin's
+        // class-level schema.
+        await stub.__materialize();
+        expect(stub.settingsSchema).toEqual({
+            type: 'object',
+            properties: { apiKey: { type: 'string' } },
+        });
+    });
+
     it('shares a single import across concurrent method calls', async () => {
         const onLoad = jest.fn().mockResolvedValue(undefined);
         let resolveLoader!: (p: IPlugin) => void;

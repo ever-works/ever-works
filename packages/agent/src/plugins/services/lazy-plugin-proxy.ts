@@ -125,9 +125,23 @@ export function createLazyPluginProxy(
             return manifest.capabilities;
         },
         get settingsSchema() {
+            // Once the real plugin is materialized, its class-level JSON-Schema
+            // is the source of truth (the manifest/package.json does not carry
+            // it). Falling back to the manifest while cold keeps sync metadata
+            // reads cheap; delegating after materialization is what lets
+            // settings resolution (incl. x-envVar bindings like
+            // PLUGIN_OPENROUTER_API_KEY) see the real schema instead of `{}`.
+            const real = materialized as unknown as Record<string, unknown> | null;
+            if (real && real.settingsSchema !== undefined) {
+                return real.settingsSchema;
+            }
             return manifestExt.settingsSchema ?? {};
         },
         get configurationMode() {
+            const real = materialized as unknown as Record<string, unknown> | null;
+            if (real && real.configurationMode !== undefined) {
+                return real.configurationMode;
+            }
             return manifestExt.configurationMode;
         },
         get __isMaterialized() {
