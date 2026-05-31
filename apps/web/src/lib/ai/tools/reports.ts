@@ -484,6 +484,52 @@ function countReport(
     };
 }
 
+/** Per-day count trend (line chart) from a list endpoint's date field. */
+function timeseriesReport(
+    id: string,
+    title: string,
+    description: string,
+    path: string,
+    dateField: string,
+    scope?: ReportScope,
+): ReportDef {
+    return {
+        id,
+        title,
+        description,
+        needsWorkId: !!scope,
+        run: async ({ workId }) => {
+            const res = await callApi({
+                method: 'GET',
+                path,
+                pathParams: scope ? { [scope]: workId! } : undefined,
+            });
+            if (!res.success) return { error: res.error ?? 'Request failed' };
+            const perDay = new Map<string, number>();
+            for (const row of toArray(res.data)) {
+                const day = String(row[dateField] ?? '').slice(0, 10);
+                if (!day) continue;
+                perDay.set(day, (perDay.get(day) ?? 0) + 1);
+            }
+            const data = [...perDay.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([day, count]) => ({ day, count }));
+            if (!data.length) return { error: 'No dated records to chart.' };
+            return {
+                artifact: {
+                    id: randomUUID(),
+                    kind: 'chart',
+                    title,
+                    chartType: 'line',
+                    xKey: 'day',
+                    series: [{ key: 'count', label: 'Count' }],
+                    data,
+                },
+            };
+        },
+    };
+}
+
 REPORTS.push(
     // group-by distributions
     groupReport(
@@ -717,6 +763,185 @@ REPORTS.push(
         '/api/works/{workId}/members',
         'Members',
         'workId',
+    ),
+);
+
+REPORTS.push(
+    // more group-by distributions
+    groupReport(
+        'works_by_domain_type',
+        'Works by domain type',
+        'Your works grouped by domain type.',
+        '/api/works',
+        'domainType',
+        'bar',
+    ),
+    groupReport(
+        'works_by_deploy_provider',
+        'Works by deploy provider',
+        'Your works grouped by deploy provider.',
+        '/api/works',
+        'deployProvider',
+        'bar',
+    ),
+    groupReport(
+        'agents_by_scope',
+        'Agents by scope',
+        'Your agents grouped by scope.',
+        '/api/agents',
+        'scope',
+        'pie',
+    ),
+    groupReport(
+        'agents_by_provider',
+        'Agents by AI provider',
+        'Your agents grouped by AI provider.',
+        '/api/agents',
+        'aiProvider',
+        'bar',
+    ),
+    groupReport(
+        'skills_catalog_by_category',
+        'Skill catalog by category',
+        'Catalog skills grouped by category.',
+        '/api/skills/catalog',
+        'category',
+        'bar',
+    ),
+    groupReport(
+        'notifications_by_priority',
+        'Notifications by priority',
+        'Your notifications grouped by priority.',
+        '/api/notifications',
+        'priority',
+        'bar',
+    ),
+    groupReport(
+        'email_messages_by_direction',
+        'Email messages by direction',
+        'Your email messages grouped by direction.',
+        '/api/email/messages',
+        'direction',
+        'pie',
+    ),
+    groupReport(
+        'kb_documents_by_status',
+        'KB documents by status',
+        'A work’s KB documents grouped by status. Needs a workId.',
+        '/api/works/{id}/kb/documents',
+        'status',
+        'bar',
+        'id',
+    ),
+    // more count stats
+    countReport(
+        'conversations_count',
+        'Conversations total',
+        'How many chat conversations you have.',
+        '/api/conversations',
+        'Conversations',
+    ),
+    countReport(
+        'email_addresses_count',
+        'Email addresses total',
+        'How many email addresses you have configured.',
+        '/api/email/addresses',
+        'Addresses',
+    ),
+    countReport(
+        'email_messages_count',
+        'Email messages total',
+        'How many email messages you have.',
+        '/api/email/messages',
+        'Messages',
+    ),
+    countReport(
+        'skill_catalog_count',
+        'Skill catalog size',
+        'How many skills are in the catalog.',
+        '/api/skills/catalog',
+        'Catalog skills',
+    ),
+    countReport(
+        'work_items_count',
+        'Work items total',
+        'How many items a work has. Needs a workId.',
+        '/api/works/{id}/items',
+        'Items',
+        'id',
+    ),
+    // per-day trends
+    timeseriesReport(
+        'notifications_per_day',
+        'Notifications per day',
+        'How many notifications arrived per day.',
+        '/api/notifications',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'organizations_per_day',
+        'Organizations created per day',
+        'New organizations created per day.',
+        '/api/organizations',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'tasks_per_day',
+        'Tasks created per day',
+        'New tasks created per day.',
+        '/api/tasks',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'agents_per_day',
+        'Agents created per day',
+        'New agents created per day.',
+        '/api/agents',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'missions_per_day',
+        'Missions created per day',
+        'New missions created per day.',
+        '/api/me/missions',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'ideas_per_day',
+        'Ideas created per day',
+        'New ideas (proposals) created per day.',
+        '/api/me/work-proposals',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'email_messages_per_day',
+        'Email messages per day',
+        'Email message volume per day.',
+        '/api/email/messages',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'webhook_deliveries_per_day',
+        'Webhook deliveries per day',
+        'Webhook delivery volume per day.',
+        '/api/webhooks/deliveries',
+        'createdAt',
+    ),
+    timeseriesReport(
+        'kb_documents_per_day',
+        'KB documents created per day',
+        'New KB documents per day for a work. Needs a workId.',
+        '/api/works/{id}/kb/documents',
+        'createdAt',
+        'id',
+    ),
+    timeseriesReport(
+        'comparisons_per_day',
+        'Comparisons created per day',
+        'New comparisons per day for a work. Needs a workId.',
+        '/api/works/{id}/comparisons',
+        'createdAt',
+        'id',
     ),
 );
 
