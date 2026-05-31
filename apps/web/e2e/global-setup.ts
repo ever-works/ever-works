@@ -14,8 +14,10 @@ const credentialsFile = 'e2e/.auth/test-user.json';
  */
 setup('authenticate', async ({ page, baseURL }) => {
     // Dev-mode compilation of the dashboard route on first hit can take a
-    // long time, so the whole setup needs a generous budget.
-    setup.setTimeout(300_000);
+    // long time, and step 7 below additionally pre-compiles the heavy
+    // dashboard routes (10-25s EACH on a cold runner), so the whole setup
+    // needs a very generous budget.
+    setup.setTimeout(600_000);
 
     // 1. Register the user via API (fast)
     try {
@@ -140,4 +142,45 @@ setup('authenticate', async ({ page, baseURL }) => {
         JSON.stringify({ ...TEST_USER, generatedAt: new Date().toISOString() }, null, 2),
         'utf8',
     );
+
+    // 7. Warm up the heavy dashboard routes. The sharded e2e job runs the
+    //    web tier under `next dev`, which compiles each route LAZILY on its
+    //    first visit — a 10-25s cold compile. The first spec to hit an
+    //    un-warmed route can blow past its own navigation timeout, which is
+    //    the intermittent "random" flakiness seen on /tasks/new,
+    //    /settings/*, /missions and /ideas. Pre-visiting them here — while
+    //    the browser is still authenticated (storageState saved in step 5)
+    //    so the auth-gated routes actually COMPILE instead of redirecting
+    //    to /login — moves that one-time compile into setup, before any
+    //    assertions run, so every spec hits an already-warm route.
+    //
+    //    Best-effort: every artifact above is already written, so a slow or
+    //    failing warm-up must NEVER fail setup or block the suite. Each
+    //    visit is individually guarded.
+    const warmupRoutes = [
+        '/en/works',
+        '/en/tasks',
+        '/en/tasks/new',
+        '/en/missions',
+        '/en/ideas',
+        '/en/skills',
+        '/en/agents',
+        '/en/activity',
+        '/en/plugins',
+        '/en/settings',
+        '/en/settings/api-keys',
+        '/en/settings/security',
+        '/en/settings/data',
+        '/en/settings/danger',
+        '/en/settings/notifications',
+        '/en/settings/integrations/channels',
+        '/en/works/new',
+    ];
+    for (const route of warmupRoutes) {
+        try {
+            await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+        } catch {
+            // Best-effort warm-up — never block the suite on a slow compile.
+        }
+    }
 });
