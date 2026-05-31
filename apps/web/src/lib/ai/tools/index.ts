@@ -66,6 +66,7 @@ import {
 // members, api-keys, budgets/usage, webhooks, orgs, KB, templates, plugins …).
 // One registry entry per platform operation — see ./generated/registry.ts.
 import { buildGeneratedTools } from './generated/factory';
+import { ALL_OPERATIONS } from './generated/registry.all';
 // Canvas rendering tools (charts / tables / stat tiles / detail panels).
 import { buildCanvasTools } from './canvas.tools';
 
@@ -84,7 +85,7 @@ import { buildCanvasTools } from './canvas.tools';
  */
 export function buildChatTools(model: LanguageModel) {
     return {
-        ...buildGeneratedTools(),
+        ...buildGeneratedTools(ALL_OPERATIONS),
         ...buildCanvasTools(),
 
         // Read

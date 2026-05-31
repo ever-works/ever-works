@@ -8,6 +8,7 @@ import {
 } from 'ai';
 import { createBackendProvider } from './provider';
 import { buildChatTools, type ChatTools } from './tools';
+import { selectActiveToolNames } from './tools/tool-selection';
 import { API_URL } from '@/lib/constants';
 
 const MAX_TOOL_STEPS = 50;
@@ -118,7 +119,20 @@ export async function runAgent({
         : 'The user is on the dashboard.';
 
     const model = provider.chatModel('auto');
-    const tools = buildChatTools(model);
+    const allTools = buildChatTools(model);
+
+    // Per-turn tool gating: the full set is large (hand-written + ~280
+    // generated + canvas), so surface only an always-on core plus the tools
+    // whose domain matches the latest message / current page. Keeps the
+    // schema payload bounded and well under provider function-count limits.
+    const activeNames = selectActiveToolNames(Object.keys(allTools), {
+        text: lastUserText(messages),
+        pageUrl: currentPageUrl,
+    });
+    const activeSet = new Set(activeNames);
+    const tools = Object.fromEntries(
+        Object.entries(allTools).filter(([name]) => activeSet.has(name)),
+    ) as typeof allTools;
 
     return streamText({
         model,
@@ -130,6 +144,19 @@ export async function runAgent({
         stopWhen: stepCountIs(MAX_TOOL_STEPS),
         onFinish,
     });
+}
+
+/** Latest user message text — drives per-turn tool gating. */
+function lastUserText(messages: UIMessage[]): string {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i];
+        if (message.role !== 'user') continue;
+        return message.parts
+            .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+            .map((part) => part.text)
+            .join(' ');
+    }
+    return '';
 }
 
 function isProviderErrorMessage(message: UIMessage): boolean {
