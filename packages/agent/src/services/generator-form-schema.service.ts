@@ -348,15 +348,18 @@ export class GeneratorFormSchemaService {
                     ),
                 );
             } catch (error) {
-                // Pass the stack as the 2nd arg so the NestJS logger attaches
-                // the full call chain — without it (once the PostHog logger
-                // fix #1183 restores logging) only the bare message would
-                // surface, making the originally-throwing plugin hard to trace.
+                // Embed the stack INSIDE the message rather than passing it as
+                // the 2nd arg: NestJS `Logger.warn(message, context?)` treats
+                // the 2nd arg as the context prefix, and PostHogLoggerService
+                // hard-codes warn's trace to undefined — so a 2nd-arg stack
+                // would clobber the "GeneratorFormSchemaService" context without
+                // recording a trace. Embedding keeps the context AND surfaces
+                // the full call chain (error.stack starts with the message)
+                // once the PostHog logger fix (#1183) restores prod logging.
+                const reason =
+                    error instanceof Error ? (error.stack ?? error.message) : String(error);
                 this.logger.warn(
-                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                    error instanceof Error ? error.stack : undefined,
+                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${reason}`,
                 );
             }
         }
