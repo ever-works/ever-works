@@ -14,9 +14,15 @@ import {
     Check,
     Compass,
     AlertCircle,
+    BarChart3,
+    ShieldAlert,
+    X,
 } from 'lucide-react';
 import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { toast } from 'sonner';
+import { useChatContext } from './ChatProvider';
+import { useCanvasOptional } from './canvas/CanvasProvider';
+import { isCanvasToolOutput, type CanvasArtifact } from './canvas/types';
 
 interface ChatToolResultProps {
     toolCallId: string;
@@ -83,6 +89,24 @@ interface UserInfoOutput {
 interface GenericToolOutput {
     success?: boolean;
     error?: string;
+    bulkRejected?: boolean;
+}
+
+interface ConfirmationOutput {
+    __confirmationRequired?: boolean;
+    toolName?: string;
+    action?: string;
+    target?: string;
+    args?: Record<string, unknown>;
+}
+
+/** snake_case / camelCase tool name → "Title Case" label for generated tools. */
+function humanizeToolName(name: string): string {
+    return name
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
 }
 
 const executedToolActions = new Set<string>();
@@ -170,13 +194,12 @@ export function ChatToolResult({
         }
     }, [toolCallId, toolName, isDone, output, router, locale]);
 
-    // Running — only show for known tools
+    // Running — labelled for known tools, humanized for generated ones.
     if (isRunning) {
-        if (!LABELS[toolName]) return null;
         return (
             <span className="inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark">
                 <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                {LABELS[toolName]}
+                {LABELS[toolName] ?? humanizeToolName(toolName)}
             </span>
         );
     }
@@ -210,6 +233,28 @@ export function ChatToolResult({
         ) : null;
     }
 
+    // Confirmation gate — a destructive tool was called without `confirmed`.
+    const confirmation = output as ConfirmationOutput | null;
+    if (confirmation?.__confirmationRequired) {
+        return <ConfirmCard action={confirmation.action ?? ''} target={confirmation.target} />;
+    }
+
+    // Canvas artifact — the agent rendered rich output into the side panel.
+    if (isCanvasToolOutput(output)) {
+        return <CanvasChip artifact={output.artifact} />;
+    }
+
+    // Single-entity guard rejection.
+    const generic = output as GenericToolOutput | null;
+    if (generic?.bulkRejected) {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] text-warning">
+                <ShieldAlert className="w-2.5 h-2.5" />
+                {generic.error}
+            </span>
+        );
+    }
+
     switch (toolName) {
         case 'listWorks':
             return <WorkList output={output} />;
@@ -226,9 +271,9 @@ export function ChatToolResult({
         case 'getUserInfo':
             return <UserInfo output={output} />;
         default: {
-            // Generic completed indicator for tools without custom UI
-            const label = LABELS[toolName];
-            if (!label) return null;
+            // Generic completed indicator. Known tools use their LABEL; generated
+            // tools fall back to a humanized name so every call shows a result.
+            const label = LABELS[toolName] ?? humanizeToolName(toolName);
             const data = output as GenericToolOutput | null;
             if (data?.error) {
                 return (
@@ -246,6 +291,99 @@ export function ChatToolResult({
             );
         }
     }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Confirmation gate + canvas chip
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * Rendered when a destructive tool returns `__confirmationRequired`. Confirming
+ * sends a chat message so the model re-issues the tool call with
+ * `confirmed: true`; cancelling tells it to stand down. The mutation never runs
+ * until the user clicks Confirm.
+ */
+function ConfirmCard({ action, target }: { action: string; target?: string }) {
+    const { sendMessage } = useChatContext();
+    const [resolved, setResolved] = useState<null | 'confirmed' | 'cancelled'>(null);
+
+    if (resolved) {
+        return (
+            <span
+                className={cn(
+                    'inline-flex items-center gap-1 mt-1 text-[10px]',
+                    resolved === 'confirmed'
+                        ? 'text-success'
+                        : 'text-text-muted dark:text-text-muted-dark',
+                )}
+            >
+                {resolved === 'confirmed' ? (
+                    <Check className="w-2.5 h-2.5" />
+                ) : (
+                    <X className="w-2.5 h-2.5" />
+                )}
+                {resolved === 'confirmed' ? 'Confirmed' : 'Cancelled'}
+            </span>
+        );
+    }
+
+    return (
+        <div className="mt-2 p-3 rounded-lg border border-warning/30 bg-warning/5">
+            <div className="flex items-center gap-2 mb-1.5">
+                <ShieldAlert className="w-4 h-4 text-warning" />
+                <span className="text-xs font-medium text-text dark:text-text-dark">
+                    Confirm this action
+                </span>
+            </div>
+            <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-3">
+                {action}
+                {target ? ` (${target})` : ''}. This can’t be undone.
+            </p>
+            <div className="flex gap-2">
+                <button
+                    onClick={() => {
+                        setResolved('confirmed');
+                        sendMessage('Yes, I confirm — please proceed with that action.');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors cursor-pointer"
+                >
+                    <Check className="w-3 h-3" />
+                    Confirm
+                </button>
+                <button
+                    onClick={() => {
+                        setResolved('cancelled');
+                        sendMessage('No, cancel that — do not proceed.');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-surface-secondary text-text dark:bg-surface-secondary-dark dark:text-text-dark hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                    <X className="w-3 h-3" />
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+}
+
+/** Compact chip shown in chat when the agent rendered something to the canvas. */
+function CanvasChip({ artifact }: { artifact: CanvasArtifact }) {
+    const canvas = useCanvasOptional();
+    return (
+        <button
+            onClick={() => canvas?.focus(artifact.id)}
+            disabled={!canvas}
+            className={cn(
+                'inline-flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-md text-[11px]',
+                'bg-surface-secondary dark:bg-surface-secondary-dark',
+                'text-text dark:text-text-dark hover:opacity-80 transition-opacity',
+                canvas ? 'cursor-pointer' : 'cursor-default',
+            )}
+        >
+            <BarChart3 className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
+            <span className="truncate">{artifact.title}</span>
+            <span className="text-text-muted dark:text-text-muted-dark">· in canvas</span>
+        </button>
+    );
 }
 
 // ────────────────────────────────────────────────────────────────
