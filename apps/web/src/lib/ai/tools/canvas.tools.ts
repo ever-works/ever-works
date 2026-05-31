@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { tool } from 'ai';
+import { CANVAS_COMPONENT_KEYS } from '@/components/ai/canvas/types';
 import type {
     CanvasToolOutput,
     ChartArtifact,
     TableArtifact,
     StatArtifact,
     DetailArtifact,
+    ComponentArtifact,
 } from '@/components/ai/canvas/types';
 
 /**
@@ -124,11 +126,40 @@ export const renderDetail = tool({
         detailOutput({ id: randomUUID(), kind: 'detail', title, fields, description, badges }),
 });
 
+const componentOutput = (artifact: ComponentArtifact): CanvasToolOutput => ({
+    __canvas: true,
+    artifact,
+});
+
+export const showComponent = tool({
+    description:
+        'Render a bespoke canvas component for data you already gathered. ' +
+        'Components — "progress": props { bars: [{ label, percent, caption? }] } (labeled percent bars, great ' +
+        'for budget usage); "timeline": props { items: [{ title, subtitle?, status? }] } (vertical event ' +
+        'timeline, great for activity/history). After calling, give a one-line summary in chat.',
+    inputSchema: z.object({
+        title: z.string(),
+        component: z.enum(CANVAS_COMPONENT_KEYS),
+        props: z.record(z.string(), z.unknown()),
+        description: z.string().optional(),
+    }),
+    execute: async ({ title, component, props, description }) =>
+        componentOutput({
+            id: randomUUID(),
+            kind: 'component',
+            title,
+            component,
+            props,
+            description,
+        }),
+});
+
 export function buildCanvasTools() {
     return {
         renderChart,
         renderTable,
         renderStatCards,
         renderDetail,
+        showComponent,
     };
 }

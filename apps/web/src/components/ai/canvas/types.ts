@@ -74,12 +74,32 @@ export interface KanbanArtifact {
     description?: string;
 }
 
+/**
+ * Keys of bespoke canvas components the agent can render via `show_component`.
+ * Each maps to a React component in `canvas/components.tsx`. Extend both in
+ * lockstep when adding to the canvas catalog.
+ */
+export const CANVAS_COMPONENT_KEYS = ['progress', 'timeline'] as const;
+export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
+
+export interface ComponentArtifact {
+    id: string;
+    kind: 'component';
+    title: string;
+    /** Registry key — see CANVAS_COMPONENT_KEYS. */
+    component: CanvasComponentKey;
+    /** Serializable props for the component. */
+    props: Record<string, unknown>;
+    description?: string;
+}
+
 export type CanvasArtifact =
     | ChartArtifact
     | TableArtifact
     | StatArtifact
     | DetailArtifact
-    | KanbanArtifact;
+    | KanbanArtifact
+    | ComponentArtifact;
 
 export interface CanvasToolOutput {
     __canvas: true;

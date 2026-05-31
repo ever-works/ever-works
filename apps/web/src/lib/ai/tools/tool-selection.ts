@@ -124,6 +124,7 @@ const STATIC_TOOL_DOMAINS: Record<string, string> = {
     renderTable: 'core',
     renderStatCards: 'core',
     renderDetail: 'core',
+    showComponent: 'core',
     runReport: 'core',
     listReports: 'core',
     webSearch: 'core',

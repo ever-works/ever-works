@@ -18,6 +18,7 @@ import {
     Legend,
 } from 'recharts';
 import { cn } from '@/lib/utils/cn';
+import { renderCanvasComponent } from './components';
 import type {
     CanvasArtifact,
     ChartArtifact,
@@ -25,6 +26,7 @@ import type {
     StatArtifact,
     DetailArtifact,
     KanbanArtifact,
+    ComponentArtifact,
 } from './types';
 
 const PALETTE = ['#6366f1', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#a855f7', '#ef4444'];
@@ -45,9 +47,15 @@ export function CanvasArtifactView({ artifact }: { artifact: CanvasArtifact }) {
             return <DetailView artifact={artifact} />;
         case 'kanban':
             return <KanbanView artifact={artifact} />;
+        case 'component':
+            return <ComponentView artifact={artifact} />;
         default:
             return null;
     }
+}
+
+function ComponentView({ artifact }: { artifact: ComponentArtifact }) {
+    return <>{renderCanvasComponent(artifact.component, artifact.props ?? {})}</>;
 }
 
 function ChartView({ artifact }: { artifact: ChartArtifact }) {
