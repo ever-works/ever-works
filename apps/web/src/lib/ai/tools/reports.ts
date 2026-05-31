@@ -427,6 +427,299 @@ const REPORTS: ReportDef[] = [
     },
 ];
 
+// ── factory-built catalogue reports ──────────────────────────────
+// Compact factories for the common shapes (group-by chart, count stat) so the
+// long tail of the report catalogue is data, not boilerplate.
+
+type ReportScope = 'id' | 'workId';
+
+function groupReport(
+    id: string,
+    title: string,
+    description: string,
+    path: string,
+    field: string,
+    viz: 'bar' | 'pie',
+    scope?: ReportScope,
+): ReportDef {
+    return {
+        id,
+        title,
+        description,
+        needsWorkId: !!scope,
+        run: async ({ workId }) => {
+            const res = await callApi({
+                method: 'GET',
+                path,
+                pathParams: scope ? { [scope]: workId! } : undefined,
+            });
+            if (!res.success) return { error: res.error ?? 'Request failed' };
+            return { artifact: groupCountChart(title, toArray(res.data), field, viz) };
+        },
+    };
+}
+
+function countReport(
+    id: string,
+    title: string,
+    description: string,
+    path: string,
+    label: string,
+    scope?: ReportScope,
+): ReportDef {
+    return {
+        id,
+        title,
+        description,
+        needsWorkId: !!scope,
+        run: async ({ workId }) => {
+            const res = await callApi({
+                method: 'GET',
+                path,
+                pathParams: scope ? { [scope]: workId! } : undefined,
+            });
+            if (!res.success) return { error: res.error ?? 'Request failed' };
+            return { artifact: countStat(title, toArray(res.data), label) };
+        },
+    };
+}
+
+REPORTS.push(
+    // group-by distributions
+    groupReport(
+        'notifications_read_state',
+        'Notifications: read vs unread',
+        'Breakdown of your notifications by read state.',
+        '/api/notifications',
+        'read',
+        'pie',
+    ),
+    groupReport(
+        'notification_channels_by_type',
+        'Notification channels by type',
+        'Your notification channels grouped by type.',
+        '/api/notification-channels',
+        'type',
+        'pie',
+    ),
+    groupReport(
+        'notifications_by_event',
+        'Notifications by event type',
+        'Your notifications grouped by event type.',
+        '/api/notifications',
+        'type',
+        'bar',
+    ),
+    groupReport(
+        'plugins_by_enabled',
+        'Plugins by enabled state',
+        'Available plugins grouped by whether they are enabled.',
+        '/api/plugins',
+        'enabled',
+        'bar',
+    ),
+    groupReport(
+        'plugins_by_category',
+        'Plugins by category',
+        'Available plugins grouped by category.',
+        '/api/plugins',
+        'category',
+        'bar',
+    ),
+    groupReport(
+        'organizations_by_status',
+        'Organizations by status',
+        'Your organizations grouped by status.',
+        '/api/organizations',
+        'status',
+        'bar',
+    ),
+    groupReport(
+        'email_addresses_by_type',
+        'Email addresses by type',
+        'Your configured email addresses grouped by type/direction.',
+        '/api/email/addresses',
+        'type',
+        'pie',
+    ),
+    groupReport(
+        'email_addresses_by_status',
+        'Email addresses by status',
+        'Your email addresses grouped by verification status.',
+        '/api/email/addresses',
+        'status',
+        'bar',
+    ),
+    groupReport(
+        'activity_by_status',
+        'Activity by status',
+        'Recent activity-log entries grouped by status.',
+        '/api/activity-log',
+        'status',
+        'pie',
+    ),
+    groupReport(
+        'activity_by_type',
+        'Activity by type',
+        'Recent activity-log entries grouped by type.',
+        '/api/activity-log',
+        'type',
+        'bar',
+    ),
+    groupReport(
+        'skills_by_scope',
+        'Skills by scope',
+        'Your installed skills grouped by owner scope.',
+        '/api/skills',
+        'scope',
+        'pie',
+    ),
+    groupReport(
+        'templates_by_type',
+        'Templates by type',
+        'Website templates grouped by type/source.',
+        '/api/templates',
+        'type',
+        'bar',
+    ),
+    groupReport(
+        'kb_documents_by_class',
+        'KB documents by class',
+        'A work’s KB documents grouped by class. Needs a workId.',
+        '/api/works/{id}/kb/documents',
+        'className',
+        'pie',
+        'id',
+    ),
+    groupReport(
+        'work_domains_by_verified',
+        'Custom domains by verification',
+        'A work’s custom domains grouped by verification state. Needs a workId.',
+        '/api/deploy/works/{id}/domains',
+        'verified',
+        'bar',
+        'id',
+    ),
+    groupReport(
+        'work_items_by_category',
+        'Items by category',
+        'A work’s items grouped by category. Needs a workId.',
+        '/api/works/{id}/items',
+        'category',
+        'bar',
+        'id',
+    ),
+    groupReport(
+        'comparisons_by_status',
+        'Comparisons by status',
+        'A work’s comparisons grouped by status. Needs a workId.',
+        '/api/works/{id}/comparisons',
+        'status',
+        'pie',
+        'id',
+    ),
+    groupReport(
+        'deployments_by_state',
+        'Deployments by state',
+        'A work’s deployments grouped by state. Needs a workId.',
+        '/api/deploy/works/{id}/deployments',
+        'state',
+        'bar',
+        'id',
+    ),
+    // count stats
+    countReport('tasks_count', 'Tasks total', 'How many tasks you have.', '/api/tasks', 'Tasks'),
+    countReport(
+        'agents_count',
+        'Agents total',
+        'How many agents you have.',
+        '/api/agents',
+        'Agents',
+    ),
+    countReport(
+        'missions_count',
+        'Missions total',
+        'How many missions you have.',
+        '/api/me/missions',
+        'Missions',
+    ),
+    countReport(
+        'ideas_count',
+        'Ideas total',
+        'How many ideas (work proposals) you have.',
+        '/api/me/work-proposals',
+        'Ideas',
+    ),
+    countReport(
+        'webhooks_count',
+        'Webhooks total',
+        'How many webhooks you have.',
+        '/api/webhooks',
+        'Webhooks',
+    ),
+    countReport(
+        'organizations_count',
+        'Organizations total',
+        'How many organizations you have.',
+        '/api/organizations',
+        'Organizations',
+    ),
+    countReport(
+        'notification_channels_count',
+        'Notification channels total',
+        'How many notification channels you have.',
+        '/api/notification-channels',
+        'Channels',
+    ),
+    countReport(
+        'templates_count',
+        'Templates total',
+        'How many website templates are available.',
+        '/api/templates',
+        'Templates',
+    ),
+    countReport(
+        'comparisons_count',
+        'Comparisons total',
+        'How many comparisons a work has. Needs a workId.',
+        '/api/works/{id}/comparisons',
+        'Comparisons',
+        'id',
+    ),
+    countReport(
+        'deployments_count',
+        'Deployments total',
+        'How many deployments a work has. Needs a workId.',
+        '/api/deploy/works/{id}/deployments',
+        'Deployments',
+        'id',
+    ),
+    countReport(
+        'kb_documents_count',
+        'KB documents total',
+        'How many KB documents a work has. Needs a workId.',
+        '/api/works/{id}/kb/documents',
+        'Documents',
+        'id',
+    ),
+    countReport(
+        'kb_tags_count',
+        'KB tags total',
+        'How many KB tags a work has. Needs a workId.',
+        '/api/works/{id}/kb/tags',
+        'Tags',
+        'id',
+    ),
+    countReport(
+        'work_members_count',
+        'Members total',
+        'How many members a work has. Needs a workId.',
+        '/api/works/{workId}/members',
+        'Members',
+        'workId',
+    ),
+);
+
 const REPORT_IDS = REPORTS.map((r) => r.id);
 
 export const runReport = tool({
