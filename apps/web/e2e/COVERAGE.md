@@ -612,14 +612,15 @@ configs**: key-present (135 passed) and CI-faithful no-key (136 incl. setup),
 local sqlite, `--workers=1`.
 
 Themes: org lifecycle (deep) + members/RBAC; work full-lifecycle + collab/activity
-+ import-export; agents (skills-binding, runs/history, instruction-files, scoping
-matrix); tasks (state-machine, hierarchy); missions (idea-build, clone/guardrails);
-plugins (AI-provider matrix, non-AI lifecycle + work-level); chat (conversation
-lifecycle, work-scoped); KB (document lifecycle, inherited overrides); profile
-identity; account data/deletion; api-keys lifecycle; notifications; magic-link;
-password-reset; email-verification; onboarding wizard; claim/zero-friction;
-subscriptions/budgets; OAuth/git-providers; multi-tenant isolation (deep);
-templates/deploy; data-sync/platform-sync.
+
+- import-export; agents (skills-binding, runs/history, instruction-files, scoping
+  matrix); tasks (state-machine, hierarchy); missions (idea-build, clone/guardrails);
+  plugins (AI-provider matrix, non-AI lifecycle + work-level); chat (conversation
+  lifecycle, work-scoped); KB (document lifecycle, inherited overrides); profile
+  identity; account data/deletion; api-keys lifecycle; notifications; magic-link;
+  password-reset; email-verification; onboarding wizard; claim/zero-friction;
+  subscriptions/budgets; OAuth/git-providers; multi-tenant isolation (deep);
+  templates/deploy; data-sync/platform-sync.
 
 These flows documented several REAL platform behaviours discovered while probing
 (asserted truthfully, not worked around): duplicate task-assignee → 500 (unmapped
