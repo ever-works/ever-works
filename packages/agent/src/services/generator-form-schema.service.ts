@@ -1,10 +1,4 @@
-import {
-    BadRequestException,
-    ForbiddenException,
-    Injectable,
-    Logger,
-    Optional,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     PluginRegistryService,
     RegisteredPlugin,
@@ -324,29 +318,42 @@ export class GeneratorFormSchemaService {
             // canExtract() URL matching in the facade — they are not user-selectable providers.
             if (registered.manifest.supplementary) continue;
 
-            // Check if plugin is enabled for this context. Discovery path —
-            // a premium plugin gated off for a free tier is simply skipped,
-            // not surfaced as a 500 (see isPluginEnabledForScopeSafe).
-            if (options?.workId || options?.userId) {
-                const isEnabled = await this.isPluginEnabledForScopeSafe(
-                    registered.plugin.id,
-                    options,
-                );
-                if (!isEnabled) {
-                    continue;
+            // Resilience: a single plugin whose enable-check / settings
+            // resolution / model-summary build throws must NOT 500 the whole
+            // provider list — that breaks the dashboard's "load AI providers"
+            // call entirely (the chat then shows "failed to load AI
+            // providers"). Skip the offending plugin instead, mirroring the
+            // fault-tolerance isPluginConfigured already applies internally.
+            try {
+                // Check if plugin is enabled for this context
+                if (options?.workId || options?.userId) {
+                    const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
+                        registered.plugin.id,
+                        options.workId,
+                        options.userId,
+                    );
+                    if (!isEnabled) {
+                        continue;
+                    }
                 }
-            }
 
-            const configured = await this.isPluginConfigured(registered, options);
-            result.push(
-                await this.toProviderOption(
-                    registered,
-                    activePluginId,
-                    configured,
-                    capability,
-                    options,
-                ),
-            );
+                const configured = await this.isPluginConfigured(registered, options);
+                result.push(
+                    await this.toProviderOption(
+                        registered,
+                        activePluginId,
+                        configured,
+                        capability,
+                        options,
+                    ),
+                );
+            } catch (error) {
+                this.logger.warn(
+                    `Skipping provider "${registered.plugin.id}" for capability "${capability}": ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
         }
 
         return result;
@@ -683,11 +690,10 @@ export class GeneratorFormSchemaService {
             if (pipelineIds.has(registered.plugin.id)) continue;
 
             if (options?.workId || options?.userId) {
-                // Discovery path — skip subscription-gated plugins instead of
-                // 500ing (see isPluginEnabledForScopeSafe).
-                const isEnabled = await this.isPluginEnabledForScopeSafe(
+                const isEnabled = await this.pluginRegistry.isPluginEnabledForScope(
                     registered.plugin.id,
-                    options,
+                    options.workId,
+                    options.userId,
                 );
                 if (!isEnabled) continue;
             }
@@ -770,43 +776,10 @@ export class GeneratorFormSchemaService {
         if (!options?.workId && !options?.userId) {
             return true;
         }
-        return this.isPluginEnabledForScopeSafe(pluginId, options);
-    }
-
-    /**
-     * Read-only enablement probe for the form-schema resolver.
-     *
-     * `PluginRegistryService.isPluginEnabledForScope` runs the
-     * `SubscriptionGate`, which intentionally THROWS `ForbiddenException`
-     * for a premium plugin on a free tier (EW-588) so enforcement paths
-     * can prompt an upgrade. But this resolver is a *discovery* path — it
-     * iterates every pipeline / form-schema plugin to decide what to show
-     * in the generator form. A throw here propagates out and 500s the
-     * whole `GET /works/:id/generator-form` endpoint (the SubscriptionGate
-     * docstring flags this exact case as the EW-588 follow-up).
-     *
-     * So for discovery we treat a hard subscription gate as "not available
-     * for this scope" (false) and skip the plugin, exactly as we would for
-     * an explicitly-disabled one. Actual enforcement still throws on the
-     * generation/validation paths (`validateSingleProvider`,
-     * `validateFormSchemaPlugins`), which deliberately do NOT use this
-     * helper. Non-subscription errors are not swallowed — they rethrow.
-     */
-    private async isPluginEnabledForScopeSafe(
-        pluginId: string,
-        options: FormSchemaOptions,
-    ): Promise<boolean> {
-        try {
-            return await this.pluginRegistry.isPluginEnabledForScope(
-                pluginId,
-                options.workId,
-                options.userId,
-            );
-        } catch (error) {
-            if (error instanceof ForbiddenException) {
-                return false;
-            }
-            throw error;
-        }
+        return this.pluginRegistry.isPluginEnabledForScope(
+            pluginId,
+            options.workId,
+            options.userId,
+        );
     }
 }
