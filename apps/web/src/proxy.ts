@@ -8,20 +8,29 @@ import { getAuthFromCookie } from './lib/auth';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
-// Real static-asset extensions that should bypass the proxy entirely.
+// Does this pathname look like a real static asset (so the proxy should
+// skip it) rather than an app route?
 //
-// IMPORTANT: this list MUST stay in lock-step with the negative-lookahead
-// in `config.matcher` at the bottom of this file. The matcher governs
-// which requests reach the proxy at all; this RE is the runtime twin used
-// in step 4 below. We deliberately do NOT skip on "any path containing a
-// dot" — KB document routes use the canonical `<class>/<slug>.md` shape
-// (e.g. `/works/<id>/kb/legal/privacy.md`), and a broad `.*\..*` skip
-// excluded those dotted app routes from the next-intl locale rewrite,
-// which (under `localePrefix: 'never'`) broke client-side <Link>
-// navigation into the `/[locale]` tree — the inherited-doc row click in
+// Historically this was "any path containing a dot" (`pathname.includes('.')`
+// + a `.*\..*` matcher). That is correct for every asset the app serves —
+// `favicon.ico`, `*.lottie` animations, `manifest.webmanifest`, `*.json`,
+// fonts, images — but it ALSO swallowed the one family of app routes that
+// legitimately contains a dot: KB document pages use the canonical
+// `<class>/<slug>.md` shape (e.g. `/works/<id>/kb/legal/privacy.md`).
+// Skipping the proxy for those meant the next-intl locale rewrite never
+// ran (under `localePrefix: 'never'`), so client-side <Link> navigation
+// into the `/[locale]` tree stalled — the inherited-doc row click in
 // kb-inherited.spec.ts never settled on the dotted URL.
-const STATIC_ASSET_RE =
-    /\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|mjs|map|txt|json|xml|woff2?|ttf|eot|otf|wasm|mp4|webm|mp3|wav)$/i;
+//
+// So we keep the broad "has a dot → static asset" rule (preserving the
+// exact prior behaviour for every real asset, including `.lottie` and
+// `.webmanifest`) and carve out ONLY a trailing `.md`, which is always an
+// app doc route, never a served static file. This RE is the runtime twin
+// of the negative-lookahead in `config.matcher` at the bottom of this
+// file — keep the two in lock-step.
+function isStaticAssetPath(pathname: string): boolean {
+    return pathname.includes('.') && !pathname.endsWith('.md');
+}
 
 // next-intl persists the active locale in this cookie when `localePrefix:
 // 'never'` is set. We read/write it directly when redirecting legacy
@@ -151,15 +160,16 @@ export default async function proxy(req: NextRequest) {
         return applySecurityHeaders(intlResponse);
     }
 
-    // 4) Static assets and API routes pass through.
-    //    Match only REAL static-asset extensions (STATIC_ASSET_RE) — not
-    //    "any path with a dot" — so dotted app routes like the KB
+    // 4) Static assets and API routes pass through. `isStaticAssetPath`
+    //    keeps the original "has a dot → static asset" rule but carves out
+    //    a trailing `.md`, so dotted app routes like the KB
     //    `<class>/<slug>.md` doc pages still flow through the auth gate
-    //    below and the next-intl rewrite above.
+    //    below and the next-intl rewrite above, while real assets
+    //    (`.lottie`, `.webmanifest`, images, fonts, …) keep bypassing.
     if (
         pathname.startsWith('/_next') ||
         pathname.startsWith('/api/') ||
-        STATIC_ASSET_RE.test(pathname)
+        isStaticAssetPath(pathname)
     ) {
         return applySecurityHeaders(intlResponse);
     }
@@ -183,15 +193,16 @@ export default async function proxy(req: NextRequest) {
 export const config = {
     // Match all pathnames except for
     // - … if they start with `/api`, `/trpc`, `/_next` or `/_vercel`
-    // - … real static-asset files (by extension)
+    // - … any path that contains a dot (a static asset) UNLESS it ends in
+    //   `.md` (a KB document app route).
     //
-    // The trailing alternation MUST stay in lock-step with
-    // `STATIC_ASSET_RE` at the top of this file. We intentionally match
-    // only a fixed list of static-asset extensions rather than the old
-    // `.*\..*` ("any dot") form: dotted APP routes such as the KB doc
-    // pages `/works/<id>/kb/<class>/<slug>.md` MUST reach this middleware
-    // so the next-intl locale rewrite runs and client-side navigation to
-    // them settles (see kb-inherited.spec.ts + STATIC_ASSET_RE comment).
-    matcher:
-        '/((?!api|trpc|_next|_vercel|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|mjs|map|txt|json|xml|woff2?|ttf|eot|otf|wasm|mp4|webm|mp3|wav)$).*)',
+    // The exclusion `.*\.(?!md$)[^/]*$` reads as "a dot whose trailing
+    // segment is not exactly `md`" — i.e. every real static asset
+    // (`favicon.ico`, `*.lottie`, `manifest.webmanifest`, images, fonts,
+    // `.json`, …) is still excluded and bypasses the middleware exactly as
+    // before, while the KB doc routes `/works/<id>/kb/<class>/<slug>.md`
+    // are NOT excluded so the next-intl locale rewrite runs and client-side
+    // navigation to them settles. MUST stay in lock-step with
+    // `isStaticAssetPath` at the top of this file (its runtime twin).
+    matcher: '/((?!api|trpc|_next|_vercel|.*\\.(?!md$)[^/]*$).*)',
 };
