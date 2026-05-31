@@ -156,7 +156,11 @@ export default async function proxy(req: NextRequest) {
     //    "any path with a dot" — so dotted app routes like the KB
     //    `<class>/<slug>.md` doc pages still flow through the auth gate
     //    below and the next-intl rewrite above.
-    if (pathname.startsWith('/_next') || pathname.startsWith('/api/') || STATIC_ASSET_RE.test(pathname)) {
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/api/') ||
+        STATIC_ASSET_RE.test(pathname)
+    ) {
         return applySecurityHeaders(intlResponse);
     }
 
@@ -188,5 +192,6 @@ export const config = {
     // pages `/works/<id>/kb/<class>/<slug>.md` MUST reach this middleware
     // so the next-intl locale rewrite runs and client-side navigation to
     // them settles (see kb-inherited.spec.ts + STATIC_ASSET_RE comment).
-    matcher: '/((?!api|trpc|_next|_vercel|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|mjs|map|txt|json|xml|woff2?|ttf|eot|otf|wasm|mp4|webm|mp3|wav)$).*)',
+    matcher:
+        '/((?!api|trpc|_next|_vercel|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|mjs|map|txt|json|xml|woff2?|ttf|eot|otf|wasm|mp4|webm|mp3|wav)$).*)',
 };
