@@ -3,6 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { tool } from 'ai';
 import { callApi } from './generated/api-call';
+import {
+    toArray,
+    labelize,
+    money,
+    groupCountChart,
+    boardArtifact,
+    countStat,
+} from './reports-aggregate';
 import type { CanvasArtifact } from '@/components/ai/canvas/types';
 
 /**
@@ -27,70 +35,8 @@ interface ReportDef {
 }
 
 // ── helpers ──────────────────────────────────────────────────────
-
-const LIST_KEYS = [
-    'data',
-    'items',
-    'results',
-    'rows',
-    'entries',
-    'history',
-    'tasks',
-    'agents',
-    'works',
-    'missions',
-    'notifications',
-];
-
-function toArray(data: unknown): Record<string, unknown>[] {
-    if (Array.isArray(data)) return data as Record<string, unknown>[];
-    if (data && typeof data === 'object') {
-        const obj = data as Record<string, unknown>;
-        for (const key of LIST_KEYS) {
-            if (Array.isArray(obj[key])) return obj[key] as Record<string, unknown>[];
-        }
-        for (const value of Object.values(obj)) {
-            if (Array.isArray(value)) return value as Record<string, unknown>[];
-        }
-    }
-    return [];
-}
-
-function labelize(value: unknown): string {
-    if (value === undefined || value === null || value === '') return 'Unknown';
-    return String(value)
-        .replace(/[_-]+/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function money(cents: unknown): number {
-    const n = typeof cents === 'number' ? cents : Number(cents);
-    return Number.isFinite(n) ? Math.round(n) / 100 : 0;
-}
-
-function groupCountChart(
-    title: string,
-    rows: Record<string, unknown>[],
-    field: string,
-    chartType: 'bar' | 'pie',
-): CanvasArtifact {
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-        const key = labelize(row[field]);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    const data = [...counts.entries()].map(([label, count]) => ({ label, count }));
-    return {
-        id: randomUUID(),
-        kind: 'chart',
-        title,
-        chartType,
-        xKey: 'label',
-        series: [{ key: 'count', label: 'Count' }],
-        data,
-        description: `${rows.length} item(s) grouped by ${field}.`,
-    };
-}
+// Pure aggregation helpers live in ./reports-aggregate (unit-tested).
+// fetchArray is the one helper that does I/O, so it stays here.
 
 async function fetchArray(
     path: string,
@@ -103,48 +49,6 @@ async function fetchArray(
     });
     if (!res.success) return { error: res.error ?? 'Request failed' };
     return toArray(res.data);
-}
-
-const STATUS_ORDER = ['draft', 'pending', 'in_progress', 'blocked', 'completed', 'archived'];
-
-function boardArtifact(
-    title: string,
-    rows: Record<string, unknown>[],
-    statusField: string,
-): CanvasArtifact {
-    const byStatus = new Map<string, Record<string, unknown>[]>();
-    for (const row of rows) {
-        const key = String(row[statusField] ?? 'unknown');
-        if (!byStatus.has(key)) byStatus.set(key, []);
-        byStatus.get(key)!.push(row);
-    }
-    const keys = [
-        ...STATUS_ORDER.filter((s) => byStatus.has(s)),
-        ...[...byStatus.keys()].filter((s) => !STATUS_ORDER.includes(s)),
-    ];
-    return {
-        id: randomUUID(),
-        kind: 'kanban',
-        title,
-        columns: keys.map((key) => ({
-            key,
-            label: labelize(key),
-            cards: (byStatus.get(key) ?? []).map((row) => ({
-                title: String(row.title ?? row.name ?? row.slug ?? 'Untitled'),
-                subtitle: row.priority ? `Priority: ${labelize(row.priority)}` : undefined,
-            })),
-        })),
-        description: `${rows.length} item(s).`,
-    };
-}
-
-function countStat(title: string, rows: Record<string, unknown>[], label: string): CanvasArtifact {
-    return {
-        id: randomUUID(),
-        kind: 'stat',
-        title,
-        stats: [{ label, value: rows.length }],
-    };
 }
 
 // ── report definitions ───────────────────────────────────────────
@@ -177,33 +81,7 @@ const REPORTS: ReportDef[] = [
         run: async () => {
             const rows = await fetchArray('/api/tasks');
             if ('error' in rows) return rows;
-            const byStatus = new Map<string, Record<string, unknown>[]>();
-            for (const row of rows) {
-                const key = String(row.status ?? 'unknown');
-                if (!byStatus.has(key)) byStatus.set(key, []);
-                byStatus.get(key)!.push(row);
-            }
-            const keys = [
-                ...STATUS_ORDER.filter((s) => byStatus.has(s)),
-                ...[...byStatus.keys()].filter((s) => !STATUS_ORDER.includes(s)),
-            ];
-            const columns = keys.map((key) => ({
-                key,
-                label: labelize(key),
-                cards: (byStatus.get(key) ?? []).map((row) => ({
-                    title: String(row.title ?? row.name ?? row.slug ?? 'Untitled'),
-                    subtitle: row.priority ? `Priority: ${labelize(row.priority)}` : undefined,
-                })),
-            }));
-            return {
-                artifact: {
-                    id: randomUUID(),
-                    kind: 'kanban',
-                    title: 'Tasks board',
-                    columns,
-                    description: `${rows.length} task(s).`,
-                },
-            };
+            return { artifact: boardArtifact('Tasks board', rows, 'status') };
         },
     },
     {
