@@ -193,11 +193,6 @@ jobs:
           # ubicloud-standard-8 runner instead of V8's ~2 GB default old-space,
           # so a heavy dev-mode e2e run never starves for memory.
           NODE_OPTIONS: --max-old-space-size=8192
-          # [E2E-DIAGNOSTIC, remove before merge] Turn on the API request
-          # tracer (apps/api/src/main.ts) so the uploaded server log records
-          # each request line and we can see which endpoint precedes the
-          # intermittent V8 `RegExpCompiler Allocation failed` API abort.
-          E2E_REQ_TRACE: '1'
           # API
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
