@@ -88,6 +88,14 @@ export const CANVAS_COMPONENT_KEYS = [
     'gallery',
     'funnel',
     'metric_delta',
+    'donut',
+    'sparkline',
+    'bars',
+    'kpi',
+    'steps',
+    'badges',
+    'json',
+    'code',
 ] as const;
 export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
 

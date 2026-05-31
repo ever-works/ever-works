@@ -141,7 +141,14 @@ export const showComponent = tool({
         '"markdown": props { content } (render a KB doc / README / item body); ' +
         '"gallery": props { images: [string | { url, caption? }] } (image / screenshot grid); ' +
         '"funnel": props { stages: [{ label, value }] } (conversion funnel sized vs the first stage); ' +
-        '"metric_delta": props { metrics: [{ label, value, delta?, deltaLabel? }] } (stat tiles with up/down deltas). ' +
+        '"metric_delta": props { metrics: [{ label, value, delta?, deltaLabel? }] } (stat tiles with up/down deltas); ' +
+        '"donut": props { segments: [{ label, value, color? }] } (donut with center total); ' +
+        '"sparkline": props { points: number[], label? } (inline trend line); ' +
+        '"bars": props { items: [{ label, value }] } (horizontal value bars); ' +
+        '"kpi": props { label, value, caption? } (one big number); ' +
+        '"steps": props { steps: [{ label, done? }] } (stepper/checklist); ' +
+        '"badges": props { badges: [{ label, tone? }] } (status badge wrap); ' +
+        '"json": props { data } (pretty JSON); "code": props { code, language? } (code block). ' +
         'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),
