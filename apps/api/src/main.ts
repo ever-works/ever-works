@@ -58,6 +58,20 @@ async function bootstrap() {
     app.use(json({ limit: bodyLimit, verify: captureRawBody }));
     app.use(urlencoded({ limit: bodyLimit, extended: true, verify: captureRawBody }));
 
+    // [E2E-DIAGNOSTIC, remove before merge] Request tracer. The e2e suite
+    // intermittently aborts the API with a V8 `RegExpCompiler Allocation
+    // failed` fatal (uncatchable in JS) and the PostHogLoggerService swallows
+    // request logs, so we can't see which endpoint triggers it. When
+    // E2E_REQ_TRACE=1, write each request line to stderr BEFORE handling so
+    // the last line before the abort in the uploaded server log names the
+    // exact METHOD + URL. Gated on an env var so it never runs in prod.
+    if (process.env.E2E_REQ_TRACE === '1') {
+        app.use((req: IncomingMessage & { url?: string; method?: string }, _res, next) => {
+            process.stderr.write(`[REQTRACE] ${req.method} ${req.url}\n`);
+            (next as () => void)();
+        });
+    }
+
     // Security configurations
     // The relaxed CSP only applies when /api/docs is actually mounted (non-production —
     // see C-09 gating below). In production the docs endpoint 404s and the default
