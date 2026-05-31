@@ -852,7 +852,7 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 - Long-running/async actions (generate_items, deploy_work, customize_template, refresh_work_proposals, account export/sync) return job handles not final results; canvas needs polling/streaming progress components (GenerationProgressCard, ExportProgressCard) and the model must not fabricate completion.
 - Reports engine has no dedicated aggregation endpoints for most of the 95 reports; run_report must derive aggregates from list endpoints, risking heavy fan-out, pagination limits, and inconsistent metrics; needs a defined aggregation contract and caching.
 
-## 10. Shipped in this PR (Waves 1-3)
+## 10. Shipped in this PR (Waves 1-4)
 
 - **Engine:** `apps/web/src/lib/ai/tools/generated/{api-call,registry,factory}.ts` - manifest-driven tool generator with the no-bulk guard + confirmation gate baked in.
 
@@ -864,12 +864,14 @@ Implement run_report against the 95 catalogued reports (aggregation + ReportChar
 
 - **Per-turn tool gating** (`tool-selection.ts`): the full ~300-tool set stays available, but each turn surfaces only an always-on core (navigation, canvas, search, user, works) plus the tools whose domain matches the latest message / current page, capped at 90 - keeping the schema payload bounded and well under provider function-count limits.
 
-- **Canvas:** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts chart + table + stat + detail renderers); `lib/ai/tools/canvas.tools.ts`.
+- **Canvas:** `apps/web/src/components/ai/canvas/*` - `CanvasProvider`, `CanvasOverlay`, `CanvasBridge`, `CanvasArtifactView` (recharts chart + table + stat + detail + **kanban** renderers); `lib/ai/tools/canvas.tools.ts`.
 
-- **Wiring:** merged into `buildChatTools()`; `agent.ts` gates tools per turn; system prompt updated with the safety + canvas rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
+- **Reports engine (Wave 4):** `lib/ai/tools/reports.ts` - `run_report` fetches data as the logged-in user, aggregates it, and renders a chart/stat/kanban into the canvas in one call (turnkey analytics); `list_reports` exposes the catalogue. Ships ~9 reports against real endpoints (tasks by status/priority, tasks kanban board, agents/missions by status, work spend trend, spend by plugin, usage overview, account spend overview). Both are always-on core tools.
+
+- **Wiring:** merged into `buildChatTools()`; `agent.ts` gates tools per turn; system prompt updated with the safety + canvas + report rules; `ChatToolResult` renders the confirmation card, canvas chip, and bulk-rejection notice; `ChatInterface` mounts the canvas.
 
 - **Verified:** web `tsc --noEmit` clean, `eslint` clean, `prettier` clean; CI green on each push.
 
 ### Next waves
 
-Remaining: the richer per-domain **canvas catalog** (113 components in section 6) + `show_component` embedding of existing dashboard components, and `run_report` against the 95 catalogued reports (section 7). Plus the small tail of mutation endpoints not yet registered. Each is a registry-data + renderer addition on this engine - parallelizable across agents.
+Remaining: the richer per-domain **canvas catalog** (113 components in section 6) + `show_component` embedding of existing dashboard components, more of the 95 catalogued reports (section 7) on the Wave-4 engine, and the small tail of mutation endpoints not yet registered. Each is a registry-data + renderer addition on this engine - parallelizable across agents.
