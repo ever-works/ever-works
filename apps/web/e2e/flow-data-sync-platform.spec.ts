@@ -58,8 +58,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
 
 // The platform-wide ingest bearer — pinned deterministically in the e2e API
 // env (apps/api/.env). The PlatformSecretGuard compares against
-// process.env.PLATFORM_API_SECRET_TOKEN with timingSafeEqual.
-const PLATFORM_API_SECRET_TOKEN = 'e2e-platform-secret-token-deterministic-32+chars';
+// process.env.PLATFORM_API_SECRET_TOKEN with timingSafeEqual. Read it from the
+// environment first (keeping the canonical value out of tracked source) and
+// fall back to the known e2e literal only when the harness didn't export it.
+const PLATFORM_API_SECRET_TOKEN =
+    process.env.PLATFORM_API_SECRET_TOKEN ?? 'e2e-platform-secret-token-deterministic-32+chars';
 
 const WEBSITE_ACTION = 'website_user_registered';
 
@@ -222,10 +225,25 @@ test.describe('Data-sync — idempotency / duplicate-suppression (retry-backoff 
         expect(first.status()).toBe(202);
         const firstBody = await first.json();
         // The first attempt actively ran a gate (not pre-suppressed). It is
-        // either 'failed' (render gate threw) or — if a residual backoff from a
-        // prior shared-DB run is still live — already 'skipped'. Either way it
-        // is a valid terminal outcome and we proceed to assert suppression.
+        // either 'failed' (render gate threw — the CI path, no connected git
+        // account) or — if a residual backoff from a prior shared-DB run is still
+        // live — already 'skipped'. Both write the retry-backoff cache key, so
+        // the suppression contract below holds.
         expect(['failed', 'skipped', 'enqueued']).toContain(firstBody.status);
+
+        // If the first dispatch actually ENQUEUED (a git account IS connected —
+        // only possible outside CI), the render gate passed and no retry-backoff
+        // key is written, so duplicate suppression does not apply and the poll
+        // below would spin to timeout. That's a non-CI environment, not a
+        // regression — assert the enqueue happened and skip the suppression poll.
+        if (firstBody.status === 'enqueued') {
+            test.info().annotations.push({
+                type: 'git-connected',
+                description:
+                    'first dispatch enqueued (git account connected — non-CI); retry-backoff suppression does not apply, skipping the suppression poll.',
+            });
+            return;
+        }
 
         // Second dispatch in the same window MUST be suppressed at gate 1
         // (retry-backoff). This is the duplicate-suppression contract: a freshly

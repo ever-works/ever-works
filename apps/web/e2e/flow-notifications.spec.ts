@@ -103,7 +103,9 @@ test.describe('Notifications end-to-end', () => {
     test('in-app notification read lifecycle + unread-count contract (API + bell UI)', async ({
         page,
         request,
+        baseURL,
     }) => {
+        const origin = baseURL ?? 'http://localhost:3000';
         // --- Step 1: fresh user starts with an empty, consistent inbox ---
         const user: RegisteredUser = await registerUserViaAPI(request, {
             email: `notif-read-${Date.now()}@test.local`,
@@ -177,15 +179,15 @@ test.describe('Notifications end-to-end', () => {
         // With zero unread there is no badge; opening the dropdown shows the
         // empty state. This is the real UI surface the read API drives.
         await page.context().addCookies([
-            { name: 'sidebar-collapsed', value: '0', url: 'http://127.0.0.1:3000' },
-            { name: 'chat-panel-open', value: '0', url: 'http://127.0.0.1:3000' },
+            { name: 'sidebar-collapsed', value: '0', url: origin },
+            { name: 'chat-panel-open', value: '0', url: origin },
         ]);
         // The dashboard SHELL (DashboardHeader + bell) lives in the (dashboard)
         // route group, but there is NO `/dashboard` route — that path 404s
         // (probed). The dashboard home is `/` and the real authenticated
         // dashboard pages are `/works`, `/agents`, etc. `/works` renders the
         // same header + bell the read API drives, so we land there.
-        await page.goto('http://127.0.0.1:3000/works', { waitUntil: 'domcontentloaded' });
+        await page.goto(`${origin}/works`, { waitUntil: 'domcontentloaded' });
 
         await openNotificationBell(page);
 
@@ -221,7 +223,9 @@ test.describe('Notifications end-to-end', () => {
     test('notification preferences gate which channels deliver an event (API + settings UI)', async ({
         page,
         request,
+        baseURL,
     }) => {
+        const origin = baseURL ?? 'http://localhost:3000';
         const user = await registerUserViaAPI(request, {
             email: `notif-prefs-${Date.now()}@test.local`,
         });
@@ -349,10 +353,10 @@ test.describe('Notifications end-to-end', () => {
         // (The unprefixed `/en` locale is stripped to `/settings/notifications`
         // by next-intl's `localePrefix: 'never'`, so either form resolves.)
         await page.context().addCookies([
-            { name: 'sidebar-collapsed', value: '0', url: 'http://127.0.0.1:3000' },
-            { name: 'chat-panel-open', value: '0', url: 'http://127.0.0.1:3000' },
+            { name: 'sidebar-collapsed', value: '0', url: origin },
+            { name: 'chat-panel-open', value: '0', url: origin },
         ]);
-        await page.goto('http://127.0.0.1:3000/settings/notifications', {
+        await page.goto(`${origin}/settings/notifications`, {
             waitUntil: 'domcontentloaded',
         });
 

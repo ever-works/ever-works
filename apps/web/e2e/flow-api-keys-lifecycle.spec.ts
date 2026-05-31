@@ -191,9 +191,13 @@ test.describe('API keys — lifecycle, expiry, isolation', () => {
         expect(listed?.expiresAt, 'expiry surfaced in list').toBeTruthy();
         expect(new Date(listed!.expiresAt as string).getTime()).toBe(new Date(farFuture).getTime());
 
-        // Now prove ENFORCEMENT (not just recording): a key that expires in ~3s
-        // authenticates before its deadline and is rejected after it lapses.
-        const soon = new Date(Date.now() + 3000).toISOString();
+        // Now prove ENFORCEMENT (not just recording): a key that expires in ~12s
+        // authenticates before its deadline and is rejected after it lapses. The
+        // window is computed BEFORE the create round-trip and `beforeExpiry` only
+        // fires after create + a couple of round-trips, so a 3s window left too
+        // little margin and intermittently 401'd the "valid-before-expiry"
+        // assertion on slow CI runners. 12s stays well inside the 20s expiry poll.
+        const soon = new Date(Date.now() + 12_000).toISOString();
         const shortLived = await createKey(request, owner.access_token, {
             name: `short-${Date.now()}`,
             expiresAt: soon,
