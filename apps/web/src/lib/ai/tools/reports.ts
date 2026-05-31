@@ -486,6 +486,67 @@ const REPORTS: ReportDef[] = [
             };
         },
     },
+    {
+        id: 'activity_per_day',
+        title: 'Activity per day',
+        description: 'Line chart of how many activity-log events occurred per day (recent).',
+        run: async () => {
+            const rows = await fetchArray('/api/activity-log');
+            if ('error' in rows) return rows;
+            const perDay = new Map<string, number>();
+            for (const row of rows) {
+                const day = String(row.createdAt ?? row.created_at ?? row.timestamp ?? '').slice(
+                    0,
+                    10,
+                );
+                if (!day) continue;
+                perDay.set(day, (perDay.get(day) ?? 0) + 1);
+            }
+            const data = [...perDay.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([day, count]) => ({ day, count }));
+            if (!data.length) return { error: 'No activity to chart.' };
+            return {
+                artifact: {
+                    id: randomUUID(),
+                    kind: 'chart',
+                    title: 'Activity per day',
+                    chartType: 'line',
+                    xKey: 'day',
+                    series: [{ key: 'count', label: 'Events' }],
+                    data,
+                },
+            };
+        },
+    },
+    {
+        id: 'work_overview',
+        title: 'Work item overview',
+        description: 'Stat tiles summarising a work’s item counts by status. Needs a workId.',
+        needsWorkId: true,
+        run: async ({ workId }) => {
+            const res = await callApi({
+                method: 'GET',
+                path: '/api/works/{id}/count',
+                pathParams: { id: workId! },
+            });
+            if (!res.success) return { error: res.error ?? 'Request failed' };
+            const obj = (res.data ?? {}) as Record<string, unknown>;
+            const stats: Array<{ label: string; value: string | number }> = [];
+            for (const [key, value] of Object.entries(obj)) {
+                if (typeof value === 'number') stats.push({ label: labelize(key), value });
+            }
+            if (!stats.length) return { error: 'No item counts available for this work.' };
+            return {
+                artifact: {
+                    id: randomUUID(),
+                    kind: 'stat',
+                    title: 'Work items',
+                    stats: stats.slice(0, 6),
+                },
+            };
+        },
+    },
 ];
 
 const REPORT_IDS = REPORTS.map((r) => r.id);
