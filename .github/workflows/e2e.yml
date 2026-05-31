@@ -3,30 +3,24 @@ name: E2E Tests
 # Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope:
-#   - push to `stage` / `main`            → run (release gate)
-#   - pull_request to `develop`/`stage`/`main` → run (pre-merge validation)
-#   - workflow_dispatch on any branch     → run (one-off verification)
+# Scope (intentionally BRANCH-ONLY — never runs on feature/fix branches):
+#   - push to `develop` / `stage` / `main` (+ `master`) → run (release-line gate)
+#   - workflow_dispatch on any branch                   → run (one-off verification)
 #
-# The full suite is sharded 4× across the matrix (~25 min wall-clock per
-# shard on ubicloud-standard-8). PR pre-validation was added because
-# stage/main-only triggers let test debt accumulate undetected until the
-# release cut. If PR cost proves too high, narrow the `pull_request:`
-# branches list to `[stage, main]` only.
+# There is deliberately NO `pull_request` trigger. The full suite is
+# sharded 4× across the matrix (~25 min wall-clock per shard on
+# ubicloud-standard-8), so running it on every feature/fix PR burned
+# runners without gating anything the post-merge branch push doesn't
+# already catch. e2e now runs only once code lands on a release-line
+# branch (`develop`, `stage`, `main`/`master`). The `concurrency` block
+# below cancels a superseded run when a newer commit reaches the same
+# branch, so only the latest commit per branch is ever validated.
 #
 # See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
 
 on:
   push:
-    branches: [stage, main]
-  # Pre-validate PRs heading into the release pipeline so test debt
-  # surfaces BEFORE the merge instead of after. Sharded across 4
-  # runners (~25 min wall-clock), so the cost is bearable to catch
-  # regressions before they reach `stage`. If this proves too
-  # expensive, narrow to `[stage, main]` only and rely on push for
-  # `develop`-merged regressions.
-  pull_request:
-    branches: [develop, stage, main]
+    branches: [develop, stage, main, master]
   workflow_dispatch:
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.
