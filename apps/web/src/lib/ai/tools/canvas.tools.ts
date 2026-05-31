@@ -134,9 +134,11 @@ const componentOutput = (artifact: ComponentArtifact): CanvasToolOutput => ({
 export const showComponent = tool({
     description:
         'Render a bespoke canvas component for data you already gathered. ' +
-        'Components — "progress": props { bars: [{ label, percent, caption? }] } (labeled percent bars, great ' +
-        'for budget usage); "timeline": props { items: [{ title, subtitle?, status? }] } (vertical event ' +
-        'timeline, great for activity/history). After calling, give a one-line summary in chat.',
+        'Components — "progress": props { bars: [{ label, percent, caption? }] } (labeled percent bars); ' +
+        '"gauge": props { label, percent, caption? } (one big % dial, great for budget/cap usage); ' +
+        '"timeline": props { items: [{ title, subtitle?, status? }] } (vertical event history); ' +
+        '"comparison": props { left: { title, fields: [{ label, value }] }, right: {…} } (side-by-side compare). ' +
+        'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),
         component: z.enum(CANVAS_COMPONENT_KEYS),

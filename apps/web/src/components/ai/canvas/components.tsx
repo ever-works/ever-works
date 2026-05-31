@@ -89,6 +89,85 @@ function Timeline({ props }: { props: Record<string, unknown> }) {
     );
 }
 
+/** props: { label, percent, caption? } — a single large percentage dial. */
+function Gauge({ props }: { props: Record<string, unknown> }) {
+    const percent = Math.max(0, Math.min(100, num(props.percent)));
+    const tone = percent >= 90 ? 'text-danger' : percent >= 70 ? 'text-warning' : 'text-primary';
+    const ring =
+        percent >= 90 ? 'stroke-danger' : percent >= 70 ? 'stroke-warning' : 'stroke-primary';
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - percent / 100);
+    return (
+        <div className="flex flex-col items-center gap-2 py-4">
+            <div className="relative h-32 w-32">
+                <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                    <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        className="fill-none stroke-surface-secondary dark:stroke-white/[0.08]"
+                        strokeWidth="10"
+                    />
+                    <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        className={cn('fill-none', ring)}
+                        strokeWidth="10"
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                    />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className={cn('text-2xl font-semibold', tone)}>{percent}%</span>
+                </div>
+            </div>
+            <p className="text-xs font-medium text-text dark:text-text-dark">{str(props.label)}</p>
+            {props.caption ? (
+                <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                    {str(props.caption)}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+/** props: { left: { title, fields: [{label,value}] }, right: {...} } — side-by-side compare. */
+function Comparison({ props }: { props: Record<string, unknown> }) {
+    const sides = [props.left, props.right]
+        .filter((s): s is Record<string, unknown> => !!s && typeof s === 'object')
+        .map((s) => ({
+            title: str(s.title),
+            fields: asArray(s.fields),
+        }));
+    if (sides.length < 2) return <Empty label="Need two sides to compare" />;
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            {sides.map((side, i) => (
+                <div key={i} className="rounded-lg border border-border dark:border-border-dark">
+                    <div className="border-b border-border px-3 py-2 text-xs font-medium text-text dark:border-border-dark dark:text-text-dark">
+                        {side.title}
+                    </div>
+                    <dl className="divide-y divide-border/60 dark:divide-white/[0.06]">
+                        {side.fields.map((f, j) => (
+                            <div key={j} className="px-3 py-1.5">
+                                <dt className="text-[10px] text-text-muted dark:text-text-muted-dark">
+                                    {str(f.label)}
+                                </dt>
+                                <dd className="text-[11px] text-text dark:text-text-dark">
+                                    {str(f.value)}
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 function Empty({ label }: { label: string }) {
     return (
         <div className="flex h-24 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
@@ -103,6 +182,8 @@ const REGISTRY: Record<
 > = {
     progress: ProgressBars,
     timeline: Timeline,
+    gauge: Gauge,
+    comparison: Comparison,
 };
 
 export function renderCanvasComponent(
