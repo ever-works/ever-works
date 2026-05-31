@@ -530,10 +530,19 @@ export class OrganizationService {
             // is a no-op once all rows have tenantId set.
             const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
             for (const { table, userColumn } of allTables) {
-                await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
-                    [tenant.id, userId],
-                );
+                // Use the query builder rather than a raw `$1/$2` string so the
+                // placeholders are emitted in the driver's own dialect. The raw
+                // Postgres-style `$n` form throws `RangeError: Too many parameter
+                // values were provided` under better-sqlite3 (the e2e in-memory
+                // driver), which 500'd the whole create-Organization transaction.
+                // The generated SQL is identical to the previous raw form on
+                // Postgres, so production behaviour is unchanged.
+                await manager
+                    .createQueryBuilder()
+                    .update(table)
+                    .set({ tenantId: tenant.id })
+                    .where(`"${userColumn}" = :userId AND "tenantId" IS NULL`, { userId })
+                    .execute();
             }
 
             this.logger.log(
