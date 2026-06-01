@@ -80,275 +80,327 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  */
 
 interface WorkRow {
-	id: string;
-	organizationId: string | null;
-	tenantId: string | null;
-	userId?: string;
+    id: string;
+    organizationId: string | null;
+    tenantId: string | null;
+    userId?: string;
 }
 
 const works = (body: unknown): WorkRow[] =>
-	(body as { works?: WorkRow[] })?.works ?? (Array.isArray(body) ? (body as WorkRow[]) : []);
-const workIds = (body: unknown): string[] => works(body).map((w) => w.id).filter(Boolean);
+    (body as { works?: WorkRow[] })?.works ?? (Array.isArray(body) ? (body as WorkRow[]) : []);
+const workIds = (body: unknown): string[] =>
+    works(body)
+        .map((w) => w.id)
+        .filter(Boolean);
 
 /** POST /api/works under a given active org scope (via X-Scope-Slug). */
 async function createWorkUnderScope(
-	request: APIRequestContext,
-	token: string,
-	scopeSlug: string | null,
-	name: string,
+    request: APIRequestContext,
+    token: string,
+    scopeSlug: string | null,
+    name: string,
 ): Promise<WorkRow> {
-	const headers: Record<string, string> = { ...authedHeaders(token) };
-	if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
-	const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-	const res = await request.post(`${API_BASE}/api/works`, {
-		headers,
-		data: { name, slug, description: `e2e ${name}`, organization: false },
-	});
-	// Probed: POST /api/works returns 200 (not 201) with { status:'success', work:{…} }.
-	expect(res.status(), `create work body=${await res.text().catch(() => '')}`).toBe(200);
-	const body = await res.json();
-	expect(body.status).toBe('success');
-	return body.work as WorkRow;
+    const headers: Record<string, string> = { ...authedHeaders(token) };
+    if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
+    const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const res = await request.post(`${API_BASE}/api/works`, {
+        headers,
+        data: { name, slug, description: `e2e ${name}`, organization: false },
+    });
+    // Probed: POST /api/works returns 200 (not 201) with { status:'success', work:{…} }.
+    expect(res.status(), `create work body=${await res.text().catch(() => '')}`).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('success');
+    return body.work as WorkRow;
 }
 
 /** GET /api/works under a given active org scope (via X-Scope-Slug). */
 async function listWorksUnderScope(
-	request: APIRequestContext,
-	token: string,
-	scopeSlug: string | null,
+    request: APIRequestContext,
+    token: string,
+    scopeSlug: string | null,
 ): Promise<unknown> {
-	const headers: Record<string, string> = { ...authedHeaders(token) };
-	if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
-	const res = await request.get(`${API_BASE}/api/works`, { headers });
-	expect(res.status(), `list works body=${await res.text().catch(() => '')}`).toBe(200);
-	return res.json();
+    const headers: Record<string, string> = { ...authedHeaders(token) };
+    if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
+    const res = await request.get(`${API_BASE}/api/works`, { headers });
+    expect(res.status(), `list works body=${await res.text().catch(() => '')}`).toBe(200);
+    return res.json();
 }
 
 test.describe('Org switch -> context propagation', () => {
-	test('switching active org via X-Scope-Slug propagates into subsequent scoped WRITES (A -> B -> A)', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const orgA = await createOrganizationViaAPI(request, user.access_token, `Switch A ${Date.now()}`);
-		const orgB = await createOrganizationViaAPI(request, user.access_token, `Switch B ${Date.now()}`);
-		expect(orgA.id).not.toBe(orgB.id);
-		// Both orgs share the one lazily-minted tenant.
-		expect(orgA.tenantId).toBeTruthy();
-		expect(orgB.tenantId).toBe(orgA.tenantId);
+    test('switching active org via X-Scope-Slug propagates into subsequent scoped WRITES (A -> B -> A)', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const orgA = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Switch A ${Date.now()}`,
+        );
+        const orgB = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Switch B ${Date.now()}`,
+        );
+        expect(orgA.id).not.toBe(orgB.id);
+        // Both orgs share the one lazily-minted tenant.
+        expect(orgA.tenantId).toBeTruthy();
+        expect(orgB.tenantId).toBe(orgA.tenantId);
 
-		// Switch active org -> A: a write is stamped with A.
-		const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'work-in-A');
-		expect(wA.organizationId).toBe(orgA.id);
-		expect(wA.tenantId).toBe(orgA.tenantId);
+        // Switch active org -> A: a write is stamped with A.
+        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'work-in-A');
+        expect(wA.organizationId).toBe(orgA.id);
+        expect(wA.tenantId).toBe(orgA.tenantId);
 
-		// Switch active org -> B: the very next write is stamped with B, not A.
-		const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'work-in-B');
-		expect(wB.organizationId).toBe(orgB.id);
-		expect(wB.organizationId).not.toBe(orgA.id);
+        // Switch active org -> B: the very next write is stamped with B, not A.
+        const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'work-in-B');
+        expect(wB.organizationId).toBe(orgB.id);
+        expect(wB.organizationId).not.toBe(orgA.id);
 
-		// Switch back -> A: writes resume being stamped with A.
-		const wA2 = await createWorkUnderScope(request, user.access_token, orgA.slug, 'work-in-A-again');
-		expect(wA2.organizationId).toBe(orgA.id);
-	});
+        // Switch back -> A: writes resume being stamped with A.
+        const wA2 = await createWorkUnderScope(
+            request,
+            user.access_token,
+            orgA.slug,
+            'work-in-A-again',
+        );
+        expect(wA2.organizationId).toBe(orgA.id);
+    });
 
-	test('per-row org stamping is the isolation signal: A-scoped and B-scoped resources keep their own org id; switch-back stamps A again', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const orgA = await createOrganizationViaAPI(request, user.access_token, `Iso A ${Date.now()}`);
-		const orgB = await createOrganizationViaAPI(request, user.access_token, `Iso B ${Date.now()}`);
+    test('per-row org stamping is the isolation signal: A-scoped and B-scoped resources keep their own org id; switch-back stamps A again', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const orgA = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Iso A ${Date.now()}`,
+        );
+        const orgB = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Iso B ${Date.now()}`,
+        );
 
-		const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A');
-		const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'iso-B');
-		const wA2 = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A-2');
+        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A');
+        const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'iso-B');
+        const wA2 = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A-2');
 
-		// Each resource carries the org that was active when it was written.
-		expect(wA.organizationId).toBe(orgA.id);
-		expect(wB.organizationId).toBe(orgB.id);
-		expect(wA2.organizationId).toBe(orgA.id); // switch-back resumed A-stamping
-		// A-scoped rows are distinguishable from B-scoped rows by org id.
-		expect(wA.organizationId).not.toBe(wB.organizationId);
+        // Each resource carries the org that was active when it was written.
+        expect(wA.organizationId).toBe(orgA.id);
+        expect(wB.organizationId).toBe(orgB.id);
+        expect(wA2.organizationId).toBe(orgA.id); // switch-back resumed A-stamping
+        // A-scoped rows are distinguishable from B-scoped rows by org id.
+        expect(wA.organizationId).not.toBe(wB.organizationId);
 
-		// The owner's list (owner-scoped, NOT org-filtered) contains all three;
-		// the org boundary is visible PER ROW, not by the list omitting rows.
-		const all = await listWorksUnderScope(request, user.access_token, orgA.slug);
-		const rows = works(all);
-		const byId = new Map(rows.map((w) => [w.id, w]));
-		expect(byId.get(wA.id)?.organizationId).toBe(orgA.id);
-		expect(byId.get(wB.id)?.organizationId).toBe(orgB.id);
-		expect(byId.get(wA2.id)?.organizationId).toBe(orgA.id);
+        // The owner's list (owner-scoped, NOT org-filtered) contains all three;
+        // the org boundary is visible PER ROW, not by the list omitting rows.
+        const all = await listWorksUnderScope(request, user.access_token, orgA.slug);
+        const rows = works(all);
+        const byId = new Map(rows.map((w) => [w.id, w]));
+        expect(byId.get(wA.id)?.organizationId).toBe(orgA.id);
+        expect(byId.get(wB.id)?.organizationId).toBe(orgB.id);
+        expect(byId.get(wA2.id)?.organizationId).toBe(orgA.id);
 
-		// Switching the active scope does NOT re-home already-written rows:
-		// re-reading the same set under scope B leaves every org id unchanged.
-		const allUnderB = await listWorksUnderScope(request, user.access_token, orgB.slug);
-		const byIdB = new Map(works(allUnderB).map((w) => [w.id, w]));
-		expect(byIdB.get(wA.id)?.organizationId).toBe(orgA.id);
-		expect(byIdB.get(wB.id)?.organizationId).toBe(orgB.id);
-	});
+        // Switching the active scope does NOT re-home already-written rows:
+        // re-reading the same set under scope B leaves every org id unchanged.
+        const allUnderB = await listWorksUnderScope(request, user.access_token, orgB.slug);
+        const byIdB = new Map(works(allUnderB).map((w) => [w.id, w]));
+        expect(byIdB.get(wA.id)?.organizationId).toBe(orgA.id);
+        expect(byIdB.get(wB.id)?.organizationId).toBe(orgB.id);
+    });
 
-	test('a work stays readable BY ID across org switches and keeps its original org id (findOne is owner-scoped)', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const orgA = await createOrganizationViaAPI(request, user.access_token, `ById A ${Date.now()}`);
-		const orgB = await createOrganizationViaAPI(request, user.access_token, `ById B ${Date.now()}`);
+    test('a work stays readable BY ID across org switches and keeps its original org id (findOne is owner-scoped)', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const orgA = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `ById A ${Date.now()}`,
+        );
+        const orgB = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `ById B ${Date.now()}`,
+        );
 
-		const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'byid');
-		expect(wA.organizationId).toBe(orgA.id);
+        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'byid');
+        expect(wA.organizationId).toBe(orgA.id);
 
-		// A direct GET /works/:id is owner-scoped and resolves even with B as the
-		// active scope; its organizationId stays A — the switch never re-homes it.
-		const byId = await request.get(`${API_BASE}/api/works/${wA.id}`, {
-			headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgB.slug },
-		});
-		expect(byId.status()).toBe(200);
-		const fetched = await byId.json();
-		const work = (fetched?.work ?? fetched) as WorkRow;
-		expect(work.id).toBe(wA.id);
-		expect(work.organizationId).toBe(orgA.id);
+        // A direct GET /works/:id is owner-scoped and resolves even with B as the
+        // active scope; its organizationId stays A — the switch never re-homes it.
+        const byId = await request.get(`${API_BASE}/api/works/${wA.id}`, {
+            headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgB.slug },
+        });
+        expect(byId.status()).toBe(200);
+        const fetched = await byId.json();
+        const work = (fetched?.work ?? fetched) as WorkRow;
+        expect(work.id).toBe(wA.id);
+        expect(work.organizationId).toBe(orgA.id);
 
-		// And reading it back under A's scope gives the identical org id.
-		const byIdA = await request.get(`${API_BASE}/api/works/${wA.id}`, {
-			headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgA.slug },
-		});
-		expect(byIdA.status()).toBe(200);
-		expect(((await byIdA.json())?.work as WorkRow)?.organizationId).toBe(orgA.id);
-	});
+        // And reading it back under A's scope gives the identical org id.
+        const byIdA = await request.get(`${API_BASE}/api/works/${wA.id}`, {
+            headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgA.slug },
+        });
+        expect(byIdA.status()).toBe(200);
+        expect(((await byIdA.json())?.work as WorkRow)?.organizationId).toBe(orgA.id);
+    });
 
-	test('cross-tenant scope spoofing is rejected (403); unknown scope slug is 404; get-by-slug stays a global 200', async ({
-		request,
-	}) => {
-		// Owner builds an org with a scoped resource.
-		const owner = await registerUserViaAPI(request);
-		const orgA = await createOrganizationViaAPI(request, owner.access_token, `Foreign A ${Date.now()}`);
-		const wA = await createWorkUnderScope(request, owner.access_token, orgA.slug, 'foreign-A');
-		expect(wA.organizationId).toBe(orgA.id);
+    test('cross-tenant scope spoofing is rejected (403); unknown scope slug is 404; get-by-slug stays a global 200', async ({
+        request,
+    }) => {
+        // Owner builds an org with a scoped resource.
+        const owner = await registerUserViaAPI(request);
+        const orgA = await createOrganizationViaAPI(
+            request,
+            owner.access_token,
+            `Foreign A ${Date.now()}`,
+        );
+        const wA = await createWorkUnderScope(request, owner.access_token, orgA.slug, 'foreign-A');
+        expect(wA.organizationId).toBe(orgA.id);
 
-		// A different user (different tenant) tries to "switch into" orgA via its
-		// slug. The slug resolves (global namespace) but ScopeOwnershipGuard sees
-		// it belongs to another tenant -> 403. Cross-tenant spoofing blocked.
-		const stranger = await registerUserViaAPI(request);
-		const spoof = await request.get(`${API_BASE}/api/works`, {
-			headers: { ...authedHeaders(stranger.access_token), 'X-Scope-Slug': orgA.slug },
-		});
-		expect(spoof.status()).toBe(403);
+        // A different user (different tenant) tries to "switch into" orgA via its
+        // slug. The slug resolves (global namespace) but ScopeOwnershipGuard sees
+        // it belongs to another tenant -> 403. Cross-tenant spoofing blocked.
+        const stranger = await registerUserViaAPI(request);
+        const spoof = await request.get(`${API_BASE}/api/works`, {
+            headers: { ...authedHeaders(stranger.access_token), 'X-Scope-Slug': orgA.slug },
+        });
+        expect(spoof.status()).toBe(403);
 
-		// An UNKNOWN scope slug doesn't resolve at all -> the middleware 404s.
-		const unknown = await request.get(`${API_BASE}/api/works`, {
-			headers: {
-				...authedHeaders(stranger.access_token),
-				'X-Scope-Slug': `no-such-org-${Date.now().toString(36)}`,
-			},
-		});
-		expect(unknown.status()).toBe(404);
+        // An UNKNOWN scope slug doesn't resolve at all -> the middleware 404s.
+        const unknown = await request.get(`${API_BASE}/api/works`, {
+            headers: {
+                ...authedHeaders(stranger.access_token),
+                'X-Scope-Slug': `no-such-org-${Date.now().toString(36)}`,
+            },
+        });
+        expect(unknown.status()).toBe(404);
 
-		// GET /api/organizations/:slug, however, IS a global resolver -> 200 even
-		// for the stranger (it backs the Phase-7 slug middleware + deep links).
-		// The real authorization boundary is the SCOPED request (403 above), not
-		// get-by-slug.
-		const resolve = await request.get(
-			`${API_BASE}/api/organizations/${encodeURIComponent(orgA.slug)}`,
-			{ headers: authedHeaders(stranger.access_token) },
-		);
-		expect(resolve.status()).toBe(200);
-		expect((await resolve.json()).id).toBe(orgA.id);
-	});
+        // GET /api/organizations/:slug, however, IS a global resolver -> 200 even
+        // for the stranger (it backs the Phase-7 slug middleware + deep links).
+        // The real authorization boundary is the SCOPED request (403 above), not
+        // get-by-slug.
+        const resolve = await request.get(
+            `${API_BASE}/api/organizations/${encodeURIComponent(orgA.slug)}`,
+            { headers: authedHeaders(stranger.access_token) },
+        );
+        expect(resolve.status()).toBe(200);
+        expect((await resolve.json()).id).toBe(orgA.id);
+    });
 
-	test('lastScopeOrganizationId + org membership persist across a fresh login; login DTO rejects extra fields', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		// First org create pins lastScopeOrganizationId = orgA on the User row.
-		const orgA = await createOrganizationViaAPI(request, user.access_token, `Persist A ${Date.now()}`);
-		const orgB = await createOrganizationViaAPI(request, user.access_token, `Persist B ${Date.now()}`);
+    test('lastScopeOrganizationId + org membership persist across a fresh login; login DTO rejects extra fields', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        // First org create pins lastScopeOrganizationId = orgA on the User row.
+        const orgA = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Persist A ${Date.now()}`,
+        );
+        const orgB = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Persist B ${Date.now()}`,
+        );
 
-		// A work stamped with A's scope before re-login.
-		const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'persist-A');
-		expect(wA.organizationId).toBe(orgA.id);
+        // A work stamped with A's scope before re-login.
+        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'persist-A');
+        expect(wA.organizationId).toBe(orgA.id);
 
-		// Re-login: the login DTO is whitelisted to { email, password } ONLY.
-		const badLogin = await request.post(`${API_BASE}/api/auth/login`, {
-			data: { email: user.email, password: user.password, name: 'nope' },
-		});
-		expect(badLogin.status(), 'extra {name} on login DTO must 400').toBe(400);
+        // Re-login: the login DTO is whitelisted to { email, password } ONLY.
+        const badLogin = await request.post(`${API_BASE}/api/auth/login`, {
+            data: { email: user.email, password: user.password, name: 'nope' },
+        });
+        expect(badLogin.status(), 'extra {name} on login DTO must 400').toBe(400);
 
-		const relogin = await request.post(`${API_BASE}/api/auth/login`, {
-			data: { email: user.email, password: user.password },
-		});
-		expect(relogin.status()).toBe(200);
-		const freshToken = (await relogin.json()).access_token;
-		expect(freshToken).toBeTruthy();
+        const relogin = await request.post(`${API_BASE}/api/auth/login`, {
+            data: { email: user.email, password: user.password },
+        });
+        expect(relogin.status()).toBe(200);
+        const freshToken = (await relogin.json()).access_token;
+        expect(freshToken).toBeTruthy();
 
-		// Org membership survives the new session (the Tenant + both orgs outlived it).
-		const orgsAfter = await listOrganizationsViaAPI(request, freshToken);
-		const orgIds = orgsAfter.map((o) => o.id);
-		expect(orgIds).toContain(orgA.id);
-		expect(orgIds).toContain(orgB.id);
+        // Org membership survives the new session (the Tenant + both orgs outlived it).
+        const orgsAfter = await listOrganizationsViaAPI(request, freshToken);
+        const orgIds = orgsAfter.map((o) => o.id);
+        expect(orgIds).toContain(orgA.id);
+        expect(orgIds).toContain(orgB.id);
 
-		// On the fresh token, the previously-A-stamped work is still readable by
-		// id and still carries A — the persisted scope wasn't reset by re-login.
-		const reread = await request.get(`${API_BASE}/api/works/${wA.id}`, {
-			headers: authedHeaders(freshToken),
-		});
-		expect(reread.status()).toBe(200);
-		expect(((await reread.json())?.work as WorkRow)?.organizationId).toBe(orgA.id);
+        // On the fresh token, the previously-A-stamped work is still readable by
+        // id and still carries A — the persisted scope wasn't reset by re-login.
+        const reread = await request.get(`${API_BASE}/api/works/${wA.id}`, {
+            headers: authedHeaders(freshToken),
+        });
+        expect(reread.status()).toBe(200);
+        expect(((await reread.json())?.work as WorkRow)?.organizationId).toBe(orgA.id);
 
-		// And the fresh session can still switch scope to A and write into A.
-		const wA2 = await createWorkUnderScope(request, freshToken, orgA.slug, 'persist-A-2');
-		expect(wA2.organizationId).toBe(orgA.id);
-	});
+        // And the fresh session can still switch scope to A and write into A.
+        const wA2 = await createWorkUnderScope(request, freshToken, orgA.slug, 'persist-A-2');
+        expect(wA2.organizationId).toBe(orgA.id);
+    });
 
-	test('UI active-org switch: the SPA stores the active org slug and the propagated X-Scope-Slug WRITE stamps the matching org (A<->B)', async ({
-		page,
-		request,
-		baseURL,
-	}) => {
-		// Seed two orgs through the SEEDED user so the browser session and the API
-		// session line up.
-		const s = loadSeededTestUser();
-		const login = await request.post(`${API_BASE}/api/auth/login`, {
-			data: { email: s.email, password: s.password },
-		});
-		expect(login.status(), `seeded login body=${await login.text().catch(() => '')}`).toBe(200);
-		const { access_token } = await login.json();
-		expect(access_token).toBeTruthy();
+    test('UI active-org switch: the SPA stores the active org slug and the propagated X-Scope-Slug WRITE stamps the matching org (A<->B)', async ({
+        page,
+        request,
+        baseURL,
+    }) => {
+        // Seed two orgs through the SEEDED user so the browser session and the API
+        // session line up.
+        const s = loadSeededTestUser();
+        const login = await request.post(`${API_BASE}/api/auth/login`, {
+            data: { email: s.email, password: s.password },
+        });
+        expect(login.status(), `seeded login body=${await login.text().catch(() => '')}`).toBe(200);
+        const { access_token } = await login.json();
+        expect(access_token).toBeTruthy();
 
-		const orgA = await createOrganizationViaAPI(request, access_token, `UI A ${Date.now()}`);
-		const orgB = await createOrganizationViaAPI(request, access_token, `UI B ${Date.now()}`);
+        const orgA = await createOrganizationViaAPI(request, access_token, `UI A ${Date.now()}`);
+        const orgB = await createOrganizationViaAPI(request, access_token, `UI B ${Date.now()}`);
 
-		const myOrgIds = (await listOrganizationsViaAPI(request, access_token)).map((o) => o.id);
-		expect(myOrgIds).toContain(orgA.id);
-		expect(myOrgIds).toContain(orgB.id);
+        const myOrgIds = (await listOrganizationsViaAPI(request, access_token)).map((o) => o.id);
+        expect(myOrgIds).toContain(orgA.id);
+        expect(myOrgIds).toContain(orgB.id);
 
-		// Load the app (authenticated via storageState) and simulate the
-		// switcher's effect: the SPA persists the active org slug in localStorage,
-		// from which its fetch wrapper derives X-Scope-Slug (see
-		// scope-resolver.middleware.ts docblock).
-		const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
-		await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
+        // Load the app (authenticated via storageState) and simulate the
+        // switcher's effect: the SPA persists the active org slug in localStorage,
+        // from which its fetch wrapper derives X-Scope-Slug (see
+        // scope-resolver.middleware.ts docblock).
+        const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
+        await page.goto(origin + '/', { waitUntil: 'domcontentloaded' });
 
-		await page.evaluate((slug) => window.localStorage.setItem('activeOrgSlug', slug), orgA.slug);
-		const storedA = await page.evaluate(() => window.localStorage.getItem('activeOrgSlug'));
-		expect(storedA).toBe(orgA.slug);
+        await page.evaluate(
+            (slug) => window.localStorage.setItem('activeOrgSlug', slug),
+            orgA.slug,
+        );
+        const storedA = await page.evaluate(() => window.localStorage.getItem('activeOrgSlug'));
+        expect(storedA).toBe(orgA.slug);
 
-		// A write using that stored slug as the propagated header is stamped with A.
-		const wA = await createWorkUnderScope(request, access_token, storedA, 'ui-A');
-		expect(wA.organizationId).toBe(orgA.id);
+        // A write using that stored slug as the propagated header is stamped with A.
+        const wA = await createWorkUnderScope(request, access_token, storedA, 'ui-A');
+        expect(wA.organizationId).toBe(orgA.id);
 
-		// Re-point the switcher to B in the browser and confirm propagation flips:
-		// the next write is stamped with B.
-		await page.evaluate((slug) => window.localStorage.setItem('activeOrgSlug', slug), orgB.slug);
-		const storedB = await page.evaluate(() => window.localStorage.getItem('activeOrgSlug'));
-		expect(storedB).toBe(orgB.slug);
-		const wB = await createWorkUnderScope(request, access_token, storedB, 'ui-B');
-		expect(wB.organizationId).toBe(orgB.id);
-		expect(wB.organizationId).not.toBe(wA.organizationId);
+        // Re-point the switcher to B in the browser and confirm propagation flips:
+        // the next write is stamped with B.
+        await page.evaluate(
+            (slug) => window.localStorage.setItem('activeOrgSlug', slug),
+            orgB.slug,
+        );
+        const storedB = await page.evaluate(() => window.localStorage.getItem('activeOrgSlug'));
+        expect(storedB).toBe(orgB.slug);
+        const wB = await createWorkUnderScope(request, access_token, storedB, 'ui-B');
+        expect(wB.organizationId).toBe(orgB.id);
+        expect(wB.organizationId).not.toBe(wA.organizationId);
 
-		// Best-effort: a native org switcher control may be present in the shell
-		// (the deep dropdown interaction is owned by organization-create-switch.spec.ts).
-		const switcher = page.getByRole('button', { name: 'Switch Organization' }).first();
-		if (await switcher.count()) {
-			await expect(switcher).toBeVisible({ timeout: 15000 }).catch(() => {});
-		}
-	});
+        // Best-effort: a native org switcher control may be present in the shell
+        // (the deep dropdown interaction is owned by organization-create-switch.spec.ts).
+        const switcher = page.getByRole('button', { name: 'Switch Organization' }).first();
+        if (await switcher.count()) {
+            await expect(switcher)
+                .toBeVisible({ timeout: 15000 })
+                .catch(() => {});
+        }
+    });
 });

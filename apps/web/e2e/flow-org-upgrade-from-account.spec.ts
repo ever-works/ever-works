@@ -105,11 +105,7 @@ async function registerCompanyRaw(
 }
 
 /** POST /api/organizations/:id/upgrade-from-account (raw — caller inspects status). */
-async function upgradeRaw(
-    request: APIRequestContext,
-    token: string | undefined,
-    orgId: string,
-) {
+async function upgradeRaw(request: APIRequestContext, token: string | undefined, orgId: string) {
     return request.post(`${API_BASE}/api/organizations/${orgId}/upgrade-from-account`, {
         headers: token ? authedHeaders(token) : {},
     });
@@ -391,7 +387,10 @@ test.describe('Organization upgrade-from-account — first-org guard + sqlite-de
             // The task's organizationId is STILL null (it was never pulled in),
             // and its tenantId is unchanged. The whole txn rolled back.
             const afterTask = await getTask(request, token, task.id);
-            expect(afterTask.organizationId, 'failed upgrade must not partially stamp orgId').toBeNull();
+            expect(
+                afterTask.organizationId,
+                'failed upgrade must not partially stamp orgId',
+            ).toBeNull();
             expect(afterTask.tenantId, 'tenantId is untouched by the rolled-back upgrade').toBe(
                 org.tenantId,
             );

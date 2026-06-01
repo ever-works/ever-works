@@ -38,7 +38,7 @@ describe('BasePromptService — display helpers', () => {
 
 	it('displaySectionHeader prints the title', () => {
 		svc.exposeDisplaySectionHeader('Auth');
-		const out = logSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		const out = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 		expect(out).toMatch(/Auth/);
 	});
 
@@ -48,7 +48,7 @@ describe('BasePromptService — display helpers', () => {
 		svc.exposeDisplayWarning('careful');
 		svc.exposeDisplayError('bad');
 		expect(logSpy).toHaveBeenCalledTimes(4);
-		const out = logSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+		const out = logSpy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
 		expect(out).toMatch(/hello/);
 		expect(out).toMatch(/ok/);
 		expect(out).toMatch(/careful/);

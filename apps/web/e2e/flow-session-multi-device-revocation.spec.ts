@@ -88,49 +88,58 @@ const SINGLE_LOGOUT_MSG = 'Logged out successfully';
 const ALL_LOGOUT_MSG = 'Logged out from all devices successfully';
 
 interface DeviceSession {
-	label: string;
-	access_token: string;
-	user: { id: string; email: string };
+    label: string;
+    access_token: string;
+    user: { id: string; email: string };
 }
 
 /** One "device" = one independent login, producing its own server session token. */
 async function loginDevice(
-	request: APIRequestContext,
-	creds: { email: string; password: string },
-	label: string,
+    request: APIRequestContext,
+    creds: { email: string; password: string },
+    label: string,
 ): Promise<DeviceSession> {
-	const res = await request.post(LOGIN, { data: creds, timeout: T });
-	expect(res.status(), `login for ${label} should be 200`).toBe(200);
-	const body = (await res.json()) as { access_token: string; user: { id: string; email: string } };
-	expect(typeof body.access_token, `${label} login must mint an access_token`).toBe('string');
-	expect(body.access_token.length, `${label} token length`).toBeGreaterThan(10);
-	return { label, access_token: body.access_token, user: body.user };
+    const res = await request.post(LOGIN, { data: creds, timeout: T });
+    expect(res.status(), `login for ${label} should be 200`).toBe(200);
+    const body = (await res.json()) as {
+        access_token: string;
+        user: { id: string; email: string };
+    };
+    expect(typeof body.access_token, `${label} login must mint an access_token`).toBe('string');
+    expect(body.access_token.length, `${label} token length`).toBeGreaterThan(10);
+    return { label, access_token: body.access_token, user: body.user };
 }
 
 /** Bring up a fleet of N independent device sessions for one fresh account. */
 async function bringUpFleet(
-	request: APIRequestContext,
-	prefix: string,
-	count: number,
+    request: APIRequestContext,
+    prefix: string,
+    count: number,
 ): Promise<{ account: Awaited<ReturnType<typeof registerUserViaAPI>>; devices: DeviceSession[] }> {
-	const account = await registerUserViaAPI(request, { email: makeTestUser(prefix).email });
-	const devices: DeviceSession[] = [];
-	for (let i = 0; i < count; i++) {
-		devices.push(
-			await loginDevice(request, { email: account.email, password: account.password }, `${prefix}-d${i}`),
-		);
-	}
-	return { account, devices };
+    const account = await registerUserViaAPI(request, { email: makeTestUser(prefix).email });
+    const devices: DeviceSession[] = [];
+    for (let i = 0; i < count; i++) {
+        devices.push(
+            await loginDevice(
+                request,
+                { email: account.email, password: account.password },
+                `${prefix}-d${i}`,
+            ),
+        );
+    }
+    return { account, devices };
 }
 
 /** Raw /profile status for a token. 200 = live session, 401/403 = revoked. */
 async function profileStatus(request: APIRequestContext, access_token: string): Promise<number> {
-	const res = await request.get(PROFILE, { headers: authedHeaders(access_token), timeout: T });
-	return res.status();
+    const res = await request.get(PROFILE, { headers: authedHeaders(access_token), timeout: T });
+    return res.status();
 }
 
 async function expectLive(request: APIRequestContext, d: DeviceSession): Promise<void> {
-	expect(await profileStatus(request, d.access_token), `${d.label} should be LIVE (200)`).toBe(200);
+    expect(await profileStatus(request, d.access_token), `${d.label} should be LIVE (200)`).toBe(
+        200,
+    );
 }
 
 /**
@@ -139,305 +148,352 @@ async function expectLive(request: APIRequestContext, d: DeviceSession): Promise
  * while a token that STAYS live (200) correctly fails the poll.
  */
 async function expectRevoked(request: APIRequestContext, d: DeviceSession): Promise<void> {
-	await expect
-		.poll(async () => [401, 403].includes(await profileStatus(request, d.access_token)), {
-			message: `${d.label} should be REVOKED (401/403)`,
-			timeout: 15_000,
-		})
-		.toBe(true);
+    await expect
+        .poll(async () => [401, 403].includes(await profileStatus(request, d.access_token)), {
+            message: `${d.label} should be REVOKED (401/403)`,
+            timeout: 15_000,
+        })
+        .toBe(true);
 }
 
 test.describe('flow-session-multi-device-revocation', () => {
-	/**
-	 * FLOW 1 — Multi-device session INVENTORY baseline + the propagation pattern
-	 * of a single targeted revoke.
-	 *
-	 * There is no GET-sessions list endpoint (404, see docblock), so the truthful
-	 * equivalent of a session inventory is: hold every device token and prove
-	 * each independently resolves /profile to the SAME account, and that all the
-	 * tokens are DISTINCT (a reused token across devices would be a credential
-	 * leak). Then we log out exactly ONE device and assert the load-bearing
-	 * propagation rule: ONLY that device's row dies; every sibling stays live.
-	 */
-	test('a 4-device fleet enumerates as distinct same-user sessions; a targeted logout propagates to ONLY that device', async ({
-		request,
-	}) => {
-		const { account, devices } = await bringUpFleet(request, 'rev-inv', 4);
+    /**
+     * FLOW 1 — Multi-device session INVENTORY baseline + the propagation pattern
+     * of a single targeted revoke.
+     *
+     * There is no GET-sessions list endpoint (404, see docblock), so the truthful
+     * equivalent of a session inventory is: hold every device token and prove
+     * each independently resolves /profile to the SAME account, and that all the
+     * tokens are DISTINCT (a reused token across devices would be a credential
+     * leak). Then we log out exactly ONE device and assert the load-bearing
+     * propagation rule: ONLY that device's row dies; every sibling stays live.
+     */
+    test('a 4-device fleet enumerates as distinct same-user sessions; a targeted logout propagates to ONLY that device', async ({
+        request,
+    }) => {
+        const { account, devices } = await bringUpFleet(request, 'rev-inv', 4);
 
-		// Inventory: every device token is unique...
-		const tokens = devices.map((d) => d.access_token);
-		expect(new Set(tokens).size, 'all device tokens must be distinct').toBe(tokens.length);
+        // Inventory: every device token is unique...
+        const tokens = devices.map((d) => d.access_token);
+        expect(new Set(tokens).size, 'all device tokens must be distinct').toBe(tokens.length);
 
-		// ...and every device independently resolves /profile to the SAME id+email.
-		for (const d of devices) {
-			const res = await request.get(PROFILE, { headers: authedHeaders(d.access_token), timeout: T });
-			expect(res.status(), `${d.label} profile`).toBe(200);
-			const body = (await res.json()) as { id?: string; userId?: string; email?: string };
-			expect(body.id ?? body.userId, `${d.label} resolves to the account id`).toBe(account.user.id);
-			expect((body.email ?? '').toLowerCase(), `${d.label} email`).toBe(account.email.toLowerCase());
-		}
+        // ...and every device independently resolves /profile to the SAME id+email.
+        for (const d of devices) {
+            const res = await request.get(PROFILE, {
+                headers: authedHeaders(d.access_token),
+                timeout: T,
+            });
+            expect(res.status(), `${d.label} profile`).toBe(200);
+            const body = (await res.json()) as { id?: string; userId?: string; email?: string };
+            expect(body.id ?? body.userId, `${d.label} resolves to the account id`).toBe(
+                account.user.id,
+            );
+            expect((body.email ?? '').toLowerCase(), `${d.label} email`).toBe(
+                account.email.toLowerCase(),
+            );
+        }
 
-		// Targeted revoke of the 2nd device only.
-		const victim = devices[1];
-		const out = await request.post(LOGOUT, { headers: authedHeaders(victim.access_token), timeout: T });
-		expect(out.status(), 'targeted logout ack').toBe(200);
-		expect(((await out.json()) as { message?: string }).message, 'single-logout body').toBe(
-			SINGLE_LOGOUT_MSG,
-		);
+        // Targeted revoke of the 2nd device only.
+        const victim = devices[1];
+        const out = await request.post(LOGOUT, {
+            headers: authedHeaders(victim.access_token),
+            timeout: T,
+        });
+        expect(out.status(), 'targeted logout ack').toBe(200);
+        expect(((await out.json()) as { message?: string }).message, 'single-logout body').toBe(
+            SINGLE_LOGOUT_MSG,
+        );
 
-		// Propagation: the victim is gone; the OTHER three are untouched.
-		await expectRevoked(request, victim);
-		for (const survivor of devices.filter((d) => d !== victim)) {
-			await expectLive(request, survivor);
-		}
-	});
+        // Propagation: the victim is gone; the OTHER three are untouched.
+        await expectRevoked(request, victim);
+        for (const survivor of devices.filter((d) => d !== victim)) {
+            await expectLive(request, survivor);
+        }
+    });
 
-	/**
-	 * FLOW 2 — Interleaved targeted revocations shrink the live set MONOTONICALLY.
-	 *
-	 * Revoke devices one-by-one (each a separate POST /logout from that device's
-	 * own token) and after every step assert the FULL fleet state: the cumulative
-	 * set of revoked devices is exactly the ones we logged out, and every
-	 * not-yet-touched device is still live. This pins that targeted logout never
-	 * cascades and never resurrects — a property a single-device sibling spec
-	 * cannot exercise.
-	 */
-	test('sequential targeted logouts revoke exactly the chosen devices while every untouched device stays live', async ({
-		request,
-	}) => {
-		const { devices } = await bringUpFleet(request, 'rev-seq', 4);
+    /**
+     * FLOW 2 — Interleaved targeted revocations shrink the live set MONOTONICALLY.
+     *
+     * Revoke devices one-by-one (each a separate POST /logout from that device's
+     * own token) and after every step assert the FULL fleet state: the cumulative
+     * set of revoked devices is exactly the ones we logged out, and every
+     * not-yet-touched device is still live. This pins that targeted logout never
+     * cascades and never resurrects — a property a single-device sibling spec
+     * cannot exercise.
+     */
+    test('sequential targeted logouts revoke exactly the chosen devices while every untouched device stays live', async ({
+        request,
+    }) => {
+        const { devices } = await bringUpFleet(request, 'rev-seq', 4);
 
-		// Baseline: the whole fleet is live.
-		for (const d of devices) await expectLive(request, d);
+        // Baseline: the whole fleet is live.
+        for (const d of devices) await expectLive(request, d);
 
-		// Revoke in order d0, d2 (skip d1 deliberately to prove "exactly chosen").
-		const revokeOrder = [devices[0], devices[2]];
-		const revoked = new Set<DeviceSession>();
-		for (const victim of revokeOrder) {
-			const out = await request.post(LOGOUT, {
-				headers: authedHeaders(victim.access_token),
-				timeout: T,
-			});
-			expect(out.status(), `${victim.label} logout ack`).toBe(200);
-			revoked.add(victim);
+        // Revoke in order d0, d2 (skip d1 deliberately to prove "exactly chosen").
+        const revokeOrder = [devices[0], devices[2]];
+        const revoked = new Set<DeviceSession>();
+        for (const victim of revokeOrder) {
+            const out = await request.post(LOGOUT, {
+                headers: authedHeaders(victim.access_token),
+                timeout: T,
+            });
+            expect(out.status(), `${victim.label} logout ack`).toBe(200);
+            revoked.add(victim);
 
-			// After each step: revoked set is exactly what we asked for; the rest live.
-			for (const d of devices) {
-				if (revoked.has(d)) {
-					await expectRevoked(request, d);
-				} else {
-					await expectLive(request, d);
-				}
-			}
-		}
+            // After each step: revoked set is exactly what we asked for; the rest live.
+            for (const d of devices) {
+                if (revoked.has(d)) {
+                    await expectRevoked(request, d);
+                } else {
+                    await expectLive(request, d);
+                }
+            }
+        }
 
-		// Final: only d0 + d2 are dead; d1 + d3 are still serving the account.
-		await expectRevoked(request, devices[0]);
-		await expectLive(request, devices[1]);
-		await expectRevoked(request, devices[2]);
-		await expectLive(request, devices[3]);
-	});
+        // Final: only d0 + d2 are dead; d1 + d3 are still serving the account.
+        await expectRevoked(request, devices[0]);
+        await expectLive(request, devices[1]);
+        await expectRevoked(request, devices[2]);
+        await expectLive(request, devices[3]);
+    });
 
-	/**
-	 * FLOW 3 — logout-all is FLEET-WIDE and RE-ENTRANT: it kills every device
-	 * INCLUDING the caller's own token, and the ack differs from single logout.
-	 *
-	 * Verified live: logout-all from device-A returns 200 but A's own token is
-	 * immediately 401 (the caller's session row is deleted too), and so is every
-	 * sibling. This re-entrant caller-token death is the distinguishing fact the
-	 * single-device sibling never asserts.
-	 */
-	test('logout-all revokes EVERY device including the caller (re-entrant fleet-wide sign-out)', async ({
-		request,
-	}) => {
-		const { devices } = await bringUpFleet(request, 'rev-all', 4);
-		for (const d of devices) await expectLive(request, d);
+    /**
+     * FLOW 3 — logout-all is FLEET-WIDE and RE-ENTRANT: it kills every device
+     * INCLUDING the caller's own token, and the ack differs from single logout.
+     *
+     * Verified live: logout-all from device-A returns 200 but A's own token is
+     * immediately 401 (the caller's session row is deleted too), and so is every
+     * sibling. This re-entrant caller-token death is the distinguishing fact the
+     * single-device sibling never asserts.
+     */
+    test('logout-all revokes EVERY device including the caller (re-entrant fleet-wide sign-out)', async ({
+        request,
+    }) => {
+        const { devices } = await bringUpFleet(request, 'rev-all', 4);
+        for (const d of devices) await expectLive(request, d);
 
-		const caller = devices[0];
-		const all = await request.post(LOGOUT_ALL, { headers: authedHeaders(caller.access_token), timeout: T });
-		expect(all.status(), 'logout-all ack').toBe(200);
-		const allBody = (await all.json()) as { message?: string };
-		expect(allBody.message, `logout-all body = ${JSON.stringify(allBody)}`).toBe(ALL_LOGOUT_MSG);
-		expect(allBody.message, 'fleet ack references all devices').toMatch(/all devices/i);
-		expect(allBody.message, 'fleet ack is NOT the single-logout ack').not.toBe(SINGLE_LOGOUT_MSG);
+        const caller = devices[0];
+        const all = await request.post(LOGOUT_ALL, {
+            headers: authedHeaders(caller.access_token),
+            timeout: T,
+        });
+        expect(all.status(), 'logout-all ack').toBe(200);
+        const allBody = (await all.json()) as { message?: string };
+        expect(allBody.message, `logout-all body = ${JSON.stringify(allBody)}`).toBe(
+            ALL_LOGOUT_MSG,
+        );
+        expect(allBody.message, 'fleet ack references all devices').toMatch(/all devices/i);
+        expect(allBody.message, 'fleet ack is NOT the single-logout ack').not.toBe(
+            SINGLE_LOGOUT_MSG,
+        );
 
-		// Every device — the CALLER included — is revoked.
-		for (const d of devices) await expectRevoked(request, d);
+        // Every device — the CALLER included — is revoked.
+        for (const d of devices) await expectRevoked(request, d);
 
-		// Re-entrancy idempotency: re-calling logout-all with the now-dead caller
-		// token is a guard 401, not a silent 200 and never a 5xx.
-		const again = await request.post(LOGOUT_ALL, {
-			headers: authedHeaders(caller.access_token),
-			timeout: T,
-		});
-		expect(
-			[401, 403].includes(again.status()),
-			`repeat logout-all with dead caller = ${again.status()} (expected 401/403)`,
-		).toBe(true);
-		expect(again.status(), 'repeat logout-all must not 5xx').toBeLessThan(500);
-	});
+        // Re-entrancy idempotency: re-calling logout-all with the now-dead caller
+        // token is a guard 401, not a silent 200 and never a 5xx.
+        const again = await request.post(LOGOUT_ALL, {
+            headers: authedHeaders(caller.access_token),
+            timeout: T,
+        });
+        expect(
+            [401, 403].includes(again.status()),
+            `repeat logout-all with dead caller = ${again.status()} (expected 401/403)`,
+        ).toBe(true);
+        expect(again.status(), 'repeat logout-all must not 5xx').toBeLessThan(500);
+    });
 
-	/**
-	 * FLOW 4 — A fleet wipe is NOT an account lockout: after logout-all kills
-	 * everything, a fresh login resurrects a brand-new WORKING session.
-	 *
-	 * This proves logout-all is a SESSION operation (delete rows), not a user
-	 * disable: the credential is untouched, so re-authentication immediately
-	 * yields a usable session that is independent of (and not poisoned by) the
-	 * wiped fleet. Also pins single-logout idempotency on a dead token.
-	 */
-	test('after a logout-all wipe the account can re-login to a fresh working session (wipe != lockout)', async ({
-		request,
-	}) => {
-		const { account, devices } = await bringUpFleet(request, 'rev-resurrect', 3);
-		for (const d of devices) await expectLive(request, d);
+    /**
+     * FLOW 4 — A fleet wipe is NOT an account lockout: after logout-all kills
+     * everything, a fresh login resurrects a brand-new WORKING session.
+     *
+     * This proves logout-all is a SESSION operation (delete rows), not a user
+     * disable: the credential is untouched, so re-authentication immediately
+     * yields a usable session that is independent of (and not poisoned by) the
+     * wiped fleet. Also pins single-logout idempotency on a dead token.
+     */
+    test('after a logout-all wipe the account can re-login to a fresh working session (wipe != lockout)', async ({
+        request,
+    }) => {
+        const { account, devices } = await bringUpFleet(request, 'rev-resurrect', 3);
+        for (const d of devices) await expectLive(request, d);
 
-		// Wipe the whole fleet from one device.
-		expect(
-			(await request.post(LOGOUT_ALL, { headers: authedHeaders(devices[0].access_token), timeout: T })).status(),
-			'logout-all ack',
-		).toBe(200);
-		for (const d of devices) await expectRevoked(request, d);
+        // Wipe the whole fleet from one device.
+        expect(
+            (
+                await request.post(LOGOUT_ALL, {
+                    headers: authedHeaders(devices[0].access_token),
+                    timeout: T,
+                })
+            ).status(),
+            'logout-all ack',
+        ).toBe(200);
+        for (const d of devices) await expectRevoked(request, d);
 
-		// Single-logout idempotency on a now-dead fleet token (never 5xx).
-		const deadLogout = await request.post(LOGOUT, {
-			headers: authedHeaders(devices[1].access_token),
-			timeout: T,
-		});
-		expect(
-			[401, 403].includes(deadLogout.status()),
-			`logout of a wiped token = ${deadLogout.status()} (expected 401/403)`,
-		).toBe(true);
-		expect(deadLogout.status(), 'dead-token logout must not 5xx').toBeLessThan(500);
+        // Single-logout idempotency on a now-dead fleet token (never 5xx).
+        const deadLogout = await request.post(LOGOUT, {
+            headers: authedHeaders(devices[1].access_token),
+            timeout: T,
+        });
+        expect(
+            [401, 403].includes(deadLogout.status()),
+            `logout of a wiped token = ${deadLogout.status()} (expected 401/403)`,
+        ).toBe(true);
+        expect(deadLogout.status(), 'dead-token logout must not 5xx').toBeLessThan(500);
 
-		// Resurrection: the credential still works → a fresh login mints a NEW,
-		// independent, fully-working session distinct from every wiped token.
-		const reborn = await loginDevice(request, { email: account.email, password: account.password }, 'reborn');
-		expect(
-			new Set([...devices.map((d) => d.access_token), reborn.access_token]).size,
-			'reborn session token is distinct from every wiped token',
-		).toBe(devices.length + 1);
-		await expectLive(request, reborn);
-	});
+        // Resurrection: the credential still works → a fresh login mints a NEW,
+        // independent, fully-working session distinct from every wiped token.
+        const reborn = await loginDevice(
+            request,
+            { email: account.email, password: account.password },
+            'reborn',
+        );
+        expect(
+            new Set([...devices.map((d) => d.access_token), reborn.access_token]).size,
+            'reborn session token is distinct from every wiped token',
+        ).toBe(devices.length + 1);
+        await expectLive(request, reborn);
+    });
 
-	/**
-	 * FLOW 5 — Credential ROTATION vs session REVOCATION are independent axes.
-	 *
-	 * A password change (update-password) rotates the LOGIN CREDENTIAL but, on
-	 * this build, does NOT evict already-issued sessions — both live devices keep
-	 * returning 200, the OLD password stops logging in, and the NEW password
-	 * works. An explicit logout-all is what actually clears the fleet. We assert
-	 * both halves in one flow so the contrast is unambiguous: changing your
-	 * password is NOT a fleet sign-out; logout-all is.
-	 */
-	test('a password change rotates the credential but keeps live sessions; logout-all is what evicts the fleet', async ({
-		request,
-	}) => {
-		const { account, devices } = await bringUpFleet(request, 'rev-rotate', 2);
-		const [devA, devB] = devices;
-		await expectLive(request, devA);
-		await expectLive(request, devB);
+    /**
+     * FLOW 5 — Credential ROTATION vs session REVOCATION are independent axes.
+     *
+     * A password change (update-password) rotates the LOGIN CREDENTIAL but, on
+     * this build, does NOT evict already-issued sessions — both live devices keep
+     * returning 200, the OLD password stops logging in, and the NEW password
+     * works. An explicit logout-all is what actually clears the fleet. We assert
+     * both halves in one flow so the contrast is unambiguous: changing your
+     * password is NOT a fleet sign-out; logout-all is.
+     */
+    test('a password change rotates the credential but keeps live sessions; logout-all is what evicts the fleet', async ({
+        request,
+    }) => {
+        const { account, devices } = await bringUpFleet(request, 'rev-rotate', 2);
+        const [devA, devB] = devices;
+        await expectLive(request, devA);
+        await expectLive(request, devB);
 
-		const newPwd = `RotatePass1zQ!${Date.now().toString(36)}`;
-		const upd = await request.post(UPDATE_PASSWORD, {
-			headers: authedHeaders(devA.access_token),
-			data: { currentPassword: account.password, newPassword: newPwd },
-			timeout: T,
-		});
-		// Never a 5xx. A build that rejects the rotation under policy → skip truthfully.
-		expect(upd.status(), 'update-password is not a 5xx').toBeLessThan(500);
-		if (upd.status() >= 400) {
-			test.skip(true, `update-password rejected (${upd.status()}) on this build`);
-		}
-		expect(((await upd.json()) as { message?: string }).message, 'pw-change body').toBe(
-			'Password updated successfully',
-		);
+        const newPwd = `RotatePass1zQ!${Date.now().toString(36)}`;
+        const upd = await request.post(UPDATE_PASSWORD, {
+            headers: authedHeaders(devA.access_token),
+            data: { currentPassword: account.password, newPassword: newPwd },
+            timeout: T,
+        });
+        // Never a 5xx. A build that rejects the rotation under policy → skip truthfully.
+        expect(upd.status(), 'update-password is not a 5xx').toBeLessThan(500);
+        if (upd.status() >= 400) {
+            test.skip(true, `update-password rejected (${upd.status()}) on this build`);
+        }
+        expect(((await upd.json()) as { message?: string }).message, 'pw-change body').toBe(
+            'Password updated successfully',
+        );
 
-		// Credential rotated: OLD password no longer logs in, NEW one does.
-		const oldLogin = await request.post(LOGIN, {
-			data: { email: account.email, password: account.password },
-			timeout: T,
-		});
-		expect(oldLogin.status(), 'old password must stop authenticating').not.toBe(200);
-		const newLogin = await loginDevice(request, { email: account.email, password: newPwd }, 'post-rotate');
-		await expectLive(request, newLogin);
+        // Credential rotated: OLD password no longer logs in, NEW one does.
+        const oldLogin = await request.post(LOGIN, {
+            data: { email: account.email, password: account.password },
+            timeout: T,
+        });
+        expect(oldLogin.status(), 'old password must stop authenticating').not.toBe(200);
+        const newLogin = await loginDevice(
+            request,
+            { email: account.email, password: newPwd },
+            'post-rotate',
+        );
+        await expectLive(request, newLogin);
 
-		// But the EXISTING device sessions SURVIVED the credential change — a
-		// password change is not an implicit fleet revoke on this build.
-		await expectLive(request, devA);
-		await expectLive(request, devB);
+        // But the EXISTING device sessions SURVIVED the credential change — a
+        // password change is not an implicit fleet revoke on this build.
+        await expectLive(request, devA);
+        await expectLive(request, devB);
 
-		// Now exercise the real fleet revoke: logout-all clears all three live
-		// sessions (the two originals + the post-rotation login) at once.
-		expect(
-			(await request.post(LOGOUT_ALL, { headers: authedHeaders(devB.access_token), timeout: T })).status(),
-			'logout-all ack',
-		).toBe(200);
-		await expectRevoked(request, devA);
-		await expectRevoked(request, devB);
-		await expectRevoked(request, newLogin);
-	});
+        // Now exercise the real fleet revoke: logout-all clears all three live
+        // sessions (the two originals + the post-rotation login) at once.
+        expect(
+            (
+                await request.post(LOGOUT_ALL, {
+                    headers: authedHeaders(devB.access_token),
+                    timeout: T,
+                })
+            ).status(),
+            'logout-all ack',
+        ).toBe(200);
+        await expectRevoked(request, devA);
+        await expectRevoked(request, devB);
+        await expectRevoked(request, newLogin);
+    });
 
-	/**
-	 * FLOW 6 — Cross-user isolation + guard rejection of unauthenticated callers.
-	 *
-	 * Two distinct accounts, each with a multi-device fleet. User-X's targeted
-	 * logout AND fleet-wide logout-all must touch ONLY X — User-Y stays fully
-	 * live throughout (a cross-user revoke leak would be critical). We also pin
-	 * that the revocation endpoints are AUTH-GUARDED: anon, mangled-bearer, and
-	 * already-revoked callers are all 401 (never a silent 200 that would let an
-	 * unauthenticated caller trigger someone else's sign-out).
-	 */
-	test('one user revocation never affects another, and revoke endpoints reject anon/mangled/dead callers', async ({
-		request,
-	}) => {
-		const x = await bringUpFleet(request, 'rev-x', 2);
-		const y = await bringUpFleet(request, 'rev-y', 2);
+    /**
+     * FLOW 6 — Cross-user isolation + guard rejection of unauthenticated callers.
+     *
+     * Two distinct accounts, each with a multi-device fleet. User-X's targeted
+     * logout AND fleet-wide logout-all must touch ONLY X — User-Y stays fully
+     * live throughout (a cross-user revoke leak would be critical). We also pin
+     * that the revocation endpoints are AUTH-GUARDED: anon, mangled-bearer, and
+     * already-revoked callers are all 401 (never a silent 200 that would let an
+     * unauthenticated caller trigger someone else's sign-out).
+     */
+    test('one user revocation never affects another, and revoke endpoints reject anon/mangled/dead callers', async ({
+        request,
+    }) => {
+        const x = await bringUpFleet(request, 'rev-x', 2);
+        const y = await bringUpFleet(request, 'rev-y', 2);
 
-		// Baseline: both fleets fully live.
-		for (const d of [...x.devices, ...y.devices]) await expectLive(request, d);
+        // Baseline: both fleets fully live.
+        for (const d of [...x.devices, ...y.devices]) await expectLive(request, d);
 
-		// X targeted-logs-out device 0: only X-d0 dies; Y entirely untouched.
-		expect(
-			(await request.post(LOGOUT, { headers: authedHeaders(x.devices[0].access_token), timeout: T })).status(),
-			'X targeted logout ack',
-		).toBe(200);
-		await expectRevoked(request, x.devices[0]);
-		await expectLive(request, x.devices[1]);
-		for (const d of y.devices) await expectLive(request, d);
+        // X targeted-logs-out device 0: only X-d0 dies; Y entirely untouched.
+        expect(
+            (
+                await request.post(LOGOUT, {
+                    headers: authedHeaders(x.devices[0].access_token),
+                    timeout: T,
+                })
+            ).status(),
+            'X targeted logout ack',
+        ).toBe(200);
+        await expectRevoked(request, x.devices[0]);
+        await expectLive(request, x.devices[1]);
+        for (const d of y.devices) await expectLive(request, d);
 
-		// X fleet-wipes: X-d1 also dies, but Y is STILL fully live.
-		expect(
-			(await request.post(LOGOUT_ALL, { headers: authedHeaders(x.devices[1].access_token), timeout: T })).status(),
-			'X logout-all ack',
-		).toBe(200);
-		await expectRevoked(request, x.devices[1]);
-		for (const d of y.devices) await expectLive(request, d);
+        // X fleet-wipes: X-d1 also dies, but Y is STILL fully live.
+        expect(
+            (
+                await request.post(LOGOUT_ALL, {
+                    headers: authedHeaders(x.devices[1].access_token),
+                    timeout: T,
+                })
+            ).status(),
+            'X logout-all ack',
+        ).toBe(200);
+        await expectRevoked(request, x.devices[1]);
+        for (const d of y.devices) await expectLive(request, d);
 
-		// Guard surface: anon + mangled bearer cannot drive either endpoint.
-		expect((await request.post(LOGOUT, { timeout: T })).status(), 'anon logout').toBe(401);
-		expect((await request.post(LOGOUT_ALL, { timeout: T })).status(), 'anon logout-all').toBe(401);
-		const mangled = { Authorization: 'Bearer not.a.real.session.token' };
-		expect(
-			(await request.post(LOGOUT, { headers: mangled, timeout: T })).status(),
-			'mangled-bearer logout must be 401, not a silent 200',
-		).toBe(401);
-		expect(
-			(await request.post(LOGOUT_ALL, { headers: mangled, timeout: T })).status(),
-			'mangled-bearer logout-all',
-		).toBe(401);
+        // Guard surface: anon + mangled bearer cannot drive either endpoint.
+        expect((await request.post(LOGOUT, { timeout: T })).status(), 'anon logout').toBe(401);
+        expect((await request.post(LOGOUT_ALL, { timeout: T })).status(), 'anon logout-all').toBe(
+            401,
+        );
+        const mangled = { Authorization: 'Bearer not.a.real.session.token' };
+        expect(
+            (await request.post(LOGOUT, { headers: mangled, timeout: T })).status(),
+            'mangled-bearer logout must be 401, not a silent 200',
+        ).toBe(401);
+        expect(
+            (await request.post(LOGOUT_ALL, { headers: mangled, timeout: T })).status(),
+            'mangled-bearer logout-all',
+        ).toBe(401);
 
-		// An already-revoked X token cannot re-drive a fleet wipe against Y or
-		// anyone — the guard checks the live session store, not just token shape.
-		const deadDrive = await request.post(LOGOUT_ALL, {
-			headers: authedHeaders(x.devices[0].access_token),
-			timeout: T,
-		});
-		expect(
-			[401, 403].includes(deadDrive.status()),
-			`logout-all with a revoked token = ${deadDrive.status()} (expected 401/403)`,
-		).toBe(true);
-		// Y must STILL be untouched after the dead-token attempt.
-		for (const d of y.devices) await expectLive(request, d);
-	});
+        // An already-revoked X token cannot re-drive a fleet wipe against Y or
+        // anyone — the guard checks the live session store, not just token shape.
+        const deadDrive = await request.post(LOGOUT_ALL, {
+            headers: authedHeaders(x.devices[0].access_token),
+            timeout: T,
+        });
+        expect(
+            [401, 403].includes(deadDrive.status()),
+            `logout-all with a revoked token = ${deadDrive.status()} (expected 401/403)`,
+        ).toBe(true);
+        // Y must STILL be untouched after the dead-token attempt.
+        for (const d of y.devices) await expectLive(request, d);
+    });
 });

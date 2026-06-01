@@ -72,28 +72,28 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  */
 
 interface ProviderOption {
-	id: string;
-	name?: string;
-	description?: string;
-	configured?: boolean;
-	isDefault?: boolean;
-	icon?: unknown;
-	models?: unknown;
+    id: string;
+    name?: string;
+    description?: string;
+    configured?: boolean;
+    isDefault?: boolean;
+    icon?: unknown;
+    models?: unknown;
 }
 
 interface GeneratorFormSchemaShape {
-	resolvedPipelineId?: string;
-	enforcedPipelineId?: string;
-	providers?: Record<string, ProviderOption[]>;
-	pluginFields?: unknown[];
-	pluginGroups?: unknown[];
-	defaultValues?: Record<string, unknown>;
+    resolvedPipelineId?: string;
+    enforcedPipelineId?: string;
+    providers?: Record<string, ProviderOption[]>;
+    pluginFields?: unknown[];
+    pluginGroups?: unknown[];
+    defaultValues?: Record<string, unknown>;
 }
 
 interface ProbeResult {
-	ok: boolean;
-	status: number;
-	body: unknown;
+    ok: boolean;
+    status: number;
+    body: unknown;
 }
 
 const GLOBAL_FORM = `${API_BASE}/api/generator-form`;
@@ -102,297 +102,304 @@ const DEFAULT_PIPELINE_ID = 'agent-pipeline';
 const ALT_PIPELINE_ID = 'standard-pipeline';
 
 function perWorkForm(workId: string): string {
-	return `${API_BASE}/api/works/${workId}/generator-form`;
+    return `${API_BASE}/api/works/${workId}/generator-form`;
 }
 
 async function getJson(
-	request: APIRequestContext,
-	token: string | null,
-	url: string,
+    request: APIRequestContext,
+    token: string | null,
+    url: string,
 ): Promise<ProbeResult> {
-	const res = await request.get(url, {
-		headers: token ? authedHeaders(token) : undefined,
-		timeout: 30_000,
-	});
-	let body: unknown = null;
-	try {
-		body = await res.json();
-	} catch {
-		body = await res.text().catch(() => null);
-	}
-	return { ok: res.ok(), status: res.status(), body };
+    const res = await request.get(url, {
+        headers: token ? authedHeaders(token) : undefined,
+        timeout: 30_000,
+    });
+    let body: unknown = null;
+    try {
+        body = await res.json();
+    } catch {
+        body = await res.text().catch(() => null);
+    }
+    return { ok: res.ok(), status: res.status(), body };
 }
 
 function asSchema(body: unknown): GeneratorFormSchemaShape {
-	return (body ?? {}) as GeneratorFormSchemaShape;
+    return (body ?? {}) as GeneratorFormSchemaShape;
 }
 
 /** A form-schema payload must carry the real binding contract keys. */
 function isGeneratorFormSchema(body: unknown): boolean {
-	const s = asSchema(body);
-	return (
-		!!body &&
-		typeof body === 'object' &&
-		!Array.isArray(body) &&
-		'resolvedPipelineId' in (body as object) &&
-		'providers' in (body as object) &&
-		typeof s.providers === 'object' &&
-		s.providers !== null &&
-		Array.isArray((s.providers as Record<string, unknown>).pipeline)
-	);
+    const s = asSchema(body);
+    return (
+        !!body &&
+        typeof body === 'object' &&
+        !Array.isArray(body) &&
+        'resolvedPipelineId' in (body as object) &&
+        'providers' in (body as object) &&
+        typeof s.providers === 'object' &&
+        s.providers !== null &&
+        Array.isArray((s.providers as Record<string, unknown>).pipeline)
+    );
 }
 
 function pipelineOptions(schema: GeneratorFormSchemaShape): ProviderOption[] {
-	return (schema.providers?.pipeline ?? []) as ProviderOption[];
+    return (schema.providers?.pipeline ?? []) as ProviderOption[];
 }
 
 test.describe('Work pipeline plugin binding (complex flows)', () => {
-	let token: string;
+    let token: string;
 
-	test.beforeAll(async ({ request }) => {
-		const user = await registerUserViaAPI(request, {
-			email: `e2e-pipe-bind-${Date.now()}@test.local`,
-		});
-		token = user.access_token;
-	});
+    test.beforeAll(async ({ request }) => {
+        const user = await registerUserViaAPI(request, {
+            email: `e2e-pipe-bind-${Date.now()}@test.local`,
+        });
+        token = user.access_token;
+    });
 
-	test('1. a work with no pipeline selected inherits the default pipeline binding + a usable config schema', async ({
-		request,
-	}) => {
-		// No pipelineId -> the server resolves the DEFAULT pipeline's config form,
-		// i.e. the binding a freshly-created work inherits.
-		const def = await getJson(request, token, GLOBAL_FORM);
-		expect(def.status, `default form-schema resolves (got ${def.status})`).toBe(200);
-		expect(
-			isGeneratorFormSchema(def.body),
-			`recognizable GeneratorFormSchema in ${JSON.stringify(def.body).slice(0, 300)}`,
-		).toBe(true);
+    test('1. a work with no pipeline selected inherits the default pipeline binding + a usable config schema', async ({
+        request,
+    }) => {
+        // No pipelineId -> the server resolves the DEFAULT pipeline's config form,
+        // i.e. the binding a freshly-created work inherits.
+        const def = await getJson(request, token, GLOBAL_FORM);
+        expect(def.status, `default form-schema resolves (got ${def.status})`).toBe(200);
+        expect(
+            isGeneratorFormSchema(def.body),
+            `recognizable GeneratorFormSchema in ${JSON.stringify(def.body).slice(0, 300)}`,
+        ).toBe(true);
 
-		const schema = asSchema(def.body);
-		// The default-for-capability pipeline plugin is the bound one.
-		expect(schema.resolvedPipelineId, 'default resolved pipeline id').toBe(DEFAULT_PIPELINE_ID);
-		// With no enforced user default in play, the binding is NOT pinned.
-		expect(schema.enforcedPipelineId, 'no enforced pipeline by default').toBeFalsy();
+        const schema = asSchema(def.body);
+        // The default-for-capability pipeline plugin is the bound one.
+        expect(schema.resolvedPipelineId, 'default resolved pipeline id').toBe(DEFAULT_PIPELINE_ID);
+        // With no enforced user default in play, the binding is NOT pinned.
+        expect(schema.enforcedPipelineId, 'no enforced pipeline by default').toBeFalsy();
 
-		// pluginFields is always an array (the dynamic per-pipeline config surface).
-		expect(Array.isArray(schema.pluginFields), 'pluginFields is an array').toBe(true);
-	});
+        // pluginFields is always an array (the dynamic per-pipeline config surface).
+        expect(Array.isArray(schema.pluginFields), 'pluginFields is an array').toBe(true);
+    });
 
-	test('2. the active-pipeline capability lists the selectable pipeline plugins with exactly one default', async ({
-		request,
-	}) => {
-		const def = await getJson(request, token, GLOBAL_FORM);
-		expect(def.status).toBe(200);
-		const schema = asSchema(def.body);
+    test('2. the active-pipeline capability lists the selectable pipeline plugins with exactly one default', async ({
+        request,
+    }) => {
+        const def = await getJson(request, token, GLOBAL_FORM);
+        expect(def.status).toBe(200);
+        const schema = asSchema(def.body);
 
-		// providers.pipeline IS the "active pipeline capability" surface.
-		const options = pipelineOptions(schema);
-		expect(options.length, 'at least the two known pipeline plugins are selectable').toBeGreaterThanOrEqual(
-			2,
-		);
+        // providers.pipeline IS the "active pipeline capability" surface.
+        const options = pipelineOptions(schema);
+        expect(
+            options.length,
+            'at least the two known pipeline plugins are selectable',
+        ).toBeGreaterThanOrEqual(2);
 
-		const ids = options.map((o) => o.id);
-		expect(ids, 'agent-pipeline is selectable').toContain(DEFAULT_PIPELINE_ID);
-		expect(ids, 'standard-pipeline is selectable').toContain(ALT_PIPELINE_ID);
+        const ids = options.map((o) => o.id);
+        expect(ids, 'agent-pipeline is selectable').toContain(DEFAULT_PIPELINE_ID);
+        expect(ids, 'standard-pipeline is selectable').toContain(ALT_PIPELINE_ID);
 
-		// Exactly one pipeline option is the active/default one, and it matches the
-		// schema's resolvedPipelineId (the binding the work would actually use).
-		const defaults = options.filter((o) => o.isDefault);
-		expect(defaults.length, 'exactly one default pipeline option').toBe(1);
-		expect(defaults[0].id, 'default option matches resolvedPipelineId').toBe(
-			schema.resolvedPipelineId,
-		);
+        // Exactly one pipeline option is the active/default one, and it matches the
+        // schema's resolvedPipelineId (the binding the work would actually use).
+        const defaults = options.filter((o) => o.isDefault);
+        expect(defaults.length, 'exactly one default pipeline option').toBe(1);
+        expect(defaults[0].id, 'default option matches resolvedPipelineId').toBe(
+            schema.resolvedPipelineId,
+        );
 
-		// Each pipeline option carries its capability metadata (name + configured flag).
-		for (const opt of options) {
-			expect(opt.id, 'pipeline option has an id').toBeTruthy();
-			expect(typeof opt.configured, `pipeline ${opt.id} exposes configured flag`).toBe(
-				'boolean',
-			);
-		}
+        // Each pipeline option carries its capability metadata (name + configured flag).
+        for (const opt of options) {
+            expect(opt.id, 'pipeline option has an id').toBeTruthy();
+            expect(typeof opt.configured, `pipeline ${opt.id} exposes configured flag`).toBe(
+                'boolean',
+            );
+        }
 
-		// The non-pipeline capability categories are present too (the generator form
-		// is composed of the pipeline's REQUIRED provider categories).
-		expect(Object.keys(schema.providers ?? {}), 'capability categories present').toEqual(
-			expect.arrayContaining(['pipeline']),
-		);
-	});
+        // The non-pipeline capability categories are present too (the generator form
+        // is composed of the pipeline's REQUIRED provider categories).
+        expect(Object.keys(schema.providers ?? {}), 'capability categories present').toEqual(
+            expect.arrayContaining(['pipeline']),
+        );
+    });
 
-	test('3. switching the selected pipeline plugin flips the resolved binding (agent -> standard)', async ({
-		request,
-	}) => {
-		// Baseline: the default binding.
-		const base = await getJson(request, token, GLOBAL_FORM);
-		expect(base.status).toBe(200);
-		expect(asSchema(base.body).resolvedPipelineId).toBe(DEFAULT_PIPELINE_ID);
+    test('3. switching the selected pipeline plugin flips the resolved binding (agent -> standard)', async ({
+        request,
+    }) => {
+        // Baseline: the default binding.
+        const base = await getJson(request, token, GLOBAL_FORM);
+        expect(base.status).toBe(200);
+        expect(asSchema(base.body).resolvedPipelineId).toBe(DEFAULT_PIPELINE_ID);
 
-		// Switch to the alternate pipeline plugin -> the resolved binding flips.
-		const switched = await getJson(
-			request,
-			token,
-			`${GLOBAL_FORM}?pipelineId=${encodeURIComponent(ALT_PIPELINE_ID)}`,
-		);
-		expect(switched.status, `switch to ${ALT_PIPELINE_ID} (got ${switched.status})`).toBe(200);
-		expect(isGeneratorFormSchema(switched.body)).toBe(true);
+        // Switch to the alternate pipeline plugin -> the resolved binding flips.
+        const switched = await getJson(
+            request,
+            token,
+            `${GLOBAL_FORM}?pipelineId=${encodeURIComponent(ALT_PIPELINE_ID)}`,
+        );
+        expect(switched.status, `switch to ${ALT_PIPELINE_ID} (got ${switched.status})`).toBe(200);
+        expect(isGeneratorFormSchema(switched.body)).toBe(true);
 
-		const switchedSchema = asSchema(switched.body);
-		expect(
-			switchedSchema.resolvedPipelineId,
-			'selecting standard-pipeline binds the work to it',
-		).toBe(ALT_PIPELINE_ID);
+        const switchedSchema = asSchema(switched.body);
+        expect(
+            switchedSchema.resolvedPipelineId,
+            'selecting standard-pipeline binds the work to it',
+        ).toBe(ALT_PIPELINE_ID);
 
-		// The default option within the switched schema now points at the alternate.
-		const defAfter = pipelineOptions(switchedSchema).find((o) => o.isDefault);
-		expect(defAfter?.id, 'switched schema marks standard-pipeline as the active one').toBe(
-			ALT_PIPELINE_ID,
-		);
+        // The default option within the switched schema now points at the alternate.
+        const defAfter = pipelineOptions(switchedSchema).find((o) => o.isDefault);
+        expect(defAfter?.id, 'switched schema marks standard-pipeline as the active one').toBe(
+            ALT_PIPELINE_ID,
+        );
 
-		// And switching back resolves the original binding again (round-trip).
-		const backToAgent = await getJson(
-			request,
-			token,
-			`${GLOBAL_FORM}?pipelineId=${encodeURIComponent(DEFAULT_PIPELINE_ID)}`,
-		);
-		expect(backToAgent.status).toBe(200);
-		expect(asSchema(backToAgent.body).resolvedPipelineId).toBe(DEFAULT_PIPELINE_ID);
-	});
+        // And switching back resolves the original binding again (round-trip).
+        const backToAgent = await getJson(
+            request,
+            token,
+            `${GLOBAL_FORM}?pipelineId=${encodeURIComponent(DEFAULT_PIPELINE_ID)}`,
+        );
+        expect(backToAgent.status).toBe(200);
+        expect(asSchema(backToAgent.body).resolvedPipelineId).toBe(DEFAULT_PIPELINE_ID);
+    });
 
-	test('4. selecting an unknown pipeline id is non-fatal: the binding falls back to the default', async ({
-		request,
-	}) => {
-		// resolvePipelinePlugin() warns + falls through to the default when the id
-		// is not a loaded+enabled pipeline plugin — so this is a CLEAN 200 with the
-		// default binding, never a 4xx/5xx. Guards against a fictional "400 unknown
-		// pipeline" contract.
-		const bogus = await getJson(
-			request,
-			token,
-			`${GLOBAL_FORM}?pipelineId=${encodeURIComponent(`no-such-pipeline-${Date.now()}`)}`,
-		);
-		expect(
-			bogus.status,
-			`unknown pipeline is non-fatal (got ${bogus.status})`,
-		).toBeLessThan(500);
-		// The platform's real behaviour is a graceful 200 fallback.
-		expect(bogus.status, 'unknown pipeline resolves the default (200 fallback)').toBe(200);
-		expect(isGeneratorFormSchema(bogus.body)).toBe(true);
-		expect(
-			asSchema(bogus.body).resolvedPipelineId,
-			'unknown pipeline falls back to the default binding',
-		).toBe(DEFAULT_PIPELINE_ID);
-	});
+    test('4. selecting an unknown pipeline id is non-fatal: the binding falls back to the default', async ({
+        request,
+    }) => {
+        // resolvePipelinePlugin() warns + falls through to the default when the id
+        // is not a loaded+enabled pipeline plugin — so this is a CLEAN 200 with the
+        // default binding, never a 4xx/5xx. Guards against a fictional "400 unknown
+        // pipeline" contract.
+        const bogus = await getJson(
+            request,
+            token,
+            `${GLOBAL_FORM}?pipelineId=${encodeURIComponent(`no-such-pipeline-${Date.now()}`)}`,
+        );
+        expect(bogus.status, `unknown pipeline is non-fatal (got ${bogus.status})`).toBeLessThan(
+            500,
+        );
+        // The platform's real behaviour is a graceful 200 fallback.
+        expect(bogus.status, 'unknown pipeline resolves the default (200 fallback)').toBe(200);
+        expect(isGeneratorFormSchema(bogus.body)).toBe(true);
+        expect(
+            asSchema(bogus.body).resolvedPipelineId,
+            'unknown pipeline falls back to the default binding',
+        ).toBe(DEFAULT_PIPELINE_ID);
+    });
 
-	test('5. a work inherits the ENFORCED user-default pipeline binding (set -> appears -> clear)', async ({
-		request,
-	}) => {
-		// User-scoped enforce default — run on a FRESH user so it cannot leak into
-		// sibling specs that share the seeded user.
-		const owner = await registerUserViaAPI(request, {
-			email: `e2e-pipe-enforce-${Date.now()}@test.local`,
-		});
-		const ownerToken = owner.access_token;
+    test('5. a work inherits the ENFORCED user-default pipeline binding (set -> appears -> clear)', async ({
+        request,
+    }) => {
+        // User-scoped enforce default — run on a FRESH user so it cannot leak into
+        // sibling specs that share the seeded user.
+        const owner = await registerUserViaAPI(request, {
+            email: `e2e-pipe-enforce-${Date.now()}@test.local`,
+        });
+        const ownerToken = owner.access_token;
 
-		// Before: no enforced pipeline.
-		const before = await getJson(request, ownerToken, GLOBAL_FORM);
-		expect(before.status).toBe(200);
-		expect(asSchema(before.body).enforcedPipelineId, 'no enforced pipeline initially').toBeFalsy();
+        // Before: no enforced pipeline.
+        const before = await getJson(request, ownerToken, GLOBAL_FORM);
+        expect(before.status).toBe(200);
+        expect(
+            asSchema(before.body).enforcedPipelineId,
+            'no enforced pipeline initially',
+        ).toBeFalsy();
 
-		// SetGlobalPipelineDefaultDto requires `enforce` — omitting it is a 400.
-		const missingEnforce = await request.post(PIPELINE_DEFAULT, {
-			headers: authedHeaders(ownerToken),
-			data: { pluginId: ALT_PIPELINE_ID },
-			timeout: 30_000,
-		});
-		expect(missingEnforce.status(), 'pipeline-default requires enforce flag').toBe(400);
+        // SetGlobalPipelineDefaultDto requires `enforce` — omitting it is a 400.
+        const missingEnforce = await request.post(PIPELINE_DEFAULT, {
+            headers: authedHeaders(ownerToken),
+            data: { pluginId: ALT_PIPELINE_ID },
+            timeout: 30_000,
+        });
+        expect(missingEnforce.status(), 'pipeline-default requires enforce flag').toBe(400);
 
-		// Pin the alternate pipeline as the ENFORCED global default for this user.
-		const setRes = await request.post(PIPELINE_DEFAULT, {
-			headers: authedHeaders(ownerToken),
-			data: { pluginId: ALT_PIPELINE_ID, enforce: true },
-			timeout: 30_000,
-		});
-		expect(setRes.status(), 'set enforced global pipeline default').toBe(200);
+        // Pin the alternate pipeline as the ENFORCED global default for this user.
+        const setRes = await request.post(PIPELINE_DEFAULT, {
+            headers: authedHeaders(ownerToken),
+            data: { pluginId: ALT_PIPELINE_ID, enforce: true },
+            timeout: 30_000,
+        });
+        expect(setRes.status(), 'set enforced global pipeline default').toBe(200);
 
-		// Now EVERY work this user generates inherits the enforced binding: the
-		// generator-form surfaces it as enforcedPipelineId.
-		await expect
-			.poll(
-				async () => asSchema((await getJson(request, ownerToken, GLOBAL_FORM)).body).enforcedPipelineId,
-				{ timeout: 20_000, message: 'enforced pipeline propagates to the binding' },
-			)
-			.toBe(ALT_PIPELINE_ID);
+        // Now EVERY work this user generates inherits the enforced binding: the
+        // generator-form surfaces it as enforcedPipelineId.
+        await expect
+            .poll(
+                async () =>
+                    asSchema((await getJson(request, ownerToken, GLOBAL_FORM)).body)
+                        .enforcedPipelineId,
+                { timeout: 20_000, message: 'enforced pipeline propagates to the binding' },
+            )
+            .toBe(ALT_PIPELINE_ID);
 
-		// A concrete owned work inherits it too (per-work binding read).
-		const work = await createWorkViaAPI(request, ownerToken, {
-			name: `Pipe Enforce ${Date.now()}`,
-		});
-		expect(work.id, 'work created under enforced default').toBeTruthy();
-		const perWork = await getJson(request, ownerToken, perWorkForm(work.id));
-		expect(perWork.status, `owner per-work form-schema (got ${perWork.status})`).toBe(200);
-		expect(isGeneratorFormSchema(perWork.body)).toBe(true);
-		expect(
-			asSchema(perWork.body).enforcedPipelineId,
-			'the new work inherits the enforced user-default pipeline',
-		).toBe(ALT_PIPELINE_ID);
+        // A concrete owned work inherits it too (per-work binding read).
+        const work = await createWorkViaAPI(request, ownerToken, {
+            name: `Pipe Enforce ${Date.now()}`,
+        });
+        expect(work.id, 'work created under enforced default').toBeTruthy();
+        const perWork = await getJson(request, ownerToken, perWorkForm(work.id));
+        expect(perWork.status, `owner per-work form-schema (got ${perWork.status})`).toBe(200);
+        expect(isGeneratorFormSchema(perWork.body)).toBe(true);
+        expect(
+            asSchema(perWork.body).enforcedPipelineId,
+            'the new work inherits the enforced user-default pipeline',
+        ).toBe(ALT_PIPELINE_ID);
 
-		// Clearing the default (pluginId:null, enforce:false) removes the inheritance.
-		const clearRes = await request.post(PIPELINE_DEFAULT, {
-			headers: authedHeaders(ownerToken),
-			data: { pluginId: null, enforce: false },
-			timeout: 30_000,
-		});
-		expect(clearRes.status(), 'clear enforced global pipeline default').toBe(200);
-		await expect
-			.poll(
-				async () => asSchema((await getJson(request, ownerToken, GLOBAL_FORM)).body).enforcedPipelineId,
-				{ timeout: 20_000, message: 'cleared enforced pipeline disappears from binding' },
-			)
-			.toBeFalsy();
-	});
+        // Clearing the default (pluginId:null, enforce:false) removes the inheritance.
+        const clearRes = await request.post(PIPELINE_DEFAULT, {
+            headers: authedHeaders(ownerToken),
+            data: { pluginId: null, enforce: false },
+            timeout: 30_000,
+        });
+        expect(clearRes.status(), 'clear enforced global pipeline default').toBe(200);
+        await expect
+            .poll(
+                async () =>
+                    asSchema((await getJson(request, ownerToken, GLOBAL_FORM)).body)
+                        .enforcedPipelineId,
+                { timeout: 20_000, message: 'cleared enforced pipeline disappears from binding' },
+            )
+            .toBeFalsy();
+    });
 
-	test('6. per-work pipeline binding is ownership-scoped and auth-guarded (owner 200 / intruder 403 / ghost 404 / anon 401)', async ({
-		request,
-		browser,
-	}) => {
-		// Owner creates a work and reads its per-work binding.
-		const work = await createWorkViaAPI(request, token, { name: `Pipe Owned ${Date.now()}` });
-		const ownerRead = await getJson(request, token, perWorkForm(work.id));
-		expect(ownerRead.status, 'owner can read per-work binding').toBe(200);
-		expect(isGeneratorFormSchema(ownerRead.body)).toBe(true);
-		// Selecting a specific pipeline for THIS work resolves that binding.
-		const ownerSelected = await getJson(
-			request,
-			token,
-			`${perWorkForm(work.id)}?pipelineId=${encodeURIComponent(ALT_PIPELINE_ID)}`,
-		);
-		expect(ownerSelected.status).toBe(200);
-		expect(asSchema(ownerSelected.body).resolvedPipelineId).toBe(ALT_PIPELINE_ID);
+    test('6. per-work pipeline binding is ownership-scoped and auth-guarded (owner 200 / intruder 403 / ghost 404 / anon 401)', async ({
+        request,
+        browser,
+    }) => {
+        // Owner creates a work and reads its per-work binding.
+        const work = await createWorkViaAPI(request, token, { name: `Pipe Owned ${Date.now()}` });
+        const ownerRead = await getJson(request, token, perWorkForm(work.id));
+        expect(ownerRead.status, 'owner can read per-work binding').toBe(200);
+        expect(isGeneratorFormSchema(ownerRead.body)).toBe(true);
+        // Selecting a specific pipeline for THIS work resolves that binding.
+        const ownerSelected = await getJson(
+            request,
+            token,
+            `${perWorkForm(work.id)}?pipelineId=${encodeURIComponent(ALT_PIPELINE_ID)}`,
+        );
+        expect(ownerSelected.status).toBe(200);
+        expect(asSchema(ownerSelected.body).resolvedPipelineId).toBe(ALT_PIPELINE_ID);
 
-		// A DIFFERENT authenticated user is denied by ensureAccess() -> 403.
-		const intruder = await registerUserViaAPI(request, {
-			email: `e2e-pipe-intruder-${Date.now()}@test.local`,
-		});
-		const intruderRead = await getJson(request, intruder.access_token, perWorkForm(work.id));
-		expect(
-			[403, 404],
-			`cross-user per-work read denied (got ${intruderRead.status})`,
-		).toContain(intruderRead.status);
+        // A DIFFERENT authenticated user is denied by ensureAccess() -> 403.
+        const intruder = await registerUserViaAPI(request, {
+            email: `e2e-pipe-intruder-${Date.now()}@test.local`,
+        });
+        const intruderRead = await getJson(request, intruder.access_token, perWorkForm(work.id));
+        expect(
+            [403, 404],
+            `cross-user per-work read denied (got ${intruderRead.status})`,
+        ).toContain(intruderRead.status);
 
-		// A nonexistent work id -> 404 (ensureAccess cannot find it).
-		const ghost = await getJson(
-			request,
-			token,
-			perWorkForm('00000000-0000-0000-0000-000000000000'),
-		);
-		expect(ghost.status, `ghost work per-work read (got ${ghost.status})`).toBe(404);
+        // A nonexistent work id -> 404 (ensureAccess cannot find it).
+        const ghost = await getJson(
+            request,
+            token,
+            perWorkForm('00000000-0000-0000-0000-000000000000'),
+        );
+        expect(ghost.status, `ghost work per-work read (got ${ghost.status})`).toBe(404);
 
-		// Anonymous (EMPTY storageState so it does NOT inherit the shared auth
-		// cookie) -> both binding reads are @CurrentUser()-guarded -> 401.
-		const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-		for (const url of [GLOBAL_FORM, perWorkForm(work.id)]) {
-			const res = await anon.request.get(url, { timeout: 30_000 });
-			expect(res.status(), `anon GET ${url} is guarded as 401`).toBe(401);
-		}
-		await anon.close();
-	});
+        // Anonymous (EMPTY storageState so it does NOT inherit the shared auth
+        // cookie) -> both binding reads are @CurrentUser()-guarded -> 401.
+        const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        for (const url of [GLOBAL_FORM, perWorkForm(work.id)]) {
+            const res = await anon.request.get(url, { timeout: 30_000 });
+            expect(res.status(), `anon GET ${url} is guarded as 401`).toBe(401);
+        }
+        await anon.close();
+    });
 });

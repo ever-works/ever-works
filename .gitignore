@@ -1,5 +1,13 @@
 .env
 
+# Agent/e2e build scratch (workflow scripts + intermediate outputs) — never commit
+/wf-*.js
+/missing-themes.json
+/wave-*.json
+/_tsc.txt
+/probe-routes.txt
+/apps/fix-w*.json
+
 # compiled output
 dist
 tmp
