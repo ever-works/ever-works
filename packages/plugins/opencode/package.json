@@ -44,7 +44,7 @@
 		"@types/node": "^22.0.0",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3",
-		"vitest": "^3.2.1"
+		"vitest": "^4.1.0"
 	},
 	"everworks": {
 		"plugin": {
