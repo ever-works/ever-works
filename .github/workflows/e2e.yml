@@ -52,7 +52,10 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22.x]
-        shard: [1, 2, 3, 4]
+        # 8 shards (was 4): the suite grew to ~1500 tests with the 1000-flow
+        # build, so 4 shards pushed each shard's wall-clock toward the 90min
+        # cap under dev-mode cold-compile + retries. 8 keeps each shard ~half.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     # Service containers — let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
@@ -179,7 +182,7 @@ jobs:
           # Each shard runs its own subset; combined across the matrix they
           # cover every test exactly once. Keep --shard total in sync with
           # the `shard:` matrix length above.
-          pnpm exec playwright test --shard=${{ matrix.shard }}/4
+          pnpm exec playwright test --shard=${{ matrix.shard }}/8
           echo "::endgroup::"
         env:
           # Give every Node process (API, web, the swc/tsc type-checker, and
