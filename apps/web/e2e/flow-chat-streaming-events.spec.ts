@@ -55,7 +55,11 @@ import {
  *         data: [DONE]
  *       stream:false → JSON { object:"chat.completion", choices:[{message,
  *       finish_reason}], usage:{prompt_tokens,completion_tokens,total_tokens} }.
- *       No provider key (CI) → 422 { error:{ type:"provider_unavailable" } }.
+ *       No provider key (CI) is mapped DIFFERENTLY per path: the non-streaming
+ *       controller catch returns 422 { error:{ type:"provider_unavailable" } };
+ *       the STREAMING service catch (failure thrown before any SSE byte flushes,
+ *       so headers aren't yet sent) ends 502 { error:{ type:"provider_error",
+ *       code:"ai_provider_error" } }. Both are truthful "no provider" outcomes.
  *  CONV POST /api/conversations { providerId } → row { id, title:null, providerId }.
  *       POST /api/conversations/:id/messages { messages:[{role,content}] } →
  *       { success:true }; auto-titles a blank conversation from the first user
@@ -63,11 +67,13 @@ import {
  *
  * ── ENVIRONMENT-ADAPTIVE (hard-won) ──────────────────────────────────────────
  *  LOCALLY the stack ships PLUGIN_OPENROUTER_API_KEY → a genuine SSE body streams
- *  text deltas + a finish frame. In CI no key is set → the API stream returns 422
- *  provider_unavailable, and the web /api/chat opens a 200 SSE that emits little
- *  or stalls. EVERY flow therefore asserts the PLUMBING (status family, headers,
- *  framing presence, composer/panel alive) and asserts decoded text deltas /
- *  finish frames ONLY when a provider is configured — never `!ok`/a crash when not.
+ *  text deltas + a finish frame. In CI no key is set → the API streaming endpoint
+ *  ends a 502 provider_error envelope (the streaming sibling of the non-streaming
+ *  422 provider_unavailable), and the web /api/chat opens a 200 SSE that emits
+ *  little or stalls. EVERY flow therefore asserts the PLUMBING (status family,
+ *  headers, framing presence, composer/panel alive) and asserts decoded text
+ *  deltas / finish frames ONLY when a provider is configured — never `!ok`/a crash
+ *  when not.
  */
 
 const NEW_CHAT_LABEL = 'New chat';
@@ -255,13 +261,22 @@ test.describe('AI Chat — SSE streaming events (web tier + API tier)', () => {
         });
 
         if (!configured) {
-            // No provider key (CI) → the controller maps the upstream failure to a 422
-            // provider_unavailable envelope (kept in the <500 family on purpose). Assert
-            // the truthful contract, not a delivered stream.
-            expect(res.status(), 'unconfigured stream → 422 provider_unavailable').toBe(422);
-            const env = (await res.json()) as { error?: { type?: string } };
-            expect(env.error?.type, 'truthful provider_unavailable type').toBe(
-                'provider_unavailable',
+            // No provider key (CI) → the upstream provider lookup fails. For a STREAMING
+            // request the streaming service catches that failure (before any SSE byte is
+            // flushed, so headers are NOT yet sent) and ends a 502 provider_error JSON
+            // envelope — distinct from the non-streaming path, where the controller's own
+            // catch returns a 422 provider_unavailable. Both are truthful "no provider"
+            // outcomes; the streaming wire shape is the 502 provider_error envelope. Probe
+            // the REAL configured-ness via the (non-streaming) isAiProviderConfigured()
+            // surface and assert the streaming unconfigured contract here — never a 200
+            // delivered stream, never a 5xx crash beyond the mapped provider_error.
+            expect(
+                res.status(),
+                `unconfigured stream → mapped provider-failure envelope, got ${res.status()}`,
+            ).toBe(502);
+            const env = (await res.json()) as { error?: { type?: string; code?: string } };
+            expect([env.error?.type, env.error?.code], 'truthful provider-failure type').toContain(
+                'provider_error',
             );
             return;
         }
@@ -666,22 +681,37 @@ test.describe('AI Chat — SSE streaming events (web tier + API tier)', () => {
         expect(noProvider.status(), 'missing providerOverride → not 5xx').toBeLessThan(500);
 
         // ── API /api/v1/chat/completions: a fresh user with NO per-user provider key. ──
-        // Whether the env key makes this configured or not, the request must stay in the
-        // <500 family: 200 (env key present) OR 422 provider_unavailable (no key).
+        // A STREAMING request resolves to exactly one of two truthful outcomes depending on
+        // whether the env binds a provider key:
+        //   • configured (env key present)  → 200, a real SSE stream that ends with [DONE];
+        //   • unconfigured (CI, no key)     → the streaming service catches the provider
+        //     lookup failure BEFORE flushing any SSE byte and ends a 502 provider_error
+        //     envelope (the streaming sibling of the non-streaming 422 provider_unavailable
+        //     the controller catch returns). The gate that matters here — auth + body — has
+        //     already passed: a half-open/streamed 200 with a malformed body never happens.
+        // Probe the REAL configured-ness up front (non-streaming surface) and branch.
+        const apiConfigured = await isAiProviderConfigured(request, freshToken);
         const apiStream = await request.post(`${API_BASE}/api/v1/chat/completions`, {
             headers: { ...authedHeaders(freshToken), 'X-Provider-Override': 'openrouter' },
             data: { messages: [{ role: 'user', content: 'ping' }], stream: true },
             timeout: 60_000,
         });
-        expect(apiStream.status(), 'API stream stays in the <500 family').toBeLessThan(500);
-        expect([200, 422]).toContain(apiStream.status());
-        if (apiStream.status() === 422) {
-            const env = (await apiStream.json()) as { error?: { type?: string } };
-            expect(env.error?.type, 'truthful provider_unavailable envelope').toBe(
-                'provider_unavailable',
-            );
+        expect(
+            [200, 502],
+            `API stream → 200 (configured) or 502 provider_error (unconfigured), got ${apiStream.status()}`,
+        ).toContain(apiStream.status());
+        if (!apiConfigured) {
+            // Unconfigured streaming → the mapped 502 provider_error envelope, never a
+            // delivered stream and never an unmapped crash.
+            expect(apiStream.status(), 'unconfigured stream → mapped provider_error').toBe(502);
+            const env = (await apiStream.json()) as { error?: { type?: string; code?: string } };
+            expect(
+                [env.error?.type, env.error?.code],
+                'truthful provider-failure envelope',
+            ).toContain('provider_error');
         } else {
             // A 200 here is a real stream → it must be SSE-framed and terminate cleanly.
+            expect(apiStream.status(), 'configured stream opens 200').toBe(200);
             expect(apiStream.headers()['content-type'] || '', 'configured → SSE').toContain(
                 'text/event-stream',
             );

@@ -411,17 +411,26 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         // Open the Help drawer. The "?" global shortcut fires onOpenHelp; it is
         // ignored while focus is in an input, so blur first. Retry-to-open to
         // ride out the dev-mode hydration race.
-        const helpTitle = page.getByRole('heading', { name: 'Help & Resources' });
-        await expect(async () => {
-            await page.locator('body').click({ position: { x: 5, y: 5 } });
-            await page.keyboard.press('?');
-            await expect(helpTitle).toBeVisible({ timeout: 3_000 });
-        }).toPass({ timeout: 30_000 });
-
+        //
         // The onboarding entry is always rendered in the drawer and shows
         // "Open onboarding (x/N)" (i18n: dashboard.header.help.onboarding.action).
+        // CI is slower (shared shard, 2 retries, next-dev cold compile) and the
+        // Headless UI drawer transitions in over ~300ms, so the drawer title can
+        // flash visible a beat before the onboarding <section> settles — and a
+        // stray retry body-click on the backdrop can re-close a half-open drawer.
+        // Assert "drawer open AND onboarding button visible" as ONE atomically
+        // retried condition, and only press "?" when the drawer isn't already
+        // open so the body-click never closes it out from under us.
+        const helpTitle = page.getByRole('heading', { name: 'Help & Resources' });
         const openOnboarding = page.getByRole('button', { name: /Open onboarding \(\d+\/\d+\)/ });
-        await expect(openOnboarding).toBeVisible({ timeout: 10_000 });
+        await expect(async () => {
+            if (!(await helpTitle.isVisible().catch(() => false))) {
+                await page.locator('body').click({ position: { x: 5, y: 5 } });
+                await page.keyboard.press('?');
+                await expect(helpTitle).toBeVisible({ timeout: 3_000 });
+            }
+            await expect(openOnboarding).toBeVisible({ timeout: 3_000 });
+        }).toPass({ timeout: 45_000 });
 
         // The N in the label must equal the API-derived step count for the
         // seeded user's persisted state — UI and server agree on the flow size.

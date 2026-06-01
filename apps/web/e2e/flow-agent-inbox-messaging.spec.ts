@@ -574,8 +574,22 @@ test.describe('Agent inbox + messaging', () => {
             await subject.fill(`UI compose ${Date.now()}`);
             await body.fill('Composed from the e2e inbox UI flow.');
 
-            const sendBtn = page.getByRole('button', { name: /Send/i });
-            await expect(sendBtn).toBeEnabled({ timeout: 15_000 });
+            // The submit button toggles its own label/disabled state via
+            // `useTransition` (`{isPending ? 'Sending…' : 'Send'}` +
+            // `disabled={isPending}`), and a substring `/Send/i` would also
+            // match the disabled "Sending…" state. Target the idle submit
+            // button exactly, and tolerate CI's slow hydration of this deep
+            // nested client component: under `next dev`↔CI the `'use client'`
+            // Composer can paint its SSR markup well before React hydrates,
+            // during which the button is briefly disabled. Wait for it to
+            // settle enabled (CI-grade timeout, matching the rest of this
+            // file) before clicking — never weaken the "Send is clickable"
+            // contract, just give hydration room to land.
+            const sendBtn = page
+                .getByRole('button', { name: 'Send', exact: true })
+                .or(page.getByRole('button', { name: /Send/i }))
+                .first();
+            await expect(sendBtn).toBeEnabled({ timeout: 30_000 });
             await sendBtn.click();
 
             // The seeded agent has no outbound address assigned, so the server action

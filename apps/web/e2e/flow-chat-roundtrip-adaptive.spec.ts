@@ -330,12 +330,23 @@ test.describe('AI Chat — round-trip adaptive (composer + reset + selector)', (
                 page.getByText(PROVIDER_NOT_CONFIGURED_BADGE).first(),
                 'an unconfigured provider shows the Not-configured badge',
             ).toBeVisible({ timeout: 10_000 });
+            // Scope to the dropdown ROW, never the selector TRIGGER. In CI the only
+            // AI provider (openrouter) is BOTH unconfigured AND the active provider, so
+            // its name ("OpenRouter") labels two buttons: the trigger (DOM-first, only
+            // `pointer-events-none` while streaming — never the HTML `disabled` attr) and
+            // the disabled dropdown row. A bare `.first()` resolves to the enabled trigger,
+            // so `toBeDisabled()` fails ("unconfigured provider row is disabled"). Only the
+            // row carries the "Not configured" badge text inside the same <button>, so
+            // requiring that text uniquely targets the actual disabled row.
             const disabledRow = page
                 .getByRole('button', {
                     name: new RegExp(escapeRegExp(unconfiguredProviders[0].name), 'i'),
                 })
+                .filter({ hasText: PROVIDER_NOT_CONFIGURED_BADGE })
                 .first();
-            await expect(disabledRow, 'unconfigured provider row is disabled').toBeDisabled();
+            await expect(disabledRow, 'unconfigured provider row is disabled').toBeDisabled({
+                timeout: 10_000,
+            });
         } else {
             // All providers configured (local default) → no Not-configured badge at all.
             await expect(

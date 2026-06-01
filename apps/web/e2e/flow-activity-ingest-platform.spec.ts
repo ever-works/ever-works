@@ -176,6 +176,38 @@ async function ingest(
     });
 }
 
+/**
+ * Ingest with the platform token, transparently riding out the Redis-backed
+ * throttler that is SHARED across the whole CI shard. A single local run rarely
+ * trips it, but in CI a sibling burst (or this file's own rate-limit spec) can
+ * already have saturated the `short` 50/1s tier, so a cold first ingest comes
+ * back 429 `ThrottlerException: Too Many Requests`. When a test genuinely needs
+ * the row to LAND (so later list/detail/feed reads can find it) a bare 202
+ * assertion is wrong — we must wait for the window to drain and retry. We honour
+ * the `X-RateLimit-Reset-short` header (seconds-until-reset, emitted by the
+ * throttler) when present and otherwise fall back to a capped exponential delay,
+ * then return the final response so the caller still asserts on it normally.
+ */
+async function ingestRideThrottle(
+    request: APIRequestContext,
+    body: Record<string, unknown>,
+    maxAttempts = 8,
+) {
+    let res = await ingest(request, body);
+    for (let attempt = 1; res.status() === 429 && attempt < maxAttempts; attempt++) {
+        const resetSec = Number(res.headers()['x-ratelimit-reset-short']);
+        // Header is seconds-to-reset; pad a little. Fall back to capped backoff
+        // (1s, 1.5s, 2s, …) when the header is absent or unparseable.
+        const waitMs =
+            Number.isFinite(resetSec) && resetSec > 0
+                ? Math.min(resetSec * 1000 + 250, 5_000)
+                : Math.min(750 + attempt * 500, 5_000);
+        await new Promise((r) => setTimeout(r, waitMs));
+        res = await ingest(request, body);
+    }
+    return res;
+}
+
 /** Create a Work and flip it to push mode; returns the Work id. */
 async function createPushWork(
     request: APIRequestContext,
@@ -741,10 +773,13 @@ test.describe('Platform ingest — ingested rows surface across every read surfa
         const owner = await registerUserViaAPI(request);
         const workId = await createPushWork(request, owner.access_token, 'IngestFeed');
 
-        // Ingest exactly one event of EACH website action type.
+        // Ingest exactly one event of EACH website action type. Each row MUST
+        // land so the list/detail/feed reads below can find it, so we ride out
+        // the shared CI throttler (429 ThrottlerException) with backoff+retry
+        // rather than hard-failing on a momentarily-saturated window.
         const ingested: Record<WebsiteAction, string> = {} as Record<WebsiteAction, string>;
         for (const action of WEBSITE_ACTION_TYPES) {
-            const res = await ingest(
+            const res = await ingestRideThrottle(
                 request,
                 ingestPayload(workId, {
                     actionType: action,

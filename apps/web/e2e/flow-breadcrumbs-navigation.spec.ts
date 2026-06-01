@@ -408,20 +408,30 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
             ? dataCrumb
             : securityCrumb;
         const targetHref = await target.getAttribute('href');
+        // The crumb tail we expect the URL to reflect AFTER following the link.
+        // Compute it BEFORE the click so we can wait on the SPECIFIC destination
+        // rather than on the generic "/settings/" prefix, which the starting
+        // route (/settings/security) already satisfies — that early-true predicate
+        // is why CI read a stale page.url() before the client nav had landed.
+        const tail = targetHref ? targetHref.replace(/.*(\/settings\/[^/?#]+).*/, '$1') : '';
         await target.click();
-        await page
-            .waitForURL((url) => url.pathname.includes('/settings/'), { timeout: NAV_TIMEOUT })
-            .catch(() => undefined);
+        // Wait for the followed crumb's tail to appear in the URL. next-intl Link
+        // does a client-side push; in CI that push lands a beat after click, so we
+        // poll the real URL (escaping the regex tail) instead of reading it once.
+        const tailPattern = tail
+            ? new RegExp(tail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            : /\/settings\//;
+        await page.waitForURL(tailPattern, { timeout: NAV_TIMEOUT }).catch(() => undefined);
 
         // The destination leaf either renders its settings content OR (local
         // nested divergence) the catch-all — but the URL must reflect the crumb
-        // we followed, proving the trail link drove a real navigation.
-        if (targetHref) {
-            const tail = targetHref.replace(/.*(\/settings\/[^/?#]+).*/, '$1');
-            expect(
-                page.url(),
+        // we followed, proving the trail link drove a real navigation. Use the
+        // auto-retrying URL matcher so a slightly-late client push still passes.
+        if (tail) {
+            await expect(
+                page,
                 `URL should reflect the followed settings crumb (${tail})`,
-            ).toContain(tail);
+            ).toHaveURL(tailPattern, { timeout: NAV_TIMEOUT });
         }
 
         // And the back-up crumb to the settings root is reachable from any leaf,

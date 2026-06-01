@@ -585,9 +585,22 @@ test.describe('Onboarding device-auth — the codex AI choice drives the device-
         });
         expect(startRes.status(), 'codex device-auth start is 200').toBe(200);
         const started = assertDeviceAuthShape(await startRes.json(), 'codex start');
-        expect(started.installed, 'install bit is stable between status and start').toBe(
-            status.installed,
-        );
+        // The `installed` bit is MONOTONIC across status→start, not strictly
+        // equal: `status` only probes for an already-present binary
+        // (resolveExistingBinary), while `start` runs ensureBinary(), which can
+        // DOWNLOAD + install the Codex CLI as a side effect. Locally (no LLM key
+        // is irrelevant here; this is binary-gated) the GitHub release download
+        // fails so both report installed:false and the test was authored against
+        // that. In CI the runner can reach the GitHub releases CDN, so `start`
+        // may legitimately flip installed false→true after materializing the
+        // binary. Assert the real invariant: start can ADD an install but never
+        // REMOVE one, so a status-installed CLI stays installed after start.
+        if (status.installed) {
+            expect(
+                started.installed,
+                'a CLI present at status is still installed after start',
+            ).toBe(true);
+        }
         if (!started.installed) {
             expect(started.pending, 'no pending session without the CLI').toBe(false);
             expect(started.connected, 'cannot be connected without the CLI').toBe(false);

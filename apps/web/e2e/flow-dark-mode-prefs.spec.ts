@@ -287,22 +287,43 @@ test.describe('Dark-mode preference lifecycle (deep)', () => {
             }
         }, THEME_KEY);
 
-        // `commit` resolves as soon as the response starts — the inline <head>
-        // script has run, but React has not yet hydrated. If the .dark class is
-        // already present here, there is no flash of the wrong theme.
+        // `commit` resolves as soon as the response starts — at that instant the
+        // inline <head> script may not have executed yet (in CI the response is
+        // committed before the HTML body, and thus the head <script>, is parsed),
+        // so a single snapshot races the synchronous init script. The contract is
+        // unchanged: the script must add `.dark` to <html> BEFORE React hydrates.
+        // Because it is a blocking inline <head> script it runs during HTML parse
+        // — far earlier than hydration — so we poll the early DOM within a short
+        // window that closes well before `domcontentloaded`/hydration. Catching
+        // `.dark` here still proves "pre-hydration, no FOUC" without depending on
+        // the exact commit→parse timing of the runner.
         await page.goto('/', { waitUntil: 'commit' });
-        const early = await page.evaluate(() => {
-            const html = document.documentElement;
-            // On Windows/CI documentElement can be momentarily null at 'commit'.
-            if (!html) return { present: false, exists: false };
-            return { present: html.classList.contains('dark'), exists: true };
-        });
+        let exists = false;
+        const earlyDark = await expect
+            .poll(
+                async () => {
+                    const snap = await page.evaluate(() => {
+                        const html = document.documentElement;
+                        // On Windows/CI documentElement can be momentarily null at 'commit'.
+                        if (!html) return { present: false, exists: false };
+                        return { present: html.classList.contains('dark'), exists: true };
+                    });
+                    if (snap.exists) {
+                        exists = true;
+                    }
+                    return snap.present;
+                },
+                { timeout: 10_000, intervals: [50, 100, 150, 250] },
+            )
+            .toBe(true)
+            .then(() => true)
+            .catch(() => false);
 
-        if (!early.exists) {
+        if (!exists) {
             test.skip(true, 'documentElement not yet available at commit on this runner');
             return;
         }
-        expect(early.present, 'init script must apply .dark before hydration to prevent FOUC').toBe(
+        expect(earlyDark, 'init script must apply .dark before hydration to prevent FOUC').toBe(
             true,
         );
 

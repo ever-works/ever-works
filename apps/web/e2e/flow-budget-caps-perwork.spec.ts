@@ -752,13 +752,32 @@ test.describe('Flow: per-Work usage read-side — period windows, CSV export fil
         const globalCap = page.getByText(/Global cap/i).first();
         const downloadCsv = page.getByRole('button', { name: /Download CSV/i }).first();
         const createGlobal = page.getByRole('button', { name: /Create global cap|Save/i }).first();
+        // The work-layout `notFound()` (un-owned/unreachable work) renders the
+        // localized errors.notFound page — title "Page not found" / "…doesn't exist…".
+        const notFound = page
+            .getByText(/page not found|not found|404|doesn.?t exist|no access|forbidden/i)
+            .first();
+        const chrome = heading.or(globalCap).or(downloadCsv).or(createGlobal);
+        const isLoginUrl = () => /\/login|\/sign-?in/i.test(page.url());
 
-        const rendered = await heading
-            .or(globalCap)
-            .or(downloadCsv)
-            .or(createGlobal)
-            .isVisible()
-            .catch(() => false);
+        // CI runs next-dev, which cold-compiles + streams this RSC route on first hit
+        // (~10–15s). A bare `isVisible()` immediately after `domcontentloaded` races that
+        // compile and sees an empty body → "neither rendered nor gated". Let the route
+        // settle, then wait (retrying) until ONE terminal landmark exists: the budgets
+        // chrome, the localized not-found, or a /login redirect. Only THEN branch.
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await expect(async () => {
+            const settled =
+                isLoginUrl() ||
+                (await chrome.isVisible().catch(() => false)) ||
+                (await notFound.isVisible().catch(() => false));
+            expect(
+                settled,
+                `budgets-usage page never reached a terminal state; url=${page.url()}`,
+            ).toBeTruthy();
+        }).toPass({ timeout: 45_000 });
+
+        const rendered = await chrome.isVisible().catch(() => false);
 
         if (rendered) {
             // The page chrome is here — at minimum the title + the global-cap surface.
@@ -771,13 +790,7 @@ test.describe('Flow: per-Work usage read-side — period windows, CSV export fil
             // Not rendered → must be a deterministic gate (login redirect) or a
             // not-found page, never a blank crash. Assert one of those held.
             const finalUrl = page.url();
-            const gated =
-                /\/login|\/sign-?in/i.test(finalUrl) ||
-                (await page
-                    .getByText(/not found|404|doesn.?t exist|no access|forbidden/i)
-                    .first()
-                    .isVisible()
-                    .catch(() => false));
+            const gated = isLoginUrl() || (await notFound.isVisible().catch(() => false));
             expect(
                 gated,
                 `budgets-usage page neither rendered nor gated cleanly; url=${finalUrl}`,

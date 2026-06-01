@@ -342,6 +342,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         const readOnlyMarker = page
             .locator('[data-testid="kb-editor-readonly"]')
             .or(page.locator('[data-locked="true"]'))
+            .or(page.getByTestId('kb-document-body'))
             .or(page.getByText(/🔒/))
             .first();
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
@@ -349,12 +350,23 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         await expect(readOnlyMarker.or(notFound).or(kbShell)).toBeVisible({ timeout: 60_000 });
         const localCatchAll = await notFound.isVisible().catch(() => false);
         if (!localCatchAll) {
-            // In CI (route renders) the live autosave editor must be absent for
-            // a full-locked doc.
+            // In CI (route renders) the LIVE autosave editor must be absent for
+            // a full-locked doc. PROBED 2026-06-01: the read-only
+            // `KbDocumentView` REUSES the `kb-editor` testid (same editor-pane
+            // slot), so a bare `kb-editor` count would always be 1 here and is
+            // NOT the right signal. Assert the live-editing affordances the
+            // Tiptap editor renders and the read-only view does not: the
+            // autosave status pill + the `contenteditable` body. The read-only
+            // Markdown body must render in their place.
             await expect(
-                page.getByTestId('kb-editor'),
-                'full-locked doc never mounts the autosave editor',
+                page.getByTestId('kb-editor-status'),
+                'full-locked doc never mounts the live autosave editor (no status pill)',
             ).toHaveCount(0, { timeout: 15_000 });
+            await expect(
+                page.locator('[data-testid="kb-editor"] [contenteditable="true"]'),
+                'full-locked doc has no editable Tiptap surface',
+            ).toHaveCount(0);
+            await expect(page.getByTestId('kb-document-body')).toBeVisible({ timeout: 15_000 });
         } else {
             test.info().annotations.push({
                 type: 'route-divergence',
@@ -369,17 +381,19 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         expect(downgrade.status, 're-lock additions-only → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
         if (!localCatchAll) {
-            const editorOrBanner = page
-                .getByTestId('kb-editor')
-                .or(
-                    page.locator(
-                        '[data-testid="kb-editor-lock-banner"][data-mode="additions-only"]',
-                    ),
-                )
+            // additions-only renders the LIVE `KbEditor` PLUS the amber banner.
+            // Key on live-editor-only markers (the status pill, the
+            // `additions-only` banner, or the editable body) — the bare
+            // `kb-editor` testid is shared with the read-only view, so it
+            // wouldn't prove the editable surface returned.
+            const liveEditorBack = page
+                .locator('[data-testid="kb-editor-lock-banner"][data-mode="additions-only"]')
+                .or(page.getByTestId('kb-editor-status'))
+                .or(page.locator('[data-testid="kb-editor"] [contenteditable="true"]'))
                 .first();
             await expect(
-                editorOrBanner,
-                'additions-only doc mounts the editor (with the additions-only banner)',
+                liveEditorBack,
+                'additions-only doc mounts the live editor (with the additions-only banner)',
             ).toBeVisible({ timeout: 60_000 });
         }
 
@@ -572,7 +586,11 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
         const historyBtn = page.getByTestId('kb-side-panel-history').first();
         const sidePanel = page.getByTestId('kb-side-panel').first();
-        await expect(historyBtn.or(sidePanel).or(notFound)).toBeVisible({ timeout: 60_000 });
+        // The side panel (which hosts the history button) is the anchor that
+        // proves the nested route rendered. On a cold CI runner the per-doc
+        // route compiles lazily, so wait generously for the panel itself
+        // before deciding whether we're on the rendered route or the 404.
+        await expect(sidePanel.or(notFound)).toBeVisible({ timeout: 60_000 });
 
         if (await notFound.isVisible().catch(() => false)) {
             test.info().annotations.push({
@@ -583,28 +601,38 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
             return;
         }
 
-        // Retry-to-open: the first click can be swallowed before hydration.
+        // The history trigger is a hydrated client button inside the panel;
+        // wait for it to actually mount before driving it (the panel can paint
+        // a beat before its interactive children hydrate in next-dev/CI).
+        await expect(historyBtn).toBeVisible({ timeout: 30_000 });
+        await historyBtn.scrollIntoViewIfNeeded().catch(() => {});
+
+        // Retry-to-open: the first click can be swallowed before hydration. Give
+        // a generous budget — on a cold CI shard the click + dialog mount race
+        // the nested-route compile.
         const dialog = page.getByTestId('kb-history-dialog');
         await expect(async () => {
             if (await historyBtn.isEnabled().catch(() => false)) {
                 await historyBtn.click({ timeout: 5_000 }).catch(() => {});
             }
             await expect(dialog).toBeVisible({ timeout: 5_000 });
-        }).toPass({ timeout: 45_000 });
+        }).toPass({ timeout: 60_000 });
 
         // The dialog settles on a terminal state: an error row (CI mirror 500),
         // an empty state, or a populated commit listbox — never a stuck spinner.
+        // The history server action round-trips through the 500ing mirror, so
+        // give the loading→error transition a wide window on a busy shard.
         const errorState = page.getByTestId('kb-history-error');
         const emptyState = page.getByTestId('kb-history-empty');
         const commitRow = page.getByTestId('kb-history-row').first();
-        await expect(errorState.or(emptyState).or(commitRow)).toBeVisible({ timeout: 30_000 });
+        await expect(errorState.or(emptyState).or(commitRow)).toBeVisible({ timeout: 45_000 });
         if (!repoBacked) {
             // CI: the mirror 500 must surface as the dialog's error state (the
             // dialog never silently shows an empty or populated list).
             await expect(
                 errorState,
                 'CI mirror 500 surfaces as the history dialog error state',
-            ).toBeVisible({ timeout: 15_000 });
+            ).toBeVisible({ timeout: 30_000 });
         }
     });
 
@@ -918,27 +946,48 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         expect(lock.status, 'full-lock → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
 
+        // A full-locked doc renders the read-only `KbDocumentView`. PROBED
+        // 2026-06-01 against the source: that read-only surface REUSES the
+        // `kb-editor` testid (it's the same editor-pane slot), so a bare
+        // `kb-editor` count is NOT a reliable "live editor gone" signal in CI
+        // where the nested route actually renders. The honest distinguisher is
+        // the live-editing affordances the Tiptap editor renders and the
+        // read-only view does NOT: the autosave status pill, the
+        // `contenteditable` body, and the Save button. Assert those are gone
+        // while the read-only Markdown body is present.
         const readOnlyMarker = page
             .locator('[data-testid="kb-editor-readonly"]')
             .or(page.locator('[data-locked="true"]'))
+            .or(page.getByTestId('kb-document-body'))
             .or(page.getByText(/🔒/))
             .or(page.getByTestId('kb-shell'))
             .first();
         await expect(readOnlyMarker).toBeVisible({ timeout: 60_000 });
+        // The autosave status pill (only the LIVE editor renders it) must
+        // disappear — this is the canonical "no more autosave" assertion.
         await expect(
-            page.getByTestId('kb-editor'),
-            'a full-locked doc renders read-only — the autosave editor is gone',
+            page.getByTestId('kb-editor-status'),
+            'a full-locked doc renders read-only — the autosave status pill is gone',
         ).toHaveCount(0, { timeout: 15_000 });
-        // The autosave status pill (only the editor renders it) is likewise absent.
-        await expect(page.getByTestId('kb-editor-status')).toHaveCount(0);
+        // The editable Tiptap surface + Save affordance are likewise absent.
+        await expect(
+            page.locator('[data-testid="kb-editor"] [contenteditable="true"]'),
+            'a full-locked doc has no editable Tiptap surface',
+        ).toHaveCount(0);
+        await expect(page.getByTestId('kb-editor-save')).toHaveCount(0);
+        // The read-only Markdown view is what renders instead.
+        await expect(page.getByTestId('kb-document-body')).toBeVisible({ timeout: 15_000 });
 
-        // Unlock → the editor surface returns on the next reload (reversible).
+        // Unlock → the LIVE editor surface returns on the next reload
+        // (reversible). Key on the status pill (live-editor-only) rather than
+        // the shared `kb-editor` testid so we assert the editable surface, not
+        // the read-only view that also carries `kb-editor`.
         const unlock = await unlockDoc(request, token, workId, documentId);
         expect(unlock.status, 'unlock → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await expect(
-            page.getByTestId('kb-editor'),
-            'after unlock the autosave editor mounts again',
+            page.getByTestId('kb-editor-status'),
+            'after unlock the autosave (live) editor mounts again',
         ).toBeVisible({ timeout: 60_000 });
     });
 });

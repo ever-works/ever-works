@@ -470,12 +470,35 @@ test.describe('Settings: work-agent integration (binding + persistence + validat
                 'boolean',
             );
         }
-        // In CI the env key configures exactly one provider as the default-bound one.
-        const configuredDefault = aiOptions.find((o) => o.isDefault && o.configured);
-        expect(
-            configuredDefault,
-            'exactly one configured AI provider is the work default binding',
-        ).toBeTruthy();
+        // The work has exactly one DEFAULT-bound AI provider — a STRUCTURAL
+        // contract (defaultForCapabilities / systemPlugin membership) that holds
+        // whether or not a key is present. Its `configured` flag is the
+        // ENV-dependent part: WITH an LLM key (local) the default is configured;
+        // with NO key (CI e2e sets none) the SAME default row is present but
+        // configured:false. So assert the default binding exists, then BRANCH on
+        // configured-ness so the spec passes in both environments.
+        const defaultProviders = aiOptions.filter((o) => o.isDefault);
+        expect(defaultProviders.length, 'exactly one AI provider is the work default binding').toBe(
+            1,
+        );
+        const defaultProvider = defaultProviders[0];
+        const anyConfigured = aiOptions.some((o) => o.configured);
+        if (anyConfigured) {
+            // A provider key is present (local): the default binding is the
+            // configured one.
+            expect(
+                defaultProvider.configured,
+                'when a provider is configured, the work default binding is that configured provider',
+            ).toBe(true);
+        } else {
+            // No provider key (CI): the default binding still exists and is
+            // listed/bindable, but reports its UNCONFIGURED state — never
+            // hard-require it to be configured.
+            expect(
+                defaultProvider.configured,
+                'with no provider key the work default binding reports unconfigured',
+            ).toBe(false);
+        }
 
         // Per-work PIPELINE selection flips the resolved binding for this work
         // (a settings choice that scopes to the work, not the whole account).
