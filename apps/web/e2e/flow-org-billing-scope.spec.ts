@@ -78,441 +78,495 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 const PLAN_CODES = ['free', 'standard', 'premium'] as const;
 
 interface PlanResponse {
-	status: string;
-	enabled: boolean;
-	plan: {
-		code: string;
-		name: string;
-		allowedCadences?: Array<{ cadence: string; allowed: boolean; payPerUse: boolean; reason?: string }>;
-	};
+    status: string;
+    enabled: boolean;
+    plan: {
+        code: string;
+        name: string;
+        allowedCadences?: Array<{
+            cadence: string;
+            allowed: boolean;
+            payPerUse: boolean;
+            reason?: string;
+        }>;
+    };
 }
 
 interface AccountWideSummary {
-	userId: string;
-	periodStart: string;
-	periodEnd: string;
-	currentSpendCents: number;
-	capCents: number | null;
-	currency: string;
-	percentUsed: number | null;
-	allowOverage: boolean;
-	blocked: boolean;
+    userId: string;
+    periodStart: string;
+    periodEnd: string;
+    currentSpendCents: number;
+    capCents: number | null;
+    currency: string;
+    percentUsed: number | null;
+    allowOverage: boolean;
+    blocked: boolean;
 }
 
-const uniq = (p: string) => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const uniq = (p: string) =>
+    `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 function scopedHeaders(token: string, scopeSlug?: string): Record<string, string> {
-	const headers: Record<string, string> = { ...authedHeaders(token) };
-	if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
-	return headers;
+    const headers: Record<string, string> = { ...authedHeaders(token) };
+    if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
+    return headers;
 }
 
-async function getPlan(request: APIRequestContext, token: string, scopeSlug?: string): Promise<PlanResponse> {
-	const res = await request.get(`${API_BASE}/api/subscriptions/plan`, { headers: scopedHeaders(token, scopeSlug) });
-	expect(res.status(), `GET plan status was ${res.status()}`).toBe(200);
-	return (await res.json()) as PlanResponse;
+async function getPlan(
+    request: APIRequestContext,
+    token: string,
+    scopeSlug?: string,
+): Promise<PlanResponse> {
+    const res = await request.get(`${API_BASE}/api/subscriptions/plan`, {
+        headers: scopedHeaders(token, scopeSlug),
+    });
+    expect(res.status(), `GET plan status was ${res.status()}`).toBe(200);
+    return (await res.json()) as PlanResponse;
 }
 
-async function setPlan(request: APIRequestContext, token: string, planCode: string, scopeSlug?: string) {
-	return request.post(`${API_BASE}/api/subscriptions/plan`, {
-		headers: scopedHeaders(token, scopeSlug),
-		data: { planCode },
-	});
+async function setPlan(
+    request: APIRequestContext,
+    token: string,
+    planCode: string,
+    scopeSlug?: string,
+) {
+    return request.post(`${API_BASE}/api/subscriptions/plan`, {
+        headers: scopedHeaders(token, scopeSlug),
+        data: { planCode },
+    });
 }
 
-async function accountWide(request: APIRequestContext, token: string, scopeSlug?: string): Promise<AccountWideSummary> {
-	const res = await request.get(`${API_BASE}/api/me/usage/account-wide`, { headers: scopedHeaders(token, scopeSlug) });
-	expect(res.status(), `account-wide status was ${res.status()}`).toBe(200);
-	return (await res.json()) as AccountWideSummary;
+async function accountWide(
+    request: APIRequestContext,
+    token: string,
+    scopeSlug?: string,
+): Promise<AccountWideSummary> {
+    const res = await request.get(`${API_BASE}/api/me/usage/account-wide`, {
+        headers: scopedHeaders(token, scopeSlug),
+    });
+    expect(res.status(), `account-wide status was ${res.status()}`).toBe(200);
+    return (await res.json()) as AccountWideSummary;
 }
 
 async function setAccountCap(
-	request: APIRequestContext,
-	token: string,
-	capCents: string | null,
-	allowOverage: boolean,
+    request: APIRequestContext,
+    token: string,
+    capCents: string | null,
+    allowOverage: boolean,
 ) {
-	return request.put(`${API_BASE}/api/me/work-agent/preferences`, {
-		headers: authedHeaders(token),
-		data: { accountWideMonthlyCapCents: capCents, accountWideAllowOverage: allowOverage },
-	});
+    return request.put(`${API_BASE}/api/me/work-agent/preferences`, {
+        headers: authedHeaders(token),
+        data: { accountWideMonthlyCapCents: capCents, accountWideAllowOverage: allowOverage },
+    });
 }
 
 async function createOrg(request: APIRequestContext, token: string, name: string) {
-	const res = await request.post(`${API_BASE}/api/organizations`, {
-		headers: authedHeaders(token),
-		data: { name },
-	});
-	expect(res.status(), `create org body=${await res.text().catch(() => '')}`).toBe(201);
-	return res.json() as Promise<{
-		id: string;
-		tenantId: string;
-		slug: string;
-		displayName: string;
-		linkedWorkId: string | null;
-	}>;
+    const res = await request.post(`${API_BASE}/api/organizations`, {
+        headers: authedHeaders(token),
+        data: { name },
+    });
+    expect(res.status(), `create org body=${await res.text().catch(() => '')}`).toBe(201);
+    return res.json() as Promise<{
+        id: string;
+        tenantId: string;
+        slug: string;
+        displayName: string;
+        linkedWorkId: string | null;
+    }>;
 }
 
 /** Create a Work, optionally stamped under an org scope via the X-Scope-Slug header. */
 async function createWorkInScope(
-	request: APIRequestContext,
-	token: string,
-	name: string,
-	scopeSlug?: string,
+    request: APIRequestContext,
+    token: string,
+    name: string,
+    scopeSlug?: string,
 ): Promise<string> {
-	const headers: Record<string, string> = { ...scopedHeaders(token, scopeSlug), 'content-type': 'application/json' };
-	const slug = uniq(name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-	const res = await request.post(`${API_BASE}/api/works`, {
-		headers,
-		data: { name, slug, description: `e2e ${name}`, organization: false },
-	});
-	expect(res.status(), `create work body=${await res.text().catch(() => '')}`).toBeLessThan(300);
-	const json = await res.json();
-	const id = json?.work?.id ?? json?.id ?? '';
-	expect(id, 'created work id').toBeTruthy();
-	return id as string;
+    const headers: Record<string, string> = {
+        ...scopedHeaders(token, scopeSlug),
+        'content-type': 'application/json',
+    };
+    const slug = uniq(name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    const res = await request.post(`${API_BASE}/api/works`, {
+        headers,
+        data: { name, slug, description: `e2e ${name}`, organization: false },
+    });
+    expect(res.status(), `create work body=${await res.text().catch(() => '')}`).toBeLessThan(300);
+    const json = await res.json();
+    const id = json?.work?.id ?? json?.id ?? '';
+    expect(id, 'created work id').toBeTruthy();
+    return id as string;
 }
 
 test.describe('Flow: org-scoped billing vs personal scope', () => {
-	test('flow 1: subscription plan is USER-scoped & org-invariant — the same bearer reports/mutates the same plan WITH or WITHOUT an X-Scope-Slug org context', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const org = await createOrg(request, user.access_token, uniq('PlanScopeOrg'));
+    test('flow 1: subscription plan is USER-scoped & org-invariant — the same bearer reports/mutates the same plan WITH or WITHOUT an X-Scope-Slug org context', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const org = await createOrg(request, user.access_token, uniq('PlanScopeOrg'));
 
-		// 1. Personal scope: a fresh user is on FREE.
-		const personal0 = await getPlan(request, user.access_token);
-		expect(personal0.plan.code).toBe('free');
-		expect(personal0.enabled).toBe(true);
+        // 1. Personal scope: a fresh user is on FREE.
+        const personal0 = await getPlan(request, user.access_token);
+        expect(personal0.plan.code).toBe('free');
+        expect(personal0.enabled).toBe(true);
 
-		// 2. The SAME plan read under the org's X-Scope-Slug is the same shape and
-		//    tier — the subscription endpoint has no org dimension.
-		const scoped0 = await getPlan(request, user.access_token, org.slug);
-		expect(scoped0.plan.code).toBe('free');
-		expect(scoped0.enabled).toBe(personal0.enabled);
-		expect(scoped0.plan.allowedCadences?.length ?? 0).toBe(personal0.plan.allowedCadences?.length ?? 0);
+        // 2. The SAME plan read under the org's X-Scope-Slug is the same shape and
+        //    tier — the subscription endpoint has no org dimension.
+        const scoped0 = await getPlan(request, user.access_token, org.slug);
+        expect(scoped0.plan.code).toBe('free');
+        expect(scoped0.enabled).toBe(personal0.enabled);
+        expect(scoped0.plan.allowedCadences?.length ?? 0).toBe(
+            personal0.plan.allowedCadences?.length ?? 0,
+        );
 
-		// 3. Upgrade WHILE sending the org scope header. If a per-org plan existed
-		//    this would mutate an "org plan"; it mutates the USER plan (the bearer).
-		expect((await setPlan(request, user.access_token, 'premium', org.slug)).status()).toBe(200);
+        // 3. Upgrade WHILE sending the org scope header. If a per-org plan existed
+        //    this would mutate an "org plan"; it mutates the USER plan (the bearer).
+        expect((await setPlan(request, user.access_token, 'premium', org.slug)).status()).toBe(200);
 
-		// 4. The upgrade is visible from BOTH the personal AND the org-scoped read —
-		//    proving a single user-scoped plan, not a per-scope plan.
-		expect((await getPlan(request, user.access_token)).plan.code).toBe('premium');
-		expect((await getPlan(request, user.access_token, org.slug)).plan.code).toBe('premium');
+        // 4. The upgrade is visible from BOTH the personal AND the org-scoped read —
+        //    proving a single user-scoped plan, not a per-scope plan.
+        expect((await getPlan(request, user.access_token)).plan.code).toBe('premium');
+        expect((await getPlan(request, user.access_token, org.slug)).plan.code).toBe('premium');
 
-		// 5. Revert under personal scope; the org-scoped read tracks it too.
-		expect((await setPlan(request, user.access_token, 'free')).status()).toBe(200);
-		expect((await getPlan(request, user.access_token, org.slug)).plan.code).toBe('free');
+        // 5. Revert under personal scope; the org-scoped read tracks it too.
+        expect((await setPlan(request, user.access_token, 'free')).status()).toBe(200);
+        expect((await getPlan(request, user.access_token, org.slug)).plan.code).toBe('free');
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				'No org-scoped subscription plan; X-Scope-Slug is ignored by /api/subscriptions/plan. Asserted the real user-scoped, org-invariant contract.',
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                'No org-scoped subscription plan; X-Scope-Slug is ignored by /api/subscriptions/plan. Asserted the real user-scoped, org-invariant contract.',
+        });
+    });
 
-	test('flow 2: account-wide usage rollup is per-USER & org-invariant — setting an account cap and switching the org context never changes the spend/cap/blocked arithmetic', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const orgA = await createOrg(request, user.access_token, uniq('UsageOrgA'));
-		const orgB = await createOrg(request, user.access_token, uniq('UsageOrgB'));
+    test('flow 2: account-wide usage rollup is per-USER & org-invariant — setting an account cap and switching the org context never changes the spend/cap/blocked arithmetic', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const orgA = await createOrg(request, user.access_token, uniq('UsageOrgA'));
+        const orgB = await createOrg(request, user.access_token, uniq('UsageOrgB'));
 
-		// 1. Zero-state account-wide summary, no cap.
-		const base = await accountWide(request, user.access_token);
-		expect(base.currentSpendCents).toBe(0);
-		expect(base.capCents).toBeNull();
-		expect(base.percentUsed).toBeNull();
-		expect(base.blocked).toBe(false);
+        // 1. Zero-state account-wide summary, no cap.
+        const base = await accountWide(request, user.access_token);
+        expect(base.currentSpendCents).toBe(0);
+        expect(base.capCents).toBeNull();
+        expect(base.percentUsed).toBeNull();
+        expect(base.blocked).toBe(false);
 
-		// 2. Reading it under orgA vs orgB vs no-scope is identical: same userId,
-		//    same zero spend. The org context is invisible to the rollup.
-		const underA = await accountWide(request, user.access_token, orgA.slug);
-		const underB = await accountWide(request, user.access_token, orgB.slug);
-		expect(underA.userId).toBe(base.userId);
-		expect(underB.userId).toBe(base.userId);
-		expect(underA.currentSpendCents).toBe(0);
-		expect(underB.currentSpendCents).toBe(0);
+        // 2. Reading it under orgA vs orgB vs no-scope is identical: same userId,
+        //    same zero spend. The org context is invisible to the rollup.
+        const underA = await accountWide(request, user.access_token, orgA.slug);
+        const underB = await accountWide(request, user.access_token, orgB.slug);
+        expect(underA.userId).toBe(base.userId);
+        expect(underB.userId).toBe(base.userId);
+        expect(underA.currentSpendCents).toBe(0);
+        expect(underB.currentSpendCents).toBe(0);
 
-		// 3. Set a HARD account cap (no overage). Cap is a user pref, not an org pref —
-		//    verify it lands and the arithmetic follows the documented contract:
-		//    capCents 0, spend 0 >= 0, allowOverage false → blocked true; percentUsed null.
-		expect((await setAccountCap(request, user.access_token, '0', false)).status()).toBe(200);
-		const hardZeroCap = await accountWide(request, user.access_token, orgA.slug);
-		expect(hardZeroCap.capCents).toBe(0);
-		expect(hardZeroCap.percentUsed).toBeNull();
-		expect(hardZeroCap.blocked).toBe(true);
-		expect(hardZeroCap.allowOverage).toBe(false);
+        // 3. Set a HARD account cap (no overage). Cap is a user pref, not an org pref —
+        //    verify it lands and the arithmetic follows the documented contract:
+        //    capCents 0, spend 0 >= 0, allowOverage false → blocked true; percentUsed null.
+        expect((await setAccountCap(request, user.access_token, '0', false)).status()).toBe(200);
+        const hardZeroCap = await accountWide(request, user.access_token, orgA.slug);
+        expect(hardZeroCap.capCents).toBe(0);
+        expect(hardZeroCap.percentUsed).toBeNull();
+        expect(hardZeroCap.blocked).toBe(true);
+        expect(hardZeroCap.allowOverage).toBe(false);
 
-		// 4. Raise the cap above zero spend, soft overage → NOT blocked, percentUsed 0.
-		expect((await setAccountCap(request, user.access_token, '100000', true)).status()).toBe(200);
-		const softCap = await accountWide(request, user.access_token, orgB.slug);
-		expect(softCap.capCents).toBe(100000);
-		expect(softCap.percentUsed).toBe(0);
-		expect(softCap.blocked).toBe(false);
-		expect(softCap.allowOverage).toBe(true);
+        // 4. Raise the cap above zero spend, soft overage → NOT blocked, percentUsed 0.
+        expect((await setAccountCap(request, user.access_token, '100000', true)).status()).toBe(
+            200,
+        );
+        const softCap = await accountWide(request, user.access_token, orgB.slug);
+        expect(softCap.capCents).toBe(100000);
+        expect(softCap.percentUsed).toBe(0);
+        expect(softCap.blocked).toBe(false);
+        expect(softCap.allowOverage).toBe(true);
 
-		// 5. The cap arithmetic is identical no matter which org we claim to be in.
-		const softNoScope = await accountWide(request, user.access_token);
-		expect(softNoScope.capCents).toBe(softCap.capCents);
-		expect(softNoScope.blocked).toBe(softCap.blocked);
-		expect(softNoScope.percentUsed).toBe(softCap.percentUsed);
+        // 5. The cap arithmetic is identical no matter which org we claim to be in.
+        const softNoScope = await accountWide(request, user.access_token);
+        expect(softNoScope.capCents).toBe(softCap.capCents);
+        expect(softNoScope.blocked).toBe(softCap.blocked);
+        expect(softNoScope.percentUsed).toBe(softCap.percentUsed);
 
-		// 6. Non-numeric cap is rejected (the pref is a bigint digit-string).
-		const badCap = await request.put(`${API_BASE}/api/me/work-agent/preferences`, {
-			headers: authedHeaders(user.access_token),
-			data: { accountWideMonthlyCapCents: 'not-a-number' },
-		});
-		expect(badCap.status()).toBe(400);
+        // 6. Non-numeric cap is rejected (the pref is a bigint digit-string).
+        const badCap = await request.put(`${API_BASE}/api/me/work-agent/preferences`, {
+            headers: authedHeaders(user.access_token),
+            data: { accountWideMonthlyCapCents: 'not-a-number' },
+        });
+        expect(badCap.status()).toBe(400);
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				'No org-level usage cap; the account-wide cap is a USER pref keyed by userId. Verified org-invariant rollup + the blocked/percentUsed contract.',
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                'No org-level usage cap; the account-wide cap is a USER pref keyed by userId. Verified org-invariant rollup + the blocked/percentUsed contract.',
+        });
+    });
 
-	test('flow 3: a Work created UNDER an org scope still carries the SAME per-Work budget surface (the only real "billing scope") — and there is NO org-level budget/usage endpoint', async ({
-		request,
-	}) => {
-		const user = await registerUserViaAPI(request);
-		const org = await createOrg(request, user.access_token, uniq('BudgetOrg'));
+    test('flow 3: a Work created UNDER an org scope still carries the SAME per-Work budget surface (the only real "billing scope") — and there is NO org-level budget/usage endpoint', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const org = await createOrg(request, user.access_token, uniq('BudgetOrg'));
 
-		// 1. Create a Work stamped under the org scope.
-		const workId = await createWorkInScope(request, user.access_token, 'OrgScopedWork', org.slug);
+        // 1. Create a Work stamped under the org scope.
+        const workId = await createWorkInScope(
+            request,
+            user.access_token,
+            'OrgScopedWork',
+            org.slug,
+        );
 
-		// 2. The per-Work budget surface exists and is empty (org stamping is
-		//    invisible to budgets — they key on workId, owner='work').
-		const list0 = await request.get(`${API_BASE}/api/works/${workId}/budgets`, {
-			headers: authedHeaders(user.access_token),
-		});
-		expect(list0.status()).toBe(200);
-		expect((await list0.json()).budgets).toEqual([]);
+        // 2. The per-Work budget surface exists and is empty (org stamping is
+        //    invisible to budgets — they key on workId, owner='work').
+        const list0 = await request.get(`${API_BASE}/api/works/${workId}/budgets`, {
+            headers: authedHeaders(user.access_token),
+        });
+        expect(list0.status()).toBe(200);
+        expect((await list0.json()).budgets).toEqual([]);
 
-		// 3. Set a GLOBAL cap on the org-scoped Work — succeeds with owner='work'.
-		const create = await request.post(`${API_BASE}/api/works/${workId}/budgets`, {
-			headers: authedHeaders(user.access_token),
-			data: { scope: 'global', monthlyCapCents: 50000, allowOverage: false, currency: 'usd' },
-		});
-		expect(create.status()).toBe(201);
-		const budget = (await create.json()).budget;
-		expect(budget.scope).toBe('global');
-		expect(budget.ownerType).toBe('work'); // NOT 'organization' — no such owner exists
-		expect(budget.monthlyCapCents).toBe(50000);
+        // 3. Set a GLOBAL cap on the org-scoped Work — succeeds with owner='work'.
+        const create = await request.post(`${API_BASE}/api/works/${workId}/budgets`, {
+            headers: authedHeaders(user.access_token),
+            data: { scope: 'global', monthlyCapCents: 50000, allowOverage: false, currency: 'usd' },
+        });
+        expect(create.status()).toBe(201);
+        const budget = (await create.json()).budget;
+        expect(budget.scope).toBe('global');
+        expect(budget.ownerType).toBe('work'); // NOT 'organization' — no such owner exists
+        expect(budget.monthlyCapCents).toBe(50000);
 
-		// 4. The cap is reflected in the per-Work usage summary's globalBudget block.
-		const summary = await request.get(`${API_BASE}/api/works/${workId}/usage/summary`, {
-			headers: authedHeaders(user.access_token),
-		});
-		expect(summary.status()).toBe(200);
-		const sum = await summary.json();
-		expect(sum.workId).toBe(workId);
-		expect(sum.totalSpendCents).toBe(0);
-		expect(sum.globalBudget?.monthlyCapCents).toBe(50000);
-		expect(sum.globalBudget?.percentUsed).toBe(0); // 0 spend of a positive cap
+        // 4. The cap is reflected in the per-Work usage summary's globalBudget block.
+        const summary = await request.get(`${API_BASE}/api/works/${workId}/usage/summary`, {
+            headers: authedHeaders(user.access_token),
+        });
+        expect(summary.status()).toBe(200);
+        const sum = await summary.json();
+        expect(sum.workId).toBe(workId);
+        expect(sum.totalSpendCents).toBe(0);
+        expect(sum.globalBudget?.monthlyCapCents).toBe(50000);
+        expect(sum.globalBudget?.percentUsed).toBe(0); // 0 spend of a positive cap
 
-		// 5. Confirm the org-LEVEL budget/usage routes simply do not exist — probe → 4xx.
-		for (const path of [
-			`/api/organizations/${org.id}/budgets`,
-			`/api/organizations/${org.slug}/budgets`,
-			`/api/organizations/${org.id}/usage`,
-			`/api/organizations/${org.id}/usage/summary`,
-		]) {
-			const res = await request.get(`${API_BASE}${path}`, { headers: authedHeaders(user.access_token) });
-			expect(res.status(), `${path} must not 5xx`).toBeLessThan(500);
-			expect(
-				[400, 401, 403, 404].includes(res.status()),
-				`${path} should be a 4xx (no org-level billing route), got ${res.status()}`,
-			).toBe(true);
-		}
+        // 5. Confirm the org-LEVEL budget/usage routes simply do not exist — probe → 4xx.
+        for (const path of [
+            `/api/organizations/${org.id}/budgets`,
+            `/api/organizations/${org.slug}/budgets`,
+            `/api/organizations/${org.id}/usage`,
+            `/api/organizations/${org.id}/usage/summary`,
+        ]) {
+            const res = await request.get(`${API_BASE}${path}`, {
+                headers: authedHeaders(user.access_token),
+            });
+            expect(res.status(), `${path} must not 5xx`).toBeLessThan(500);
+            expect(
+                [400, 401, 403, 404].includes(res.status()),
+                `${path} should be a 4xx (no org-level billing route), got ${res.status()}`,
+            ).toBe(true);
+        }
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				'Budgets are owner-scoped (work|idea|mission|agent) — no organization owner. Org-scoped Works fall back to the per-Work cap; org-level budget/usage endpoints are absent (4xx).',
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                'Budgets are owner-scoped (work|idea|mission|agent) — no organization owner. Org-scoped Works fall back to the per-Work cap; org-level budget/usage endpoints are absent (4xx).',
+        });
+    });
 
-	test("flow 4: MEMBER usage attribution — usage rolls up by the ACTING userId, so two users in/around the same tenant each see only their OWN attributed spend (never each other's)", async ({
-		request,
-	}) => {
-		const alice = await registerUserViaAPI(request);
-		const bob = await registerUserViaAPI(request);
+    test("flow 4: MEMBER usage attribution — usage rolls up by the ACTING userId, so two users in/around the same tenant each see only their OWN attributed spend (never each other's)", async ({
+        request,
+    }) => {
+        const alice = await registerUserViaAPI(request);
+        const bob = await registerUserViaAPI(request);
 
-		// alice owns an org + a billable Work inside it.
-		const org = await createOrg(request, alice.access_token, uniq('AttribOrg'));
-		const aliceWork = await createWorkInScope(request, alice.access_token, 'AliceBillable', org.slug);
+        // alice owns an org + a billable Work inside it.
+        const org = await createOrg(request, alice.access_token, uniq('AttribOrg'));
+        const aliceWork = await createWorkInScope(
+            request,
+            alice.access_token,
+            'AliceBillable',
+            org.slug,
+        );
 
-		// 1. Each user's account-wide rollup is keyed by THEIR userId.
-		const aliceUsage = await accountWide(request, alice.access_token);
-		const bobUsage = await accountWide(request, bob.access_token);
-		expect(aliceUsage.userId).not.toBe(bobUsage.userId);
-		expect(aliceUsage.userId).toBe(alice.user.id);
-		expect(bobUsage.userId).toBe(bob.user.id);
+        // 1. Each user's account-wide rollup is keyed by THEIR userId.
+        const aliceUsage = await accountWide(request, alice.access_token);
+        const bobUsage = await accountWide(request, bob.access_token);
+        expect(aliceUsage.userId).not.toBe(bobUsage.userId);
+        expect(aliceUsage.userId).toBe(alice.user.id);
+        expect(bobUsage.userId).toBe(bob.user.id);
 
-		// 2. Both are zero in CI (no billed plugin calls); the KEY point is attribution
-		//    isolation: bob's rollup never reflects alice's Work.
-		expect(aliceUsage.currentSpendCents).toBe(0);
-		expect(bobUsage.currentSpendCents).toBe(0);
+        // 2. Both are zero in CI (no billed plugin calls); the KEY point is attribution
+        //    isolation: bob's rollup never reflects alice's Work.
+        expect(aliceUsage.currentSpendCents).toBe(0);
+        expect(bobUsage.currentSpendCents).toBe(0);
 
-		// 3. bob (a different tenant) cannot even READ the per-Work usage/budgets of
-		//    alice's Work — owner-scoped 403 (not a cross-tenant data leak). This is
-		//    the attribution boundary made concrete.
-		for (const path of [
-			`/api/works/${aliceWork}/budgets`,
-			`/api/works/${aliceWork}/usage/summary`,
-			`/api/works/${aliceWork}/usage/trend`,
-		]) {
-			const res = await request.get(`${API_BASE}${path}`, { headers: authedHeaders(bob.access_token) });
-			expect(res.status(), `bob reading alice's ${path}`).toBe(403);
-		}
+        // 3. bob (a different tenant) cannot even READ the per-Work usage/budgets of
+        //    alice's Work — owner-scoped 403 (not a cross-tenant data leak). This is
+        //    the attribution boundary made concrete.
+        for (const path of [
+            `/api/works/${aliceWork}/budgets`,
+            `/api/works/${aliceWork}/usage/summary`,
+            `/api/works/${aliceWork}/usage/trend`,
+        ]) {
+            const res = await request.get(`${API_BASE}${path}`, {
+                headers: authedHeaders(bob.access_token),
+            });
+            expect(res.status(), `bob reading alice's ${path}`).toBe(403);
+        }
 
-		// 4. bob cannot WRITE a budget on alice's Work either (assertWriteAccess → 403).
-		const bobWrite = await request.post(`${API_BASE}/api/works/${aliceWork}/budgets`, {
-			headers: authedHeaders(bob.access_token),
-			data: { scope: 'global', monthlyCapCents: 1000 },
-		});
-		expect(bobWrite.status()).toBe(403);
+        // 4. bob cannot WRITE a budget on alice's Work either (assertWriteAccess → 403).
+        const bobWrite = await request.post(`${API_BASE}/api/works/${aliceWork}/budgets`, {
+            headers: authedHeaders(bob.access_token),
+            data: { scope: 'global', monthlyCapCents: 1000 },
+        });
+        expect(bobWrite.status()).toBe(403);
 
-		// 5. The org slug resolver IS global (any authed user resolves it) — but that
-		//    grants NO billing visibility. bob resolves the org yet sees none of its spend.
-		const bobResolvesOrg = await request.get(`${API_BASE}/api/organizations/${org.slug}`, {
-			headers: authedHeaders(bob.access_token),
-		});
-		expect(bobResolvesOrg.status()).toBe(200); // global resolver
-		expect((await accountWide(request, bob.access_token)).currentSpendCents).toBe(0); // still none of alice's spend
+        // 5. The org slug resolver IS global (any authed user resolves it) — but that
+        //    grants NO billing visibility. bob resolves the org yet sees none of its spend.
+        const bobResolvesOrg = await request.get(`${API_BASE}/api/organizations/${org.slug}`, {
+            headers: authedHeaders(bob.access_token),
+        });
+        expect(bobResolvesOrg.status()).toBe(200); // global resolver
+        expect((await accountWide(request, bob.access_token)).currentSpendCents).toBe(0); // still none of alice's spend
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				'Usage attribution is per-userId (PluginUsageEvents.userId). No org-aggregated usage view; the org slug resolver is global but conveys no cross-user billing visibility.',
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                'Usage attribution is per-userId (PluginUsageEvents.userId). No org-aggregated usage view; the org slug resolver is global but conveys no cross-user billing visibility.',
+        });
+    });
 
-	test('flow 5: org PLAN transition is per-MEMBER, not per-org — two distinct users both anchored to the same org slug keep INDEPENDENT subscription tiers', async ({
-		request,
-	}) => {
-		const owner = await registerUserViaAPI(request);
-		const peer = await registerUserViaAPI(request);
-		const org = await createOrg(request, owner.access_token, uniq('PlanTenantOrg'));
+    test('flow 5: org PLAN transition is per-MEMBER, not per-org — two distinct users both anchored to the same org slug keep INDEPENDENT subscription tiers', async ({
+        request,
+    }) => {
+        const owner = await registerUserViaAPI(request);
+        const peer = await registerUserViaAPI(request);
+        const org = await createOrg(request, owner.access_token, uniq('PlanTenantOrg'));
 
-		// Both users can RESOLVE the org slug (global resolver), so both can claim the
-		// same org context on their requests.
-		for (const u of [owner, peer]) {
-			const r = await request.get(`${API_BASE}/api/organizations/${org.slug}`, {
-				headers: authedHeaders(u.access_token),
-			});
-			expect(r.status()).toBe(200);
-		}
+        // Both users can RESOLVE the org slug (global resolver), so both can claim the
+        // same org context on their requests.
+        for (const u of [owner, peer]) {
+            const r = await request.get(`${API_BASE}/api/organizations/${org.slug}`, {
+                headers: authedHeaders(u.access_token),
+            });
+            expect(r.status()).toBe(200);
+        }
 
-		// 1. Both start on FREE (under the org scope).
-		expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('free');
-		expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
+        // 1. Both start on FREE (under the org scope).
+        expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('free');
+        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
 
-		// 2. Owner upgrades to PREMIUM under the org scope.
-		expect((await setPlan(request, owner.access_token, 'premium', org.slug)).status()).toBe(200);
+        // 2. Owner upgrades to PREMIUM under the org scope.
+        expect((await setPlan(request, owner.access_token, 'premium', org.slug)).status()).toBe(
+            200,
+        );
 
-		// 3. If a per-org plan existed, peer's org-scoped read would now show premium.
-		//    It does NOT — peer is still FREE. The plan followed the OWNER's bearer.
-		expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
-		expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
+        // 3. If a per-org plan existed, peer's org-scoped read would now show premium.
+        //    It does NOT — peer is still FREE. The plan followed the OWNER's bearer.
+        expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
+        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
 
-		// 4. Peer upgrades to STANDARD; owner stays premium. Fully independent tiers.
-		expect((await setPlan(request, peer.access_token, 'standard', org.slug)).status()).toBe(200);
-		expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('standard');
-		expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
+        // 4. Peer upgrades to STANDARD; owner stays premium. Fully independent tiers.
+        expect((await setPlan(request, peer.access_token, 'standard', org.slug)).status()).toBe(
+            200,
+        );
+        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('standard');
+        expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
 
-		// 5. Cadence-gating arrays are well-formed per member (same cardinality across tiers).
-		const ownerCadences = (await getPlan(request, owner.access_token, org.slug)).plan.allowedCadences ?? [];
-		const peerCadences = (await getPlan(request, peer.access_token, org.slug)).plan.allowedCadences ?? [];
-		expect(ownerCadences.length).toBeGreaterThan(0);
-		expect(peerCadences.length).toBe(ownerCadences.length);
+        // 5. Cadence-gating arrays are well-formed per member (same cardinality across tiers).
+        const ownerCadences =
+            (await getPlan(request, owner.access_token, org.slug)).plan.allowedCadences ?? [];
+        const peerCadences =
+            (await getPlan(request, peer.access_token, org.slug)).plan.allowedCadences ?? [];
+        expect(ownerCadences.length).toBeGreaterThan(0);
+        expect(peerCadences.length).toBe(ownerCadences.length);
 
-		// Reset both to free to keep the shared DB tidy for sibling subscription specs.
-		await setPlan(request, owner.access_token, 'free', org.slug);
-		await setPlan(request, peer.access_token, 'free', org.slug);
-		expect((await getPlan(request, owner.access_token)).plan.code).toBe('free');
-		expect((await getPlan(request, peer.access_token)).plan.code).toBe('free');
+        // Reset both to free to keep the shared DB tidy for sibling subscription specs.
+        await setPlan(request, owner.access_token, 'free', org.slug);
+        await setPlan(request, peer.access_token, 'free', org.slug);
+        expect((await getPlan(request, owner.access_token)).plan.code).toBe('free');
+        expect((await getPlan(request, peer.access_token)).plan.code).toBe('free');
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				'No org-level plan: assignPlanToUser is per-user. Two members of the same org slug hold independent tiers; the org context never aggregates billing.',
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                'No org-level plan: assignPlanToUser is per-user. Two members of the same org slug hold independent tiers; the org context never aggregates billing.',
+        });
+    });
 
-	test('flow 6: a REGISTERED company org links a billable "company" Work whose budget/usage is still owner-scoped + cross-tenant isolated; plan/usage stay user-scoped end-to-end', async ({
-		request,
-	}) => {
-		const founder = await registerUserViaAPI(request);
-		const outsider = await registerUserViaAPI(request);
+    test('flow 6: a REGISTERED company org links a billable "company" Work whose budget/usage is still owner-scoped + cross-tenant isolated; plan/usage stay user-scoped end-to-end', async ({
+        request,
+    }) => {
+        const founder = await registerUserViaAPI(request);
+        const outsider = await registerUserViaAPI(request);
 
-		// 1. register-company mints a REGISTERED org WITH a linked company Work.
-		const reg = await request.post(`${API_BASE}/api/organizations/register-company`, {
-			headers: authedHeaders(founder.access_token),
-			data: { name: uniq('RegCo'), countryCode: 'US' },
-		});
-		expect(reg.status()).toBe(201);
-		const company = await reg.json();
-		expect(company.registrationStatus).toBe('registered');
-		expect(company.registrationProvider).toBe('manual');
-		const linkedWorkId: string = company.linkedWorkId;
-		expect(linkedWorkId, 'register-company should link a Work').toBeTruthy();
+        // 1. register-company mints a REGISTERED org WITH a linked company Work.
+        const reg = await request.post(`${API_BASE}/api/organizations/register-company`, {
+            headers: authedHeaders(founder.access_token),
+            data: { name: uniq('RegCo'), countryCode: 'US' },
+        });
+        expect(reg.status()).toBe(201);
+        const company = await reg.json();
+        expect(company.registrationStatus).toBe('registered');
+        expect(company.registrationProvider).toBe('manual');
+        const linkedWorkId: string = company.linkedWorkId;
+        expect(linkedWorkId, 'register-company should link a Work').toBeTruthy();
 
-		// 2. The linked company Work has the SAME per-Work billing surface as any Work.
-		const create = await request.post(`${API_BASE}/api/works/${linkedWorkId}/budgets`, {
-			headers: authedHeaders(founder.access_token),
-			data: { scope: 'global', monthlyCapCents: 250000, allowOverage: true, currency: 'usd' },
-		});
-		// The founder owns the linked work → 201. Branch defensively if membership is
-		// modelled differently in some build (→ 403) so the flow stays truthful.
-		expect([201, 403]).toContain(create.status());
-		if (create.status() === 201) {
-			const budget = (await create.json()).budget;
-			expect(budget.ownerType).toBe('work');
-			expect(budget.monthlyCapCents).toBe(250000);
+        // 2. The linked company Work has the SAME per-Work billing surface as any Work.
+        const create = await request.post(`${API_BASE}/api/works/${linkedWorkId}/budgets`, {
+            headers: authedHeaders(founder.access_token),
+            data: { scope: 'global', monthlyCapCents: 250000, allowOverage: true, currency: 'usd' },
+        });
+        // The founder owns the linked work → 201. Branch defensively if membership is
+        // modelled differently in some build (→ 403) so the flow stays truthful.
+        expect([201, 403]).toContain(create.status());
+        if (create.status() === 201) {
+            const budget = (await create.json()).budget;
+            expect(budget.ownerType).toBe('work');
+            expect(budget.monthlyCapCents).toBe(250000);
 
-			const summary = await request.get(`${API_BASE}/api/works/${linkedWorkId}/usage/summary`, {
-				headers: authedHeaders(founder.access_token),
-			});
-			expect(summary.status()).toBe(200);
-			const sum = await summary.json();
-			expect(sum.totalSpendCents).toBe(0);
-			expect(sum.globalBudget?.monthlyCapCents).toBe(250000);
-		} else {
-			test.info().annotations.push({
-				type: 'note',
-				description: 'Founder is not the linked-work owner in this build; budget write 403 — surface still owner-scoped.',
-			});
-		}
+            const summary = await request.get(
+                `${API_BASE}/api/works/${linkedWorkId}/usage/summary`,
+                {
+                    headers: authedHeaders(founder.access_token),
+                },
+            );
+            expect(summary.status()).toBe(200);
+            const sum = await summary.json();
+            expect(sum.totalSpendCents).toBe(0);
+            expect(sum.globalBudget?.monthlyCapCents).toBe(250000);
+        } else {
+            test.info().annotations.push({
+                type: 'note',
+                description:
+                    'Founder is not the linked-work owner in this build; budget write 403 — surface still owner-scoped.',
+            });
+        }
 
-		// 3. An OUTSIDER (different tenant) cannot read the company Work's budgets —
-		//    owner-scoped 403, even though register-company is "public-ish".
-		const outsiderBudgets = await request.get(`${API_BASE}/api/works/${linkedWorkId}/budgets`, {
-			headers: authedHeaders(outsider.access_token),
-		});
-		expect(outsiderBudgets.status()).toBe(403);
+        // 3. An OUTSIDER (different tenant) cannot read the company Work's budgets —
+        //    owner-scoped 403, even though register-company is "public-ish".
+        const outsiderBudgets = await request.get(`${API_BASE}/api/works/${linkedWorkId}/budgets`, {
+            headers: authedHeaders(outsider.access_token),
+        });
+        expect(outsiderBudgets.status()).toBe(403);
 
-		// 4. The outsider CAN resolve the company org by slug (global resolver) but gets
-		//    no billing visibility from it.
-		const resolve = await request.get(`${API_BASE}/api/organizations/${company.slug}`, {
-			headers: authedHeaders(outsider.access_token),
-		});
-		expect(resolve.status()).toBe(200);
+        // 4. The outsider CAN resolve the company org by slug (global resolver) but gets
+        //    no billing visibility from it.
+        const resolve = await request.get(`${API_BASE}/api/organizations/${company.slug}`, {
+            headers: authedHeaders(outsider.access_token),
+        });
+        expect(resolve.status()).toBe(200);
 
-		// 5. The founder's PLAN + account-wide usage remain user-scoped: querying them
-		//    under the company org slug yields the same user-keyed result.
-		const planUnderCompany = await getPlan(request, founder.access_token, company.slug);
-		expect(PLAN_CODES).toContain(planUnderCompany.plan.code as (typeof PLAN_CODES)[number]);
-		const usageUnderCompany = await accountWide(request, founder.access_token, company.slug);
-		expect(usageUnderCompany.userId).toBe(founder.user.id);
-		expect(usageUnderCompany.currentSpendCents).toBe(0);
+        // 5. The founder's PLAN + account-wide usage remain user-scoped: querying them
+        //    under the company org slug yields the same user-keyed result.
+        const planUnderCompany = await getPlan(request, founder.access_token, company.slug);
+        expect(PLAN_CODES).toContain(planUnderCompany.plan.code as (typeof PLAN_CODES)[number]);
+        const usageUnderCompany = await accountWide(request, founder.access_token, company.slug);
+        expect(usageUnderCompany.userId).toBe(founder.user.id);
+        expect(usageUnderCompany.currentSpendCents).toBe(0);
 
-		test.info().annotations.push({
-			type: 'org-billing-scope',
-			description:
-				"A registered company org links a billable Work, but that Work's budget/usage is owner-scoped (work) + cross-tenant isolated (403). Org registration creates no org billing scope; plan + account usage stay user-keyed.",
-		});
-	});
+        test.info().annotations.push({
+            type: 'org-billing-scope',
+            description:
+                "A registered company org links a billable Work, but that Work's budget/usage is owner-scoped (work) + cross-tenant isolated (403). Org registration creates no org billing scope; plan + account usage stay user-keyed.",
+        });
+    });
 });

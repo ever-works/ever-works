@@ -5,9 +5,9 @@ import type { PluginContext } from '@ever-works/plugin';
 const mockPromptGet = vi.fn();
 
 vi.mock('@langfuse/client', () => {
-	const MockLangfuseClient = vi.fn().mockImplementation(() => ({
-		prompt: { get: mockPromptGet }
-	}));
+	const MockLangfuseClient = vi.fn().mockImplementation(function () {
+		return { prompt: { get: mockPromptGet } };
+	});
 	return { LangfuseClient: MockLangfuseClient };
 });
 

@@ -1,2 +1,0 @@
-﻿GLOBAL_DEFAULT status=404
-GLOBAL_DEFAULT body=

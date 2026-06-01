@@ -15,11 +15,13 @@ const { mockToolkitsGet, mockConnectedAccountsList, mockToolsExecute } = vi.hois
 }));
 
 vi.mock('@composio/core', () => ({
-	Composio: vi.fn().mockImplementation(() => ({
-		toolkits: { get: mockToolkitsGet },
-		connectedAccounts: { list: mockConnectedAccountsList },
-		tools: { execute: mockToolsExecute }
-	}))
+	Composio: vi.fn().mockImplementation(function () {
+		return {
+			toolkits: { get: mockToolkitsGet },
+			connectedAccounts: { list: mockConnectedAccountsList },
+			tools: { execute: mockToolsExecute }
+		};
+	})
 }));
 
 // Import after vi.mock so the plugin's ComposioClient picks up the mocked SDK.

@@ -22,13 +22,17 @@ vi.mock('screenshotone-api-sdk', () => {
 	};
 
 	return {
-		Client: vi.fn().mockImplementation(() => ({
-			take: vi.fn().mockResolvedValue({
-				arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(100))
-			}),
-			generateTakeURL: vi.fn().mockReturnValue('https://api.screenshotone.com/take?url=test'),
-			generateSignedTakeURL: vi.fn().mockReturnValue('https://api.screenshotone.com/take?url=test&signature=abc')
-		})),
+		Client: vi.fn().mockImplementation(function () {
+			return {
+				take: vi.fn().mockResolvedValue({
+					arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(100))
+				}),
+				generateTakeURL: vi.fn().mockReturnValue('https://api.screenshotone.com/take?url=test'),
+				generateSignedTakeURL: vi
+					.fn()
+					.mockReturnValue('https://api.screenshotone.com/take?url=test&signature=abc')
+			};
+		}),
 		TakeOptions: {
 			url: vi.fn().mockReturnValue(mockTakeOptions)
 		}

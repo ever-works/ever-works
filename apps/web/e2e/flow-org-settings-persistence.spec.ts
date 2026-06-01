@@ -126,18 +126,15 @@ async function patchOrgOk(
     body: Record<string, unknown>,
 ): Promise<OrgRow> {
     const res = await patchOrgRaw(request, token, id, body);
-    expect(res.status(), `PATCH ${JSON.stringify(body)} body=${await res.text().catch(() => '')}`).toBe(
-        200,
-    );
+    expect(
+        res.status(),
+        `PATCH ${JSON.stringify(body)} body=${await res.text().catch(() => '')}`,
+    ).toBe(200);
     return res.json();
 }
 
 /** GET /api/organizations/:slug — the global slug resolver. */
-async function getBySlug(
-    request: APIRequestContext,
-    token: string,
-    slug: string,
-): Promise<OrgRow> {
+async function getBySlug(request: APIRequestContext, token: string, slug: string): Promise<OrgRow> {
     const res = await request.get(`${API_BASE}/api/organizations/${encodeURIComponent(slug)}`, {
         headers: authedHeaders(token),
     });
@@ -202,7 +199,9 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         expect(patched.slug, 'PATCH must NOT re-allocate the slug').toBe(originalSlug);
         expect(patched.tenantId).toBe(org.tenantId);
         expect(patched.createdAt).toBe(originalCreatedAt);
-        expect(patched.registrationStatus, 'a profile edit must not touch the status').toBe('draft');
+        expect(patched.registrationStatus, 'a profile edit must not touch the status').toBe(
+            'draft',
+        );
         expect(
             new Date(patched.updatedAt).getTime(),
             'updatedAt should advance (or at least not regress) on a real change',
@@ -270,9 +269,9 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         expect(noop.displayName).toBe(`Acme (rebrand) ${s}`);
 
         // 5. Final durable read confirms the accumulated end-state.
-        const fromList = ((await listOrganizationsViaAPI(request, token)) as unknown as OrgRow[]).find(
-            (o) => o.id === org.id,
-        );
+        const fromList = (
+            (await listOrganizationsViaAPI(request, token)) as unknown as OrgRow[]
+        ).find((o) => o.id === org.id);
         expect(fromList?.displayName).toBe(`Acme (rebrand) ${s}`);
         expect(fromList?.legalName).toBeNull();
         expect(fromList?.countryCode).toBe('US');
@@ -300,17 +299,23 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         // (a) Empty displayName → 400 (Length min 1).
         const emptyDisplay = await patchOrgRaw(request, token, org.id, { displayName: '' });
         expect(emptyDisplay.status()).toBe(400);
-        expect(msgOf(await emptyDisplay.json())).toMatch(/displayName must be longer than or equal to 1/i);
+        expect(msgOf(await emptyDisplay.json())).toMatch(
+            /displayName must be longer than or equal to 1/i,
+        );
 
         // (b) countryCode too short ('d', 1 char) AND too long ('USA', 3 chars) →
         //     both 400 with the matching boundary message.
         const ccShort = await patchOrgRaw(request, token, org.id, { countryCode: 'd' });
         expect(ccShort.status()).toBe(400);
-        expect(msgOf(await ccShort.json())).toMatch(/countryCode must be longer than or equal to 2/i);
+        expect(msgOf(await ccShort.json())).toMatch(
+            /countryCode must be longer than or equal to 2/i,
+        );
 
         const ccLong = await patchOrgRaw(request, token, org.id, { countryCode: 'USA' });
         expect(ccLong.status()).toBe(400);
-        expect(msgOf(await ccLong.json())).toMatch(/countryCode must be shorter than or equal to 2/i);
+        expect(msgOf(await ccLong.json())).toMatch(
+            /countryCode must be shorter than or equal to 2/i,
+        );
 
         // (c) WHITELIST: the endpoint exposes ONLY display/legal/country. Attempting
         //     to slip in a privileged field (registrationStatus / registrationProvider
@@ -399,9 +404,9 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
 
         // 4. Durable re-read confirms the registered metadata persisted alongside the
         //    rebrand (not just echoed in the PATCH response).
-        const fromList = ((await listOrganizationsViaAPI(request, token)) as unknown as OrgRow[]).find(
-            (o) => o.id === reg.id,
-        );
+        const fromList = (
+            (await listOrganizationsViaAPI(request, token)) as unknown as OrgRow[]
+        ).find((o) => o.id === reg.id);
         expect(fromList?.registrationStatus).toBe('registered');
         expect(fromList?.registrationProvider).toBe('manual');
         expect(fromList?.linkedWorkId).toBe(originalLinkedWork);
@@ -474,9 +479,9 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         // (f) After EVERY foreign/anon probe above, A's org profile is untouched —
         //     none of the rejected writes leaked a partial mutation across the tenant
         //     boundary.
-        const aFresh = ((await listOrganizationsViaAPI(request, userA.access_token)) as unknown as OrgRow[]).find(
-            (o) => o.id === orgA.id,
-        );
+        const aFresh = (
+            (await listOrganizationsViaAPI(request, userA.access_token)) as unknown as OrgRow[]
+        ).find((o) => o.id === orgA.id);
         expect(aFresh?.displayName, 'owner profile survived all foreign probes').toBe(
             `AuthZ A Owned ${s}`,
         );
@@ -496,7 +501,11 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         // pre-existing rows — so this UI-mutating flow stays isolation-safe.
         const token = await seededToken(request);
         const initialName = `Switcher Org ${s}`;
-        const org = (await createOrganizationViaAPI(request, token, initialName)) as unknown as OrgRow;
+        const org = (await createOrganizationViaAPI(
+            request,
+            token,
+            initialName,
+        )) as unknown as OrgRow;
         const slug = org.slug;
 
         // A NON-MEMBER reader: a different user with their OWN tenant (so they're
@@ -523,10 +532,10 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         // 3. The non-member immediately sees the NEW profile through the same global
         //    resolver (no caching staleness, no membership required to read it).
         await expect
-            .poll(
-                async () => (await getBySlug(request, reader.access_token, slug)).displayName,
-                { timeout: 15_000, message: 'non-member should see the renamed displayName via get-by-slug' },
-            )
+            .poll(async () => (await getBySlug(request, reader.access_token, slug)).displayName, {
+                timeout: 15_000,
+                message: 'non-member should see the renamed displayName via get-by-slug',
+            })
             .toBe(renamed);
         const afterRead = await getBySlug(request, reader.access_token, slug);
         expect(afterRead.legalName).toBe(`Switcher Org Legal ${s}`);
@@ -542,9 +551,7 @@ test.describe('Organization settings persistence (PATCH /api/organizations/:id)'
         // The OLD name must NOT linger as a selectable menuitem (rename replaced it,
         // it didn't add a second row).
         await openWorkspaceSwitcher(page);
-        await expect(
-            page.getByRole('menuitem', { name: initialName, exact: true }),
-        ).toHaveCount(0);
+        await expect(page.getByRole('menuitem', { name: initialName, exact: true })).toHaveCount(0);
         await page.keyboard.press('Escape');
     });
 });
