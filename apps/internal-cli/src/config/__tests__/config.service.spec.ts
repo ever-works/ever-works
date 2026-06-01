@@ -25,6 +25,13 @@ describe('ConfigService', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // vitest 4: clearAllMocks() clears call history but NOT implementations,
+        // so a mockRejectedValue set in one test would otherwise leak into the
+        // next. Re-seed the fs-extra mocks' default implementations each test.
+        m(fs.ensureDir).mockResolvedValue(undefined as never);
+        m(fs.writeJson).mockResolvedValue(undefined as never);
+        m(fs.readJson).mockReset();
+        m(fs.pathExists).mockReset();
         service = new ConfigService();
     });
 

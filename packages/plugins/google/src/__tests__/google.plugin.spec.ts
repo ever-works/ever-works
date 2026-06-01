@@ -4,14 +4,16 @@ import type { PluginContext } from '@ever-works/plugin';
 import { AiOperations } from '@ever-works/plugin/ai';
 
 vi.mock('@ever-works/plugin/ai', () => {
-	const MockAiOperations = vi.fn().mockImplementation(() => ({
-		createChatCompletion: vi.fn().mockResolvedValue({ id: 'test', choices: [], model: 'gemini', created: 0 }),
-		createStreamingChatCompletion: vi.fn(),
-		createEmbedding: vi.fn(),
-		askJson: vi.fn().mockResolvedValue({ result: {}, model: 'gemini', usage: undefined }),
-		listModels: vi.fn().mockResolvedValue([]),
-		testConnection: vi.fn().mockResolvedValue({ success: true })
-	}));
+	const MockAiOperations = vi.fn().mockImplementation(function () {
+		return {
+			createChatCompletion: vi.fn().mockResolvedValue({ id: 'test', choices: [], model: 'gemini', created: 0 }),
+			createStreamingChatCompletion: vi.fn(),
+			createEmbedding: vi.fn(),
+			askJson: vi.fn().mockResolvedValue({ result: {}, model: 'gemini', usage: undefined }),
+			listModels: vi.fn().mockResolvedValue([]),
+			testConnection: vi.fn().mockResolvedValue({ success: true })
+		};
+	});
 	return { AiOperations: MockAiOperations };
 });
 

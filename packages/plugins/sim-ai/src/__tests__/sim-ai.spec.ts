@@ -4,32 +4,34 @@ import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } f
 
 // Mock the simstudio-ts-sdk
 vi.mock('simstudio-ts-sdk', () => ({
-	SimStudioClient: vi.fn().mockImplementation(() => ({
-		validateWorkflow: vi.fn().mockResolvedValue(true),
-		getWorkflowStatus: vi.fn().mockResolvedValue({ isDeployed: true, needsRedeployment: false }),
-		executeWorkflow: vi.fn().mockResolvedValue({
-			success: true,
-			output: {
-				items: [
-					{
-						name: 'Test Item 1',
-						description: 'A test item',
-						url: 'https://example.com/1',
-						category: 'Tools'
-					},
-					{
-						name: 'Test Item 2',
-						description: 'Another test item',
-						url: 'https://example.com/2',
-						tags: ['tag1']
-					}
-				],
-				categories: [{ name: 'Tools', description: 'Development tools' }],
-				tags: [{ name: 'tag1' }]
-			}
-		}),
-		getRateLimitInfo: vi.fn().mockReturnValue(null)
-	})),
+	SimStudioClient: vi.fn().mockImplementation(function () {
+		return {
+			validateWorkflow: vi.fn().mockResolvedValue(true),
+			getWorkflowStatus: vi.fn().mockResolvedValue({ isDeployed: true, needsRedeployment: false }),
+			executeWorkflow: vi.fn().mockResolvedValue({
+				success: true,
+				output: {
+					items: [
+						{
+							name: 'Test Item 1',
+							description: 'A test item',
+							url: 'https://example.com/1',
+							category: 'Tools'
+						},
+						{
+							name: 'Test Item 2',
+							description: 'Another test item',
+							url: 'https://example.com/2',
+							tags: ['tag1']
+						}
+					],
+					categories: [{ name: 'Tools', description: 'Development tools' }],
+					tags: [{ name: 'tag1' }]
+				}
+			}),
+			getRateLimitInfo: vi.fn().mockReturnValue(null)
+		};
+	}),
 	SimStudioError: class SimStudioError extends Error {
 		code?: string;
 		status?: number;

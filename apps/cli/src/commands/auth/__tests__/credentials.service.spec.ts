@@ -175,6 +175,7 @@ describe('CredentialsService', () => {
     describe('remove', () => {
         it('returns true after removing an existing file', async () => {
             (fs.pathExists as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+            (fs.remove as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
             await expect(CredentialsService.remove()).resolves.toBe(true);
             expect(fs.remove).toHaveBeenCalled();
         });

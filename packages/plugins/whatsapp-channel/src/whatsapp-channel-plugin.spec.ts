@@ -6,6 +6,7 @@ describe('WhatsappChannelPlugin', () => {
 	const target = { accessToken: 'tok', phoneNumberId: '111', to: '+15551234567' };
 
 	beforeEach(() => {
+		vi.restoreAllMocks();
 		plugin = new WhatsappChannelPlugin();
 	});
 
