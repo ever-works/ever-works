@@ -547,24 +547,108 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
         );
         await expect(workOwnedRow).toBeVisible({ timeout: 15_000 });
 
-        // Best-effort detail-view nav: clicking the Work-owned row should land on
-        // the editable (non-inherited) detail view — but only assert if the
-        // editor mounts (route may 404 to catch-all in local next-dev).
-        await workOwnedRow.click().catch(() => {});
+        // ── Detail-view nav: the Work-owned row deep-links to the editable
+        // (non-inherited) detail route. The detail route mounts `KbEditor`
+        // (a heavy 'use client' Tiptap surface) for Work-owned docs; its
+        // server-rendered `<section data-testid="kb-editor">` shell can paint
+        // before Tiptap hydrates, and under next-dev + shard load the editable
+        // surface (`kb-editor-body`, rendered by `EditorContent`) does NOT
+        // always mount within a single timeout. We HARDEN by retrying the
+        // route with a RELOAD on every miss (which re-kicks hydration) over a
+        // generous budget, then assert the inheritance CONTRACT on whichever
+        // real surface actually mounted — the LIVE editor first, else the
+        // equivalent read-only document body the same route renders — so the
+        // "Work-owned doc is NOT inherited" contract is asserted end-to-end
+        // rather than hard-failing on a dev-only paint gap.
+        const detailUrl = `/en/works/${workId}/kb/legal/privacy.md`;
         const editor = page.getByTestId('kb-editor');
-        const editorVisible = await editor
-            .waitFor({ state: 'visible', timeout: 20_000 })
-            .then(() => true)
-            .catch(() => false);
-        if (editorVisible) {
-            // Work-owned detail view is NOT inherited (no read-only banner / data attr).
+        // The editable Tiptap surface is the true "live editor hydrated" signal
+        // (the `<section>` shell alone server-renders before hydration). The
+        // read-only fallback the same route can render exposes `kb-document-body`
+        // instead — either one proves the detail route resolved the doc.
+        const liveEditorSurface = page.getByTestId('kb-editor-body');
+        const readOnlyBody = page.getByTestId('kb-document-body');
+
+        type DetailSurface = 'live-editor' | 'read-only' | 'none';
+        let surface: DetailSurface = 'none';
+        // The retry RELOADS the route each pass to re-kick hydration. We swallow
+        // the eventual timeout (rather than let it fail the test) so that when
+        // the dev-only paint gap wins the whole 90s budget we fall through to
+        // the API-truth degrade branch below — the override CONTRACT is still
+        // asserted, just not painted.
+        await expect(async () => {
+            // Assert the root editor shell first (server-rendered, fast) so a
+            // stuck pass surfaces as a retry rather than a silent miss.
+            await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
+            await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 30_000 });
+            await expect(editor).toBeVisible({ timeout: 20_000 });
+
+            // Prefer the LIVE editor when its editable surface actually hydrates.
+            if (
+                await liveEditorSurface
+                    .waitFor({ state: 'visible', timeout: 15_000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
+                surface = 'live-editor';
+                return;
+            }
+            // Otherwise accept the read-only document body the same route renders
+            // (full-render fallback) — still the real KB detail surface.
+            if (
+                await readOnlyBody
+                    .waitFor({ state: 'visible', timeout: 5_000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
+                surface = 'read-only';
+                return;
+            }
+            // Neither inner surface mounted this pass — fail so `toPass` reloads.
+            throw new Error('KB detail editor/body surface did not mount yet; reloading');
+        })
+            .toPass({ timeout: 90_000, intervals: [1_000, 2_000, 5_000] })
+            .catch(() => {
+                // Budget exhausted without a usable paint → degrade to API truth.
+                surface = 'none';
+            });
+
+        if (surface !== 'none') {
+            // The detail route resolved the Work-owned doc on a real surface →
+            // assert the inheritance CONTRACT directly in the DOM: a Work-owned
+            // detail view is NEVER inherited (no `data-inherited="true"`, which
+            // only `KbDocumentView isInherited` stamps), and the URL is the doc.
             await expect(editor).not.toHaveAttribute('data-inherited', 'true');
             await expect(page).toHaveURL(/\/kb\/legal\/privacy\.md$/, { timeout: 15_000 });
         } else {
+            // DEGRADE: the live route never painted a usable surface under load
+            // (dev-only hydration/catch-all gap). Re-assert the SAME contract
+            // end-to-end through the KB API the route itself reads: the Work
+            // resolves a Work-OWNED row at this path (workId === workId, masking
+            // the org row), while the inherited-body endpoint still pins the org
+            // row (workId === null). The override contract holds regardless of
+            // the dev paint.
+            const workOwned = (await resolveInheritableViaAPI(request, token, workId, orgId)).find(
+                (d) => d.path === 'legal/privacy.md',
+            );
+            expect(
+                workOwned?.workId,
+                'override masks inheritance: privacy is Work-owned in the merged set',
+            ).toBe(workId);
+            const guardRes = await request.get(
+                `${API_BASE}/api/works/${workId}/kb/inheritable/legal/privacy.md?orgId=${encodeURIComponent(orgId)}`,
+                { headers: authedHeaders(token) },
+            );
+            expect(guardRes.ok()).toBeTruthy();
+            const guardRow = (await guardRes.json()) as InheritableDoc;
+            expect(
+                guardRow.workId,
+                'inherited-body endpoint still pins the org row even while overridden',
+            ).toBeNull();
             test.info().annotations.push({
                 type: 'note',
                 description:
-                    'KB detail route did not mount the editor (local next-dev catch-all 404); API truth already asserted the org-row guard.',
+                    'KB detail route did not paint a usable editor/body surface under next-dev load; the Work-owned (non-inherited) override contract was re-asserted end-to-end via the KB API.',
             });
         }
     });
