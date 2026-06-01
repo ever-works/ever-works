@@ -133,6 +133,28 @@ async function seedTask(
 
 const idsOf = (rows: TaskRow[]) => rows.map((r) => r.id);
 
+/**
+ * The list sort is `ORDER BY task.updatedAt DESC` with NO secondary
+ * tie-breaker (task.repository.ts:89). On the sqlite CI driver `updatedAt`
+ * has only SECOND granularity — probed live, the column round-trips as
+ * `…:43.000Z` (truncated to whole seconds). So two mutations that land in the
+ * SAME wall-clock second get an IDENTICAL updatedAt, the DESC sort ties, and
+ * sqlite breaks the tie by ascending rowid (insertion order) — which puts the
+ * EARLIER-created row at the head, the OPPOSITE of "newest touch first". That
+ * is a genuine race: when the PATCH (on `first`) and the transition (on
+ * `second`) collide in one second, `first` wrongly stays at the head and no
+ * amount of polling reorders it (there is no further mutation to bump the
+ * clock). Gate each ordering-significant mutation behind a fresh second so the
+ * updatedAt values are STRICTLY increasing and the DESC order is deterministic.
+ */
+async function waitForNextSecond(): Promise<void> {
+    const start = Date.now();
+    // Sleep just past the next whole-second boundary (+50ms cushion so the
+    // server's own `new Date()` is comfortably inside the new second).
+    const ms = 1000 - (start % 1000) + 50;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 test.describe('Task labels · priority · search · pagination (deep API query surface)', () => {
     test('priority axis: full p0..p4 enumeration, comma-separated multi-value IN filter, and the single-bad-token 400 guard (with total invariance)', async ({
         request,
@@ -257,21 +279,26 @@ test.describe('Task labels · priority · search · pagination (deep API query s
         const { access_token: token } = await registerUserViaAPI(request);
         const stamp = Date.now().toString(36);
 
-        // Create three tasks in order; without any mutation the newest-created sits
-        // at the head (createdAt == updatedAt at birth, DESC by updatedAt).
+        // Create three tasks in order. updatedAt has only SECOND granularity on the
+        // sqlite CI driver, so a same-second burst gives all three an IDENTICAL
+        // updatedAt — the updatedAt-DESC sort then ties and sqlite breaks the tie by
+        // insertion order, NOT newest-created-first. So at birth we only pin the
+        // deterministic invariant (the exact three rows are present, no more no less);
+        // the head-of-list ORDER is meaningless until a mutation bumps updatedAt below.
         const first = await seedTask(request, token, { title: `Sort first ${stamp}` });
         const second = await seedTask(request, token, { title: `Sort second ${stamp}` });
         const third = await seedTask(request, token, { title: `Sort third ${stamp}` });
 
         const initial = await listTasks(request, token, '?limit=50');
-        expect(idsOf(initial.data), 'newest-created first at birth').toEqual([
-            third.id,
-            second.id,
-            first.id,
-        ]);
+        expect([...idsOf(initial.data)].sort(), 'all three present at birth').toEqual(
+            [first.id, second.id, third.id].sort(),
+        );
 
         // Touch the OLDEST (first) via PATCH — updatedAt bumps → it must float to head.
-        // expect.poll absorbs the second-granularity updatedAt clock on sqlite.
+        // Cross a whole-second boundary first so first.updatedAt is STRICTLY greater
+        // than the create-burst's (sqlite second-granularity); expect.poll then absorbs
+        // any residual lag while the write lands.
+        await waitForNextSecond();
         await patchTask(request, token, first.id, { priority: 'p0' });
         await expect
             .poll(async () => idsOf((await listTasks(request, token, '?limit=50')).data)[0], {
@@ -281,7 +308,13 @@ test.describe('Task labels · priority · search · pagination (deep API query s
             .toBe(first.id);
 
         // Now touch `second` via a TRANSITION (backlog → todo). A transition also
-        // writes the row, so it likewise floats to the head over the PATCHed `first`.
+        // writes the row, so it likewise floats to the head over the PATCHed `first` —
+        // but ONLY if second.updatedAt is strictly later than first's. Without the
+        // boundary the PATCH above and this transition can share a second, tie on
+        // updatedAt, and sqlite's rowid tie-break floats the EARLIER-created `first`
+        // to the head instead (the residual flake this fixes). Cross the boundary so
+        // the transition is unambiguously the newest touch.
+        await waitForNextSecond();
         await transitionTaskViaAPI(request, token, second.id, 'todo');
         await expect
             .poll(async () => idsOf((await listTasks(request, token, '?limit=50')).data)[0], {

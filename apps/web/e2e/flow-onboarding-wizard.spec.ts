@@ -439,20 +439,19 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
 
         // Click it → the drawer closes and the wizard Dialog opens (manual
         // open path; independent of dismissed/works state). Assert the wizard's
-        // own stable chrome appears: the "Setup" badge, the heading, and the
-        // first step ("Welcome to Ever Works").
+        // own stable chrome appears: the SideNav "Setup" badge heading and the
+        // numbered step buttons — these render regardless of which step the
+        // wizard restores to from the user's persisted `lastStep`.
         await openOnboarding.click();
 
         await expect(page.getByText('Get started with Ever Works')).toBeVisible({
             timeout: 15_000,
         });
-        await expect(page.getByRole('heading', { name: 'Welcome to Ever Works' })).toBeVisible({
-            timeout: 15_000,
-        });
         // The wizard SideNav lists every derived step as a numbered button.
         // For the seeded user we cannot assume defaults, but the base
         // navigation labels are always present.
-        await expect(page.getByRole('button', { name: 'Welcome' })).toBeVisible({
+        const welcomeNav = page.getByRole('button', { name: 'Welcome' });
+        await expect(welcomeNav).toBeVisible({
             timeout: 10_000,
         });
         await expect(page.getByRole('button', { name: 'Your AI choice' })).toBeVisible({
@@ -465,6 +464,18 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         await expect(page.getByRole('button', { name: 'Close wizard' })).toBeVisible({
             timeout: 10_000,
         });
+        // The wizard restores to the user's persisted `lastStep` (probe shows
+        // the seeded user can be at step 1 = "ai-choice", mutated by sibling
+        // onboarding specs under parallelism), so the welcome step body is NOT
+        // guaranteed to be the open step. Jump to step 0 via the "Welcome"
+        // SideNav button (flow.jumpTo(0)) so the WelcomeStep body renders, then
+        // assert its heading. Retry-to-open rides out the dev hydration race.
+        await expect(async () => {
+            await welcomeNav.click();
+            await expect(page.getByRole('heading', { name: 'Welcome to Ever Works' })).toBeVisible({
+                timeout: 3_000,
+            });
+        }).toPass({ timeout: 15_000 });
     });
 });
 

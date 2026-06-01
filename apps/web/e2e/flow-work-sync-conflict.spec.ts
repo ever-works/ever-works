@@ -515,12 +515,18 @@ test.describe('flow: work data-sync state-field + conflict contract (EW-628, dee
         expect(live, 'sync state readable before delete').toBeTruthy();
         expect(live!.syncIntervalMinutes, 'cadence present pre-delete').toBe(5);
 
-        const del = await request.delete(`${API_BASE}/api/works/${work.id}`, {
+        // Hard-delete via the REAL route: POST /api/works/:id/delete (there is NO
+        // DELETE /api/works/:id route — it 404s as "Cannot DELETE"). The live
+        // controller @HttpCode(200)s and returns a success envelope.
+        const del = await request.post(`${API_BASE}/api/works/${work.id}/delete`, {
             headers: authedHeaders(token),
+            data: {},
         });
         expect([200, 202, 204], `delete responds cleanly (got ${del.status()})`).toContain(
             del.status(),
         );
+        const delBody = await del.json();
+        expect(delBody, 'delete envelope is a success').toMatchObject({ status: 'success' });
 
         // The persisted sync state is gone — GET 404s (hard delete, no soft-delete).
         const gone = await request.get(`${API_BASE}/api/works/${work.id}`, {

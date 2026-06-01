@@ -471,11 +471,14 @@ test.describe('Work ownership transfer (owner-claim) — deep integration', () =
         expect(stillThere, 'left member is removed from the roster').toBeUndefined();
         expect(await readWorkOwnerId(request, owner.access_token, workId)).toBe(owner.user.id);
 
-        // Leaving again with no membership → 404 'You are not a member of this work'.
+        // Leaving again is rejected: `leaveWork` runs the orphan-protection
+        // `ensureCanView` gate FIRST, and the ex-member now has no membership row,
+        // so that gate throws 403 'You do not have permission to access this work'
+        // BEFORE the (unreachable) "not a member" 404 branch. Confirmed live.
         const leaveAgain = await request.post(`${API_BASE}/api/works/${workId}/members/leave`, {
             headers: authedHeaders(member.access_token),
         });
-        expect(leaveAgain.status(), 'leaving twice → 404').toBe(404);
+        expect(leaveAgain.status(), 'leaving twice → 403 (view gate)').toBe(403);
     });
 
     test('transfer lifecycle: owner retains ALL owner rights across issue → accept-attempt → revoke', async ({

@@ -196,12 +196,18 @@ test.describe('Work items CRUD — deep single-item lifecycle (API integration)'
                 expect: [/source_url must be a URL address/i],
             },
             {
+                // PROBED: a bare string for `categories` fails @IsArray/@ArrayMinSize
+                // (and falls back to the category branch) — it does NOT emit the
+                // each-value message because `@IsString({ each:true })` only runs over
+                // arrays. To exercise the each-value validator we must pass an ARRAY
+                // holding a non-string element ([123] → "each value in categories must
+                // be a string", confirmed live).
                 label: 'wrong-typed categories → each value must be a string',
                 body: {
                     name: 'X',
                     description: 'd',
                     source_url: 'https://example.com/a',
-                    categories: 'should-be-array',
+                    categories: [123],
                 },
                 expect: [/each value in categories must be a string/i],
             },
@@ -318,11 +324,15 @@ test.describe('Work items CRUD — deep single-item lifecycle (API integration)'
             ).toMatch(/item_slug/i);
 
             // stage B: DTO-valid body → owner reaches the git gate → exact 400.
+            // PROBED: `featured` is whitelisted on UpdateItemDto but FORBIDDEN on
+            // RemoveItemDto (forbidNonWhitelisted → "property featured should not
+            // exist"), so the shared-valid body is item_slug ALONE — that bottoms
+            // out in the git gate on BOTH routes (status:'error' + GIT_GATE_MESSAGE).
             const valid = await postItem(
                 request,
                 token,
                 work.id,
-                { item_slug: 'no-such-item', featured: true },
+                { item_slug: 'no-such-item' },
                 route,
             );
             const validText = await valid.text().catch(() => '');

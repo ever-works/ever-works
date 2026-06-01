@@ -665,7 +665,10 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
     //      task that (via the PATCH asymmetry) dangles off A's id.
     // ───────────────────────────────────────────────────────────────────────
     test('depth-64 parent-chain cap + cross-user parent isolation', async ({ request }) => {
-        test.setTimeout(180_000);
+        // Building a 64-deep chain inherently spans ≥1 create-throttle window
+        // (60/60s per-IP); under workers=4 the shared bucket + retried Step 2/3
+        // writes can span several windows, so we budget generously.
+        test.setTimeout(300_000);
         const a = await registerUserViaAPI(request);
         const b = await registerUserViaAPI(request);
         const tokenA = a.access_token;
@@ -675,28 +678,51 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
         // --- Step 1: build a deep chain, expecting an eventual depth-cap 400.
         //         We push up to ~70 levels; somewhere past depth 64 the create
         //         must be rejected. We assert (a) a deep prefix succeeded and
-        //         (b) the first rejection carries the depth-cap message. ---
+        //         (b) the first rejection carries the depth-cap message.
+        //
+        //         REALITY (probed live): POST /api/tasks is @Throttle-d at
+        //         60/60s per-IP (route) PLUS the global short tier (50/s), so a
+        //         tight burst of ~67 creations needed to actually REACH the
+        //         depth-64 cap will trip a 429 long before the cap — and under
+        //         the workers=4 run that per-IP budget is shared across workers,
+        //         which is exactly why an un-hardened burst stalled at ~43. A
+        //         429 is NOT the depth cap: it means "slow down", so we wait out
+        //         the throttle window and RETRY the SAME level (never advancing
+        //         `created`) until each create either lands (201) or is rejected
+        //         by the real cap (400). With backoff the chain reliably reaches
+        //         created=66, then the cap fires. ---
         let parentId: string | undefined;
         let created = 0;
         let capError: { status: number; message: string } | null = null;
         const MAX_TRY = 70;
-        for (let i = 1; i <= MAX_TRY; i++) {
-            const res = await request.post(`${API_BASE}/api/tasks`, {
-                headers: authedHeaders(tokenA),
-                data: {
-                    title: `Deep ${i} ${sfx}`,
-                    ...(parentId ? { parentTaskId: parentId } : {}),
-                },
-            });
-            if (res.status() === 201) {
-                const node = (await res.json()) as Task;
-                parentId = node.id;
-                created += 1;
-                continue;
+        outer: for (let i = 1; i <= MAX_TRY; i++) {
+            // Retry this level until it lands or hits a non-429 outcome. The
+            // generous attempt budget tolerates several full throttle windows
+            // even when sibling workers are contending the same per-IP bucket.
+            for (let attempt = 0; attempt < 40; attempt++) {
+                const res = await request.post(`${API_BASE}/api/tasks`, {
+                    headers: authedHeaders(tokenA),
+                    data: {
+                        title: `Deep ${i} ${sfx}`,
+                        ...(parentId ? { parentTaskId: parentId } : {}),
+                    },
+                });
+                if (res.status() === 201) {
+                    const node = (await res.json()) as Task;
+                    parentId = node.id;
+                    created += 1;
+                    continue outer;
+                }
+                // 429 = throttle, not the cap. Back off past the window and
+                // retry the SAME level without advancing the chain.
+                if (res.status() === 429) {
+                    await new Promise((r) => setTimeout(r, 1500));
+                    continue;
+                }
+                // First genuine non-201/non-429 is the depth cap.
+                capError = { status: res.status(), message: String((await res.json()).message) };
+                break outer;
             }
-            // First non-201 is the depth cap.
-            capError = { status: res.status(), message: String((await res.json()).message) };
-            break;
         }
         // A genuinely deep chain must have formed before the cap bit (well past
         // a trivial nesting) — and the cap must have actually triggered.
@@ -710,47 +736,85 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
         );
 
         // --- Step 2: cross-user. A makes a normal root task. ---
-        const aRoot = await createTask(request, tokenA, { title: `A Root ${sfx}` });
+        // Step 1 just drained the per-IP create-throttle (60/60s) building the
+        // 64-deep chain; under workers=4 that bucket is also shared with sibling
+        // specs. Wrap the throttle-prone create in a toPass retry so a transient
+        // 429 (which fails the helper's `.toBe(201)`) simply retries past the
+        // window — the 201 + shape assertion inside createTask is preserved.
+        let aRoot!: Task;
+        await expect(async () => {
+            aRoot = await createTask(request, tokenA, { title: `A Root ${sfx}` });
+        }).toPass({ timeout: 90_000 });
 
         // B CANNOT create a child under A's task — A's task is invisible to B's
         // user-scoped parent lookup → 400 "not found" (no existence leak as 403).
-        const bUnderA = await request.post(`${API_BASE}/api/tasks`, {
-            headers: authedHeaders(tokenB),
-            data: { title: `B child of A ${sfx}`, parentTaskId: aRoot.id },
-        });
-        expect(bUnderA.status(), "B cannot create a child under A's task → 400").toBe(400);
+        // Retry past any 429 so we assert the real 400, never a throttle blip.
+        let bUnderABody = '';
+        await expect(async () => {
+            const res = await request.post(`${API_BASE}/api/tasks`, {
+                headers: authedHeaders(tokenB),
+                data: { title: `B child of A ${sfx}`, parentTaskId: aRoot.id },
+            });
+            bUnderABody = await res.text();
+            expect(res.status(), "B cannot create a child under A's task → 400").toBe(400);
+        }).toPass({ timeout: 90_000 });
         expect(
-            String((await bUnderA.json()).message),
+            String(JSON.parse(bUnderABody).message),
             'cross-user parent reads as not-found',
         ).toMatch(/parent task .* not found/i);
 
-        // B GET on A's task → 404 (cross-user read hidden).
-        const bGetA = await request.get(`${API_BASE}/api/tasks/${aRoot.id}`, {
-            headers: authedHeaders(tokenB),
-        });
-        expect(bGetA.status(), "B GET on A's task → 404").toBe(404);
+        // B GET on A's task → 404 (cross-user read hidden). Retried past any
+        // transient throttle so we assert the real 404, never a 429.
+        await expect(async () => {
+            const bGetA = await request.get(`${API_BASE}/api/tasks/${aRoot.id}`, {
+                headers: authedHeaders(tokenB),
+            });
+            expect(bGetA.status(), "B GET on A's task → 404").toBe(404);
+        }).toPass({ timeout: 60_000 });
 
         // --- Step 3: B owns a task and (via the PATCH cycle-check-only path)
         //         dangles it off A's parent id. This does NOT leak A's rows:
         //         B's `?parentTaskId=aRoot.id` returns ONLY B's own dangling
         //         child, and A's same query returns ONLY A's own children. The
         //         filter is always AND-ed with userId. ---
-        const bTask = await createTask(request, tokenB, { title: `B Task ${sfx}` });
-        const bDangle = await patchTask(request, tokenB, bTask.id, { parentTaskId: aRoot.id });
-        expect(bDangle.status(), "B PATCH dangling off A's id is accepted (200)").toBe(200);
+        // Same throttle-resilient retry for the remaining writes (see Step 2).
+        let bTask!: Task;
+        await expect(async () => {
+            bTask = await createTask(request, tokenB, { title: `B Task ${sfx}` });
+        }).toPass({ timeout: 90_000 });
+        await expect(async () => {
+            const bDangle = await patchTask(request, tokenB, bTask.id, { parentTaskId: aRoot.id });
+            expect(bDangle.status(), "B PATCH dangling off A's id is accepted (200)").toBe(200);
+        }).toPass({ timeout: 90_000 });
 
         // Give A a real child so both users have exactly one row under aRoot.id.
-        const aChild = await createTask(request, tokenA, {
-            title: `A Child ${sfx}`,
-            parentTaskId: aRoot.id,
-        });
+        let aChild!: Task;
+        await expect(async () => {
+            aChild = await createTask(request, tokenA, {
+                title: `A Child ${sfx}`,
+                parentTaskId: aRoot.id,
+            });
+        }).toPass({ timeout: 90_000 });
 
-        const bView = await listTasks(request, tokenB, `parentTaskId=${aRoot.id}`);
-        expect(bView.meta.total, "B's view of ?parentTaskId=aRoot has only B's own row").toBe(1);
-        expect(bView.data[0]?.id, "B sees only its own dangling child — never A's").toBe(bTask.id);
+        // Exact-count isolation assertions retried past any transient throttle
+        // (read-only GETs — retrying re-fetches; the strict `.toBe(1)` and the
+        // owned-row identity checks are unchanged).
+        await expect(async () => {
+            const bView = await listTasks(request, tokenB, `parentTaskId=${aRoot.id}`);
+            expect(bView.meta.total, "B's view of ?parentTaskId=aRoot has only B's own row").toBe(
+                1,
+            );
+            expect(bView.data[0]?.id, "B sees only its own dangling child — never A's").toBe(
+                bTask.id,
+            );
+        }).toPass({ timeout: 60_000 });
 
-        const aView = await listTasks(request, tokenA, `parentTaskId=${aRoot.id}`);
-        expect(aView.meta.total, "A's view of ?parentTaskId=aRoot has only A's own child").toBe(1);
-        expect(aView.data[0]?.id, "A sees only its own real child — never B's").toBe(aChild.id);
+        await expect(async () => {
+            const aView = await listTasks(request, tokenA, `parentTaskId=${aRoot.id}`);
+            expect(aView.meta.total, "A's view of ?parentTaskId=aRoot has only A's own child").toBe(
+                1,
+            );
+            expect(aView.data[0]?.id, "A sees only its own real child — never B's").toBe(aChild.id);
+        }).toPass({ timeout: 60_000 });
     });
 });

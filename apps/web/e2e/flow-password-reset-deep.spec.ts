@@ -585,19 +585,27 @@ test.describe('Password-reset (deep)', () => {
             await expect(passwordField.or(loginRedirect).first()).toBeVisible({ timeout: 20_000 });
 
             if (await passwordField.isVisible().catch(() => false)) {
-                await passwordField.fill('ValidPass1!');
                 const confirm = page.locator('input[type="password"]').nth(1);
-                if (await confirm.isVisible().catch(() => false)) {
-                    await confirm.fill('ValidPass1!');
-                }
 
                 const submit = page
                     .getByRole('button', { name: /reset|set.*password|submit|continue/i })
                     .first();
 
-                // Dev hydration race: first click can be swallowed pre-hydration — retry.
+                // Dev hydration race: the submit button is `disabled` until BOTH
+                // controlled password fields hold a value, so a single pre-hydration
+                // `.fill()` can land before React attaches its onChange and leave the
+                // button permanently disabled. Re-fill INSIDE the retry loop and gate
+                // the click on the button being enabled so each attempt re-syncs the
+                // controlled state before clicking.
                 await expect(async () => {
-                    if (await submit.isVisible().catch(() => false)) {
+                    await passwordField.fill('ValidPass1!');
+                    if (await confirm.isVisible().catch(() => false)) {
+                        await confirm.fill('ValidPass1!');
+                    }
+                    if (
+                        (await submit.isVisible().catch(() => false)) &&
+                        (await submit.isEnabled().catch(() => false))
+                    ) {
                         await submit.click({ timeout: 5_000 });
                     }
                     // Acceptable: the exact API message, a generic error, or a

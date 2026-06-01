@@ -601,7 +601,13 @@ test.describe('Skill content + version lifecycle', () => {
             .or(page.getByText(/skills/i))
             .first();
 
-        await expect(updatedTitle.or(skillsHub)).toBeVisible({ timeout: 30_000 });
+        // The new title can surface in BOTH the visible <h1> AND the always-mounted
+        // (opacity-0) <span role="tooltip"> of the dashboard chrome, and the detail
+        // page also renders a "← Skills" breadcrumb that matches the hub locator — so
+        // the union resolves to multiple nodes. A trailing `.first()` on the whole
+        // `.or()` dodges the strict-mode violation while keeping the
+        // "updated title OR skills hub" intent intact.
+        await expect(updatedTitle.or(skillsHub).first()).toBeVisible({ timeout: 30_000 });
 
         // And the stale title must NOT be the thing rendered on the detail page
         // when the detail route DID render (guarding against a cache surfacing v1).

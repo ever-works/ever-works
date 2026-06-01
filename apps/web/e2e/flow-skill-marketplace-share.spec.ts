@@ -578,7 +578,11 @@ test.describe('Skill marketplace / share / visibility', () => {
         await expect(async () => {
             await availableTab.first().click();
             const emptyCopy = page.getByText(/no skills available/i);
-            const installBtn = page.getByRole('button', { name: /^install/i });
+            // Anchor to the catalog card's exact "Install" CTA — an unanchored
+            // /^install/i also matches the "installed" section toggle button
+            // (accessible name "installed"), so when the empty-state shows the
+            // .or() would resolve to 2 elements and trip strict mode.
+            const installBtn = page.getByRole('button', { name: /^install$/i });
             await expect(emptyCopy.first().or(installBtn.first())).toBeVisible({ timeout: 10_000 });
         }).toPass({ timeout: 30_000 });
 
