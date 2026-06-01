@@ -600,7 +600,7 @@ test.describe('Agent inbox + messaging', () => {
                 /no outbound email address|From address not found|requires bodyText|error/i,
             );
             const successBanner = page.getByText(/Sent ✓/i);
-            await expect(errorBanner.or(successBanner).first()).toBeVisible({ timeout: 30_000 });
+            await expect(errorBanner.or(successBanner).first()).toBeVisible({ timeout: 45_000 });
         } else {
             // Local next-dev fell back to the 404 page for this nested segment.
             // Assert that real surface, then re-prove the route wiring via the

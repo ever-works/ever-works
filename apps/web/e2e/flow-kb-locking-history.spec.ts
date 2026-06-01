@@ -347,7 +347,9 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
             .first();
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
         const kbShell = page.getByTestId('kb-shell').first();
-        await expect(readOnlyMarker.or(notFound).or(kbShell)).toBeVisible({ timeout: 60_000 });
+        await expect(readOnlyMarker.or(notFound).or(kbShell).first()).toBeVisible({
+            timeout: 60_000,
+        });
         const localCatchAll = await notFound.isVisible().catch(() => false);
         if (!localCatchAll) {
             // In CI (route renders) the LIVE autosave editor must be absent for

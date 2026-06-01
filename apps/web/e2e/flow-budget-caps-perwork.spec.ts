@@ -771,11 +771,16 @@ test.describe('Flow: per-Work usage read-side — period windows, CSV export fil
                 isLoginUrl() ||
                 (await chrome.isVisible().catch(() => false)) ||
                 (await notFound.isVisible().catch(() => false));
+            if (!settled) {
+                // A deep nested RSC route can stream slower than a single CI compile
+                // window; re-hit it to kick a fresh render before failing the poll.
+                await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            }
             expect(
                 settled,
                 `budgets-usage page never reached a terminal state; url=${page.url()}`,
             ).toBeTruthy();
-        }).toPass({ timeout: 45_000 });
+        }).toPass({ timeout: 90_000 });
 
         const rendered = await chrome.isVisible().catch(() => false);
 

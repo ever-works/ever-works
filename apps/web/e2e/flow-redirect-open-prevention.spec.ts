@@ -443,7 +443,9 @@ test.describe('flow: end-to-end login-redirect-back integrity (unauth → author
             // ahead of the cookie-clearing redirect and flaking the consume assert.
             await expect
                 .poll(() => new URL(page.url()).pathname.replace(/^\/[a-z]{2}(?=\/|$)/, ''), {
-                    timeout: 30_000,
+                    // CI cold-compiles the post-login target route on first hit, so the
+                    // stash-consuming redirect away from /login can take >30s.
+                    timeout: 60_000,
                 })
                 .not.toMatch(/\/login$/);
             // And we are on our own origin (never attacker-controlled).

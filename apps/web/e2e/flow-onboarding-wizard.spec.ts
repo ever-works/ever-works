@@ -466,7 +466,9 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         await expect(page.getByRole('button', { name: 'Your AI choice' })).toBeVisible({
             timeout: 10_000,
         });
-        await expect(page.getByRole('button', { name: 'Create your first work' })).toBeVisible({
+        await expect(
+            page.getByRole('button', { name: 'Create your first work' }).first(),
+        ).toBeVisible({
             timeout: 10_000,
         });
         // And the wizard footer's "Close wizard" affordance.
