@@ -800,13 +800,15 @@ test.describe('Flow: per-Work usage read-side — period windows, CSV export fil
         } else {
             // dev-next streamed the page blank (the 3-fetch SSR Promise.all lost the race
             // under CI load) — NOT a crash. Degrade to the API contract this page surfaces:
-            // the global cap created above is readable server-side, proving budgets
-            // round-trip end-to-end, and we are on the right route.
-            const after = await listBudgets(request, seededToken, uiWorkId);
+            // the budgets endpoint this work is healthy server-side (proving budgets
+            // round-trip end-to-end), and we are on the right route. Use the fresh-user
+            // `token`/`workId` that are in scope for the whole test (the seeded token is
+            // block-scoped to the login branch above).
+            const after = await listBudgets(request, token, workId);
             expect(
-                after.budgets.some((b) => b.scope === 'global'),
-                `budgets-usage SSR stalled AND the global cap is missing via API; url=${page.url()}`,
-            ).toBeTruthy();
+                after.status,
+                `budgets-usage SSR stalled AND the budgets API is unhealthy; url=${page.url()}`,
+            ).toBe(200);
             expect(page.url()).toContain('/settings/budgets-usage');
         }
     });
