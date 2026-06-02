@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { BadRequestException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
@@ -7,6 +8,7 @@ import {
     EnableWorkPluginDto,
     SetActiveCapabilityDto,
     SetGlobalPipelineDefaultDto,
+    sanitizeSettingsObject,
     UpdateUserPluginSettingsDto,
     UpdateWorkPluginPriorityDto,
     UpdateWorkPluginSettingsDto,
@@ -55,6 +57,50 @@ describe('plugins update-plugin-settings DTOs validation', () => {
             });
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'metadata').isObject).toBeDefined();
+        });
+    });
+
+    // The @Transform on every settings/metadata field runs this sanitizer, which
+    // is exported and unit-tested directly here: building adversarial payloads
+    // through plainToInstance would otherwise trip class-transformer's own
+    // reflection (it reads `.constructor` while traversing) before our transform
+    // runs, which is a class-transformer quirk rather than the behaviour we own.
+    describe('sanitizeSettingsObject (prototype-pollution + depth guard)', () => {
+        it('strips prototype-polluting keys (__proto__/constructor) at every level', () => {
+            // JSON.parse — not an object literal — so `__proto__` is a real own
+            // enumerable key (the attacker's wire format), not the prototype setter.
+            const input = JSON.parse(
+                '{"safe":1,"__proto__":{"polluted":true},"nested":{"constructor":"x","ok":2,"prototype":"y"}}',
+            );
+
+            expect(sanitizeSettingsObject(input)).toEqual({ safe: 1, nested: { ok: 2 } });
+            // The global Object prototype was not polluted.
+            expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+        });
+
+        it('strips dangerous keys nested inside arrays', () => {
+            const input = JSON.parse('{"list":[{"__proto__":{"x":1},"keep":"y"}]}');
+            expect(sanitizeSettingsObject(input)).toEqual({ list: [{ keep: 'y' }] });
+        });
+
+        it('rejects payloads nested beyond the maximum depth instead of passing them through', () => {
+            // 12 levels deep > MAX_SETTINGS_DEPTH (10).
+            let deep: Record<string, unknown> = { leaf: true };
+            for (let i = 0; i < 12; i++) {
+                deep = { child: deep };
+            }
+            expect(() => sanitizeSettingsObject(deep)).toThrow(BadRequestException);
+        });
+
+        it('returns within-depth objects unchanged (deep-cloned, no dangerous keys)', () => {
+            const input = { a: { b: { c: { d: 'ok' } } } };
+            expect(sanitizeSettingsObject(input)).toEqual(input);
+        });
+
+        it('passes primitives through untouched', () => {
+            expect(sanitizeSettingsObject('hello')).toBe('hello');
+            expect(sanitizeSettingsObject(42)).toBe(42);
+            expect(sanitizeSettingsObject(null)).toBeNull();
         });
     });
 

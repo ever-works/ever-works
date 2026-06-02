@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
     IsBoolean,
@@ -17,14 +18,26 @@ import { IsValidCapabilityConstraint } from './validators/capability.validator';
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_SETTINGS_DEPTH = 10;
 
-function sanitizeSettingsObject(value: unknown, depth = 0): unknown {
-    if (
-        depth > MAX_SETTINGS_DEPTH ||
-        value === null ||
-        typeof value !== 'object' ||
-        Array.isArray(value)
-    ) {
+// Exported for direct unit testing of the prototype-pollution + depth guard.
+export function sanitizeSettingsObject(value: unknown, depth = 0): unknown {
+    if (value === null || typeof value !== 'object') {
         return value;
+    }
+    // Reject (do NOT pass through) payloads nested beyond the limit. Returning
+    // the raw subtree here — the previous behaviour — persisted any dangerous
+    // keys (__proto__/constructor) and arbitrarily deep structures *below* the
+    // cap unchecked, defeating both the prototype-pollution and depth/DoS
+    // guards for inputs like `settings.a.a.…(11 deep).constructor = {...}`.
+    if (depth > MAX_SETTINGS_DEPTH) {
+        throw new BadRequestException(
+            `Plugin settings exceed the maximum nesting depth of ${MAX_SETTINGS_DEPTH}.`,
+        );
+    }
+    if (Array.isArray(value)) {
+        // Recurse into array entries too: a dangerous key nested inside an array
+        // element (e.g. `settings.list[0].__proto__`) must not slip past the
+        // sanitizer just because its parent is an array.
+        return value.map((entry) => sanitizeSettingsObject(entry, depth + 1));
     }
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
