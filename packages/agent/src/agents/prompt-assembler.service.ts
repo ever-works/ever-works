@@ -268,9 +268,7 @@ export class PromptAssemblerService {
         for (const skill of skills) {
             const slug = neutralizeInjectedBlock(skill.slug);
             const body = neutralizeInjectedBlock(skill.body);
-            lines.push(
-                `<skill slug="${slug}" priority="${skill.priority}">\n${body}\n</skill>`,
-            );
+            lines.push(`<skill slug="${slug}" priority="${skill.priority}">\n${body}\n</skill>`);
         }
         return lines.join('\n\n');
     }

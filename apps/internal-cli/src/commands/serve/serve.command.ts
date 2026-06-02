@@ -5,11 +5,16 @@ import { ValidationPipe } from '@nestjs/common';
 import chalk from 'chalk';
 import { ConfigCheckService } from '../work/config-check.service';
 import { WorksModule } from '../../works/works.module';
+import { CliTokenGuard } from '../../works/cli-token.guard';
+import { isLoopbackHost, ServeTokenService } from '../../works/serve-token.service';
 
 interface ServeOptions {
     port?: string;
     host?: string;
+    allowRemote?: boolean;
 }
+
+const DEFAULT_HOST = '127.0.0.1';
 
 @Command({
     name: 'serve',
@@ -30,31 +35,58 @@ export class ServeCommand extends CommandRunner {
             await this.configCheck.requireConfiguration();
 
             const port = parseInt(options?.port || '3100', 10);
-            const host = options?.host || 'localhost';
+            const requestedHost = options?.host;
+            const allowRemote = options?.allowRemote === true;
 
-            // Security: this server mounts WorksController, which has NO
-            // authentication (every handler runs as the local user). Binding to
-            // a non-loopback interface exposes full work CRUD + AI generation to
-            // anyone who can reach the port. We don't block it (operators may
-            // have a trusted-network reason), but loudly warn so it isn't done
-            // by accident. Loopback-only is the safe default.
-            const loopbackHosts = ['localhost', '127.0.0.1', '::1', '[::1]'];
-            if (!loopbackHosts.includes(host.toLowerCase())) {
+            // Security: this server mounts WorksController, which runs every
+            // handler as the local user. We now gate it with a per-start token
+            // (see below), but loopback-by-default is still the right posture:
+            // binding to a non-loopback interface widens the attack surface to
+            // the LAN, so it must be an explicit opt-in.
+            //
+            // Default to 127.0.0.1 (unambiguous loopback). A non-loopback host
+            // is only honoured when `--allow-remote` is passed; otherwise we
+            // refuse rather than silently downgrade the operator's intent.
+            const host = requestedHost || DEFAULT_HOST;
+            if (requestedHost && !isLoopbackHost(requestedHost) && !allowRemote) {
                 console.log(
                     chalk.red.bold(
-                        '\n⚠ SECURITY WARNING: binding to a non-loopback host ' +
-                            `(${host}).`,
+                        `\n✗ Refusing to bind to non-loopback host (${requestedHost}) ` +
+                            'without --allow-remote.',
                     ),
                 );
                 console.log(
                     chalk.yellow(
-                        'This API has NO authentication — anyone who can reach ' +
-                            'this port can create, generate, and delete works as you. ' +
-                            'Only do this on a fully trusted network, behind a ' +
-                            'firewall/reverse-proxy that adds authentication.',
+                        'Binding to a remote-reachable interface exposes the work ' +
+                            'API beyond this machine. Re-run with --allow-remote if ' +
+                            'you really intend this, and only on a trusted network ' +
+                            'behind a firewall.',
+                    ),
+                );
+                process.exit(1);
+            }
+            if (requestedHost && !isLoopbackHost(requestedHost) && allowRemote) {
+                console.log(
+                    chalk.red.bold(
+                        `\n⚠ SECURITY WARNING: binding to a non-loopback host (${host}).`,
+                    ),
+                );
+                console.log(
+                    chalk.yellow(
+                        'The work API is reachable from the network. Every request ' +
+                            'still requires the per-start CLI token, but treat that ' +
+                            'token as a network secret and run behind a firewall.',
                     ),
                 );
             }
+
+            // Security: generate a random per-start token and require it on
+            // every request via a global guard. This means even loopback/local
+            // callers (other processes on this machine, drive-by web pages
+            // hitting the localhost port) must present a secret they can only
+            // learn by reading the 0600 token file we write below.
+            const cliToken = ServeTokenService.generateToken();
+            const tokenPath = await ServeTokenService.writeToken(cliToken);
 
             console.log(chalk.cyan('--- Server Configuration ---'));
             console.log(chalk.gray('Host:'), chalk.white(host));
@@ -78,6 +110,12 @@ export class ServeCommand extends CommandRunner {
                         forbidNonWhitelisted: true,
                     }),
                 );
+
+                // Security: require the per-start token on EVERY request. The
+                // guard is constructed with the token generated above and
+                // registered globally so it covers every WorksController route
+                // (and any future ones) without per-handler opt-in.
+                app.useGlobalGuards(new CliTokenGuard(cliToken));
 
                 // Security: do NOT reflect arbitrary origins. `{ origin: true,
                 // credentials: true }` echoes any site's Origin back with
@@ -114,6 +152,15 @@ export class ServeCommand extends CommandRunner {
                 // Start listening
                 await app.listen(port, host);
 
+                console.log(chalk.yellow('\n--- Authentication ---'));
+                console.log(
+                    chalk.gray('Every request requires this per-start token via'),
+                    chalk.white('Authorization: Bearer <token>'),
+                    chalk.gray('or'),
+                    chalk.white('X-EW-CLI-Token: <token>'),
+                );
+                console.log(chalk.gray('Token file (0600):'), chalk.white(tokenPath));
+
                 console.log(chalk.yellow('\n--- Controls ---'));
                 console.log(
                     chalk.gray('Press'),
@@ -121,24 +168,30 @@ export class ServeCommand extends CommandRunner {
                     chalk.gray('to stop the server'),
                 );
 
-                // Keep the process alive
-                process.on('SIGINT', () => {
+                const shutdown = () => {
                     console.log(chalk.yellow('\n\n⚠ Shutting down server...'));
-                    app.close().then(() => {
-                        console.log(chalk.green('✓ Server stopped successfully'));
-                        process.exit(0);
-                    });
-                });
+                    app.close()
+                        .then(() => ServeTokenService.removeToken())
+                        .then(() => {
+                            console.log(chalk.green('✓ Server stopped successfully'));
+                            process.exit(0);
+                        })
+                        .catch(() => {
+                            // Even if close/cleanup fails, exit so the operator
+                            // isn't left with a hung process.
+                            process.exit(0);
+                        });
+                };
 
-                process.on('SIGTERM', () => {
-                    console.log(chalk.yellow('\n\n⚠ Shutting down server...'));
-                    app.close().then(() => {
-                        console.log(chalk.green('✓ Server stopped successfully'));
-                        process.exit(0);
-                    });
-                });
-            } catch (error) {
-                throw error;
+                // Keep the process alive until interrupted.
+                process.on('SIGINT', shutdown);
+                process.on('SIGTERM', shutdown);
+            } catch (startupError) {
+                // The server never came up (e.g. EADDRINUSE). Remove the token
+                // file we wrote so a stale, never-listened-on token isn't left
+                // readable on disk. Best-effort; rethrow the original error.
+                await ServeTokenService.removeToken();
+                throw startupError;
             }
         } catch (error) {
             this.logger.error('Failed to start API server:', error);
@@ -170,12 +223,22 @@ export class ServeCommand extends CommandRunner {
 
     @Option({
         flags: '-h, --host <string>',
-        description: 'Host to bind the server to',
+        description: 'Host to bind the server to (defaults to 127.0.0.1)',
     })
     parseHost(val: string): string {
         if (!val || val.trim().length === 0) {
             throw new Error('Host cannot be empty');
         }
         return val.trim();
+    }
+
+    @Option({
+        flags: '--allow-remote',
+        description:
+            'Permit binding to a non-loopback host (e.g. 0.0.0.0). Required ' +
+            'to expose the API beyond this machine; otherwise loopback-only.',
+    })
+    parseAllowRemote(): boolean {
+        return true;
     }
 }

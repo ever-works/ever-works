@@ -986,7 +986,9 @@ export class OrganizationService {
 
     private assertSafeSqlIdentifier(identifier: string): string {
         if (!OrganizationService.SAFE_SQL_IDENTIFIER.test(identifier)) {
-            throw new Error(`Unsafe SQL identifier in backfill table map: ${JSON.stringify(identifier)}`);
+            throw new Error(
+                `Unsafe SQL identifier in backfill table map: ${JSON.stringify(identifier)}`,
+            );
         }
         return identifier;
     }

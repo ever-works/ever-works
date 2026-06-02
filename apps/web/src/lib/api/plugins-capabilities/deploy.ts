@@ -181,7 +181,9 @@ export const deployAPI = {
      */
     getDomains(workId: string) {
         // Security: encode workId to prevent path-segment injection
-        return serverFetch<DomainsResponseDto>(`/deploy/works/${encodeURIComponent(workId)}/domains`);
+        return serverFetch<DomainsResponseDto>(
+            `/deploy/works/${encodeURIComponent(workId)}/domains`,
+        );
     },
 
     /**

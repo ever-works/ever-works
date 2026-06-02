@@ -156,7 +156,11 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 		// the workspace. `slugify` already removes traversal sequences; this assert
 		// guarantees confinement even if that ever regresses.
 		const relativeToWorkspace = path.relative(workspaceResolved, filePath);
-		if (relativeToWorkspace.startsWith('..') || path.isAbsolute(relativeToWorkspace) || relativeToWorkspace.includes('/')) {
+		if (
+			relativeToWorkspace.startsWith('..') ||
+			path.isAbsolute(relativeToWorkspace) ||
+			relativeToWorkspace.includes('/')
+		) {
 			continue;
 		}
 		const content = JSON.stringify(item, null, 2);

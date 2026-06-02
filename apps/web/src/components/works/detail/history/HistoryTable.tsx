@@ -388,11 +388,13 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                         : t('trigger.api')}
                                                                 </span>
                                                             )}
-                                                        {entry.triggerRunId && (
+                                                        {entry.triggerRunId &&
                                                             // Security: validate triggerRunId to a safe alphanumeric/dash/underscore
                                                             // format before interpolating into the URL, preventing open-redirect
                                                             // if a malicious value was stored in the DB.
-                                                            /^[a-zA-Z0-9_-]{1,128}$/.test(entry.triggerRunId) ? (
+                                                            (/^[a-zA-Z0-9_-]{1,128}$/.test(
+                                                                entry.triggerRunId,
+                                                            ) ? (
                                                                 <a
                                                                     href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
                                                                     target="_blank"
@@ -402,8 +404,7 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                     <span>Trigger.dev</span>
                                                                     <ExternalLink className="h-3 w-3" />
                                                                 </a>
-                                                            ) : null
-                                                        )}
+                                                            ) : null)}
                                                     </div>
                                                 </div>
                                             </div>

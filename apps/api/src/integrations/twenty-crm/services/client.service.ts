@@ -33,70 +33,123 @@ export class ClientService {
         return encodeURIComponent(id);
     }
 
-    async createCompany(company: TwentyOrganization): Promise<TwentyOrganization> {
+    // Security (cross-tenant IDOR fix): the per-caller tenant endpoint prefix
+    // (`/tenants/{tenantId}`) MUST be present on every data-plane call made
+    // on behalf of an authenticated user, so a caller can only ever address
+    // rows inside their own tenant partition. We reject an empty prefix
+    // defensively — an empty/whitespace prefix would silently collapse back
+    // to the old un-scoped (cross-tenant) behaviour, so it is a programming
+    // error, not something we want to forward.
+    private requireTenantPrefix(tenantPrefix: string): string {
+        if (typeof tenantPrefix !== 'string' || tenantPrefix.trim().length === 0) {
+            throw new BadRequestException('Missing tenant scope');
+        }
+        return tenantPrefix;
+    }
+
+    async createCompany(
+        company: TwentyOrganization,
+        tenantPrefix: string,
+    ): Promise<TwentyOrganization> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
             'POST',
             '/companies',
             company,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async createContact(contact: TwentyContact): Promise<TwentyContact> {
+    async createContact(contact: TwentyContact, tenantPrefix: string): Promise<TwentyContact> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyContact>(
             'POST',
             '/contacts',
             contact,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async createDeal(deal: TwentyDeal): Promise<TwentyDeal> {
+    async createDeal(deal: TwentyDeal, tenantPrefix: string): Promise<TwentyDeal> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyDeal>(
             'POST',
             '/deals',
             deal,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async createProduct(product: TwentyProduct): Promise<TwentyProduct> {
+    async createProduct(product: TwentyProduct, tenantPrefix: string): Promise<TwentyProduct> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyProduct>(
             'POST',
             '/products',
             product,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getCompany(companyId: string): Promise<TwentyOrganization> {
+    async getCompany(companyId: string, tenantPrefix: string): Promise<TwentyOrganization> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
             'GET',
             `/companies/${this.safeId(companyId, 'companyId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getContact(contactId: string): Promise<TwentyContact> {
+    async getContact(contactId: string, tenantPrefix: string): Promise<TwentyContact> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyContact>(
             'GET',
             `/contacts/${this.safeId(contactId, 'contactId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getDeal(dealId: string): Promise<TwentyDeal> {
+    async getDeal(dealId: string, tenantPrefix: string): Promise<TwentyDeal> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyDeal>(
             'GET',
             `/deals/${this.safeId(dealId, 'dealId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getProduct(productId: string): Promise<TwentyProduct> {
+    async getProduct(productId: string, tenantPrefix: string): Promise<TwentyProduct> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyProduct>(
             'GET',
             `/products/${this.safeId(productId, 'productId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
@@ -104,95 +157,163 @@ export class ClientService {
     async updateCompany(
         companyId: string,
         company: TwentyOrganization,
+        tenantPrefix: string,
     ): Promise<TwentyOrganization> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
             'PUT',
             `/companies/${this.safeId(companyId, 'companyId')}`,
             company,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async updateContact(contactId: string, contact: TwentyContact): Promise<TwentyContact> {
+    async updateContact(
+        contactId: string,
+        contact: TwentyContact,
+        tenantPrefix: string,
+    ): Promise<TwentyContact> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyContact>(
             'PUT',
             `/contacts/${this.safeId(contactId, 'contactId')}`,
             contact,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async updateDeal(dealId: string, deal: TwentyDeal): Promise<TwentyDeal> {
+    async updateDeal(dealId: string, deal: TwentyDeal, tenantPrefix: string): Promise<TwentyDeal> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyDeal>(
             'PUT',
             `/deals/${this.safeId(dealId, 'dealId')}`,
             deal,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async updateProduct(productId: string, product: TwentyProduct): Promise<TwentyProduct> {
+    async updateProduct(
+        productId: string,
+        product: TwentyProduct,
+        tenantPrefix: string,
+    ): Promise<TwentyProduct> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyProduct>(
             'PUT',
             `/products/${this.safeId(productId, 'productId')}`,
             product,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async deleteCompany(companyId: string): Promise<void> {
+    async deleteCompany(companyId: string, tenantPrefix: string): Promise<void> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         await this.twentyCrmService.makeRequest<void>(
             'DELETE',
             `/companies/${this.safeId(companyId, 'companyId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
     }
 
-    async deleteContact(contactId: string): Promise<void> {
+    async deleteContact(contactId: string, tenantPrefix: string): Promise<void> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         await this.twentyCrmService.makeRequest<void>(
             'DELETE',
             `/contacts/${this.safeId(contactId, 'contactId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
     }
 
-    async deleteDeal(dealId: string): Promise<void> {
+    async deleteDeal(dealId: string, tenantPrefix: string): Promise<void> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         await this.twentyCrmService.makeRequest<void>(
             'DELETE',
             `/deals/${this.safeId(dealId, 'dealId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
     }
 
-    async deleteProduct(productId: string): Promise<void> {
+    async deleteProduct(productId: string, tenantPrefix: string): Promise<void> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         await this.twentyCrmService.makeRequest<void>(
             'DELETE',
             `/products/${this.safeId(productId, 'productId')}`,
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
     }
 
-    async getCompanies(): Promise<TwentyOrganization[]> {
+    async getCompanies(tenantPrefix: string): Promise<TwentyOrganization[]> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization[]>(
             'GET',
             '/companies',
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getContacts(): Promise<TwentyContact[]> {
+    async getContacts(tenantPrefix: string): Promise<TwentyContact[]> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyContact[]>(
             'GET',
             '/contacts',
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }
 
-    async getDeals(): Promise<TwentyDeal[]> {
-        const response = await this.twentyCrmService.makeRequest<TwentyDeal[]>('GET', '/deals');
+    async getDeals(tenantPrefix: string): Promise<TwentyDeal[]> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
+        const response = await this.twentyCrmService.makeRequest<TwentyDeal[]>(
+            'GET',
+            '/deals',
+            undefined,
+            undefined,
+            false,
+            prefix,
+        );
         return response;
     }
 
-    async getProducts(): Promise<TwentyProduct[]> {
+    async getProducts(tenantPrefix: string): Promise<TwentyProduct[]> {
+        const prefix = this.requireTenantPrefix(tenantPrefix);
         const response = await this.twentyCrmService.makeRequest<TwentyProduct[]>(
             'GET',
             '/products',
+            undefined,
+            undefined,
+            false,
+            prefix,
         );
         return response;
     }

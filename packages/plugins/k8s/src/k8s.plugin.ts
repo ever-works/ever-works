@@ -847,7 +847,10 @@ function isValidK8sNamespace(input: string): boolean {
 // an unintended digest (`@sha256:...`) or break the image reference. Returns an
 // empty string if nothing valid remains so the caller can fall back.
 function sanitiseDockerTag(input: string): string {
-	return input.replace(/[^A-Za-z0-9_.-]+/g, '').replace(/^[._-]+/, '').slice(0, 128);
+	return input
+		.replace(/[^A-Za-z0-9_.-]+/g, '')
+		.replace(/^[._-]+/, '')
+		.slice(0, 128);
 }
 
 // Security: validate + normalise a hostname for use as an Ingress `host:` rule.

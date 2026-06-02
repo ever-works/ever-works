@@ -150,6 +150,28 @@ export class AgentRunService {
             return { runId: context.runId, status: 'agent-not-found' };
         }
 
+        // Security (authz/IDOR): the agent is loaded by id only, so a caller
+        // whose `context.userId` does not own this agent would otherwise run a
+        // cross-tenant Agent — leaking that tenant's SOUL/AGENTS/HEARTBEAT
+        // prompt content, skills, budget and identity, and acting under its
+        // credentials. Two of the three production callers
+        // (`agent-heartbeat.task.ts`, `agent-chat-reply.task.ts`) look the
+        // agent up via `findById(payload.agentId)` (NOT user-scoped) and thread
+        // a separately-supplied `payload.userId` into the run, so the only
+        // boundary that can enforce same-owner is here. Reject the mismatch
+        // before any prompt/budget/memory work runs. We return `agent-not-found`
+        // (rather than a distinct "forbidden") so the response cannot be used as
+        // a cross-tenant existence oracle — mirrors the no-existence-leak
+        // posture already used in `agent-task-execute.task.ts` and the
+        // defensive ownership assertion in `checkBudget` below. For every
+        // legitimate run `agent.userId === context.userId`, so this is a no-op.
+        if (agent.userId !== context.userId) {
+            this.logger.warn(
+                `AgentRunService.execute: ownership mismatch for run ${context.runId} — agent ${context.agentId} is not owned by the requesting user; refusing cross-tenant run.`,
+            );
+            return { runId: context.runId, status: 'agent-not-found' };
+        }
+
         // 1. Pre-flight budget check.
         const budgetCheck = await this.checkBudget(agent);
         if (!budgetCheck.allowed) {

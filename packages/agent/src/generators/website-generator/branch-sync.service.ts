@@ -37,7 +37,9 @@ const SAFE_GIT_BRANCH_NAME = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
 
 function isSafeGitBranchName(name: unknown): name is string {
     return (
-        typeof name === 'string' && name.length > 0 && name.length <= 255 &&
+        typeof name === 'string' &&
+        name.length > 0 &&
+        name.length <= 255 &&
         SAFE_GIT_BRANCH_NAME.test(name)
     );
 }

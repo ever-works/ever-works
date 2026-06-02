@@ -1130,7 +1130,10 @@ export const buildReport = tool({
         groupBy: z
             .string()
             .max(64)
-            .regex(/^[a-zA-Z_][a-zA-Z0-9_.]*$/, 'groupBy must be a valid field name (letters, digits, underscores, dots)')
+            .regex(
+                /^[a-zA-Z_][a-zA-Z0-9_.]*$/,
+                'groupBy must be a valid field name (letters, digits, underscores, dots)',
+            )
             .describe('Field name to group/count by (e.g. status, priority, role)'),
         chartType: z.enum(['bar', 'pie']).optional(),
         workId: z.string().optional().describe('Required for work-scoped sources'),

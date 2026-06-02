@@ -127,7 +127,8 @@ function parseItems(rawItems: ActivepiecesOutputItem[]): ItemData[] {
 
 		// Security: validate source_url and images URLs from untrusted flow output to
 		// prevent javascript:, file:, data: schemes and SSRF via http: to internal hosts.
-		const rawSourceUrl = typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '';
+		const rawSourceUrl =
+			typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '';
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : '',

@@ -73,9 +73,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         const content = children as React.ReactNode;
 
         // Security: prevent reverse tabnapping — automatically inject noopener/noreferrer when target="_blank"
-        const safeRel = target === '_blank'
-            ? [rel, 'noopener', 'noreferrer'].filter(Boolean).join(' ')
-            : rel;
+        const safeRel =
+            target === '_blank' ? [rel, 'noopener', 'noreferrer'].filter(Boolean).join(' ') : rel;
 
         if (href && !disabled) {
             return (

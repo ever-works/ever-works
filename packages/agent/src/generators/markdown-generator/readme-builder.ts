@@ -107,7 +107,10 @@ export class ReadmeBuilder {
 
         if (item.tags && item.tags.length > 0) {
             const tags = item.tags
-                .map((tag) => `\`${this.escapeMarkdownInline((tag as { name?: string }).name ?? String(tag))}\``)
+                .map(
+                    (tag) =>
+                        `\`${this.escapeMarkdownInline((tag as { name?: string }).name ?? String(tag))}\``,
+                )
                 .join(' ');
             this.content += ` ${tags}`;
         }

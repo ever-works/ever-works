@@ -657,7 +657,8 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             className="w-full rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark px-3 py-2 text-sm text-text dark:text-text-dark outline-none focus:ring-2 focus:ring-primary/25"
                         />
                         <p className="text-xs text-text-muted dark:text-text-muted-dark text-right">
-                            {instruction.length.toLocaleString()} / {MAX_INSTRUCTION_LENGTH.toLocaleString()}
+                            {instruction.length.toLocaleString()} /{' '}
+                            {MAX_INSTRUCTION_LENGTH.toLocaleString()}
                         </p>
                         <div className="flex flex-col gap-3 @3xl/main:flex-row @3xl/main:items-center @3xl/main:justify-between">
                             <ToggleRow

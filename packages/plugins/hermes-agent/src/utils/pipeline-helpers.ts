@@ -12,7 +12,7 @@ import type {
 } from '@ever-works/plugin';
 import { buildCancelledPipelineResult, buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import type { HermesAgentStepId } from '../types.js';
-import { HERMES_AGENT_STEP_IDS } from '../types.js';
+import { DEFAULT_MAX_TURNS, DEFAULT_PROFILE, DEFAULT_TOOLSETS, HERMES_AGENT_STEP_IDS } from '../types.js';
 import { STEP_DEFINITIONS } from '../steps.js';
 
 export interface HermesRuntimeSettings {
@@ -307,19 +307,24 @@ function sanitizeBinaryPath(value: unknown): string | undefined {
 
 export function resolveHermesRuntimeSettings(settings: Record<string, unknown>): HermesRuntimeSettings {
 	return {
-		profile: typeof settings.profile === 'string' && settings.profile.trim() ? settings.profile.trim() : 'default',
+		profile:
+			typeof settings.profile === 'string' && settings.profile.trim() ? settings.profile.trim() : DEFAULT_PROFILE,
 		provider:
 			typeof settings.provider === 'string' && settings.provider.trim() ? settings.provider.trim() : undefined,
 		model: typeof settings.model === 'string' && settings.model.trim() ? settings.model.trim() : undefined,
+		// Security: the fallback MUST match DEFAULT_TOOLSETS so `terminal` stays
+		// opt-in here too. Using the shared constant keeps the two in lockstep — a
+		// regression that re-adds `terminal` to the default would have to change the
+		// constant, which is the single audited source of truth.
 		toolsets:
 			typeof settings.toolsets === 'string' && settings.toolsets.trim()
 				? settings.toolsets.trim()
-				: 'web,terminal,skills',
+				: DEFAULT_TOOLSETS,
 		skills: typeof settings.skills === 'string' && settings.skills.trim() ? settings.skills.trim() : undefined,
 		maxTurns:
 			typeof settings.maxTurns === 'number' && Number.isFinite(settings.maxTurns)
 				? Math.max(1, Math.floor(settings.maxTurns))
-				: 90,
+				: DEFAULT_MAX_TURNS,
 		binaryPath: sanitizeBinaryPath(settings.binaryPath),
 		yolo: settings.yolo !== false
 	};

@@ -45,9 +45,7 @@ function assertScenarioParamsWithinLimits(params: Record<string, unknown>): void
 		for (const child of entries) {
 			nodeCount += 1;
 			if (nodeCount > MAX_SCENARIO_PARAMS_NODES) {
-				throw new Error(
-					`Custom scenario parameters are too large (max ${MAX_SCENARIO_PARAMS_NODES} values).`
-				);
+				throw new Error(`Custom scenario parameters are too large (max ${MAX_SCENARIO_PARAMS_NODES} values).`);
 			}
 			if (child !== null && typeof child === 'object') {
 				stack.push({ value: child, depth: depth + 1 });

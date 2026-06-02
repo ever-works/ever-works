@@ -43,8 +43,41 @@ import { redactSecrets } from '../../utils/secret-scan';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
-const DEFAULT_ITEM_MARKDOWN = (item: ItemData) =>
-    `# ${item.name}\n\n${item.description}\n\n[${item.source_url}](${item.source_url})`;
+// Security (markdown-link breakout): `item.source_url` is populated by the
+// AI pipeline from externally-fetched, attacker-controllable web content and
+// is interpolated into a Markdown link in BOTH the link text `[...]` and the
+// link destination `(...)`. A hostile value (e.g. `https://x) <script>` or a
+// `javascript:`/`data:` URI) would otherwise terminate the link early and
+// inject extra Markdown/HTML when this body is later rendered. Mirror the
+// house pattern from ReadmeBuilder (markdown-generator): only emit http(s)
+// destinations (anything else collapses to an inert `#`), percent-encode the
+// few chars that break out of `(...)`, and escape Markdown control chars in
+// the visible link text. Benign http(s) URLs contain none of these and pass
+// through byte-for-byte unchanged. (Stored XSS via the broader markdown body /
+// name / description is intentionally NOT escaped here — that belongs at the
+// HTML render layer; see this file's audit note.)
+const escapeMarkdownInline = (value: string): string =>
+    String(value ?? '').replace(/[\\`[\]]/g, '\\$&');
+
+const sanitizeMarkdownUrl = (value: string): string => {
+    const raw = String(value ?? '');
+    let parsed: URL;
+    try {
+        parsed = new URL(raw);
+    } catch {
+        return '#';
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return '#';
+    }
+    return raw.replace(/[()<>\s]/g, encodeURIComponent);
+};
+
+const DEFAULT_ITEM_MARKDOWN = (item: ItemData) => {
+    const linkText = escapeMarkdownInline(item.source_url);
+    const linkUrl = sanitizeMarkdownUrl(item.source_url);
+    return `# ${item.name}\n\n${item.description}\n\n[${linkText}](${linkUrl})`;
+};
 
 export type InitializeErrorCode =
     | 'CLONE_FAILED'

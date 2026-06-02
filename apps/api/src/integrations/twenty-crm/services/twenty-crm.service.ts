@@ -52,10 +52,24 @@ export class TwentyCrmService {
         data?: any,
         params?: any,
         schema: boolean = false,
+        // Security (cross-tenant IDOR fix): the request-scoped, per-caller
+        // tenant endpoint prefix (`/tenants/{tenantId}`). When provided it is
+        // prepended to the data-plane endpoint so a caller can only ever
+        // address rows inside their own tenant partition. `undefined` keeps
+        // the legacy un-prefixed behaviour for internal/system callers (e.g.
+        // metadata/schema calls and sync paths that are NOT per-caller). The
+        // companies/people controllers ALWAYS pass a non-empty prefix.
+        tenantPrefix?: string,
     ): Promise<T> {
         try {
             const config = this.configService.twentyCrmConfig;
-            const url = schema ? `${this.metadataUrl}${endpoint}` : `${this.baseUrl}${endpoint}`;
+            // Schema/metadata calls are workspace-global admin operations and are
+            // never tenant-scoped; only the data plane gets the tenant prefix.
+            const scopedEndpoint =
+                !schema && tenantPrefix ? `${tenantPrefix}${endpoint}` : endpoint;
+            const url = schema
+                ? `${this.metadataUrl}${scopedEndpoint}`
+                : `${this.baseUrl}${scopedEndpoint}`;
 
             this.logger.debug(`Making ${method} request to ${url}`);
 

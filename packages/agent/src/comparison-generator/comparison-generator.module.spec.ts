@@ -7,6 +7,7 @@ jest.mock('../facades/facades.module', () => ({
 
 import { ComparisonGeneratorModule } from './comparison-generator.module';
 import { ComparisonGenerationService } from './comparison-generation.service';
+import { WorkOwnershipService } from '../services/work-ownership.service';
 
 describe('ComparisonGeneratorModule', () => {
     const meta = (key: string): unknown[] =>
@@ -18,6 +19,13 @@ describe('ComparisonGeneratorModule', () => {
 
     it('exports ComparisonGenerationService for downstream modules', () => {
         expect(meta('exports')).toContain(ComparisonGenerationService);
+    });
+
+    // Security: WorkOwnershipService must be a local provider so the service's
+    // defense-in-depth, membership-aware authorization gate (IDOR) can resolve
+    // via DI. It is intentionally NOT exported (internal to this module).
+    it('provides WorkOwnershipService for the defense-in-depth authz gate', () => {
+        expect(meta('providers')).toContain(WorkOwnershipService);
     });
 
     it('imports DatabaseModule + FacadesModule by name', () => {

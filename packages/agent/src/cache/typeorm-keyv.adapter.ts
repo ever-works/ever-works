@@ -142,7 +142,10 @@ export class TypeORMKeyvAdapter extends EventEmitter {
         // all namespaces/tenants. Emit (rather than throw) to match this class's
         // swallow-and-emit error contract; callers see no behaviour change.
         if (typeof likeTerm !== 'string' || likeTerm.trim().length === 0) {
-            this.emit('error', new Error('deleteUnscopedEntriesLike: likeTerm must be a non-empty string'));
+            this.emit(
+                'error',
+                new Error('deleteUnscopedEntriesLike: likeTerm must be a non-empty string'),
+            );
             return;
         }
         try {

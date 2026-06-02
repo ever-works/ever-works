@@ -163,7 +163,20 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 
 	verifyWebhookSignature(_rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void {
 		const expected = resolveInboundSecret(options);
-		if (!expected) return; // No secret configured — accept (operator opt-in to signature checking).
+		if (!expected) {
+			// Security: signature verification is an operator opt-in (matches the
+			// mailgun plugin + the IEmailInboundPlugin contract, which only
+			// mandates throwing on MISMATCH). Accepting an unsigned inbound
+			// webhook means ANY caller who knows the public webhook URL can
+			// inject mail into a tenant's scope, so surface a loud operator
+			// warning to make the unsigned state visible in logs/alerting.
+			// (Flipping the default to reject-when-unsigned is a cross-cutting
+			// behavior change — tracked as a re-deferred finding.)
+			console.warn(
+				'[postmark] inbound webhook accepted WITHOUT signature verification: no `inboundWebhookSecret`/POSTMARK_INBOUND_SECRET configured. Configure a secret to authenticate inbound mail.'
+			);
+			return;
+		}
 		// Postmark uses Basic Auth for inbound webhooks. Compare the
 		// Authorization header against `Basic base64(user:secret)`.
 		const authHeader = headers['authorization'] ?? headers['Authorization'];

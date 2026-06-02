@@ -33,7 +33,10 @@ export async function encrypt(text: string): Promise<string> {
         });
     } catch (error) {
         // Security: log only the message, not the full error object, to avoid leaking stack traces or iron-session internals to log aggregators.
-        console.error('Encryption error:', error instanceof Error ? error.message : 'Unknown error');
+        console.error(
+            'Encryption error:',
+            error instanceof Error ? error.message : 'Unknown error',
+        );
         throw new Error('Failed to encrypt cookie value');
     }
 }
@@ -48,7 +51,10 @@ export async function decrypt(encryptedText: string): Promise<string> {
         return unsealed as string;
     } catch (error) {
         // Security: log only the message, not the full error object, to avoid leaking stack traces or iron-session internals to log aggregators.
-        console.error('Decryption error:', error instanceof Error ? error.message : 'Unknown error');
+        console.error(
+            'Decryption error:',
+            error instanceof Error ? error.message : 'Unknown error',
+        );
         throw new Error('Failed to decrypt cookie value');
     }
 }

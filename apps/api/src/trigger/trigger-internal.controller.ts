@@ -97,7 +97,9 @@ const METHOD_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
  */
 const FORBIDDEN_ENVELOPE_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 
-function assertSuperJsonEnvelope(value: unknown): asserts value is { json: unknown; meta?: object } {
+function assertSuperJsonEnvelope(
+    value: unknown,
+): asserts value is { json: unknown; meta?: object } {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         throw new BadRequestException('Invalid args envelope');
     }

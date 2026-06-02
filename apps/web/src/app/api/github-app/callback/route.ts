@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
         /^\/(?![/\\])/.test(data.redirectTo) &&
         (() => {
             try {
-                return new URL(data.redirectTo!, request.url).origin === new URL(request.url).origin;
+                return (
+                    new URL(data.redirectTo!, request.url).origin === new URL(request.url).origin
+                );
             } catch {
                 return false;
             }

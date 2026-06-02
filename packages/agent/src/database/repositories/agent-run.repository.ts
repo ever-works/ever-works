@@ -48,7 +48,12 @@ export class AgentRunRepository {
     // Security: user-scoped variants — use these in HTTP handlers instead of
     // findByAgent/countByAgent to enforce ownership at the repository layer
     // and prevent latent IDOR if a future caller omits the service-level guard.
-    async findByAgentAndUser(agentId: string, userId: string, limit = 25, offset = 0): Promise<AgentRun[]> {
+    async findByAgentAndUser(
+        agentId: string,
+        userId: string,
+        limit = 25,
+        offset = 0,
+    ): Promise<AgentRun[]> {
         return this.repository.find({
             where: { agentId, userId },
             order: { createdAt: 'DESC' },

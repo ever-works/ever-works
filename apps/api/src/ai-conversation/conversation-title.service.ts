@@ -135,7 +135,8 @@ export class ConversationTitleService {
  * unchanged, so legitimate titles are unaffected.
  */
 const CONVERSATION_FENCE_TOKEN_PATTERN = /<\/?conversation\b/gi;
-const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+const CHAT_TEMPLATE_MARKER_PATTERN =
+    /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
 
 function neutralizeConversationField(value: string): string {
     return value

@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { KnowledgeBaseService, WorkOwnershipService } from '@ever-works/agent/services';
-import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import { CreateKbDocumentDto, KbDocumentQueryDto } from '@ever-works/agent/dto';
+import { OrganizationMembershipService } from '../organizations/organization-membership.service';
 import type { KbDocumentClass, KbDocumentStatus } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -27,9 +27,14 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
  * doesn't need a separate class filter.
  *
  * Permission gate: org-scoped routes require the caller to belong to
- * the Tenant that owns the target Organization (see `assertOrgAccess`).
- * A future PR will tighten this to an `OrganizationAdminGuard` once the
- * org-admin role concept lands platform-wide.
+ * the Tenant that owns the target Organization. The tenant-ownership
+ * check is delegated to the shared `OrganizationMembershipService`
+ * (`ensureMember` / `ensureAdmin`) so every raw
+ * `/api/organizations/:orgId/...` route platform-wide reuses ONE
+ * audited implementation instead of re-deriving the comparison.
+ * A future PR will tighten the write path to a true org-admin role
+ * once that role concept (a schema + product decision) lands; the
+ * `ensureAdmin` seam is already in place for it.
  */
 @ApiTags('Knowledge Base (Organization)')
 @ApiBearerAuth('JWT-auth')
@@ -42,31 +47,12 @@ export class OrgKbController {
         // routes are NOT scope-prefixed, so ScopeResolverMiddleware yields
         // EMPTY_SCOPE and ScopeOwnershipGuard passes trivially — i.e. the
         // global scope guards do NOT authorize the attacker-supplied
-        // `:orgId`/`?orgId`. We must resolve org→tenant and caller→tenant
-        // ourselves (mirrors OrganizationService.update / upgradeFromAccount).
-        private readonly organizationRepository: OrganizationRepository,
-        private readonly userRepository: UserRepository,
+        // `:orgId`/`?orgId`. We resolve org→tenant and caller→tenant via
+        // the shared membership service (mirrors OrganizationService.update
+        // / upgradeFromAccount).
+        private readonly membership: OrganizationMembershipService,
         private readonly ownershipService: WorkOwnershipService,
     ) {}
-
-    /**
-     * Security: object-level authorization for org-scoped KB routes.
-     * Resolves the caller's Tenant and the target Organization's Tenant
-     * and rejects any cross-tenant access. Throws `NotFoundException`
-     * (not `Forbidden`) on mismatch to avoid leaking org existence —
-     * same contract as `OrganizationService.update`/`upgradeFromAccount`.
-     */
-    private async assertOrgAccess(orgId: string, userId: string): Promise<void> {
-        const user = await this.userRepository.findById(userId);
-        if (!user || !user.tenantId) {
-            // No Tenant ⇒ cannot own/belong to any Organization.
-            throw new NotFoundException(`Organization ${orgId} not found`);
-        }
-        const org = await this.organizationRepository.findById(orgId);
-        if (!org || org.tenantId !== user.tenantId) {
-            throw new NotFoundException(`Organization ${orgId} not found`);
-        }
-    }
 
     /**
      * Security: the inheritable Work routes accept an attacker-controlled
@@ -103,7 +89,7 @@ export class OrgKbController {
         @Query() query: KbDocumentQueryDto,
     ) {
         // Security: reject cross-tenant reads of another org's KB docs.
-        await this.assertOrgAccess(orgId, auth.userId);
+        await this.membership.ensureMember(orgId, auth.userId);
         return this.kb.listOrgDocuments(orgId, {
             class: query.class as KbDocumentClass | undefined,
         });
@@ -125,7 +111,9 @@ export class OrgKbController {
     ) {
         // Security: reject cross-tenant writes (stored prompt-injection /
         // repo poisoning of another tenant's org via attacker-supplied orgId).
-        await this.assertOrgAccess(orgId, auth.userId);
+        // `ensureAdmin` is the write-side seam; today it's the same
+        // tenant-ownership check as `ensureMember` (org-admin role re-deferred).
+        await this.membership.ensureAdmin(orgId, auth.userId);
         return this.kb.createOrgDocument(orgId, auth.userId, {
             path: body.path,
             title: body.title,
@@ -198,9 +186,7 @@ export class OrgKbController {
         const orgScope = await this.resolveWorkOrgScope(workId, auth.userId, orgId ?? null);
         if (!orgScope) {
             // Work belongs to no organization ⇒ no inheritable org doc exists.
-            throw new NotFoundException(
-                `KB inherited document not found: ${joinedIdOrPath}`,
-            );
+            throw new NotFoundException(`KB inherited document not found: ${joinedIdOrPath}`);
         }
         return this.kb.getInheritedDocument(workId, orgScope, joinedIdOrPath, auth.userId);
     }

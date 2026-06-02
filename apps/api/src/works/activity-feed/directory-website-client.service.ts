@@ -144,7 +144,8 @@ export class DirectoryWebsiteClient {
         // the guard is enforced in every non-local env (staging/prod share network
         // reach to internal tooling and cloud metadata).
         const env = process.env.NODE_ENV;
-        const isLocalEnv = env === 'development' || env === 'test' || env === undefined || env === '';
+        const isLocalEnv =
+            env === 'development' || env === 'test' || env === undefined || env === '';
         if (!isLocalEnv && !isSafeWebhookUrl(url)) {
             this.logger.warn(
                 `directory-site request blocked by SSRF guard for work ${work.id} (host resolves to a private / loopback / link-local / metadata target)`,

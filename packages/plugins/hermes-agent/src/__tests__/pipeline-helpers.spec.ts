@@ -6,10 +6,30 @@ describe('resolveHermesRuntimeSettings', () => {
 	it('applies defaults', () => {
 		expect(resolveHermesRuntimeSettings({})).toMatchObject({
 			profile: 'default',
-			toolsets: 'web,terminal,skills',
+			// Security: `terminal` is opt-in; the default toolset must not include it.
+			toolsets: 'web,skills',
 			maxTurns: 90,
 			yolo: true
 		});
+	});
+
+	it('does not enable the terminal toolset by default (RCE hardening)', () => {
+		// The Hermes child runs --yolo on untrusted content; `terminal` in the
+		// default toolset would make a prompt injection RCE. Operators opt in by
+		// setting `toolsets` explicitly.
+		const resolved = resolveHermesRuntimeSettings({});
+		expect(resolved.toolsets.split(',')).not.toContain('terminal');
+
+		// Empty / whitespace-only overrides fall back to the secure default, not
+		// the historical 'web,terminal,skills'.
+		expect(resolveHermesRuntimeSettings({ toolsets: '   ' }).toolsets).toBe('web,skills');
+		expect(resolveHermesRuntimeSettings({ toolsets: 123 as unknown as string }).toolsets).toBe('web,skills');
+	});
+
+	it('still honors an explicit operator opt-in to the terminal toolset', () => {
+		// Opt-in must keep working: when an operator deliberately sets the toolset,
+		// the resolved value is passed through verbatim.
+		expect(resolveHermesRuntimeSettings({ toolsets: 'web,terminal,skills' }).toolsets).toBe('web,terminal,skills');
 	});
 
 	it('keeps explicit values', () => {

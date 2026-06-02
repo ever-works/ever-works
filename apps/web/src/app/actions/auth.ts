@@ -91,7 +91,11 @@ export async function login(identifier: string, password: string, redirectUrl: s
     // Security: require BOTH a syntactically valid URL AND a relative path or
     // allowlisted host before honoring the query-param redirect target, closing
     // the open redirect (an absolute `?redirect=https://evil.com` is rejected).
-    if (redirectUrl && isValidRedirectUrl(redirectUrl) && isRelativeOrAllowedRedirectHost(redirectUrl)) {
+    if (
+        redirectUrl &&
+        isValidRedirectUrl(redirectUrl) &&
+        isRelativeOrAllowedRedirectHost(redirectUrl)
+    ) {
         href = redirectUrl;
     } else if (authResponse) {
         // Check if we have a redirect URL in a cookie
@@ -398,7 +402,11 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
     // Security: require BOTH a syntactically valid URL AND a relative path or
     // allowlisted host before honoring the query-param redirect target, closing
     // the open redirect (an absolute `?redirect=https://evil.com` is rejected).
-    if (redirectUrl && isValidRedirectUrl(redirectUrl) && isRelativeOrAllowedRedirectHost(redirectUrl)) {
+    if (
+        redirectUrl &&
+        isValidRedirectUrl(redirectUrl) &&
+        isRelativeOrAllowedRedirectHost(redirectUrl)
+    ) {
         href = redirectUrl;
     } else if (authResponse) {
         href = await getRedirectUrl(authResponse, href);

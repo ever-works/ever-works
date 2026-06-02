@@ -527,9 +527,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     // scoping in EmailService.sendMessage.
                     const target = await agents.findByIdAndUser(targetAgentId, userId);
                     if (!target) {
-                        throw new Error(
-                            `messageAgent: target agent ${targetAgentId} not found.`,
-                        );
+                        throw new Error(`messageAgent: target agent ${targetAgentId} not found.`);
                     }
                     const inbound = await assignments.findByAgent(targetAgentId, 'inbound');
                     const assignment = inbound[0];

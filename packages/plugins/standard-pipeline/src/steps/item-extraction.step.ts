@@ -110,9 +110,10 @@ function sanitizePageContent(value: string, maxLength: number): string {
  * `sanitizePromptVariable` limits used on equivalent untrusted prompt variables.
  */
 function sanitizeHintEntry(value: string, maxLength: number): string {
-	return neutralizeFenceTokens(
-		value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')
-	).slice(0, maxLength);
+	return neutralizeFenceTokens(value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')).slice(
+		0,
+		maxLength
+	);
 }
 
 /**

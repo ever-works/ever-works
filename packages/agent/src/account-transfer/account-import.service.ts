@@ -389,9 +389,7 @@ export class AccountImportService {
                 // repo namespace (path traversal). Legitimate renames always use
                 // a canonical slug, so this is a no-op for valid input.
                 if (!SLUG_PATTERN.test(slug)) {
-                    result.errors.push(
-                        `Cannot rename "${dir.slug}" to "${slug}" - invalid slug`,
-                    );
+                    result.errors.push(`Cannot rename "${dir.slug}" to "${slug}" - invalid slug`);
                     result.worksSkipped++;
                     return;
                 }

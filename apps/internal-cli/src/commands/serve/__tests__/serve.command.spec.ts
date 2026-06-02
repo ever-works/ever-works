@@ -53,4 +53,12 @@ describe('ServeCommand option parsers', () => {
             expect(() => cmd.parseHost('   ')).toThrow(/Host cannot be empty/);
         });
     });
+
+    describe('parseAllowRemote', () => {
+        it('returns true so the presence of the flag opts into remote binding', () => {
+            // The flag is boolean (no value). Its mere presence must flip the
+            // gate that otherwise refuses non-loopback hosts.
+            expect(cmd.parseAllowRemote()).toBe(true);
+        });
+    });
 });

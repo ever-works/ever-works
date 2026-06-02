@@ -26,7 +26,9 @@ function assertApiUrlSafeForToken(apiUrl: string): void {
         throw new Error(`Refusing to send credentials to an invalid API URL: ${apiUrl}`);
     }
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        throw new Error(`Refusing to send credentials to a non-http(s) API URL: ${parsed.protocol}`);
+        throw new Error(
+            `Refusing to send credentials to a non-http(s) API URL: ${parsed.protocol}`,
+        );
     }
     if (parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname)) {
         throw new Error(

@@ -228,6 +228,40 @@ describe('HermesAgentPlugin', () => {
 		});
 	});
 
+	it('runs Hermes with a terminal-free toolset by default and forwards the resolved provider', async () => {
+		// End-to-end: with no toolsets override the child must be launched without
+		// the `terminal` toolset (RCE hardening), and the resolved provider must be
+		// passed through so the subprocess env stays scoped to that provider's key.
+		await plugin.onLoad(
+			createMockContext({
+				global: { provider: 'openrouter' },
+				user: { profile: 'work' }
+			})
+		);
+
+		let capturedOptions: Parameters<typeof processRunner.executeHermes>[0] | undefined;
+		vi.mocked(processRunner.executeHermes).mockImplementation((options) => {
+			capturedOptions = options;
+			return {
+				promise: Promise.resolve({
+					stdout: '',
+					stderr: '',
+					exitCode: 0,
+					killed: false,
+					duration: 0
+				}),
+				kill: vi.fn()
+			};
+		});
+
+		await plugin.execute(work as never, request as never, existing as never);
+
+		expect(capturedOptions).toBeDefined();
+		expect(capturedOptions?.toolsets).toBe('web,skills');
+		expect(capturedOptions?.toolsets.split(',')).not.toContain('terminal');
+		expect(capturedOptions?.provider).toBe('openrouter');
+	});
+
 	it('rejects concurrent execute calls on the same plugin instance', async () => {
 		await plugin.onLoad(
 			createMockContext({

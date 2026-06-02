@@ -73,10 +73,10 @@ export class TaskReviewerRepository {
     ): Promise<void> {
         // Security (IDOR): optional `taskId` scopes the update so a
         // reviewer row from another task can't be mutated by PK alone.
-        await this.repo.update(
-            taskId ? { id, taskId } : id,
-            { reviewState, reviewedAt: new Date() },
-        );
+        await this.repo.update(taskId ? { id, taskId } : id, {
+            reviewState,
+            reviewedAt: new Date(),
+        });
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
@@ -111,10 +111,10 @@ export class TaskApproverRepository {
     ): Promise<void> {
         // Security (IDOR): optional `taskId` scopes the update so an
         // approver row from another task can't be mutated by PK alone.
-        await this.repo.update(
-            taskId ? { id, taskId } : id,
-            { approvalState, approvedAt: new Date() },
-        );
+        await this.repo.update(taskId ? { id, taskId } : id, {
+            approvalState,
+            approvedAt: new Date(),
+        });
     }
     // Security (IDOR): optional `taskId` scopes the delete (see
     // TaskAssigneeRepository.remove). Behavior unchanged when omitted.

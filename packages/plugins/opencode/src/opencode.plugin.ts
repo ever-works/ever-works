@@ -668,10 +668,7 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 	private static readonly PROMPT_FENCE_TOKEN_PATTERN = /<\/?(?:system_instructions|user_request)\b/gi;
 
 	private neutralizePromptFences(value: string): string {
-		return value.replace(
-			OpenCodePlugin.PROMPT_FENCE_TOKEN_PATTERN,
-			(token) => `${token[0]}​${token.slice(1)}`
-		);
+		return value.replace(OpenCodePlugin.PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
 	}
 
 	private buildCombinedPrompt(systemPrompt: string, userPrompt: string): string {

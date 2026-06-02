@@ -778,7 +778,10 @@ export class TemplateCustomizationService {
     // commit-parsing tooling (changelogs, contribution graphs) would honour.
     private sanitizeForCommit(value: string): string {
         // eslint-disable-next-line no-control-regex
-        const single = value.replace(/[\x00-\x1f\x7f]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const single = value
+            .replace(/[\x00-\x1f\x7f]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
         return single.length > 200 ? `${single.slice(0, 200)}…` : single;
     }
 

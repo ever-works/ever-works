@@ -30,7 +30,8 @@ const withNextIntl = createNextIntlPlugin();
 // bare `*` into the policy and widen the whole CSP. Accept only well-formed
 // scheme+host[:port] sources and drop anything else; legitimate hosts pass
 // unchanged. Mirrors the `SAFE_CSP_HOST_SOURCE` filter in `src/proxy.ts`.
-const SAFE_CSP_HOST_SOURCE = /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
+const SAFE_CSP_HOST_SOURCE =
+    /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
 const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
     .split(',')
     .map((s) => s.trim())

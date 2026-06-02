@@ -332,8 +332,7 @@ export class ComposioService {
         // message so a hostile slug cannot inject control characters or pad the
         // response with an unbounded string.
         const safeContext = sanitizeContext(context);
-        if (!(error instanceof Error))
-            return new Error(`Unexpected error during ${safeContext}.`);
+        if (!(error instanceof Error)) return new Error(`Unexpected error during ${safeContext}.`);
         const status = readNumberProp(error, 'status') ?? readNumberProp(error, 'statusCode');
         const message = error.message || String(error);
         if (status === 401 || status === 403) {

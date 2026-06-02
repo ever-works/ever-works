@@ -105,10 +105,7 @@ export class ConversationController {
 
     @Post()
     @ApiOperation({ summary: 'Create a conversation' })
-    async create(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body() body: CreateConversationDto,
-    ) {
+    async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateConversationDto) {
         return this.repo.create({
             userId: auth.userId,
             title: body.title,

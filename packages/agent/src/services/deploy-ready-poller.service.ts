@@ -120,7 +120,9 @@ export class DeployReadyPollerService {
                 // Mirrors `CloudflareDnsProvider.assertSlug`. Routed through the
                 // existing catch → counted as `failed` and logged.
                 if (!this.isValidSlug(work.slug)) {
-                    throw new Error(`refusing to probe work with malformed slug: ${JSON.stringify(work.slug)}`);
+                    throw new Error(
+                        `refusing to probe work with malformed slug: ${JSON.stringify(work.slug)}`,
+                    );
                 }
                 const url = `https://${work.slug}.${domain}/api/healthz`;
                 const ok = await this.probeUrl(httpFetch, url, timeoutMs);

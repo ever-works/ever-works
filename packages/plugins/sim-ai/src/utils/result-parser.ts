@@ -142,9 +142,7 @@ function parseItems(rawItems: SimOutputItem[]): ItemData[] {
 		// SSRF guard; unsafe values are dropped (source_url falls back to '').
 		const source_url = sanitizeSimUrl(raw.url) ?? sanitizeSimUrl(raw.source_url) ?? '';
 		const images = Array.isArray(raw.images)
-			? raw.images
-					.map((i) => sanitizeSimUrl(i))
-					.filter((i): i is string => typeof i === 'string')
+			? raw.images.map((i) => sanitizeSimUrl(i)).filter((i): i is string => typeof i === 'string')
 			: undefined;
 
 		const item: ItemData = {

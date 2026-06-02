@@ -151,7 +151,10 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			// SDK issues requests to the user-controlled baseUrl and reflects the
 			// response back through this validateConnection message.
 			if (!isSafeWebhookUrl(baseUrl)) {
-				return { success: false, message: 'SIM base URL is not safe to call (SSRF guard blocked the destination host).' };
+				return {
+					success: false,
+					message: 'SIM base URL is not safe to call (SSRF guard blocked the destination host).'
+				};
 			}
 			const client = new SimClientWrapper({
 				apiKey,

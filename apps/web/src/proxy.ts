@@ -59,7 +59,8 @@ const STATIC_SECURITY_HEADERS: Record<string, string> = {
 // entry containing CSP delimiters (whitespace, `;`, quotes) could smuggle extra
 // directives or `'unsafe-inline'`/`*` into the policy. Accept only well-formed
 // host sources and drop anything else; legitimate hostnames pass unchanged.
-const SAFE_CSP_HOST_SOURCE = /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
+const SAFE_CSP_HOST_SOURCE =
+    /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
 
 function buildCsp(): string {
     const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')

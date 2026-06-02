@@ -74,13 +74,7 @@ async function bootstrap() {
         if (!Number.isFinite(amount)) return null;
         const unit = match[2] ?? 'b';
         const multiplier =
-            unit === 'gb'
-                ? 1024 ** 3
-                : unit === 'mb'
-                  ? 1024 ** 2
-                  : unit === 'kb'
-                    ? 1024
-                    : 1;
+            unit === 'gb' ? 1024 ** 3 : unit === 'mb' ? 1024 ** 2 : unit === 'kb' ? 1024 : 1;
         return amount * multiplier;
     };
     const requestedBodyLimit = process.env.BODY_LIMIT;

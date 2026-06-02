@@ -94,7 +94,9 @@ export class WorkKnowledgeDocumentRepository {
         // caller already passes one scope key; this enforces that mechanically
         // at the data layer instead of relying on call-site discipline.
         if (!opts.workId && !opts.organizationId) {
-            throw new Error('WorkKnowledgeDocumentRepository.list requires workId or organizationId');
+            throw new Error(
+                'WorkKnowledgeDocumentRepository.list requires workId or organizationId',
+            );
         }
 
         const qb = this.repository.createQueryBuilder('doc');
@@ -137,12 +139,9 @@ export class WorkKnowledgeDocumentRepository {
             // (DoS amplification within the caller's authorized Work/Org).
             // Mirrors agent.repository.ts; escape-only (no LOWER()) preserves
             // the existing matching for legitimate input.
-            qb.andWhere(
-                "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')",
-                {
-                    q: `%${sanitizeLikePattern(opts.q)}%`,
-                },
-            );
+            qb.andWhere("(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')", {
+                q: `%${sanitizeLikePattern(opts.q)}%`,
+            });
         }
 
         qb.orderBy('doc.updatedAt', 'DESC');

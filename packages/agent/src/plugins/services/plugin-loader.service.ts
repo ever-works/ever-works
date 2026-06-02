@@ -853,10 +853,7 @@ export class PluginLoaderService {
         const entryPath = path.join(pluginPath, mainEntry);
         const resolvedRoot = path.resolve(pluginPath);
         const resolvedEntry = path.resolve(pluginPath, mainEntry);
-        if (
-            resolvedEntry !== resolvedRoot &&
-            !resolvedEntry.startsWith(resolvedRoot + path.sep)
-        ) {
+        if (resolvedEntry !== resolvedRoot && !resolvedEntry.startsWith(resolvedRoot + path.sep)) {
             throw new Error(`Plugin entry point escapes plugin directory: ${mainEntry}`);
         }
         return entryPath;

@@ -76,7 +76,8 @@ export class EverWorksK8sDeployProvider {
         // reusing the same normaliser used for the namespace name.
         const slugPart = sanitiseDnsLabel(work.slug);
         const userPart =
-            sanitiseDnsLabel((work.userSlug ?? '').trim()) || sanitiseDnsLabel(work.userId.slice(0, 8));
+            sanitiseDnsLabel((work.userSlug ?? '').trim()) ||
+            sanitiseDnsLabel(work.userId.slice(0, 8));
         const workIdPart = sanitiseDnsLabel(work.id);
         return template
             .replace(/\{slug\}/g, slugPart)

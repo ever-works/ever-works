@@ -527,7 +527,10 @@ export class KnowledgeBaseBufferExtractorService {
      * newlines) are unaffected.
      */
     private sanitizeHeadingText(value: string): string {
-        return value.replace(/[\r\n#<>]/g, ' ').replace(/\s+/g, ' ').trim();
+        return value
+            .replace(/[\r\n#<>]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     /**

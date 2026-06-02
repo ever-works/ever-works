@@ -174,7 +174,10 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 			// but rejecting here yields a clearer validation error before any
 			// authenticated REST call (which carries the Make API token) is issued.
 			if (!isSafeWebhookUrl(baseUrl)) {
-				return { success: false, message: 'Make.com API base URL is not allowed (must be a public HTTPS host).' };
+				return {
+					success: false,
+					message: 'Make.com API base URL is not allowed (must be a public HTTPS host).'
+				};
 			}
 			const client = new MakeClient({
 				apiKey,

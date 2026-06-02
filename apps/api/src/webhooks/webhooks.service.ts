@@ -168,7 +168,8 @@ export class WebhooksService {
         // ULA/CGNAT/metadata) which `localhost` also fails since it is not a
         // literal IP — but we keep an explicit `localhost` reject for clarity.
         const env = process.env.NODE_ENV;
-        const isLocalEnv = env === 'development' || env === 'test' || env === undefined || env === '';
+        const isLocalEnv =
+            env === 'development' || env === 'test' || env === undefined || env === '';
         if (!isLocalEnv) {
             const lowerHost = parsed.hostname.toLowerCase();
             const bareHost =

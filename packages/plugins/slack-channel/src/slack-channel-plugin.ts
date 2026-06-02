@@ -36,7 +36,11 @@ function getWebhookUrl(config: ChannelTargetConfig): string {
 	} catch {
 		throw new Error('slack-channel: targetConfig.webhookUrl is not a valid URL');
 	}
-	if (!url.startsWith(SLACK_WEBHOOK_PREFIX) || parsed.hostname.toLowerCase() !== SLACK_WEBHOOK_HOST || !isSafeWebhookUrl(url)) {
+	if (
+		!url.startsWith(SLACK_WEBHOOK_PREFIX) ||
+		parsed.hostname.toLowerCase() !== SLACK_WEBHOOK_HOST ||
+		!isSafeWebhookUrl(url)
+	) {
 		throw new Error(`slack-channel: targetConfig.webhookUrl must start with ${SLACK_WEBHOOK_PREFIX}`);
 	}
 	return url;

@@ -52,9 +52,7 @@ interface DashboardLayoutClientProps {
 // Evaluated lazily at call-time (client-side only) so SSR is unaffected.
 function getCookieOpts(): string {
     const secure =
-        typeof window !== 'undefined' && window.location.protocol === 'https:'
-            ? '; Secure'
-            : '';
+        typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
     return `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax${secure}`;
 }
 

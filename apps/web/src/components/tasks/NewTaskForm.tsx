@@ -178,7 +178,9 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
             {preFillSource === 'template' && templateSlug && (
                 <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
                     Pre-filled from template{' '}
-                    <span className="font-medium text-text dark:text-text-dark">{templateSlug}</span>
+                    <span className="font-medium text-text dark:text-text-dark">
+                        {templateSlug}
+                    </span>
                     . Review the content before creating the task.
                 </div>
             )}

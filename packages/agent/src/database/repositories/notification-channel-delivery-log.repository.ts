@@ -48,7 +48,12 @@ export class NotificationChannelDeliveryLogRepository {
     ): Promise<NotificationChannelDeliveryLog[]> {
         return this.repository
             .createQueryBuilder('log')
-            .innerJoin('notification_channels', 'ch', 'ch.id = log.channelId AND ch."userId" = :userId', { userId })
+            .innerJoin(
+                'notification_channels',
+                'ch',
+                'ch.id = log.channelId AND ch."userId" = :userId',
+                { userId },
+            )
             .where('log.channelId = :channelId', { channelId })
             .orderBy('log.createdAt', 'DESC')
             .take(Math.min(limit, 200))

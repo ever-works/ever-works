@@ -44,7 +44,11 @@ export async function getRedirectUrl(authResponse: AuthResponse | null, initialH
     // Security: require BOTH a syntactically valid URL AND a relative path or
     // allowlisted host before honoring the cookie-supplied redirect target,
     // closing the open redirect on the redirect-consumption path.
-    if (redirectUrl && isValidRedirectUrl(redirectUrl) && isRelativeOrAllowedRedirectHost(redirectUrl)) {
+    if (
+        redirectUrl &&
+        isValidRedirectUrl(redirectUrl) &&
+        isRelativeOrAllowedRedirectHost(redirectUrl)
+    ) {
         await removeRedirectCookie();
 
         initialHref = authResponse

@@ -163,7 +163,10 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			if (!response.ok) {
 				// Security (info-leak): report only the HTTP status line, not the raw
 				// upstream Linkup response body (may carry internal API error detail).
-				return { success: false, message: `Linkup connection failed (${response.status}): ${response.statusText}` };
+				return {
+					success: false,
+					message: `Linkup connection failed (${response.status}): ${response.statusText}`
+				};
 			}
 
 			return { success: true, message: 'Linkup connection verified.' };

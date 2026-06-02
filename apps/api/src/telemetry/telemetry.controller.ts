@@ -94,8 +94,11 @@ export class TelemetryController {
         //      longer override the already-validated `event` (allow-list),
         //      `funnelStep` (1..8), `timestamp` (ISO-8601) or `correlationId`
         //      (regex) — which the previous extra-last ordering allowed.
-        const { userId: _ignoredExtraUserId, workId: _ignoredExtraWorkId, ...safeExtra } =
-            (dto.extra ?? {}) as Record<string, unknown>;
+        const {
+            userId: _ignoredExtraUserId,
+            workId: _ignoredExtraWorkId,
+            ...safeExtra
+        } = (dto.extra ?? {}) as Record<string, unknown>;
         void _ignoredExtraUserId;
         void _ignoredExtraWorkId;
 

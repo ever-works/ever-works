@@ -315,10 +315,7 @@ export function buildProposalsPrompt(
             // chat-template markers) so an Idea field cannot break out of the
             // bullet into a new top-level instruction or spoof a system turn.
             const desc = neutralizePromptField(
-                idea.description
-                    .trim()
-                    .replace(/\s+/g, ' ')
-                    .slice(0, EXISTING_IDEA_DESC_MAX_CHARS),
+                idea.description.trim().replace(/\s+/g, ' ').slice(0, EXISTING_IDEA_DESC_MAX_CHARS),
             );
             const title = neutralizePromptField(idea.title);
             const slug = neutralizePromptField(idea.slug);

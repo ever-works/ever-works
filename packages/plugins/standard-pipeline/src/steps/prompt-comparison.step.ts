@@ -76,9 +76,10 @@ function neutralizeFenceTokens(value: string): string {
  * similarity scoring continue to see the raw values unchanged.
  */
 function sanitizePromptForComparison(value: string, maxLength: number): string {
-	return neutralizeFenceTokens(
-		value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')
-	).slice(0, maxLength);
+	return neutralizeFenceTokens(value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')).slice(
+		0,
+		maxLength
+	);
 }
 
 /**
