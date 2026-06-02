@@ -12,6 +12,7 @@ import {
 } from '@/components/common/PromptComposer';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import { ROUTES } from '@/lib/constants';
 import { MissionCard } from './MissionCard';
 import type { Mission, MissionStatus } from '@/lib/api/missions';
 
@@ -173,7 +174,7 @@ export function MissionsList({
                         Apply
                     </button>
                     <Link
-                        href="/missions"
+                        href={ROUTES.DASHBOARD_MISSIONS}
                         className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                     >
                         Reset
@@ -218,9 +219,13 @@ export function MissionsList({
 
             {!loadError && pagination && (pagination.hasPrevious || pagination.hasNext) ? (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
-                    <span>
-                        Showing {pagination.offset + 1}-{pagination.offset + missions.length}
-                    </span>
+                    {missions.length > 0 ? (
+                        <span>
+                            Showing {pagination.offset + 1}-{pagination.offset + missions.length}
+                        </span>
+                    ) : (
+                        <span>No results on this page</span>
+                    )}
                     <div className="flex items-center gap-2">
                         {pagination.hasPrevious ? (
                             <Link

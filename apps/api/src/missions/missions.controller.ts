@@ -315,11 +315,19 @@ export class MissionsController {
 
     private parseLimit(value?: string): number | undefined {
         if (!value) return undefined;
-        return Math.min(101, Math.max(1, parseInt(value, 10) || 50));
+        const n = Number(value);
+        if (!Number.isInteger(n)) {
+            throw new BadRequestException('limit must be an integer.');
+        }
+        return Math.min(101, Math.max(1, n));
     }
 
     private parseOffset(value?: string): number | undefined {
         if (!value) return undefined;
-        return Math.max(0, parseInt(value, 10) || 0);
+        const n = Number(value);
+        if (!Number.isInteger(n)) {
+            throw new BadRequestException('offset must be an integer.');
+        }
+        return Math.max(0, n);
     }
 }

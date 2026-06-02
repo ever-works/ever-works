@@ -341,9 +341,13 @@ export function IdeasPageClient({
 
             {!loadError && pagination && (pagination.hasPrevious || pagination.hasNext) ? (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
-                    <span>
-                        Showing {pagination.offset + 1}-{pagination.offset + ideas.length}
-                    </span>
+                    {ideas.length > 0 ? (
+                        <span>
+                            Showing {pagination.offset + 1}-{pagination.offset + ideas.length}
+                        </span>
+                    ) : (
+                        <span>No results on this page</span>
+                    )}
                     <div className="flex items-center gap-2">
                         {pagination.hasPrevious ? (
                             <Link
