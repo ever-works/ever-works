@@ -21,11 +21,6 @@ export function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Log
 	logger?.debug(`Using Gemini CLI via npx (${packageSpec})`);
 	return {
 		command: 'npx',
-		// Security: `--ignore-scripts` disables npm lifecycle scripts (pre/postinstall, prepare)
-		// of the fetched package so a compromised/yanked upstream version cannot execute arbitrary
-		// code on the worker during install. The `version` flows from tenant-writable plugin
-		// settings, so the install must never run package-controlled scripts. This only affects
-		// npm lifecycle scripts — the resolved Gemini CLI `bin` entrypoint still runs normally.
-		args: ['--yes', '--ignore-scripts', packageSpec]
+		args: ['--yes', packageSpec]
 	};
 }
