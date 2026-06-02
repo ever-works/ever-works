@@ -168,7 +168,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                     </Button>
                 </div>
             </form>
-            <TasksList tasks={result.data} />
+            <TasksList tasks={result.data} enableStatusFilter={!query.status} />
             {result.meta.total > result.meta.limit && (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
                     <span>
