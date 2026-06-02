@@ -45,6 +45,7 @@ export const agentHeartbeatDispatcherTask = schedules.task({
                     >('agent-heartbeat', {
                         agentId: payload.agentId,
                         userId: payload.userId,
+                        runId: payload.runId,
                         scheduledFor: payload.scheduledFor.toISOString(),
                     } satisfies AgentHeartbeatPayload);
                     return { runId: handle.id };

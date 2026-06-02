@@ -40,6 +40,10 @@ export class TaskAssigneeRepository {
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
     }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
+    }
 }
 
 @Injectable()
@@ -66,6 +70,10 @@ export class TaskReviewerRepository {
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
     }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
+    }
 }
 
 @Injectable()
@@ -88,6 +96,10 @@ export class TaskApproverRepository {
     }
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
+    }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
     }
     async allApproved(taskId: string): Promise<boolean> {
         const rows = await this.repo.find({ where: { taskId } });
@@ -130,6 +142,10 @@ export class TaskBlockRepository {
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
     }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
+    }
 }
 
 @Injectable()
@@ -149,6 +165,10 @@ export class TaskRelationRepository {
     }
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
+    }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
     }
 }
 
@@ -209,6 +229,10 @@ export class TaskAttachmentRepository {
     }
     async remove(id: string): Promise<void> {
         await this.repo.delete(id);
+    }
+    async removeForTask(taskId: string, id: string): Promise<boolean> {
+        const result = await this.repo.delete({ id, taskId });
+        return (result.affected ?? 0) > 0;
     }
 }
 

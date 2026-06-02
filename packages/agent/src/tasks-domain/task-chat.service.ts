@@ -140,21 +140,22 @@ export class TaskChatService {
                 const dedupKey = `${task.id}:${mention.id}:${row.id}`;
                 void (async () => {
                     try {
-                        if (this.runs) {
-                            await this.runs.createQueued({
-                                agentId: mention.id,
-                                userId,
-                                triggerKind: 'chat',
-                                taskId: task.id,
-                                chatMessageId: row.id,
-                            });
-                        }
+                        const run = this.runs
+                            ? await this.runs.createQueued({
+                                  agentId: mention.id,
+                                  userId,
+                                  triggerKind: 'chat',
+                                  taskId: task.id,
+                                  chatMessageId: row.id,
+                              })
+                            : null;
                         await this.chatDispatcher!.enqueue({
                             agentId: mention.id,
                             userId,
                             taskId: task.id,
                             triggeringMessageId: row.id,
                             dedupKey,
+                            runId: run?.id,
                         });
                     } catch (err) {
                         this.logger.warn(

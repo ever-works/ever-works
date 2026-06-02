@@ -56,14 +56,23 @@ const STATUS_FILTERS: { key: TaskStatus | 'all'; label: string }[] = [
     { key: 'cancelled', label: 'Cancelled' },
 ];
 
-export function TasksList({ tasks }: { tasks: Task[] }) {
+export function TasksList({
+    tasks,
+    enableStatusFilter = true,
+}: {
+    tasks: Task[];
+    enableStatusFilter?: boolean;
+}) {
     const t = useTranslations('dashboard.tasksPage');
     const [view, setView] = useState<ViewKey>('cards');
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
 
     const filtered = useMemo(
-        () => (statusFilter === 'all' ? tasks : tasks.filter((t) => t.status === statusFilter)),
-        [tasks, statusFilter],
+        () =>
+            !enableStatusFilter || statusFilter === 'all'
+                ? tasks
+                : tasks.filter((t) => t.status === statusFilter),
+        [enableStatusFilter, tasks, statusFilter],
     );
 
     return (
@@ -96,14 +105,16 @@ export function TasksList({ tasks }: { tasks: Task[] }) {
                     only the list-level filter ratio is meaningful in
                     cards/table. */}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark bg-card dark:bg-card-primary-dark self-start @sm/main:self-auto">
-                    {view === 'kanban' ? tasks.length : `${filtered.length} / ${tasks.length}`}
+                    {view === 'kanban' || !enableStatusFilter
+                        ? tasks.length
+                        : `${filtered.length} / ${tasks.length}`}
                 </span>
             </div>
 
             {/* ── Status filter pills ──────────────────────────────────────── */}
             {/* Hidden in kanban view — the columns already group by status, so
                 the pills would just empty most columns when one is selected. */}
-            {view !== 'kanban' && (
+            {view !== 'kanban' && enableStatusFilter && (
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
                     {STATUS_FILTERS.map(({ key, label }) => {
                         const isActive = statusFilter === key;

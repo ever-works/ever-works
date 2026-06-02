@@ -17,6 +17,9 @@ type CreateTaskFn = (input: {
     description?: string | null;
     priority?: TaskPriority;
     labels?: string[];
+    missionId?: string | null;
+    ideaId?: string | null;
+    workId?: string | null;
 }) => Promise<Task>;
 
 /**
@@ -36,6 +39,12 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
+
+    const workId = searchParams?.get('workId') || null;
+    const missionId = searchParams?.get('missionId') || null;
+    const ideaId = searchParams?.get('ideaId') || null;
+    const scopeCount = [workId, missionId, ideaId].filter(Boolean).length;
+    const scopeLabel = scopeCount === 1 ? (workId ? 'Work' : missionId ? 'Mission' : 'Idea') : null;
 
     // PASS-4 fix: read ?from=<slug> and pre-fill title + description
     // + labels (tags carry over from the template entry). Without
@@ -108,6 +117,9 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         description: description.trim() || null,
                         priority,
                         labels: labels.length ? labels : undefined,
+                        workId: scopeCount === 1 ? workId : null,
+                        missionId: scopeCount === 1 ? missionId : null,
+                        ideaId: scopeCount === 1 ? ideaId : null,
                     });
                     router.push(ROUTES.DASHBOARD_TASK(task.id));
                 } catch (err) {
@@ -123,9 +135,16 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-info/10 border border-info/20 flex items-center justify-center">
                     <ListChecks className="w-4 h-4 text-info" />
                 </div>
-                <h1 className="text-xl font-semibold text-text dark:text-text-dark">
-                    {t('title')}
-                </h1>
+                <div className="min-w-0">
+                    <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                        {t('title')}
+                    </h1>
+                    {scopeLabel && (
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
+                            {scopeLabel}-scoped task
+                        </p>
+                    )}
+                </div>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

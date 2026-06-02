@@ -1,10 +1,11 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
+import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
 import { WorksModule } from './works/works.module';
 import { KbStorageModule } from './uploads/kb-storage.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -186,7 +187,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         },
         {
             provide: APP_GUARD,
-            useClass: ThrottlerGuard,
+            useClass: UserAwareThrottlerGuard,
         },
         {
             provide: APP_INTERCEPTOR,

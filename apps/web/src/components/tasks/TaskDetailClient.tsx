@@ -45,10 +45,14 @@ export function TaskDetailClient({
     task,
     initialChat,
     initialAttachments = [],
+    initialChatError = null,
+    initialAttachmentsError = null,
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
+    initialChatError?: string | null;
+    initialAttachmentsError?: string | null;
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
     const tStatus = useTranslations('dashboard.tasksPage.status');
@@ -171,12 +175,22 @@ export function TaskDetailClient({
             {/* FU-5 — Attachments. Mounted between transitions and
                 conversation so file context is visible alongside chat
                 without dominating the page. */}
-            <TaskAttachmentsSection taskId={task.id} initial={initialAttachments} />
+            <TaskAttachmentsSection
+                taskId={task.id}
+                workId={task.workId}
+                initial={initialAttachments}
+                initialError={initialAttachmentsError}
+            />
 
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
                     {t('conversation')}
                 </h2>
+                {initialChatError && (
+                    <p className="text-xs text-danger mb-3" role="alert">
+                        {initialChatError}
+                    </p>
+                )}
                 {messages.length === 0 ? (
                     <p className="text-xs text-text-muted">{t('noMessages')}</p>
                 ) : (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Repeat, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ export function TaskRecurringSection({ task }: { task: Task }) {
 
 function ActivePanel({ task }: { task: Task }) {
     const t = useTranslations('dashboard.tasksPage.recurring');
+    const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
@@ -49,8 +51,7 @@ function ActivePanel({ task }: { task: Task }) {
             void (async () => {
                 try {
                     await clearTaskRecurringAction(task.id);
-                    // Server-action revalidates the page; the parent
-                    // server component will re-render with isRecurring=false.
+                    router.refresh();
                 } catch (err) {
                     setError(err instanceof Error ? err.message : 'Failed to stop');
                 }
@@ -143,6 +144,7 @@ function detectBrowserTimezone(): string {
 
 function InactivePanel({ task }: { task: Task }) {
     const t = useTranslations('dashboard.tasksPage.recurring');
+    const router = useRouter();
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
@@ -218,6 +220,7 @@ function InactivePanel({ task }: { task: Task }) {
                                 : undefined,
                     });
                     setOpen(false);
+                    router.refresh();
                 } catch (err) {
                     setError(err instanceof Error ? err.message : 'Failed to save');
                 }
