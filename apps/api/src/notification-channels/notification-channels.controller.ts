@@ -111,7 +111,7 @@ export class NotificationChannelsController {
     // belongs in NotificationChannelsService.create() (separate file) — see the
     // deferred audit note — but this rate limit blunts the tight-loop storage
     // DoS in the meantime. Matches the 20/min create cap used elsewhere.
-    @Throttle({ default: { ttl: 60_000, limit: 20 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @ApiOperation({ summary: 'Add a notification channel' })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateChannelDto) {
         assertTargetConfigSize(body.targetConfig);

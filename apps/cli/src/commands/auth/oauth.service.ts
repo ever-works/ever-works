@@ -491,7 +491,11 @@ export async function performOAuthFlow(): Promise<string> {
     // before any token is accepted. This binds the authorization to THIS CLI
     // invocation and defeats forged/raced callbacks.
     const state = crypto.randomBytes(32).toString('hex');
-    const redirectUri = `http://localhost:${port}/?state=${state}`;
+    // Use 127.0.0.1 (not `localhost`) to match the callback server, which binds
+    // only to 127.0.0.1. On hosts that resolve `localhost` to IPv6 `::1` first,
+    // a `localhost` redirect would hit `[::1]:<port>` where nothing is
+    // listening and the OAuth login would hang.
+    const redirectUri = `http://127.0.0.1:${port}/?state=${state}`;
 
     // Build authorization URL
     const authUrl = buildAuthUrl(redirectUri);

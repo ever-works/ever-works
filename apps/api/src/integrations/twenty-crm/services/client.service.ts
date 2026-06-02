@@ -156,7 +156,9 @@ export class ClientService {
 
     async updateCompany(
         companyId: string,
-        company: TwentyOrganization,
+        // PATCH semantics: callers may send a partial company (any subset of
+        // fields) — the upstream merges it onto the existing record.
+        company: Partial<TwentyOrganization>,
         tenantPrefix: string,
     ): Promise<TwentyOrganization> {
         const prefix = this.requireTenantPrefix(tenantPrefix);

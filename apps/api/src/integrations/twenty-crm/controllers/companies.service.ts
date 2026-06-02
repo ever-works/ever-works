@@ -19,6 +19,7 @@ import {
     MaxLength,
     Min,
 } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
 import { UserRepository } from '@ever-works/agent/database';
 import { ClientService } from '../services/client.service';
 import { CrmTenantService } from '../services/crm-tenant.service';
@@ -77,6 +78,12 @@ class CompanyBodyDto {
     @IsBoolean()
     idealCustomerProfile?: boolean;
 }
+
+// PATCH is a partial update: every field (including `name`) is optional so a
+// client can patch a subset — e.g. just `domainName` — without resubmitting the
+// whole company. PartialType re-applies all of CompanyBodyDto's field-level
+// validators but marks each property optional.
+class UpdateCompanyBodyDto extends PartialType(CompanyBodyDto) {}
 
 @Controller('api/twenty-crm/companies')
 @UseGuards(AuthSessionGuard)
@@ -167,7 +174,7 @@ export class CompaniesController {
     async updateCompany(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
-        @Body() company: CompanyBodyDto,
+        @Body() company: UpdateCompanyBodyDto,
     ): Promise<TwentyOrganization> {
         const tenantPrefix = await this.resolveTenantPrefix(auth);
         // Security: verify the record belongs to the caller's tenant BEFORE
