@@ -1,6 +1,8 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { AgentRunService } from '@ever-works/agent/agents';
+import { TasksService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
@@ -8,6 +10,7 @@ export interface AgentTaskExecutePayload {
     agentId: string;
     userId: string;
     taskId: string;
+    runId?: string;
     /** Deduplication key — `${taskId}:${agentId}:${generation}`. */
     dedupKey: string;
 }
@@ -40,8 +43,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             try {
                 const runs = appContext.get(AgentRunRepository);
                 const message = error instanceof Error ? error.message : String(error);
-                const inFlight = await runs.findInFlightForAgent(payload.agentId);
-                if (inFlight) {
+                const inFlight = payload.runId
+                    ? await runs.findById(payload.runId)
+                    : await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+                if (inFlight && (inFlight.status === 'queued' || inFlight.status === 'running')) {
                     await runs.markFailed(inFlight.id, message);
                 }
             } finally {
@@ -58,6 +63,8 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
         try {
             const agents = appContext.get(AgentRepository);
             const runs = appContext.get(AgentRunRepository);
+            const runner = appContext.get(AgentRunService);
+            const tasks = appContext.get(TasksService);
 
             // Security: scope the Agent lookup to the payload's userId
             // (defense-in-depth IDOR guard). The legitimate dispatch path
@@ -81,7 +88,27 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // TaskTransitionService fanned out the dispatch). If we
             // don't find one, create on the fly so the audit trail is
             // consistent.
-            let run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+            let run = payload.runId ? await runs.findById(payload.runId) : null;
+            if (run && (run.agentId !== agent.id || run.taskId !== payload.taskId)) {
+                return {
+                    status: 'skipped',
+                    reason: 'run-payload-mismatch',
+                    agentId: payload.agentId,
+                };
+            }
+            if (run && run.status !== 'queued' && run.status !== 'running') {
+                return {
+                    status: 'skipped',
+                    reason: `run-${run.status}`,
+                    agentId: agent.id,
+                    taskId: payload.taskId,
+                    runId: run.id,
+                    dedupKey: payload.dedupKey,
+                };
+            }
+            if (!run) {
+                run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+            }
             if (!run) {
                 run = await runs.createQueued({
                     agentId: agent.id,
@@ -93,16 +120,42 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
 
             await runs.markStarted(run.id, null);
 
-            // Phase 15 placeholder — Phase 7's AgentRunService.execute()
-            // with kind='task' wires the real prompt-assembly + LLM
-            // dispatch + tool loop once Skill catalog + tools land. v1
-            // marks the run completed with a stub summary so the
-            // status flow + Activity Feed entries fire end-to-end.
-            const summary = `Phase 15 placeholder — task ${payload.taskId} acknowledged by Agent ${agent.id}`;
-            await runs.markCompleted(run.id, summary);
+            const taskRow = await tasks.getOne(payload.userId, payload.taskId).catch(() => null);
+            const immediateInput = taskRow
+                ? [
+                      `Task ${taskRow.slug ?? taskRow.id}: ${taskRow.title}`,
+                      taskRow.description ? `Description: ${taskRow.description}` : null,
+                      `Status: ${taskRow.status}`,
+                      `Priority: ${taskRow.priority}`,
+                      taskRow.labels?.length ? `Labels: ${taskRow.labels.join(', ')}` : null,
+                  ]
+                      .filter(Boolean)
+                      .join('\n')
+                : `Task ${payload.taskId}`;
+
+            const result = await runner.execute({
+                runId: run.id,
+                agentId: agent.id,
+                userId: payload.userId,
+                kind: 'task',
+                taskId: payload.taskId,
+                immediateInput,
+                scopeContext: taskRow
+                    ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
+                    : null,
+            });
+
+            if (result.status === 'assembled') {
+                await runs.markCompleted(run.id, `Prompt assembled for task ${payload.taskId}`);
+            } else if (result.status === 'agent-not-found') {
+                await runs.markFailed(run.id, 'Agent not found');
+            }
 
             return {
-                status: 'completed',
+                status:
+                    result.status === 'assembled' || result.status === 'dispatched'
+                        ? 'completed'
+                        : result.status,
                 agentId: agent.id,
                 taskId: payload.taskId,
                 runId: run.id,

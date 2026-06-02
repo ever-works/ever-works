@@ -33,6 +33,19 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 import { AgentRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import {
+    AddApproverDto,
+    AddAssigneeDto,
+    AddAttachmentDto,
+    AddBlockerDto,
+    AddRelationDto,
+    AddReviewerDto,
+    CreateTaskDto,
+    PostTaskChatDto,
+    SetTaskRecurringDto,
+    TransitionTaskDto,
+    UpdateTaskDto,
+} from './tasks.dto';
 
 /**
  * Tasks feature — Phase 12.3.
@@ -95,10 +108,10 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Query('status') status?: string,
         @Query('priority') priority?: string,
-        @Query('missionId') missionId?: string,
-        @Query('ideaId') ideaId?: string,
-        @Query('workId') workId?: string,
-        @Query('parentTaskId') parentTaskId?: string,
+        @Query('missionId', new ParseUUIDPipe({ optional: true })) missionId?: string,
+        @Query('ideaId', new ParseUUIDPipe({ optional: true })) ideaId?: string,
+        @Query('workId', new ParseUUIDPipe({ optional: true })) workId?: string,
+        @Query('parentTaskId', new ParseUUIDPipe({ optional: true })) parentTaskId?: string,
         @Query('label') label?: string,
         @Query('search') search?: string,
         @Query('limit') limit?: string,
@@ -124,22 +137,7 @@ export class TasksController {
     @ApiOperation({ summary: 'Create a Task.' })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ default: { limit: 60, ttl: 60_000 } })
-    async create(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Body()
-        body: {
-            title: string;
-            description?: string | null;
-            status?: TaskStatus;
-            priority?: TaskPriority;
-            labels?: string[];
-            missionId?: string | null;
-            ideaId?: string | null;
-            workId?: string | null;
-            parentTaskId?: string | null;
-            requireAllApprovers?: boolean;
-        },
-    ) {
+    async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateTaskDto) {
         if (!body?.title) throw new BadRequestException('title is required.');
         return this.service.create(auth.userId, {
             title: body.title,
@@ -171,15 +169,7 @@ export class TasksController {
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body()
-        body: {
-            title?: string;
-            description?: string | null;
-            priority?: TaskPriority;
-            labels?: string[] | null;
-            parentTaskId?: string | null;
-            requireAllApprovers?: boolean;
-        },
+        @Body() body: UpdateTaskDto,
     ) {
         return this.service.update(auth.userId, id, body);
     }
@@ -202,13 +192,7 @@ export class TasksController {
     async setRecurring(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body()
-        body: {
-            recurrenceRule: string;
-            recurrenceTimezone?: string;
-            recurrenceEndsAt?: string;
-            recurrenceMaxOccurrences?: number;
-        },
+        @Body() body: SetTaskRecurringDto,
     ) {
         if (!body?.recurrenceRule) {
             throw new BadRequestException('recurrenceRule is required.');
@@ -240,7 +224,7 @@ export class TasksController {
     async transition(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { to: TaskStatus; force?: boolean },
+        @Body() body: TransitionTaskDto,
     ) {
         if (!Object.values(TaskStatus).includes(body?.to)) {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
@@ -255,7 +239,7 @@ export class TasksController {
     async addAssignee(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { assigneeType: TaskActorType; assigneeId: string },
+        @Body() body: AddAssigneeDto,
     ) {
         this.assertActorType(body.assigneeType);
         return this.service.addAssignee(auth.userId, id, body.assigneeType, body.assigneeId);
@@ -278,7 +262,7 @@ export class TasksController {
     async addReviewer(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { reviewerType: TaskActorType; reviewerId: string },
+        @Body() body: AddReviewerDto,
     ) {
         this.assertActorType(body.reviewerType);
         return this.service.addReviewer(auth.userId, id, body.reviewerType, body.reviewerId);
@@ -290,7 +274,7 @@ export class TasksController {
     async addApprover(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { approverType: TaskActorType; approverId: string },
+        @Body() body: AddApproverDto,
     ) {
         this.assertActorType(body.approverType);
         return this.service.addApprover(auth.userId, id, body.approverType, body.approverId);
@@ -302,7 +286,7 @@ export class TasksController {
     async addBlocker(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { blockedByTaskId: string },
+        @Body() body: AddBlockerDto,
     ) {
         if (!body?.blockedByTaskId) throw new BadRequestException('blockedByTaskId is required.');
         return this.service.addBlocker(auth.userId, id, body.blockedByTaskId);
@@ -339,7 +323,7 @@ export class TasksController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        @Body() body: AddAttachmentDto,
     ) {
         if (!body?.uploadId) throw new BadRequestException('uploadId is required.');
         return this.service.addAttachment(auth.userId, id, body.uploadId);
@@ -362,7 +346,7 @@ export class TasksController {
     async addRelation(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { relatedTaskId: string; kind: 'related' | 'duplicates' | 'follow-up' },
+        @Body() body: AddRelationDto,
     ) {
         if (!body?.relatedTaskId) throw new BadRequestException('relatedTaskId is required.');
         if (!['related', 'duplicates', 'follow-up'].includes(body.kind)) {
@@ -457,7 +441,7 @@ export class TasksController {
     async postChat(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { body: string; attachments?: { uploadId: string }[] },
+        @Body() body: PostTaskChatDto,
     ) {
         if (typeof body?.body !== 'string') {
             throw new BadRequestException('body is required.');

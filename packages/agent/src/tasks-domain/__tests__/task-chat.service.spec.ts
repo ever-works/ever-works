@@ -111,6 +111,46 @@ describe('TaskChatService', () => {
                 expect.objectContaining({ actionType: ActivityActionType.TASK_COMMENTED }),
             );
         });
+
+        it('passes the pre-created AgentRun id to the chat reply dispatcher', async () => {
+            const runs = { createQueued: jest.fn().mockResolvedValue({ id: 'run-chat-1' }) };
+            const chatDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+            const dispatchingSvc = new TaskChatService(
+                tasks,
+                messages,
+                kbMentions,
+                activity,
+                runs as any,
+                chatDispatcher,
+            );
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+            messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
+
+            await dispatchingSvc.post(
+                'u1',
+                {
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'hey @ceo, look at this',
+                },
+                { ownedAgentSlugs: new Map([['ceo', 'agent-a1']]) },
+            );
+            await new Promise((resolve) => setImmediate(resolve));
+
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agentId: 'agent-a1',
+                    userId: 'u1',
+                    triggerKind: 'chat',
+                    taskId: 't1',
+                    chatMessageId: 'm1',
+                }),
+            );
+            expect(chatDispatcher.enqueue).toHaveBeenCalledWith(
+                expect.objectContaining({ runId: 'run-chat-1' }),
+            );
+        });
     });
 
     describe('edit', () => {

@@ -1,5 +1,5 @@
 import 'server-only';
-import { serverFetch, serverMutation } from './server-api';
+import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type TaskStatus =
     | 'backlog'
@@ -85,8 +85,11 @@ export const tasksAPI = {
     async get(id: string) {
         try {
             return await serverFetch<Task>(`/tasks/${id}`, { method: 'GET' });
-        } catch {
-            return null;
+        } catch (err) {
+            if (err instanceof ApiResponseError && err.statusCode === 404) {
+                return null;
+            }
+            throw err;
         }
     },
 
@@ -230,8 +233,8 @@ export const tasksAPI = {
         });
     },
 
-    async removeAttachment(id: string, attachmentId: string): Promise<{ removed: boolean }> {
-        return serverMutation<{ removed: boolean }>({
+    async removeAttachment(id: string, attachmentId: string): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
             endpoint: `/tasks/${id}/attachments/${attachmentId}`,
             data: {},
             method: 'DELETE',

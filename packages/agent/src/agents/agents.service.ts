@@ -25,53 +25,6 @@ import { AgentAttachmentRepository } from '../database/repositories/attachment.r
 import { slugifyText } from '../utils/text.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
-import { matchesCron, parseCron } from '../missions/cron-matcher';
-
-// Security: minimum number of minutes between consecutive cron fires.
-// Expressions that fire more often than this (e.g. `* * * * *`) are
-// rejected to prevent users from saturating the dispatcher with
-// high-frequency AI runs.
-const HEARTBEAT_MIN_INTERVAL_MINUTES = 15;
-
-/**
- * Security: validate that a heartbeat cron expression does not fire more
- * frequently than HEARTBEAT_MIN_INTERVAL_MINUTES. Samples the expression
- * over a 24-hour window and checks the minimum gap between consecutive
- * matches. Throws BadRequestException if the expression is invalid or too
- * frequent.
- */
-function validateHeartbeatCadence(cadence: string): void {
-    if (cadence === 'manual') return;
-    // Verify the expression is syntactically valid first.
-    try {
-        parseCron(cadence);
-    } catch (err) {
-        throw new BadRequestException(
-            `Invalid heartbeatCadence cron expression: ${err instanceof Error ? err.message : String(err)}`,
-        );
-    }
-    // Sample over 24 h (1440 minutes) to find the minimum gap.
-    const base = new Date('2024-01-01T00:00:00Z');
-    let prevMatchMinute: number | null = null;
-    let minGap = Infinity;
-    for (let i = 0; i < 1440; i++) {
-        const ts = new Date(base.getTime() + i * 60_000);
-        if (matchesCron(cadence, ts)) {
-            if (prevMatchMinute !== null) {
-                const gap = i - prevMatchMinute;
-                if (gap < minGap) minGap = gap;
-            }
-            prevMatchMinute = i;
-        }
-    }
-    // If the expression fires at all within 24 h, enforce the minimum gap.
-    if (minGap !== Infinity && minGap < HEARTBEAT_MIN_INTERVAL_MINUTES) {
-        throw new BadRequestException(
-            `heartbeatCadence fires too frequently (minimum interval: ${HEARTBEAT_MIN_INTERVAL_MINUTES} minutes). ` +
-                `Use a cron expression that fires no more than once every ${HEARTBEAT_MIN_INTERVAL_MINUTES} minutes.`,
-        );
-    }
-}
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -229,18 +182,13 @@ export class AgentsService {
             permissions.canCommitToRepo = true;
         }
 
-        // Security: enforce minimum heartbeat cadence to prevent DoS via
-        // high-frequency cron expressions consuming AI budget + dispatcher slots.
-        if (input.heartbeatCadence) {
-            validateHeartbeatCadence(input.heartbeatCadence);
-        }
-
         const avatarMode = input.avatarMode ?? AgentAvatarMode.INITIALS;
         this.validateAvatarFields(
             avatarMode,
             input.avatarIcon ?? null,
             input.avatarImageUploadId ?? null,
         );
+        this.validateHeartbeatCadence(input.heartbeatCadence ?? null);
 
         const created = await this.agents.create({
             userId,
@@ -325,12 +273,14 @@ export class AgentsService {
         if (input.maxSkillContextTokens !== undefined)
             patch.maxSkillContextTokens = input.maxSkillContextTokens;
         if (input.heartbeatCadence !== undefined) {
-            // Security: enforce minimum heartbeat cadence to prevent DoS via
-            // high-frequency cron expressions consuming AI budget + dispatcher slots.
-            if (input.heartbeatCadence) {
-                validateHeartbeatCadence(input.heartbeatCadence);
-            }
+            this.validateHeartbeatCadence(input.heartbeatCadence);
             patch.heartbeatCadence = input.heartbeatCadence;
+            if (agent.status === AgentStatus.ACTIVE) {
+                patch.nextHeartbeatAt =
+                    input.heartbeatCadence && input.heartbeatCadence !== 'manual'
+                        ? computeNextHeartbeat(input.heartbeatCadence, new Date())
+                        : null;
+            }
         }
         if (input.idleBehavior !== undefined) patch.idleBehavior = input.idleBehavior;
         if (input.pauseAfterFailures !== undefined)
@@ -561,6 +511,15 @@ export class AgentsService {
         }
         if (mode === AgentAvatarMode.IMAGE && !uploadId) {
             throw new BadRequestException('avatarImageUploadId required when avatarMode=image');
+        }
+    }
+
+    private validateHeartbeatCadence(cadence: string | null | undefined): void {
+        if (!cadence || cadence === 'manual') return;
+        if (!computeNextHeartbeat(cadence, new Date())) {
+            throw new BadRequestException(
+                `Invalid heartbeatCadence "${cadence}". Use "manual", null, or a supported cron expression.`,
+            );
         }
     }
 

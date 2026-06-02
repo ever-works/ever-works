@@ -38,6 +38,7 @@ export interface AgentHeartbeatTrigger {
         agentId: string;
         userId: string;
         scheduledFor: Date;
+        runId?: string;
     }): Promise<{ runId: string }>;
 }
 
@@ -136,6 +137,7 @@ export class AgentScheduleDispatcherService {
                     agentId: agent.id,
                     userId: agent.userId,
                     scheduledFor: originalNext,
+                    runId: run.id,
                 });
                 enqueueSucceeded = true;
 
@@ -231,6 +233,7 @@ export class AgentScheduleDispatcherService {
                 agentId: agent.id,
                 userId: agent.userId,
                 scheduledFor: priorClaim.priorNextHeartbeatAt ?? new Date(),
+                runId: run.id,
             });
             enqueueSucceeded = true;
             return { outcome: 'dispatched', runId: run?.id ?? handle.runId };

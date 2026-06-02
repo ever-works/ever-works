@@ -5,6 +5,7 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    Matches,
     MaxLength,
     Min,
     MinLength,
@@ -181,4 +182,14 @@ export class UpdateMissionDto {
     @IsString()
     @MaxLength(200)
     missionTemplateRepo?: string | null;
+}
+
+export class AddMissionAttachmentDto {
+    @ApiProperty({
+        description: 'Upload id returned by POST /api/uploads/file.',
+        pattern: '^[0-9a-fA-F]{64}$',
+    })
+    @IsString()
+    @Matches(/^[0-9a-f]{64}$/i)
+    uploadId: string;
 }

@@ -15,8 +15,7 @@ import {
     Put,
     Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { IsString, Matches } from 'class-validator';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import type { WorkProposal } from '@ever-works/agent/entities';
@@ -27,6 +26,7 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
+    AddWorkProposalAttachmentDto,
     BuildWorkProposalResponseDto,
     CreateWorkProposalDto,
     ListWorkProposalsQueryDto,
@@ -108,15 +108,6 @@ function toProposalUserPrompt(proposal: {
     return parts.join(' ').slice(0, 1000).trim();
 }
 
-// Security: proper DTO class so ValidationPipe enforces uploadId shape at
-// the controller layer, not only inside the service (defense-in-depth).
-class AddAttachmentDto {
-    @ApiProperty({ description: 'SHA-256 hex digest of the uploaded file (64 lowercase hex chars).' })
-    @IsString()
-    @Matches(/^[a-f0-9]{64}$/, { message: 'uploadId must be a 64-character lowercase hex SHA-256 string' })
-    uploadId: string;
-}
-
 @ApiTags('work-proposals')
 @Controller('api/me/work-proposals')
 export class WorkProposalsController {
@@ -163,6 +154,9 @@ export class WorkProposalsController {
                 : [WorkProposalStatus.PENDING];
         const proposals = await this.service.list(auth.userId, statuses, {
             missionId: query.missionId,
+            search: query.search?.trim() || undefined,
+            limit: query.limit,
+            offset: query.offset,
         });
         return proposals.map(toResponseDto);
     }
@@ -379,7 +373,7 @@ export class WorkProposalsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: AddAttachmentDto, // Security: class-validator DTO replaces inline interface
+        @Body() body: AddWorkProposalAttachmentDto,
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }
