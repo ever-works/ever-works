@@ -43,6 +43,10 @@ type SseResponse = {
     setHeader(name: string, value: string): void;
     flushHeaders?(): void;
     write(chunk: string): void;
+    end(): void;
+    // Present on the underlying Express `Response`; used by the lifetime-cap
+    // cleanup to avoid double-ending an already-closed socket.
+    readonly writableEnded?: boolean;
     on(event: 'close', listener: () => void): void;
 };
 
@@ -232,6 +236,10 @@ export class EmailController {
             clearInterval(pollTimer);
             clearInterval(heartbeat);
             if (maxLifetime) clearTimeout(maxLifetime);
+            // End the response so the lifetime cap actually closes the stream
+            // (lets EventSource reconnect) instead of leaving a silent, stalled
+            // connection open. No-op if the socket has already closed.
+            if (!res.writableEnded) res.end();
         };
 
         maxLifetime = setTimeout(cleanup, 10 * 60 * 1000);
@@ -270,7 +278,7 @@ export class EmailController {
     // Security: rate-limit the unauthenticated token-confirmation endpoint so
     // verification tokens cannot be brute-forced/enumerated. A legitimate
     // click-through hits this once; 10/min/IP is far above that.
-    @Throttle({ default: { ttl: 60_000, limit: 10 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({ summary: 'Confirm an email address via verification token' })
     async confirmVerification(@Param('token') token: string) {
         return this.emailService.confirmVerification(token);

@@ -105,7 +105,10 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template updated' })
     async updateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
+        @Param('templateId') templateId: string,
         @Body() body: UpdateCustomTemplateDto,
     ) {
         const template = await this.templateCatalogService.updateCustomTemplateForUser(
@@ -142,7 +145,10 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template archived' })
     async archiveCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
+        @Param('templateId') templateId: string,
         @Body() body: ArchiveCustomTemplateDto,
     ) {
         const result = await this.templateCatalogService.archiveCustomTemplateForUser(
@@ -315,7 +321,10 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization scheduled' })
     async iterateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
+        @Param('templateId') templateId: string,
         @Body() body: IterateCustomTemplateDto,
     ) {
         const result = await this.templateCustomizationService.runOnExistingTemplate(
@@ -357,7 +366,10 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Template synced' })
     async syncCustomTemplateFromBase(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
+        @Param('templateId') templateId: string,
     ) {
         const result = await this.templateCustomizationService.syncFromBase(
             auth.userId,
@@ -428,7 +440,10 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization list' })
     async listCustomizationsForTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
+        @Param('templateId') templateId: string,
     ) {
         const customizations = await this.templateCustomizationService.listForTemplate(
             templateId,
