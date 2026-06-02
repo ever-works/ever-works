@@ -16,6 +16,16 @@ import type {
 import type { ReferenceEntry } from '@ever-works/plugin';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
+// Security (path-traversal hardening): item/comparison slugs are used verbatim
+// as directory names under the cloned data repo, and the value reaching the
+// remove/update/read sinks can be an attacker-supplied `item_slug` (validated
+// only as a non-empty string at the DTO layer). `path.basename` alone is
+// platform-dependent (POSIX leaves `..\\x` untouched) and lets through reserved
+// names like `.`/`..`, so we additionally require a strict allowlist matching
+// the `slugifyText` output charset ([A-Za-z0-9_-]) before any path is built.
+// Mirrors `GitHubSyncService.safeSlugDir`.
+const SAFE_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
 export type PRUpdate = {
     branch: string;
     title: string;
@@ -314,8 +324,37 @@ export class DataRepository {
         return collectionPath;
     }
 
+    /**
+     * Security helper: resolve a slug to a directory under `baseDir`, rejecting
+     * anything that is not a strict `[A-Za-z0-9_-]+` token or that would escape
+     * `baseDir` once resolved (e.g. `../../victim`). Throws on a hostile slug so
+     * the traversal never reaches an `fs.rm`/`fs.writeFile`/`fs.readFile` sink.
+     * Legitimate slugs are `slugifyText` output ([a-z0-9_-]) and pass unchanged.
+     * Mirrors `GitHubSyncService.safeSlugDir`.
+     */
+    private confineSlugPath(baseDir: string, slug: string): string {
+        const safeName = path.basename(slug);
+        // Reject empty results and anything outside the slug allowlist before
+        // building a path — defends against platform-dependent `basename`
+        // behaviour and OS-reserved names (`.`, `..`, etc.).
+        if (!safeName || safeName !== slug || !SAFE_SLUG_PATTERN.test(safeName)) {
+            throw new Error(`Invalid slug: ${slug}`);
+        }
+        // Build the path in the same `path.join` form the original code used so
+        // the return value is identical for legitimate slugs. Resolve BOTH sides
+        // only for the containment check — correct even when `baseDir` is not an
+        // absolute, normalized path.
+        const dirPath = path.join(baseDir, safeName);
+        const resolvedRoot = path.resolve(baseDir);
+        const resolvedChild = path.resolve(baseDir, safeName);
+        if (resolvedChild !== resolvedRoot && !resolvedChild.startsWith(resolvedRoot + path.sep)) {
+            throw new Error(`Invalid slug: ${slug}`);
+        }
+        return dirPath;
+    }
+
     private getItemPath(slug: string) {
-        return path.join(this.dataDir, slug);
+        return this.confineSlugPath(this.dataDir, slug);
     }
 
     async cleanup() {
@@ -621,7 +660,9 @@ export class DataRepository {
     }
 
     private getComparisonPath(slug: string): string {
-        return path.join(this.comparisonsDir, slug);
+        // Same path-traversal confinement as item slugs (see confineSlugPath):
+        // comparison slugs feed fs.rm / fs.writeFile / fs.readFile sinks.
+        return this.confineSlugPath(this.comparisonsDir, slug);
     }
 
     private normalizeComparisonSource(source: unknown): ComparisonSource | null {

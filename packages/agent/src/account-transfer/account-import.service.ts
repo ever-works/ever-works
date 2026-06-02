@@ -22,6 +22,20 @@ import type {
 } from './types';
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 
+/**
+ * Canonical slug shape (matches the work/item DTO `@Matches` rule and
+ * `ItemImportService.SLUG_PATTERN`). Item/comparison slugs from an
+ * imported payload are written to disk as directory/file names by
+ * `DataRepository.writeItem`/`writeComparison*` (which `path.join` the
+ * raw slug onto the clone dir with no confinement), so a slug containing
+ * `..`/`/` segments would let an attacker-supplied export escape the
+ * cloned data repo and write attacker-controlled content elsewhere on
+ * the host (zip-slip / path traversal → arbitrary file write). Enforcing
+ * this whitelist before any write keeps malicious slugs out of the
+ * filesystem while leaving every legitimate export unchanged.
+ */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 @Injectable()
 export class AccountImportService {
     private readonly logger = new Logger(AccountImportService.name);
@@ -555,6 +569,18 @@ export class AccountImportService {
             // Write items
             if (hasItems) {
                 for (const item of dir.items!) {
+                    // Security: the item slug becomes a directory/file name on
+                    // disk via path.join with no confinement, so reject any
+                    // slug with traversal/illegal chars to prevent writing
+                    // outside the cloned data repo (path traversal). Legitimate
+                    // exports always carry a canonical slug, so this is a no-op
+                    // for valid input.
+                    if (item.slug && !SLUG_PATTERN.test(item.slug)) {
+                        result.warnings.push(
+                            `Skipped item with invalid slug "${item.slug}" in work "${dir.slug}"`,
+                        );
+                        continue;
+                    }
                     const { markdown, ...itemData } = item;
                     await data.writeItem(itemData as any);
                     if (markdown) {
@@ -566,6 +592,18 @@ export class AccountImportService {
             // Write comparisons
             if (hasComparisons) {
                 for (const comp of dir.comparisons!) {
+                    // Security: the comparison slug becomes a directory/file
+                    // name on disk via path.join with no confinement, so reject
+                    // any slug with traversal/illegal chars to prevent writing
+                    // outside the cloned data repo (path traversal). Legitimate
+                    // exports always carry a canonical slug, so this is a no-op
+                    // for valid input.
+                    if (!SLUG_PATTERN.test(comp.slug)) {
+                        result.warnings.push(
+                            `Skipped comparison with invalid slug "${comp.slug}" in work "${dir.slug}"`,
+                        );
+                        continue;
+                    }
                     const { markdown, ...compData } = comp;
                     await data.writeComparison(compData as any);
                     if (markdown) {

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Skill, type SkillOwnerType } from '../../entities/skill.entity';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 
 export interface ListSkillsFilter {
     ownerType?: SkillOwnerType;
@@ -54,10 +55,28 @@ export class SkillRepository {
             qb.andWhere('skill.ownerType = :ownerType', { ownerType: filter.ownerType });
         if (filter.ownerId) qb.andWhere('skill.ownerId = :ownerId', { ownerId: filter.ownerId });
         if (filter.search) {
-            qb.andWhere(
-                '(skill.title LIKE :q OR skill.slug LIKE :q OR skill.description LIKE :q)',
-                { q: `%${filter.search}%` },
-            );
+            // Escape LIKE metacharacters (%, _, \) in the user-supplied search
+            // term so they're matched literally rather than acting as wildcards.
+            // Mirrors work.repository.ts / activity-log.repository.ts: prevents
+            // filter-bypass (e.g. `search=%`) and the index-defeating full scans
+            // that an unescaped `%...%` pattern would otherwise allow.
+            const searchPattern = prepareCaseInsensitiveContainsPattern(filter.search);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('skill.title'), {
+                                search: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('skill.slug'), {
+                                search: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('skill.description'), {
+                                search: searchPattern,
+                            });
+                    }),
+                );
+            }
         }
 
         const total = await qb.getCount();

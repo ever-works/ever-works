@@ -7,6 +7,9 @@ import type {
 	MakeWorkflowInput
 } from '../types.js';
 import { DEFAULT_MAX_POLL_ATTEMPTS, DEFAULT_POLL_INTERVAL_MS } from '../types.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 export interface MakeExecutionResult {
 	output: unknown;
@@ -194,6 +197,17 @@ export class MakeClient {
 	 * final output inline when the scenario uses a "Webhook Response" module.
 	 */
 	async invokeWebhook(webhookUrl: string, input: MakeWorkflowInput, signal?: AbortSignal): Promise<unknown> {
+		// SSRF guard: webhookUrl is tenant-controlled (generator form / plugin
+		// settings) and the call site at make.plugin.ts also forwards a hook URL
+		// returned by the Make REST API. Reject literal private/loopback/
+		// link-local/cloud-metadata IPs and non-HTTP(S) schemes before issuing
+		// the request, so a malicious config can't make the server POST to (and
+		// return the body of) an internal endpoint such as 169.254.169.254 IMDS.
+		// Mirrors the content-extractor / pdf-extractor / source-validation guards.
+		if (!isSafeWebhookUrl(webhookUrl)) {
+			throw new Error('Make.com webhook URL is not safe to call (SSRF guard blocked the destination host).');
+		}
+
 		const response = await fetch(webhookUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

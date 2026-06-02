@@ -20,6 +20,13 @@ import type {
 const SYNC_REPO_NAME = 'ever-works-config';
 const PROVIDER_ID = 'github';
 
+// Security (path-traversal hardening): slugs are used verbatim as directory
+// names under the cloned sync repo. `path.basename` alone is platform-dependent
+// (POSIX leaves `..\\x` untouched, Windows strips it) and lets through reserved
+// names like `.`/`..`, so we additionally require a strict allowlist matching
+// the `slugifyText` output charset ([A-Za-z0-9_-]) before any path is built.
+const SAFE_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
 @Injectable()
 export class GitHubSyncService {
     private readonly logger = new Logger(GitHubSyncService.name);
@@ -315,6 +322,35 @@ export class GitHubSyncService {
         await this.syncConfigRepository.delete(userId);
     }
 
+    /**
+     * Security helper: resolve a slug to a directory under `baseDir`, rejecting
+     * anything that is not a strict `[A-Za-z0-9_-]+` token or that would escape
+     * `baseDir` once resolved. Returns the safe absolute path, or `null` when
+     * the slug must be skipped. Mirrors the path-confinement check used by
+     * `KnowledgeBaseGitMirrorService.resolveInsideKbRoot`.
+     */
+    private safeSlugDir(baseDir: string, slug: string): string | null {
+        const safeName = path.basename(slug);
+        // Reject empty results and anything outside the slug allowlist before
+        // building a path — defends against platform-dependent `basename`
+        // behaviour and OS-reserved names (`.`, `..`, etc.).
+        if (!safeName || safeName !== slug || !SAFE_SLUG_PATTERN.test(safeName)) {
+            return null;
+        }
+        // Build the path in the same `path.join` form the original code used so
+        // the return value is identical for legitimate slugs. Resolve BOTH sides
+        // only for the containment check — correct even when `baseDir` is not an
+        // absolute, normalized path (otherwise path.resolve would prepend the cwd
+        // drive to the child but not to the bare root, rejecting valid slugs).
+        const dirPath = path.join(baseDir, safeName);
+        const resolvedRoot = path.resolve(baseDir);
+        const resolvedChild = path.resolve(baseDir, safeName);
+        if (resolvedChild !== resolvedRoot && !resolvedChild.startsWith(resolvedRoot + path.sep)) {
+            return null;
+        }
+        return dirPath;
+    }
+
     private writeExportFiles(dir: string, payload: AccountExportPayload): void {
         // Phase 19.5 — manifest carries the v2 tail counts when present
         // so a pull-side reader can decide which subdirs to walk
@@ -346,12 +382,11 @@ export class GitHubSyncService {
         fs.mkdirSync(worksDir, { recursive: true });
 
         for (const work of payload.data.works) {
-            const safeName = path.basename(work.slug);
-            if (safeName !== work.slug) {
+            const dirPath = this.safeSlugDir(worksDir, work.slug);
+            if (!dirPath) {
                 this.logger.warn(`Skipping work with invalid slug: ${work.slug}`);
                 continue;
             }
-            const dirPath = path.join(worksDir, safeName);
             fs.mkdirSync(dirPath, { recursive: true });
 
             const {
@@ -413,36 +448,36 @@ export class GitHubSyncService {
             const agentsDir = path.join(dir, 'agents');
             fs.mkdirSync(agentsDir, { recursive: true });
             for (const agent of agents) {
-                const safeName = path.basename(agent.identity.slug);
-                if (safeName !== agent.identity.slug) {
+                const safeDir = this.safeSlugDir(agentsDir, agent.identity.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping agent with invalid slug: ${agent.identity.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(agentsDir, `${safeName}.json`), agent);
+                this.writeJsonFile(`${safeDir}.json`, agent);
             }
         }
         if (skills.length > 0) {
             const skillsDir = path.join(dir, 'skills');
             fs.mkdirSync(skillsDir, { recursive: true });
             for (const skill of skills) {
-                const safeName = path.basename(skill.slug);
-                if (safeName !== skill.slug) {
+                const safeDir = this.safeSlugDir(skillsDir, skill.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping skill with invalid slug: ${skill.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(skillsDir, `${safeName}.json`), skill);
+                this.writeJsonFile(`${safeDir}.json`, skill);
             }
         }
         if (tasks.length > 0) {
             const tasksDir = path.join(dir, 'tasks');
             fs.mkdirSync(tasksDir, { recursive: true });
             for (const task of tasks) {
-                const safeName = path.basename(task.slug);
-                if (safeName !== task.slug) {
+                const safeDir = this.safeSlugDir(tasksDir, task.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping task with invalid slug: ${task.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(tasksDir, `${safeName}.json`), task);
+                this.writeJsonFile(`${safeDir}.json`, task);
             }
         }
     }

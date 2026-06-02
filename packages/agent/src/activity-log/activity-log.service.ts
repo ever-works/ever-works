@@ -360,11 +360,18 @@ export class ActivityLogService {
         const rows = activities.map((a) => {
             const workName = csvSafeCell((a.work?.name || '').replace(/"/g, '""'));
             const summary = csvSafeCell(this.formatSummary(a).replace(/"/g, '""'));
+            // Formula-injection defense: run every exported cell through
+            // csvSafeCell, not just workName/summary. actionType/action/status
+            // are currently enum-derived (safe) values, but the export covers
+            // ALL activity rows — guarding here future-proofs against any
+            // upstream code path that ever stores user-influenced content in
+            // these columns. createdAt is an ISO timestamp (always digit-led),
+            // so it can never start a formula and is left as-is.
             return [
                 a.createdAt.toISOString(),
-                a.actionType,
-                a.action,
-                a.status,
+                csvSafeCell(a.actionType),
+                csvSafeCell(a.action),
+                csvSafeCell(a.status),
                 `"${workName}"`,
                 `"${summary}"`,
             ].join(',');

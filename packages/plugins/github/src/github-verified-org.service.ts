@@ -118,15 +118,21 @@ export class GitHubVerifiedOrgService {
 					org,
 					username: params.username
 				});
-				// Octokit's typed return narrows `status` to the success
-				// codes — 204 (caller is a member, target is a member) or
-				// 302 (target is a non-public member; redirect points to
-				// the public-members endpoint). Either way the user IS a
-				// member of `org`, so anything we receive here counts as
-				// verified. (404 / 429 / 5xx are thrown by Octokit and
-				// handled in the catch block.)
+				// SECURITY (C-11 fail-open fix): only a definitive 204
+				// proves `username` is a member of `org`. A 302 from
+				// `GET /orgs/{org}/members/{username}` does NOT mean the
+				// target user is a member — per the GitHub REST API it
+				// means the *requesting token's owner* is not an org member
+				// and is being redirected to the public-members endpoint.
+				// Treating 302 as verified would let an unverified PR author
+				// pass the verified-org allow-list whenever the probing
+				// (Work-owner) token is itself a non-member. So a 302 (or
+				// anything that is not 204) is treated as "could not verify"
+				// → keep checking the next org / fall through to untrusted.
+				// (404 / 429 / 5xx are thrown by Octokit and handled in the
+				// catch block.)
 				const status = response.status as number;
-				if (status === 204 || status === 302) {
+				if (status === 204) {
 					verified = true;
 					break;
 				}

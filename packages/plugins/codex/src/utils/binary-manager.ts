@@ -49,7 +49,23 @@ function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
 		proto
 			.get(url, (res: http.IncomingMessage) => {
 				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-					fetchBuffer(res.headers.location, maxRedirects - 1).then(resolve, reject);
+					// Security: the codex archive is executed with no checksum gate, so its integrity
+					// rests entirely on TLS. A redirect that downgrades to plaintext HTTP (or points at
+					// an attacker host over http) would let a MITM swap in a trojaned archive. Resolve
+					// the Location against the current URL and refuse to follow anything that is not
+					// https — never fall back to the `http` module after a redirect.
+					let redirectUrl: string;
+					try {
+						redirectUrl = new URL(res.headers.location, url).toString();
+					} catch {
+						reject(new Error(`Invalid redirect location while fetching ${url}`));
+						return;
+					}
+					if (!redirectUrl.startsWith('https:')) {
+						reject(new Error(`Refusing to follow non-https redirect to ${redirectUrl}`));
+						return;
+					}
+					fetchBuffer(redirectUrl, maxRedirects - 1).then(resolve, reject);
 					return;
 				}
 

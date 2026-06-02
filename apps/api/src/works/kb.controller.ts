@@ -451,7 +451,16 @@ export class KbController {
         // won't reinterpret the bytes as HTML even if the recorded MIME
         // is wrong. The viewers expect inline so `<iframe src>` /
         // `<video src>` / `<img src>` Just Work.
-        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        //
+        // Security: `filename` is the raw multipart `originalFilename`
+        // stored verbatim (unlike the sibling `uploads.controller.ts`
+        // serve route whose filename is the validated `<hex64>.<ext>`
+        // shape). Strip `"`/CR/LF before interpolating into the quoted
+        // header value so an attacker-chosen filename containing a double
+        // quote can't terminate the quoted-string and inject additional
+        // `Content-Disposition` parameters (disposition / filename spoof).
+        const safeFilename = filename.replace(/["\r\n]/g, '_');
+        res.setHeader('Content-Disposition', `inline; filename="${safeFilename}"`);
         res.send(buffer);
     }
 

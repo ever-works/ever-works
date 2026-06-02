@@ -9,6 +9,7 @@ import {
     KbDocumentStatus,
     KbLockMode,
 } from '../../entities/kb-types';
+import { sanitizeLikePattern } from '../utils';
 
 export interface KbDocumentListOptions {
     workId?: string;
@@ -118,9 +119,20 @@ export class WorkKnowledgeDocumentRepository {
         }
 
         if (opts.q) {
-            qb.andWhere('(doc.title LIKE :q OR doc.description LIKE :q)', {
-                q: `%${opts.q}%`,
-            });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // search term and pair each predicate with an explicit ESCAPE
+            // clause. The value is already bound, so this is not SQLi, but
+            // unescaped wildcards otherwise let a caller bypass the filter
+            // (e.g. `%`) or force an index-defeating leading-wildcard scan
+            // (DoS amplification within the caller's authorized Work/Org).
+            // Mirrors agent.repository.ts; escape-only (no LOWER()) preserves
+            // the existing matching for legitimate input.
+            qb.andWhere(
+                "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')",
+                {
+                    q: `%${sanitizeLikePattern(opts.q)}%`,
+                },
+            );
         }
 
         qb.orderBy('doc.updatedAt', 'DESC');

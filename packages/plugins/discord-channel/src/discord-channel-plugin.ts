@@ -10,11 +10,40 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+// SSRF guard: the webhook URL is fully user-supplied. isSafeWebhookUrl rejects
+// private/loopback/link-local/metadata hosts lexically; safeFetchWithDnsPin
+// re-checks after DNS resolution to mitigate DNS rebinding. Mirrors
+// WebhookDeliveryService and the content-extractor plugins.
+import { isSafeWebhookUrl, safeFetchWithDnsPin } from '@ever-works/plugin/helpers/ssrf-guard';
+
+// Discord webhooks always live on these hosts. Constraining to them turns the
+// "any URL the user pastes" SSRF oracle (verifyTarget echoes the upstream JSON
+// id/channel_id/name; send POSTs an attacker-controlled body) into a no-op for
+// non-Discord targets, on top of the generic SSRF guard below.
+const DISCORD_WEBHOOK_HOSTS = new Set(['discord.com', 'discordapp.com', 'ptb.discord.com', 'canary.discord.com']);
+
+function isDiscordWebhookHost(host: string): boolean {
+	const normalized = host.toLowerCase();
+	if (DISCORD_WEBHOOK_HOSTS.has(normalized)) return true;
+	// Accept regional/CDN-style subdomains of the canonical Discord domains.
+	return normalized.endsWith('.discord.com') || normalized.endsWith('.discordapp.com');
+}
 
 function getWebhookUrl(config: ChannelTargetConfig): string {
 	const url = config.webhookUrl;
 	if (typeof url !== 'string' || url.length === 0) {
 		throw new Error('discord-channel: targetConfig.webhookUrl is required');
+	}
+	// Reject SSRF-unsafe hosts (private/loopback/link-local/cloud-metadata) and
+	// any non-Discord host before the URL ever reaches fetch.
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		throw new Error('discord-channel: targetConfig.webhookUrl is not a valid URL');
+	}
+	if (!isSafeWebhookUrl(url) || !isDiscordWebhookHost(parsed.hostname)) {
+		throw new Error('discord-channel: targetConfig.webhookUrl must be a Discord webhook URL');
 	}
 	return url;
 }
@@ -57,7 +86,9 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 		try {
 			const url = getWebhookUrl(config);
 			// Discord webhook URLs return 200 with the webhook metadata on GET.
-			const response = await fetch(url, { method: 'GET' });
+			// safeFetchWithDnsPin re-checks the SSRF guard and refuses any host
+			// that resolves to a private/metadata IP before the socket connect.
+			const response = await safeFetchWithDnsPin(url, { method: 'GET' });
 			if (!response.ok) {
 				return {
 					valid: false,
@@ -101,7 +132,9 @@ export class DiscordChannelPlugin implements INotificationChannelPlugin {
 
 		// Append wait=true so Discord returns the message id back.
 		const url = `${webhookUrl}${webhookUrl.includes('?') ? '&' : '?'}wait=true`;
-		const response = await fetch(url, {
+		// safeFetchWithDnsPin re-applies the SSRF guard (host already constrained
+		// to Discord by getWebhookUrl) and pins against DNS-rebinding.
+		const response = await safeFetchWithDnsPin(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body)

@@ -377,8 +377,39 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     if (files && files.length > 0) {
                         const fsp = await import('node:fs/promises');
                         const path = await import('node:path');
+                        // SECURITY: `f.path` is supplied verbatim by the LLM
+                        // tool call (potentially prompt-injected via hostile
+                        // repo/web content) and is NOT validated upstream.
+                        // Confine every write to the cloned repo `dir` —
+                        // mirroring `resolveSandboxPath`
+                        // (packages/plugins/agent-pipeline/src/tools/file-tools.ts):
+                        // reject absolute paths and reject any relative path
+                        // whose resolved target escapes `dir` (e.g.
+                        // `../../.ssh/authorized_keys`). Without this, the
+                        // recursive mkdir + writeFile below would create and
+                        // overwrite arbitrary files outside the repo on the
+                        // shared worker filesystem (path traversal / zip-slip).
+                        const repoRoot = path.resolve(dir);
                         for (const f of files) {
-                            const abs = path.join(dir, f.path);
+                            if (
+                                typeof f.path !== 'string' ||
+                                f.path.length === 0 ||
+                                path.isAbsolute(f.path)
+                            ) {
+                                throw new Error(
+                                    `commitToRepo: invalid file path ${JSON.stringify(
+                                        f.path,
+                                    )} — must be a non-empty path relative to the repo root.`,
+                                );
+                            }
+                            const abs = path.resolve(repoRoot, f.path);
+                            if (abs !== repoRoot && !abs.startsWith(repoRoot + path.sep)) {
+                                throw new Error(
+                                    `commitToRepo: file path ${JSON.stringify(
+                                        f.path,
+                                    )} resolves outside the repo directory — refusing to write.`,
+                                );
+                            }
                             await fsp.mkdir(path.dirname(abs), { recursive: true });
                             await fsp.writeFile(abs, f.body, 'utf8');
                         }
