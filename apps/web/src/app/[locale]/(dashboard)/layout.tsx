@@ -36,6 +36,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         // are sent to login even if the proxy middleware matcher is misconfigured.
         const locale = await getLocale();
         redirect({ href: ROUTES.AUTH_LOGIN, locale });
+        // Unreachable at runtime (`redirect()` throws). Present so the type
+        // checker narrows `user` to non-null below — next-intl's `redirect`
+        // isn't typed `never` the way `next/navigation`'s is.
+        return null;
     }
 
     const [
