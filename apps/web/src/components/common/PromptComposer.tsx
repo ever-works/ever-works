@@ -548,7 +548,7 @@ export function PromptComposer({
                     'border border-border/60 dark:border-white/10',
                     'bg-background dark:bg-zinc-900/50',
                     'shadow-sm',
-                    'transition-all duration-200',
+                    'transition-[border-color,box-shadow,opacity] duration-200',
                     'focus-within:border-border dark:focus-within:border-white/20',
                     submitting && 'opacity-60 pointer-events-none',
                 )}
@@ -567,7 +567,7 @@ export function PromptComposer({
                     disabled={inputDisabled}
                     aria-label={ariaLabel}
                     data-testid={testId}
-                    className="block w-full resize-none bg-transparent px-4 pt-4 pb-3 text-base leading-relaxed outline-none placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 text-text dark:text-text-dark"
+                    className="block w-full resize-none bg-transparent px-4 pt-4 pb-3 text-base leading-relaxed placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 text-text dark:text-text-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/40 focus-visible:outline-offset-[-2px]"
                 />
 
                 {attachments.length > 0 ? (
@@ -781,7 +781,7 @@ export function PromptComposer({
                                                         }
                                                     }}
                                                     placeholder="https://github.com/owner/repo"
-                                                    className="w-full rounded-lg border border-border/60 dark:border-white/10 bg-foreground/[0.03] dark:bg-white/[0.03] px-3 py-1.5 text-xs text-text dark:text-text-dark placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
+                                                    className="w-full rounded-lg border border-border/60 dark:border-white/10 bg-foreground/[0.03] dark:bg-white/[0.03] px-3 py-1.5 text-xs text-text dark:text-text-dark placeholder:text-text-muted/50 dark:placeholder:text-text-muted-dark/50 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors"
                                                 />
                                                 {githubError ? (
                                                     <p
@@ -927,7 +927,7 @@ export function PromptComposer({
                                 'bg-primary text-white',
                                 'shadow-sm hover:bg-primary/90 hover:shadow-md',
                                 'active:scale-95',
-                                'transition-all duration-150',
+                                'transition-[transform,box-shadow,background-color] duration-150',
                                 'disabled:cursor-not-allowed disabled:opacity-35',
                             )}
                         >
