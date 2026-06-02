@@ -1,5 +1,5 @@
 import { mkdir, writeFile, readdir, readFile, rm } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import type { ItemData, WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
@@ -43,8 +43,36 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
+// Security: workspace path components (userId, workId, runId) must be opaque
+// identifiers — database IDs / UUIDs — never path fragments. Reject anything
+// outside the safe-identifier set so an attacker-controlled `..`, `/` or `\`
+// component cannot relocate the workspace (and its later `rm -rf`) outside
+// BASE_DIR. Legitimate UUID/slug IDs pass unchanged.
+const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
+
+function assertSafePathSegment(value: string, label: string): void {
+	if (typeof value !== 'string' || !SAFE_PATH_SEGMENT.test(value)) {
+		throw new Error(`Invalid ${label}: must match [A-Za-z0-9_-]+`);
+	}
+}
+
 export function getWorkspacePath(userId: string, workId: string, runId: string): string {
-	return join(BASE_DIR, userId, `${workId}-${runId}`);
+	// Security: validate identifiers before they reach `join` (which would
+	// normalize `..` segments and escape BASE_DIR).
+	assertSafePathSegment(userId, 'userId');
+	assertSafePathSegment(workId, 'workId');
+	assertSafePathSegment(runId, 'runId');
+
+	const workspacePath = join(BASE_DIR, userId, `${workId}-${runId}`);
+
+	// Security: defense-in-depth — assert the resolved path stays under BASE_DIR.
+	const resolvedBase = resolve(BASE_DIR);
+	const resolvedPath = resolve(workspacePath);
+	if (resolvedPath !== resolvedBase && !resolvedPath.startsWith(resolvedBase + sep)) {
+		throw new Error('Resolved workspace path escapes the sandbox base directory');
+	}
+
+	return workspacePath;
 }
 
 /**
@@ -67,8 +95,14 @@ export async function createWorkspace(
 	const itemWrites: (() => Promise<void>)[] = [];
 	const indexLines: string[] = [];
 
+	// Security: re-slugify `item.slug` (not just the `item.name` fallback) before
+	// using it as a filename. `item.slug` is tenant-controlled and was previously
+	// used raw, so a crafted slug like `../../evil` survived `path.join`'s `..`
+	// normalization and escaped `workspacePath`. `slugify` strips `/`, `\` and `.`,
+	// and the empty-result fallback guarantees a non-escaping, non-empty filename.
+	const resolvedWorkspace = resolve(workspacePath);
 	for (const item of existing.items) {
-		const baseSlug = item.slug || slugify(item.name);
+		const baseSlug = slugify(item.slug || '') || slugify(item.name) || 'item';
 		const slug = deduplicateSlug(baseSlug, usedSlugs);
 		usedSlugs.add(slug);
 
@@ -77,7 +111,13 @@ export async function createWorkspace(
 		seededManifest[fileName] = hashWorkspaceContent(content);
 		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
 
-		itemWrites.push(() => writeFile(join(workspacePath, fileName), content, 'utf-8'));
+		// Security: defense-in-depth — confirm the seed file stays inside the workspace.
+		const itemPath = join(workspacePath, fileName);
+		if (resolve(itemPath) !== resolvedWorkspace && !resolve(itemPath).startsWith(resolvedWorkspace + sep)) {
+			throw new Error(`Seed item path escapes the workspace: ${fileName}`);
+		}
+
+		itemWrites.push(() => writeFile(itemPath, content, 'utf-8'));
 	}
 
 	if (itemWrites.length > 0) {

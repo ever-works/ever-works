@@ -484,7 +484,27 @@ export class UploadsController {
             filename,
             workId ? { workId } : undefined,
         );
-        res.setHeader('Content-Type', mimeType);
+        // Security: defense-in-depth against inline rendering of
+        // attacker-uploaded active content. `saveFile`'s text allow-list
+        // admits text/html, text/css and (application/)javascript, which a
+        // browser would execute / interpret if served with their real MIME
+        // (the disposition is still `inline` for legacy viewers + the
+        // committed serve spec). The strict CSP + nosniff already neuter
+        // script/frame execution, but we additionally collapse these
+        // renderable types to application/octet-stream at the point of
+        // serving so no code path can ever hand the browser an active
+        // Content-Type. Images / JSON / markdown / PDFs are untouched, so
+        // legitimate viewers keep working.
+        const ACTIVE_MIMES = new Set([
+            'text/html',
+            'text/css',
+            'text/javascript',
+            'application/javascript',
+        ]);
+        const safeMimeType = ACTIVE_MIMES.has(mimeType.split(';')[0].trim().toLowerCase())
+            ? 'application/octet-stream'
+            : mimeType;
+        res.setHeader('Content-Type', safeMimeType);
         res.setHeader('Content-Length', buffer.length);
         // `inline` is safe here because we (a) pinned a strict CSP that
         // disallows script and frame execution and (b) set nosniff so the

@@ -794,6 +794,25 @@ export class PluginSettingsService {
 
             const settingScope = def.scope;
 
+            // Security: operator-only global toggles (e.g. codex `unsafeBypassSandbox`,
+            // hermes `yolo`) carry no `x-scope` (=> global) and are marked `x-adminOnly`
+            // / `x-hidden`, so they are stripped from the tenant-facing schema and never
+            // surfaced in the UI. Without this guard a tenant could still POST such a
+            // host-behaviour-shaping field directly at user/work scope (global keys are
+            // accepted at any level and they carry no `x-envVar`), disabling the agent
+            // sandbox for their own runs. Restrict these to global (admin) writes only.
+            // Plain global fields (e.g. `model`) stay overridable per user/work.
+            if (
+                settingScope === 'global' &&
+                updateScope !== 'global' &&
+                (def.schema['x-adminOnly'] === true || def.schema['x-hidden'] === true)
+            ) {
+                violations.push(
+                    `Setting "${key}" is admin-only and cannot be updated at "${updateScope}" level`,
+                );
+                continue;
+            }
+
             // Check if the update scope matches or is more specific than the setting scope
             // global settings can be set at any level
             // user settings can be set at user or work level

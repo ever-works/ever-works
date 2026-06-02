@@ -98,6 +98,11 @@ export class AuthController {
 
     @Public()
     @Post('register')
+    // Security: cap unauthenticated mass-registration / verification-email
+    // flooding. Keyed on the configured `long` tier (see throttler.config.ts)
+    // because a `default`-keyed override binds to no real throttler and is
+    // silently ignored, leaving only the loose 1000/min global cap.
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Register a new user',
         description: 'Create a new user account with email and password',
@@ -134,7 +139,10 @@ export class AuthController {
     // EW-617 G2: zero-friction onboarding entrypoint. Rate-limited per IP to
     // prevent abuse; G7 layers on optional captcha when CAPTCHA_PROVIDER +
     // CAPTCHA_SECRET are configured (no-op in dev).
-    @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } })
+    // Security: key on a CONFIGURED throttler tier (`long`); a `default`-keyed
+    // override matches no throttler in throttler.config.ts and is ignored,
+    // silently falling back to the loose 1000/min global cap.
+    @Throttle({ long: { limit: 5, ttl: 60 * 60 * 1000 } })
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
         summary: 'Create an anonymous (zero-friction) user',
@@ -213,7 +221,9 @@ export class AuthController {
     @Post('claim')
     // EW-617 G3: convert an anonymous user (G2) into a regular account.
     // Throttled to dampen brute-force attempts at squatting taken emails.
-    @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } })
+    // Security: key on the configured `long` tier — `default` binds to no
+    // throttler and would silently fall back to the loose global cap.
+    @Throttle({ long: { limit: 10, ttl: 60 * 60 * 1000 } })
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth('JWT-auth')
     @ApiOperation({
@@ -303,8 +313,14 @@ export class AuthController {
     // alongside the H-17/H-18 Redis work). A per-user lockout (vs IP
     // throttle) needs an additional DB-backed counter; that's also deferred.
     @Public()
+    // Security: the override key MUST match a configured throttler name
+    // (short/medium/long in throttler.config.ts). The previous `default` key
+    // bound to no throttler, so @nestjs/throttler v6 ignored it and the login
+    // endpoint silently inherited the loose 1000/min global cap — wide-open
+    // credential stuffing. `long` applies this 10/min cap on top of the
+    // existing short/medium global ceilings.
     @Throttle({
-        default: {
+        long: {
             limit: Number(process.env.LOGIN_THROTTLE_LIMIT ?? 10),
             ttl: Number(process.env.LOGIN_THROTTLE_TTL_MS ?? 60_000),
         },
@@ -481,6 +497,11 @@ export class AuthController {
     }
 
     @Public()
+    // Security: throttle the reset-email trigger to stop inbox mail-bombing /
+    // transactional-mail-quota burn against a known victim address. Keyed on
+    // the configured `long` tier so the override actually binds (a `default`
+    // key is ignored, leaving only the loose 1000/min global cap).
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @Post('forgot-password')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Forgot password', description: 'Request a password reset email' })
@@ -490,6 +511,12 @@ export class AuthController {
     }
 
     @Public()
+    // Security: throttle the reset-token consumption oracle. The token has
+    // 256 bits of entropy so brute force is infeasible, but pairing a leaked
+    // log line with an unrestricted oracle gets cheap without this cap. Keyed
+    // on the configured `long` tier so the override binds (not the inert
+    // `default` key).
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @Post('reset-password')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -511,7 +538,9 @@ export class AuthController {
     // line or DB peek combined with an unrestricted validity oracle would let
     // an attacker confirm token guesses cheaply. 10/min/IP closes that side-channel.
     @Public()
-    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
+    // Security: key on the configured `long` tier so this 10/min oracle cap
+    // actually binds (a `default` key matches no throttler and is ignored).
+    @Throttle({ long: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-email-token')
     @ApiOperation({
         summary: 'Validate email verification token',
@@ -528,7 +557,9 @@ export class AuthController {
     }
 
     @Public()
-    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
+    // Security: key on the configured `long` tier so this 10/min oracle cap
+    // actually binds (a `default` key matches no throttler and is ignored).
+    @Throttle({ long: { limit: 10, ttl: 60 * 1000 } })
     @Get('validate-reset-token')
     @ApiOperation({
         summary: 'Validate password reset token',
@@ -552,7 +583,10 @@ export class AuthController {
      * brute-force attempt against the redeem endpoint below.
      */
     @Public()
-    @Throttle({ default: { limit: 5, ttl: 60 * 1000 } })
+    // Security: key on the configured `long` tier so this 5/min issuance cap
+    // actually binds (a `default` key matches no throttler and is ignored),
+    // capping mailer-cost abuse and token-brute-force setup.
+    @Throttle({ long: { limit: 5, ttl: 60 * 1000 } })
     @Post('magic-link')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
@@ -573,7 +607,10 @@ export class AuthController {
      * combined with cheap brute-force.
      */
     @Public()
-    @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
+    // Security: key on the configured `long` tier so this 10/min redeem cap
+    // actually binds (a `default` key matches no throttler and is ignored),
+    // keeping token brute-force expensive even with a leaked log line.
+    @Throttle({ long: { limit: 10, ttl: 60 * 1000 } })
     @Post('magic-link/redeem')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({

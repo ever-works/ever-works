@@ -9,12 +9,16 @@ import {
     gitProvidersAPI,
 } from '@/lib/api';
 import { getTranslations } from 'next-intl/server';
+import { getAuthFromCookie } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { ROUTES } from '@/lib/constants';
 import { checkGitProviderConnection } from './oauth';
 import {
     sanitizeName,
     sanitizePrompt,
     sanitizeStringArray,
     sanitizeText,
+    sanitizeObject,
 } from '@/lib/utils/sanitize';
 
 /**
@@ -39,7 +43,35 @@ function sanitizePluginConfig(config: Record<string, unknown>): Record<string, u
                 sanitized[key] = sanitizeStringArray(value);
             }
         }
-        // Pass through all other values
+        // Security: strip control characters from plain string config values so
+        // plugin-specific instruction/prompt fields cannot smuggle hidden payloads
+        // into the downstream AI pipeline. Newlines are preserved (prompts may be
+        // multi-line); only control chars are removed.
+        else if (typeof value === 'string') {
+            sanitized[key] = sanitizeText(value, {
+                removeNewlines: false,
+                collapseSpaces: false,
+                trim: false,
+                maxLength: 10000,
+            });
+        }
+        // Security: recursively sanitize string leaves of nested plain objects
+        // (e.g. a nested `instructions` object) using the shared sanitizeObject util.
+        else if (
+            value &&
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            Object.getPrototypeOf(value) === Object.prototype
+        ) {
+            sanitized[key] = sanitizeObject(value as Record<string, unknown>, {
+                removeNewlines: false,
+                collapseSpaces: false,
+                removeControlChars: true,
+                trim: false,
+                maxLength: 10000,
+            });
+        }
+        // Pass through all other values (numbers, booleans, mixed/non-plain arrays)
         else {
             sanitized[key] = value;
         }
@@ -60,6 +92,13 @@ type CancelGenerationActionResult =
       };
 
 export async function generateItems(workId: string, data: CreateItemsGeneratorDto) {
+    // Security: require an authenticated session before triggering generation
+    // (matches the guard used in every other dashboard server action).
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.generator');
     const tWorks = await getTranslations('actions.works');
 
@@ -137,6 +176,12 @@ export async function generateItems(workId: string, data: CreateItemsGeneratorDt
 }
 
 export async function updateItems(workId: string, data: UpdateItemsGeneratorDto) {
+    // Security: require an authenticated session before triggering an update job.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.generator');
 
     try {
@@ -158,6 +203,12 @@ export async function updateItems(workId: string, data: UpdateItemsGeneratorDto)
 }
 
 export async function cancelGeneration(workId: string): Promise<CancelGenerationActionResult> {
+    // Security: require an authenticated session before cancelling a generation job.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.generator');
 
     try {
@@ -179,6 +230,12 @@ export async function cancelGeneration(workId: string): Promise<CancelGeneration
 }
 
 export async function regenerateMarkdown(workId: string) {
+    // Security: require an authenticated session before triggering markdown regeneration.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.generator');
 
     try {

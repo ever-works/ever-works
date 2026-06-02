@@ -10,7 +10,8 @@ import {
     Patch,
     Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { IsString, Matches } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import {
     MissionCloneService,
@@ -24,6 +25,19 @@ import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { CloneMissionDto, CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
+
+/**
+ * Security: Typed DTO for `POST /:id/attachments` so that the global
+ * ValidationPipe whitelist/forbidNonWhitelisted can strip (or reject)
+ * unexpected extra body fields. The SHA-256 hex pattern matches the
+ * format enforced by missions.service.ts SHA256_RE.
+ */
+class AddAttachmentDto {
+    @ApiProperty({ description: 'SHA-256 hex upload ID (64 lowercase hex chars)' })
+    @IsString()
+    @Matches(/^[0-9a-f]{64}$/i, { message: 'uploadId must be a 64-character hex string' })
+    uploadId: string;
+}
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -261,9 +275,12 @@ export class MissionsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        // Security: use a class-validator DTO so the global ValidationPipe
+        // whitelist/forbidNonWhitelisted strips unknown fields; format is also
+        // validated here to match the SHA-256 hex pattern (defense-in-depth).
+        @Body() body: AddAttachmentDto,
     ) {
-        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+        return this.service.addAttachment(auth.userId, id, body.uploadId);
     }
 
     @Delete(':id/attachments/:attachmentId')

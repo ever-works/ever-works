@@ -161,6 +161,11 @@ export async function commitWithLfsCli(
 	// not a conservative ref name before we shell out.
 	assertSafeBranch(cfg.branch);
 	const tmpdir = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'ew-gh-storage-lfs-'));
+	// Security: resolve the real tmpdir once so each file's target path can
+	// be confined to it. `mkdtemp` can return a symlinked prefix on some
+	// platforms (e.g. macOS `/tmp` -> `/private/tmp`); resolving keeps the
+	// containment check honest.
+	const tmpdirReal = nodePath.resolve(tmpdir);
 	const run = (cwd: string | undefined, cmd: string, args: ReadonlyArray<string>) =>
 		exec(cmd, args, { cwd, signal: cfg.signal });
 	try {
@@ -168,13 +173,35 @@ export async function commitWithLfsCli(
 		await run(tmpdir, 'git', ['lfs', 'install', '--local']);
 		await run(tmpdir, 'git', ['lfs', 'track', sanitizeTrackPattern(pathPrefix)]);
 		for (const file of files) {
-			const full = nodePath.join(tmpdir, file.path);
+			// Security (defense-in-depth): `commitWithLfsCli` is exported and
+			// callable with an arbitrary `file.path`. `nodePath.join` does NOT
+			// prevent traversal (`join(tmp, '../../etc/x')` escapes `tmp`), so
+			// a crafted path would let writeFile clobber files OUTSIDE the
+			// clone. Confine the resolved target to `tmpdir`, and reject paths
+			// git would parse as a flag (leading `-`, e.g. `-A`/`-u`) before
+			// they reach `git add`. The production caller derives the path from
+			// validated `<pathPrefix>/<ownerId>/<hash><ext>` parts, so legit
+			// uploads are unaffected.
+			const full = nodePath.resolve(tmpdirReal, file.path);
+			if (full !== tmpdirReal && !full.startsWith(tmpdirReal + nodePath.sep)) {
+				throw new Error(`Refusing to write file outside the clone: ${JSON.stringify(file.path)}`);
+			}
+			assertSafeAddPath(file.path);
 			await fsp.mkdir(nodePath.dirname(full), { recursive: true });
 			await fsp.writeFile(full, file.content);
 			await run(tmpdir, 'git', ['add', file.path]);
 		}
 		// `git lfs track` writes `.gitattributes` — always stage it.
 		await run(tmpdir, 'git', ['add', '.gitattributes']);
+		// Security (defense-in-depth): name/email land in `-c user.name=<v>`
+		// / `-c user.email=<v>` argv. A newline (or NUL) embedded in the value
+		// can let `git -c` parse a SECOND config key off the next line (e.g.
+		// `core.sshCommand=` / `core.hooksPath=`), turning an identity into
+		// config-injection -> RCE. The production caller hard-codes a static
+		// committer, but the function is exported and accepts arbitrary input.
+		// Reject control characters before building the argv.
+		assertSafeCommitterField('name', committer.name);
+		assertSafeCommitterField('email', committer.email);
 		await run(tmpdir, 'git', [
 			'-c',
 			`user.name=${committer.name}`,
@@ -202,6 +229,13 @@ export async function commitWithLfsCli(
 function sanitizeTrackPattern(pathPrefix: string): string {
 	const safe = pathPrefix.replace(/(^\/+|\/+$)/g, '');
 	if (safe.length === 0) return '*';
+	// Security: reject `..` path components so a misconfigured
+	// `GITHUB_STORAGE_PATH_PREFIX` (e.g. `uploads/../.github/workflows`)
+	// can't aim the `git lfs track` glob outside the intended uploads
+	// scope (which would, e.g., mark CI workflow YAML as LFS objects).
+	if (/(^|\/)\.\.(\/|$)/.test(safe)) {
+		throw new Error(`Refusing to use unsafe LFS track path prefix: ${JSON.stringify(pathPrefix)}`);
+	}
 	return `${safe}/**`;
 }
 
@@ -217,6 +251,31 @@ const SAFE_BRANCH_PATTERN = /^(?!-)[A-Za-z0-9._/-]{1,255}$/;
 function assertSafeBranch(branch: string): void {
 	if (!SAFE_BRANCH_PATTERN.test(branch)) {
 		throw new Error(`Refusing to use unsafe git branch ref: ${JSON.stringify(branch)}`);
+	}
+}
+
+/**
+ * Security: guard the path handed to `git add`. Even after the on-disk
+ * containment check, the raw `file.path` is passed to git as a positional
+ * argument; git parses options anywhere on the line, so a value starting
+ * with `-` (e.g. `-A`, `-u`, `--all`) would be read as a flag rather than a
+ * pathspec. Reject leading `-` and any control characters / NUL.
+ */
+function assertSafeAddPath(p: string): void {
+	if (p.length === 0 || p.startsWith('-') || /[\0\r\n]/.test(p)) {
+		throw new Error(`Refusing to git-add unsafe path: ${JSON.stringify(p)}`);
+	}
+}
+
+/**
+ * Security: reject CR/LF/NUL in a committer identity field before it lands
+ * in a `git -c user.<field>=<value>` argument. An embedded newline can let
+ * git's config parser pick up a second key from the next line, escalating an
+ * identity into arbitrary git config (e.g. `core.sshCommand`, `core.hooksPath`).
+ */
+function assertSafeCommitterField(field: 'name' | 'email', value: string): void {
+	if (/[\0\r\n]/.test(value)) {
+		throw new Error(`Refusing to use committer ${field} containing control characters`);
 	}
 }
 

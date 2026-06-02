@@ -7,6 +7,12 @@ import {
 } from '@nestjs/common';
 import { WebhookSubscriptionRepository } from '@ever-works/agent/database';
 import type { WebhookSubscription } from '@ever-works/agent/entities';
+// Security: reuse the canonical lexical SSRF guard shared with the delivery
+// path (packages/agent/src/utils/ssrf-guard.ts) instead of a weaker inline
+// hostname check. It strips IPv6 brackets, and covers IPv4-mapped IPv6,
+// ULA (fc00::/7), link-local, CGNAT (100.64/10), 0.0.0.0/8 and cloud-metadata
+// hosts — closing the [::1] / ::ffff:127.0.0.1 / IPv6-range bypasses.
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 import { WebhookSecretService } from './webhook-secret.service';
 
 export interface WebhookSubscriptionView {
@@ -151,34 +157,29 @@ export class WebhooksService {
                 `url scheme ${parsed.protocol} is not allowed; use http(s)`,
             );
         }
-        // SSRF defense in production — refuse local / private addresses.
-        // We intentionally allow them in dev/test so a developer can
-        // point at https://webhook.site or a local tunnel.
-        if (process.env.NODE_ENV === 'production') {
-            if (this.isPrivateHostname(parsed.hostname)) {
+        // SSRF defense — refuse local / private / link-local / metadata
+        // targets. We intentionally allow them in local dev/test so a
+        // developer can point at https://webhook.site or a local tunnel,
+        // but staging shares network access to cloud metadata / internal
+        // tooling, so the guard MUST run there too. Skip only in the
+        // explicit local dev/test envs.
+        // Security: gate now covers every non-local env (was production-only),
+        // and uses isSafeWebhookUrl (handles bracketed IPv6, IPv4-mapped IPv6,
+        // ULA/CGNAT/metadata) which `localhost` also fails since it is not a
+        // literal IP — but we keep an explicit `localhost` reject for clarity.
+        const env = process.env.NODE_ENV;
+        const isLocalEnv = env === 'development' || env === 'test' || env === undefined || env === '';
+        if (!isLocalEnv) {
+            const lowerHost = parsed.hostname.toLowerCase();
+            const bareHost =
+                lowerHost.startsWith('[') && lowerHost.endsWith(']')
+                    ? lowerHost.slice(1, -1)
+                    : lowerHost;
+            if (bareHost === 'localhost' || !isSafeWebhookUrl(url)) {
                 throw new ForbiddenException(
                     `url ${parsed.hostname} resolves to a private / loopback / link-local address`,
                 );
             }
         }
-    }
-
-    private isPrivateHostname(host: string): boolean {
-        const lower = host.toLowerCase();
-        if (lower === 'localhost' || lower === '0.0.0.0') return true;
-        // IPv4
-        const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(lower);
-        if (m) {
-            const a = Number(m[1]);
-            const b = Number(m[2]);
-            if (a === 10) return true;
-            if (a === 127) return true;
-            if (a === 169 && b === 254) return true;
-            if (a === 172 && b >= 16 && b <= 31) return true;
-            if (a === 192 && b === 168) return true;
-        }
-        // IPv6 loopback / link-local — minimal check.
-        if (lower === '::1' || lower.startsWith('fe80:')) return true;
-        return false;
     }
 }

@@ -74,7 +74,9 @@ export const pluginsAPI = {
      * @param category - The plugin category to filter by
      */
     listByCategory: async (category: string): Promise<UserPlugin[]> => {
-        const response = await serverFetch<PluginListResponse>(`/plugins?category=${category}`);
+        // Security: use URLSearchParams to prevent query-string injection via special chars (& # ?) in category
+        const params = new URLSearchParams({ category });
+        const response = await serverFetch<PluginListResponse>(`/plugins?${params.toString()}`);
         return response.plugins;
     },
 

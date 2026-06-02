@@ -87,6 +87,16 @@ export class WorkKnowledgeDocumentRepository {
     async list(
         opts: KbDocumentListOptions,
     ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
+        // Security: mandatory tenant-scope guard. The `workId`/`organizationId`
+        // filters below are applied only when truthy, so a caller that omits
+        // BOTH would otherwise produce a WHERE-less query returning every
+        // tenant's KB documents (cross-tenant metadata dump). Every legitimate
+        // caller already passes one scope key; this enforces that mechanically
+        // at the data layer instead of relying on call-site discipline.
+        if (!opts.workId && !opts.organizationId) {
+            throw new Error('WorkKnowledgeDocumentRepository.list requires workId or organizationId');
+        }
+
         const qb = this.repository.createQueryBuilder('doc');
 
         if (opts.workId) {

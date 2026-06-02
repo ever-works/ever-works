@@ -60,6 +60,11 @@ export function PluginSettingsField({
     const [isEditing, setIsEditing] = useState(false);
     const [previousMaskedValue, setPreviousMaskedValue] = useState<string | null>(null);
 
+    // Security: schema.title and schema.description come from plugin JSON Schema metadata
+    // (third-party or user-installable plugins). They are rendered as React text nodes below,
+    // which React HTML-escapes automatically — safe for plain text. If rich-text or markdown
+    // rendering is ever added for descriptions, sanitize with DOMPurify before rendering and
+    // NEVER pass these values to dangerouslySetInnerHTML unsanitized.
     const label = schema.title || name;
     const description = schema.description;
     const isSecret = schema.secret;

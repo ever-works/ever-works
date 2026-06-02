@@ -17,6 +17,12 @@ import type {
 
 import { ScrapflyClient, ScrapeConfig } from 'scrapfly-sdk';
 
+// Security (SSRF): shared lexical guard rejecting non-HTTP(S) schemes and
+// literal private/loopback/link-local/cloud-metadata IPs. Imported directly
+// from the helper subpath because the plugin barrel intentionally does not
+// re-export it (it pulls in node:net / node:dns).
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+
 const API_KEY_ERROR =
 	'Scrapfly API key not configured. Set it in plugin settings or via PLUGIN_SCRAPFLY_API_KEY environment variable.';
 
@@ -48,6 +54,21 @@ export class ScrapflyPlugin implements IPlugin, IScreenshotPlugin, IContentExtra
 	private context?: PluginContext;
 
 	async capture(options: ScreenshotOptions): Promise<ScreenshotResult> {
+		// Security (SSRF): `options.url` is attacker-controllable (work source
+		// URLs, LLM-generated item URLs) and is forwarded to the Scrapfly
+		// backend to render. `canExtract()` validates the scheme but is part of
+		// the content-extractor interface and is never invoked on this path, so
+		// guard inline here. Block non-HTTP(S) schemes (e.g. gopher://, file://)
+		// and literal private/loopback/link-local/cloud-metadata targets (e.g.
+		// http://169.254.169.254/...) before building the ScrapeConfig.
+		// Legitimate https item URLs are unaffected.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				error: `URL host is not safe to capture (SSRF guard blocked: ${options.url})`
+			};
+		}
+
 		const apiKey = this.getApiKey(options.settings);
 
 		try {
@@ -137,8 +158,25 @@ export class ScrapflyPlugin implements IPlugin, IScreenshotPlugin, IContentExtra
 	}
 
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
-		const apiKey = this.getApiKey(options.settings);
 		const startTime = Date.now();
+
+		// Security (SSRF): `extract()` relies entirely on the caller invoking
+		// `canExtract()` first, which cannot be guaranteed. `options.url` is
+		// attacker-controllable (every item's source_url, including URLs the
+		// community-PR LLM picks) and is forwarded to Scrapfly to fetch. Refuse
+		// non-HTTP(S) schemes and literal private/loopback/link-local/
+		// cloud-metadata targets before issuing the scrape. Mirrors
+		// local-content-extractor / pdf-extractor. Legitimate https URLs pass.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				url: options.url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${options.url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
+		const apiKey = this.getApiKey(options.settings);
 
 		try {
 			const client = new ScrapflyClient({ key: apiKey });

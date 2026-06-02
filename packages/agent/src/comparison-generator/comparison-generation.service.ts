@@ -36,6 +36,7 @@ import {
 import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { normalizeGeneratorError } from '../services/utils/error.utils';
+import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
@@ -358,6 +359,17 @@ export class ComparisonGenerationService {
         for (const candidate of candidates) {
             const url = candidate.url?.trim();
             if (!url || deduped.has(url)) {
+                continue;
+            }
+
+            // Security: seed URLs originate from attacker-controllable item data
+            // (source_url / suggested_source_url / markdown links — writable via
+            // auto-applied community PRs). Drop any URL that targets a private,
+            // loopback, link-local, or cloud-metadata address before it is handed
+            // to the content-extractor facade, mitigating SSRF (e.g. fetching
+            // http://169.254.169.254/...). The default extractor enforces the same
+            // lexical guard internally, but a swapped-in extractor plugin may not.
+            if (!isSafeWebhookUrl(url)) {
                 continue;
             }
 

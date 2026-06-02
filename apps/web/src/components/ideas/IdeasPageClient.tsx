@@ -154,8 +154,9 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                 const { idea } = await buildIdeaAction(id);
                 setIdeas((prev) => prev.map((row) => (row.id === id ? idea : row)));
                 toast.success(t('toasts.ideaQueued'));
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.ideaQueueError'));
+            } catch {
+                // Security: never expose raw error messages (may contain internal details, API keys, stack fragments)
+                toast.error(t('toasts.ideaQueueError'));
             }
         });
     };

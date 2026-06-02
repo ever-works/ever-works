@@ -27,6 +27,16 @@ import { assertNoSecrets } from '../utils/secret-scan';
 import type { AgentDto } from './types';
 import { toAgentDto } from './types';
 
+// Security: per-file byte cap for imported instruction bodies. Mirrors
+// the 64 KB `MAX_FILE_BYTES` limit enforced on the live-edit path
+// (`AgentFileService.write` → `assertSize`). The import path previously
+// only secret-scanned the bodies with no size bound, so a single
+// envelope field could carry a multi-megabyte string that bloats the
+// `agents` TEXT columns and forces a full-string scan in memory. Kept
+// inline (and matched in value) to avoid coupling agent-export to
+// agent-file at the module-construction layer.
+const MAX_IMPORT_FILE_BYTES = 64 * 1024; // 64 KB per file (spec §5.10a / §5.6.6).
+
 /**
  * Review-fix I7: shared canonical-hash function. Mirrors the
  * algorithm in `AgentFileService.hashOf` so import-overwrite refresh
@@ -298,6 +308,21 @@ export class AgentExportService {
         // posture as live edits via AgentFileService.write.
         for (const [name, body] of Object.entries(envelope.files)) {
             if (typeof body === 'string' && body.length > 0) {
+                // Security: enforce the same 64 KB per-file cap the
+                // live-edit path applies (AgentFileService.assertSize),
+                // BEFORE the secret-scan walks the whole string. Without
+                // this an imported envelope could carry a multi-megabyte
+                // body that bloats the agents TEXT columns and forces an
+                // unbounded in-memory scan (DoS). Checked first so an
+                // oversized body is rejected without being scanned.
+                const bytes = Buffer.byteLength(body, 'utf8');
+                if (bytes > MAX_IMPORT_FILE_BYTES) {
+                    throw new BadRequestException(
+                        `Imported file "${name}" is ${Math.round(
+                            bytes / 1024,
+                        )} KB; max ${MAX_IMPORT_FILE_BYTES / 1024} KB.`,
+                    );
+                }
                 assertNoSecrets(body, `import-envelope:${name}`);
             }
         }

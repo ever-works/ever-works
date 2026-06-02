@@ -103,7 +103,10 @@ export class GitHubVerifiedOrgService {
 			return false;
 		}
 
-		const cacheKey = `${params.baseUrl ?? 'https://api.github.com'}|${params.username}`;
+		// Security: include verifiedOrgs in the cache key to prevent cross-tenant cache
+		// collisions if orgs differ between callers (e.g. future per-tenant configuration).
+		const orgsKey = [...params.verifiedOrgs].sort().join(',');
+		const cacheKey = `${params.baseUrl ?? 'https://api.github.com'}|${params.username}|${orgsKey}`;
 		const cached = this.cache.get(cacheKey);
 		if (cached && cached.expiresAt > this.now()) {
 			return cached.orgVerified;

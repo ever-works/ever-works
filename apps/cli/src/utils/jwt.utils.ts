@@ -17,7 +17,14 @@ export interface JwtPayload extends AuthUser {
 
 /**
  * Decode a JWT token without verification (for reading payload)
- * Note: This doesn't verify the signature, it just decodes the payload
+ *
+ * Security: this does NOT verify the signature — it only base64-decodes the
+ * payload. The returned claims are UNTRUSTED and must be treated as
+ * display-only / best-effort hints (e.g. local email/username display and
+ * client-side expiry heuristics). They MUST NOT be used for any authorization
+ * decision. Trust is established only by the server, which validates the raw
+ * token on every API call; the manual-login path should additionally confirm
+ * the token via an authenticated profile fetch before relying on it.
  */
 export function decodeJWT(token: string): JwtPayload | null {
     try {
@@ -37,8 +44,11 @@ export function decodeJWT(token: string): JwtPayload | null {
         // Decode base64 to JSON
         const decoded = Buffer.from(padded, 'base64').toString('utf-8');
         return JSON.parse(decoded) as JwtPayload;
-    } catch (error) {
-        console.error('Failed to decode JWT:', error.message);
+    } catch {
+        // Security: do not log error.message — for a malformed token it can
+        // echo decoded payload/base64 fragments of the credential into stdout,
+        // CI logs, or centralized monitoring. Log a fixed, token-free string.
+        console.error('Failed to decode JWT:', 'invalid token format');
         return null;
     }
 }

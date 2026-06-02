@@ -34,7 +34,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const body = await request.text();
 
     const upstream = await fetch(
-        `${API_URL}/works/${id}/kb/documents/${encodeURIComponent(docId)}/lock`,
+        // Security: encode both path segments to prevent URL injection via crafted IDs
+        `${API_URL}/works/${encodeURIComponent(id)}/kb/documents/${encodeURIComponent(docId)}/lock`,
         {
             method: 'POST',
             headers,

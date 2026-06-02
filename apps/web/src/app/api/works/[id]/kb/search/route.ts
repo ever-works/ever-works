@@ -45,8 +45,13 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
     upstreamParams.set('q', q);
     upstreamParams.set('limit', String(limit));
 
+    // Security: percent-encode the `id` path segment so a crafted Work ID
+    // (containing `/`, `..`, or `@`) can't break out of the `works/:id/...`
+    // path and re-resolve to an unintended upstream API route. Matches the
+    // `encodeURIComponent(id)` pattern already used by the sibling citations
+    // and document-history proxies. Behaviour-preserving for real Work IDs.
     const upstream = await fetch(
-        `${API_URL}/works/${id}/kb/documents?${upstreamParams.toString()}`,
+        `${API_URL}/works/${encodeURIComponent(id)}/kb/documents?${upstreamParams.toString()}`,
         {
             method: 'GET',
             headers,

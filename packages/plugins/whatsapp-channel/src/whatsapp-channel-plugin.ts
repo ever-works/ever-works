@@ -14,6 +14,21 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 const GRAPH_API_BASE = 'https://graph.facebook.com';
 const DEFAULT_API_VERSION = 'v21.0';
 
+// Security: phoneNumberId and apiVersion are interpolated straight into the
+// Graph API path. phoneNumberId comes from the per-tenant targetConfig and
+// apiVersion from a tenant-controlled plugin setting, so a value containing
+// `/`, `..`, `?`, or `#` could redirect the request to a different Graph
+// endpoint (e.g. `123/me/accounts?fields=access_token`) and exfiltrate the
+// linked OAuth token's data. Constrain both to their canonical shapes before
+// they ever reach fetch. WhatsApp phone-number IDs are purely numeric; Graph
+// API versions are `v<major>.<minor>`.
+const PHONE_NUMBER_ID_PATTERN = /^\d{1,32}$/;
+const API_VERSION_PATTERN = /^v\d+\.\d+$/;
+
+function isValidPhoneNumberId(value: string): boolean {
+	return PHONE_NUMBER_ID_PATTERN.test(value);
+}
+
 interface WhatsappTarget {
 	accessToken: string;
 	phoneNumberId: string;
@@ -29,6 +44,11 @@ function getTarget(config: ChannelTargetConfig): WhatsappTarget {
 	}
 	if (typeof phoneNumberId !== 'string' || phoneNumberId.length === 0) {
 		throw new Error('whatsapp-channel: targetConfig.phoneNumberId is required');
+	}
+	// Security: reject any phoneNumberId that is not a bare numeric id so it
+	// cannot inject extra path segments / query into the Graph API URL.
+	if (!isValidPhoneNumberId(phoneNumberId)) {
+		throw new Error('whatsapp-channel: targetConfig.phoneNumberId must be a numeric id');
 	}
 	if (typeof to !== 'string' || to.length === 0) {
 		throw new Error('whatsapp-channel: targetConfig.to (recipient) is required');
@@ -80,7 +100,10 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 
 	private apiVersion(options: ChannelOptions): string {
 		const v = options.settings?.apiVersion;
-		return typeof v === 'string' && v.length > 0 ? v : DEFAULT_API_VERSION;
+		// Security: only honour a well-formed `v<major>.<minor>` override; any
+		// other value (containing slashes, query, fragment, …) is ignored and we
+		// fall back to the safe default so it cannot alter the Graph API path.
+		return typeof v === 'string' && API_VERSION_PATTERN.test(v) ? v : DEFAULT_API_VERSION;
 	}
 
 	async verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification> {
@@ -91,6 +114,11 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 		}
 		if (typeof phoneNumberId !== 'string' || phoneNumberId.length === 0) {
 			return { valid: false, message: 'phoneNumberId is required' };
+		}
+		// Security: only a bare numeric id may be interpolated into the Graph API
+		// URL below — reject anything that could inject extra path/query segments.
+		if (!isValidPhoneNumberId(phoneNumberId)) {
+			return { valid: false, message: 'phoneNumberId must be a numeric id' };
 		}
 		if (typeof config.to !== 'string' || config.to.length === 0) {
 			return { valid: false, message: 'to (recipient) is required' };
@@ -121,10 +149,20 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 	}
 
 	async send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult> {
-		const cached = this.idempotencyCache.get(payload.messageRef);
-		if (cached) return cached;
-
 		const { accessToken, phoneNumberId, to } = getTarget(payload.target ?? {});
+
+		// Security: this plugin is a module-level singleton shared across all
+		// tenants, so keying the idempotency cache on payload.messageRef alone
+		// lets a second tenant that reuses another tenant's messageRef get back
+		// the first tenant's ChannelSendResult and silently skip real delivery
+		// (or pre-poison the cache to suppress it). Scope the key to the actual
+		// delivery target (phone number id) + the per-tenant channel row id so the
+		// de-dupe stays per-channel while a bare messageRef can no longer collide
+		// across tenants. Legitimate same-channel retries still hit.
+		// Mirrors the discord-channel / telegram-channel plugins.
+		const cacheKey = `${options.channelId ?? ''} ${phoneNumberId} ${payload.messageRef}`;
+		const cached = this.idempotencyCache.get(cacheKey);
+		if (cached) return cached;
 
 		const body: Record<string, unknown> =
 			payload.rich?.kind === 'whatsapp-template'
@@ -161,7 +199,7 @@ export class WhatsappChannelPlugin implements INotificationChannelPlugin {
 			providerMessageId: data.messages[0].id,
 			deliveredAt: new Date()
 		};
-		this.idempotencyCache.set(payload.messageRef, result);
+		this.idempotencyCache.set(cacheKey, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

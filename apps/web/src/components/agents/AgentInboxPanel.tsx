@@ -13,6 +13,22 @@ interface Props {
  * v0: paginated list view rendered server-side from the initial fetch.
  * SSE live-stream + message detail drawer + composer land in follow-up
  * ticks.
+ *
+ * Security: ALL fields on EmailMessageListItem/EmailMessageDetail that
+ * originate from inbound email are UNTRUSTED external content controlled by
+ * arbitrary senders:
+ *   - m.from       — sender address (attacker-controlled)
+ *   - m.subject    — email subject  (attacker-controlled)
+ *   - m.bodyText   — plain-text body (attacker-controlled)
+ *   - m.bodyHtml   — HTML body      (attacker-controlled, HIGH RISK)
+ *
+ * React JSX text children (used here) are HTML-encoded automatically and are
+ * safe. If any future component passes these fields to:
+ *   - dangerouslySetInnerHTML
+ *   - a markdown / rich-text renderer
+ *   - template literals inserted into HTML strings
+ * it MUST first sanitize via DOMPurify (or equivalent) to prevent stored XSS.
+ * m.bodyHtml in particular must NEVER be rendered raw.
  */
 export function AgentInboxPanel({ agentId, initialMessages }: Props) {
     return (
@@ -67,12 +83,14 @@ export function AgentInboxPanel({ agentId, initialMessages }: Props) {
                                             {m.direction === 'inbound' ? '↓ in' : '↑ out'}
                                         </span>
                                     </td>
+                                    {/* Security: m.from is untrusted external content; safe here as a React text child */}
                                     <td className="py-2">{m.from}</td>
                                     <td className="py-2 font-medium">
                                         <a
                                             href={`/agents/${agentId}/inbox/${m.id}`}
                                             className="hover:underline"
                                         >
+                                            {/* Security: m.subject is untrusted external content; safe here as a React text child */}
                                             {m.subject}
                                         </a>
                                     </td>

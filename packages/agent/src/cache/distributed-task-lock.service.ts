@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
@@ -128,7 +129,8 @@ export class DistributedTaskLockService {
         ttlMs: number,
         maxLifetimeMs: number,
     ): Promise<string | null> {
-        const token = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        // Security: use CSPRNG instead of Math.random() to prevent token prediction and lock forgery
+        const token = `${process.pid}-${Date.now()}-${randomBytes(16).toString('hex')}`;
         const lockKey = this.buildKey(key);
         const now = Date.now();
         const staleBefore = new Date(

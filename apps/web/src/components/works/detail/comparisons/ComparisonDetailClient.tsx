@@ -348,8 +348,18 @@ export function ComparisonDetailClient({
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={{
-                                a: ({ node: _node, ...props }) => (
-                                    <a {...props} target="_blank" rel="noopener noreferrer" />
+                                // Security: the article markdown is AI-generated and can be
+                                // poisoned via prompt-injection from researched web content, so
+                                // run link hrefs through the L-10 http(s) allow-list before they
+                                // reach an <a href>. Unsafe schemes (javascript:/data:/...) yield
+                                // an inert anchor; rel/target alone do NOT block them.
+                                a: ({ node: _node, href, ...props }) => (
+                                    <a
+                                        {...props}
+                                        href={safeExternalUrl(href) ?? '#'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    />
                                 ),
                             }}
                         >
@@ -454,8 +464,17 @@ export function ComparisonDetailClient({
                             <ReactMarkdown
                                 remarkPlugins={[remarkGfm]}
                                 components={{
-                                    a: ({ node: _node, ...props }) => (
-                                        <a {...props} target="_blank" rel="noopener noreferrer" />
+                                    // Security: extended-analysis markdown is AI-generated and
+                                    // prompt-injectable from researched web content; validate link
+                                    // hrefs against the L-10 http(s) allow-list before rendering so
+                                    // a javascript:/data: scheme can't land a working XSS anchor.
+                                    a: ({ node: _node, href, ...props }) => (
+                                        <a
+                                            {...props}
+                                            href={safeExternalUrl(href) ?? '#'}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        />
                                     ),
                                 }}
                             >

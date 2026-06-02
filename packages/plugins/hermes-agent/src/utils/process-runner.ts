@@ -80,7 +80,32 @@ export interface ExecuteResult {
 	readonly duration: number;
 }
 
+// Security: these values are passed as separate argv elements to spawn() (no
+// shell), so they cannot inject shell metacharacters. They can, however, be
+// parsed by the Hermes CLI as option *flags* if they begin with '-' (e.g. a
+// `skills` value of '--output' smuggled in via a settings write). Reject any
+// such value to prevent CLI option injection. Legitimate profile / toolset /
+// provider / model / skill identifiers never start with '-'.
+function assertNotOptionLike(field: string, value: string): void {
+	if (value.startsWith('-')) {
+		throw new Error(`Invalid Hermes ${field}: value must not start with "-"`);
+	}
+}
+
 export function buildHermesArgs(options: ExecuteOptions): string[] {
+	// Security: guard each user/admin-controlled value against CLI option injection.
+	assertNotOptionLike('profile', options.profile);
+	assertNotOptionLike('toolsets', options.toolsets);
+	if (options.provider) {
+		assertNotOptionLike('provider', options.provider);
+	}
+	if (options.model) {
+		assertNotOptionLike('model', options.model);
+	}
+	if (options.skills) {
+		assertNotOptionLike('skills', options.skills);
+	}
+
 	const args = ['-p', options.profile, 'chat', '--quiet', '--toolsets', options.toolsets];
 
 	if (options.yolo) {

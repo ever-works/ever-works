@@ -72,7 +72,19 @@ export async function seedMetadata(workspacePath: string, metadata: Record<strin
 }
 
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {
-	await fs.rm(assertWithinBaseDir(workspacePath), { recursive: true, force: true });
+	// Security: resolve symlinks via realpath before the prefix check so that a
+	// prompt-injected symlink created inside the workspace (e.g. pointing to
+	// /etc/cron.d) cannot cause fs.rm({ recursive }) to operate outside
+	// BASE_TEMP_DIR.  fs.realpath() throws ENOENT if the path does not exist,
+	// which we treat the same as "nothing to clean up".
+	let resolvedPath: string;
+	try {
+		resolvedPath = await fs.realpath(workspacePath);
+	} catch {
+		// Path does not exist or is otherwise inaccessible — nothing to remove.
+		return;
+	}
+	await fs.rm(assertWithinBaseDir(resolvedPath), { recursive: true, force: true });
 }
 
 export function collectMetadataFromItems(items: readonly ItemData[]): {

@@ -32,6 +32,30 @@ export class ServeCommand extends CommandRunner {
             const port = parseInt(options?.port || '3100', 10);
             const host = options?.host || 'localhost';
 
+            // Security: this server mounts WorksController, which has NO
+            // authentication (every handler runs as the local user). Binding to
+            // a non-loopback interface exposes full work CRUD + AI generation to
+            // anyone who can reach the port. We don't block it (operators may
+            // have a trusted-network reason), but loudly warn so it isn't done
+            // by accident. Loopback-only is the safe default.
+            const loopbackHosts = ['localhost', '127.0.0.1', '::1', '[::1]'];
+            if (!loopbackHosts.includes(host.toLowerCase())) {
+                console.log(
+                    chalk.red.bold(
+                        '\n⚠ SECURITY WARNING: binding to a non-loopback host ' +
+                            `(${host}).`,
+                    ),
+                );
+                console.log(
+                    chalk.yellow(
+                        'This API has NO authentication — anyone who can reach ' +
+                            'this port can create, generate, and delete works as you. ' +
+                            'Only do this on a fully trusted network, behind a ' +
+                            'firewall/reverse-proxy that adds authentication.',
+                    ),
+                );
+            }
+
             console.log(chalk.cyan('--- Server Configuration ---'));
             console.log(chalk.gray('Host:'), chalk.white(host));
             console.log(chalk.gray('Port:'), chalk.white(port));
@@ -55,9 +79,35 @@ export class ServeCommand extends CommandRunner {
                     }),
                 );
 
-                // Enable CORS for development
+                // Security: do NOT reflect arbitrary origins. `{ origin: true,
+                // credentials: true }` echoes any site's Origin back with
+                // Access-Control-Allow-Credentials, so any web page the operator
+                // visits could make credentialed cross-origin calls to this
+                // unauthenticated localhost API (drive-by CSRF / data exfil).
+                // Restrict to an explicit localhost allow-list, matching the
+                // callback shape used by apps/api/src/main.ts (a static array
+                // still makes the `cors` package emit ACAC:true for evil
+                // origins, so use a callback that only echoes allow-listed ones).
+                const configuredOrigins =
+                    process.env.ALLOWED_ORIGINS?.split(',')
+                        .map((o) => o.trim())
+                        .filter(Boolean) ?? [];
+                const allowedOrigins =
+                    configuredOrigins.length > 0
+                        ? configuredOrigins
+                        : ['http://localhost:3000', 'http://127.0.0.1:3000'];
                 app.enableCors({
-                    origin: true,
+                    origin: (
+                        origin: string | undefined,
+                        callback: (err: Error | null, allow?: boolean) => void,
+                    ) => {
+                        // Same-origin / non-browser requests have no Origin header.
+                        if (!origin || allowedOrigins.includes(origin)) {
+                            callback(null, true);
+                        } else {
+                            callback(null, false);
+                        }
+                    },
                     credentials: true,
                 });
 

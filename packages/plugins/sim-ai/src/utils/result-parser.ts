@@ -1,5 +1,24 @@
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { SimWorkflowOutput, SimOutputItem } from '../types.js';
+
+// Security: SIM workflow output is untrusted external content (a malicious or
+// compromised SIM workflow can return arbitrary URLs). `source_url` and
+// `images` are later fetched server-side — `source_url` is passed to
+// `screenshotFacade.getSmartImage` in the capture-screenshots step. Without
+// validation an attacker could return `http://169.254.169.254/...`, a
+// private/loopback host, or a `file://` URL to probe internal services via the
+// screenshot/image-proxy plugins (SSRF). Gate every stored URL on the shared
+// lexical SSRF guard (rejects non-HTTP(S) schemes and literal
+// private/loopback/link-local/cloud-metadata IPs). Legitimate https URLs are
+// unaffected; an unsafe URL fails closed (dropped) so the probe never reaches
+// downstream fetchers.
+function sanitizeSimUrl(value: unknown): string | undefined {
+	if (typeof value !== 'string') return undefined;
+	const trimmed = value.trim();
+	if (!trimmed || !isSafeWebhookUrl(trimmed)) return undefined;
+	return trimmed;
+}
 
 export interface ParsedResults {
 	items: ItemData[];
@@ -119,16 +138,24 @@ function parseItems(rawItems: SimOutputItem[]): ItemData[] {
 		if (!raw || typeof raw !== 'object') continue;
 		if (!raw.name || typeof raw.name !== 'string') continue;
 
+		// Security: only keep `source_url` / `images` URLs that pass the lexical
+		// SSRF guard; unsafe values are dropped (source_url falls back to '').
+		const source_url = sanitizeSimUrl(raw.url) ?? sanitizeSimUrl(raw.source_url) ?? '';
+		const images = Array.isArray(raw.images)
+			? raw.images
+					.map((i) => sanitizeSimUrl(i))
+					.filter((i): i is string => typeof i === 'string')
+			: undefined;
+
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : '',
-			source_url:
-				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '',
+			source_url,
 			markdown: typeof raw.content === 'string' ? raw.content : undefined,
 			category: typeof raw.category === 'string' ? raw.category.trim() : '',
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
-			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
+			images
 		};
 
 		items.push(item);

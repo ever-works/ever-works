@@ -61,9 +61,15 @@ export class ComposioTriggerSubscription {
     composioConnectedAccountId: string;
 
     /**
-     * HMAC-SHA256 key used to verify the `x-composio-signature` header
-     * on every webhook delivery. Generated server-side at subscription
-     * creation time, never re-shown after creation.
+     * Security: this field is vestigial — it is random noise generated only
+     * to satisfy the NOT NULL constraint. Actual Composio webhook signature
+     * verification uses the project-level webhook secret resolved from plugin
+     * settings at verify time (see ComposioService.verifyWebhook), NOT this
+     * per-subscription value. This column is never surfaced in API responses
+     * and should be dropped in a future migration once the NOT NULL constraint
+     * is removed.
+     *
+     * @deprecated vestigial; do NOT use for any HMAC/signature purpose.
      */
     @Column({ type: 'varchar', length: 128 })
     webhookSecret: string;

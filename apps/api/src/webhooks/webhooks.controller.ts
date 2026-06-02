@@ -21,8 +21,22 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WebhooksService, WebhookSubscriptionView } from './webhooks.service';
 import { WebhooksDeliveriesService, WebhookDeliveryView } from './webhooks-deliveries.service';
 
+// Security: webhook delivery payloads carry business-sensitive data (workId,
+// names, deployment URLs, error details) and the HMAC signature provides
+// integrity, NOT confidentiality. In non-local envs require https:// so the
+// payload is never sent in cleartext over the wire. Plain http:// stays
+// allowed in dev/test so devs can point at ngrok / webhook.site / a local
+// tunnel. NODE_ENV is fixed at process start, so reading it at module load
+// (the decorator runs once when the class is defined) is correct and matches
+// the codebase convention (see main.ts / oauth.controller.ts cookie `secure`).
+const WEBHOOK_URL_PROTOCOLS: string[] = (() => {
+    const env = process.env.NODE_ENV;
+    const isLocalEnv = env === 'development' || env === 'test' || env === undefined || env === '';
+    return isLocalEnv ? ['http', 'https'] : ['https'];
+})();
+
 class CreateWebhookSubscriptionDto {
-    @IsUrl({ require_protocol: true, protocols: ['http', 'https'] })
+    @IsUrl({ require_protocol: true, protocols: WEBHOOK_URL_PROTOCOLS })
     url: string;
 
     @IsOptional()
@@ -46,7 +60,8 @@ class UpdateWebhookSubscriptionDto {
  *
  * Security gates:
  *  - Global AuthSessionGuard (no @Public)
- *  - URL must be http(s); javascript:/file:/data: rejected at DTO
+ *  - URL must be https:// outside dev/test (http:// allowed only in
+ *    local envs); javascript:/file:/data: rejected at DTO
  *  - At-most-25 active subscriptions per account (in service layer)
  *  - The raw signing secret appears in the response ONCE on create /
  *    rotate — never readable again

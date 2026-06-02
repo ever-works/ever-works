@@ -38,15 +38,21 @@ export class NotificationChannelDeliveryLogRepository {
         return this.repository.findOne({ where });
     }
 
+    // Security: userId is required so ownership is always enforced via a join on
+    // notification_channels.userId; callers cannot omit it and fetch logs for an
+    // arbitrary channel they do not own (IDOR prevention).
     async findRecentByChannel(
         channelId: string,
+        userId: string,
         limit = 50,
     ): Promise<NotificationChannelDeliveryLog[]> {
-        return this.repository.find({
-            where: { channelId },
-            order: { createdAt: 'DESC' },
-            take: Math.min(limit, 200),
-        });
+        return this.repository
+            .createQueryBuilder('log')
+            .innerJoin('notification_channels', 'ch', 'ch.id = log.channelId AND ch."userId" = :userId', { userId })
+            .where('log.channelId = :channelId', { channelId })
+            .orderBy('log.createdAt', 'DESC')
+            .take(Math.min(limit, 200))
+            .getMany();
     }
 
     async updateStatus(

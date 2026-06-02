@@ -11,6 +11,26 @@ interface WorkConfigProps {
     config: WorkConfigType;
 }
 
+// Security: scheme allow-list for the user-supplied `company_website` rendered
+// as an <a href> below. The DTO now rejects non-http(s) schemes on save, but
+// config persisted before that validation (or any future write path) could
+// still carry `javascript:`/`data:`/`vbscript:` URIs that execute on click —
+// `rel`/`target` do not block this. Returns `undefined` for anything that is
+// not http/https; the JSX uses `?? '#'` so the anchor is inert. Legitimate
+// http(s) URLs round-trip unchanged.
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 export function WorkConfig({ config }: WorkConfigProps) {
     const { work } = useWorkDetail();
     const t = useTranslations('dashboard.workDetail.config');
@@ -69,7 +89,7 @@ export function WorkConfig({ config }: WorkConfigProps) {
                         </div>
                         <div className="flex-1 text-xs text-text dark:text-text-dark">
                             <a
-                                href={config.company_website}
+                                href={safeExternalUrl(config.company_website) ?? '#'}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-primary hover:underline"

@@ -1,3 +1,4 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { ServerClient } from 'postmark';
 import type {
 	IEmailOutboundPlugin,
@@ -149,7 +150,10 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		// dashboard, not the API. We emit a verification token + send a
 		// confirmation email through the same `sendEmail` path so the
 		// click-through verifies the address.
-		const verificationToken = `pm-${Math.random().toString(36).slice(2)}${Date.now()}`;
+		// Security: use a CSPRNG (256-bit) instead of Math.random() — the
+		// token grants control over a tenant email address, so it must be
+		// unpredictable. The `pm-` prefix is kept for log/debug readability.
+		const verificationToken = `pm-${randomBytes(32).toString('hex')}`;
 		return {
 			address,
 			verificationToken,
@@ -168,7 +172,13 @@ export class PostmarkPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin
 		}
 		const provided = authHeader.slice('Basic '.length).trim();
 		const expectedB64 = Buffer.from(`postmark:${expected}`).toString('base64');
-		if (provided !== expectedB64) {
+		// Security: constant-time compare to avoid leaking the secret via
+		// response-timing side channels (matches the mailgun plugin). The
+		// length check guards timingSafeEqual's equal-length requirement;
+		// a length mismatch is already a mismatch.
+		const a = Buffer.from(provided);
+		const b = Buffer.from(expectedB64);
+		if (a.length !== b.length || !timingSafeEqual(a, b)) {
 			throw new Error('Postmark inbound: signature mismatch.');
 		}
 	}

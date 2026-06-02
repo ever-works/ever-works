@@ -9,6 +9,7 @@ import {
 import { WorkAgentGuardrails, WorkAgentPreference } from '../entities/work-agent-preference.entity';
 import { WorkAgentRun, WorkAgentRunStatus } from '../entities/work-agent-run.entity';
 import { WorkAgentRunLog, WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';
+import { sanitizeName } from '../utils/sanitize.util';
 import type {
     CreateWorkAgentGoalInput,
     UpdateWorkAgentPreferencesInput,
@@ -390,7 +391,15 @@ export class WorkAgentService {
 
     private buildInitialPlanSummary(instruction: string, dryRun: boolean): string {
         const mode = dryRun ? 'dry-run' : 'live';
-        return `Prepared a ${mode} Work-agent plan for: ${instruction.trim()}`;
+        // Security: the user-supplied instruction is interpolated verbatim into
+        // the persisted `agentPlanSummary` (and run-log message). Sanitize it
+        // with the shared helper so control chars and newlines cannot forge
+        // fake delimiters (e.g. `\n\n[SYSTEM]:` / `---SYSTEM---`) that could
+        // hijack any downstream LLM context that ingests the summary. This is a
+        // prompt-injection-hardening measure only; legitimate single-line goal
+        // text is unaffected aside from whitespace collapsing.
+        const safeInstruction = sanitizeName(instruction, 500);
+        return `Prepared a ${mode} Work-agent plan for: ${safeInstruction}`;
     }
 
     private toPreferencesDto(preference: WorkAgentPreference): WorkAgentPreferencesDto {

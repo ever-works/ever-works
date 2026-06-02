@@ -318,7 +318,10 @@ export class KnowledgeBaseBufferExtractorService {
 
         const sections: string[] = [];
         for (const sheet of workbook.worksheets) {
-            const sheetName = sheet.name?.trim() || `Sheet ${sheet.id}`;
+            // Security: sheet name is attacker-controlled and used as a
+            // Markdown `##` heading below — strip heading/fence chars so a
+            // crafted name can't inject a heading or `</kb>` boundary.
+            const sheetName = this.sanitizeHeadingText(sheet.name ?? '') || `Sheet ${sheet.id}`;
             const headerRow = sheet.getRow(1);
             const headers: string[] = [];
             headerRow.eachCell({ includeEmpty: false }, (cell) => {
@@ -455,7 +458,11 @@ export class KnowledgeBaseBufferExtractorService {
             KnowledgeBaseBufferExtractorService.PPTX_TEXT_RE.lastIndex = 0;
             let m: RegExpExecArray | null;
             while ((m = KnowledgeBaseBufferExtractorService.PPTX_TEXT_RE.exec(xml)) !== null) {
-                const decoded = this.decodeXmlEntities(m[1]);
+                // Security: slide text is attacker-controlled; XML-entity
+                // decoding can reconstruct a literal `</kb>` fence (from
+                // `&lt;/kb&gt;`). Neutralize the fence/control tokens before
+                // it enters the body. See `neutralizeBodyText`.
+                const decoded = this.neutralizeBodyText(this.decodeXmlEntities(m[1]));
                 if (decoded.length > 0) {
                     texts.push(decoded);
                 }
@@ -488,6 +495,39 @@ export class KnowledgeBaseBufferExtractorService {
             .replace(/&quot;/g, '"')
             .replace(/&apos;/g, "'")
             .replace(/&amp;/g, '&');
+    }
+
+    /**
+     * Security (prompt-injection hardening, defense-in-depth): the
+     * extracted body becomes the KB document body, which is later wrapped
+     * verbatim inside the `<kb>...</kb>` trusted-region block that the LLM
+     * is told marks the knowledge base (see `kb-prompt-formatter.ts`'s
+     * `neutralizeKbField`). `formatKbContext` already defuses these tokens
+     * at the injection boundary, but the body is attacker-controlled file
+     * content that is also persisted and surfaced in other contexts (git
+     * mirror, workbench doc page), so we neutralize the forgeable
+     * `</kb>`/`<kb>` fence and chat-template control markers at the
+     * extraction layer too. Newlines/whitespace are preserved because the
+     * body is multi-line Markdown — only the forgeable tokens are broken
+     * (a zero-width space keeps the text human-readable). Mirrors the
+     * formatter's transform so the two layers stay consistent.
+     */
+    private neutralizeBodyText(value: string): string {
+        return value
+            .replace(/<\/?kb>/gi, (token) => `${token[0]}​${token.slice(1)}`)
+            .replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '');
+    }
+
+    /**
+     * Security: attacker-controlled strings (e.g. an XLSX sheet name) are
+     * interpolated as Markdown `##` headings. Collapse newlines and strip
+     * the `#`/`<`/`>` characters so a crafted name cannot inject an extra
+     * heading line or smuggle the `</kb>` fence into the body. Legitimate
+     * sheet names (Excel disallows `\\ / ? * [ ]` and never contains
+     * newlines) are unaffected.
+     */
+    private sanitizeHeadingText(value: string): string {
+        return value.replace(/[\r\n#<>]/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
     /**

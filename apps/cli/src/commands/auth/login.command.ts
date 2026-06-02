@@ -53,12 +53,27 @@ async function manualLogin(apiUrl: string): Promise<void> {
         },
     ]);
 
-    // Save credentials
-    const credentials = CredentialsService.createWithExpiry(answers.token, answers.apiUrl);
+    // Security: verify token against the API before persisting it, so attacker-supplied
+    // or expired tokens are rejected rather than silently stored as valid credentials.
+    const tempCredentials = CredentialsService.createWithExpiry(answers.token, answers.apiUrl);
+    await CredentialsService.save(tempCredentials);
+
+    console.log(chalk.gray('Verifying credentials...'));
+
+    const apiService = getApiService();
+    const profile = await apiService.getProfile();
+
+    // Update saved credentials with verified user info
+    const credentials = CredentialsService.createWithExpiry(
+        answers.token,
+        answers.apiUrl,
+        profile.email || profile.username || 'User',
+    );
 
     await CredentialsService.save(credentials);
 
-    console.log(chalk.green('\n✓ Successfully logged in!'));
+    const displayName = credentials.email || credentials.username || 'User';
+    console.log(chalk.green(`\n✓ Successfully logged in as ${chalk.bold(displayName)}!`));
 }
 
 async function oauthLogin(apiUrl: string): Promise<void> {

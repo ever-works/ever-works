@@ -16,6 +16,27 @@ import {
 } from '@/app/actions/dashboard/taxonomy';
 import { toast } from 'sonner';
 
+/**
+ * Security: scheme allow-list for the (AI-generated / imported) collection
+ * `icon_url` before it is placed into `<img src>`. Restricting to http/https
+ * blocks `javascript:` / `data:` schemes and prevents the browser from being
+ * pointed at internal metadata or other SSRF-style targets. Returns
+ * `undefined` for anything unparseable or not http(s); callers fall back to
+ * the default glyph. Mirrors `safeImageUrl` in CategoriesTab.tsx.
+ */
+function safeImageUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 interface CollectionsTabProps {
     workId: string;
     initialCollections: Collection[];
@@ -212,6 +233,9 @@ export function CollectionsTab({
                         <tbody className="divide-y divide-border dark:divide-border-dark">
                             {filteredCollections.map((collection) => {
                                 const count = itemCounts[collection.id.toLowerCase().trim()] || 0;
+                                // Security: validate icon_url scheme (https/http only) at render time
+                                // to block javascript:/data: schemes and SSRF-via-browser attacks.
+                                const iconUrl = safeImageUrl(collection.icon_url);
                                 return (
                                     <tr
                                         key={collection.id}
@@ -219,9 +243,9 @@ export function CollectionsTab({
                                     >
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                {collection.icon_url ? (
+                                                {iconUrl ? (
                                                     <img
-                                                        src={collection.icon_url}
+                                                        src={iconUrl}
                                                         alt=""
                                                         className="w-6 h-6 rounded"
                                                     />

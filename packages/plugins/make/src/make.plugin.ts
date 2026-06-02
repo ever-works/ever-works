@@ -29,6 +29,12 @@ import type { MakeStepId, MakeSettings, MakePipelineMetrics, MakeExecutionMode }
 import { MAKE_STEP_IDS, DEFAULT_BASE_URL, DEFAULT_POLL_INTERVAL_MS, DEFAULT_MAX_POLL_ATTEMPTS } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { MakeClient, type MakeExecutionResult } from './utils/make-client.js';
+// Security (SSRF): lexical guard reused to reject private/loopback/link-local/
+// cloud-metadata hosts and non-HTTP(S) schemes in the tenant-controlled baseUrl
+// before a MakeClient is constructed. Direct subpath import (NOT via the
+// `@ever-works/plugin/helpers` barrel) because the guard pulls in node:net/dns
+// and is intentionally excluded from that barrel. Mirrors make-client.ts.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { buildWorkflowPayload } from './utils/payload-builder.js';
 import { parseMakeOutput, deduplicateItems } from './utils/result-parser.js';
 import {
@@ -162,6 +168,14 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 
 		try {
 			const baseUrl = (settings.baseUrl as string) || DEFAULT_BASE_URL;
+			// Security (SSRF): fail closed early when the tenant-controlled baseUrl
+			// targets a private/loopback/link-local/cloud-metadata host or a
+			// non-HTTP(S) scheme. The MakeClient also re-checks at the point of use,
+			// but rejecting here yields a clearer validation error before any
+			// authenticated REST call (which carries the Make API token) is issued.
+			if (!isSafeWebhookUrl(baseUrl)) {
+				return { success: false, message: 'Make.com API base URL is not allowed (must be a public HTTPS host).' };
+			}
 			const client = new MakeClient({
 				apiKey,
 				baseUrl,
@@ -554,9 +568,19 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		const timeoutMinutes = (config.scenario_timeout as number) || 30;
 		const mode = ((config.execution_mode as string) || 'scenario') as MakeExecutionMode;
 
+		const baseUrl = (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL;
+		// Security (SSRF): reject a tenant-controlled baseUrl that points at a
+		// private/loopback/link-local/cloud-metadata host or a non-HTTP(S) scheme
+		// before it flows into MakeClient and every authenticated REST call (which
+		// carries the Make API token). Fails closed here, mirroring the missing-key
+		// guard above; MakeClient.buildUrl re-checks at the point of use.
+		if (!isSafeWebhookUrl(baseUrl)) {
+			throw new Error('Make.com API base URL is not allowed (must be a public HTTPS host).');
+		}
+
 		return {
 			apiKey,
-			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
+			baseUrl,
 			teamId: (pluginSettings.teamId as string) || undefined,
 			organizationId: (pluginSettings.organizationId as string) || undefined,
 			defaultScenarioId: pluginSettings.defaultScenarioId as string | undefined,

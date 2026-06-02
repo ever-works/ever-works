@@ -267,7 +267,16 @@ export class HermesAgentPlugin implements IPlugin, IPipelinePlugin, IFormSchemaP
 				description: 'Override the Hermes CLI executable path if it is not available as `hermes`.',
 				default: DEFAULT_BINARY_PATH,
 				'x-hidden': true,
-				'x-scope': 'global'
+				'x-scope': 'global',
+				// Security: binaryPath selects the executable that the backend spawns for
+				// every Hermes run, so it must NEVER be settable through the plugin
+				// settings API by a tenant (it is not auth-restricted to operators and a
+				// `global` scope is silently accepted at user/work scope). Binding it to an
+				// env var makes `filterEnvVarFields` strip it from every settings write
+				// (same posture as codex/claude-code secrets) so only the host operator can
+				// override the CLI path via PLUGIN_HERMES_BINARY_PATH; the default `hermes`
+				// is used otherwise. Prevents arbitrary host-binary execution.
+				'x-envVar': 'PLUGIN_HERMES_BINARY_PATH'
 			}
 		},
 		required: ['profile']

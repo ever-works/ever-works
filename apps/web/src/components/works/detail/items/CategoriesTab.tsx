@@ -14,6 +14,27 @@ import { createCategory, updateCategory, deleteCategory } from '@/app/actions/da
 import { toast } from 'sonner';
 
 /**
+ * Security: scheme allow-list for the (AI-generated / imported) category
+ * `icon_url` before it is placed into `<img src>`. Restricting to http/https
+ * blocks `javascript:` / `data:` schemes and prevents the browser from being
+ * pointed at internal metadata or other SSRF-style targets. Returns
+ * `undefined` for anything unparseable or not http(s); callers fall back to
+ * the default glyph. Mirrors `safeExternalUrl` in ComparisonDetailClient.
+ */
+function safeImageUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * M-09: defense-in-depth render-time SVG hardening. The agent-side
  * `sanitizeSvg` already strips script/event-handler/foreignObject on writes,
  * but pre-seeded or imported categories (account import, restored backups,
@@ -22,18 +43,48 @@ import { toast } from 'sonner';
  * dangerous slips through, swap this client copy for `isomorphic-dompurify`
  * when adding it as a dep.
  */
+// Security: align the client deny-lists with the server-side
+// `svg-sanitizer.ts` (packages/agent) and close the bypasses an audit
+// flagged. The previous tag pattern only stripped `<use ... xlink:href>`
+// (missing the modern SVG2 `<use href>` form) and omitted CSS / link /
+// SMIL-animation vectors. Inline icon SVGs never legitimately contain
+// any of these elements, so stripping them wholesale is safe for all
+// real icons. This stays a defense-in-depth regex pass behind the
+// server sanitizer; swap for `isomorphic-dompurify` if it is ever
+// added as a web dependency.
 const SVG_DANGEROUS_TAG_RE =
-    /<\/?(?:script|iframe|object|embed|foreignObject|use\s+[^>]*xlink:href)[^>]*>/gi;
-const SVG_DANGEROUS_ATTR_RE = /\s(?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+    /<\/?\s*(?:script|iframe|object|embed|foreignObject|use|a|style|image|set|handler|listener|animate|animateTransform|animateMotion|feImage)\b[^>]*>/gi;
+// Security: strip whole `<style>…</style>` blocks (open tag, CSS body, and
+// close tag) so CSS-based payloads such as `*{background:url('javascript:…')}`
+// or `@import` cannot survive as an applied stylesheet.
+const SVG_STYLE_BLOCK_RE = /<\s*style\b[^>]*>[\s\S]*?<\s*\/\s*style\s*>/gi;
+// Security: event-handler / href stripping now also fires when the
+// attribute is separated by `/` (e.g. `<svg/onload=alert(1)>`), not only
+// by whitespace, closing the slash-delimited bypass. Real icons carry no
+// on* handlers or href attributes, so this never affects legitimate SVG.
+const SVG_DANGEROUS_ATTR_RE =
+    /[\s/](?:on[a-z]+|xlink:href|href)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
+// Security: reject inline SVG carrying a dangerous URL scheme anywhere in
+// the body (belt-and-braces against `javascript:`/`vbscript:` survivors and
+// `data:`/`file:` references), mirroring the server sanitizer's check.
+const SVG_DANGEROUS_URL_RE = /\b(?:javascript|vbscript|data|file)\s*:/i;
 
 function sanitizeSvgClient(svg: string): string {
     if (typeof svg !== 'string') return '';
     // Trim XML processing instructions / DOCTYPE that don't belong inline.
-    return svg
+    const cleaned = svg
         .replace(/<\?xml[^>]*\?>/gi, '')
         .replace(/<!DOCTYPE[^>]*>/gi, '')
+        // Security: drop comments / CDATA so payloads cannot hide inside them.
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
+        .replace(SVG_STYLE_BLOCK_RE, '')
         .replace(SVG_DANGEROUS_TAG_RE, '')
         .replace(SVG_DANGEROUS_ATTR_RE, '');
+    // Security: fail closed — if a dangerous URL scheme still survived the
+    // attribute/tag scrub, render nothing rather than risk execution.
+    if (SVG_DANGEROUS_URL_RE.test(cleaned)) return '';
+    return cleaned;
 }
 
 /**
@@ -56,8 +107,14 @@ function CategoryIcon({ category }: { category: Category }) {
             />
         );
     }
-    if (category.icon_url) {
-        return <img src={category.icon_url} alt="" className="w-6 h-6 rounded" />;
+    // Security: validate the (AI-generated / imported) icon_url scheme before
+    // putting it in `<img src>`. Rejecting non-http(s) URLs blocks `javascript:`
+    // / `data:` schemes and internal-metadata / SSRF-style targets being fetched
+    // by every viewer's browser; an unparseable or unsafe URL falls through to
+    // the default glyph below.
+    const safeIconUrl = safeImageUrl(category.icon_url);
+    if (safeIconUrl) {
+        return <img src={safeIconUrl} alt="" className="w-6 h-6 rounded" />;
     }
     return (
         <FolderTree

@@ -21,6 +21,7 @@ import type {
     ExportedWork,
 } from './types';
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
+import { sanitizePrompt } from '../utils/sanitize.util';
 
 /**
  * Canonical slug shape (matches the work/item DTO `@Matches` rule and
@@ -35,6 +36,38 @@ import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
  * filesystem while leaving every legitimate export unchanged.
  */
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Max length applied to imported advanced-prompt fields. Mirrors
+ * `UpdateWorkAdvancedPromptsDto`'s `MAX_PROMPT_LENGTH` (2000) so an
+ * imported payload can't carry a longer/un-sanitized prompt than the
+ * canonical write path allows.
+ */
+const MAX_IMPORTED_PROMPT_LENGTH = 2000;
+
+/**
+ * Sanitize an advanced-prompt string coming from an untrusted import
+ * payload, exactly as the canonical DTO write path does
+ * (`UpdateWorkAdvancedPromptsDto.sanitizeAndNormalize`): trim, treat
+ * empty/whitespace-only as `null`, otherwise `sanitizePrompt` (strips
+ * control characters, caps length, preserves intentional newlines).
+ *
+ * These fields are later injected verbatim into LLM system prompts by
+ * `PromptAssemblerService`. The account-import flow previously wrote
+ * them straight to the DB with no sanitization, so a hostile export
+ * could plant control characters / oversized content that the normal
+ * API path would never accept (prompt-injection hardening). Applying
+ * the same transform here keeps legitimate prompts unchanged while
+ * stripping the abusive bits. (Stronger isolation — delimiting
+ * user-supplied prompt segments as untrusted in the assembler — is a
+ * separate, cross-file change.)
+ */
+function sanitizeImportedPrompt(value: string | null | undefined): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return null;
+    return sanitizePrompt(trimmed, MAX_IMPORTED_PROMPT_LENGTH);
+}
 
 @Injectable()
 export class AccountImportService {
@@ -213,6 +246,32 @@ export class AccountImportService {
             warnings: [],
         };
 
+        // Security: previewImport gates the payload version + shape, but
+        // applyImport could be called directly (skipping preview) and then
+        // dereferenced payload.data.works/.userPlugins unguarded — a malformed
+        // or unsupported-version body crashed with an unhandled 500. Mirror the
+        // preview guard here so only well-formed v1/v2 envelopes proceed; reject
+        // everything else with a clean failed result. v2 is accepted (its tail
+        // arrays are ignored, matching existing behavior); only unknown versions
+        // and missing works/userPlugins arrays are rejected.
+        if (!payload || typeof payload !== 'object') {
+            result.success = false;
+            result.errors.push('Invalid payload: expected a JSON object');
+            return result;
+        }
+        if (payload.version !== 1 && payload.version !== 2) {
+            result.success = false;
+            result.errors.push(
+                `Unsupported export version: ${payload.version}. Only versions 1 and 2 are supported.`,
+            );
+            return result;
+        }
+        if (!Array.isArray(payload.data?.works) || !Array.isArray(payload.data?.userPlugins)) {
+            result.success = false;
+            result.errors.push('Invalid payload: missing works or userPlugins array');
+            return result;
+        }
+
         const user = await this.userRepository.findById(userId);
         if (!user) {
             result.success = false;
@@ -322,6 +381,20 @@ export class AccountImportService {
 
             if (resolution.strategy === 'rename') {
                 slug = resolution.newSlug || `${dir.slug}-imported`;
+                // Security: `newSlug` comes straight from the request body and
+                // flows into the created work's `slug`, which is later used to
+                // build the `${slug}-data` git clone directory name in
+                // importWorkRepoData. Reject anything outside the canonical slug
+                // charset so a value like `../../../injected` can't escape the
+                // repo namespace (path traversal). Legitimate renames always use
+                // a canonical slug, so this is a no-op for valid input.
+                if (!SLUG_PATTERN.test(slug)) {
+                    result.errors.push(
+                        `Cannot rename "${dir.slug}" to "${slug}" - invalid slug`,
+                    );
+                    result.worksSkipped++;
+                    return;
+                }
                 // Check the new slug doesn't conflict either
                 const newExisting = await this.workRepository.existsByUserAndSlug(userId, slug);
                 if (newExisting) {
@@ -436,14 +509,22 @@ export class AccountImportService {
         // Import advanced prompts
         if (dir.advancedPrompts && Object.keys(dir.advancedPrompts).length > 0) {
             try {
+                // Security: sanitize each imported prompt the same way the
+                // canonical DTO write path does (strip control chars, cap at
+                // 2000, empty→null) before it is stored and later injected
+                // verbatim into LLM system prompts. Prevents an untrusted
+                // export from smuggling oversized/control-char prompt-injection
+                // payloads past the validation the normal API enforces.
                 await this.advancedPromptsRepository.createOrUpdate(workId, {
-                    relevanceAssessment: dir.advancedPrompts.relevanceAssessment,
-                    itemGeneration: dir.advancedPrompts.itemGeneration,
-                    itemExtraction: dir.advancedPrompts.itemExtraction,
-                    searchQuery: dir.advancedPrompts.searchQuery,
-                    categorization: dir.advancedPrompts.categorization,
-                    deduplication: dir.advancedPrompts.deduplication,
-                    sourceValidation: dir.advancedPrompts.sourceValidation,
+                    relevanceAssessment: sanitizeImportedPrompt(
+                        dir.advancedPrompts.relevanceAssessment,
+                    ),
+                    itemGeneration: sanitizeImportedPrompt(dir.advancedPrompts.itemGeneration),
+                    itemExtraction: sanitizeImportedPrompt(dir.advancedPrompts.itemExtraction),
+                    searchQuery: sanitizeImportedPrompt(dir.advancedPrompts.searchQuery),
+                    categorization: sanitizeImportedPrompt(dir.advancedPrompts.categorization),
+                    deduplication: sanitizeImportedPrompt(dir.advancedPrompts.deduplication),
+                    sourceValidation: sanitizeImportedPrompt(dir.advancedPrompts.sourceValidation),
                 });
             } catch (error) {
                 result.warnings.push(

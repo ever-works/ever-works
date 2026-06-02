@@ -363,6 +363,17 @@ export class TasksService {
 
     async removeAssignee(userId: string, taskId: string, assigneeId: string) {
         await this.getOne(userId, taskId);
+        // Security (IDOR): the assignee row is deleted by its own PK, so
+        // confirm it actually belongs to the ownership-verified task
+        // before removing. Without this, a caller could pass a task they
+        // own as `taskId` but another tenant's assignee-row UUID as
+        // `assigneeId` and silently delete a cross-tenant row.
+        const ownsRow = (await this.assignees.findByTaskId(taskId)).some(
+            (r) => r.id === assigneeId,
+        );
+        if (!ownsRow) {
+            throw new NotFoundException(`Assignee ${assigneeId} not found on Task ${taskId}.`);
+        }
         await this.assignees.remove(assigneeId);
         await this.logActivity({
             userId,
@@ -432,6 +443,15 @@ export class TasksService {
 
     async removeBlocker(userId: string, taskId: string, blockId: string) {
         await this.getOne(userId, taskId);
+        // Security (IDOR): the block row is deleted by its own PK, so
+        // confirm it belongs to the ownership-verified task first.
+        // Otherwise a caller could pass a task they own as `taskId` but
+        // another tenant's block-row UUID as `blockId` and delete a
+        // cross-tenant dependency edge.
+        const ownsRow = (await this.blocks.findByTaskId(taskId)).some((r) => r.id === blockId);
+        if (!ownsRow) {
+            throw new NotFoundException(`Blocker ${blockId} not found on Task ${taskId}.`);
+        }
         await this.blocks.remove(blockId);
         // Review-fix I1 (second-pass NEW-bug corrected): removing a
         // block row may unblock the DEPENDENT task (`taskId` itself).
@@ -488,6 +508,19 @@ export class TasksService {
         await this.getOne(userId, taskId);
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
+        }
+        // Security (IDOR): the attachment row is deleted by its own PK,
+        // so confirm it belongs to the ownership-verified task first.
+        // Otherwise a caller could pass a task they own as `taskId` but
+        // another tenant's attachment-row UUID as `attachmentId` and
+        // delete a cross-tenant Task→Upload edge.
+        const ownsRow = (await this.attachments.findByTaskId(taskId)).some(
+            (r) => r.id === attachmentId,
+        );
+        if (!ownsRow) {
+            throw new NotFoundException(
+                `Attachment ${attachmentId} not found on Task ${taskId}.`,
+            );
         }
         await this.attachments.remove(attachmentId);
         return { deleted: true } as const;

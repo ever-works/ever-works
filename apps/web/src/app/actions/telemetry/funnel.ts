@@ -1,6 +1,7 @@
 'use server';
 
 import { API_URL } from '@/lib/constants';
+import { getAuthFromCookie } from '@/lib/auth';
 
 /**
  * EW-617 G8 — client-side funnel event emit, server-action edition.
@@ -25,8 +26,23 @@ export async function emitFunnelEventAction(payload: {
     extra?: Record<string, unknown>;
 }): Promise<void> {
     try {
+        // Security: never trust a caller-supplied userId — a funnel emit
+        // attributed to a user must be derived from the session, otherwise
+        // any (even anonymous) caller could forge events against another
+        // account's UUID and pollute analytics. Strip the inbound userId and
+        // re-derive it server-side from the auth cookie. Unauthenticated
+        // flows simply have no userId (the legitimate wizard never sends one).
+        const { userId: _ignoredUserId, ...rest } = payload;
+        let sessionUserId: string | undefined;
+        try {
+            const authUser = await getAuthFromCookie();
+            sessionUserId = authUser?.id;
+        } catch {
+            // Auth resolution must never break a fire-and-forget emit.
+        }
         const body = JSON.stringify({
-            ...payload,
+            ...rest,
+            ...(sessionUserId ? { userId: sessionUserId } : {}),
             timestamp: payload.timestamp || new Date().toISOString(),
         });
         // 2s timeout — the funnel sink is a logger, but if the API is

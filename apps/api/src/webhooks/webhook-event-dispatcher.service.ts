@@ -18,6 +18,13 @@ import {
     DeploymentFailedEvent,
 } from '@ever-works/agent/events';
 import { Work } from '@ever-works/agent/entities';
+// Security: lexical SSRF guard re-used from the delivery layer so redeliveries
+// are rejected at the dispatcher before a new DB row is created, regardless of
+// environment. This catches subscriptions created in a non-production context
+// (where the creation-time guard was skipped) that are later redelivered in
+// production. The delivery layer (WebhookDeliveryService.deliver) performs the
+// same check again as defence-in-depth.
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 
 /**
  * Producer-side fanout for outbound webhook subscriptions.
@@ -149,6 +156,22 @@ export class WebhookEventDispatcherService {
             // 404 cover for cross-account snooping (mirrors WebhooksService).
             return { deliveryId: input.originalDeliveryId, enqueued: false, runId: null };
         }
+
+        // Security: re-validate the subscription URL's SSRF status before
+        // creating a new delivery row. A subscription may have been created in
+        // a non-production environment (where the creation-time SSRF guard was
+        // bypassed) and is now being redelivered in production, or the SSRF
+        // blocklist may have been updated since the subscription was created.
+        // Skip if the subscription no longer exists (deleted between delivery
+        // and redeliver) — the enqueue will be a no-op in that case.
+        const sub = await this.subscriptions.findById(row.subscriptionId);
+        if (sub && !isSafeWebhookUrl(sub.url)) {
+            this.logger.warn(
+                `webhook.redeliver_ssrf_blocked subscription=${row.subscriptionId} delivery=${input.originalDeliveryId}`,
+            );
+            return { deliveryId: input.originalDeliveryId, enqueued: false, runId: null };
+        }
+
         const fresh = await this.deliveries.createPending({
             subscriptionId: row.subscriptionId,
             accountId: row.accountId,

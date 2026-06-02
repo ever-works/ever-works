@@ -75,6 +75,9 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
             })
             .catch((err) => {
                 if (cancelled) return;
+                // Security: log full error server-side only; never expose raw error
+                // messages (which may contain DB hostnames, file paths, stack frames)
+                // to the client UI.
                 console.error('Failed to load items:', err);
                 setLoaded({
                     workId,
@@ -82,7 +85,7 @@ export function ItemsPageClient({ workId, sourceValidationSettings }: ItemsPageC
                     categories: [],
                     tags: [],
                     collections: [],
-                    error: err instanceof Error ? err.message : String(err),
+                    error: 'Failed to load items. Please try again.',
                 });
             });
         return () => {

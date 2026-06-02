@@ -47,16 +47,26 @@ export async function downloadFromUrl(url: string): Promise<void> {
     }
 }
 
+// Security: strip path separators, null bytes, and non-printable control characters from
+// Content-Disposition filenames before they are used as the `download` attribute value.
+// Limits the result to 255 characters to match common filesystem constraints.
+function sanitizeFilename(name: string): string {
+    return name.replace(/[/\\?\x00-\x1f]/g, '_').slice(0, 255) || 'download';
+}
+
 function filenameFromDispositionOrUrl(disposition: string | null, url: string): string {
     if (disposition) {
         const match = /filename\*?=(?:UTF-8'')?(?:"([^"]+)"|([^;\s]+))/i.exec(disposition);
         const captured = match?.[1] ?? match?.[2];
         if (captured) {
-            return decodeURIComponent(captured);
+            // Security: sanitize after URI-decoding to prevent path traversal or
+            // control-character injection via a crafted Content-Disposition header.
+            return sanitizeFilename(decodeURIComponent(captured));
         }
     }
     // Strip the query string and take the last path segment.
     const path = url.split('?')[0];
     const last = path.substring(path.lastIndexOf('/') + 1) || 'download';
-    return last;
+    // Security: sanitize the URL-derived fallback name as well.
+    return sanitizeFilename(last);
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
     IGitProviderPlugin,
     GitRepository,
@@ -111,6 +111,9 @@ export type { GitProviderInfo };
 @Injectable()
 export class GitFacadeService implements IGitFacade {
     private readonly CAPABILITY = PLUGIN_CAPABILITIES.GIT_PROVIDER;
+    // Security: use structured NestJS Logger instead of console.warn so log output is
+    // routed through the standard logging pipeline and log-level controls apply.
+    private readonly logger = new Logger(GitFacadeService.name);
     private readonly installationTokenCache = new Map<
         string,
         {
@@ -804,11 +807,13 @@ export class GitFacadeService implements IGitFacade {
         } catch (err) {
             // Don't propagate — callers always fall back. Surface in
             // the logger so this is visible if it happens repeatedly.
-            // eslint-disable-next-line no-console
-            console.warn(
-                `GitFacadeService.getRepoDir: clone/pull failed for ${scope} ${scopeId}: ${
-                    err instanceof Error ? err.message : String(err)
-                }`,
+            // Security: sanitize the error message before logging to prevent log-injection
+            // via ANSI escape sequences or newlines embedded in attacker-controlled repo
+            // owner/name/branch values that may appear in git error output.
+            const rawMsg = err instanceof Error ? err.message : String(err);
+            const safeMsg = rawMsg.replace(/[\x00-\x1F\x7F]/g, ' ').slice(0, 500);
+            this.logger.warn(
+                `GitFacadeService.getRepoDir: clone/pull failed for ${scope} ${scopeId}: ${safeMsg}`,
             );
             return null;
         }

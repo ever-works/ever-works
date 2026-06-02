@@ -325,7 +325,15 @@ export class PluginLoaderService {
 
             const mainEntry =
                 (packageJson.main as string) || (packageJson.module as string) || 'index.js';
-            const entryPath = path.join(pluginPath, mainEntry);
+            // Security: `mainEntry` comes straight from the plugin's own
+            // package.json (`main`/`module`), which is attacker-controlled for
+            // any filesystem-discovered or dynamically-installed plugin. Confine
+            // the resolved entry to the plugin directory before import() so a
+            // value like "../../../apps/api/dist/evil.js" or an absolute path
+            // can't escape and execute arbitrary modules in the host process
+            // (zip-slip / path-traversal RCE). Mirrors the containment idiom in
+            // GitHubSyncService.safeSlugDir / DataRepository.confineSlugPath.
+            const entryPath = this.confinePluginEntry(pluginPath, mainEntry);
 
             // Dynamic import
             const module = await import(entryPath);
@@ -806,6 +814,52 @@ export class PluginLoaderService {
             const manifest = (plugin as DiscoveredPlugin).manifest;
             return manifest.dependencies ? Object.keys(manifest.dependencies) : [];
         }
+    }
+
+    /**
+     * Security helper: resolve a plugin's `main`/`module` entry to an absolute
+     * path under `pluginPath`, rejecting any value that is absolute, contains a
+     * `..` segment, carries a non-JS extension, or that escapes `pluginPath`
+     * once resolved. The entry comes from the plugin's own (attacker-
+     * controlled) package.json, so without this an entry like
+     * `../../../apps/api/dist/evil.js` would be `import()`ed and run arbitrary
+     * code in the host process. Throws on a hostile entry so the traversal
+     * never reaches `import()`; the caller's try/catch turns that into a clean
+     * "Failed to load plugin module". Legitimate entries (e.g. `dist/index.js`)
+     * resolve unchanged. Mirrors the containment idiom in
+     * `GitHubSyncService.safeSlugDir` / `DataRepository.confineSlugPath`.
+     */
+    private confinePluginEntry(pluginPath: string, mainEntry: string): string {
+        // Reject absolute paths up front — `path.join` would otherwise honour a
+        // drive/root and silently leave `pluginPath` behind on some platforms.
+        if (path.isAbsolute(mainEntry)) {
+            throw new Error(`Plugin entry point must be relative: ${mainEntry}`);
+        }
+        // Reject any traversal segment before joining. Split on both separators
+        // so a `..\\` segment is caught on POSIX too (entry is cross-platform
+        // text from package.json, not necessarily this OS's convention).
+        if (mainEntry.split(/[/\\]/).some((seg) => seg === '..')) {
+            throw new Error(`Plugin entry point must not contain '..': ${mainEntry}`);
+        }
+        // Allowlist executable JS module extensions only.
+        const ext = path.extname(mainEntry).toLowerCase();
+        if (ext !== '.js' && ext !== '.mjs' && ext !== '.cjs') {
+            throw new Error(`Plugin entry point has unsupported extension: ${mainEntry}`);
+        }
+        // Build the path in the same `path.join` form the original code used so
+        // the return value is identical for legitimate entries. Resolve BOTH
+        // sides only for the containment check — correct even when `pluginPath`
+        // is not an absolute, normalized path.
+        const entryPath = path.join(pluginPath, mainEntry);
+        const resolvedRoot = path.resolve(pluginPath);
+        const resolvedEntry = path.resolve(pluginPath, mainEntry);
+        if (
+            resolvedEntry !== resolvedRoot &&
+            !resolvedEntry.startsWith(resolvedRoot + path.sep)
+        ) {
+            throw new Error(`Plugin entry point escapes plugin directory: ${mainEntry}`);
+        }
+        return entryPath;
     }
 
     /**

@@ -47,7 +47,16 @@ interface DashboardLayoutClientProps {
     apiVersion?: ApiVersion | null;
 }
 
-const COOKIE_OPTS = `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+// Security: include the Secure flag when the page is served over HTTPS so these
+// UI-state cookies are never transmitted in plaintext on an HTTPS deployment.
+// Evaluated lazily at call-time (client-side only) so SSR is unaffected.
+function getCookieOpts(): string {
+    const secure =
+        typeof window !== 'undefined' && window.location.protocol === 'https:'
+            ? '; Secure'
+            : '';
+    return `path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax${secure}`;
+}
 
 export function DashboardLayoutClient({
     user,
@@ -135,7 +144,7 @@ export function DashboardLayoutClient({
 
     const setChatOpen = useCallback((value: boolean, resetOnOpen = true) => {
         setChatOpenRaw(value);
-        document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
+        document.cookie = `chat-panel-open=${value ? '1' : '0'}; ${getCookieOpts()}`;
 
         if (value) {
             if (resetOnOpen) {
@@ -241,7 +250,7 @@ export function DashboardLayoutClient({
     const handleSidebarCollapsedChange = useCallback(
         (value: boolean) => {
             setSidebarCollapsedRaw(value);
-            document.cookie = `sidebar-collapsed=${value ? '1' : '0'}; ${COOKIE_OPTS}`;
+            document.cookie = `sidebar-collapsed=${value ? '1' : '0'}; ${getCookieOpts()}`;
 
             // If collapsing the sidebar while chat is expanded, immediately hide
             // the main content to keep focus on expanded chat.

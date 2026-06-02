@@ -8,6 +8,7 @@ import {
     HttpCode,
     HttpStatus,
     Param,
+    ParseUUIDPipe,
     Patch,
     Post,
     Query,
@@ -94,7 +95,14 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'List of KB documents' })
     async listDocuments(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        // Security: every UUID-shaped route param (`id`/workId, `docId`,
+        // `tagId`, `uploadId`) is validated with `ParseUUIDPipe`, matching
+        // the convention already used in `invitations.controller.ts`. This
+        // rejects malformed/abusive identifiers at the pipe layer (400)
+        // before they reach the service + repository, narrowing the attack
+        // surface for any future raw-query path. `docIdOrPath` is left
+        // unvalidated on purpose — it legitimately accepts non-UUID paths.
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @Query() query: KbDocumentQueryDto,
     ) {
         return this.kb.listDocuments(workId, auth.userId, {
@@ -115,7 +123,7 @@ export class KbController {
     @ApiResponse({ status: 201, description: 'KB document created' })
     async createDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @Body() body: CreateKbDocumentDto,
     ) {
         return this.kb.createDocument({
@@ -139,7 +147,7 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'KB document body + metadata' })
     async getDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('docIdOrPath') docIdOrPath: string,
     ) {
         return this.kb.getDocument(workId, docIdOrPath, auth.userId);
@@ -151,8 +159,8 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'KB document updated' })
     async updateDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
         @Body() body: UpdateKbDocumentDto,
     ) {
         return this.kb.updateDocument(workId, docId, auth.userId, {
@@ -167,8 +175,8 @@ export class KbController {
     @ApiResponse({ status: 204, description: 'KB document deleted' })
     async deleteDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
     ) {
         await this.kb.deleteDocument(workId, docId, auth.userId);
     }
@@ -179,8 +187,8 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'KB document locked' })
     async lockDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
         @Body() body: LockKbDocumentDto,
     ) {
         return this.kb.lockDocument(workId, docId, auth.userId, body.mode as KbLockMode);
@@ -192,8 +200,8 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'KB document unlocked' })
     async unlockDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
     ) {
         return this.kb.unlockDocument(workId, docId, auth.userId);
     }
@@ -209,8 +217,8 @@ export class KbController {
     @ApiResponse({ status: 404, description: 'Document or commit not found' })
     async restoreDocument(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
         @Body() body: RestoreKbDocumentDto,
     ) {
         return this.kb.restoreDocumentFromHistory(workId, docId, auth.userId, body.commitSha);
@@ -232,8 +240,8 @@ export class KbController {
     @ApiResponse({ status: 404, description: 'Document not found' })
     async getDocumentHistory(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
         @Query('limit') limit?: string,
     ) {
         const parsedLimit = limit && /^\d+$/.test(limit) ? Number(limit) : undefined;
@@ -248,8 +256,8 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'Citation rows' })
     async listCitations(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('docId') docId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
     ) {
         return this.kb.listCitationsForDocument(workId, docId, auth.userId);
     }
@@ -260,7 +268,10 @@ export class KbController {
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'List per-Work KB tags' })
     @ApiResponse({ status: 200, description: 'List of tags' })
-    async listTags(@CurrentUser() auth: AuthenticatedUser, @Param('id') workId: string) {
+    async listTags(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+    ) {
         return this.kb.listTags(workId, auth.userId);
     }
 
@@ -270,7 +281,7 @@ export class KbController {
     @ApiResponse({ status: 201, description: 'Tag created' })
     async createTag(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @Body() body: CreateKbTagDto,
     ) {
         return this.kb.createTag(workId, auth.userId, body);
@@ -282,8 +293,8 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'Tag updated' })
     async updateTag(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('tagId') tagId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('tagId', new ParseUUIDPipe()) tagId: string,
         @Body() body: UpdateKbTagDto,
     ) {
         return this.kb.updateTag(workId, tagId, auth.userId, body);
@@ -295,8 +306,8 @@ export class KbController {
     @ApiResponse({ status: 204, description: 'Tag deleted' })
     async deleteTag(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('tagId') tagId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('tagId', new ParseUUIDPipe()) tagId: string,
     ) {
         await this.kb.deleteTag(workId, tagId, auth.userId);
     }
@@ -337,7 +348,7 @@ export class KbController {
     @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
     async createUpload(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @UploadedFile() file: Express.Multer.File | undefined,
         @Body() body: CreateKbUploadDto,
     ) {
@@ -376,7 +387,7 @@ export class KbController {
     @ApiResponse({ status: 200, description: 'Paginated list of upload rows' })
     async listUploads(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
         @Query('status') status?: KbUploadExtractionStatus,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
@@ -395,8 +406,8 @@ export class KbController {
     @ApiResponse({ status: 404, description: 'Upload not found' })
     async getUpload(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('uploadId') uploadId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
     ) {
         return this.kb.getUpload(workId, uploadId, auth.userId);
     }
@@ -434,8 +445,8 @@ export class KbController {
     @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
     async downloadUpload(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('uploadId') uploadId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
         @Res() res: ServeResponse,
     ) {
         const { buffer, mimeType, filename } = await this.kb.getUploadBytes(
@@ -477,8 +488,8 @@ export class KbController {
     @ApiResponse({ status: 409, description: 'Upload already produced a KB document' })
     async retryUploadExtraction(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') workId: string,
-        @Param('uploadId') uploadId: string,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
     ) {
         return this.kb.retryUploadExtraction(workId, uploadId, auth.userId);
     }

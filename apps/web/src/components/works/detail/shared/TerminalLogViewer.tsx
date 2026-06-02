@@ -66,6 +66,12 @@ function formatTime(timestamp: string, locale: string): string {
     }
 }
 
+// Security: log.message and log.source originate from the agent/pipeline runtime and may contain
+// content derived from hostile external inputs (repo files, fetched URLs, LLM output). React JSX
+// text escaping prevents XSS here. NEVER switch these fields to dangerouslySetInnerHTML or
+// innerHTML — if ANSI color support is added in the future, use a well-audited library (e.g.
+// ansi-to-react) that sanitizes output. The SOURCE_COLORS / LEVEL_COLORS fixed maps prevent
+// CSS className injection via unknown source/level values.
 function LogLine({ log }: { log: GenerationStepLog }) {
     const locale = useLocale();
     const mounted = useMounted();

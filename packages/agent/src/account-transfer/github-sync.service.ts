@@ -7,6 +7,7 @@ import { UserRepository } from '../database/repositories/user.repository';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
 import { AccountExportService } from './account-export.service';
 import { AccountImportService } from './account-import.service';
+import { redactSecrets } from '../utils/secret-scan';
 import type {
     SyncStatus,
     ConfigureSyncDto,
@@ -221,7 +222,8 @@ export class GitHubSyncService {
             await this.syncConfigRepository.updateLastPush(userId);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
@@ -267,7 +269,8 @@ export class GitHubSyncService {
             return this.importService.previewImport(userId, payload);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
@@ -313,7 +316,8 @@ export class GitHubSyncService {
             return result;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
@@ -349,6 +353,43 @@ export class GitHubSyncService {
             return null;
         }
         return dirPath;
+    }
+
+    /**
+     * Security (secrets — defence-in-depth): the agent/skill/task bodies
+     * are about to be durably written into a user-pointed GitHub repo's
+     * git history. Agent file bodies are already hard-rejected for
+     * secrets upstream (`AgentExportService.exportOne` → `assertNoSecrets`),
+     * but the skill `instructionsMd` and task `description` + chat `body`
+     * reach this serializer un-scanned. Redact (not hard-reject) so a body
+     * that acquired a credential never lands in the remote repo, while a
+     * single bad body never blocks the sync of everything else. Returns a
+     * shallow clone with redacted fields so the source payload is never
+     * mutated. No-op for clean (legitimate) bodies.
+     */
+    private redactBodyForRepo<T extends Record<string, any>>(
+        row: T,
+        bodyFields: Array<keyof T>,
+    ): T {
+        let clone: T | null = null;
+        let total = 0;
+        for (const field of bodyFields) {
+            const value = row[field];
+            if (typeof value !== 'string' || value.length === 0) continue;
+            const { cleaned, redactions } = redactSecrets(value);
+            if (redactions > 0) {
+                if (!clone) clone = { ...row };
+                (clone as Record<string, unknown>)[field as string] = cleaned;
+                total += redactions;
+            }
+        }
+        if (clone && total > 0) {
+            this.logger.warn(
+                `Redacted ${total} secret-like value(s) from a synced body before push`,
+            );
+            return clone;
+        }
+        return row;
     }
 
     private writeExportFiles(dir: string, payload: AccountExportPayload): void {
@@ -465,7 +506,11 @@ export class GitHubSyncService {
                     this.logger.warn(`Skipping skill with invalid slug: ${skill.slug}`);
                     continue;
                 }
-                this.writeJsonFile(`${safeDir}.json`, skill);
+                // Security: scrub secrets from the skill body before it lands
+                // in the remote repo (the skill-write path scans on save, but
+                // this sync serializer otherwise bypasses that hygiene).
+                const safeSkill = this.redactBodyForRepo(skill, ['instructionsMd', 'description']);
+                this.writeJsonFile(`${safeDir}.json`, safeSkill);
             }
         }
         if (tasks.length > 0) {
@@ -477,7 +522,24 @@ export class GitHubSyncService {
                     this.logger.warn(`Skipping task with invalid slug: ${task.slug}`);
                     continue;
                 }
-                this.writeJsonFile(`${safeDir}.json`, task);
+                // Security: scrub secrets from the task description AND every
+                // chat-message body before writing to the remote repo. Task
+                // descriptions/chat are redact-on-save (not hard-reject), so a
+                // body could legitimately have carried a secret pre-scan; this
+                // mirrors that posture on the sync-out path.
+                let safeTask = this.redactBodyForRepo(task, ['description']);
+                if (Array.isArray(safeTask.chat) && safeTask.chat.length > 0) {
+                    let chatChanged = false;
+                    const safeChat = safeTask.chat.map((m) => {
+                        const redacted = this.redactBodyForRepo(m, ['body']);
+                        if (redacted !== m) chatChanged = true;
+                        return redacted;
+                    });
+                    if (chatChanged) {
+                        safeTask = { ...safeTask, chat: safeChat };
+                    }
+                }
+                this.writeJsonFile(`${safeDir}.json`, safeTask);
             }
         }
     }
@@ -591,7 +653,16 @@ export class GitHubSyncService {
             const rows: any[] = [];
             const names = fs
                 .readdirSync(dirPath, { withFileTypes: true })
-                .filter((d) => d.isFile() && d.name.endsWith('.json'))
+                // Security (symlink escape / path traversal): the directory
+                // lives inside an attacker-controllable cloned sync repo. A
+                // malicious repo can ship a symlink (e.g. `evil.json ->
+                // /etc/passwd`) that `fs.readFileSync` would follow off-tree
+                // and surface its contents in logs/parse errors. `Dirent`
+                // uses lstat semantics, so a symlink reports `isFile()`
+                // false today — but reject it EXPLICITLY (same posture as
+                // WebsiteUpdateService.copyRepositoryFiles) so the guard can
+                // never regress if the filter above is relaxed.
+                .filter((d) => !d.isSymbolicLink?.() && d.isFile() && d.name.endsWith('.json'))
                 .map((d) => d.name)
                 .sort();
             for (const name of names) {
@@ -618,6 +689,21 @@ export class GitHubSyncService {
         if (!fs.existsSync(filePath)) return null;
         const content = fs.readFileSync(filePath, 'utf-8');
         return JSON.parse(content);
+    }
+
+    /**
+     * Security (info-leak): the raw git/provider error message is stored in
+     * `lastSyncError` and reflected back to the client by `getSyncStatus`.
+     * isomorphic-git / GitHub error strings can embed absolute filesystem
+     * paths, internal hostnames, or token fragments. Redact secret-like
+     * spans (reusing the shared scanner) and cap the length before it is
+     * persisted/returned. Behaviour for the happy path is unchanged — this
+     * only touches the error-reporting string.
+     */
+    private sanitizeSyncError(message: string): string {
+        const { cleaned } = redactSecrets(message || '');
+        const MAX = 500;
+        return cleaned.length > MAX ? `${cleaned.slice(0, MAX)}…` : cleaned;
     }
 
     private async hasGitHubOAuth(userId: string): Promise<boolean> {

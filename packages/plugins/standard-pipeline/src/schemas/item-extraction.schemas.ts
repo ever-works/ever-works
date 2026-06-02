@@ -1,4 +1,19 @@
 import { z } from 'zod';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+
+// Security: these schemas validate LLM structured output. AI-generated URL
+// fields (`source_url`, `brand_logo_url`, `images[]`) are persisted and later
+// rendered as href/src and fetched server-side, so a plain `z.string()` would
+// let an adversarial / prompt-injected model emit `javascript:`, `data:`,
+// `file://`, or private/metadata-host URLs. `isSafeWebhookUrl` enforces a
+// parseable URL, restricts the scheme to http(s), and blocks SSRF
+// private/loopback/link-local + cloud-metadata hosts — the same guard the
+// sibling Submit/Extract item DTOs apply to these exact fields. Applied to the
+// inner string (before `.nullable()`) so null stays allowed; invalid items are
+// already silently skipped by the per-item `.parse()` in the generation steps.
+const safeHttpUrl = z.string().refine((value) => isSafeWebhookUrl(value), {
+	message: 'URL must be a valid http(s) URL pointing to a public host'
+});
 
 /**
  * Base schema for item data
@@ -16,20 +31,21 @@ const baseSchema = z.object({
  * Schema for item data without categories/tags
  */
 export const itemDataSchema = baseSchema.extend({
-	source_url: z
-		.string()
+	// Security: http(s)-only, SSRF-guarded URL (see `safeHttpUrl` above).
+	source_url: safeHttpUrl
 		.nullable()
 		.describe(
 			'The most direct, stable, and canonical URL for the item itself. Must be a valid and highly relevant URL.'
 		),
 	featured: z.boolean().nullable().default(false),
 	brand: z.string().nullable().describe('Optional brand/manufacturer associated with the item (one per item).'),
-	brand_logo_url: z
-		.string()
+	// Security: http(s)-only, SSRF-guarded URL (see `safeHttpUrl` above).
+	brand_logo_url: safeHttpUrl
 		.nullable()
 		.describe('Logo URL for the brand if available and canonical. Must be a valid URL.'),
 	images: z
-		.array(z.string())
+		// Security: each image URL is http(s)-only and SSRF-guarded (see `safeHttpUrl` above).
+		.array(safeHttpUrl)
 		.nullable()
 		.default([])
 		.describe(
@@ -116,8 +132,8 @@ export const itemBadgesSchema = z.record(badgeSchema.nullable());
  * Schema for item data with badges
  */
 export const itemDataWithBadgesSchema = baseSchema.extend({
-	source_url: z
-		.string()
+	// Security: http(s)-only, SSRF-guarded URL (see `safeHttpUrl` above).
+	source_url: safeHttpUrl
 		.nullable()
 		.describe(
 			'The most direct, stable, and canonical URL for the item itself (e.g., project homepage, official documentation, GitHub repository etc.). Must be a valid and highly relevant URL.'
@@ -131,12 +147,13 @@ export const itemDataWithBadgesSchema = baseSchema.extend({
 		),
 	badges: itemBadgesSchema.nullable(),
 	brand: z.string().nullable().describe('Optional brand/manufacturer associated with the item (one per item).'),
-	brand_logo_url: z
-		.string()
+	// Security: http(s)-only, SSRF-guarded URL (see `safeHttpUrl` above).
+	brand_logo_url: safeHttpUrl
 		.nullable()
 		.describe('Logo URL for the brand if available and canonical. Must be a valid URL.'),
 	images: z
-		.array(z.string())
+		// Security: each image URL is http(s)-only and SSRF-guarded (see `safeHttpUrl` above).
+		.array(safeHttpUrl)
 		.nullable()
 		.default([])
 		.describe(

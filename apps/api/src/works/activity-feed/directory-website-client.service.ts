@@ -5,11 +5,18 @@ import { firstValueFrom } from 'rxjs';
 import type { AxiosError, AxiosResponse } from 'axios';
 import type { Work } from '@ever-works/agent/entities';
 import { PlatformSyncSecretService } from '@ever-works/agent/services';
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 import type { DirectorySiteEntry, FeedCategory, FeedEntry } from './dto/feed-entry.dto';
 import type { FeedDegradedReason } from './dto/feed-response.dto';
 
 const REQUEST_TIMEOUT_MS = 5000;
 const MAX_DRIFT_MS = 5 * 60 * 1000;
+// Security: upper bound on the upstream-supplied `summary` string. The directory
+// site is tenant-controlled (and could be compromised), so a malicious deploy
+// could return a multi-megabyte or control-char-laden summary that bloats the
+// feed payload or, if the value ever reaches an LLM prompt / log line, smuggles
+// injected instructions. Cap length and strip control characters server-side.
+const MAX_SUMMARY_LENGTH = 500;
 
 export type DirectoryFeedFetchParams = {
     since?: string;
@@ -121,10 +128,33 @@ export class DirectoryWebsiteClient {
     ): Promise<DirectoryFeedResult> {
         const timestamp = new Date().toISOString();
         const queryString = serialiseQuery(params);
+        const url = `${stripTrailingSlash(work.website!)}/api/platform/activity-feed${queryString ? `?${queryString}` : ''}`;
+
+        // Security (SSRF + signed-bearer leak): `work.website` is
+        // attacker-influenceable (a tenant's verified custom domain is promoted
+        // into it by the deploy facade), and every request below carries an HMAC
+        // `Authorization: Bearer` header binding the per-Work signing secret. A
+        // host that points at a private/loopback/link-local or cloud-metadata
+        // address (e.g. 169.254.169.254 / metadata.google.internal) must never be
+        // contacted, and the signed header must never be sent to it. Reuse the
+        // shared lexical SSRF guard already used by WebhookDeliveryService. We
+        // refuse BEFORE computing/sending the signature so the secret never
+        // leaves the process for an unsafe target. Local dev/test may legitimately
+        // point a Work at http://localhost, so — mirroring webhooks.service.ts —
+        // the guard is enforced in every non-local env (staging/prod share network
+        // reach to internal tooling and cloud metadata).
+        const env = process.env.NODE_ENV;
+        const isLocalEnv = env === 'development' || env === 'test' || env === undefined || env === '';
+        if (!isLocalEnv && !isSafeWebhookUrl(url)) {
+            this.logger.warn(
+                `directory-site request blocked by SSRF guard for work ${work.id} (host resolves to a private / loopback / link-local / metadata target)`,
+            );
+            return degraded('not_provisioned', 'Website URL rejected by SSRF guard');
+        }
+
         // The work ID binds the HMAC to a specific Work so a leaked signature
         // can't be replayed against another Work hosted on the same domain.
         const signature = sign(timestamp, queryString, work.id, secret);
-        const url = `${stripTrailingSlash(work.website!)}/api/platform/activity-feed${queryString ? `?${queryString}` : ''}`;
 
         try {
             const response = await firstValueFrom(
@@ -200,10 +230,23 @@ function mapEntry(entry: UpstreamEntry): DirectorySiteEntry {
         type: entry.type,
         category: categoryFor(entry.type),
         timestamp: entry.timestamp,
-        summary: entry.summary,
+        summary: sanitiseSummary(entry.summary),
         actor: entry.actor ?? null,
         target: entry.target,
     };
+}
+
+// Security: harden the tenant-controlled upstream `summary` before it is stored
+// and surfaced. Strip ASCII/Unicode control characters (keeps it from injecting
+// line-control / escape sequences into logs or downstream prompts) and cap the
+// length so a malicious directory site cannot bloat the feed payload.
+function sanitiseSummary(value: string): string {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    // eslint-disable-next-line no-control-regex
+    const stripped = value.replace(/[\x00-\x1f\x7f-\x9f]/g, ' ');
+    return stripped.length > MAX_SUMMARY_LENGTH ? stripped.slice(0, MAX_SUMMARY_LENGTH) : stripped;
 }
 
 function serialiseQuery(params: DirectoryFeedFetchParams): string {

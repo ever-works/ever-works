@@ -37,8 +37,13 @@ export class TaskAssigneeRepository {
         const entity = this.repo.create({ taskId, assigneeType, assigneeId });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete to a single
+    // task so a side-row PK from another tenant's task can never be
+    // removed by passing an owned `taskId`. When omitted, behavior is
+    // unchanged (callers that already verify ownership upstream keep
+    // working); new callers SHOULD pass `taskId` for defense-in-depth.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -60,11 +65,19 @@ export class TaskReviewerRepository {
     async setState(
         id: string,
         reviewState: 'pending' | 'requested-changes' | 'approved',
+        taskId?: string,
     ): Promise<void> {
-        await this.repo.update(id, { reviewState, reviewedAt: new Date() });
+        // Security (IDOR): optional `taskId` scopes the update so a
+        // reviewer row from another task can't be mutated by PK alone.
+        await this.repo.update(
+            taskId ? { id, taskId } : id,
+            { reviewState, reviewedAt: new Date() },
+        );
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -83,11 +96,22 @@ export class TaskApproverRepository {
         const entity = this.repo.create({ taskId, approverType, approverId });
         return this.repo.save(entity);
     }
-    async setState(id: string, approvalState: 'pending' | 'approved' | 'rejected'): Promise<void> {
-        await this.repo.update(id, { approvalState, approvedAt: new Date() });
+    async setState(
+        id: string,
+        approvalState: 'pending' | 'approved' | 'rejected',
+        taskId?: string,
+    ): Promise<void> {
+        // Security (IDOR): optional `taskId` scopes the update so an
+        // approver row from another task can't be mutated by PK alone.
+        await this.repo.update(
+            taskId ? { id, taskId } : id,
+            { approvalState, approvedAt: new Date() },
+        );
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
     async allApproved(taskId: string): Promise<boolean> {
         const rows = await this.repo.find({ where: { taskId } });
@@ -127,8 +151,10 @@ export class TaskBlockRepository {
         const entity = this.repo.create({ taskId, blockedByTaskId });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -147,8 +173,10 @@ export class TaskRelationRepository {
         const entity = this.repo.create({ taskId, relatedTaskId, kind });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -207,8 +235,10 @@ export class TaskAttachmentRepository {
         const entity = this.repo.create({ taskId, uploadId });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -226,8 +256,10 @@ export class TaskWatcherRepository {
         const entity = this.repo.create({ taskId, userId });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 
@@ -247,8 +279,10 @@ export class TaskKbMentionRepository {
         const entity = this.repo.create({ taskId, kbDocumentId });
         return this.repo.save(entity);
     }
-    async remove(id: string): Promise<void> {
-        await this.repo.delete(id);
+    // Security (IDOR): optional `taskId` scopes the delete (see
+    // TaskAssigneeRepository.remove). Behavior unchanged when omitted.
+    async remove(id: string, taskId?: string): Promise<void> {
+        await this.repo.delete(taskId ? { id, taskId } : id);
     }
 }
 

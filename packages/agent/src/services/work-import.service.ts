@@ -336,11 +336,15 @@ export class WorkImportService {
             const workOwner =
                 dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING ? parsed.owner : dto.owner;
 
+            // Security: strip HTML metacharacters from the URL before storing it in
+            // the description field to prevent stored XSS if the description is later
+            // rendered without encoding. Legitimate git URLs never contain < > " ' `.
+            const safeSourceUrl = dto.sourceUrl.replace(/[<>"'`\\]/g, '');
             const work = await this.workRepository.create(
                 {
                     slug,
                     name: normalizedName,
-                    description: `Imported from ${dto.sourceUrl}`,
+                    description: `Imported from ${safeSourceUrl}`,
                     userId: user.id,
                     owner: workOwner,
                     organization: dto.organization || false,
@@ -502,11 +506,15 @@ export class WorkImportService {
             };
         }
 
+        // Security: strip HTML metacharacters from the URL before storing it in
+        // the description field to prevent stored XSS if the description is later
+        // rendered without encoding. Legitimate git URLs never contain < > " ' `.
+        const safeInputSourceUrl = input.sourceUrl.replace(/[<>"'`\\]/g, '');
         const work = await this.workRepository.create(
             {
                 slug,
                 name: normalizedName,
-                description: `Imported from ${input.sourceUrl}`,
+                description: `Imported from ${safeInputSourceUrl}`,
                 userId: user.id,
                 owner: input.sourceOwner,
                 organization: input.organization || false,

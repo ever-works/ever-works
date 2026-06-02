@@ -105,7 +105,26 @@ export class SkillRepository {
         await this.repository.update(id, data);
     }
 
+    // Security: ownership-scoped update. Prefer this over `updateById` so the
+    // `userId` is enforced in the WHERE clause regardless of caller — a
+    // miscounted/omitted service-layer guard then cannot overwrite another
+    // user's skill body (cross-user IDOR), e.g. injecting malicious
+    // `instructionsMd` that later reaches LLM prompts via `resolveActive`.
+    // Additive + defense-in-depth: `updateById` is retained, and this mirrors
+    // `skill-binding.repository.ts`'s `deleteByIdAndUser`.
+    async updateByIdAndUser(id: string, userId: string, data: Partial<Skill>): Promise<void> {
+        await this.repository.update({ id, userId }, data);
+    }
+
     async deleteById(id: string): Promise<void> {
         await this.repository.delete(id);
+    }
+
+    // Security: ownership-scoped delete. Prefer this over `deleteById` so the
+    // `userId` is enforced in the WHERE clause regardless of caller — a
+    // miscounted/omitted service-layer guard then cannot delete another user's
+    // skill (cross-user IDOR). Additive: `deleteById` is retained.
+    async deleteByIdAndUser(id: string, userId: string): Promise<void> {
+        await this.repository.delete({ id, userId });
     }
 }

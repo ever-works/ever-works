@@ -472,11 +472,17 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // into a conversation thread on arrival.
         {
             provide: AGENT_EMAIL_FACADE,
-            inject: [EmailService, AgentEmailAssignmentRepository, TenantEmailAddressRepository],
+            inject: [
+                EmailService,
+                AgentEmailAssignmentRepository,
+                TenantEmailAddressRepository,
+                AgentRepository,
+            ],
             useFactory: (
                 email: EmailService,
                 assignments: AgentEmailAssignmentRepository,
                 addresses: TenantEmailAddressRepository,
+                agents: AgentRepository,
             ): AgentEmailFacade => ({
                 async sendEmail({
                     userId,
@@ -506,6 +512,22 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     };
                 },
                 async messageAgent({ userId, fromAgentId, targetAgentId, subject, body }) {
+                    // Security: `targetAgentId` is supplied verbatim by the LLM
+                    // tool call (potentially prompt-injected) and is otherwise
+                    // unscoped — `assignments.findByAgent` queries by agentId
+                    // alone. Without this check an agent on one tenant could
+                    // pass another tenant's agent UUID to leak that agent's
+                    // inbound address (returned as `targetAddress`) and deliver
+                    // an unsolicited message to it (cross-tenant IDOR). Confine
+                    // the target to an Agent owned by the calling `userId` —
+                    // same ownership boundary as the outbound from-address
+                    // scoping in EmailService.sendMessage.
+                    const target = await agents.findByIdAndUser(targetAgentId, userId);
+                    if (!target) {
+                        throw new Error(
+                            `messageAgent: target agent ${targetAgentId} not found.`,
+                        );
+                    }
                     const inbound = await assignments.findByAgent(targetAgentId, 'inbound');
                     const assignment = inbound[0];
                     if (!assignment) {

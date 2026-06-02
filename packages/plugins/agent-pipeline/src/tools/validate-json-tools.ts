@@ -1,7 +1,7 @@
-import nodePath from 'node:path';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { jsonrepair } from '@ever-works/plugin';
+import { resolveSandboxPath } from './file-tools.js';
 import type { WrappedSandbox } from '../types.js';
 
 /**
@@ -16,7 +16,17 @@ export function createValidateItemJsonTool(sandbox: WrappedSandbox, cwd: string)
 			path: z.string().describe('Path of the JSON file to validate (e.g., my-item.json)')
 		}),
 		execute: async ({ path }) => {
-			const resolvedPath = nodePath.posix.resolve(cwd, path);
+			// Security: confine the LLM-supplied path to the workspace sandbox.
+			// `resolveSandboxPath` rejects absolute paths and any traversal that
+			// escapes `cwd`, matching createFile/updateFile in file-tools.ts. A
+			// prompt-injected model could otherwise pass `/etc/passwd` or
+			// `../../sensitive` and have it read/repaired-and-overwritten here.
+			let resolvedPath: string;
+			try {
+				resolvedPath = resolveSandboxPath(cwd, path);
+			} catch (err) {
+				return { valid: false, error: err instanceof Error ? err.message : String(err) };
+			}
 
 			// Read the file
 			let content: string;

@@ -18,6 +18,108 @@ export type LoadItemsForListResult = {
     collections: Collection[];
 };
 
+// Security: SSRF guard for client-supplied source URLs that the API fetches
+// server-side (item extraction, screenshot capture). Rejects non-http(s)
+// schemes, embedded credentials, and hosts that are loopback / RFC-1918 /
+// link-local / unique-local IPs (incl. octal/hex/decimal IPv4 obfuscation and
+// IPv6 forms) so an authenticated tenant cannot pivot the backend fetcher to
+// internal services or cloud-metadata endpoints (e.g. 169.254.169.254). This
+// is defense-in-depth at the web boundary; the backend fetcher should still
+// DNS-pin to defeat rebinding. Legitimate public source URLs are unaffected.
+function isPrivateIpv4(host: string): boolean {
+    // Normalize potential octal/hex/decimal-dotted notations to dotted-decimal.
+    const parts = host.split('.');
+    if (parts.length !== 4) {
+        // Single 32-bit integer form (e.g. http://2130706433/ === 127.0.0.1).
+        if (/^(0x[0-9a-f]+|0[0-7]*|\d+)$/i.test(host)) {
+            const n = Number(
+                host.toLowerCase().startsWith('0x')
+                    ? parseInt(host, 16)
+                    : /^0[0-7]+$/.test(host)
+                      ? parseInt(host, 8)
+                      : host,
+            );
+            if (!Number.isInteger(n) || n < 0 || n > 0xffffffff) return false;
+            return isPrivateIpv4(
+                [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff].join('.'),
+            );
+        }
+        return false;
+    }
+    const octets = parts.map((p) => {
+        if (/^0x[0-9a-f]+$/i.test(p)) return parseInt(p, 16);
+        if (/^0[0-7]+$/.test(p)) return parseInt(p, 8);
+        if (/^\d+$/.test(p)) return parseInt(p, 10);
+        return NaN;
+    });
+    if (octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) return false;
+    const [a, b] = octets;
+    return (
+        a === 0 || // 0.0.0.0/8 "this host"
+        a === 127 || // loopback
+        a === 10 || // RFC-1918
+        (a === 172 && b >= 16 && b <= 31) || // RFC-1918
+        (a === 192 && b === 168) || // RFC-1918
+        (a === 169 && b === 254) || // link-local (incl. cloud metadata)
+        (a === 100 && b >= 64 && b <= 127) || // CGNAT RFC-6598
+        a >= 224 // multicast / reserved
+    );
+}
+
+function isPrivateIpv6(host: string): boolean {
+    let h = host.toLowerCase();
+    if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1);
+    // IPv4-mapped / -embedded (e.g. ::ffff:169.254.169.254).
+    const v4 = h.match(/(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (v4 && isPrivateIpv4(v4[1])) return true;
+    return (
+        h === '::1' || // loopback
+        h === '::' || // unspecified
+        h.startsWith('fc') || // unique-local fc00::/7
+        h.startsWith('fd') ||
+        h.startsWith('fe8') || // link-local fe80::/10
+        h.startsWith('fe9') ||
+        h.startsWith('fea') ||
+        h.startsWith('feb')
+    );
+}
+
+function isSafeExternalUrl(rawUrl: string): boolean {
+    if (typeof rawUrl !== 'string' || rawUrl.trim() === '') return false;
+    let parsed: URL;
+    try {
+        parsed = new URL(rawUrl.trim());
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    // Reject embedded credentials (SSRF/credential-smuggling obfuscation).
+    if (parsed.username !== '' || parsed.password !== '') return false;
+    let hostname = parsed.hostname.toLowerCase();
+    // Strip IPv6 brackets for the literal-IP checks below.
+    const bracketed = hostname.startsWith('[') && hostname.endsWith(']');
+    if (bracketed) hostname = hostname.slice(1, -1);
+    if (hostname === '') return false;
+    // Loopback / internal hostnames.
+    if (
+        hostname === 'localhost' ||
+        hostname.endsWith('.localhost') ||
+        hostname === 'ip6-localhost' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname === 'metadata' || // GCP metadata shorthand
+        hostname === 'metadata.google.internal'
+    ) {
+        return false;
+    }
+    if (hostname.includes(':') || bracketed) {
+        if (isPrivateIpv6(hostname)) return false;
+    } else if (isPrivateIpv4(hostname)) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * Server action that fetches the items + taxonomy needed to populate
  * the Items tab. Splits off the page's SSR data so the route shell
@@ -135,6 +237,15 @@ export async function extractItemDetails(sourceUrl: string, existingCategories?:
     }
 
     const t = await getTranslations('dashboard.workDetail.items.addModal');
+
+    // Security: block SSRF via attacker-controlled source URLs that the API
+    // fetches server-side (internal hosts / cloud metadata) before forwarding.
+    if (!isSafeExternalUrl(sourceUrl)) {
+        return {
+            success: false,
+            error: t('extractFailed'),
+        };
+    }
 
     try {
         const response = await itemsGeneratorAPI.extractItemDetails({
@@ -266,6 +377,15 @@ export async function captureScreenshot(
     }
 
     const t = await getTranslations('dashboard.workDetail.items.screenshot');
+
+    // Security: block SSRF via attacker-controlled URLs that the screenshot
+    // provider fetches (internal hosts / cloud metadata) before forwarding.
+    if (!isSafeExternalUrl(sourceUrl)) {
+        return {
+            success: false,
+            error: t('captureFailed'),
+        };
+    }
 
     try {
         const availability = await screenshotAPI.checkAvailability(options?.workId);

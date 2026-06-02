@@ -9,6 +9,7 @@ import {
     IsString,
     IsUUID,
     Length,
+    Matches,
     MaxLength,
     Min,
 } from 'class-validator';
@@ -199,8 +200,10 @@ export class UpdateKbTagDto {
 }
 
 export class RestoreKbDocumentDto {
+    // Security: enforce hex-only SHA to prevent arbitrary git ref names (branch, tag, HEAD~n)
     @IsString()
     @Length(7, 40)
+    @Matches(/^[0-9a-f]{7,40}$/, { message: 'commitSha must be a hexadecimal Git SHA' })
     commitSha: string;
 }
 

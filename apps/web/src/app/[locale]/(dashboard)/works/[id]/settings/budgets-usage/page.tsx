@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { workAPI } from '@/lib/api';
+import { canAccessSettings } from '@/lib/permissions';
 import { budgetsAPI } from '@/lib/api/budgets';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { BudgetsUsageClient, type BudgetEligiblePlugin } from './budgets-usage-client';
@@ -22,6 +25,23 @@ const BUDGET_ELIGIBLE_CATEGORIES = new Set([
 
 export default async function BudgetsUsagePage({ params }: Params) {
     const { id } = await params;
+
+    // Security: gate the budgets/usage settings sub-page on the user's Work
+    // role, mirroring the sibling settings pages (settings/page.tsx,
+    // settings/members/page.tsx). Without this, any member (incl. VIEWER) could
+    // read budget caps and per-plugin spend by navigating directly to this
+    // route. workAPI.get is React.cache()-memoised, so this adds no extra fetch.
+    let work;
+    try {
+        const res = await workAPI.get(id);
+        work = res.work;
+    } catch {
+        notFound();
+    }
+
+    if (!canAccessSettings(work.userRole)) {
+        notFound();
+    }
 
     const [summary, list, plugins] = await Promise.all([
         budgetsAPI.getSummary(id).catch(() => null),

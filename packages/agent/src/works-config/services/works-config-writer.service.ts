@@ -10,6 +10,36 @@ import { WorksConfigService, type ResolvedWorksConfig } from './works-config.ser
 
 const WORKS_CONFIG_FILEPATH = '.works/works.yml';
 
+// Security (prototype pollution): the existing `.works/works.yml` comes from an
+// attacker-controllable cloned repo and is parsed with `yaml.parse`, which
+// surfaces a YAML `__proto__:` mapping key as an OWN enumerable property. That
+// parsed object is spread verbatim as the base of the file we re-author here
+// (`...baseRaw`) and re-serialised on every sync, so a hostile `__proto__` /
+// `constructor` / `prototype` key would persist across round-trips and become
+// the classic recursive-merge pollution vector for any downstream consumer
+// (mirrors the same mitigation in data-generator/data-repository.ts). Strip
+// those dangerous own keys before carrying the config forward. Behaviour is
+// unchanged for legitimate configs — no valid `works.yml` carries an own
+// `__proto__`/`constructor`/`prototype` key.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const stripPrototypePollution = <T>(value: T): T => {
+    if (Array.isArray(value)) {
+        value.forEach((entry) => stripPrototypePollution(entry));
+        return value;
+    }
+    if (value && typeof value === 'object') {
+        for (const key of Object.keys(value as Record<string, unknown>)) {
+            if (DANGEROUS_KEYS.has(key)) {
+                delete (value as Record<string, unknown>)[key];
+                continue;
+            }
+            stripPrototypePollution((value as Record<string, unknown>)[key]);
+        }
+    }
+    return value;
+};
+
 export type WorksConfigWriteRequest = Partial<Pick<CreateItemsGeneratorDto, 'name' | 'prompt'>> & {
     model?: string | null;
     providers?: ProvidersDto | null;
@@ -83,7 +113,10 @@ export class WorksConfigWriterService {
         // forms — otherwise the snake_case key from `existingRaw` survives
         // the spread and the parser silently re-applies the old value on
         // the next sync.
-        const baseRaw = { ...existingRaw };
+        // Security (prototype pollution): drop dangerous own keys carried over
+        // from the attacker-controlled existing works.yml before spreading
+        // `...baseRaw` into the re-authored config below.
+        const baseRaw = stripPrototypePollution({ ...existingRaw });
         if (request.deployProvider === null) {
             delete baseRaw.deployProvider;
             delete baseRaw.deploy_provider;

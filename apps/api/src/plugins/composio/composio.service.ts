@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import { Composio } from '@composio/core';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
+// Security: lexical SSRF guard (private/loopback/link-local/IPv4-mapped-IPv6 +
+// cloud-metadata hosts, http(s)-only) reused from the canonical helper so a
+// user-controlled `baseUrl` cannot point the Composio SDK at internal targets.
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 import type {
     ComposioToolkitDto,
     ComposioConnectedAccountDto,
@@ -101,6 +105,23 @@ export class ComposioService {
             );
         }
         const baseUrl = readString(settings, 'baseUrl') || undefined;
+        // Security (SSRF): `baseUrl` is a user-scoped setting, so an attacker
+        // could set it to `http://169.254.169.254/...` or an internal host and
+        // have the SDK issue requests there (with responses surfacing in error
+        // messages). Reject non-http(s) / private / loopback / link-local /
+        // cloud-metadata targets via the canonical lexical guard. Local dev/test
+        // is exempted (same carve-out as webhooks.service) so an operator can
+        // point at a Composio mock on localhost; staging/prod always enforce it.
+        if (baseUrl) {
+            const env = process.env.NODE_ENV;
+            const isLocalEnv =
+                env === 'development' || env === 'test' || env === undefined || env === '';
+            if (!isLocalEnv && !isSafeWebhookUrl(baseUrl)) {
+                throw new BadRequestException(
+                    'The Composio API base URL is invalid. Use an absolute https URL to a public Composio endpoint.',
+                );
+            }
+        }
         return new Composio({
             apiKey,
             ...(baseUrl ? { baseURL: baseUrl } : {}),
@@ -306,30 +327,43 @@ export class ComposioService {
      * sync; CodeRabbit / Greptile have flagged divergence in the past.
      */
     private wrapComposioError(error: unknown, context: string): Error {
+        // Security: `context` embeds user-supplied values (e.g. toolkitSlug /
+        // triggerSlug). Sanitize before reflecting it into any client-visible
+        // message so a hostile slug cannot inject control characters or pad the
+        // response with an unbounded string.
+        const safeContext = sanitizeContext(context);
         if (!(error instanceof Error))
-            return new Error(`Unexpected error during ${context}: ${String(error)}`);
+            return new Error(`Unexpected error during ${safeContext}.`);
         const status = readNumberProp(error, 'status') ?? readNumberProp(error, 'statusCode');
         const message = error.message || String(error);
         if (status === 401 || status === 403) {
             return new UnauthorizedException(
-                `Composio rejected the API key (HTTP ${status}) during ${context}. Verify it under Settings → Plugins → Composio.`,
+                `Composio rejected the API key (HTTP ${status}) during ${safeContext}. Verify it under Settings → Plugins → Composio.`,
             );
         }
         if (status === 404) {
             return new NotFoundException(
-                `Composio returned 404 during ${context}. Likely causes: the toolkit / tool slug does not exist, or the user has no connected account.`,
+                `Composio returned 404 during ${safeContext}. Likely causes: the toolkit / tool slug does not exist, or the user has no connected account.`,
             );
         }
         if (status === 429) {
             return new BadRequestException('Composio rate limit exceeded. Wait and retry.');
         }
         if (status !== undefined && status >= 500) {
+            // Security: log the raw upstream message server-side but do NOT echo
+            // it to the caller — SDK/HTTP-client 5xx messages can carry internal
+            // hostnames, URLs with tokens, or stack traces.
+            this.logger.warn(`Composio SDK ${status} during ${safeContext}: ${message}`);
             return new BadGatewayException(
-                `Composio is returning HTTP ${status} during ${context}. Check https://status.composio.dev. (${message})`,
+                `Composio is returning HTTP ${status} during ${safeContext}. Check https://status.composio.dev.`,
             );
         }
-        this.logger.warn(`Composio SDK error during ${context}: ${message}`);
-        return new BadRequestException(`Composio error during ${context}: ${message}`);
+        // Security: the raw SDK message is logged for operators but kept out of
+        // the client response to avoid leaking upstream/internal error detail.
+        this.logger.warn(`Composio SDK error during ${safeContext}: ${message}`);
+        return new BadRequestException(
+            `Composio integration error during ${safeContext}. See server logs for details.`,
+        );
     }
 }
 
@@ -344,4 +378,21 @@ function readString(source: Record<string, unknown> | null, key: string): string
 function readNumberProp(target: object, prop: string): number | undefined {
     const value = (target as Record<string, unknown>)[prop];
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Security: the error `context` string embeds user-supplied slugs. Replace
+ * control characters and cap the length before it is reflected into any
+ * client-visible HTTP exception message.
+ */
+function sanitizeContext(context: string): string {
+    // Replace C0 control chars (code < 0x20) and DEL (0x7f) with spaces so an
+    // injected CR/LF in a slug cannot break the reflected message onto a new
+    // line, then bound the length. Done by char code to avoid embedding raw
+    // control characters in a regex literal.
+    const cleaned = Array.from(context, (ch) => {
+        const code = ch.charCodeAt(0);
+        return code < 0x20 || code === 0x7f ? ' ' : ch;
+    }).join('');
+    return cleaned.length > 80 ? `${cleaned.slice(0, 80)}…` : cleaned;
 }

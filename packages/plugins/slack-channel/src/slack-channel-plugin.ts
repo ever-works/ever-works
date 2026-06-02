@@ -11,13 +11,33 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+// SSRF guard: isSafeWebhookUrl rejects private/loopback/link-local/metadata
+// hosts lexically. Mirrors the discord-channel plugin and WebhookDeliveryService.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const SLACK_WEBHOOK_PREFIX = 'https://hooks.slack.com/';
+// Slack incoming webhooks always live on this host. Constraining to it (in the
+// shared getWebhookUrl, so BOTH verifyTarget and send enforce it) closes the
+// SSRF path: verifyTarget validates the host but send() previously only checked
+// that webhookUrl was a non-empty string, so a stored/forged targetConfig could
+// have pointed IncomingWebhook at an internal/metadata URL.
+const SLACK_WEBHOOK_HOST = 'hooks.slack.com';
 
 function getWebhookUrl(config: ChannelTargetConfig): string {
 	const url = config.webhookUrl;
 	if (typeof url !== 'string' || url.length === 0) {
 		throw new Error('slack-channel: targetConfig.webhookUrl is required');
+	}
+	// Security: re-enforce the Slack-host constraint on every call path (not just
+	// verifyTarget) and reject SSRF-unsafe hosts before the URL reaches the SDK.
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		throw new Error('slack-channel: targetConfig.webhookUrl is not a valid URL');
+	}
+	if (!url.startsWith(SLACK_WEBHOOK_PREFIX) || parsed.hostname.toLowerCase() !== SLACK_WEBHOOK_HOST || !isSafeWebhookUrl(url)) {
+		throw new Error(`slack-channel: targetConfig.webhookUrl must start with ${SLACK_WEBHOOK_PREFIX}`);
 	}
 	return url;
 }
@@ -80,11 +100,20 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 	}
 
 	async send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult> {
-		const cached = this.idempotencyCache.get(payload.messageRef);
-		if (cached) return cached;
-
 		const config = payload.target ?? {};
 		const webhookUrl = getWebhookUrl(config);
+
+		// Security: this plugin is a module-level singleton shared across all
+		// tenants, so keying the idempotency cache on payload.messageRef alone
+		// lets a second tenant that reuses another tenant's messageRef get back
+		// the first tenant's ChannelSendResult and silently skip real delivery
+		// (or pre-poison the cache to suppress it). Scope the key to the actual
+		// delivery target (webhook URL) + the per-tenant channel row id, using a
+		// NUL separator so the components can't collide. Legitimate same-channel
+		// retries (same channelId + webhookUrl + messageRef) still hit the cache.
+		const cacheKey = `${options.channelId ?? ''}\0${webhookUrl}\0${payload.messageRef}`;
+		const cached = this.idempotencyCache.get(cacheKey);
+		if (cached) return cached;
 		const username =
 			(typeof options.settings?.defaultUsername === 'string' ? options.settings.defaultUsername : undefined) ??
 			(typeof config.username === 'string' ? (config.username as string) : undefined);
@@ -112,7 +141,7 @@ export class SlackChannelPlugin implements INotificationChannelPlugin {
 			providerMessageId: `slack-${payload.messageRef}`,
 			deliveredAt: new Date()
 		};
-		this.idempotencyCache.set(payload.messageRef, result);
+		this.idempotencyCache.set(cacheKey, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

@@ -18,6 +18,7 @@ import type {
 } from '@ever-works/plugin';
 
 import { Valyu, type SearchOptions as ValyuSearchOptions } from 'valyu-js';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtractorPlugin {
 	readonly id = 'valyu';
@@ -155,6 +156,21 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 		const client = this.getClient(options.settings);
 		const startTime = Date.now();
 
+		// Security (SSRF): refuse to hand private/loopback/link-local/cloud-metadata
+		// URLs to the Valyu SDK, which would fetch them server-side and return the
+		// rendered content. `canExtract()` is advisory and may be bypassed by a
+		// direct call, so enforce the guard here. The Valyu SDK performs the fetch
+		// internally, so redirect targets can't be re-checked — this is the lexical
+		// first line of defense for the initial URL.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				url: options.url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${options.url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
 		try {
 			const response = await client.contents([options.url]);
 
@@ -197,12 +213,32 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 		const client = this.getClient(options?.settings);
 		const startTime = Date.now();
 
+		// Security (SSRF): drop private/loopback/link-local/cloud-metadata URLs
+		// before they reach the Valyu SDK (which would fetch them server-side),
+		// emitting a failed result for each. This also stops a single batch call
+		// from being used to probe many internal hosts/ports at once. Legitimate
+		// public URLs are unaffected.
+		const safeUrls: string[] = [];
+		const blockedResults: ContentExtractionResult[] = [];
+		for (const url of urls) {
+			if (isSafeWebhookUrl(url)) {
+				safeUrls.push(url);
+			} else {
+				blockedResults.push({
+					success: false,
+					url,
+					error: `URL host is not safe to fetch (SSRF guard blocked: ${url})`,
+					duration: Date.now() - startTime
+				});
+			}
+		}
+
 		try {
 			const batchSize = 10;
 			const allResults: ContentExtractionResult[] = [];
 
-			for (let i = 0; i < urls.length; i += batchSize) {
-				const batch = urls.slice(i, i + batchSize);
+			for (let i = 0; i < safeUrls.length; i += batchSize) {
+				const batch = safeUrls.slice(i, i + batchSize);
 				const response = await client.contents(batch as string[]);
 
 				const results = (response.results || []).map((result, index) => {
@@ -223,24 +259,26 @@ export class ValyuSearchPlugin implements IPlugin, ISearchPlugin, IContentExtrac
 				allResults.push(...results);
 			}
 
-			return allResults;
+			return [...blockedResults, ...allResults];
 		} catch (error) {
-			return urls.map((url) => ({
+			// Only the safe URLs were sent to the SDK, so surface the fetch error
+			// for those; blocked URLs already carry their SSRF-guard reason.
+			const failed = safeUrls.map((url) => ({
 				success: false,
 				url,
 				error: error instanceof Error ? error.message : String(error),
 				duration: Date.now() - startTime
 			}));
+			return [...blockedResults, ...failed];
 		}
 	}
 
 	async canExtract(url: string): Promise<boolean> {
-		try {
-			const parsed = new URL(url);
-			return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-		} catch {
-			return false;
-		}
+		// Security (SSRF): `isSafeWebhookUrl` enforces http(s) AND rejects
+		// private/loopback/link-local/cloud-metadata hosts, so callers that gate
+		// on canExtract() won't even surface an internal URL as extractable.
+		// (extract()/extractBatch() re-check independently in case this is bypassed.)
+		return isSafeWebhookUrl(url);
 	}
 
 	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {

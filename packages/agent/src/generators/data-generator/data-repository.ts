@@ -217,8 +217,35 @@ const mergeUniqueArray = (existing: unknown[], incoming: unknown[]): unknown[] =
     return merged;
 };
 
+// Security (prototype pollution): `.works/works.yml` (and the other config
+// files) come from an attacker-controllable cloned repo and are parsed with
+// `yaml.parse`, which surfaces a YAML `__proto__:` mapping key as an OWN
+// enumerable property. Feeding that straight into `mergeWith` is the classic
+// recursive-merge pollution vector. Rather than rely on lodash's internal
+// safe-key mitigation, strip the dangerous own keys from the parsed config
+// before merging. Behaviour is unchanged for legitimate configs — no valid
+// `works.yml` carries an own `__proto__`/`constructor`/`prototype` key.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const stripPrototypePollution = <T>(value: T): T => {
+    if (Array.isArray(value)) {
+        value.forEach((entry) => stripPrototypePollution(entry));
+        return value;
+    }
+    if (value && typeof value === 'object') {
+        for (const key of Object.keys(value as Record<string, unknown>)) {
+            if (DANGEROUS_KEYS.has(key)) {
+                delete (value as Record<string, unknown>)[key];
+                continue;
+            }
+            stripPrototypePollution((value as Record<string, unknown>)[key]);
+        }
+    }
+    return value;
+};
+
 const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDataConfig =>
-    mergeWith({}, base, incoming, (objValue, srcValue) => {
+    mergeWith({}, base, stripPrototypePollution(incoming), (objValue, srcValue) => {
         if (Array.isArray(objValue) && Array.isArray(srcValue)) {
             return mergeUniqueArray(objValue, srcValue);
         }
@@ -817,7 +844,12 @@ export class DataRepository {
     }
 
     async createItemDir(item: ItemData) {
-        const itemDir = path.join(this.dataDir, item.slug);
+        // Security (path-traversal): route the slug through the same confinement
+        // guard the other item sinks use (writeItem/writeItemMarkdown) so a
+        // hostile `item.slug` (e.g. `../../victim`) cannot make fs.mkdir create
+        // directories outside `this.dataDir`. Legitimate slugifyText output is
+        // unchanged.
+        const itemDir = this.getItemPath(item.slug);
         await fs.mkdir(itemDir, { recursive: true });
     }
 

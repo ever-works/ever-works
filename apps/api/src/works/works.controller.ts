@@ -2153,7 +2153,12 @@ export class WorksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ) {
-        await this.authService.getUser(auth.userId);
+        const user = await this.authService.getUser(auth.userId);
+        // Security: enforce per-work access before leaking generation
+        // progress. Mirrors every sibling comparison endpoint (list /
+        // remaining-count / get / generate*) which gate on the work owner
+        // or a membership record; this was the lone unguarded handler (IDOR).
+        await this.workOwnershipService.ensureAccess(id, user.id);
         return this.comparisonGenerationService.getGenerationStatus(id);
     }
 

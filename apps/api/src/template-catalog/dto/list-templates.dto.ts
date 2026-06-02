@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUrl, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, Matches, MaxLength, MinLength } from 'class-validator';
 
 // Must mirror `TemplateKind` in packages/agent/src/entities/template.entity.ts.
 // Phase 8 PR W/X added 'mission' (Mission Templates catalog filter); Phase 11
@@ -56,14 +56,20 @@ export class AddCustomTemplateDto {
     })
     previewImageUrl?: string;
 
+    // Security: constrain branch refs to safe git ref characters to prevent command injection / path traversal
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
+    @MaxLength(255)
+    @Matches(/^\w[\w./-]{0,249}$/, { message: 'branch must be a valid git ref name' })
     branch?: string;
 
+    // Security: constrain betaBranch refs to safe git ref characters to prevent command injection / path traversal
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
+    @MaxLength(255)
+    @Matches(/^\w[\w./-]{0,249}$/, { message: 'betaBranch must be a valid git ref name' })
     betaBranch?: string;
 }
 
@@ -107,14 +113,20 @@ export class UpdateCustomTemplateDto {
     })
     previewImageUrl?: string | null;
 
+    // Security: constrain branch refs to safe git ref characters to prevent command injection / path traversal
     @ApiProperty({ required: false })
     @IsOptional()
     @IsString()
+    @MaxLength(255)
+    @Matches(/^\w[\w./-]{0,249}$/, { message: 'branch must be a valid git ref name' })
     branch?: string;
 
+    // Security: constrain betaBranch refs to safe git ref characters to prevent command injection / path traversal
     @ApiProperty({ required: false, nullable: true })
     @IsOptional()
     @IsString()
+    @MaxLength(255)
+    @Matches(/^\w[\w./-]{0,249}$/, { message: 'betaBranch must be a valid git ref name' })
     betaBranch?: string | null;
 }
 

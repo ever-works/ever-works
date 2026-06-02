@@ -25,6 +25,13 @@ export class NotificationChannelRepository {
         return this.repository.save(entry);
     }
 
+    /**
+     * Security: PRIVILEGED — no userId scope. Use only from system-level
+     * background tasks (e.g. Trigger.dev delivery retries) where the channelId
+     * originates from a previously-validated, system-owned payload — never from
+     * user-supplied input. For any user-initiated lookup, use
+     * {@link findByIdForUser} instead to prevent IDOR across tenants.
+     */
     async findById(id: string): Promise<NotificationChannel | null> {
         return this.repository.findOne({ where: { id } });
     }

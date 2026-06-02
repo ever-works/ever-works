@@ -39,6 +39,7 @@ import type { GenerationLogCollector } from './generation-log-collector';
 import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
+import { redactSecrets } from '../../utils/secret-scan';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -1496,7 +1497,19 @@ export class DataGeneratorService {
 
     private async writeItemToDisk(data: DataRepository, item: ItemData) {
         await data.createItemDir(item);
-        const md = item.markdown || DEFAULT_ITEM_MARKDOWN(item);
+        const rawMd = item.markdown || DEFAULT_ITEM_MARKDOWN(item);
+        // Security (secrets): the item body originates from LLM output / hostile
+        // web content the research pipeline (or import source) ingests. Redact any
+        // live-looking credentials before it is written to disk, committed, and
+        // pushed to the user's (and later public) Git data repo. Redact rather than
+        // reject — dropping a whole generation over one matched token is hostile;
+        // legitimate markdown without secrets is unchanged.
+        const { cleaned: md, redactions } = redactSecrets(rawMd);
+        if (redactions > 0) {
+            this.logger.warn(
+                `Redacted ${redactions} secret-like value(s) from item "${item.slug}" markdown before commit.`,
+            );
+        }
         await Promise.all([data.writeItem(item), data.writeItemMarkdown(item, md)]);
     }
 
@@ -1782,8 +1795,14 @@ export class DataGeneratorService {
                 success: false,
                 error: {
                     code: 'DATA_REPO_FAILED',
-                    message: error.message || 'Failed to initialize data repository',
-                    cause: error,
+                    // Security (info-leak): guard the untyped throw so a non-Error
+                    // value can't surface `message: undefined` or serialize a raw
+                    // internal object (paths/stack) into the API result `cause`.
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : 'Failed to initialize data repository',
+                    cause: error instanceof Error ? error : new Error(String(error)),
                 },
             };
         }
@@ -2004,8 +2023,12 @@ export class DataGeneratorService {
                 success: false,
                 error: {
                     code: 'GENERATION_FAILED',
-                    message: error.message || 'Failed to sync data repository',
-                    cause: error,
+                    // Security (info-leak): guard the untyped throw so a non-Error
+                    // value can't surface `message: undefined` or serialize a raw
+                    // internal object (paths/stack) into the API result `cause`.
+                    message:
+                        error instanceof Error ? error.message : 'Failed to sync data repository',
+                    cause: error instanceof Error ? error : new Error(String(error)),
                 },
             };
         }

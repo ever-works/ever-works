@@ -15,7 +15,8 @@ import {
     Put,
     Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsString, Matches } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { WorkProposalStatus } from '@ever-works/agent/user-research';
 import type { WorkProposal } from '@ever-works/agent/entities';
@@ -105,6 +106,15 @@ function toProposalUserPrompt(proposal: {
         categories.length > 0 ? `Use categories like ${categories.join(', ')}.` : '',
     ].filter(Boolean);
     return parts.join(' ').slice(0, 1000).trim();
+}
+
+// Security: proper DTO class so ValidationPipe enforces uploadId shape at
+// the controller layer, not only inside the service (defense-in-depth).
+class AddAttachmentDto {
+    @ApiProperty({ description: 'SHA-256 hex digest of the uploaded file (64 lowercase hex chars).' })
+    @IsString()
+    @Matches(/^[a-f0-9]{64}$/, { message: 'uploadId must be a 64-character lowercase hex SHA-256 string' })
+    uploadId: string;
 }
 
 @ApiTags('work-proposals')
@@ -369,7 +379,7 @@ export class WorkProposalsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        @Body() body: AddAttachmentDto, // Security: class-validator DTO replaces inline interface
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }

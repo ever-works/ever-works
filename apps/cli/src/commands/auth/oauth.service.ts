@@ -1,4 +1,5 @@
 import * as http from 'http';
+import * as crypto from 'crypto';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import chalk from 'chalk';
@@ -13,7 +14,34 @@ const escapeHtml = (value?: string | null) =>
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        // Security: escape single quotes too so the helper is safe in HTML
+        // attribute contexts as well as element text (defense-in-depth).
+        .replace(/'/g, '&#x27;');
+
+// Security: the OAuth `error` query parameter is attacker-influenceable (it
+// is reflected from whatever the browser was redirected with). Before it is
+// surfaced to the terminal via `reject(new Error(error))` (printed with
+// chalk in login.command.ts) strip ANSI/C0 control characters so a crafted
+// redirect cannot clear the screen, rewrite earlier output, or forge a
+// "success" line, and cap the length to keep the message readable.
+const sanitizeErrorMessage = (value: string): string =>
+    value
+        // eslint-disable-next-line no-control-regex
+        .replace(/[\x00-\x1f\x7f-\x9f]/g, ' ')
+        .trim()
+        .slice(0, 200);
+
+// Security: constant-time comparison of the OAuth `state` nonce to avoid
+// leaking timing information while validating the callback.
+const safeStateEquals = (a: string, b: string): boolean => {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+        return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+};
 
 type OAuthPageState = 'success' | 'error' | 'waiting';
 
@@ -265,7 +293,10 @@ const renderOAuthPage = (state: OAuthPageState, message?: string) => {
 export async function getAvailablePort(): Promise<number> {
     return new Promise((resolve) => {
         const server = http.createServer();
-        server.listen(0, () => {
+        // Security: bind the probe socket to the loopback interface only so
+        // the OS-assigned free port reflects availability on 127.0.0.1 (where
+        // the callback server actually listens), not on all interfaces.
+        server.listen(0, '127.0.0.1', () => {
             let port = DEFAULT_PORT;
             const address = server.address();
 
@@ -279,7 +310,12 @@ export async function getAvailablePort(): Promise<number> {
 }
 
 // Helper function to start OAuth server
-export async function startOAuthServer(port: number): Promise<string> {
+// Security: `expectedState` is the CSRF/session-fixation nonce that the CLI
+// generated and embedded in the authorization redirect_uri. When provided,
+// the callback MUST echo back a matching `state` before any `sessionToken`
+// is accepted, so a local page/process that races the callback port cannot
+// inject an attacker-chosen token (login/session fixation).
+export async function startOAuthServer(port: number, expectedState?: string): Promise<string> {
     return new Promise((resolve, reject) => {
         let resolved = false;
         const connections = new Set<import('net').Socket>();
@@ -302,18 +338,35 @@ export async function startOAuthServer(port: number): Promise<string> {
         };
 
         const server = http.createServer((req, res) => {
-            const url = new URL(req.url!, `http://localhost:${port}`);
+            const url = new URL(req.url!, `http://127.0.0.1:${port}`);
             const sessionToken = url.searchParams.get('sessionToken');
+            const state = url.searchParams.get('state');
+            // Security: neutralize ANSI/control sequences in the reflected
+            // error before it reaches the terminal or the HTML page.
             const error = url.searchParams.get('error');
+            const safeError = error ? sanitizeErrorMessage(error) : null;
 
             // Disable keep-alive to ensure connection closes
             res.setHeader('Connection', 'close');
             res.writeHead(200, { 'Content-Type': 'text/html' });
 
-            if (error) {
-                res.end(renderOAuthPage('error', error));
-                closeAllConnections(error);
+            if (safeError) {
+                res.end(renderOAuthPage('error', safeError));
+                closeAllConnections(safeError);
             } else if (sessionToken) {
+                // Security: reject the credential unless the callback carries
+                // the exact `state` nonce we generated (constant-time compare).
+                // Missing or mismatched state means this is not our callback.
+                if (expectedState && (!state || !safeStateEquals(state, expectedState))) {
+                    res.end(
+                        renderOAuthPage(
+                            'error',
+                            'Authentication state mismatch. Please retry the login from the CLI.',
+                        ),
+                    );
+                    closeAllConnections('Authentication state mismatch');
+                    return;
+                }
                 res.end(renderOAuthPage('success'));
                 closeAllConnections(undefined, sessionToken);
             } else {
@@ -329,7 +382,11 @@ export async function startOAuthServer(port: number): Promise<string> {
             });
         });
 
-        server.listen(port);
+        // Security: bind to the loopback interface explicitly. Without the
+        // host argument Node listens on all interfaces (0.0.0.0/::), exposing
+        // the credential-accepting callback to the LAN; `127.0.0.1` keeps it
+        // reachable only from this machine.
+        server.listen(port, '127.0.0.1');
 
         // Set a timeout for the OAuth flow
         const timeoutHandle = setTimeout(
@@ -426,7 +483,15 @@ export async function performOAuthFlow(): Promise<string> {
 
     // Get available port for callback server
     const port = await getAvailablePort();
-    const redirectUri = `http://localhost:${port}`;
+
+    // Security: generate a cryptographically random CSRF/session-fixation
+    // nonce and embed it in the redirect_uri. The web authorize flow appends
+    // the sessionToken to this exact URL (preserving existing query params),
+    // so the nonce round-trips back to the callback where it is verified
+    // before any token is accepted. This binds the authorization to THIS CLI
+    // invocation and defeats forged/raced callbacks.
+    const state = crypto.randomBytes(32).toString('hex');
+    const redirectUri = `http://localhost:${port}/?state=${state}`;
 
     // Build authorization URL
     const authUrl = buildAuthUrl(redirectUri);
@@ -434,7 +499,7 @@ export async function performOAuthFlow(): Promise<string> {
     console.log(chalk.gray(`\nStarting local server on port ${port}...`));
 
     // Start OAuth callback server
-    const tokenPromise = startOAuthServer(port);
+    const tokenPromise = startOAuthServer(port, state);
 
     // Open browser
     console.log(chalk.cyan('\nOpening browser for authentication...'));

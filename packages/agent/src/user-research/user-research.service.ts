@@ -20,6 +20,7 @@ import {
     type ResolvedAiProvider,
 } from './provider-resolver';
 import { createSearchWebTool, createFetchPageTool, createFinalizeTool } from './tools';
+import { sanitizeName, sanitizeStringArray, sanitizeText } from '../utils/sanitize.util';
 
 export interface UserResearchResult {
     status: 'completed' | 'rate-limited' | 'no-data' | 'error';
@@ -278,14 +279,45 @@ export class UserResearchService {
 
         // Re-parse to lock the type — AI SDK's tool execute() hands back a partial.
         const validated = inferredProfileSchema.parse(finalProfile);
+        // Security (prompt-injection hardening): this profile is synthesized by
+        // the LLM from attacker-controlled web content (fetched pages / search
+        // snippets), persisted to `user.inferredInterests`, and later
+        // re-injected into the proposals prompt via raw `JSON.stringify` in
+        // `buildProposalsPrompt` (prompts.ts) — which, unlike the seed prompt,
+        // does NOT neutralize these fields. Zod validates shape/length but not
+        // string CONTENT, so an injected directive (control chars, a
+        // newline-started instruction line, or a Markdown heading) would survive
+        // verbatim into every future generation for this user. Strip control
+        // chars and collapse newlines/whitespace on every free-text field at the
+        // persistence boundary (house `sanitizeText`/`sanitizeName`/
+        // `sanitizeStringArray` from utils/sanitize.util). Markdown headings only
+        // act at line-start, so the newline collapse defuses them too. Benign
+        // single-line profile values pass through unchanged. Optional scalars
+        // stay `undefined` when absent so behavior is preserved.
         const inferredInterests: InferredUserProfile = {
-            industry: validated.industry,
-            role: validated.role,
-            expertise: (validated.expertise ?? []) as string[],
-            topics: (validated.topics ?? []) as string[],
-            businessType: validated.businessType,
+            industry: validated.industry ? sanitizeName(validated.industry) : validated.industry,
+            role: validated.role ? sanitizeName(validated.role) : validated.role,
+            expertise: sanitizeStringArray((validated.expertise ?? []) as string[]),
+            topics: sanitizeStringArray((validated.topics ?? []) as string[]),
+            businessType: validated.businessType
+                ? sanitizeName(validated.businessType)
+                : validated.businessType,
             confidence: validated.confidence ?? 'low',
-            sources: (validated.sources ?? []) as Array<{ url: string; title: string }>,
+            sources: ((validated.sources ?? []) as Array<{ url: string; title: string }>).map(
+                (s) => ({
+                    // `url` is already `z.string().url()`-validated; only the
+                    // free-text title needs neutralizing before it is stringified
+                    // into the prompt.
+                    url: s.url,
+                    title: sanitizeText(s.title, {
+                        removeNewlines: true,
+                        trim: true,
+                        collapseSpaces: true,
+                        removeControlChars: true,
+                        maxLength: 200,
+                    }),
+                }),
+            ),
             researchedAt: new Date().toISOString(),
             tokensUsed,
             toolCallsCount,

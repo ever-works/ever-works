@@ -250,6 +250,61 @@ export function buildCancelledResult(
 	};
 }
 
+// Security: the resolved `binaryPath` is passed straight to spawn() in
+// process-runner.ts / binary-manager.ts as the executable run for every Hermes
+// generation. The primary defence lives on the schema: the `x-envVar` binding
+// makes filterEnvVarFields strip binaryPath from tenant settings writes, so only
+// the host operator can set it. This adds defence-in-depth at the point of use:
+// reject any value containing shell-metacharacter, glob, quote, or control
+// characters that have no place in a real executable path. spawn() is invoked
+// WITHOUT shell:true, so these cannot be interpreted as a command line today,
+// but rejecting them blocks argument smuggling and keeps the plugin safe if a
+// shell-mode spawn is ever introduced. Legitimate paths are preserved unchanged
+// (`hermes`, `/usr/local/bin/hermes`, relative `../bin/hermes`); a suspicious
+// value falls back to `undefined` so the safe `hermes` default applies
+// downstream, identical to leaving the setting unset.
+const UNSAFE_BINARY_PATH_CHARS = [
+	';',
+	'|',
+	'&',
+	'$',
+	'`',
+	'(',
+	')',
+	'<',
+	'>',
+	'{',
+	'}',
+	'[',
+	']',
+	'!',
+	'?',
+	'*',
+	"'",
+	'"',
+	'\n',
+	'\r',
+	'\t',
+	'\0'
+];
+
+function sanitizeBinaryPath(value: unknown): string | undefined {
+	if (typeof value !== 'string') {
+		return undefined;
+	}
+
+	const trimmed = value.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+
+	if (UNSAFE_BINARY_PATH_CHARS.some((char) => trimmed.includes(char))) {
+		return undefined;
+	}
+
+	return trimmed;
+}
+
 export function resolveHermesRuntimeSettings(settings: Record<string, unknown>): HermesRuntimeSettings {
 	return {
 		profile: typeof settings.profile === 'string' && settings.profile.trim() ? settings.profile.trim() : 'default',
@@ -265,10 +320,7 @@ export function resolveHermesRuntimeSettings(settings: Record<string, unknown>):
 			typeof settings.maxTurns === 'number' && Number.isFinite(settings.maxTurns)
 				? Math.max(1, Math.floor(settings.maxTurns))
 				: 90,
-		binaryPath:
-			typeof settings.binaryPath === 'string' && settings.binaryPath.trim()
-				? settings.binaryPath.trim()
-				: undefined,
+		binaryPath: sanitizeBinaryPath(settings.binaryPath),
 		yolo: settings.yolo !== false
 	};
 }

@@ -28,9 +28,14 @@ export async function POST(request: NextRequest) {
     if (contentType) headers.set('Content-Type', contentType);
     if (token) headers.set('Authorization', `Bearer ${token}`);
 
-    const search = request.nextUrl.search; // includes the leading "?" if present
+    // Security: allowlist only the documented query parameters instead of
+    // forwarding the entire raw query string, which could pass unexpected
+    // parameters to the NestJS controller.
+    const upstreamUrl = new URL(`${API_URL}/uploads/file`);
+    const workId = request.nextUrl.searchParams.get('workId');
+    if (workId) upstreamUrl.searchParams.set('workId', workId);
 
-    const upstream = await fetch(`${API_URL}/uploads/file${search}`, {
+    const upstream = await fetch(upstreamUrl.toString(), {
         method: 'POST',
         headers,
         body: request.body,

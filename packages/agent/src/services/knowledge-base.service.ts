@@ -956,7 +956,16 @@ export class KnowledgeBaseService {
         userId: string,
         input: Omit<CreateDocumentInput, 'workId' | 'userId'>,
     ): Promise<KbDocumentBodyDto> {
-        // Org-admin guard happens at the controller layer.
+        // Security: object-level authorization (caller's tenant must own
+        // `organizationId`) is enforced at the controller layer via
+        // `OrgKbController.assertOrgAccess` before this write is reached.
+        // That check resolves org→tenant and caller→tenant and rejects any
+        // cross-tenant write, preventing stored prompt-injection / KB
+        // poisoning of another tenant's org (whose docs then fan out as
+        // overlays into every Work in that org). The legacy un-prefixed
+        // `/api/organizations/:orgId/...` route bypasses the global scope
+        // guards, so that explicit controller check is the authoritative
+        // gate for this method.
         if (!(KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>).includes(input.class)) {
             throw new BadRequestException(
                 `Organization-scoped KB documents must have class in [${KB_ORG_INHERITABLE_CLASSES.join(', ')}], got '${input.class}'`,
@@ -1011,6 +1020,14 @@ export class KnowledgeBaseService {
         organizationId: string,
         opts: { class?: KbDocumentClass } = {},
     ): Promise<{ items: KbDocumentDto[]; total: number }> {
+        // Security: object-level authorization (caller's tenant must own
+        // `organizationId`) is enforced at the controller layer via
+        // `OrgKbController.assertOrgAccess` before this method is reached —
+        // same pattern as `createOrgDocument`. The legacy un-prefixed
+        // `/api/organizations/:orgId/...` routes bypass the global scope
+        // guards, so that explicit org→tenant / caller→tenant check is the
+        // gate that prevents an authenticated tenant from reading another
+        // tenant's org KB docs via a foreign `orgId`.
         const { items, total } = await this.documentRepository.list({
             organizationId,
             classes: opts.class ? [opts.class] : undefined,
@@ -1806,7 +1823,22 @@ export class KnowledgeBaseService {
         if (idx <= 0 || idx === filename.length - 1) {
             return '';
         }
-        return filename.slice(idx + 1).toLowerCase();
+        const ext = filename.slice(idx + 1).toLowerCase();
+        // Security: the extracted extension is the only attacker-controlled
+        // segment of the `kb-originals/{class}/{sha256}.{ext}` storage key
+        // (the sha256 base + class enum are server-derived). The raw
+        // `originalFilename` can carry path separators, traversal segments,
+        // NUL bytes, or a pathologically long tail after the final dot
+        // (e.g. `evil.js/../../x` → `/x`, or a 400-char extension). Treat
+        // anything that isn't a short, purely-alphanumeric token as "no
+        // extension" so the key always stays inside the intended prefix.
+        // Every legitimate upload extension (md, txt, pdf, docx, xlsx,
+        // pptx, jpg, jpeg, png, gif, webp, mp4, mp3, mov, …) passes this
+        // unchanged.
+        if (ext.length > 12 || !/^[a-z0-9]+$/.test(ext)) {
+            return '';
+        }
+        return ext;
     }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────

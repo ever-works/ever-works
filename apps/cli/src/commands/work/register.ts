@@ -5,6 +5,41 @@ import { handleCliError } from '../../utils/error';
 
 const DEFAULT_API_URL = process.env.EVER_WORKS_API_URL || 'https://api.ever.works';
 
+// Security: the GitHub PAT is transmitted as the `X-GitHub-Token` header to
+// whatever `--api-url` resolves to. Parse the override before use and refuse
+// to send the credential in cleartext (`http:`) to anything other than a
+// loopback host: a plaintext token bound for a remote host is never a
+// legitimate flow (it is an attacker host or a misconfiguration) and would
+// leak the PAT off-box. HTTPS and local-dev (`http://localhost:3100`,
+// loopback IPs) stay fully supported — see the `--api-url` override flow.
+// NOTE: this does not allowlist the destination host (self-hosted custom
+// domains are a supported deployment), so a token sent over HTTPS to a
+// non-ever.works host is still permitted; a host allowlist would be a
+// product/config decision and is intentionally left to the server/config.
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+function isLoopbackHost(hostname: string): boolean {
+    return LOOPBACK_HOSTNAMES.has(hostname) || hostname.startsWith('127.');
+}
+
+function assertApiUrlSafeForToken(apiUrl: string): URL {
+    let parsed: URL;
+    try {
+        parsed = new URL(apiUrl);
+    } catch {
+        throw new Error(`Invalid --api-url: ${apiUrl}`);
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error(`--api-url must use http(s); got: ${parsed.protocol}`);
+    }
+    if (parsed.protocol === 'http:' && !isLoopbackHost(parsed.hostname)) {
+        throw new Error(
+            `Refusing to send the GitHub token over insecure HTTP to a non-local host (${parsed.host}). Use an https:// API URL.`,
+        );
+    }
+    return parsed;
+}
+
 interface RegisterOptions {
     repo: string;
     githubToken?: string;
@@ -38,6 +73,36 @@ export const registerCommand = new Command('register')
         }
 
         const apiUrl = (options.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
+
+        // Security: validate the resolved API base URL before the GitHub PAT is
+        // attached as a request header, so a misconfigured or attacker-supplied
+        // --api-url (or $EVER_WORKS_API_URL) cannot exfiltrate the token over an
+        // insecure channel. Throwing here is caught below and reported cleanly.
+        try {
+            assertApiUrlSafeForToken(apiUrl);
+        } catch (err) {
+            console.error(chalk.red((err as Error).message));
+            process.exit(2);
+        }
+
+        // Security: the --webhook-url is forwarded to the API, which later makes
+        // outbound requests to it. As additive defense-in-depth, reject any
+        // value that is not a well-formed https:// URL here (the flag documents
+        // an "HTTPS URL"); authoritative SSRF filtering of private/link-local
+        // targets remains the server's responsibility.
+        if (options.webhookUrl) {
+            let webhookOk = false;
+            try {
+                webhookOk = new URL(options.webhookUrl).protocol === 'https:';
+            } catch {
+                webhookOk = false;
+            }
+            if (!webhookOk) {
+                console.error(chalk.red(`--webhook-url must be a valid https:// URL`));
+                process.exit(2);
+            }
+        }
+
         const spinner = ora(`Registering ${options.repo} with ${apiUrl}…`).start();
 
         try {

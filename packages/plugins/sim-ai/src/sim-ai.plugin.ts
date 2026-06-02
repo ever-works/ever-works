@@ -29,6 +29,14 @@ import type { SimAiStepId, SimAiSettings, SimAiPipelineMetrics } from './types.j
 import { SIM_AI_STEP_IDS, DEFAULT_BASE_URL, DEFAULT_TARGET_ITEMS } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import { SimClientWrapper } from './utils/sim-client.js';
+// Security (SSRF): baseUrl is a free-form user-supplied plugin setting that flows
+// into SimStudioClient as the HTTP base for every authenticated SIM call. Validate
+// it with the shared lexical SSRF guard before instantiating the client. Direct
+// import (NOT via the helpers barrel): the guard pulls in Node-only `node:net`/
+// `node:dns` and is intentionally not re-exported from the barrel. Mirrors the
+// langfuse / make / composio / zapier / activepieces plugin guards (and the
+// existing payload-builder.ts usage in this same plugin).
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { buildWorkflowPayload } from './utils/payload-builder.js';
 import { parseSimOutput, deduplicateItems } from './utils/result-parser.js';
 import {
@@ -138,6 +146,13 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 
 		try {
 			const baseUrl = (settings.baseUrl as string) || DEFAULT_BASE_URL;
+			// Security (SSRF): reject private/loopback/link-local/cloud-metadata hosts
+			// (e.g. http://169.254.169.254 IMDS) and non-HTTP(S) schemes before the
+			// SDK issues requests to the user-controlled baseUrl and reflects the
+			// response back through this validateConnection message.
+			if (!isSafeWebhookUrl(baseUrl)) {
+				return { success: false, message: 'SIM base URL is not safe to call (SSRF guard blocked the destination host).' };
+			}
 			const client = new SimClientWrapper({
 				apiKey,
 				baseUrl,
@@ -431,9 +446,18 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 		}
 
 		const timeoutMinutes = (config.workflow_timeout as number) || 60;
+		const baseUrl = (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL;
+		// Security (SSRF): baseUrl is a user-supplied plugin setting that flows into
+		// SimStudioClient (carrying the SIM API key) for the execute pipeline. Reject
+		// private/loopback/link-local/cloud-metadata hosts (e.g. http://169.254.169.254
+		// IMDS, http://10.0.0.1) and non-HTTP(S) schemes so it can't be redirected to an
+		// internal endpoint. Thrown here and surfaced as a clean error result by execute().
+		if (!isSafeWebhookUrl(baseUrl)) {
+			throw new Error('SIM base URL is not safe to call (SSRF guard blocked the destination host).');
+		}
 		return {
 			apiKey,
-			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
+			baseUrl,
 			defaultWorkflowId: pluginSettings.defaultWorkflowId as string | undefined,
 			timeoutMs: timeoutMinutes * 60 * 1000
 		};

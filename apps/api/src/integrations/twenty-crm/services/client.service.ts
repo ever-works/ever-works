@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { TwentyCrmService } from './twenty-crm.service';
 import {
     TwentyContact,
@@ -10,6 +10,28 @@ import {
 @Injectable()
 export class ClientService {
     constructor(private readonly twentyCrmService: TwentyCrmService) {}
+
+    // Security: resource IDs are caller-controlled (@Param('id') in the
+    // companies/people controllers, with no ParseUUIDPipe upstream) and get
+    // interpolated straight into the outgoing CRM REST path
+    // (`/companies/${id}`). Without this guard a value such as
+    // `../metadata/objects` (or its `..%2F...` encoded form, decoded by the
+    // router before it reaches here) would redirect the request to an
+    // unintended Twenty CRM sub-path (e.g. admin metadata). We reject any id
+    // carrying path-traversal metacharacters and percent-encode the rest so
+    // it can only ever land in a single path segment. Legitimate ids (Twenty
+    // UUIDs — hex + hyphen only — and the slug ids used in tests like `co-1`)
+    // contain none of these characters and pass through byte-for-byte.
+    private safeId(id: string, paramName: string): string {
+        if (typeof id !== 'string' || id.length === 0 || id.length > 256) {
+            throw new BadRequestException(`Invalid ${paramName}`);
+        }
+        // Block separators, parent-dir sequences and percent-encoding smuggling.
+        if (/[/\\%]/.test(id) || id.includes('..')) {
+            throw new BadRequestException(`Invalid ${paramName}`);
+        }
+        return encodeURIComponent(id);
+    }
 
     async createCompany(company: TwentyOrganization): Promise<TwentyOrganization> {
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
@@ -50,7 +72,7 @@ export class ClientService {
     async getCompany(companyId: string): Promise<TwentyOrganization> {
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
             'GET',
-            `/companies/${companyId}`,
+            `/companies/${this.safeId(companyId, 'companyId')}`,
         );
         return response;
     }
@@ -58,7 +80,7 @@ export class ClientService {
     async getContact(contactId: string): Promise<TwentyContact> {
         const response = await this.twentyCrmService.makeRequest<TwentyContact>(
             'GET',
-            `/contacts/${contactId}`,
+            `/contacts/${this.safeId(contactId, 'contactId')}`,
         );
         return response;
     }
@@ -66,7 +88,7 @@ export class ClientService {
     async getDeal(dealId: string): Promise<TwentyDeal> {
         const response = await this.twentyCrmService.makeRequest<TwentyDeal>(
             'GET',
-            `/deals/${dealId}`,
+            `/deals/${this.safeId(dealId, 'dealId')}`,
         );
         return response;
     }
@@ -74,7 +96,7 @@ export class ClientService {
     async getProduct(productId: string): Promise<TwentyProduct> {
         const response = await this.twentyCrmService.makeRequest<TwentyProduct>(
             'GET',
-            `/products/${productId}`,
+            `/products/${this.safeId(productId, 'productId')}`,
         );
         return response;
     }
@@ -85,7 +107,7 @@ export class ClientService {
     ): Promise<TwentyOrganization> {
         const response = await this.twentyCrmService.makeRequest<TwentyOrganization>(
             'PUT',
-            `/companies/${companyId}`,
+            `/companies/${this.safeId(companyId, 'companyId')}`,
             company,
         );
         return response;
@@ -94,7 +116,7 @@ export class ClientService {
     async updateContact(contactId: string, contact: TwentyContact): Promise<TwentyContact> {
         const response = await this.twentyCrmService.makeRequest<TwentyContact>(
             'PUT',
-            `/contacts/${contactId}`,
+            `/contacts/${this.safeId(contactId, 'contactId')}`,
             contact,
         );
         return response;
@@ -103,7 +125,7 @@ export class ClientService {
     async updateDeal(dealId: string, deal: TwentyDeal): Promise<TwentyDeal> {
         const response = await this.twentyCrmService.makeRequest<TwentyDeal>(
             'PUT',
-            `/deals/${dealId}`,
+            `/deals/${this.safeId(dealId, 'dealId')}`,
             deal,
         );
         return response;
@@ -112,26 +134,38 @@ export class ClientService {
     async updateProduct(productId: string, product: TwentyProduct): Promise<TwentyProduct> {
         const response = await this.twentyCrmService.makeRequest<TwentyProduct>(
             'PUT',
-            `/products/${productId}`,
+            `/products/${this.safeId(productId, 'productId')}`,
             product,
         );
         return response;
     }
 
     async deleteCompany(companyId: string): Promise<void> {
-        await this.twentyCrmService.makeRequest<void>('DELETE', `/companies/${companyId}`);
+        await this.twentyCrmService.makeRequest<void>(
+            'DELETE',
+            `/companies/${this.safeId(companyId, 'companyId')}`,
+        );
     }
 
     async deleteContact(contactId: string): Promise<void> {
-        await this.twentyCrmService.makeRequest<void>('DELETE', `/contacts/${contactId}`);
+        await this.twentyCrmService.makeRequest<void>(
+            'DELETE',
+            `/contacts/${this.safeId(contactId, 'contactId')}`,
+        );
     }
 
     async deleteDeal(dealId: string): Promise<void> {
-        await this.twentyCrmService.makeRequest<void>('DELETE', `/deals/${dealId}`);
+        await this.twentyCrmService.makeRequest<void>(
+            'DELETE',
+            `/deals/${this.safeId(dealId, 'dealId')}`,
+        );
     }
 
     async deleteProduct(productId: string): Promise<void> {
-        await this.twentyCrmService.makeRequest<void>('DELETE', `/products/${productId}`);
+        await this.twentyCrmService.makeRequest<void>(
+            'DELETE',
+            `/products/${this.safeId(productId, 'productId')}`,
+        );
     }
 
     async getCompanies(): Promise<TwentyOrganization[]> {

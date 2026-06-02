@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { detectPlatform, getBinaryPath } from './platform.js';
-import { CLAUDE_CODE_DIST_URL, DEFAULT_CLI_VERSION } from '../types.js';
+import { BASE_TEMP_DIR, CLAUDE_CODE_DIST_URL, DEFAULT_CLI_VERSION } from '../types.js';
 
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
@@ -21,6 +21,23 @@ interface Manifest {
 	readonly platforms: {
 		readonly [platform: string]: ManifestEntry;
 	};
+}
+
+// Security: the CLI `version` originates from a user-configurable plugin setting
+// (`settings.version`) and is interpolated unvalidated into both filesystem paths
+// (getBinaryPath -> path.join(BASE_TEMP_DIR, 'bin', `claude-${version}-...`)) and the
+// manifest/binary download URLs. A value containing `../` (e.g. `../../usr/local/bin/evil`)
+// would let an authenticated tenant escape BASE_TEMP_DIR when writing/chmod'ing the binary,
+// and could rewrite the fetch URL. Enforce a strict semver allowlist before the value is
+// ever used so only genuine release identifiers (e.g. `2.1.76`) are accepted.
+const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+
+function assertSafeVersion(version: string): void {
+	if (typeof version !== 'string' || !VERSION_PATTERN.test(version)) {
+		throw new Error(
+			`Invalid Claude Code CLI version "${version}". Expected a semantic version like "2.1.76".`
+		);
+	}
 }
 
 /**
@@ -75,6 +92,8 @@ function fetchBuffer(url: string, maxRedirects = 5): Promise<Buffer> {
  * Fetch and parse the manifest.json for a given CLI version.
  */
 async function fetchManifest(version: string): Promise<Manifest> {
+	// Security: reject any version that is not a strict semver before building the fetch URL.
+	assertSafeVersion(version);
 	const url = `${CLAUDE_CODE_DIST_URL}/${version}/manifest.json`;
 	const buffer = await fetchBuffer(url);
 	return JSON.parse(buffer.toString('utf-8'));
@@ -96,8 +115,20 @@ async function verifyChecksum(filePath: string, expectedSha256: string): Promise
  * @returns Path to the executable binary
  */
 export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
+	// Security: validate the user-supplied version before it reaches any path/URL construction.
+	assertSafeVersion(version);
+
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
+
+	// Security: defense-in-depth — assert the resolved cache path stays inside BASE_TEMP_DIR so
+	// that even an unexpected platformString/version combination cannot escape the cache dir for
+	// the write/chmod/rename below.
+	const baseBinDir = path.resolve(BASE_TEMP_DIR, 'bin');
+	const resolvedBinaryPath = path.resolve(binaryPath);
+	if (resolvedBinaryPath !== baseBinDir && !resolvedBinaryPath.startsWith(baseBinDir + path.sep)) {
+		throw new Error(`Refusing to use binary path outside ${baseBinDir}: ${resolvedBinaryPath}`);
+	}
 
 	// Check if binary already exists and is executable
 	try {

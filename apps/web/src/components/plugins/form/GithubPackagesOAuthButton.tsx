@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { Github, ExternalLink, Loader2 } from 'lucide-react';
 import { connectReadPackagesOAuthProvider } from '@/app/actions/dashboard/oauth';
+import { isValidRedirectUrl } from '@/lib/utils';
 
 interface GithubPackagesOAuthButtonProps {
     /** The plugin ID — always `'github'` today, but threaded so the
@@ -46,6 +47,13 @@ export function GithubPackagesOAuthButton({ pluginId }: GithubPackagesOAuthButto
                 );
                 if (!result.success || !result.url) {
                     setError(result.error ?? t('githubPackagesOAuthFailed'));
+                    return;
+                }
+                // Security: validate the OAuth URL returned by the server action is an
+                // https URL before navigating, guarding against a compromised or
+                // misconfigured API layer returning a javascript:/data: URI.
+                if (!isValidRedirectUrl(result.url) || !/^https:\/\//i.test(result.url)) {
+                    setError(t('githubPackagesOAuthFailed'));
                     return;
                 }
                 window.location.href = result.url;

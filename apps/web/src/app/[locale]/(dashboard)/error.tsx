@@ -14,7 +14,9 @@ export default function DashboardError({
     const t = useTranslations('errors.dashboard');
 
     useEffect(() => {
-        console.error('Dashboard error:', error);
+        // Security: log only the opaque digest to avoid exposing server-side stack traces or
+        // module paths to the browser console (and any third-party error-monitoring integrations).
+        console.error('Dashboard error:', error.digest ?? 'no digest');
     }, [error]);
 
     return (

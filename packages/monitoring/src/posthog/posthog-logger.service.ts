@@ -21,6 +21,38 @@ const serializeMessage = (message: unknown): string => {
 const resolveEnv = (): string =>
     process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || 'development';
 
+// Security: high-signal secret/PII patterns scrubbed out of any string we
+// forward to PostHog (a third-party analytics sink). This is additive and
+// value-only: it ONLY rewrites substrings that look like credentials/emails
+// and leaves all other log content — including UUID entity ids and ordinary
+// prose — untouched, so legitimate logs are unchanged. Mirrors the redaction
+// approach in `sentry.interceptor.ts` (kept inline; this package must stay
+// dependency-free). It does NOT replace the deferred, higher-level controls
+// (log-level gating, omitting full stacks) — it just stops obvious token/
+// email leakage in `message`, `error_stack`, and `trace`.
+const REDACTED = '[REDACTED]';
+const SECRET_PATTERNS: ReadonlyArray<RegExp> = [
+    // `Authorization: Bearer <token>` / `Bearer <token>` — keep the scheme.
+    /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi,
+    // JWTs: three base64url segments separated by dots.
+    /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g,
+    // Email addresses (called out explicitly in the audit exploit paths).
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
+];
+
+const redactSecrets = (value: string | undefined): string | undefined => {
+    if (!value) return value;
+    let out = value;
+    for (const pattern of SECRET_PATTERNS) {
+        out = out.replace(pattern, (match) =>
+            /^(Bearer|Basic)\b/i.test(match)
+                ? `${match.slice(0, match.indexOf(' '))} ${REDACTED}`
+                : REDACTED,
+        );
+    }
+    return out;
+};
+
 type LogLevel = 'log' | 'warn' | 'error' | 'debug' | 'verbose';
 
 /**
@@ -125,17 +157,19 @@ export class PostHogLoggerService implements LoggerService {
             if (client) {
                 const properties: Record<string, unknown> = {
                     level,
-                    message: serializeMessage(message),
+                    // Security: scrub bearer tokens / JWTs / emails before they
+                    // reach the third-party analytics sink.
+                    message: redactSecrets(serializeMessage(message)),
                     context: ctx,
                     service: 'ever-works-api',
                     env: resolveEnv(),
                 };
                 if (message instanceof Error) {
                     properties.error_name = message.name;
-                    properties.error_stack = message.stack;
+                    properties.error_stack = redactSecrets(message.stack);
                 }
                 if (trace) {
-                    properties.trace = trace;
+                    properties.trace = redactSecrets(trace);
                 }
                 client.capture({
                     distinctId: this.distinctId,

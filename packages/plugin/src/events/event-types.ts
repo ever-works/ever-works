@@ -71,7 +71,9 @@ export interface PluginLoadedPayload extends BaseEventPayload {
 
 export interface PluginErrorPayload extends BaseEventPayload {
 	readonly pluginId: string;
-	readonly error: Error | string;
+	// Security: narrowed to string so callers must use error.message; prevents raw Error objects
+	// (with stack traces and internal paths) from being serialized into event payloads.
+	readonly error: string;
 	readonly context?: Record<string, unknown>;
 }
 
@@ -108,7 +110,8 @@ export interface WorkGenerationCompletedPayload extends WorkEventPayload {
 }
 
 export interface WorkGenerationFailedPayload extends WorkEventPayload {
-	readonly error: Error | string;
+	// Security: narrowed to string; callers must pass error.message to avoid stack-trace leakage.
+	readonly error: string;
 	readonly step?: string;
 }
 
@@ -147,7 +150,8 @@ export interface PipelineStepCompletedPayload extends PipelineStepEventPayload {
 }
 
 export interface PipelineStepFailedPayload extends PipelineStepEventPayload {
-	readonly error: Error | string;
+	// Security: narrowed to string; callers must pass error.message to avoid stack-trace leakage.
+	readonly error: string;
 	readonly recoverable: boolean;
 }
 
@@ -158,7 +162,8 @@ export interface PipelineCompletedPayload extends PipelineEventPayload {
 }
 
 export interface PipelineFailedPayload extends PipelineEventPayload {
-	readonly error: Error | string;
+	// Security: narrowed to string; callers must pass error.message to avoid stack-trace leakage.
+	readonly error: string;
 	readonly failedStep?: string;
 	readonly completedSteps: number;
 }

@@ -8,9 +8,35 @@ import {
     Min,
     Max,
     MaxLength,
+    Validate,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+// Security: cap the total serialised size of the `metadata` field to prevent
+// large-payload DoS where an attacker floods the memory backend with objects
+// that are individually < 1 MB but impose significant CPU / storage cost.
+const METADATA_BYTE_CAP = 8 * 1024; // 8 KiB
+
+@ValidatorConstraint({ name: 'agentMemoryMetadataByteCap', async: false })
+class MetadataByteCapConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (value === undefined || value === null) return true;
+        if (typeof value !== 'object') return false;
+        try {
+            const serialized = JSON.stringify(value);
+            return Buffer.byteLength(serialized, 'utf8') <= METADATA_BYTE_CAP;
+        } catch {
+            return false;
+        }
+    }
+
+    defaultMessage(): string {
+        return `metadata must serialise to <= ${METADATA_BYTE_CAP} bytes`;
+    }
+}
 
 /**
  * Shared optional fields that show up on most agent-memory calls:
@@ -65,10 +91,11 @@ export class SaveMemoryDto extends WorkScopedDto {
     tags?: string[];
 
     @ApiPropertyOptional({
-        description: 'Arbitrary structured metadata stored alongside the record.',
+        description: `Arbitrary structured metadata stored alongside the record (capped at ${METADATA_BYTE_CAP} bytes after JSON serialisation).`,
     })
     @IsOptional()
     @IsObject()
+    @Validate(MetadataByteCapConstraint) // Security: reject oversized metadata objects
     metadata?: Record<string, unknown>;
 
     @ApiPropertyOptional({
@@ -139,10 +166,11 @@ export class BuildContextDto extends WorkScopedDto {
 
 export class OpenSessionDto extends WorkScopedDto {
     @ApiPropertyOptional({
-        description: 'Seed metadata persisted on the session row.',
+        description: `Seed metadata persisted on the session row (capped at ${METADATA_BYTE_CAP} bytes after JSON serialisation).`,
     })
     @IsOptional()
     @IsObject()
+    @Validate(MetadataByteCapConstraint) // Security: reject oversized metadata objects
     metadata?: Record<string, unknown>;
 }
 

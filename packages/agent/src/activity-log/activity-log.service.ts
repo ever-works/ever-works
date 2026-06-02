@@ -141,6 +141,23 @@ export class ActivityLogService {
         // orders by "when it happened" rather than "when the platform
         // got around to recording it". TypeORM's @CreateDateColumn only
         // auto-populates when the value is left undefined.
+
+        // Security: cap summary to 480 chars to stay safely under the DB
+        // varchar(500) column limit and prevent oversized strings causing
+        // unexpected truncation or ORM errors.
+        const safeSummary =
+            payload.summary.length > 480 ? payload.summary.slice(0, 480) : payload.summary;
+
+        // Security: reject metadata blobs that would consume excessive memory
+        // when serialised and later deserialised for the AI prompt segment.
+        // 8 KB is generous for all legitimate website event metadata.
+        const rawMetadata = payload.metadata ?? {};
+        if (JSON.stringify(rawMetadata).length > 8192) {
+            throw new Error(
+                `Ingest event metadata for work ${payload.workId} exceeds the 8 KB size limit`,
+            );
+        }
+
         try {
             return await this.log(
                 {
@@ -149,9 +166,9 @@ export class ActivityLogService {
                     actionType: payload.actionType,
                     action: `website.${payload.actionType}`,
                     status: ActivityStatus.COMPLETED,
-                    summary: payload.summary,
+                    summary: safeSummary,
                     metadata: {
-                        ...(payload.metadata ?? {}),
+                        ...rawMetadata,
                         occurredAt: payload.occurredAt.toISOString(),
                     },
                     ingestEventId: payload.eventId,

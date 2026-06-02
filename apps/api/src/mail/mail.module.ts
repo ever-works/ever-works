@@ -23,8 +23,17 @@ import { MailerService } from './providers/mailer.service';
                         user: config.mail.smtpUser(),
                         pass: config.mail.smtpPassword(),
                     },
+                    // Security: verify the SMTP relay's TLS certificate by
+                    // default so outbound mail (password-reset, magic-link and
+                    // account-deletion tokens) can't be intercepted via a
+                    // MITM presenting an invalid cert. Verification stays ON
+                    // unless an operator explicitly opts out with
+                    // `SMTP_REJECT_UNAUTHORIZED=false` (e.g. a local
+                    // MailHog/Mailpit relay with a self-signed cert). The e2e
+                    // stack short-circuits TLS via `SMTP_IGNORE_TLS=true`, so
+                    // this default does not affect it.
                     tls: {
-                        rejectUnauthorized: false,
+                        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
                     },
                 },
                 defaults: {

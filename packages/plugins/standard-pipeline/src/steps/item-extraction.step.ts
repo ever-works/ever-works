@@ -57,6 +57,65 @@ Exclude any invalid or irrelevant content, and align the findings with the topic
 </web_page_content>` as const;
 
 /**
+ * Security (prompt-injection hardening): chat-template control markers that some
+ * models interpret as out-of-band role/turn delimiters. Stripped from every
+ * untrusted value before it is interpolated into {@link ITEMS_EXTRACTION_PROMPT}
+ * so injected text cannot spoof a system/user turn. Mirrors the canonical
+ * `sanitizePromptVariable` in `@ever-works/agent`'s `item-health.service.ts`
+ * and the sibling `source-validation.step.ts`.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the literal XML-style delimiter tags
+ * that fence the sections of {@link ITEMS_EXTRACTION_PROMPT}. Untrusted values
+ * (fetched web-page content and user-supplied featured-item hints) are
+ * interpolated INSIDE these fences, so a value that prints its own
+ * `</web_page_content>` (or any sibling fence tag) could forge a boundary and
+ * have trailing imperative text parsed as authoritative instructions. Matched
+ * (open or close) so the boundary token can be defused wherever it appears.
+ */
+const PROMPT_FENCE_TOKEN_PATTERN =
+	/<\/?(?:web_page_content|extraction_criteria|research_context_instructions|featured_item_hints_section)\b/gi;
+
+/**
+ * Security (prompt-injection hardening): defuse a forged fence boundary by
+ * inserting a zero-width space right after the opening `<` of any fence tag.
+ * This keeps the text human/model-readable while breaking the literal token the
+ * boundary keys on. Mirrors `prompt.utils.ts`'s `neutralizeCustomPrompt`.
+ */
+function neutralizeFenceTokens(value: string): string {
+	return value.replace(PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+}
+
+/**
+ * Security (prompt-injection hardening): sanitize raw web-page content before it
+ * is interpolated into the `<web_page_content>` block. Newlines are PRESERVED
+ * because the markdown structure is load-bearing for extraction (the splitter
+ * even keys on `\n## ` boundaries) and legitimate pages are multi-line — only
+ * forged fence tokens and chat-template control markers are neutralized, plus a
+ * hard length cap as a belt-and-suspenders guard.
+ */
+function sanitizePageContent(value: string, maxLength: number): string {
+	return neutralizeFenceTokens(value.replace(CHAT_TEMPLATE_MARKER_PATTERN, '')).slice(0, maxLength);
+}
+
+/**
+ * Security (prompt-injection hardening): sanitize a single user-supplied
+ * featured-item hint before it is rendered as a `- {hint}` bullet inside the
+ * `<featured_item_hints_section>` block. Each hint is a single logical line, so
+ * newlines are collapsed to spaces (preventing injected fake bullets / fake
+ * sections), chat-template markers are stripped, forged fence tokens are
+ * neutralized, and the value is hard-truncated. Mirrors the canonical
+ * `sanitizePromptVariable` limits used on equivalent untrusted prompt variables.
+ */
+function sanitizeHintEntry(value: string, maxLength: number): string {
+	return neutralizeFenceTokens(
+		value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')
+	).slice(0, maxLength);
+}
+
+/**
  * Item Extraction Step
  *
  * Extracts items from web pages using AI.
@@ -194,7 +253,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 										variables: {
 											topicName,
 											topicDescription,
-											page_content_snippet: chunk,
+											// Security (prompt-injection hardening): chunk is raw, attacker-
+											// controllable web-page content fenced inside <web_page_content>;
+											// neutralize forged fence tokens + chat-template markers so it
+											// cannot break out and forge instruction blocks. Cap matches the
+											// chunk size so legitimate chunks pass through unchanged.
+											page_content_snippet: sanitizePageContent(chunk, this.MAX_CHUNK_SIZE),
 											featured_hints_section: featuredHintsSection
 										},
 										routing: {
@@ -257,7 +321,12 @@ export class ItemExtractionStep extends BasePipelineStep {
 							variables: {
 								topicName,
 								topicDescription,
-								page_content_snippet: page.raw_content || '',
+								// Security (prompt-injection hardening): raw_content is raw,
+								// attacker-controllable web-page content fenced inside
+								// <web_page_content>; neutralize forged fence tokens +
+								// chat-template markers. This branch only runs when content is
+								// <= MAX_CHUNK_SIZE, so the cap never truncates legitimate input.
+								page_content_snippet: sanitizePageContent(page.raw_content || '', this.MAX_CHUNK_SIZE),
 								featured_hints_section: featuredHintsSection
 							},
 							routing: {
@@ -380,10 +449,14 @@ export class ItemExtractionStep extends BasePipelineStep {
 			return '';
 		}
 
+		// Security (prompt-injection hardening): featuredItemHints entries are
+		// user-supplied free text (AI-extracted from the original work prompt) and
+		// are rendered as bullets inside <featured_item_hints_section>. Sanitize each
+		// so a crafted hint cannot forge a fence boundary or spoof a system turn.
 		return `
 **Featured Item Specifications:**
 The user has provided the following specifications for which items should be marked as featured (highlighted):
-${featuredItemHints.map((hint) => `- ${hint}`).join('\n')}
+${featuredItemHints.map((hint) => `- ${sanitizeHintEntry(hint, 500)}`).join('\n')}
 
 When determining the 'featured' status for items, carefully consider these specifications. Items that match these criteria, guidelines, or instructions should be marked as featured=true.`;
 	}

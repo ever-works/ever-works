@@ -10,8 +10,44 @@ import type {
 	JsonSchema
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+// Security (SSRF): `apiBase` is tenant-controlled plugin settings that flows
+// verbatim into every outbound fetch (carrying the Novu API key in an
+// `Authorization: ApiKey …` header). Validate the resolved URL with the shared
+// lexical SSRF guard before fetching so a malicious base (e.g.
+// http://169.254.169.254 IMDS, http://10.0.0.1, http://127.0.0.1:6379, or a
+// non-HTTP(S) scheme) can't redirect the request — and the bearer key — at an
+// internal endpoint and leak its response back through the error path. Mirrors
+// the make-client / zapier tenant-baseUrl guards.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const DEFAULT_NOVU_API_BASE = 'https://api.novu.co';
+
+/**
+ * Security (header injection): `messageRef` is the idempotency key set on the
+ * outbound Novu `Idempotency-Key` request header. HTTP header values must not
+ * contain CR/LF or other control characters — a value carrying a CRLF could
+ * inject additional request headers on fetch implementations that don't reject
+ * them. Legitimate idempotency keys are short ASCII tokens, so reject any value
+ * containing a C0 control char (code points 0–31, which includes CR=13 / LF=10)
+ * or DEL (127) before it reaches the header (and the in-memory cache key).
+ *
+ * Implemented as a code-point scan (not a regex with literal control chars) so
+ * the check is unambiguous and avoids embedding raw control bytes in source.
+ */
+function assertSafeMessageRef(messageRef: string): string {
+	if (typeof messageRef !== 'string') {
+		throw new Error('novu-channel: messageRef must be a string');
+	}
+	for (let i = 0; i < messageRef.length; i++) {
+		const code = messageRef.charCodeAt(i);
+		if (code <= 31 || code === 127) {
+			throw new Error(
+				'novu-channel: messageRef contains control characters and cannot be used as an Idempotency-Key'
+			);
+		}
+	}
+	return messageRef;
+}
 
 interface NovuTarget {
 	apiKey: string;
@@ -82,6 +118,21 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 		return typeof base === 'string' && base.length > 0 ? base.replace(/\/+$/, '') : DEFAULT_NOVU_API_BASE;
 	}
 
+	/**
+	 * Security (SSRF): build the absolute Novu API URL from the
+	 * tenant-controlled `apiBase` and reject it if the destination host is a
+	 * literal private/loopback/link-local/cloud-metadata IP or a non-HTTP(S)
+	 * scheme before any request (and the API key) leaves the process. Mirrors
+	 * `MakeClient.buildUrl()`.
+	 */
+	private safeNovuUrl(options: ChannelOptions, path: string): string {
+		const url = `${this.apiBase(options)}${path}`;
+		if (!isSafeWebhookUrl(url)) {
+			throw new Error('novu-channel: apiBase is not safe to call (SSRF guard blocked the destination host)');
+		}
+		return url;
+	}
+
 	async verifyTarget(config: ChannelTargetConfig, options: ChannelOptions): Promise<ChannelVerification> {
 		const apiKey = config.apiKey;
 		if (typeof apiKey !== 'string' || apiKey.length === 0) {
@@ -94,7 +145,9 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 			return { valid: false, message: 'subscriberId is required' };
 		}
 		try {
-			const response = await fetch(`${this.apiBase(options)}/v1/environments/me`, {
+			// Security (SSRF): `apiBase` is tenant-controlled — guard the destination
+			// host before sending the key (see isSafeWebhookUrl import note).
+			const response = await fetch(this.safeNovuUrl(options, '/v1/environments/me'), {
 				method: 'GET',
 				headers: { Authorization: `ApiKey ${apiKey}` }
 			});
@@ -115,7 +168,10 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 	}
 
 	async send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult> {
-		const cached = this.idempotencyCache.get(payload.messageRef);
+		// Security (header injection): reject control chars in the idempotency key
+		// before it is used as a header value or cache key.
+		const messageRef = assertSafeMessageRef(payload.messageRef);
+		const cached = this.idempotencyCache.get(messageRef);
 		if (cached) return cached;
 
 		const { apiKey, workflowId, subscriberId } = getTarget(payload.target ?? {});
@@ -125,12 +181,14 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 			Object.assign(triggerPayload, payload.rich.payload as Record<string, unknown>);
 		}
 
-		const response = await fetch(`${this.apiBase(options)}/v1/events/trigger`, {
+		// Security (SSRF): `apiBase` is tenant-controlled — guard the destination
+		// host before sending the key (see isSafeWebhookUrl import note).
+		const response = await fetch(this.safeNovuUrl(options, '/v1/events/trigger'), {
 			method: 'POST',
 			headers: {
 				Authorization: `ApiKey ${apiKey}`,
 				'Content-Type': 'application/json',
-				'Idempotency-Key': payload.messageRef
+				'Idempotency-Key': messageRef
 			},
 			body: JSON.stringify({
 				name: workflowId,
@@ -148,7 +206,7 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 			providerMessageId: data.data.transactionId,
 			deliveredAt: new Date()
 		};
-		this.idempotencyCache.set(payload.messageRef, result);
+		this.idempotencyCache.set(messageRef, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

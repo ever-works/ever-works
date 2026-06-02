@@ -26,7 +26,10 @@ export class CredentialsService {
     }
 
     static async ensureCredentialsDir(): Promise<void> {
-        await fs.ensureDir(CREDENTIALS_DIR);
+        // Security: create the credentials dir owner-only (0o700) so other local
+        // users cannot traverse into it to read the stored bearer token. POSIX
+        // mode is a no-op on Windows. The file mode itself is hardened separately.
+        await fs.ensureDir(CREDENTIALS_DIR, { mode: 0o700 });
     }
 
     static async save(credentials: Credentials): Promise<void> {

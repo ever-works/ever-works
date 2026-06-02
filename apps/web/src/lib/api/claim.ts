@@ -1,3 +1,7 @@
+// Security: server-only guard prevents this module (and the auth-cookie-forwarding
+// serverFetch/serverMutation logic + internal API_URL it pulls in) from being bundled
+// into client JS. Matches the convention of every other file in lib/api.
+import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 
 export interface ClaimPreview {

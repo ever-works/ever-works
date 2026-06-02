@@ -22,6 +22,10 @@ export default async function ClaimPage({ params }: Params) {
     const { token } = await params;
     const outcome = await loadPreview(token);
 
+    // Security: validate the upstream URL scheme before rendering it as an
+    // anchor href (rejects `javascript:`/`data:`/etc.). See safeExternalUrl below.
+    const safeSourceUrl = outcome.ok ? safeExternalUrl(outcome.preview.sourceUrl) : undefined;
+
     if (!outcome.ok) {
         return (
             <div className="min-h-screen flex items-center justify-center p-6">
@@ -56,16 +60,16 @@ export default async function ClaimPage({ params }: Params) {
                             <span className="font-medium">{outcome.preview.role}</span>
                         </p>
                     )}
-                    {outcome.preview.sourceUrl ? (
+                    {safeSourceUrl ? (
                         <p className="text-xs text-text-secondary mt-2">
                             Upstream:{' '}
                             <a
-                                href={outcome.preview.sourceUrl}
+                                href={safeSourceUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="underline"
                             >
-                                {outcome.preview.sourceUrl}
+                                {safeSourceUrl}
                             </a>
                         </p>
                     ) : null}
@@ -79,6 +83,25 @@ export default async function ClaimPage({ params }: Params) {
             </div>
         </div>
     );
+}
+
+// Security: `sourceUrl` originates from a Work DB column surfaced by the
+// `/claim/preview` API and is rendered into an `<a href target="_blank">`.
+// React does NOT sanitize the `href` attribute, so a `javascript:`/`data:`
+// scheme would execute on click and `rel="noreferrer"` does not block it. Only
+// follow validated http(s) URLs; anything else yields `undefined` and the
+// anchor is omitted. Mirrors `safeExternalUrl` in claim/ClaimForm.tsx.
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
 }
 
 function humanizeError(code: string): string {

@@ -6,6 +6,7 @@ import {
     HttpStatus,
     InternalServerErrorException,
     Param,
+    ParseUUIDPipe,
     Post,
     Put,
     Query,
@@ -104,7 +105,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template updated' })
     async updateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId') templateId: string,
+        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
         @Body() body: UpdateCustomTemplateDto,
     ) {
         const template = await this.templateCatalogService.updateCustomTemplateForUser(
@@ -141,7 +142,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template archived' })
     async archiveCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId') templateId: string,
+        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
         @Body() body: ArchiveCustomTemplateDto,
     ) {
         const result = await this.templateCatalogService.archiveCustomTemplateForUser(
@@ -314,7 +315,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization scheduled' })
     async iterateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId') templateId: string,
+        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
         @Body() body: IterateCustomTemplateDto,
     ) {
         const result = await this.templateCustomizationService.runOnExistingTemplate(
@@ -356,7 +357,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Template synced' })
     async syncCustomTemplateFromBase(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId') templateId: string,
+        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
     ) {
         const result = await this.templateCustomizationService.syncFromBase(
             auth.userId,
@@ -411,7 +412,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization status' })
     async getCustomization(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('customizationId') customizationId: string,
+        @Param('customizationId', ParseUUIDPipe) customizationId: string, // Security: enforce UUID format
     ) {
         const customization = await this.templateCustomizationService.getByIdForUser(
             customizationId,
@@ -427,7 +428,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization list' })
     async listCustomizationsForTemplate(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('templateId') templateId: string,
+        @Param('templateId', ParseUUIDPipe) templateId: string, // Security: enforce UUID format
     ) {
         const customizations = await this.templateCustomizationService.listForTemplate(
             templateId,

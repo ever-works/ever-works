@@ -8,23 +8,46 @@ import {
     Min,
     Validate,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { IsValidCapabilityConstraint } from './validators/capability.validator';
+
+// Security: strip prototype-polluting keys (__proto__, constructor, prototype) from
+// open-ended Record<string, unknown> plugin settings fields, and clamp nesting depth
+// to prevent stack-overflow DoS from deeply nested payloads.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const MAX_SETTINGS_DEPTH = 10;
+
+function sanitizeSettingsObject(value: unknown, depth = 0): unknown {
+    if (depth > MAX_SETTINGS_DEPTH || value === null || typeof value !== 'object' || Array.isArray(value)) {
+        return value;
+    }
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        if (!DANGEROUS_KEYS.has(k)) {
+            result[k] = sanitizeSettingsObject(v, depth + 1);
+        }
+    }
+    return result;
+}
 
 /**
  * DTO for updating user plugin settings
  */
 export class UpdateUserPluginSettingsDto {
     @ApiPropertyOptional({ description: 'Plugin settings to update' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'Secret settings to update (API keys, tokens)' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     secretSettings?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'Metadata to update' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     metadata?: Record<string, unknown>;
@@ -35,11 +58,13 @@ export class UpdateUserPluginSettingsDto {
  */
 export class EnableUserPluginDto {
     @ApiPropertyOptional({ description: 'Initial settings when enabling' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'Initial secret settings when enabling' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     secretSettings?: Record<string, unknown>;
@@ -55,16 +80,19 @@ export class EnableUserPluginDto {
  */
 export class UpdateWorkPluginSettingsDto {
     @ApiPropertyOptional({ description: 'Work-specific settings' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'Work-specific secret settings' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     secretSettings?: Record<string, unknown>;
 
     @ApiPropertyOptional({ description: 'Work-specific metadata' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     metadata?: Record<string, unknown>;
@@ -75,6 +103,7 @@ export class UpdateWorkPluginSettingsDto {
  */
 export class EnableWorkPluginDto {
     @ApiPropertyOptional({ description: 'Initial work-specific settings' })
+    @Transform(({ value }) => (value !== undefined && value !== null ? sanitizeSettingsObject(value) : value))
     @IsObject()
     @IsOptional()
     settings?: Record<string, unknown>;

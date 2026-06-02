@@ -65,6 +65,13 @@ import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from 
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 
+// Security: runtime bounds for `target_items`, mirroring the form-level
+// validation in form-schema.ts (validateFormInput enforces 1..250). Kept local
+// to this file so the runtime cap in getTargetItems() is enforced even when the
+// request bypasses the UI/form validation path.
+const MIN_TARGET_ITEMS = 1;
+const MAX_TARGET_ITEMS = 250;
+
 const MANIFEST: PluginManifest = {
 	id: 'claude-managed-agent',
 	name: 'Claude Managed Agent',
@@ -496,7 +503,15 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	private getTargetItems(config: Record<string, unknown>): number {
 		const value = config.target_items;
 		if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-			return value;
+			// Security: re-apply the form-level 1..250 bound (form-schema.ts
+			// validateFormInput) at runtime. `config.target_items` reaches
+			// execute() straight from the GenerationRequest, so an authenticated
+			// caller hitting the API directly bypasses UI validation and could
+			// pass e.g. 50000 — which gets embedded verbatim into the agent's
+			// user prompt ("Target items: 50000") and drives unbounded research,
+			// runtime, and Anthropic credit consumption. Clamp instead of
+			// rejecting so all legitimate (already in-range) inputs are unchanged.
+			return Math.max(MIN_TARGET_ITEMS, Math.min(MAX_TARGET_ITEMS, Math.floor(value)));
 		}
 
 		return DEFAULT_TARGET_ITEMS;

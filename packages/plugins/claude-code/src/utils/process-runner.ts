@@ -87,7 +87,18 @@ export function executeClaudeCode(options: ExecuteOptions): {
 			args.push('--max-budget-usd', String(options.maxBudgetUsd));
 		}
 
-		if (options.model) {
+		// Security: `options.model` originates from user-controlled plugin
+		// settings and is passed verbatim to the CLI argv. spawn() with an argv
+		// array prevents shell injection, but a value beginning with `-` (e.g.
+		// `--dangerously-skip-permissions`, `--max-budget-usd`) would be parsed
+		// by the Claude Code CLI as an additional flag (argument injection),
+		// potentially overriding platform-set safety limits. Every legitimate
+		// model id is a short alias (`sonnet`/`opus`/`haiku`) or a full id like
+		// `claude-sonnet-4-5-20250929`, so constrain to a strict charset that
+		// must start with an alphanumeric. Reject (omit the flag, falling back
+		// to the CLI default) anything that doesn't match — legitimate inputs
+		// are unaffected.
+		if (options.model && /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(options.model)) {
 			args.push('--model', options.model);
 		}
 

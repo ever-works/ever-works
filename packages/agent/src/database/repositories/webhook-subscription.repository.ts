@@ -27,7 +27,21 @@ export class WebhookSubscriptionRepository {
         return this.repository.save(row);
     }
 
-    async listActiveForWork(workId: string): Promise<WebhookSubscription[]> {
+    async listActiveForWork(workId: string, accountId?: string): Promise<WebhookSubscription[]> {
+        // Security: when an accountId is supplied, scope BOTH arms of the OR to
+        // that account so the account-wide (workId IS NULL) branch can no longer
+        // pull every tenant's active subscriptions into memory. Callers that pass
+        // accountId get tenant isolation enforced at the DB instead of relying on
+        // a fragile post-query filter. Omitting accountId preserves the legacy
+        // behaviour (and exact query shape) for existing callers.
+        if (accountId) {
+            return this.repository.find({
+                where: [
+                    { workId, accountId, status: 'active' },
+                    { workId: null as unknown as string, accountId, status: 'active' },
+                ],
+            });
+        }
         return this.repository.find({
             where: [
                 { workId, status: 'active' },
@@ -65,8 +79,13 @@ export class WebhookSubscriptionRepository {
         await this.repository.update(id, { secretEncrypted });
     }
 
-    async delete(id: string): Promise<void> {
-        await this.repository.delete(id);
+    async delete(id: string, accountId?: string): Promise<void> {
+        // Security: defence-in-depth ownership guard. When an accountId is
+        // supplied the delete is scoped to { id, accountId } so a caller can
+        // never remove another tenant's subscription by supplying an arbitrary
+        // UUID, even if the service-layer ownership check is bypassed. Omitting
+        // accountId preserves the existing by-id behaviour for current callers.
+        await this.repository.delete(accountId ? { id, accountId } : id);
     }
 
     async findById(id: string): Promise<WebhookSubscription | null> {

@@ -289,7 +289,18 @@ export class MakeClient {
 				}
 			}
 		}
-		return url.toString();
+		// Security (SSRF): baseUrl is tenant-controlled plugin settings and flows
+		// into every authenticated REST call (which carries the Make API token in
+		// an `Authorization: Token …` header). Reject literal private/loopback/
+		// link-local/cloud-metadata hosts and non-HTTP(S) schemes so a malicious
+		// baseUrl (e.g. http://169.254.169.254 or http://10.0.0.1) can't redirect
+		// the request — and the bearer token — to an internal endpoint and leak
+		// its response back through the error path. Mirrors the invokeWebhook guard.
+		const finalUrl = url.toString();
+		if (!isSafeWebhookUrl(finalUrl)) {
+			throw new Error('Make.com API base URL is not safe to call (SSRF guard blocked the destination host).');
+		}
+		return finalUrl;
 	}
 
 	private wrapHttpError(status: number, statusText: string, rawBody: string): Error {

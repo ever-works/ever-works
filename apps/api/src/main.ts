@@ -55,7 +55,47 @@ async function bootstrap() {
     // File uploads go through multer (which has its own limits, set in the
     // route's `FileInterceptor` options) and don't share this parser, so we
     // don't have to leave headroom for CSV/XLSX imports here.
-    const bodyLimit = process.env.BODY_LIMIT || '1mb';
+    //
+    // Security (M-19 follow-up): BODY_LIMIT is operator-supplied, so it must not
+    // be passed verbatim to the parser. A typo like `BODY_LIMIT=512mb` would
+    // silently re-arm the memory-amplification vector this limit exists to close
+    // (an anonymous attacker could then make the parser buffer hundreds of MB per
+    // connection). Parse the value and reject anything above a hard cap, falling
+    // back to the safe default. Legitimate values (`1mb`, `2mb`, `5mb`, …) are
+    // well under the cap and pass through unchanged.
+    const DEFAULT_BODY_LIMIT = '1mb';
+    const MAX_BODY_LIMIT_BYTES = 10 * 1024 * 1024; // 10mb hard ceiling
+    const parseByteSize = (value: string): number | null => {
+        const trimmed = value.trim().toLowerCase();
+        // Accept an optional unit suffix (b/kb/mb/gb) or a bare byte count.
+        const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/.exec(trimmed);
+        if (!match) return null;
+        const amount = Number(match[1]);
+        if (!Number.isFinite(amount)) return null;
+        const unit = match[2] ?? 'b';
+        const multiplier =
+            unit === 'gb'
+                ? 1024 ** 3
+                : unit === 'mb'
+                  ? 1024 ** 2
+                  : unit === 'kb'
+                    ? 1024
+                    : 1;
+        return amount * multiplier;
+    };
+    const requestedBodyLimit = process.env.BODY_LIMIT;
+    let bodyLimit = DEFAULT_BODY_LIMIT;
+    if (requestedBodyLimit) {
+        const parsed = parseByteSize(requestedBodyLimit);
+        if (parsed === null || parsed > MAX_BODY_LIMIT_BYTES) {
+            // eslint-disable-next-line no-console
+            console.warn(
+                `[bootstrap] BODY_LIMIT="${requestedBodyLimit}" is invalid or exceeds the ${MAX_BODY_LIMIT_BYTES}-byte cap; falling back to ${DEFAULT_BODY_LIMIT}.`,
+            );
+        } else {
+            bodyLimit = requestedBodyLimit;
+        }
+    }
     app.use(json({ limit: bodyLimit, verify: captureRawBody }));
     app.use(urlencoded({ limit: bodyLimit, extended: true, verify: captureRawBody }));
 

@@ -48,6 +48,11 @@ type SseResponse = {
 
 type SseRequest = {
     on(event: 'close', listener: () => void): void;
+    // Security: the underlying TCP socket is used as a belt-and-braces
+    // cleanup hook — on abrupt (RST) disconnects the response/request
+    // `close` event may not fire reliably behind some proxies/HTTP2, but
+    // the socket `close` does. Optional since it isn't guaranteed present.
+    socket?: { on(event: 'close', listener: () => void): void };
 };
 
 type WebhookRequest = {
@@ -212,13 +217,29 @@ export class EmailController {
             if (!closed) res.write(': ping\n\n');
         }, 15000);
 
+        // Security: bound the stream lifetime so a zombie connection (abrupt
+        // RST with no graceful FIN, where neither req/res `close` fires)
+        // cannot keep its poll+heartbeat timers — and their per-tick DB
+        // queries — alive for the process lifetime. The client reconnects
+        // (and falls back to plain polling) on disconnect, so force-closing
+        // long-lived streams after 10 minutes is transparent to legitimate
+        // callers.
+        let maxLifetime: ReturnType<typeof setTimeout> | undefined;
+
         const cleanup = () => {
+            if (closed) return;
             closed = true;
             clearInterval(pollTimer);
             clearInterval(heartbeat);
+            if (maxLifetime) clearTimeout(maxLifetime);
         };
+
+        maxLifetime = setTimeout(cleanup, 10 * 60 * 1000);
         req.on('close', cleanup);
         res.on('close', cleanup);
+        // Security: belt-and-braces fallback for abrupt socket teardown where
+        // the higher-level `close` events may not fire.
+        req.socket?.on('close', cleanup);
     }
 
     @UseGuards(AuthSessionGuard)
@@ -246,6 +267,10 @@ export class EmailController {
 
     @Public()
     @Get('verify/:token')
+    // Security: rate-limit the unauthenticated token-confirmation endpoint so
+    // verification tokens cannot be brute-forced/enumerated. A legitimate
+    // click-through hits this once; 10/min/IP is far above that.
+    @Throttle({ default: { ttl: 60_000, limit: 10 } })
     @ApiOperation({ summary: 'Confirm an email address via verification token' })
     async confirmVerification(@Param('token') token: string) {
         return this.emailService.confirmVerification(token);

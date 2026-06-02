@@ -1,5 +1,5 @@
 import 'server-only';
-import { API_URL, WEB_URL } from '../constants';
+import { ALLOWED_REDIRECT_URLS, API_URL, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
@@ -31,13 +31,54 @@ export async function handleServerError(error: unknown): Promise<never> {
     throw new Error(t('unexpected'));
 }
 
+// Security: `x-forwarded-host` / `x-forwarded-proto` are attacker-controlled
+// (a client can send `x-forwarded-host: evil.com` directly, or a misconfigured
+// proxy can pass it through). The resolved value is forwarded to the backend
+// API as the `X-Frontend-URL` header on every server-side call, so an
+// un-validated host enables host-header injection (open-redirect / phishing if
+// the API ever uses it to build email/OAuth/redirect links). Only honor a
+// forwarded host when it resolves to an allowlisted origin; otherwise fall back
+// to the canonical `WEB_URL`. Host matching mirrors `isRelativeOrAllowedRedirectHost`
+// in lib/auth/redirect.ts and lib/utils/url.ts (exact match + leading `*.` wildcard).
+function isAllowedFrontendHost(hostname: string): boolean {
+    const cleanHostname = hostname.toLowerCase();
+
+    return ALLOWED_REDIRECT_URLS.some((allowed) => {
+        const cleanAllowed = allowed
+            .replace(/^https?:\/\//, '')
+            .toLowerCase()
+            .trim();
+
+        if (cleanAllowed.startsWith('*.')) {
+            const domain = cleanAllowed.slice(2);
+            return cleanHostname !== domain && cleanHostname.endsWith('.' + domain);
+        }
+
+        return cleanHostname === cleanAllowed;
+    });
+}
+
 export async function getFrontendUrl(): Promise<string> {
     const headersList = await headers();
     const host = headersList.get('x-forwarded-host') || headersList.get('host');
-    const protocol = headersList.get('x-forwarded-proto') || 'https';
+    // Security: constrain the protocol to http(s); never echo back an
+    // attacker-supplied scheme (e.g. `x-forwarded-proto: file`).
+    const protocol = headersList.get('x-forwarded-proto') === 'http' ? 'http' : 'https';
 
     if (host) {
-        return `${protocol}://${host}`;
+        const candidate = `${protocol}://${host}`;
+
+        // Security: validate the forwarded host against the allowlist before
+        // trusting it; fall back to the canonical WEB_URL on any mismatch or
+        // malformed value (the port is ignored, matching the allowlist logic
+        // used across the auth redirect helpers).
+        try {
+            if (isAllowedFrontendHost(new URL(candidate).hostname)) {
+                return candidate;
+            }
+        } catch {
+            // malformed host — fall through to WEB_URL
+        }
     }
 
     // Fallback to environment variable or localhost

@@ -15,6 +15,15 @@ interface MiddlewareRequest {
 type NextFn = (err?: unknown) => void;
 
 /**
+ * Security: matches C0 control chars (U+0000–U+001F, incl. CR/LF and the
+ * ESC at U+001B that begins ANSI escape sequences), DEL (U+007F), and the
+ * C1 range (U+0080–U+009F). Built from a string so no raw control bytes
+ * live in the source. Used to neutralize untrusted slug values before they
+ * are embedded in log lines so they cannot forge extra entries.
+ */
+const CONTROL_CHARS = new RegExp('[\\u0000-\\u001F\\u007F-\\u009F]+', 'g');
+
+/**
  * EW-659 (Tenants & Organizations Phase 7) — slug routing middleware.
  *
  * Resolves the request's scope from either a `:slug` URL segment
@@ -128,7 +137,13 @@ export class ScopeResolverMiddleware implements NestMiddleware {
             };
         }
 
-        this.logger.debug(`Scope resolution miss for slug='${slug}'`);
+        // Security: `slug` originates from the untrusted `X-Scope-Slug`
+        // header / URL param and is only whitespace-trimmed upstream, so it
+        // can carry newlines or ANSI escapes that would forge extra log
+        // lines (log injection). Collapse control chars to a single space
+        // and cap length before embedding it in the log string.
+        const safeSlug = slug.replace(CONTROL_CHARS, ' ').slice(0, 128);
+        this.logger.debug(`Scope resolution miss for slug='${safeSlug}'`);
         return null;
     }
 }

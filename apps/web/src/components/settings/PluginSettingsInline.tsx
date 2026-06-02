@@ -18,6 +18,27 @@ import { getCapabilityLabel } from '@/lib/utils/plugin-category-icons';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
 import { usePluginToggle } from '@/lib/hooks/use-plugin-toggle';
 
+// Security: `plugin.uiHints.setupLink.url` originates from an untrusted
+// plugin manifest and is typed as a plain string with no protocol
+// enforcement. Rendering it directly in an <a href> would let a malicious
+// plugin inject a `javascript:` URI that executes on click. Only allow
+// http(s)/mailto schemes (mirrors isSafeSetupLinkUrl in plugins/PluginSettings.tsx).
+const SAFE_SETUP_LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:']);
+
+function isSafeSetupLinkUrl(value: string | undefined | null): boolean {
+    if (!value) return false;
+    const trimmed = value.trim();
+    if (trimmed.length === 0) return false;
+    try {
+        const parsed = new URL(trimmed);
+        return SAFE_SETUP_LINK_SCHEMES.has(parsed.protocol.toLowerCase());
+    } catch {
+        // Reject anything that isn't an absolute URL with a known-safe
+        // scheme (relative URLs make no sense for an external setup link).
+        return false;
+    }
+}
+
 interface PluginSettingsInlineProps {
     plugin: UserPlugin;
     oauthConnection?: OAuthConnectionInfo | null;
@@ -114,7 +135,11 @@ export function PluginSettingsInline({
     }, [plugin.uiHints?.byok, byokRevealed, visibleProperties]);
 
     const setupLink = plugin.uiHints?.setupLink;
+    // Security: only treat the setup link as renderable when its URL uses a
+    // safe scheme. A plugin-supplied `javascript:` URL is dropped entirely.
+    const hasSafeSetupLink = Boolean(setupLink && isSafeSetupLinkUrl(setupLink.url));
     const showSetupButton =
+        hasSafeSetupLink &&
         setupLink &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 

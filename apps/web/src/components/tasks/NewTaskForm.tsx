@@ -11,6 +11,9 @@ import type { Task, TaskPriority } from '@/lib/api/tasks';
 // PASS-4 review fix (CRITICAL): templates dead end. Pre-fill from
 // ?from=<slug> when the user clicked "Use template" on /tasks/templates.
 import { listAstTemplates } from '@/lib/api/agent-templates';
+// Security: sanitizers strip control characters from untrusted URL-derived
+// input (mirrors the pattern used in NewAgentDialog.tsx).
+import { sanitizeName, sanitizePrompt } from '@/lib/utils/sanitize';
 
 type CreateTaskFn = (input: {
     title: string;
@@ -34,6 +37,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const [priority, setPriority] = useState<TaskPriority>('p3');
     const [labelsRaw, setLabelsRaw] = useState('');
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
+    // Security: track whether the form was pre-filled from a URL param so we
+    // can show a visible notice to the user (guards against phishing deep-links
+    // that silently inject content into the form before submission).
+    const [preFillSource, setPreFillSource] = useState<'prompt' | 'template' | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +57,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 const entry = all.find((e) => e.slug === from);
                 if (entry) {
                     setTemplateSlug(from);
+                    // Security: show a visible pre-fill notice so users
+                    // notice form content was loaded from a URL parameter
+                    // before they submit.
+                    setPreFillSource('template');
                     if (!title) setTitle(entry.title);
                     if (!description && entry.description) setDescription(entry.description);
                     if (!labelsRaw && entry.tags && entry.tags.length > 0) {
@@ -79,16 +90,25 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
         const trimmed = promptParam.trim();
         if (!trimmed) return;
         const firstBreak = trimmed.indexOf('\n');
-        const candidateTitle =
+        const rawTitle =
             firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 120).trim();
-        const candidateDescription =
+        const rawDescription =
             firstBreak > 0
                 ? trimmed.slice(firstBreak + 1).trim()
                 : trimmed.length > 120
                   ? trimmed
                   : '';
+        // Security: the `?prompt=` query param is untrusted (e.g. a shared
+        // phishing deep-link). Strip control characters before pre-populating
+        // the form. sanitizeName removes newlines + control chars from the
+        // title; sanitizePrompt preserves intentional newlines in the
+        // description but strips hidden control characters. Legitimate
+        // plain-text prompts pass through unchanged.
+        const candidateTitle = sanitizeName(rawTitle, 120);
+        const candidateDescription = sanitizePrompt(rawDescription, 5000);
         if (!title && candidateTitle) setTitle(candidateTitle);
         if (!description && candidateDescription) setDescription(candidateDescription);
+        if (candidateTitle || candidateDescription) setPreFillSource('prompt');
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
@@ -127,6 +147,22 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     {t('title')}
                 </h1>
             </div>
+            {/* Security: visible notice when the form is pre-filled from a URL
+                parameter so users notice potentially attacker-crafted content
+                before submitting. */}
+            {preFillSource === 'prompt' && (
+                <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                    This form was pre-filled from a URL link. Review the content before creating the
+                    task.
+                </div>
+            )}
+            {preFillSource === 'template' && templateSlug && (
+                <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                    Pre-filled from template{' '}
+                    <span className="font-medium text-text dark:text-text-dark">{templateSlug}</span>
+                    . Review the content before creating the task.
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                     <label className="block text-xs text-text-secondary mb-1">{t('name')}</label>

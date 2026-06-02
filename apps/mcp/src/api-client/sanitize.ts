@@ -21,7 +21,45 @@ const SENSITIVE_FIELDS = new Set([
 	'refresh_token',
 	'privateKey',
 	'private_key',
-	'token'
+	'token',
+	// Security: additional unambiguous credential/secret field names that can
+	// leak through serialiser misconfigurations on auth/user/plugin responses.
+	// Only exact, non-ambiguous names are added here — a bare `hash` is left
+	// out on purpose because in this repo it commonly denotes a git commit /
+	// content hash (a legitimate, non-sensitive value).
+	'passwordHash',
+	'password_hash',
+	'hashedPassword',
+	'hashed_password',
+	'salt',
+	'authToken',
+	'auth_token',
+	'apiToken',
+	'api_token',
+	'bearerToken',
+	'bearer_token',
+	'oauthToken',
+	'oauth_token',
+	'sessionToken',
+	'session_token',
+	'verificationToken',
+	'verification_token',
+	'jwt',
+	'jwtToken',
+	'idToken',
+	'id_token',
+	'twoFactorSecret',
+	'two_factor_secret',
+	'totpSecret',
+	'totp_secret',
+	'twoFactorBackupCodes',
+	'backupCodes',
+	'backup_codes',
+	'encryptedKey',
+	'encrypted_key',
+	'encryptedSecret',
+	'encrypted_secret',
+	'otp'
 ]);
 
 function sanitizeValue(data: unknown): unknown {

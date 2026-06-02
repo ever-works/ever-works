@@ -67,5 +67,16 @@ export async function detectPlatform(): Promise<PlatformInfo> {
  * Get the cached binary path for a given version and platform.
  */
 export function getBinaryPath(version: string, platformString: string): string {
-	return path.join(BASE_TEMP_DIR, 'bin', `opencode-${version}-${platformString}`);
+	const binaryPath = path.join(BASE_TEMP_DIR, 'bin', `opencode-${version}-${platformString}`);
+	// Security: defense-in-depth path confinement. `version` originates from tenant-supplied
+	// plugin settings; although callers validate it against a semver pattern first, assert the
+	// resolved path stays inside BASE_TEMP_DIR so a traversal payload (e.g. `../../etc/cron.d`)
+	// can never point the binary cache / spawn target outside the temp dir. Legitimate values
+	// like `opencode-v1.0.223-linux-x64` resolve well within the base and are unaffected.
+	const resolvedBase = path.resolve(BASE_TEMP_DIR);
+	const resolvedPath = path.resolve(binaryPath);
+	if (resolvedPath !== resolvedBase && !resolvedPath.startsWith(resolvedBase + path.sep)) {
+		throw new Error('Invalid OpenCode binary path: resolves outside the cache directory');
+	}
+	return binaryPath;
 }

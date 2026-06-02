@@ -52,6 +52,13 @@ export function executeGemini(options: ExecuteOptions): {
 			args.push('--model', options.model);
 		}
 
+		// Security: do NOT forward host GCP credentials (GOOGLE_APPLICATION_CREDENTIALS,
+		// GOOGLE_API_USE_CLIENT_CERTIFICATE) into the per-user Gemini CLI child. The CLI is
+		// run with `--approval-mode yolo` on prompts built from untrusted user/research
+		// content; a prompt-injection could otherwise read the referenced service-account
+		// key file and exfiltrate it. Gemini authenticates solely via the scoped
+		// GEMINI_API_KEY injected through options.env (resolveAuthEnv). This mirrors the
+		// codex/claude-code buildSubprocessEnv allow-lists, which intentionally omit these.
 		const passthroughEnvKeys = [
 			'HTTP_PROXY',
 			'HTTPS_PROXY',
@@ -59,9 +66,7 @@ export function executeGemini(options: ExecuteOptions): {
 			'NO_PROXY',
 			'SSL_CERT_FILE',
 			'SSL_CERT_DIR',
-			'NODE_EXTRA_CA_CERTS',
-			'GOOGLE_APPLICATION_CREDENTIALS',
-			'GOOGLE_API_USE_CLIENT_CERTIFICATE'
+			'NODE_EXTRA_CA_CERTS'
 		] as const;
 
 		const env: Record<string, string> = {

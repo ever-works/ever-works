@@ -11,6 +11,9 @@ import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import type { UserPlugin } from '@/lib/api/plugins';
+import { redirect } from '@/i18n/navigation';
+import { getLocale } from 'next-intl/server';
+import { ROUTES } from '@/lib/constants';
 
 const FALLBACK_CATALOG: OnboardingCatalogResponse = {
     ai: [],
@@ -29,7 +32,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     const user = await getAuthFromCookie();
 
     if (!user) {
-        return null;
+        // Security: defense-in-depth redirect — ensures unauthenticated requests
+        // are sent to login even if the proxy middleware matcher is misconfigured.
+        const locale = await getLocale();
+        redirect({ href: ROUTES.AUTH_LOGIN, locale });
     }
 
     const [

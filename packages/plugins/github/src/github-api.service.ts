@@ -856,6 +856,41 @@ export class GitHubApiService {
 	}
 
 	getRawFileUrl(owner: string, repo: string, branch: string, path: string): string {
+		// Security (URL injection / path traversal): owner/repo/branch/path are
+		// interpolated straight into a raw.githubusercontent.com URL whose result
+		// is fed to fetch() (source-repo-analyzer) and may be rendered in the UI.
+		// A segment containing `..`, an encoded slash (%2F), a backslash, or a
+		// CR/LF sequence could traverse to a different repository or inject into
+		// the URL. Reject those vectors; legitimate GitHub owner/repo/branch/path
+		// values pass through unchanged. Fail closed by throwing -- the sole caller
+		// wraps this in try/catch and falls through to the next candidate.
+		const rejectSegment = (segment: string, allowSlash: boolean): void => {
+			// Control chars (incl. CR/LF/NUL/DEL), backslash, and % (percent-encoding
+			// such as %2F) are never valid here and all enable URL/path injection.
+			for (let idx = 0; idx < segment.length; idx++) {
+				const code = segment.charCodeAt(idx);
+				const ch = segment[idx];
+				if (code <= 0x1f || code === 0x7f || ch === '\\' || ch === '%') {
+					throw new Error('getRawFileUrl: illegal character in URL segment');
+				}
+			}
+			// A `..` or `.` that is a WHOLE path component (slash-delimited, or the
+			// entire value) is traversal; a literal `..` inside a longer filename
+			// (e.g. a..b.txt) is harmless and stays allowed.
+			if (segment.split('/').some((p) => p === '..' || p === '.')) {
+				throw new Error('getRawFileUrl: path traversal in URL segment');
+			}
+			// owner/repo/branch are single path segments and must not contain a
+			// slash of their own; only path may legitimately contain `/`.
+			if (!allowSlash && segment.includes('/')) {
+				throw new Error('getRawFileUrl: unexpected slash in URL segment');
+			}
+		};
+		rejectSegment(owner, false);
+		rejectSegment(repo, false);
+		rejectSegment(branch, false);
+		rejectSegment(path, true);
+
 		return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${path}`;
 	}
 

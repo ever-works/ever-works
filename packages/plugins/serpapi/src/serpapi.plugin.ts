@@ -84,7 +84,14 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 		}
 
 		const startTime = Date.now();
-		const engine = (options.settings?.engine as string) || 'google';
+		// Security: re-validate the engine against the allowed list rather than
+		// trusting the settings-supplied value. Unknown/abusive values (e.g. an
+		// attempt at parameter injection) fall back to the default 'google'.
+		const requestedEngine = options.settings?.engine as string | undefined;
+		const engine =
+			requestedEngine && (SUPPORTED_ENGINES as readonly string[]).includes(requestedEngine)
+				? requestedEngine
+				: 'google';
 		const limit = options.limit || (options.settings?.maxResults as number) || 10;
 		const page = options.page || 1;
 
@@ -131,7 +138,9 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				throw new Error(`SerpAPI request failed (${response.status}): ${errorText}`);
+				// Security: sanitize/truncate the upstream body so a reflected secret
+				// or oversized response can't leak into thrown errors/logs.
+				throw new Error(`SerpAPI request failed (${response.status}): ${this.sanitizeErrorBody(errorText)}`);
 			}
 
 			const data = await response.json();
@@ -195,7 +204,12 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				return { success: false, message: `SerpAPI connection failed (${response.status}): ${errorText}` };
+				// Security: sanitize/truncate the upstream body before returning it in
+				// the validation message (may be displayed to the user or stored).
+				return {
+					success: false,
+					message: `SerpAPI connection failed (${response.status}): ${this.sanitizeErrorBody(errorText)}`
+				};
 			}
 
 			return { success: true, message: 'SerpAPI connection verified.' };
@@ -213,6 +227,19 @@ export class SerpApiSearchPlugin implements IPlugin, ISearchPlugin {
 			limit: -1,
 			period: 'month'
 		};
+	}
+
+	/**
+	 * Security (info-leak): collapses an upstream SerpAPI error body into a
+	 * single bounded line before it is surfaced to callers/logs. SerpAPI error
+	 * bodies can echo account/quota details (or a reflected api_key). Removes
+	 * control characters (newlines, NUL, etc.) and truncates so a hostile or
+	 * oversized body can't leak large internal detail or break the UI layout.
+	 */
+	private sanitizeErrorBody(body: string, maxLength = 300): string {
+		// eslint-disable-next-line no-control-regex
+		const cleaned = body.replace(/[\x00-\x1f\x7f]+/g, ' ').trim();
+		return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}…` : cleaned;
 	}
 
 	// ============================================================================

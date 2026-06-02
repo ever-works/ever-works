@@ -191,8 +191,22 @@ export async function addDomain(workId: string, domain: string) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
+    // Security: validate hostname format (RFC 1123 / RFC 5891) before forwarding to
+    // the deploy plugin.  Rejects path-traversal strings, special characters, and
+    // other values that could corrupt an external provider API call.
+    const trimmedDomain = domain.trim();
+    const hostnameRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    if (!hostnameRegex.test(trimmedDomain)) {
+        return {
+            success: false,
+            domain: undefined,
+            verified: false,
+            error: 'Invalid domain name format',
+        };
+    }
+
     try {
-        const response = await deployAPI.addDomain(workId, domain);
+        const response = await deployAPI.addDomain(workId, trimmedDomain);
         revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         return {
             success: response.status === 'success',

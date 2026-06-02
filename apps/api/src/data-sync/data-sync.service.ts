@@ -415,17 +415,34 @@ function classifyError(err: unknown): SyncEventErrorClass {
     return 'unknown';
 }
 
+/**
+ * Security: strip credential-bearing URLs from git subprocess output before
+ * it reaches the activity log. Git stderr frequently echoes the remote URL
+ * (e.g. "fatal: repository 'https://<token>@github.com/org/repo' not found"),
+ * so any token embedded in the URL must be redacted before storage.
+ */
+function sanitizeErrorText(text: string): string {
+    // Replace credential-bearing URL patterns emitted by git:
+    //   https://user:password@host  (basic-auth form)
+    //   https://token@host          (token-only form used by GitHub CLI / gh)
+    // The pattern requires at least one non-whitespace, non-slash char after
+    // the scheme before the @ so it does not match bare https://@host.
+    return text.replace(/https?:\/\/[^@\s/][^@\s]*@/g, 'https://<redacted>@');
+}
+
 function extractErrorMessage(err: unknown): string {
     if (typeof err === 'string') {
-        return err;
+        return sanitizeErrorText(err);
     }
     if (err && typeof err === 'object') {
         const e = err as { stderr?: unknown; message?: unknown };
         if (typeof e.stderr === 'string' && e.stderr.length > 0) {
-            return e.stderr;
+            // Security: sanitize before returning — stderr may contain
+            // the authenticated remote URL (e.g. https://<token>@github.com/…).
+            return sanitizeErrorText(e.stderr);
         }
         if (typeof e.message === 'string') {
-            return e.message;
+            return sanitizeErrorText(e.message);
         }
     }
     return String(err);

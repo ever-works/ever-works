@@ -1,12 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+    ArrayMaxSize,
     IsArray,
     IsBoolean,
     IsIn,
     IsInt,
     IsOptional,
     IsString,
+    MaxLength,
     Min,
     ValidateNested,
 } from 'class-validator';
@@ -85,10 +87,13 @@ export class OnboardingStatePatchInnerDto {
     @Type(() => DeployChoicePatchDto)
     deploy?: DeployChoicePatchDto;
 
+    // Security: bound array size and element length to prevent large-payload DoS writes to onboarding_state column
     @ApiPropertyOptional({ type: [String] })
     @IsOptional()
     @IsArray()
+    @ArrayMaxSize(20)
     @IsString({ each: true })
+    @MaxLength(64, { each: true })
     skippedSteps?: string[];
 
     @ApiPropertyOptional()

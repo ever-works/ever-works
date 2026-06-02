@@ -183,19 +183,25 @@ function mapNativeRecord(record: Record<string, unknown>, mapping: ComposioField
 	const images: string[] = [];
 	if (mapping.imageField) {
 		const raw = readField(record, mapping.imageField);
+		// Security: only keep http(s) image URLs (see sanitizeHttpUrl).
 		if (Array.isArray(raw)) {
 			for (const img of raw) {
-				if (typeof img === 'string' && img.trim()) images.push(img.trim());
+				if (typeof img === 'string') {
+					const safe = sanitizeHttpUrl(img);
+					if (safe) images.push(safe);
+				}
 			}
-		} else if (typeof raw === 'string' && raw.trim()) {
-			images.push(raw.trim());
+		} else if (typeof raw === 'string') {
+			const safe = sanitizeHttpUrl(raw);
+			if (safe) images.push(safe);
 		}
 	}
 
 	return {
 		name: (name || '').trim(),
 		description: (description || '').trim(),
-		source_url: (url || '').trim(),
+		// Security: reject non-http(s) source URLs (javascript:/data:/…).
+		source_url: sanitizeHttpUrl(url || ''),
 		markdown: content,
 		category: (category || '').trim(),
 		tags,
@@ -218,6 +224,13 @@ function readField(record: Record<string, unknown>, path: string): unknown {
 	let current: unknown = record;
 	for (const part of parts) {
 		if (current == null) return undefined;
+		// Security (prototype-pollution): both the mapping path and the live
+		// records are attacker-controlled (Composio tool output). Refuse to walk
+		// into `__proto__` / `constructor` / `prototype` so a crafted path or a
+		// record key literally named `__proto__` can't escape onto the prototype
+		// chain and leak built-in members into item fields. No legitimate field
+		// uses these names, so behavior is unchanged for valid input.
+		if (part === '__proto__' || part === 'prototype' || part === 'constructor') return undefined;
 		if (Array.isArray(current)) {
 			const idx = Number(part);
 			if (!Number.isInteger(idx)) return undefined;
@@ -225,7 +238,10 @@ function readField(record: Record<string, unknown>, path: string): unknown {
 			continue;
 		}
 		if (typeof current !== 'object') return undefined;
-		current = (current as Record<string, unknown>)[part];
+		// Read own properties only — never inherited members off the prototype.
+		current = Object.prototype.hasOwnProperty.call(current, part)
+			? (current as Record<string, unknown>)[part]
+			: undefined;
 	}
 	return current;
 }
@@ -243,6 +259,26 @@ function tryParseJson(str: string): unknown {
 	}
 }
 
+/**
+ * Security (open-redirect / stored-XSS): `source_url` and `images` come straight
+ * from attacker-controlled Composio tool output (Gmail bodies, GitHub issues,
+ * Notion pages) and are later rendered as `href` / `<img src>`. Allow only
+ * http(s) URLs — anything else (`javascript:`, `data:`, relative junk) is
+ * dropped to an empty string. Mirrors the canonical `httpUrl` schema used by the
+ * CLI pipeline (`packages/plugin/src/cli-pipeline/workspace.ts`). Legitimate
+ * http(s) URLs pass through unchanged.
+ */
+function sanitizeHttpUrl(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed) return '';
+	try {
+		const u = new URL(trimmed);
+		return u.protocol === 'http:' || u.protocol === 'https:' ? trimmed : '';
+	} catch {
+		return '';
+	}
+}
+
 function parseItems(rawItems: ComposioOutputItem[]): ItemData[] {
 	const items: ItemData[] = [];
 
@@ -250,16 +286,28 @@ function parseItems(rawItems: ComposioOutputItem[]): ItemData[] {
 		if (!raw || typeof raw !== 'object') continue;
 		if (!raw.name || typeof raw.name !== 'string') continue;
 
+		// Security: source_url / images are attacker-controlled tool output that
+		// the platform later renders as href / <img src>. Allow only http(s).
+		const rawUrl = typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '';
+		const safeImages = Array.isArray(raw.images)
+			? raw.images.reduce<string[]>((acc, i) => {
+					if (typeof i === 'string') {
+						const safe = sanitizeHttpUrl(i);
+						if (safe) acc.push(safe);
+					}
+					return acc;
+				}, [])
+			: undefined;
+
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : '',
-			source_url:
-				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '',
+			source_url: sanitizeHttpUrl(rawUrl),
 			markdown: typeof raw.content === 'string' ? raw.content : undefined,
 			category: typeof raw.category === 'string' ? raw.category.trim() : '',
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
-			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
+			images: safeImages
 		};
 
 		items.push(item);

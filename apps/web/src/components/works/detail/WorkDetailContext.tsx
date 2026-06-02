@@ -95,9 +95,12 @@ function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null)
     const dataRepository = relatedRepositories?.data;
     const websiteRepository = relatedRepositories?.website;
 
+    // Security: encodeURIComponent applied to all user-controlled path segments to prevent
+    // path-traversal via malicious slug or repository names (e.g. "../../evil").
+    const encSlug = encodeURIComponent(work.slug);
     return {
-        main: `${baseUrl}/${mainRepository?.owner || owner}/${mainRepository?.repo || work.slug}`,
-        dataRepo: `${baseUrl}/${dataRepository?.owner || owner}/${dataRepository?.repo || `${work.slug}-data`}`,
-        websiteRepo: `${baseUrl}/${websiteRepository?.owner || owner}/${websiteRepository?.repo || `${work.slug}-website`}`,
+        main: `${baseUrl}/${encodeURIComponent(mainRepository?.owner || owner)}/${encodeURIComponent(mainRepository?.repo || work.slug)}`,
+        dataRepo: `${baseUrl}/${encodeURIComponent(dataRepository?.owner || owner)}/${encodeURIComponent(dataRepository?.repo || `${encSlug}-data`)}`,
+        websiteRepo: `${baseUrl}/${encodeURIComponent(websiteRepository?.owner || owner)}/${encodeURIComponent(websiteRepository?.repo || `${encSlug}-website`)}`,
     };
 }

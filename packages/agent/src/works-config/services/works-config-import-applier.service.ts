@@ -6,6 +6,20 @@ import { PluginOperationsService } from '@src/plugins/services/plugin-operations
 import { WorkScheduleService } from '@src/services/work-schedule.service';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 
+// Security: a pipeline `model` read from `.works/works.yml` is attacker-controlled
+// external content. It is persisted as a plugin setting and later passed verbatim
+// to a coding-agent CLI subprocess via `spawn(cmd, argv)`. spawn with an argv array
+// prevents shell injection, but a value beginning with `-`/`--` (or containing
+// whitespace) could be parsed by the downstream CLI as an extra flag (argument
+// injection — e.g. `--dangerously-bypass-approvals-and-sandbox`, `--max-budget-usd`),
+// overriding platform safety limits. Constrain to the same strict charset the
+// claude-code/codex process-runners accept: must start alphanumeric, then a short
+// run of `A-Za-z0-9._-`. Every legitimate model id (`sonnet`, `opus`, `haiku`,
+// `gpt-4o`, `o3`, `claude-sonnet-4-5-20250929`, `codex-mini-latest`) matches, so no
+// real import is affected; malicious values are dropped (model omitted from the
+// persisted settings, falling back to the plugin/CLI default).
+const SAFE_PIPELINE_MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
 @Injectable()
 export class WorksConfigImportApplierService {
     private readonly logger = new Logger(WorksConfigImportApplierService.name);
@@ -131,6 +145,19 @@ export class WorksConfigImportApplierService {
         const model = worksConfig?.model;
 
         if (!model) {
+            return null;
+        }
+
+        // Security: reject a model id that could smuggle CLI flags into the
+        // downstream coding-agent subprocess (argument injection). Drop the
+        // invalid value rather than persisting it; a malformed optional field
+        // must not abort the import, so treat it as "no model configured".
+        if (!SAFE_PIPELINE_MODEL_PATTERN.test(model)) {
+            this.logger.warn(
+                `Ignoring invalid pipeline model from .works/works.yml (does not match allowed format): ${JSON.stringify(
+                    model.slice(0, 120),
+                )}`,
+            );
             return null;
         }
 

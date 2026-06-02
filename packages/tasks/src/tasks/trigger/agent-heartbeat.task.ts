@@ -5,6 +5,8 @@ import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database'
 import { computeNextHeartbeat } from '@ever-works/agent/agents';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
+// Security: import assertUuid to validate Trigger.dev payload fields before any DB access
+import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 
 export interface AgentHeartbeatPayload {
     agentId: string;
@@ -39,6 +41,9 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
     maxDuration: config.agents.getMaxRunDurationSeconds(),
     onFailure: async ({ payload, error }) => {
         if (!payload) return;
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentHeartbeat:Failure'));
@@ -67,6 +72,9 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
         }
     },
     run: async (payload: AgentHeartbeatPayload) => {
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('AgentHeartbeat'));
 
