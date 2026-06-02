@@ -18,10 +18,13 @@ jest.mock('@ever-works/agent/database', () => ({
 // to avoid the resolution chain.
 jest.mock('@ever-works/agent/agents', () => ({
     AgentScheduleDispatcherService: class AgentScheduleDispatcherService {},
+    AgentRunService: class AgentRunService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskRecurrenceDispatcherService: class TaskRecurrenceDispatcherService {},
+    TasksService: class TasksService {},
+    TaskChatService: class TaskChatService {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -44,6 +47,7 @@ jest.mock('@ever-works/agent/notifications', () => ({
 }));
 jest.mock('@ever-works/agent/facades', () => ({
     GitFacadeService: class GitFacadeService {},
+    NotificationChannelFacadeService: class NotificationChannelFacadeService {},
 }));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRepository: class PluginRepository {},
@@ -102,6 +106,9 @@ describe('TriggerInternalController', () => {
     let userRepository: any;
     let workKnowledgeDocumentRepository: any;
     let missionTickService: any;
+    let agentRunService: any;
+    let tasksService: any;
+    let taskChatService: any;
     let controller: TriggerInternalController;
 
     const buildController = () => {
@@ -130,9 +137,13 @@ describe('TriggerInternalController', () => {
             // constructor args after missionTickService; tests pass
             // undefined since they don't exercise these paths.
             undefined, // agentScheduleDispatcherService
+            agentRunService,
             undefined, // agentRepositoryRef
             undefined, // agentRunRepositoryRef
             undefined, // taskRecurrenceDispatcherService
+            tasksService,
+            taskChatService,
+            undefined, // notificationChannelFacade
             undefined, // workProposalsApiService (Optional trailing)
         );
         c.onModuleInit();
@@ -159,6 +170,9 @@ describe('TriggerInternalController', () => {
         userTemplatePreferenceRepository = { name: 'UserTemplatePreferenceRepository' };
         workKnowledgeDocumentRepository = { name: 'WorkKnowledgeDocumentRepository' };
         missionTickService = { name: 'MissionTickService', tickDue: jest.fn() };
+        agentRunService = { name: 'AgentRunService', execute: jest.fn() };
+        tasksService = { name: 'TasksService', getOne: jest.fn() };
+        taskChatService = { name: 'TaskChatService', list: jest.fn() };
 
         controller = buildController();
     });

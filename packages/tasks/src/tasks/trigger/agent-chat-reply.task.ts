@@ -1,6 +1,8 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { AgentRunService } from '@ever-works/agent/agents';
+import { TaskChatService, TasksService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
@@ -8,6 +10,7 @@ export interface AgentChatReplyPayload {
     agentId: string;
     userId: string;
     taskId: string;
+    runId?: string;
     /** The originating chat message id (lets the worker fetch full thread context). */
     triggeringMessageId: string;
     /** Dedup key — `${taskId}:${agentId}:${triggeringMessageId}`. */
@@ -45,11 +48,10 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
             try {
                 const runs = appContext.get(AgentRunRepository);
                 const message = error instanceof Error ? error.message : String(error);
-                const inFlight = await runs.findInFlightForTaskAgent(
-                    payload.taskId,
-                    payload.agentId,
-                );
-                if (inFlight) {
+                const inFlight = payload.runId
+                    ? await runs.findById(payload.runId)
+                    : await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+                if (inFlight && (inFlight.status === 'queued' || inFlight.status === 'running')) {
                     await runs.markFailed(inFlight.id, message);
                 }
             } finally {
@@ -66,6 +68,9 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
         try {
             const agents = appContext.get(AgentRepository);
             const runs = appContext.get(AgentRunRepository);
+            const runner = appContext.get(AgentRunService);
+            const tasks = appContext.get(TasksService);
+            const chat = appContext.get(TaskChatService);
 
             const agent = await agents.findById(payload.agentId);
             if (!agent) {
@@ -73,7 +78,33 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
             }
 
             // T6 chat-dedup: re-use any in-flight (task, agent) run.
-            let run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+            let run = payload.runId ? await runs.findById(payload.runId) : null;
+            if (
+                run &&
+                (run.agentId !== agent.id ||
+                    run.taskId !== payload.taskId ||
+                    run.chatMessageId !== payload.triggeringMessageId)
+            ) {
+                return {
+                    status: 'skipped',
+                    reason: 'run-payload-mismatch',
+                    agentId: payload.agentId,
+                };
+            }
+            if (run && run.status !== 'queued' && run.status !== 'running') {
+                return {
+                    status: 'skipped',
+                    reason: `run-${run.status}`,
+                    agentId: agent.id,
+                    taskId: payload.taskId,
+                    triggeringMessageId: payload.triggeringMessageId,
+                    runId: run.id,
+                    dedupKey: payload.dedupKey,
+                };
+            }
+            if (!run) {
+                run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
+            }
             if (!run) {
                 run = await runs.createQueued({
                     agentId: agent.id,
@@ -86,13 +117,51 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
 
             await runs.markStarted(run.id, null);
 
-            // Phase 15 placeholder — AgentRunService.execute({kind:'chat'})
-            // wires LLM + post-back-to-chat. v1 just records completion.
-            const summary = `Phase 15 placeholder — chat reply for task ${payload.taskId}, msg ${payload.triggeringMessageId}`;
-            await runs.markCompleted(run.id, summary);
+            const [taskRow, messages] = await Promise.all([
+                tasks.getOne(payload.userId, payload.taskId).catch(() => null),
+                chat.list(payload.userId, payload.taskId, { limit: 20, offset: 0 }).catch(() => []),
+            ]);
+            const orderedMessages = [...messages].reverse();
+            const triggering = orderedMessages.find((m) => m.id === payload.triggeringMessageId);
+            const conversationContext = orderedMessages.map((m) => ({
+                author: `${m.authorType}:${m.authorId}`,
+                body: m.body,
+                createdAt:
+                    typeof m.createdAt === 'string'
+                        ? m.createdAt
+                        : (m.createdAt?.toISOString?.() ?? undefined),
+            }));
+            const immediateInput =
+                triggering?.body ?? `Chat message ${payload.triggeringMessageId}`;
+
+            const result = await runner.execute({
+                runId: run.id,
+                agentId: agent.id,
+                userId: payload.userId,
+                kind: 'chat',
+                taskId: payload.taskId,
+                chatMessageId: payload.triggeringMessageId,
+                immediateInput,
+                conversationContext,
+                scopeContext: taskRow
+                    ? `Task ${taskRow.slug ?? taskRow.id}: ${taskRow.title}\nStatus: ${taskRow.status}\nPriority: ${taskRow.priority}`
+                    : null,
+            });
+
+            if (result.status === 'assembled') {
+                await runs.markCompleted(
+                    run.id,
+                    `Prompt assembled for chat message ${payload.triggeringMessageId}`,
+                );
+            } else if (result.status === 'agent-not-found') {
+                await runs.markFailed(run.id, 'Agent not found');
+            }
 
             return {
-                status: 'completed',
+                status:
+                    result.status === 'assembled' || result.status === 'dispatched'
+                        ? 'completed'
+                        : result.status,
                 agentId: agent.id,
                 taskId: payload.taskId,
                 triggeringMessageId: payload.triggeringMessageId,

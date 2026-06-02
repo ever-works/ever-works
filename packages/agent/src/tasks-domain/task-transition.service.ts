@@ -218,19 +218,20 @@ export class TaskTransitionService {
             try {
                 // Pre-create a queued AgentRun row so the worker can find
                 // it via findInFlightForTaskAgent (T6 chat-dedup posture).
-                if (this.runs) {
-                    await this.runs.createQueued({
-                        agentId: assignee.assigneeId,
-                        userId: task.userId,
-                        triggerKind: 'task',
-                        taskId: task.id,
-                    });
-                }
+                const run = this.runs
+                    ? await this.runs.createQueued({
+                          agentId: assignee.assigneeId,
+                          userId: task.userId,
+                          triggerKind: 'task',
+                          taskId: task.id,
+                      })
+                    : null;
                 await this.dispatcher.enqueue({
                     agentId: assignee.assigneeId,
                     userId: task.userId,
                     taskId: task.id,
                     dedupKey,
+                    runId: run?.id,
                 });
             } catch (err) {
                 this.logger.warn(

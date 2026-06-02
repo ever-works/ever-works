@@ -586,6 +586,7 @@ export class AgentsController {
                 userId: auth.userId,
                 taskId: body.taskId,
                 dedupKey: `${body.taskId}:${id}:assigned:${run.id}`,
+                runId: run.id,
             });
         } catch (err) {
             // FU-2 review fix (codex P1): without this rollback, the

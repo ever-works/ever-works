@@ -105,7 +105,7 @@ describe('AgentScheduleDispatcherService', () => {
             expect.objectContaining({ agentId: 'a1', userId: 'u1', triggerKind: 'heartbeat' }),
         );
         expect(trigger.enqueue).toHaveBeenCalledWith(
-            expect.objectContaining({ agentId: 'a1', userId: 'u1' }),
+            expect.objectContaining({ agentId: 'a1', userId: 'u1', runId: 'run-1' }),
         );
     });
 

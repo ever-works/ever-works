@@ -39,8 +39,12 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
-import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
-import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
+import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import {
+    TaskChatService,
+    TaskRecurrenceDispatcherService,
+    TasksService,
+} from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -160,10 +164,15 @@ export class TriggerInternalController implements OnModuleInit {
         // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
         // one-shot worker over the internal RPC channel.
         private readonly agentScheduleDispatcherService: AgentScheduleDispatcherService,
+        // Agent runtime execution stays API-owned because the API module
+        // binds AI/tool/finalizer facades. Trigger workers call it over RPC.
+        private readonly agentRunService: AgentRunService,
         private readonly agentRepositoryRef: AgentRepository,
         private readonly agentRunRepositoryRef: AgentRunRepository,
         // Phase 17 — recurring Task dispatcher.
         private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
+        private readonly tasksService: TasksService,
+        private readonly taskChatService: TaskChatService,
         // Notifications v2 (EW-663) — exposed for the
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
@@ -200,10 +209,13 @@ export class TriggerInternalController implements OnModuleInit {
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
+            AgentRunService: this.agentRunService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,
             // Phase 17 — recurring Task dispatcher.
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
+            TasksService: this.tasksService,
+            TaskChatService: this.taskChatService,
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,

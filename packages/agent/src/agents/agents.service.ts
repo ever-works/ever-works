@@ -188,6 +188,7 @@ export class AgentsService {
             input.avatarIcon ?? null,
             input.avatarImageUploadId ?? null,
         );
+        this.validateHeartbeatCadence(input.heartbeatCadence ?? null);
 
         const created = await this.agents.create({
             userId,
@@ -271,7 +272,16 @@ export class AgentsService {
         if (input.modelId !== undefined) patch.modelId = input.modelId;
         if (input.maxSkillContextTokens !== undefined)
             patch.maxSkillContextTokens = input.maxSkillContextTokens;
-        if (input.heartbeatCadence !== undefined) patch.heartbeatCadence = input.heartbeatCadence;
+        if (input.heartbeatCadence !== undefined) {
+            this.validateHeartbeatCadence(input.heartbeatCadence);
+            patch.heartbeatCadence = input.heartbeatCadence;
+            if (agent.status === AgentStatus.ACTIVE) {
+                patch.nextHeartbeatAt =
+                    input.heartbeatCadence && input.heartbeatCadence !== 'manual'
+                        ? computeNextHeartbeat(input.heartbeatCadence, new Date())
+                        : null;
+            }
+        }
         if (input.idleBehavior !== undefined) patch.idleBehavior = input.idleBehavior;
         if (input.pauseAfterFailures !== undefined)
             patch.pauseAfterFailures = input.pauseAfterFailures;
@@ -501,6 +511,15 @@ export class AgentsService {
         }
         if (mode === AgentAvatarMode.IMAGE && !uploadId) {
             throw new BadRequestException('avatarImageUploadId required when avatarMode=image');
+        }
+    }
+
+    private validateHeartbeatCadence(cadence: string | null | undefined): void {
+        if (!cadence || cadence === 'manual') return;
+        if (!computeNextHeartbeat(cadence, new Date())) {
+            throw new BadRequestException(
+                `Invalid heartbeatCadence "${cadence}". Use "manual", null, or a supported cron expression.`,
+            );
         }
     }
 
