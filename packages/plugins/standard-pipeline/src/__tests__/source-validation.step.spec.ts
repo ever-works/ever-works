@@ -153,6 +153,11 @@ describe('SourceValidationStep', () => {
 		});
 
 		it('should process items in batches', async () => {
+			// Mock the network: the SSRF DNS-pinned probe (safeFetchWithDnsPin)
+			// would otherwise do real DNS/fetch for all 20 items, which is
+			// slow/flaky on network-restricted CI runners and tripped the 5s
+			// default timeout. Mirrors the sibling tests in this describe block.
+			global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 			mockContext.finalItems = Array.from({ length: 20 }, (_, i) =>
 				createMockItem(`Item ${i}`, `https://example${i}.com`)
 			);
@@ -162,7 +167,7 @@ describe('SourceValidationStep', () => {
 			expect(mockExecContext.logger.log).toHaveBeenCalledWith(
 				expect.stringContaining('Source validation complete')
 			);
-		});
+		}, 20000);
 
 		it('should accumulate metrics correctly', async () => {
 			global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
