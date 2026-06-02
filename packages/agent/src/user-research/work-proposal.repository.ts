@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import {
     IdeaFailureKind,
     WorkProposal,
@@ -31,6 +31,13 @@ export interface CreateWorkProposalInput {
     missionId?: string | null;
 }
 
+export interface ListWorkProposalOptions {
+    missionId?: string | null;
+    search?: string;
+    limit?: number;
+    offset?: number;
+}
+
 @Injectable()
 export class WorkProposalRepository {
     constructor(
@@ -49,7 +56,7 @@ export class WorkProposalRepository {
     async findByUser(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
-        opts: { missionId?: string | null } = {},
+        opts: ListWorkProposalOptions = {},
     ): Promise<WorkProposal[]> {
         const qb = this.repository
             .createQueryBuilder('p')
@@ -67,6 +74,20 @@ export class WorkProposalRepository {
         } else if (typeof opts.missionId === 'string') {
             qb.andWhere('p.missionId = :missionId', { missionId: opts.missionId });
         }
+
+        const search = opts.search?.trim();
+        if (search) {
+            qb.andWhere(
+                new Brackets((subQb) => {
+                    subQb
+                        .where('p.title ILIKE :search', { search: `%${search}%` })
+                        .orWhere('p.description ILIKE :search', { search: `%${search}%` });
+                }),
+            );
+        }
+
+        if (opts.limit !== undefined) qb.take(opts.limit);
+        if (opts.offset !== undefined) qb.skip(opts.offset);
 
         return qb.orderBy('p.generatedAt', 'DESC').getMany();
     }

@@ -65,7 +65,7 @@ function mkIdea(
 }
 
 describe('IdeasPageClient (Phase 5 PR N)', () => {
-    it('hides ACCEPTED + DISMISSED Ideas by default', () => {
+    it('renders the server-provided Ideas without hiding terminal statuses locally', () => {
         const ideas: WorkProposal[] = [
             mkIdea({ id: 'a', status: 'pending' }),
             mkIdea({ id: 'b', status: 'accepted' }),
@@ -73,80 +73,23 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         ];
         render(<IdeasPageClient initialIdeas={ideas} />);
         expect(screen.getByText('Idea a')).toBeTruthy();
-        expect(screen.queryByText('Idea b')).toBeNull();
-        expect(screen.queryByText('Idea c')).toBeNull();
-    });
-
-    it('shows ACCEPTED rows when "Show accepted" toggle is ticked', () => {
-        const ideas: WorkProposal[] = [
-            mkIdea({ id: 'a', status: 'pending' }),
-            mkIdea({ id: 'b', status: 'accepted' }),
-        ];
-        render(<IdeasPageClient initialIdeas={ideas} />);
-        // getByText('toggles.showAccepted') returns the <label> itself
-        // (the label has the text node as a direct child). The input
-        // checkbox is also a direct child of that label, so query
-        // INSIDE the label, not in its parent (the parent contains
-        // both toggles' inputs and would match the wrong one).
-        const label = screen.getByText('toggles.showAccepted').closest('label');
-        const checkbox = label?.querySelector('input[type="checkbox"]');
-        if (!checkbox) throw new Error('toggle checkbox missing');
-        fireEvent.click(checkbox);
         expect(screen.getByText('Idea b')).toBeTruthy();
-    });
-
-    it('shows DISMISSED rows when "Show dismissed" toggle is ticked', () => {
-        const ideas: WorkProposal[] = [
-            mkIdea({ id: 'a', status: 'pending' }),
-            mkIdea({ id: 'c', status: 'dismissed' }),
-        ];
-        render(<IdeasPageClient initialIdeas={ideas} />);
-        const label = screen.getByText('toggles.showDismissed').closest('label');
-        const checkbox = label?.querySelector('input[type="checkbox"]');
-        if (!checkbox) throw new Error('toggle checkbox missing');
-        fireEvent.click(checkbox);
         expect(screen.getByText('Idea c')).toBeTruthy();
     });
 
-    it('renders one filter chip per status + an "all" chip, showing counts from the full set', () => {
-        const ideas: WorkProposal[] = [
-            mkIdea({ id: 'p1', status: 'pending' }),
-            mkIdea({ id: 'p2', status: 'pending' }),
-            mkIdea({ id: 'q1', status: 'queued' }),
-            mkIdea({ id: 'b1', status: 'building' }),
-            mkIdea({ id: 'a1', status: 'accepted' }),
-        ];
-        render(<IdeasPageClient initialIdeas={ideas} />);
-        // Locate filter chips via their i18n key text — the PromptComposer
-        // submit button is also `rounded-full` so we can't just count
-        // `button.rounded-full` anymore.
-        const filterChipKeys = [
-            'all',
-            'pending',
-            'queued',
-            'building',
-            'failed',
-            'accepted',
-            'dismissed',
-            'done',
-        ];
-        for (const key of filterChipKeys) {
-            expect(screen.getByText(`filters.${key}`)).toBeTruthy();
-        }
-        // 'all' badge shows total count (5), pending shows (2).
-        expect(screen.getByText('filters.all').parentElement?.textContent).toMatch(/5/);
-        expect(screen.getByText('filters.pending').parentElement?.textContent).toMatch(/2/);
-    });
-
-    it('filter chip narrows the list to a single status', () => {
-        const ideas: WorkProposal[] = [
-            mkIdea({ id: 'p1', status: 'pending' }),
-            mkIdea({ id: 'b1', status: 'building' }),
-        ];
-        render(<IdeasPageClient initialIdeas={ideas} />);
-        fireEvent.click(screen.getByText('filters.building'));
-        expect(screen.getByText('Idea b1')).toBeTruthy();
-        expect(screen.queryByText('Idea p1')).toBeNull();
+    it('renders URL-backed search and status filters', () => {
+        const { container } = render(
+            <IdeasPageClient
+                initialIdeas={[]}
+                filters={{ status: 'failed', search: 'benchmarks' }}
+            />,
+        );
+        const search = container.querySelector('input[name="search"]') as HTMLInputElement;
+        const status = container.querySelector('select[name="status"]') as HTMLSelectElement;
+        expect(search.value).toBe('benchmarks');
+        expect(status.value).toBe('failed');
+        expect(screen.getByText('Actionable')).toBeTruthy();
+        expect(screen.getByText('filters.done')).toBeTruthy();
     });
 
     it('quick-add submit disabled until description >= 10 chars', () => {
@@ -181,30 +124,38 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             'button[data-testid="ideas-quick-add-submit"]',
         ) as HTMLButtonElement;
         fireEvent.click(addBtn);
-        // Prompt is forwarded to the shared chat-start helper instead
-        // of creating an Idea row directly — the chat AI now drives
-        // the create-from-prompt flow.
         expect(startFromPromptMock).toHaveBeenCalledWith(
             'My freshly typed Idea, longer than ten chars',
             expect.objectContaining({ intent: 'Idea' }),
         );
         expect(createIdeaMock).not.toHaveBeenCalled();
-        // The existing rows are still rendered (canvas) — the new
-        // Idea will appear once chat confirms creation.
         expect(screen.getByText('Idea old')).toBeTruthy();
     });
 
-    it('exposes ACTIONABLE_STATUSES = [pending, queued, building, failed]', () => {
-        // Lock the contract so a future tick can't silently shift
-        // what "actionable" means without updating this spec.
-        expect(ACTIONABLE_STATUSES).toEqual(['pending', 'queued', 'building', 'failed']);
+    it('renders a load error instead of masking it as an empty state', () => {
+        render(<IdeasPageClient initialIdeas={[]} loadError="API unavailable" />);
+        expect(screen.getByRole('alert').textContent).toContain('Could not load Ideas.');
+        expect(screen.getByRole('alert').textContent).toContain('API unavailable');
+        expect(screen.queryByText('empty.title')).toBeNull();
     });
 
-    it('renders an empty state when no Ideas match the current filters', () => {
-        render(<IdeasPageClient initialIdeas={[mkIdea({ id: 'a', status: 'accepted' })]} />);
-        // ACCEPTED hidden by default → empty state.
-        expect(screen.getByText('empty.title')).toBeTruthy();
-        expect(screen.getByText('empty.subtitle')).toBeTruthy();
+    it('renders pagination links when the server page has adjacent pages', () => {
+        render(
+            <IdeasPageClient
+                initialIdeas={[mkIdea({ id: 'a', status: 'pending' })]}
+                pagination={{
+                    offset: 24,
+                    hasPrevious: true,
+                    hasNext: true,
+                    previousHref: '/ideas?offset=0',
+                    nextHref: '/ideas?offset=48',
+                }}
+            />,
+        );
+        const links = Array.from(document.querySelectorAll('a')).map((a) => a.getAttribute('href'));
+        expect(screen.getByText('Showing 25-25')).toBeTruthy();
+        expect(links).toContain('/ideas?offset=0');
+        expect(links).toContain('/ideas?offset=48');
     });
 
     it('gears menu deep-links to the Phase 4 settings anchors', () => {
@@ -221,52 +172,13 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
         }
     });
 
-    describe('Done filter chip (Phase 5 PR P)', () => {
-        it('renders a "Done" chip in the filter strip at the end of the list', () => {
-            render(<IdeasPageClient initialIdeas={[]} />);
-            // The 'done' chip uses the same i18n key namespace.
-            expect(screen.getByText('filters.done')).toBeTruthy();
-        });
+    it('exposes ACTIONABLE_STATUSES = [pending, queued, building, failed]', () => {
+        expect(ACTIONABLE_STATUSES).toEqual(['pending', 'queued', 'building', 'failed']);
+    });
 
-        it('Done chip surfaces ACCEPTED Ideas even when "Show accepted" toggle is OFF', () => {
-            const ideas: WorkProposal[] = [
-                mkIdea({ id: 'p1', status: 'pending' }),
-                mkIdea({ id: 'a1', status: 'accepted' }),
-                mkIdea({ id: 'a2', status: 'accepted' }),
-            ];
-            render(<IdeasPageClient initialIdeas={ideas} />);
-            // Toggle is OFF — accepted rows hidden initially.
-            expect(screen.queryByText('Idea a1')).toBeNull();
-            // Click Done chip — accepted rows surface regardless.
-            fireEvent.click(screen.getByText('filters.done'));
-            expect(screen.getByText('Idea a1')).toBeTruthy();
-            expect(screen.getByText('Idea a2')).toBeTruthy();
-            // Non-accepted rows are filtered out by the Done alias.
-            expect(screen.queryByText('Idea p1')).toBeNull();
-        });
-
-        it('Done chip is enabled even when "Show accepted" toggle is OFF (different semantics)', () => {
-            render(<IdeasPageClient initialIdeas={[]} />);
-            const doneBtn = screen
-                .getByText('filters.done')
-                .closest('button')! as HTMLButtonElement;
-            // Should be enabled regardless — the toggle gates the
-            // *Accepted* chip, not the Done chip (which expresses
-            // "show my completed work").
-            expect(doneBtn.disabled).toBe(false);
-        });
-
-        it('Done chip count mirrors the ACCEPTED count', () => {
-            const ideas: WorkProposal[] = [
-                mkIdea({ id: 'a1', status: 'accepted' }),
-                mkIdea({ id: 'a2', status: 'accepted' }),
-                mkIdea({ id: 'a3', status: 'accepted' }),
-                mkIdea({ id: 'p1', status: 'pending' }),
-            ];
-            render(<IdeasPageClient initialIdeas={ideas} />);
-            const doneBtn = screen.getByText('filters.done').closest('button')!;
-            // The badge span inside the button shows the count.
-            expect(doneBtn.textContent).toMatch(/3/);
-        });
+    it('renders an empty state when the server page has no Ideas', () => {
+        render(<IdeasPageClient initialIdeas={[]} />);
+        expect(screen.getByText('empty.title')).toBeTruthy();
+        expect(screen.getByText('empty.subtitle')).toBeTruthy();
     });
 });

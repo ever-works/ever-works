@@ -503,7 +503,7 @@ export class WorkProposalService {
     async list(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
-        opts: { missionId?: string | null } = {},
+        opts: { missionId?: string | null; search?: string; limit?: number; offset?: number } = {},
     ) {
         return this.repo.findByUser(userId, statuses, opts);
     }

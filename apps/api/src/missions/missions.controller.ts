@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -9,11 +10,13 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     MissionCloneService,
+    MissionStatus,
     MissionsService,
     type CloneMissionResult,
     type MissionDto,
@@ -23,7 +26,12 @@ import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budget
 import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { CloneMissionDto, CreateMissionDto, UpdateMissionDto } from './dto/mission.dto';
+import {
+    AddMissionAttachmentDto,
+    CloneMissionDto,
+    CreateMissionDto,
+    UpdateMissionDto,
+} from './dto/mission.dto';
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -66,8 +74,19 @@ export class MissionsController {
     @Get()
     @ApiOperation({ summary: 'List my missions' })
     @HttpCode(HttpStatus.OK)
-    async list(@CurrentUser() auth: AuthenticatedUser): Promise<MissionDto[]> {
-        return this.service.listForUser(auth.userId);
+    async list(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('status') status?: string,
+        @Query('search') search?: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ): Promise<MissionDto[]> {
+        return this.service.listForUser(auth.userId, {
+            status: this.parseStatus(status),
+            search: this.parseSearch(search),
+            limit: this.parseLimit(limit),
+            offset: this.parseOffset(offset),
+        });
     }
 
     @Post()
@@ -261,7 +280,7 @@ export class MissionsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        @Body() body: AddMissionAttachmentDto,
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }
@@ -275,5 +294,40 @@ export class MissionsController {
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
         return this.service.removeAttachment(auth.userId, id, attachmentId);
+    }
+
+    private parseStatus(value?: string): MissionStatus | undefined {
+        if (!value) return undefined;
+        if (!Object.values(MissionStatus).includes(value as MissionStatus)) {
+            throw new BadRequestException(`Invalid status filter: ${value}`);
+        }
+        return value as MissionStatus;
+    }
+
+    private parseSearch(value?: string): string | undefined {
+        const trimmed = value?.trim();
+        if (!trimmed) return undefined;
+        if (trimmed.length > 500) {
+            throw new BadRequestException('search must be 500 characters or fewer.');
+        }
+        return trimmed;
+    }
+
+    private parseLimit(value?: string): number | undefined {
+        if (!value) return undefined;
+        const n = Number(value);
+        if (!Number.isInteger(n)) {
+            throw new BadRequestException('limit must be an integer.');
+        }
+        return Math.min(101, Math.max(1, n));
+    }
+
+    private parseOffset(value?: string): number | undefined {
+        if (!value) return undefined;
+        const n = Number(value);
+        if (!Number.isInteger(n)) {
+            throw new BadRequestException('offset must be an integer.');
+        }
+        return Math.max(0, n);
     }
 }

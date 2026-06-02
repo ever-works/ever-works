@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { Lightbulb, Settings as SettingsIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils/cn';
-import { buildIdeaAction, dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
+import { buildIdeaAction } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,33 +22,27 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useRouter } from '@/i18n/navigation';
+import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { IdeaCard } from './IdeaCard';
 
 /**
  * Phase 5 PR N + UI polish — Ideas catalog page client.
  *
- * Renders the full list of the user's Ideas — drafted by auto-
- * generation, suggested by Discover, spawned from a Mission, and
- * typed in by the user — with two visibility toggles for the
- * terminal statuses (ACCEPTED + DISMISSED, off by default) and a
- * filter-chip strip for narrowing to one specific status.
+ * Renders a server-filtered page of the user's Ideas — drafted by
+ * auto-generation, suggested by Discover, spawned from a Mission,
+ * and typed in by the user — with URL-backed search/status filters.
  *
  * Quick-add at the top now uses the shared `PromptComposer`
  * (same shape as the marketing site's landing prompt) so this
  * page and `/missions` feel like the same primitive.
  */
-type Toggles = {
-    showAccepted: boolean;
-    showDismissed: boolean;
-};
-
-type StatusFilter = 'all' | WorkProposalStatus | 'done';
+type IdeasStatusFilter = 'actionable' | 'all' | WorkProposalStatus | 'done';
 
 const ACTIONABLE_STATUSES: WorkProposalStatus[] = ['pending', 'queued', 'building', 'failed'];
 
-const STATUS_FILTER_ORDER: StatusFilter[] = [
+const STATUS_FILTER_ORDER: IdeasStatusFilter[] = [
+    'actionable',
     'all',
     'pending',
     'queued',
@@ -59,6 +52,13 @@ const STATUS_FILTER_ORDER: StatusFilter[] = [
     'dismissed',
     'done',
 ];
+
+function ideaMatchesFilter(idea: WorkProposal, filter: IdeasStatusFilter = 'actionable'): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'done') return idea.status === 'accepted';
+    if (filter === 'actionable') return ACTIONABLE_STATUSES.includes(idea.status);
+    return idea.status === filter;
+}
 
 const IDEA_PLACEHOLDERS: ReadonlyArray<string> = [
     'e.g. "A curated list of the best AI coding agents released this year"',
@@ -71,46 +71,32 @@ const IDEA_PLACEHOLDERS: ReadonlyArray<string> = [
 
 interface IdeasPageClientProps {
     initialIdeas: WorkProposal[];
+    loadError?: string | null;
+    filters?: {
+        status?: IdeasStatusFilter;
+        search?: string;
+    };
+    pagination?: {
+        offset: number;
+        hasPrevious: boolean;
+        hasNext: boolean;
+        previousHref: string;
+        nextHref: string;
+    };
 }
 
-export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
+export function IdeasPageClient({
+    initialIdeas,
+    loadError = null,
+    filters,
+    pagination,
+}: IdeasPageClientProps) {
     const t = useTranslations('dashboard.ideasPage');
-    const router = useRouter();
     const [ideas, setIdeas] = useState(initialIdeas);
     const [draft, setDraft] = useState('');
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
-    const [toggles, setToggles] = useState<Toggles>({
-        showAccepted: false,
-        showDismissed: false,
-    });
-    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [isCreating, startCreating] = useTransition();
     const [isBuilding, startBuilding] = useTransition();
-
-    const visibleIdeas = useMemo(() => {
-        const isDoneFilter = statusFilter === 'done';
-        return ideas.filter((idea) => {
-            if (idea.status === 'accepted' && !toggles.showAccepted && !isDoneFilter) {
-                return false;
-            }
-            if (idea.status === 'dismissed' && !toggles.showDismissed) return false;
-            if (statusFilter === 'done' && idea.status !== 'accepted') return false;
-            if (statusFilter !== 'all' && statusFilter !== 'done' && idea.status !== statusFilter) {
-                return false;
-            }
-            return true;
-        });
-    }, [ideas, toggles, statusFilter]);
-
-    const counts = useMemo(() => {
-        const map = new Map<StatusFilter, number>();
-        map.set('all', ideas.length);
-        for (const idea of ideas) {
-            map.set(idea.status, (map.get(idea.status) ?? 0) + 1);
-        }
-        map.set('done', map.get('accepted') ?? 0);
-        return map;
-    }, [ideas]);
 
     const startFromPrompt = useStartFromPrompt();
 
@@ -118,6 +104,20 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
         const description = draft.trim();
         if (description.length < 10) {
             toast.error(t('quickAdd.minLength'));
+            return;
+        }
+        const uploadsInProgress = attachments.some(
+            (a) => (a.kind === 'file' || a.kind === 'folder-file') && a.uploading,
+        );
+        if (uploadsInProgress) {
+            toast.error('Wait for attachments to finish uploading before starting the chat.');
+            return;
+        }
+        const failedUploads = attachments.some(
+            (a) => (a.kind === 'file' || a.kind === 'folder-file') && a.error,
+        );
+        if (failedUploads) {
+            toast.error('Remove failed attachments before starting the chat.');
             return;
         }
         // The quick-add composer no longer creates an Idea inline.
@@ -136,36 +136,29 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
     };
 
     const handleDismissed = (id: string) => {
-        setIdeas((prev) =>
-            prev.map((idea) => (idea.id === id ? { ...idea, status: 'dismissed' as const } : idea)),
-        );
+        setIdeas((prev) => {
+            const next = prev.map((idea) =>
+                idea.id === id ? { ...idea, status: 'dismissed' as const } : idea,
+            );
+            return next.filter((idea) => ideaMatchesFilter(idea, filters?.status));
+        });
     };
 
-    // Build-from-Idea handler (Phase 1 PR B `POST /me/work-proposals/:id/build`).
-    // Wired here as an explicit `Queue build` button on the FAILED
-    // and PENDING cards once we add a richer card variant. For now
-    // the existing IdeaCard's Build CTA preserves the legacy
-    // `/works/new?proposal=…` flow. This handler stays exposed so a
-    // follow-up tick can swap one for the other without touching
-    // the IdeaCard component.
     const handleQueueBuild = (id: string) => {
         startBuilding(async () => {
             try {
                 const { idea } = await buildIdeaAction(id);
-                setIdeas((prev) => prev.map((row) => (row.id === id ? idea : row)));
+                setIdeas((prev) =>
+                    prev
+                        .map((row) => (row.id === id ? idea : row))
+                        .filter((row) => ideaMatchesFilter(row, filters?.status)),
+                );
                 toast.success(t('toasts.ideaQueued'));
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : t('toasts.ideaQueueError'));
             }
         });
     };
-    // Suppress unused-var warning until a card variant calls handleQueueBuild.
-    void handleQueueBuild;
-
-    // Catch-all dismiss for the per-card handler in IdeaCard; we
-    // re-export a `silent` no-op when the user manually dismisses
-    // via the card's X button (handled inside IdeaCard already).
-    void dismissProposalAction;
 
     return (
         <div className="w-full">
@@ -187,57 +180,43 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                                 className="shrink-0 gap-1.5"
                                 aria-label={t('gears.menuLabel')}
                             >
-                                <SettingsIcon className="w-4 h-4" />
+                                <SettingsIcon className="w-4 h-4" aria-hidden="true" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64">
                             <DropdownMenuLabel>{t('gears.menuLabel')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                onClick={() =>
-                                    router.push('/settings/work-agent#auto-generate-ideas')
-                                }
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-generate-ideas"
                                     className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
                                 >
                                     {t('gears.autoGenerate')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-build-works')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-build-works"
                                     className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
                                 >
                                     {t('gears.autoBuild')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#auto-retry')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#auto-retry"
                                     className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
                                 >
                                     {t('gears.autoRetry')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onClick={() => router.push('/settings/work-agent#account-budgets')}
-                            >
-                                <a
+                            <DropdownMenuItem asChild>
+                                <Link
                                     href="/settings/work-agent#account-budgets"
                                     className="w-full text-left"
-                                    onClick={(e) => e.preventDefault()}
                                 >
                                     {t('gears.accountBudgets')}
-                                </a>
+                                </Link>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -260,95 +239,71 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                     submitting={isCreating}
                     placeholderExamples={IDEA_PLACEHOLDERS}
                     ariaLabel={t('quickAdd.label')}
-                    submitTitle={t('quickAdd.submitTitle')}
+                    submitTitle="Start in chat"
                     testId="ideas-quick-add"
                     onAttachmentsChange={setAttachments}
                 />
             </div>
 
-            {/* Toggles + filter chips row */}
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/50 dark:border-border-dark/50 bg-card/70 dark:bg-card-primary-dark/50 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-3">
-                    <label className="inline-flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer select-none">
-                        <input
-                            type="checkbox"
-                            checked={toggles.showAccepted}
-                            onChange={(e) =>
-                                setToggles((prev) => ({
-                                    ...prev,
-                                    showAccepted: e.target.checked,
-                                }))
-                            }
-                            className="rounded border-border dark:border-border-dark"
-                        />
-                        {t('toggles.showAccepted')}
-                    </label>
-                    <label className="inline-flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark cursor-pointer select-none">
-                        <input
-                            type="checkbox"
-                            checked={toggles.showDismissed}
-                            onChange={(e) =>
-                                setToggles((prev) => ({
-                                    ...prev,
-                                    showDismissed: e.target.checked,
-                                }))
-                            }
-                            className="rounded border-border dark:border-border-dark"
-                        />
-                        {t('toggles.showDismissed')}
-                    </label>
+            <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
+                <label className="flex-1 min-w-0">
+                    <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
+                        Search
+                    </span>
+                    <input
+                        name="search"
+                        defaultValue={filters?.search ?? ''}
+                        placeholder="Title or description"
+                        maxLength={500}
+                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                    />
+                </label>
+                <label className="min-w-44">
+                    <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
+                        Status
+                    </span>
+                    <select
+                        name="status"
+                        defaultValue={filters?.status ?? 'actionable'}
+                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                    >
+                        {STATUS_FILTER_ORDER.map((status) => (
+                            <option key={status} value={status}>
+                                {status === 'actionable' ? 'Actionable' : t(`filters.${status}`)}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="submit"
+                        className="inline-flex h-9 items-center justify-center rounded-md bg-button-primary dark:bg-button-primary-dark px-3 text-sm font-medium text-button-primary-foreground dark:text-button-primary-foreground-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
+                    >
+                        Apply
+                    </button>
+                    <Link
+                        href={ROUTES.DASHBOARD_IDEAS}
+                        className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
+                    >
+                        Reset
+                    </Link>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                    {STATUS_FILTER_ORDER.map((s) => {
-                        const c = counts.get(s) ?? 0;
-                        const isActive = statusFilter === s;
-                        const isTerminal = s === 'accepted' || s === 'dismissed';
-                        const isDoneChip = s === 'done';
-                        const isHidden =
-                            (s === 'accepted' && !toggles.showAccepted) ||
-                            (s === 'dismissed' && !toggles.showDismissed);
-                        return (
-                            <button
-                                key={s}
-                                type="button"
-                                onClick={() => setStatusFilter(s)}
-                                disabled={isHidden}
-                                className={cn(
-                                    'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors',
-                                    isDoneChip
-                                        ? isActive
-                                            ? 'bg-success text-white border-success'
-                                            : 'bg-success/5 dark:bg-success/10 border-success/30 text-success hover:border-success/60'
-                                        : isActive
-                                          ? 'bg-primary text-white border-primary'
-                                          : 'bg-card dark:bg-card-primary-dark border-border dark:border-border-dark text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
-                                    isHidden && 'opacity-40 cursor-not-allowed',
-                                    isTerminal && !isActive && 'italic',
-                                )}
-                                title={isDoneChip ? t('filters.doneTooltip') : undefined}
-                            >
-                                {isDoneChip && <span aria-hidden>✓</span>}
-                                {t(`filters.${s}`)}
-                                <span
-                                    className={cn(
-                                        'rounded-full px-1.5 text-[10px] font-medium',
-                                        isActive
-                                            ? 'bg-white/20'
-                                            : isDoneChip
-                                              ? 'bg-success/15 dark:bg-success/20 text-success'
-                                              : 'bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
-                                    )}
-                                >
-                                    {c}
-                                </span>
-                            </button>
-                        );
-                    })}
+            </form>
+
+            {loadError ? (
+                <div
+                    role="alert"
+                    className="mb-5 rounded-lg border border-danger/30 bg-danger/5 p-4"
+                >
+                    <p className="text-sm font-medium text-danger">Could not load Ideas.</p>
+                    <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                        {loadError}
+                    </p>
                 </div>
-            </div>
+            ) : null}
 
             {/* Sorted list */}
-            {visibleIdeas.length === 0 ? (
+            {!loadError && ideas.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/70 dark:border-border-dark/70 bg-surface/40 dark:bg-surface-dark/30 p-8 text-center">
                     <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg border border-concept-ideas/20 bg-concept-ideas/10">
                         <Lightbulb className="w-4 h-4 text-concept-ideas" />
@@ -360,12 +315,13 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                         {t('empty.subtitle')}
                     </p>
                 </div>
-            ) : (
+            ) : null}
+            {!loadError && ideas.length > 0 ? (
                 <div
                     className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4"
                     aria-busy={isBuilding}
                 >
-                    {visibleIdeas
+                    {ideas
                         .slice()
                         .sort(
                             (a, b) =>
@@ -373,10 +329,45 @@ export function IdeasPageClient({ initialIdeas }: IdeasPageClientProps) {
                                 new Date(a.generatedAt).getTime(),
                         )
                         .map((idea) => (
-                            <IdeaCard key={idea.id} proposal={idea} onDismissed={handleDismissed} />
+                            <IdeaCard
+                                key={idea.id}
+                                proposal={idea}
+                                onDismissed={handleDismissed}
+                                onQueueBuild={handleQueueBuild}
+                            />
                         ))}
                 </div>
-            )}
+            ) : null}
+
+            {!loadError && pagination && (pagination.hasPrevious || pagination.hasNext) ? (
+                <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
+                    {ideas.length > 0 ? (
+                        <span>
+                            Showing {pagination.offset + 1}-{pagination.offset + ideas.length}
+                        </span>
+                    ) : (
+                        <span>No results on this page</span>
+                    )}
+                    <div className="flex items-center gap-2">
+                        {pagination.hasPrevious ? (
+                            <Link
+                                href={pagination.previousHref}
+                                className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
+                            >
+                                Previous
+                            </Link>
+                        ) : null}
+                        {pagination.hasNext ? (
+                            <Link
+                                href={pagination.nextHref}
+                                className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
+                            >
+                                Next
+                            </Link>
+                        ) : null}
+                    </div>
+                </nav>
+            ) : null}
         </div>
     );
 }

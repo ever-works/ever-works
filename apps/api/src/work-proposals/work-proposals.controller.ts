@@ -26,6 +26,7 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
+    AddWorkProposalAttachmentDto,
     BuildWorkProposalResponseDto,
     CreateWorkProposalDto,
     ListWorkProposalsQueryDto,
@@ -153,6 +154,9 @@ export class WorkProposalsController {
                 : [WorkProposalStatus.PENDING];
         const proposals = await this.service.list(auth.userId, statuses, {
             missionId: query.missionId,
+            search: query.search?.trim() || undefined,
+            limit: query.limit,
+            offset: query.offset,
         });
         return proposals.map(toResponseDto);
     }
@@ -369,7 +373,7 @@ export class WorkProposalsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        @Body() body: AddWorkProposalAttachmentDto,
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }

@@ -6,7 +6,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     Mission,
     MissionStatus,
@@ -62,6 +62,13 @@ export interface UpdateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: MissionGuardrailsOverride | null;
     missionTemplateRepo?: string | null;
+}
+
+export interface ListMissionsFilter {
+    status?: MissionStatus;
+    search?: string;
+    limit?: number;
+    offset?: number;
 }
 
 /**
@@ -142,10 +149,23 @@ export class MissionsService {
      * PR H adds filter + pagination; PR R (Phase 6 frontend) drives
      * the design for which controls land where.
      */
-    async listForUser(userId: string): Promise<MissionDto[]> {
+    async listForUser(userId: string, filter: ListMissionsFilter = {}): Promise<MissionDto[]> {
+        const baseWhere: FindOptionsWhere<Mission> = {
+            userId,
+            ...(filter.status ? { status: filter.status } : {}),
+        };
+        const search = filter.search?.trim();
+        const where: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[] = search
+            ? [
+                  { ...baseWhere, title: ILike(`%${search}%`) },
+                  { ...baseWhere, description: ILike(`%${search}%`) },
+              ]
+            : baseWhere;
         const rows = await this.missions.find({
-            where: { userId },
+            where,
             order: { updatedAt: 'DESC' },
+            take: filter.limit,
+            skip: filter.offset,
         });
         return rows.map(toMissionDto);
     }
