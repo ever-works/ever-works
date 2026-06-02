@@ -559,12 +559,20 @@ test.describe('Agent inbox + messaging', () => {
             waitUntil: 'domcontentloaded',
         });
         const composeHeading = page.getByRole('heading', { name: 'Compose' });
-        const notFoundHeading = page.getByRole('heading', { name: /Page not found/i });
-        await expect(composeHeading.or(notFoundHeading).first()).toBeVisible({
-            timeout: 30_000,
-        });
+        // REQUIRE the real compose page to render (Codex P2): accepting the next-dev
+        // not-found fallback here would let a genuinely-broken composer pass in CI (which
+        // runs `next dev`). The route exists (agents/[id]/inbox/compose/page.tsx); its
+        // first hit can cold-compile to the catch-all 404, so reload-retry to force the
+        // compile, then REQUIRE the Compose heading — a page that never renders FAILS
+        // rather than silently passing via a link-href recheck.
+        await expect(async () => {
+            if (!(await composeHeading.isVisible().catch(() => false))) {
+                await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+            }
+            await expect(composeHeading).toBeVisible({ timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
 
-        if (await composeHeading.isVisible()) {
+        {
             const to = page.locator('#to');
             const subject = page.locator('#subject');
             const body = page.locator('#body');
@@ -620,19 +628,6 @@ test.describe('Agent inbox + messaging', () => {
                     { timeout: 30_000 },
                 );
             }
-        } else {
-            // Local next-dev fell back to the 404 page for this nested segment.
-            // Assert that real surface, then re-prove the route wiring via the
-            // inbox page's Compose link (the actual navigation contract).
-            await expect(notFoundHeading).toBeVisible({ timeout: 30_000 });
-            await page.goto(`${origin}/agents/${agent.id}/inbox`, {
-                waitUntil: 'domcontentloaded',
-            });
-            await expect(page.getByRole('link', { name: 'Compose' })).toHaveAttribute(
-                'href',
-                `/agents/${agent.id}/inbox/compose`,
-                { timeout: 30_000 },
-            );
         }
     });
 });
