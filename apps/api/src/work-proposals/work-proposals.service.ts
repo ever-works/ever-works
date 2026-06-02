@@ -58,7 +58,7 @@ export class WorkProposalsApiService {
     async list(
         userId: string,
         statuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
-        opts: { missionId?: string | null } = {},
+        opts: { missionId?: string | null; search?: string; limit?: number; offset?: number } = {},
     ) {
         return this.proposals.list(userId, statuses, opts);
     }

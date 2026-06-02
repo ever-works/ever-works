@@ -86,7 +86,7 @@ export const workProposalsAPI = {
 
     async list(
         statuses: WorkProposalStatus[] = ['pending'],
-        opts: { missionId?: string } = {},
+        opts: { missionId?: string; search?: string; limit?: number; offset?: number } = {},
     ): Promise<WorkProposal[]> {
         const params = statuses.map((s) => `statuses=${encodeURIComponent(s)}`);
         // Phase 6 PR R — server-side `missionId` filter is already
@@ -96,6 +96,15 @@ export const workProposalsAPI = {
         // entire catalog.
         if (opts.missionId) {
             params.push(`missionId=${encodeURIComponent(opts.missionId)}`);
+        }
+        if (opts.search) {
+            params.push(`search=${encodeURIComponent(opts.search)}`);
+        }
+        if (opts.limit) {
+            params.push(`limit=${encodeURIComponent(String(opts.limit))}`);
+        }
+        if (opts.offset && opts.offset > 0) {
+            params.push(`offset=${encodeURIComponent(String(opts.offset))}`);
         }
         return serverFetch<WorkProposal[]>(`/me/work-proposals?${params.join('&')}`, {
             method: 'GET',
