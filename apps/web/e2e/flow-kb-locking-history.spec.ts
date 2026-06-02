@@ -451,7 +451,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
                 .first();
             const statusPill = page.getByTestId('kb-editor-status').first();
             await expect(
-                additionsBanner.or(statusPill),
+                additionsBanner.or(statusPill).first(),
                 'additions-only doc mounts the live editor (banner + autosave pill = KbEditor, not the read-only view)',
             ).toBeVisible({ timeout: 60_000 });
 
@@ -667,7 +667,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         // proves the nested route rendered. On a cold CI runner the per-doc
         // route compiles lazily, so wait generously for the panel itself
         // before deciding whether we're on the rendered route or the 404.
-        await expect(sidePanel.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(sidePanel.or(notFound).first()).toBeVisible({ timeout: 60_000 });
 
         if (await notFound.isVisible().catch(() => false)) {
             test.info().annotations.push({
@@ -702,7 +702,9 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         const errorState = page.getByTestId('kb-history-error');
         const emptyState = page.getByTestId('kb-history-empty');
         const commitRow = page.getByTestId('kb-history-row').first();
-        await expect(errorState.or(emptyState).or(commitRow)).toBeVisible({ timeout: 45_000 });
+        await expect(errorState.or(emptyState).or(commitRow).first()).toBeVisible({
+            timeout: 45_000,
+        });
         if (!repoBacked) {
             // CI: the mirror 500 must surface as the dialog's error state (the
             // dialog never silently shows an empty or populated list).
@@ -979,7 +981,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
 
         const editor = page.getByTestId('kb-editor');
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
-        await expect(editor.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(editor.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if (await notFound.isVisible().catch(() => false)) {
             test.info().annotations.push({
                 type: 'route-divergence',
