@@ -212,13 +212,15 @@ test.describe('Skill CRUD + scope/owner validation', () => {
         expect(derived.frontmatter.name).toBe('code-review-best-practices');
 
         // A title that slugifies to '' (CJK / emoji are stripped by the ASCII \w
-        // class) is rejected up-front with a truthful message.
+        // class) is rejected up-front with a truthful message. NOTE: no internal
+        // whitespace — a space would survive as a hyphen (`\s+`→`-`, which `[^\w-]+`
+        // keeps), yielding the truthy slug '-' and a 201 instead of the empty-slug 400.
         const emptySlug = await request.post(`${API_BASE}/api/skills`, {
             headers: authedHeaders(token),
             data: {
                 ownerType: 'tenant',
                 ownerId: user.user.id,
-                title: '日本語 🎉',
+                title: '日本語🎉',
                 description: 'd',
                 instructionsMd: '# x',
             },

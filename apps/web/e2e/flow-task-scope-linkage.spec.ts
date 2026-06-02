@@ -491,7 +491,10 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         // render) or the section's "Tasks" header as proof the route mounted.
         const taskCell = page.getByText(onTabTitle).first();
         const sectionHeader = page.getByRole('heading', { name: 'Tasks' }).first();
-        await expect(taskCell.or(sectionHeader)).toBeVisible({ timeout: 30_000 });
+        // When the route renders fully BOTH the task title AND the "Tasks"
+        // header are present, so the .or() union matches 2 elements — apply
+        // .first() to the whole union (not each operand) to stay strict-safe.
+        await expect(taskCell.or(sectionHeader).first()).toBeVisible({ timeout: 30_000 });
 
         // If the full section rendered the scoped task, the orphan must NOT
         // be on this workId-filtered tab. Only assert the negative when the

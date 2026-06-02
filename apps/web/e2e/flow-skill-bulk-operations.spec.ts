@@ -689,14 +689,17 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         await page.goto(`${origin}/skills`, { waitUntil: 'domcontentloaded' });
 
         // Title may render in the Installed grid. Tolerate ordering / dev hydration.
-        const titleOnHub = page.getByText(title, { exact: false }).first();
-        const slugOnHub = page.getByText(created.slug, { exact: false }).first();
-        await expect(titleOnHub.or(slugOnHub)).toBeVisible({ timeout: 30_000 });
+        // The card renders BOTH the title (<h3>) and slug (<span.font-mono>), so the
+        // .or() union is 2 elements — collapse with a trailing .first() (KNOWN FACT:
+        // assert with locatorA.or(locatorB).first()) to avoid a strict-mode violation.
+        const titleOnHub = page.getByText(title, { exact: false });
+        const slugOnHub = page.getByText(created.slug, { exact: false });
+        await expect(titleOnHub.or(slugOnHub).first()).toBeVisible({ timeout: 30_000 });
 
         // Open the detail page directly; assert the title renders there too.
         await page.goto(`${origin}/skills/${created.id}`, { waitUntil: 'domcontentloaded' });
-        const titleOnDetail = page.getByText(title, { exact: false }).first();
-        const slugOnDetail = page.getByText(created.slug, { exact: false }).first();
-        await expect(titleOnDetail.or(slugOnDetail)).toBeVisible({ timeout: 30_000 });
+        const titleOnDetail = page.getByText(title, { exact: false });
+        const slugOnDetail = page.getByText(created.slug, { exact: false });
+        await expect(titleOnDetail.or(slugOnDetail).first()).toBeVisible({ timeout: 30_000 });
     });
 });

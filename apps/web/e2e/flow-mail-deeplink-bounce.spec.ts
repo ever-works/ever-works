@@ -442,17 +442,43 @@ test.describe('Flow: mail deeplink resolution / callback allow-list / bounce', (
             if (await passwordField.isVisible().catch(() => false)) {
                 // Fill both password fields (the form requires a match) and submit against the
                 // bogus token; we must see an error-like state, never a success navigation.
-                await passwordField.fill('ValidPass1!');
                 const confirm = page.locator('input[type="password"]').nth(1);
-                if (await confirm.isVisible().catch(() => false)) {
-                    await confirm.fill('ValidPass1!');
-                }
                 const submit = page
                     .getByRole('button', { name: /reset password|reset|submit|continue/i })
                     .first();
 
+                // DEV hydration race: the inputs are CONTROLLED (value driven by React state) and
+                // the submit button is disabled until BOTH password + confirmPassword state are
+                // non-empty. A plain .fill() before hydration can set the DOM value without firing
+                // React's onChange, leaving the button disabled forever. Drive the value via the
+                // native setter + a dispatched 'input' event and poll until the button enables.
+                const setControlled = async (loc: typeof passwordField, value: string) => {
+                    await loc.evaluate((el, v) => {
+                        const setter = Object.getOwnPropertyDescriptor(
+                            window.HTMLInputElement.prototype,
+                            'value',
+                        )?.set;
+                        setter?.call(el, v);
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }, value);
+                };
+
                 await expect(async () => {
-                    if (await submit.isVisible().catch(() => false)) {
+                    await passwordField.fill('ValidPass1!');
+                    await setControlled(passwordField, 'ValidPass1!');
+                    if (await confirm.isVisible().catch(() => false)) {
+                        await confirm.fill('ValidPass1!');
+                        await setControlled(confirm, 'ValidPass1!');
+                    }
+                    // The button only enables once React state caught both values.
+                    await expect(submit).toBeEnabled({ timeout: 2_000 });
+                }).toPass({ timeout: 20_000 });
+
+                await expect(async () => {
+                    if (
+                        (await submit.isVisible().catch(() => false)) &&
+                        (await submit.isEnabled().catch(() => false))
+                    ) {
                         await submit.click({ timeout: 5_000 });
                     }
                     // Acceptable: a visible error, OR the still-alive form (request failed,

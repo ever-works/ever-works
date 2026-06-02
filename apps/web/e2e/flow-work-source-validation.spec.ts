@@ -71,8 +71,6 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * READ-ONLY in the last flow. login DTO accepts ONLY {email,password}.
  */
 
-const seeded = loadSeededTestUser();
-
 const ALL_CADENCES = [
     'hourly',
     'every_3_hours',
@@ -88,6 +86,11 @@ const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 const SV_PATH = (workId: string) => `${API_BASE}/api/works/${workId}/source-validation`;
 
 async function loginSeeded(request: APIRequestContext): Promise<string> {
+    // Lazy: read the seeded creds at call time (inside a test), NOT at module load.
+    // A module-scope loadSeededTestUser() runs during Playwright COLLECTION — before
+    // the setup project writes .auth/test-user.json — and since sharding collects
+    // every file in every shard, a collection-time throw here reddens ALL shards.
+    const seeded = loadSeededTestUser();
     const res = await request.post(`${API_BASE}/api/auth/login`, {
         data: { email: seeded.email, password: seeded.password },
     });

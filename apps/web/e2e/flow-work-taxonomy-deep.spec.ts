@@ -344,13 +344,22 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
             `validation complains about name; got ${JSON.stringify(invalid.body.message)}`,
         ).toBe(true);
 
-        // Tag name has a tighter cap (50) than category/collection (100): an over-long name 400s at
-        // validation too — same layer, different bound. Confirms the DTO is the first gate per-kind.
+        // The tag DTO carries a tighter cap (50) than category/collection (100), surfaced by the
+        // SAME validation layer. We can't probe it with an over-long STRING: CreateTagDto.name has a
+        // @Transform(sanitizeName(value, 50)) that runs (class-transformer) BEFORE @MaxLength (class-
+        // validator), truncating 'x'.repeat(51) to 50 chars so it passes validation and falls through
+        // to the git-gated save -> 500 (live-probed 2026-06-01). A NON-string name (12345) can't be
+        // truncated, so @IsString + @MaxLength(50) both fire -> 400 with the tighter 50-char message
+        // — proving the per-kind tag DTO with its 50-bound is the FIRST gate, before ownership/git.
         const tooLong = await postTaxonomy(request, a.access_token, workId, 'tags', {
-            name: 'x'.repeat(51),
+            name: 12345 as unknown as string,
         });
-        expect(tooLong.status, `over-long tag -> 400; body=${tooLong.text}`).toBe(400);
+        expect(tooLong.status, `non-string tag -> 400; body=${tooLong.text}`).toBe(400);
         expect(Array.isArray(tooLong.body.message)).toBe(true);
+        expect(
+            (tooLong.body.message as string[]).some((m) => /shorter than or equal to 50/i.test(m)),
+            `tag validation reports the tighter 50-char bound; got ${JSON.stringify(tooLong.body.message)}`,
+        ).toBe(true);
 
         // (b) AUTH second — a DTO-valid body with NO bearer is 401, before ownership can run.
         const anon = await postTaxonomy(request, null, workId, 'categories', { name: `Anon ${s}` });

@@ -584,17 +584,51 @@ test.describe('Mission CRUD + schedule/cadence + status', () => {
         // The whole card is a <Link> to /missions/:id — scope chip assertions to it.
         const schedCard = page.locator(`a[href$="/missions/${scheduled.id}"]`).first();
         await expect(schedCard).toBeVisible({ timeout: 30_000 });
-        await expect(schedCard.getByText('Scheduled', { exact: true })).toBeVisible();
-        await expect(schedCard.getByText(cron, { exact: true })).toBeVisible();
-        await expect(schedCard.getByText('Auto-build on', { exact: true })).toBeVisible();
-        await expect(schedCard.getByText('Unlimited', { exact: true })).toBeVisible();
+        // The card <Link> can read visible a paint BEFORE its inner chip text settles
+        // under next-dev compile + hydration, especially when sibling specs have seeded
+        // the shared user's /missions list with many cards. Give the scoped chip waits
+        // the same generous budget as the card itself instead of the default 5s. The API
+        // round-trips outstandingIdeasCap:-1 verbatim (probed live), so "Unlimited" is the
+        // genuine label — this is a timing flake, not a contract mismatch.
+        await expect(schedCard.getByText('Scheduled', { exact: true })).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(schedCard.getByText(cron, { exact: true })).toBeVisible({ timeout: 30_000 });
+        await expect(schedCard.getByText('Auto-build on', { exact: true })).toBeVisible({
+            timeout: 30_000,
+        });
+        // REAL DOM (probed live): MissionCard renders the cap as a BARE TEXT NODE next to
+        // the `capPrefix` span inside ONE <div> — `<span>Outstanding cap:</span> Unlimited`
+        // (MissionCard.tsx lines 93-98). The smallest enclosing ELEMENT is that <div>, whose
+        // normalized text is "Outstanding cap: Unlimited", so `getByText('Unlimited', exact)`
+        // matches no element. Assert the genuine combined div text exactly — this pins BOTH
+        // the `capPrefix` ("Outstanding cap:") and the -1 → "Unlimited" sentinel verbatim.
+        await expect(
+            schedCard.getByText('Outstanding cap: Unlimited', { exact: true }),
+        ).toBeVisible({
+            timeout: 30_000,
+        });
 
         // The one-shot card: "One-shot" chip, NO cron line, "Auto-build off", inherit cap.
         const oneShotCard = page.locator(`a[href$="/missions/${oneShot.id}"]`).first();
         await expect(oneShotCard).toBeVisible({ timeout: 30_000 });
-        await expect(oneShotCard.getByText('One-shot', { exact: true })).toBeVisible();
-        await expect(oneShotCard.getByText('Auto-build off', { exact: true })).toBeVisible();
-        await expect(oneShotCard.getByText('Inherit user default', { exact: true })).toBeVisible();
+        // Same generous budget for the one-shot card's inner chips (see note above).
+        await expect(oneShotCard.getByText('One-shot', { exact: true })).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(oneShotCard.getByText('Auto-build off', { exact: true })).toBeVisible({
+            timeout: 30_000,
+        });
+        // Same bare-text-node shape as the scheduled card's cap above: the inherit-cap
+        // label shares its <div> with the "Outstanding cap:" prefix span, so the smallest
+        // enclosing element's text is "Outstanding cap: Inherit user default". Assert that
+        // genuine combined text exactly — pins `capPrefix` + the null → "Inherit user
+        // default" sentinel verbatim.
+        await expect(
+            oneShotCard.getByText('Outstanding cap: Inherit user default', { exact: true }),
+        ).toBeVisible({
+            timeout: 30_000,
+        });
         // A one-shot has no schedule → no "Cron:" prefix inside its card.
         await expect(oneShotCard.getByText('Cron:', { exact: false })).toHaveCount(0);
 
