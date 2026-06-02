@@ -3,6 +3,21 @@ import { SourceValidationStep } from '../steps/source-validation.step';
 import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
+// Mock the SSRF guard so the source-validation probe does NOT perform real
+// DNS resolution in tests: `safeFetchWithDnsPin` here just delegates to the
+// test-controlled `global.fetch`. The real guard resolves DNS for every URL,
+// which hangs on network-restricted CI runners and timed out the 20-item
+// batch test. `isSafeWebhookUrl` keeps its real (lexical, DNS-free) behavior.
+vi.mock('@ever-works/plugin/helpers/ssrf-guard', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@ever-works/plugin/helpers/ssrf-guard')>();
+	return {
+		...actual,
+		safeFetchWithDnsPin: vi.fn((url: string | URL, opts?: RequestInit) =>
+			(globalThis.fetch as typeof fetch)(url, opts)
+		)
+	};
+});
+
 describe('SourceValidationStep', () => {
 	let step: SourceValidationStep;
 	let mockContext: MutableGenerationContext;
