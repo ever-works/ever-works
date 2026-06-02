@@ -31,9 +31,9 @@ describe('UserAwareThrottlerGuard', () => {
     });
 
     it('uses the socket address when no parsed IP is available', async () => {
-        await expect(
-            guard.track({ socket: { remoteAddress: '::ffff:127.0.0.1' } }),
-        ).resolves.toBe('ip:::ffff:127.0.0.1');
+        await expect(guard.track({ socket: { remoteAddress: '::ffff:127.0.0.1' } })).resolves.toBe(
+            'ip:::ffff:127.0.0.1',
+        );
     });
 
     it('keeps a deterministic fallback for malformed requests', async () => {
