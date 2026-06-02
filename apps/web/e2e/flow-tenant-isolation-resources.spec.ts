@@ -282,17 +282,27 @@ test.describe('Tenant isolation across every resource type', () => {
         expect(listB.status()).toBe(200);
         const aThreads = (await listA.json()).conversations as Array<{
             id: string;
-            userId: string;
+            userId?: string;
         }>;
         const bThreads = (await listB.json()).conversations as Array<{
             id: string;
-            userId: string;
+            userId?: string;
         }>;
         expect(aThreads.map((c) => c.id)).toContain(ca.id);
         expect(aThreads.map((c) => c.id)).not.toContain(cb.id);
         expect(bThreads.map((c) => c.id)).toContain(cb.id);
         expect(bThreads.map((c) => c.id)).not.toContain(ca.id);
-        expect(aThreads.every((c) => c.userId === a.user.user.id)).toBe(true);
+        // The list projection (repo.findByUser) selects only id/title/providerId/
+        // model/createdAt/updatedAt — userId is INTENTIONALLY omitted since the rows
+        // are already user-scoped. Ownership is proven on the detail GET below, which
+        // DOES return userId; the list-scoping itself is proven by the id membership
+        // checks above. (cf. createConversation's POST body, which carries userId.)
+        expect(aThreads.every((c) => c.userId === undefined)).toBe(true);
+        const aDetail = await request.get(`${API_BASE}/api/conversations/${ca.id}`, {
+            headers: a.headers,
+        });
+        expect(aDetail.status()).toBe(200);
+        expect((await aDetail.json()).userId).toBe(a.user.user.id);
 
         // ── Cross-tenant GET / PATCH(204) / DELETE(204) all → 404 ──
         const crossUrl = `${API_BASE}/api/conversations/${ca.id}`;

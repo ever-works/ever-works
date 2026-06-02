@@ -434,15 +434,16 @@ test.describe('Flow: org-scoped billing vs personal scope', () => {
         });
     });
 
-    test('flow 5: org PLAN transition is per-MEMBER, not per-org — two distinct users both anchored to the same org slug keep INDEPENDENT subscription tiers', async ({
+    test('flow 5: org PLAN transition is per-MEMBER, not per-org — the org OWNER acts in the org scope while a NON-member is forbidden from claiming it, and each holds an INDEPENDENT subscription tier', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
         const peer = await registerUserViaAPI(request);
         const org = await createOrg(request, owner.access_token, uniq('PlanTenantOrg'));
 
-        // Both users can RESOLVE the org slug (global resolver), so both can claim the
-        // same org context on their requests.
+        // Both users can RESOLVE the org slug — GET /api/organizations/:slug is a GLOBAL
+        // metadata resolver (200 for any authed user). But resolving the slug grants NO
+        // right to ACT in that org's scope.
         for (const u of [owner, peer]) {
             const r = await request.get(`${API_BASE}/api/organizations/${org.slug}`, {
                 headers: authedHeaders(u.access_token),
@@ -450,45 +451,57 @@ test.describe('Flow: org-scoped billing vs personal scope', () => {
             expect(r.status()).toBe(200);
         }
 
-        // 1. Both start on FREE (under the org scope).
-        expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('free');
-        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
+        // VERIFIED LIVE: an X-Scope-Slug pointing at an org you don't own is rejected by
+        // ScopeOwnershipGuard (scope-ownership.guard.ts) with 403 BEFORE the controller
+        // runs — there is no shared/per-org plan a non-member could read or mutate. So the
+        // per-member story is: the OWNER acts in the org scope (it just follows their
+        // bearer); the NON-member is FORBIDDEN from that scope entirely.
 
-        // 2. Owner upgrades to PREMIUM under the org scope.
+        // 1. Owner starts on FREE — read under the org scope (owner's tenant === org tenant → 200).
+        expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('free');
+
+        // 2. Peer (a non-member) CANNOT claim the owner's org context at all: the
+        //    subscription route is scope-guarded and 403s. This is the strongest TRUE
+        //    statement that there is no per-org plan surface shared across members.
+        const peerScoped = await request.get(`${API_BASE}/api/subscriptions/plan`, {
+            headers: scopedHeaders(peer.access_token, org.slug),
+        });
+        expect(peerScoped.status(), 'non-member claiming owner org scope must be forbidden').toBe(
+            403,
+        );
+
+        // 3. Owner upgrades to PREMIUM under the org scope. The mutation follows the
+        //    OWNER's bearer (assignPlanToUser is per-user) — not an "org plan".
         expect((await setPlan(request, owner.access_token, 'premium', org.slug)).status()).toBe(
             200,
         );
-
-        // 3. If a per-org plan existed, peer's org-scoped read would now show premium.
-        //    It does NOT — peer is still FREE. The plan followed the OWNER's bearer.
+        // Visible from BOTH the owner's org-scoped AND personal read — one user-scoped plan.
         expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
-        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('free');
+        expect((await getPlan(request, owner.access_token)).plan.code).toBe('premium');
 
-        // 4. Peer upgrades to STANDARD; owner stays premium. Fully independent tiers.
-        expect((await setPlan(request, peer.access_token, 'standard', org.slug)).status()).toBe(
-            200,
-        );
-        expect((await getPlan(request, peer.access_token, org.slug)).plan.code).toBe('standard');
+        // 4. The peer's OWN plan is fully independent. Peer can only act in its OWN
+        //    (personal / no-scope) context — upgrade to STANDARD there; owner stays premium.
+        expect((await setPlan(request, peer.access_token, 'standard')).status()).toBe(200);
+        expect((await getPlan(request, peer.access_token)).plan.code).toBe('standard');
         expect((await getPlan(request, owner.access_token, org.slug)).plan.code).toBe('premium');
 
         // 5. Cadence-gating arrays are well-formed per member (same cardinality across tiers).
         const ownerCadences =
             (await getPlan(request, owner.access_token, org.slug)).plan.allowedCadences ?? [];
-        const peerCadences =
-            (await getPlan(request, peer.access_token, org.slug)).plan.allowedCadences ?? [];
+        const peerCadences = (await getPlan(request, peer.access_token)).plan.allowedCadences ?? [];
         expect(ownerCadences.length).toBeGreaterThan(0);
         expect(peerCadences.length).toBe(ownerCadences.length);
 
         // Reset both to free to keep the shared DB tidy for sibling subscription specs.
         await setPlan(request, owner.access_token, 'free', org.slug);
-        await setPlan(request, peer.access_token, 'free', org.slug);
+        await setPlan(request, peer.access_token, 'free');
         expect((await getPlan(request, owner.access_token)).plan.code).toBe('free');
         expect((await getPlan(request, peer.access_token)).plan.code).toBe('free');
 
         test.info().annotations.push({
             type: 'org-billing-scope',
             description:
-                'No org-level plan: assignPlanToUser is per-user. Two members of the same org slug hold independent tiers; the org context never aggregates billing.',
+                'No org-level plan: assignPlanToUser is per-user. The org OWNER acts in the org scope (it follows their bearer) while ScopeOwnershipGuard 403s a non-member who claims the same X-Scope-Slug. Members/non-members hold fully independent tiers; the org context never aggregates billing.',
         });
     });
 

@@ -246,7 +246,20 @@ test.describe('organization slug lifecycle (deep)', () => {
             if (chk.available) {
                 expect(chk.suggestion, `free '${word}' has no suggestion`).toBeUndefined();
             } else {
-                expect(chk.suggestion, `taken '${word}' bumps`).toBe(`${word}-2`);
+                // GLOBAL namespace + workers=4: `${word}-2`/`-3` may already be
+                // claimed, so the suggestion is the NEXT-FREE plain numeric bump
+                // (allocateUsername), not necessarily `-2`. The point being proven
+                // is that a taken word still bumps numerically (never suggestion-less
+                // the way a reserved word would) — assert the `${word}-N` (N>=2)
+                // SHAPE and that the suggested slug is actually claimable.
+                expect(chk.suggestion, `taken '${word}' bumps`).toMatch(
+                    new RegExp(`^${word}-([2-9]|[1-9][0-9]+)$`),
+                );
+                expect(chk.suggestion, `'${word}' suggestion is a valid slug`).toMatch(SLUG_RE);
+                const reCheck = await (
+                    await checkSlug(request, user.access_token, chk.suggestion)
+                ).json();
+                expect(reCheck.available, `suggested '${chk.suggestion}' is free`).toBe(true);
             }
         }
 

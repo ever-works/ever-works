@@ -242,11 +242,24 @@ test.describe('Work pipeline plugin binding (complex flows)', () => {
             'selecting standard-pipeline binds the work to it',
         ).toBe(ALT_PIPELINE_ID);
 
-        // The default option within the switched schema now points at the alternate.
-        const defAfter = pipelineOptions(switchedSchema).find((o) => o.isDefault);
-        expect(defAfter?.id, 'switched schema marks standard-pipeline as the active one').toBe(
-            ALT_PIPELINE_ID,
-        );
+        // PROBED REALITY (live 2026-06-01): the GLOBAL form has no workId, so the
+        // providers.pipeline `isDefault` flag is computed purely from each plugin's
+        // manifest `defaultForCapabilities` (toProviderOption) and does NOT track the
+        // `?pipelineId` query param — it stays pinned to the manifest default
+        // (agent-pipeline). The OBSERVABLE binding switch is `resolvedPipelineId`
+        // (asserted above); the alternate is still a selectable option, just not the
+        // capability-default. Assert the TRUE shape, not a fictional "isDefault follows
+        // the selection" contract.
+        const switchedOptions = pipelineOptions(switchedSchema);
+        const switchedDefault = switchedOptions.find((o) => o.isDefault);
+        expect(
+            switchedDefault?.id,
+            'manifest default-for-capability stays agent-pipeline regardless of selection',
+        ).toBe(DEFAULT_PIPELINE_ID);
+        expect(
+            switchedOptions.map((o) => o.id),
+            'standard-pipeline remains a selectable pipeline option after the switch',
+        ).toContain(ALT_PIPELINE_ID);
 
         // And switching back resolves the original binding again (round-trip).
         const backToAgent = await getJson(

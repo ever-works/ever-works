@@ -332,24 +332,35 @@ test.describe('Agent instruction files (full) — multi-file persistence + concu
         // exactly what React's onChange listens to — so the buffer cleanly
         // becomes ONLY the edit, arming the 800ms autosave debounce.
         const edited = `# Edited via UI ${stamp}\n\nThis line was typed in the browser.`;
-        await soulTextarea.click();
-        await soulTextarea.evaluate((el, val) => {
-            const node = el as HTMLTextAreaElement;
-            const setter = Object.getOwnPropertyDescriptor(
-                window.HTMLTextAreaElement.prototype,
-                'value',
-            )?.set;
-            setter?.call(node, val);
-            node.dispatchEvent(new Event('input', { bubbles: true }));
-        }, edited);
-        await expect
-            .poll(async () => (await soulTextarea.inputValue()) ?? '', { timeout: 10_000 })
-            .toBe(edited);
 
         // Autosave success stamps a ✓ on the SOUL.md pill (status 'saved'). The
         // pill is the tab button whose accessible name contains the file name.
-        const soulPill = page.getByRole('button', { name: /SOUL\.md/ });
-        await expect(soulPill).toContainText('✓', { timeout: 30_000 });
+        const soulPill = page.getByRole('button', { name: /SOUL\.md/ }).first();
+
+        // HARDENING (workers=4 flake): under load the dispatched 'input' can land
+        // BEFORE React has wired its onChange (dev hydration lag). The native
+        // setter still updates the DOM value, so a one-shot value poll can pass
+        // while React's `buffers` state never changed → `dirty` stays false →
+        // autosave never fires → the pill stays a bare "SOUL.md" forever (the
+        // observed symptom). Re-dispatch inside a toPass retry until the autosave
+        // actually lands a ✓, which is the only proof React registered the edit.
+        // The ✓ assertion itself is unchanged — this only makes reaching it robust.
+        await expect(async () => {
+            await soulTextarea.click();
+            await soulTextarea.evaluate((el, val) => {
+                const node = el as HTMLTextAreaElement;
+                const setter = Object.getOwnPropertyDescriptor(
+                    window.HTMLTextAreaElement.prototype,
+                    'value',
+                )?.set;
+                setter?.call(node, val);
+                node.dispatchEvent(new Event('input', { bubbles: true }));
+            }, edited);
+            await expect(soulTextarea).toHaveValue(edited, { timeout: 5_000 });
+            // 800ms debounce + server-action round-trip + revalidate — give it
+            // room per attempt before the outer toPass re-dispatches.
+            await expect(soulPill).toContainText('✓', { timeout: 12_000 });
+        }).toPass({ timeout: 60_000 });
 
         // Authoritative cross-check: the API now returns the UI-entered body with
         // a fresh 64-hex hash.

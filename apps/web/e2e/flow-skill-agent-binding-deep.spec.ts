@@ -719,12 +719,29 @@ test.describe('Skill ↔ Agent binding — deep resolution', () => {
             priority: 20,
         });
 
+        // The /agents/:id/skills resolver ALSO surfaces the user's tenant-scoped
+        // bindings (targetType='tenant', scoped by userId) on top of this agent's
+        // own bindings — so under workers=4 a sibling spec's tenant binding can
+        // inflate the page count. Derive the TRUE expected counts from the live
+        // resolver instead of hard-coding 2→1, and build the exact rendered copy
+        // ("N active binding" singular / "N active bindings" plural, matching the
+        // component's `rows.length === 1 ? '' : 's'`). Intent is preserved: the
+        // count is exactly right and drops by exactly one when a binding is removed.
+        const countCopy = (n: number) =>
+            new RegExp(`(?<!\\d)${n} active binding${n === 1 ? '(?!s)' : 's'}`, 'i');
+        const before = await listAgentSkills(request, access_token, agent.id);
+        const beforeCount = before.length; // ≥ 2: our keep + drop, plus any leaked tenant bindings
+        expect(before.map((r) => r.skill.id)).toContain(keep.id);
+        expect(before.map((r) => r.skill.id)).toContain(drop.id);
+
         await page.goto(`/agents/${agent.id}/skills`, { waitUntil: 'domcontentloaded' });
 
         // Both rows + the count are visible.
         await expect(page.getByText(keepTitle).first()).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText(dropTitle).first()).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByText(/2 active bindings/i).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(countCopy(beforeCount)).first()).toBeVisible({
+            timeout: 30_000,
+        });
 
         // Find the article row for the skill we want to drop and click its
         // Remove button. The row is the <article> containing the drop title.
@@ -739,14 +756,17 @@ test.describe('Skill ↔ Agent binding — deep resolution', () => {
             await expect(page.getByText(dropTitle)).toHaveCount(0, { timeout: 5_000 });
         }).toPass({ timeout: 30_000 });
 
-        // The kept skill remains and the count drops to one (singular copy).
+        // The kept skill remains and the count drops by exactly one.
         await expect(page.getByText(keepTitle).first()).toBeVisible();
-        await expect(page.getByText(/1 active binding(?!s)/i).first()).toBeVisible({
+        await expect(page.getByText(countCopy(beforeCount - 1)).first()).toBeVisible({
             timeout: 30_000,
         });
 
-        // API agrees: only the kept binding survives on the agent.
+        // API agrees: the dropped binding is gone and the kept one survives
+        // (the list may still carry leaked tenant-scoped bindings for this user).
         const resolved = await listAgentSkills(request, access_token, agent.id);
-        expect(resolved.map((r) => r.skill.id)).toEqual([keep.id]);
+        const resolvedIds = resolved.map((r) => r.skill.id);
+        expect(resolvedIds).toContain(keep.id);
+        expect(resolvedIds).not.toContain(drop.id);
     });
 });

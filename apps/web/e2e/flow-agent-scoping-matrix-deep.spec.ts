@@ -563,7 +563,13 @@ test.describe('Agent scoping matrix — deep cascade rules', () => {
         const myCard = page.locator(`[data-testid="agent-template-card-${slug}"]`).first();
         const newAgentCta = page.getByText('New Agent', { exact: false }).first();
 
-        await expect(heading.or(composer).or(myChip).or(myCard).or(newAgentCta)).toBeVisible({
+        // The page mounts SEVERAL of these at once (the "Agents" h1 AND the
+        // prompt composer both render), so the `.or()` union resolves to
+        // multiple visible nodes — trailing `.first()` collapses it to one to
+        // avoid a strict-mode violation while still proving the catalog rendered.
+        await expect(
+            heading.or(composer).or(myChip).or(myCard).or(newAgentCta).first(),
+        ).toBeVisible({
             timeout: 30_000,
         });
 

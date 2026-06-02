@@ -567,14 +567,39 @@ test.describe('work kind variants — create surface, domain inference + overrid
         const s = loadSeededTestUser();
         expect(s.email, 'seeded user available').toBeTruthy();
 
-        await page.goto(`${ORIGIN(baseURL)}/works/new`);
+        // REALITY (probed live 2026-06-01 vs works/new/page.tsx): a BARE `/works/new` has neither
+        // `?mode=` nor `?proposal=`, so the server 307-redirects it to ROUTES.DASHBOARD_NEW (`/new`,
+        // the global catalog) — it NEVER renders the Work prompt composer. The kind-chip entry view
+        // (creationMode === null) is only reachable by first landing on a mode view (which `?mode=`
+        // forces, skipping the redirect) and then clicking the in-app "Back to options" control. So
+        // arrive via `?mode=manual` (renders NewWorkClient's form) then step back into the entry view.
+        await page.goto(`${ORIGIN(baseURL)}/works/new?mode=manual`);
 
-        // The entry view's prompt composer (kind picker lives in its chip row). If the build routed
-        // us elsewhere (local catch-all 404), branch via the manual affordance / heading instead.
+        // The mode view exposes the "Back to options" affordance; clicking it surfaces the entry view
+        // (prompt composer + full kind-chip catalog). Retry the first click to beat the dev hydration
+        // race that swallows pre-hydration clicks.
+        const backToOptions = page.getByRole('button', { name: /back to options/i }).first();
         const promptComposer = page
             .getByTestId('new-work-prompt')
             .or(page.getByRole('heading', { name: /new work/i }))
             .first();
+        await expect(backToOptions, 'mode-view back affordance present').toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(async () => {
+            if (
+                !(await page
+                    .getByTestId('new-work-prompt')
+                    .first()
+                    .isVisible({ timeout: 1_500 })
+                    .catch(() => false))
+            ) {
+                await backToOptions.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            await expect(page.getByTestId('new-work-prompt').first()).toBeVisible({
+                timeout: 4_000,
+            });
+        }).toPass({ timeout: 30_000 });
         await expect(promptComposer).toBeVisible({ timeout: 30_000 });
 
         // Live kind chips. testIdPrefix is 'new-work-kind'; fall back to visible chip text.
