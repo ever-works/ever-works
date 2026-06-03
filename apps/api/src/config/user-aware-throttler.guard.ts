@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
 type ThrottledRequest = Record<string, unknown> & {
@@ -7,6 +7,8 @@ type ThrottledRequest = Record<string, unknown> & {
         id?: unknown;
         sub?: unknown;
     };
+    url?: unknown;
+    originalUrl?: unknown;
     ip?: unknown;
     ips?: unknown;
     socket?: {
@@ -16,6 +18,33 @@ type ThrottledRequest = Record<string, unknown> & {
 
 @Injectable()
 export class UserAwareThrottlerGuard extends ThrottlerGuard {
+    /**
+     * Test/CI escape hatch for the AUTH endpoints only. The e2e suite drives
+     * every spec from a single CI IP and must register / log in / mint many
+     * accounts, so the per-IP auth throttles (register 5/min, login 10/min,
+     * anonymous 5/h, …) would 429 its bulk setup. When `E2E_DISABLE_AUTH_THROTTLE`
+     * is set AND we are not in production, skip throttling for `/api/auth/*`
+     * routes. NON-auth throttling (ingest / notification / global tiers) stays
+     * fully active so those rate-limit specs keep their coverage, and this is
+     * HARD-gated off in production so it can never weaken a real deployment.
+     */
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        if (
+            process.env.E2E_DISABLE_AUTH_THROTTLE === 'true' &&
+            process.env.NODE_ENV !== 'production'
+        ) {
+            const req = context.switchToHttp().getRequest<ThrottledRequest>();
+            const rawUrl =
+                (typeof req.originalUrl === 'string' && req.originalUrl) ||
+                (typeof req.url === 'string' && req.url) ||
+                '';
+            if (rawUrl.split('?')[0].startsWith('/api/auth/')) {
+                return true;
+            }
+        }
+        return super.canActivate(context);
+    }
+
     protected getTracker(req: ThrottledRequest): Promise<string> {
         const userId = firstString(req.user?.userId, req.user?.id, req.user?.sub);
         if (userId) {

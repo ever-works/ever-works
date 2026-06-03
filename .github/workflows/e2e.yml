@@ -258,6 +258,14 @@ jobs:
           # spec is tolerant — it annotates when no 429 surfaces rather than
           # failing.
           LOGIN_THROTTLE_LIMIT: '100000'
+          # Belt-and-braces for ALL the other audit-added auth throttles
+          # (anonymous 5/h, claim 10/h, forgot/reset-password 5/min, magic-link,
+          # validate-*): rather than tune each per-IP cap, skip throttling for
+          # `/api/auth/*` ONLY (UserAwareThrottlerGuard, hard-gated off in prod).
+          # NON-auth throttling (ingest / notification / global) stays active so
+          # those rate-limit specs keep coverage; the auth-throttle specs already
+          # `test.skip` when no 429 surfaces.
+          E2E_DISABLE_AUTH_THROTTLE: 'true'
           # Subscriptions — flip the kill-switch so the plan / tier /
           # billing-grace specs run their real branches. The default
           # disabled state returns `plan: { code: 'free' }` (post-fix

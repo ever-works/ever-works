@@ -19,10 +19,23 @@ import { MailerService } from './providers/mailer.service';
                     port: config.mail.smtpPort(),
                     secure: config.mail.smtpSecure(),
                     ignoreTLS: config.mail.smtpIgnoreTLS(),
-                    auth: {
-                        user: config.mail.smtpUser(),
-                        pass: config.mail.smtpPassword(),
-                    },
+                    // Only send SMTP AUTH when credentials are actually
+                    // configured. A local relay (MailHog/Mailpit, used by e2e)
+                    // accepts unauthenticated mail; passing
+                    // `auth: { user: undefined, pass: undefined }` makes
+                    // nodemailer attempt PLAIN auth with no credentials and
+                    // abort the connection with `Missing credentials for
+                    // "PLAIN"`, so every outbound message silently fails and the
+                    // email-flow e2e specs can't read the sent mail. Ternary
+                    // (not `&&`) keeps the spread typed as an object.
+                    ...(config.mail.smtpUser() && config.mail.smtpPassword()
+                        ? {
+                              auth: {
+                                  user: config.mail.smtpUser(),
+                                  pass: config.mail.smtpPassword(),
+                              },
+                          }
+                        : {}),
                     // Security: verify the SMTP relay's TLS certificate by
                     // default so outbound mail (password-reset, magic-link and
                     // account-deletion tokens) can't be intercepted via a
