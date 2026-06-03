@@ -143,4 +143,81 @@ describe('CrmConfigService', () => {
             );
         });
     });
+
+    describe('configForTenant (per-tenant workspace credentials)', () => {
+        const baseEnv = {
+            TWENTY_CRM_BASE_URL: 'https://crm.example.com',
+            TWENTY_CRM_API_KEY: 'default-key',
+            TWENTY_CRM_WORKSPACE_ID: 'default-ws',
+        };
+
+        it('returns the default config when no tenantId is given (internal/system callers)', () => {
+            const service = new CrmConfigService(mockConfigService(baseEnv));
+            expect(service.configForTenant()).toMatchObject({
+                apiKey: 'default-key',
+                workspaceId: 'default-ws',
+            });
+        });
+
+        it('falls back to the default config when the tenant has no entry', () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({ 'other-tenant': { apiKey: 'x' } }),
+                }),
+            );
+            expect(service.configForTenant('tenant-1')).toMatchObject({
+                apiKey: 'default-key',
+                workspaceId: 'default-ws',
+            });
+        });
+
+        it("uses the tenant's OWN workspace credentials when an entry exists", () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({
+                        'tenant-1': {
+                            apiKey: 't1-key',
+                            workspaceId: 't1-ws',
+                            apiUrl: 'https://t1.example.com',
+                        },
+                    }),
+                }),
+            );
+            expect(service.configForTenant('tenant-1')).toMatchObject({
+                apiUrl: 'https://t1.example.com',
+                apiKey: 't1-key',
+                workspaceId: 't1-ws',
+            });
+        });
+
+        it('inherits base fields the override omits, and isolates two tenants from each other', () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({
+                        'tenant-a': { apiKey: 'a-key' },
+                        'tenant-b': { apiKey: 'b-key', workspaceId: 'b-ws' },
+                    }),
+                }),
+            );
+
+            const a = service.configForTenant('tenant-a');
+            const b = service.configForTenant('tenant-b');
+
+            // tenant-a inherits the default workspace; tenant-b overrides it.
+            expect(a).toMatchObject({ apiKey: 'a-key', workspaceId: 'default-ws' });
+            expect(b).toMatchObject({ apiKey: 'b-key', workspaceId: 'b-ws' });
+            expect(a.apiKey).not.toBe(b.apiKey);
+        });
+
+        it('ignores a malformed TWENTY_CRM_TENANTS JSON value and falls back to the default', () => {
+            const service = new CrmConfigService(
+                mockConfigService({ ...baseEnv, TWENTY_CRM_TENANTS: '{not json' }),
+            );
+            jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+            expect(service.configForTenant('tenant-1')).toMatchObject({ apiKey: 'default-key' });
+        });
+    });
 });

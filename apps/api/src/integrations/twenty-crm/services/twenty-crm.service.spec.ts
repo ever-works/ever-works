@@ -11,8 +11,12 @@ const buildConfig = (
         workspaceId: string;
         timeout: number;
     }> = {},
-) => ({
-    twentyCrmConfig: {
+    tenantOverrides: Record<
+        string,
+        { apiUrl?: string; apiKey?: string; workspaceId?: string }
+    > = {},
+) => {
+    const base = {
         apiUrl: 'https://crm.example.com',
         apiKey: 'secret',
         workspaceId: 'ws-1',
@@ -20,8 +24,18 @@ const buildConfig = (
         retryAttempts: 3,
         retryDelay: 1000,
         ...overrides,
-    },
-});
+    };
+    return {
+        twentyCrmConfig: base,
+        // Mirror CrmConfigService.configForTenant: a tenant with its own entry
+        // uses its own workspace credentials; otherwise it falls back to base.
+        configForTenant: (tenantId?: string) => {
+            if (!tenantId) return base;
+            const override = tenantOverrides[tenantId];
+            return override ? { ...base, ...override } : base;
+        },
+    };
+};
 
 describe('TwentyCrmService.makeRequest', () => {
     let httpService: { request: jest.Mock };
@@ -58,30 +72,34 @@ describe('TwentyCrmService.makeRequest', () => {
         expect(result).toEqual({ ok: 1 });
     });
 
-    it('prepends the per-caller tenant prefix to the data-plane URL when provided', async () => {
-        // Security (cross-tenant IDOR fix): the 6th positional arg is the
-        // per-caller tenant endpoint prefix. When present, the outgoing URL is
-        // scoped to `/rest/tenants/{tenantId}/...` so a caller can only ever
-        // address rows inside their own tenant partition.
+    it("authenticates with the caller-tenant's OWN workspace credentials when a tenantId is provided", async () => {
+        // Security (cross-tenant IDOR fix): the 6th positional arg is the caller
+        // tenant id. It selects that tenant's own Twenty workspace credentials
+        // (one workspace + API key per tenant) — the URL stays `/rest/<object>`
+        // (Twenty has no tenant path routing), and isolation comes from the
+        // workspace-scoped API key.
+        configService = buildConfig(
+            {},
+            { 'tenant-1': { apiKey: 'tenant-1-key', workspaceId: 'tenant-1-ws' } },
+        ) as unknown as CrmConfigService;
+        service = new TwentyCrmService(httpService as unknown as HttpService, configService);
+        jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
         httpService.request.mockReturnValue(of({ data: [] }));
 
-        await service.makeRequest(
-            'GET',
-            '/companies',
-            undefined,
-            undefined,
-            false,
-            '/tenants/tenant-1',
-        );
+        await service.makeRequest('GET', '/companies', undefined, undefined, false, 'tenant-1');
 
         expect(httpService.request).toHaveBeenCalledWith(
             expect.objectContaining({
-                url: 'https://crm.example.com/rest/tenants/tenant-1/companies',
+                url: 'https://crm.example.com/rest/companies',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer tenant-1-key',
+                    'X-Workspace-Id': 'tenant-1-ws',
+                }),
             }),
         );
     });
 
-    it('keeps the data-plane URL un-prefixed when no tenant prefix is supplied (internal/system callers)', async () => {
+    it('uses the default credentials when no tenantId is supplied (internal/system callers)', async () => {
         httpService.request.mockReturnValue(of({ data: [] }));
 
         await service.makeRequest('GET', '/companies');
@@ -89,23 +107,18 @@ describe('TwentyCrmService.makeRequest', () => {
         expect(httpService.request).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: 'https://crm.example.com/rest/companies',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer secret',
+                    'X-Workspace-Id': 'ws-1',
+                }),
             }),
         );
     });
 
-    it('does NOT apply the tenant prefix to schema/metadata (workspace-global admin) calls', async () => {
-        // Metadata calls are workspace-global admin operations, never tenant
-        // data — the prefix must not leak into them.
+    it('routes schema/metadata calls to `/rest/metadata<endpoint>` regardless of tenantId', async () => {
         httpService.request.mockReturnValue(of({ data: { schema: true } }));
 
-        await service.makeRequest(
-            'GET',
-            '/objects',
-            undefined,
-            undefined,
-            true,
-            '/tenants/tenant-1',
-        );
+        await service.makeRequest('GET', '/objects', undefined, undefined, true, 'tenant-1');
 
         expect(httpService.request).toHaveBeenCalledWith(
             expect.objectContaining({

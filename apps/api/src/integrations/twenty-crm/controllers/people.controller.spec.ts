@@ -21,7 +21,9 @@ import type { UserRepository } from '@ever-works/agent/database';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 
 const TENANT_A = 'tenant-a';
-const PREFIX_A = `/tenants/${TENANT_A}`;
+// Controllers now pass the raw tenant id (which selects that tenant's own
+// Twenty workspace credentials), not a `/tenants/{id}` path prefix.
+const PREFIX_A = TENANT_A;
 
 const authUser = (userId = 'user-1'): AuthenticatedUser =>
     ({ userId, email: 'u@x.test' }) as AuthenticatedUser;

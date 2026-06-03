@@ -3,11 +3,11 @@ import { ClientService } from './client.service';
 import type { TwentyCrmService } from './twenty-crm.service';
 
 // Security (cross-tenant IDOR fix): every ClientService method now REQUIRES a
-// per-caller tenant endpoint prefix (`/tenants/{tenantId}`) and forwards it to
-// `TwentyCrmService.makeRequest` as the 6th positional arg. These tests assert
-// the prefix is always threaded through so a caller can only ever address rows
-// inside their own tenant partition.
-const PREFIX = '/tenants/tenant-1';
+// per-caller tenant id and forwards it to `TwentyCrmService.makeRequest` as the
+// 6th positional arg, which selects that tenant's own Twenty workspace
+// credentials. These tests assert the tenant id is always threaded through so a
+// caller can only ever address rows in their own workspace.
+const PREFIX = 'tenant-1';
 
 describe('ClientService', () => {
     let twenty: { makeRequest: jest.Mock };
@@ -18,7 +18,7 @@ describe('ClientService', () => {
         service = new ClientService(twenty as unknown as TwentyCrmService);
     });
 
-    // makeRequest signature: (method, endpoint, data, params, schema, tenantPrefix)
+    // makeRequest signature: (method, endpoint, data, params, schema, tenantId)
     const expectCall = (
         method: 'GET' | 'POST' | 'PUT' | 'DELETE',
         endpoint: string,
@@ -28,7 +28,7 @@ describe('ClientService', () => {
         expect(callArgs[0]).toBe(method);
         expect(callArgs[1]).toBe(endpoint);
         expect(callArgs[2]).toEqual(body);
-        // schema flag must be false for data-plane calls, and the tenant prefix
+        // schema flag must be false for data-plane calls, and the tenant id
         // must always be forwarded as the final arg.
         expect(callArgs[4]).toBe(false);
         expect(callArgs[5]).toBe(PREFIX);

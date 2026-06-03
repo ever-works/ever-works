@@ -90,31 +90,26 @@ class UpdateCompanyBodyDto extends PartialType(CompanyBodyDto) {}
 export class CompaniesController {
     constructor(
         private readonly clientService: ClientService,
-        // Security (cross-tenant IDOR fix): used to derive + sanitise the
-        // per-caller tenant endpoint prefix, and to resolve the caller's real
-        // Tenant id from the users table (the auth layer does not put it on
-        // `request.user`). Mirrors `OrgKbController` / `SessionScopeGuard`.
+        // Security (cross-tenant IDOR fix): used to resolve + validate the
+        // caller's real Tenant id from the users table (the auth layer does not
+        // put it on `request.user`); that id selects the tenant's own Twenty
+        // workspace credentials. Mirrors `OrgKbController` / `SessionScopeGuard`.
         private readonly crmTenantService: CrmTenantService,
         private readonly userRepository: UserRepository,
     ) {}
 
     /**
-     * Security: resolve the request-scoped, per-caller tenant endpoint prefix
-     * (`/tenants/{tenantId}`) from the authenticated user's real Tenant id.
+     * Security: resolve the request-scoped, per-caller tenant id from the
+     * authenticated user's real Tenant. Downstream this id selects the tenant's
+     * OWN Twenty workspace credentials (one workspace + API key per tenant), so
+     * a caller can only ever read/mutate/delete rows in their own workspace.
      *
-     * Every Twenty-CRM record lives in ONE shared upstream workspace, so
-     * without this prefix any authenticated user could read/mutate/delete
-     * EVERY tenant's records (cross-tenant IDOR). Prefixing every outgoing
-     * endpoint with the caller's own tenant partition means a caller can
-     * only ever address rows that belong to their tenant.
-     *
-     * Fail-closed: a caller with no Tenant (`users.tenantId IS NULL` — not
-     * yet upgraded) has no partition, so we throw `NotFoundException` rather
-     * than fall back to a shared partition. We use 404 (not 403) so we do
-     * not leak whether the shared workspace holds any records — same contract
-     * as `OrgKbController.assertOrgAccess`.
+     * Fail-closed: a caller with no Tenant (`users.tenantId IS NULL` — not yet
+     * upgraded) has no workspace, so we throw `NotFoundException` rather than
+     * fall back to a shared one. We use 404 (not 403) so we do not leak whether
+     * any records exist — same contract as `OrgKbController.assertOrgAccess`.
      */
-    private async resolveTenantPrefix(auth: AuthenticatedUser): Promise<string> {
+    private async resolveTenantId(auth: AuthenticatedUser): Promise<string> {
         const dbUser = await this.userRepository.findById(auth.userId);
         const context = this.crmTenantService.resolveCallerTenantContext(
             auth.userId,
@@ -123,18 +118,19 @@ export class CompaniesController {
         if (!context) {
             throw new NotFoundException('CRM records not found');
         }
-        return this.crmTenantService.getTenantEndpointPrefix(context);
+        return context.tenantId;
     }
 
     /**
      * Security: object-level ownership gate for by-id mutations. Reads the
-     * record UNDER the caller's tenant prefix first; if it is not present in
-     * the caller's partition the upstream returns 404, which surfaces as a
-     * `NotFoundException` — so a caller can never PATCH/DELETE another
-     * tenant's record (it 404s for them, identically to a non-existent id).
+     * record with the caller-tenant's own workspace credentials first; a record
+     * in another tenant's workspace is not visible to this key and the upstream
+     * returns 404 — surfaced as a `NotFoundException` — so a caller can never
+     * PATCH/DELETE another tenant's record (it 404s, identically to a
+     * non-existent id).
      */
-    private async assertCompanyInTenant(companyId: string, tenantPrefix: string): Promise<void> {
-        const existing = await this.clientService.getCompany(companyId, tenantPrefix);
+    private async assertCompanyInTenant(companyId: string, tenantId: string): Promise<void> {
+        const existing = await this.clientService.getCompany(companyId, tenantId);
         if (!existing) {
             throw new NotFoundException(`Company ${companyId} not found`);
         }
@@ -142,8 +138,8 @@ export class CompaniesController {
 
     @Get()
     async getCompanies(@CurrentUser() auth: AuthenticatedUser) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
-        return this.clientService.getCompanies(tenantPrefix);
+        const tenantId = await this.resolveTenantId(auth);
+        return this.clientService.getCompanies(tenantId);
     }
 
     @Get(':id')
@@ -151,10 +147,10 @@ export class CompaniesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ): Promise<TwentyOrganization> {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
-        // Reads are already partitioned by the tenant prefix: a foreign id is
-        // not under the caller's partition and 404s.
-        const company = await this.clientService.getCompany(id, tenantPrefix);
+        const tenantId = await this.resolveTenantId(auth);
+        // Reads use the caller-tenant's own workspace credentials: a foreign id
+        // lives in another workspace, is invisible to this key, and 404s.
+        const company = await this.clientService.getCompany(id, tenantId);
         if (!company) {
             throw new NotFoundException(`Company ${id} not found`);
         }
@@ -166,8 +162,8 @@ export class CompaniesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() company: CompanyBodyDto,
     ): Promise<TwentyOrganization> {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
-        return this.clientService.createCompany(company, tenantPrefix);
+        const tenantId = await this.resolveTenantId(auth);
+        return this.clientService.createCompany(company, tenantId);
     }
 
     @Patch(':id')
@@ -176,18 +172,18 @@ export class CompaniesController {
         @Param('id') id: string,
         @Body() company: UpdateCompanyBodyDto,
     ): Promise<TwentyOrganization> {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
+        const tenantId = await this.resolveTenantId(auth);
         // Security: verify the record belongs to the caller's tenant BEFORE
         // mutating it, so a foreign id is rejected (404) instead of edited.
-        await this.assertCompanyInTenant(id, tenantPrefix);
-        return this.clientService.updateCompany(id, company, tenantPrefix);
+        await this.assertCompanyInTenant(id, tenantId);
+        return this.clientService.updateCompany(id, company, tenantId);
     }
 
     @Delete(':id')
     async deleteCompany(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
+        const tenantId = await this.resolveTenantId(auth);
         // Security: verify ownership before deleting so a foreign id 404s.
-        await this.assertCompanyInTenant(id, tenantPrefix);
-        return this.clientService.deleteCompany(id, tenantPrefix);
+        await this.assertCompanyInTenant(id, tenantId);
+        return this.clientService.deleteCompany(id, tenantId);
     }
 }
