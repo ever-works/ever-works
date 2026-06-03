@@ -29,6 +29,8 @@ import { SettingsSchemaValidatorService } from './services/settings-schema-valid
 import { PluginContextFactoryService } from './services/plugin-context-factory.service';
 import { CustomCapabilityRegistryService } from './services/custom-capability-registry.service';
 import { PluginBootstrapService } from './services/plugin-bootstrap.service';
+// EW-693 — runtime installer (dynamic distribution).
+import { PluginInstallerService } from './services/plugin-installer.service';
 
 // Constants and interfaces
 import { PLUGINS_MODULE_OPTIONS, DEFAULT_PLATFORM_VERSION } from './plugins.constants';
@@ -84,6 +86,9 @@ const PROVIDERS = [
     CustomCapabilityRegistryService,
     // Bootstrap service
     PluginBootstrapService,
+    // EW-693 — runtime installer. Inert in bundled mode; active only
+    // when PluginsModuleOptions.distributionMode === 'dynamic'.
+    PluginInstallerService,
 ];
 
 /**
@@ -112,6 +117,11 @@ const EXPORTS = [
     SettingsSchemaValidatorService,
     // Bootstrap service (for explicit initialization)
     PluginBootstrapService,
+    // EW-693 — runtime installer, exported so the plugins controller
+    // (Phase 6) can call install/uninstall and the execution router
+    // (Phase 7) can call ensurePluginAvailable before invoking a
+    // distributable plugin.
+    PluginInstallerService,
 ];
 
 /**
