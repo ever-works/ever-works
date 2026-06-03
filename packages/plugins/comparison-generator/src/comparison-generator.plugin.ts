@@ -65,6 +65,7 @@ export class ComparisonGeneratorPlugin implements IPlugin {
 				type: 'string',
 				title: 'Custom Prompt',
 				description: 'Additional instructions to append to comparison generation prompts',
+				maxLength: 2000,
 				'x-hidden': true
 			},
 			extended_analysis: {

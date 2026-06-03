@@ -35,6 +35,16 @@ function neutralizeUserField(value: string): string {
 		.replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
 }
 
+/**
+ * Build the system prompt for the managed agent.
+ *
+ * @param override - INTERNAL/PLATFORM USE ONLY. Must be a fully-trusted,
+ *   platform-authored string. This parameter performs a full replacement of the
+ *   system prompt and MUST NEVER receive a tenant-controlled or user-supplied
+ *   value. If a custom-system-prompt feature is added in the future, implement
+ *   it as a validated, fenced, appended section (see neutralizeUserField /
+ *   appendCustomPrompt pattern) rather than passing it here.
+ */
 export function buildSystemPrompt(override?: string): string {
 	if (override && override.trim().length > 0) {
 		return override;

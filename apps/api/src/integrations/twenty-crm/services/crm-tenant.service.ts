@@ -4,14 +4,15 @@ import { CrmTenantContext } from '../types/twenty-crm.types';
 /**
  * Service for managing CRM tenant context.
  *
- * Security (overnight-audit DEFERRED CRITICAL — cross-tenant IDOR):
- * Every Twenty-CRM record lives in ONE shared upstream workspace. The
- * companies/people controllers used to address records with bare paths
- * (`/companies/:id`), so any authenticated user could read/mutate/delete
- * EVERY tenant's records. The fix is to derive a real per-caller tenant
- * key from the authenticated user's Tenant id and prefix every outgoing
- * endpoint with `/tenants/{tenantId}/...` so a caller can only ever
- * address rows inside their own tenant partition.
+ * Security (cross-tenant IDOR fix):
+ * The companies/people controllers used to address records with bare,
+ * caller-independent credentials, so any authenticated user could
+ * read/mutate/delete EVERY tenant's records. The fix is to derive a real
+ * per-caller tenant id from the authenticated user's Tenant and use it to
+ * select that tenant's OWN Twenty workspace credentials (isolation model:
+ * one Twenty workspace + API key per tenant — see
+ * `CrmConfigService.configForTenant`). Twenty scopes an API key to a single
+ * workspace, so a caller can only ever address rows in their own workspace.
  *
  * The authoritative per-caller key is the user's `users.tenantId` (the
  * same Tenant the platform-wide scope guards authorize against — see
@@ -64,12 +65,12 @@ export class CrmTenantService {
      * (404/403) rather than fall back to a shared partition. A `null`
      * return is the signal to do exactly that.
      *
-     * The tenant id is sanitised into a single safe path segment before
-     * it is ever interpolated into an outgoing CRM path: Tenant ids are
-     * UUIDs (hex + hyphen) in production, but we defend in depth against
-     * any future id source by rejecting path-traversal / separator
-     * metacharacters here too, exactly as `ClientService.safeId` does for
-     * record ids.
+     * The tenant id is validated before use: Tenant ids are UUIDs (hex +
+     * hyphen) in production, but we defend in depth against any future id
+     * source by rejecting separator / parent-dir / percent-encoding
+     * metacharacters, exactly as `ClientService.safeId` does for record ids —
+     * the tenant id is used as a credential-map key and is logged, so it must
+     * never carry traversal/injection characters.
      */
     resolveCallerTenantContext(
         userId: string,
@@ -82,9 +83,9 @@ export class CrmTenantService {
             return null;
         }
 
-        // Defence-in-depth: a tenant id is only ever a single path segment.
-        // Reject separators / parent-dir / percent-encoding smuggling so a
-        // crafted id can never break out of the `/tenants/{id}` segment.
+        // Defence-in-depth: reject separators / parent-dir / percent-encoding
+        // smuggling so a crafted id can never be abused as a credential-map key
+        // or traversal vector.
         if (typeof tenantId !== 'string' || /[/\\%]/.test(tenantId) || tenantId.includes('..')) {
             this.logger.error(`Refusing malformed tenant id for caller ${userId}`);
             return null;
@@ -94,16 +95,6 @@ export class CrmTenantService {
             tenantId,
             userId,
         };
-    }
-
-    /**
-     * Get tenant-specific API endpoint prefix.
-     *
-     * Encodes the tenant id so it can only ever occupy a single path
-     * segment. Legitimate UUID tenant ids pass through byte-for-byte.
-     */
-    getTenantEndpointPrefix(tenantContext: CrmTenantContext): string {
-        return `/tenants/${encodeURIComponent(tenantContext.tenantId)}`;
     }
 
     /**

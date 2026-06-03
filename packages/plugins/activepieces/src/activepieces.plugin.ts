@@ -554,6 +554,16 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 		for (const item of itemsNeedingImages) {
 			if (signal.aborted) break;
 
+			// Security (SSRF): item.source_url originates from the Activepieces flow's
+			// Return Response — untrusted external content. Guard against hostile flows
+			// targeting internal endpoints by running the URL through the same SSRF check
+			// used for baseUrl and webhook URLs in this plugin.
+			if (typeof item.source_url !== 'string' || !isSafeWebhookUrl(item.source_url)) {
+				logger.warn(`Skipping screenshot for "${item.name}": source_url failed SSRF guard`);
+				errors.push(`source_url for "${item.name}" is not a safe URL`);
+				continue;
+			}
+
 			try {
 				const result = await screenshotFacade.getSmartImage(
 					{ url: item.source_url, itemName: item.name },

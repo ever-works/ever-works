@@ -143,4 +143,98 @@ describe('CrmConfigService', () => {
             );
         });
     });
+
+    describe('configForTenant (per-tenant workspace credentials)', () => {
+        const baseEnv = {
+            TWENTY_CRM_BASE_URL: 'https://crm.example.com',
+            TWENTY_CRM_API_KEY: 'default-key',
+            TWENTY_CRM_WORKSPACE_ID: 'default-ws',
+        };
+
+        it('returns the default config when no tenantId is given (internal/system callers)', () => {
+            const service = new CrmConfigService(mockConfigService(baseEnv));
+            expect(service.configForTenant()).toMatchObject({
+                apiKey: 'default-key',
+                workspaceId: 'default-ws',
+            });
+        });
+
+        it('returns null (fail closed) when the tenant has no entry, even if other tenants are configured', () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({ 'other-tenant': { apiKey: 'x' } }),
+                }),
+            );
+            // Must NOT fall back to the shared default — that would route the
+            // unconfigured tenant into the shared workspace (cross-tenant IDOR).
+            expect(service.configForTenant('tenant-1')).toBeNull();
+        });
+
+        it('returns null (fail closed) for a tenant-scoped call when NO per-tenant map is configured', () => {
+            const service = new CrmConfigService(mockConfigService(baseEnv));
+            expect(service.configForTenant('tenant-1')).toBeNull();
+        });
+
+        it('returns null (fail closed) when the tenant entry has no apiKey', () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({ 'tenant-1': { workspaceId: 'ws-only' } }),
+                }),
+            );
+            expect(service.configForTenant('tenant-1')).toBeNull();
+        });
+
+        it("uses the tenant's OWN workspace credentials when an entry exists", () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({
+                        'tenant-1': {
+                            apiKey: 't1-key',
+                            workspaceId: 't1-ws',
+                            apiUrl: 'https://t1.example.com',
+                        },
+                    }),
+                }),
+            );
+            expect(service.configForTenant('tenant-1')).toMatchObject({
+                apiUrl: 'https://t1.example.com',
+                apiKey: 't1-key',
+                workspaceId: 't1-ws',
+            });
+        });
+
+        it('inherits base fields the override omits, and isolates two tenants from each other', () => {
+            const service = new CrmConfigService(
+                mockConfigService({
+                    ...baseEnv,
+                    TWENTY_CRM_TENANTS: JSON.stringify({
+                        'tenant-a': { apiKey: 'a-key' },
+                        'tenant-b': { apiKey: 'b-key', workspaceId: 'b-ws' },
+                    }),
+                }),
+            );
+
+            const a = service.configForTenant('tenant-a');
+            const b = service.configForTenant('tenant-b');
+
+            // tenant-a inherits the default workspace; tenant-b overrides it.
+            expect(a).toMatchObject({ apiKey: 'a-key', workspaceId: 'default-ws' });
+            expect(b).toMatchObject({ apiKey: 'b-key', workspaceId: 'b-ws' });
+            expect(a.apiKey).not.toBe(b.apiKey);
+        });
+
+        it('ignores a malformed TWENTY_CRM_TENANTS JSON value and fails closed for tenant-scoped calls', () => {
+            const service = new CrmConfigService(
+                mockConfigService({ ...baseEnv, TWENTY_CRM_TENANTS: '{not json' }),
+            );
+            jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+            // Malformed map → treated as empty → tenant-scoped call fails closed,
+            // but internal/system (no tenantId) still uses the default.
+            expect(service.configForTenant('tenant-1')).toBeNull();
+            expect(service.configForTenant()).toMatchObject({ apiKey: 'default-key' });
+        });
+    });
 });

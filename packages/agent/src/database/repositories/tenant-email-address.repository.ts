@@ -24,6 +24,13 @@ export class TenantEmailAddressRepository {
         return this.repository.save(entry);
     }
 
+    /**
+     * @internal Trusted-internal lookup — no ownership check.
+     * Callers MUST have already validated that the requesting user owns the
+     * record (e.g. via {@link findByIdForUser}) OR be operating on a row
+     * resolved from an unguessable token (verificationToken). Do NOT call
+     * this from a request-scoped context without a prior ownership gate.
+     */
     async findById(id: string): Promise<TenantEmailAddress | null> {
         return this.repository.findOne({ where: { id } });
     }
@@ -66,6 +73,13 @@ export class TenantEmailAddressRepository {
         return this.repository.findOne({ where: { verificationToken: token } });
     }
 
+    /**
+     * @internal Trusted-internal update — no ownership check.
+     * Callers MUST have already validated ownership before invoking this
+     * method (e.g. via {@link findByIdForUser} or a prior
+     * {@link findByVerificationToken} resolution). Do NOT call this from a
+     * request-scoped context without a prior ownership gate.
+     */
     async update(id: string, patch: Partial<TenantEmailAddress>): Promise<void> {
         await this.repository.update({ id }, patch);
     }

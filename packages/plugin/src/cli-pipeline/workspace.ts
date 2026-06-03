@@ -58,7 +58,11 @@ const cliItemSchema = z
 		tags: z.array(z.string().max(ITEM_TAG_MAX)).max(256).optional(),
 		images: z.array(httpUrl).max(64).optional(),
 		image: stringOrNullish.optional(),
-		brand: stringOrNullish.optional()
+		brand: stringOrNullish.optional(),
+		// M-26 schema-level slug cap: only bound length, never reject or drop
+		// (traversal is already closed at the fs.writeFile sink via slugify +
+		// confinement; strict regex would silently drop legitimate items).
+		slug: z.string().max(255).optional()
 		// Free-form metadata — accept but cap.
 	})
 	.catchall(z.unknown())
@@ -120,6 +124,16 @@ export function getWorkspacePath(baseTempDir: string, userId: string, workId: st
 
 export async function createWorkspace(baseTempDir: string, userId: string, workId: string): Promise<string> {
 	const workspaceRoot = getWorkspacePath(baseTempDir, userId, workId);
+	// Security (path-traversal confinement): verify that the constructed path
+	// stays inside baseTempDir before creating any directories. This catches
+	// any caller that passes a crafted userId/workId containing `..` sequences
+	// without relying solely on the API layer's UUID validation.
+	const resolvedBase = path.resolve(baseTempDir);
+	const resolvedRoot = path.resolve(workspaceRoot);
+	const rel = path.relative(resolvedBase, resolvedRoot);
+	if (rel.startsWith('..') || path.isAbsolute(rel) || rel === '') {
+		throw new Error('createWorkspace: workspace path escapes baseTempDir');
+	}
 	await fs.mkdir(workspaceRoot, { recursive: true });
 	const workspacePath = await fs.mkdtemp(path.join(workspaceRoot, 'run-'));
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });

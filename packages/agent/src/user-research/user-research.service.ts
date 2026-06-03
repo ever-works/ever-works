@@ -85,8 +85,11 @@ export class UserResearchService {
             return { status: 'no-data', tokensUsed: 0, toolCallsCount: 0, durationMs: 0 };
         }
 
+        // Atomic check-and-increment: closes the TOCTOU between the cap check
+        // and the increment — two concurrent runs for the same user could
+        // otherwise both pass assertCanRun() and both increment past the cap.
         try {
-            await this.limits.assertCanRun(userId);
+            await this.limits.tryIncrementRuns(userId);
         } catch (err) {
             if (err instanceof UserResearchRateLimitedError) {
                 this.logger.warn(`Research rate-limited for user ${userId}: ${err.message}`);
@@ -100,8 +103,6 @@ export class UserResearchService {
             }
             throw err;
         }
-
-        await this.limits.incrementRuns(userId);
 
         let socials: string[] = [];
         try {

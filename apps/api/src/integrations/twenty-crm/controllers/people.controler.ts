@@ -19,11 +19,11 @@ import { TwentyContact } from '../types/twenty-crm.types';
 
 /**
  * Security (cross-tenant IDOR fix): identical per-caller tenant scoping to
- * `CompaniesController`. Every record lives in ONE shared Twenty workspace,
- * so every outgoing endpoint is prefixed with the caller's own tenant
- * partition (`/tenants/{tenantId}/...`) and by-id mutations are gated on an
- * object-level ownership check, so a caller can only ever read/mutate/delete
- * rows that belong to their own Tenant.
+ * `CompaniesController`. Every outgoing call is authenticated with the
+ * caller-tenant's own Twenty workspace credentials (one workspace + API key
+ * per tenant), and by-id mutations are gated on an object-level ownership
+ * check, so a caller can only ever read/mutate/delete rows that belong to
+ * their own Tenant.
  *
  * NOTE: this controller is intentionally STILL not registered in
  * `TwentyCrmModule` (OQ-1/OQ-2 in the spec — whether to expose People routes
@@ -42,11 +42,12 @@ export class PeopleController {
     ) {}
 
     /**
-     * Security: resolve the per-caller tenant endpoint prefix. Fail-closed
-     * (404) when the caller has no Tenant. See `CompaniesController` for the
-     * full rationale — this is the identical gate.
+     * Security: resolve the per-caller tenant id (which selects the tenant's
+     * own Twenty workspace credentials). Fail-closed (404) when the caller has
+     * no Tenant. See `CompaniesController` for the full rationale — this is the
+     * identical gate.
      */
-    private async resolveTenantPrefix(auth: AuthenticatedUser): Promise<string> {
+    private async resolveTenantId(auth: AuthenticatedUser): Promise<string> {
         const dbUser = await this.userRepository.findById(auth.userId);
         const context = this.crmTenantService.resolveCallerTenantContext(
             auth.userId,
@@ -55,16 +56,17 @@ export class PeopleController {
         if (!context) {
             throw new NotFoundException('CRM records not found');
         }
-        return this.crmTenantService.getTenantEndpointPrefix(context);
+        return context.tenantId;
     }
 
     /**
      * Security: object-level ownership gate for by-id mutations. Reads the
-     * record under the caller's tenant prefix first; a foreign id is not in
-     * the caller's partition and 404s, so it can never be PATCHed/DELETEd.
+     * record with the caller-tenant's own workspace credentials first; a record
+     * in another tenant's workspace is invisible to this key and 404s, so it can
+     * never be PATCHed/DELETEd.
      */
-    private async assertContactInTenant(contactId: string, tenantPrefix: string): Promise<void> {
-        const existing = await this.clientService.getContact(contactId, tenantPrefix);
+    private async assertContactInTenant(contactId: string, tenantId: string): Promise<void> {
+        const existing = await this.clientService.getContact(contactId, tenantId);
         if (!existing) {
             throw new NotFoundException(`Contact ${contactId} not found`);
         }
@@ -72,8 +74,8 @@ export class PeopleController {
 
     @Get()
     async getContacts(@CurrentUser() auth: AuthenticatedUser) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
-        return this.clientService.getContacts(tenantPrefix);
+        const tenantId = await this.resolveTenantId(auth);
+        return this.clientService.getContacts(tenantId);
     }
 
     @Get(':id')
@@ -81,8 +83,8 @@ export class PeopleController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ): Promise<TwentyContact> {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
-        const contact = await this.clientService.getContact(id, tenantPrefix);
+        const tenantId = await this.resolveTenantId(auth);
+        const contact = await this.clientService.getContact(id, tenantId);
         if (!contact) {
             throw new NotFoundException(`Contact ${id} not found`);
         }
@@ -91,7 +93,7 @@ export class PeopleController {
 
     @Post()
     async createContact(@CurrentUser() auth: AuthenticatedUser, @Body() contact: TwentyContact) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
+        const tenantId = await this.resolveTenantId(auth);
         return await this.clientService.createContact(
             {
                 firstName: contact.firstName,
@@ -102,7 +104,7 @@ export class PeopleController {
                 position: contact.position,
                 avatarUrl: contact.avatarUrl,
             },
-            tenantPrefix,
+            tenantId,
         );
     }
 
@@ -112,17 +114,17 @@ export class PeopleController {
         @Param('id') id: string,
         @Body() contact: TwentyContact,
     ) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
+        const tenantId = await this.resolveTenantId(auth);
         // Security: verify ownership before mutating so a foreign id 404s.
-        await this.assertContactInTenant(id, tenantPrefix);
-        return this.clientService.updateContact(id, contact, tenantPrefix);
+        await this.assertContactInTenant(id, tenantId);
+        return this.clientService.updateContact(id, contact, tenantId);
     }
 
     @Delete(':id')
     async deleteContact(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
-        const tenantPrefix = await this.resolveTenantPrefix(auth);
+        const tenantId = await this.resolveTenantId(auth);
         // Security: verify ownership before deleting so a foreign id 404s.
-        await this.assertContactInTenant(id, tenantPrefix);
-        return this.clientService.deleteContact(id, tenantPrefix);
+        await this.assertContactInTenant(id, tenantId);
+        return this.clientService.deleteContact(id, tenantId);
     }
 }

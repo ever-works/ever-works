@@ -53,7 +53,9 @@ class QuietHoursBody {
 }
 
 class MuteBody {
-    // Security: restrict category to the known NotificationCategory enum values
+    // Security: restrict category to the known NotificationCategory enum values.
+    // Keep Swagger on a plain values array; reflecting the enum object here can
+    // trigger a circular schema error on enum keys such as AI_CREDITS.
     @ApiProperty({
         enum: NOTIFICATION_CATEGORY_VALUES,
         description: 'Notification category to mute.',
@@ -132,6 +134,8 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
+    // Keep Swagger on a plain values array for the same reason as MuteBody.
+    // Runtime validation is still enforced by the ParseEnumPipe below.
     @ApiParam({
         name: 'category',
         type: String,

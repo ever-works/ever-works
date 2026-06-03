@@ -43,6 +43,7 @@ describe('AuthService', () => {
             | 'update'
             | 'updateForSocialAuth'
             | 'clearPasswordResetToken'
+            | 'consumeMagicLinkToken'
         >
     >;
     let authAccountRepo: jest.Mocked<
@@ -67,6 +68,7 @@ describe('AuthService', () => {
             update: jest.fn(),
             updateForSocialAuth: jest.fn(),
             clearPasswordResetToken: jest.fn(),
+            consumeMagicLinkToken: jest.fn(),
         } as any;
         authAccountRepo = {
             findProviderAccount: jest.fn(),
@@ -985,23 +987,39 @@ describe('AuthService', () => {
             });
         });
 
-        it('on success returns the user AND wipes the token (single-use)', async () => {
+        it('on success returns the user AND atomically consumes the token (single-use)', async () => {
             const user = {
                 id: 'u-1',
                 email: 'a@b.co',
                 magicLinkExpires: new Date(Date.now() + 60_000),
             };
             userRepo.findOne.mockResolvedValue(user as any);
+            userRepo.consumeMagicLinkToken.mockResolvedValue(true);
 
             const result = await service.redeemMagicLink('valid-token');
 
             expect(result).toBe(user);
-            // Single-use enforcement: the token column is cleared as part
-            // of the successful redeem.
-            expect(userRepo.update).toHaveBeenCalledWith('u-1', {
-                magicLinkToken: null,
-                magicLinkExpires: null,
-            });
+            // Single-use enforcement: the token is cleared via the atomic
+            // conditional UPDATE keyed on (id, tokenHash), not a blind update.
+            expect(userRepo.consumeMagicLinkToken).toHaveBeenCalledWith(
+                'u-1',
+                createHash('sha256').update('valid-token', 'utf8').digest('hex'),
+            );
+        });
+
+        it('rejects when the token was already consumed by a racing request', async () => {
+            const user = {
+                id: 'u-1',
+                email: 'a@b.co',
+                magicLinkExpires: new Date(Date.now() + 60_000),
+            };
+            userRepo.findOne.mockResolvedValue(user as any);
+            // The conditional UPDATE affected 0 rows — another request won.
+            userRepo.consumeMagicLinkToken.mockResolvedValue(false);
+
+            await expect(service.redeemMagicLink('valid-token')).rejects.toThrow(
+                'Invalid magic link',
+            );
         });
 
         it('looks up by sha256(token), never by raw token', async () => {

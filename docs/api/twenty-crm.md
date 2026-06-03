@@ -34,16 +34,35 @@ apps/api/src/integrations/twenty-crm/
 
 The module reads configuration from environment variables via `CrmConfigService`:
 
-| Environment Variable        | Default | Description                      |
-| --------------------------- | ------- | -------------------------------- |
-| `TWENTY_CRM_BASE_URL`       | --      | Twenty CRM API base URL          |
-| `TWENTY_CRM_API_KEY`        | --      | API key for authentication       |
-| `TWENTY_CRM_WORKSPACE_ID`   | --      | Workspace identifier             |
-| `TWENTY_CRM_TIMEOUT_MS`     | `30000` | Request timeout in milliseconds  |
-| `TWENTY_CRM_MAX_RETRIES`    | `3`     | Maximum retry attempts           |
-| `TWENTY_CRM_RETRY_DELAY_MS` | `1000`  | Base retry delay in milliseconds |
+| Environment Variable        | Default | Description                                 |
+| --------------------------- | ------- | ------------------------------------------- |
+| `TWENTY_CRM_BASE_URL`       | --      | Twenty CRM API base URL                     |
+| `TWENTY_CRM_API_KEY`        | --      | API key for authentication                  |
+| `TWENTY_CRM_WORKSPACE_ID`   | --      | Workspace identifier                        |
+| `TWENTY_CRM_TENANTS`        | --      | Per-tenant workspace credentials (JSON map) |
+| `TWENTY_CRM_TIMEOUT_MS`     | `30000` | Request timeout in milliseconds             |
+| `TWENTY_CRM_MAX_RETRIES`    | `3`     | Maximum retry attempts                      |
+| `TWENTY_CRM_RETRY_DELAY_MS` | `1000`  | Base retry delay in milliseconds            |
 
 The `isEnabled` getter returns `true` only when all three required variables (`BASE_URL`, `API_KEY`, `WORKSPACE_ID`) are set.
+
+### Per-tenant isolation (cross-tenant IDOR fix)
+
+All Ever Works tenants would otherwise share one Twenty workspace + API key, so any
+authenticated user could read/mutate/delete every tenant's CRM records. The companies/people
+controllers resolve the caller's real `tenantId` (fail-closed if absent) and pass it down to
+`makeRequest`, which selects that tenant's **own** Twenty workspace credentials via
+`CrmConfigService.configForTenant(tenantId)`. Because a Twenty API key is scoped to a single
+workspace, a caller can only ever address rows in their own workspace — isolation is enforced by
+the credential, not by a URL path prefix (Twenty's REST API exposes objects at `/rest/<object>`
+and has no tenant path routing).
+
+Configure `TWENTY_CRM_TENANTS` as a JSON map of `tenantId -> { apiKey, workspaceId, apiUrl? }`,
+e.g. `{"<tenant-uuid>":{"apiKey":"...","workspaceId":"..."}}`. A tenant-scoped call **fails closed**
+(refused with 404) unless that tenant has an explicit entry **with an API key** — the resolver never
+falls back to the shared `TWENTY_CRM_API_KEY` for per-caller calls, so a partially-populated map or a
+still-set legacy default cannot leak one tenant's records to another. The shared base values are used
+only by internal/system sync paths (which are not per-caller).
 
 ## Base REST Client
 

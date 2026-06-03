@@ -48,6 +48,9 @@ export function startTaxonomyWatcher(options: TaxonomyWatcherOptions): { stop: (
 		watcher = watch(workspacePath, (eventType, filename) => {
 			if (!filename || !filename.endsWith('.json')) return;
 			if (filename.startsWith('_meta')) return;
+			// Guard against path-traversal: fs.watch on a flat directory must only
+			// emit bare filenames; reject anything containing a separator or '..'.
+			if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) return;
 
 			// Debounce per file
 			const existing = debounceTimers.get(filename);

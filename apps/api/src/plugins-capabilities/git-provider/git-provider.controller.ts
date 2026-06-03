@@ -71,7 +71,7 @@ export class GitProviderController {
                 req.user.userId,
                 providerId,
                 page ? parseInt(page, 10) : undefined,
-                perPage ? parseInt(perPage, 10) : undefined,
+                perPage ? Math.min(parseInt(perPage, 10), 100) : undefined,
             );
             return { success: true, repositories };
         } catch (error) {

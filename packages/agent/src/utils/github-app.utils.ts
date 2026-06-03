@@ -66,6 +66,11 @@ export const requestGitHubAppInstallationAccessTokenDetails = async (
     installationId: string,
     credentials: GitHubAppCredentials,
 ): Promise<GitHubAppInstallationAccessToken> => {
+    if (!/^[A-Za-z0-9_-]+$/.test(installationId)) {
+        throw new Error(
+            `Invalid installationId: must contain only alphanumeric characters, hyphens, or underscores`,
+        );
+    }
     const jwt = createGitHubAppJwt(credentials);
     const response = await fetch(
         `https://api.github.com/app/installations/${installationId}/access_tokens`,
