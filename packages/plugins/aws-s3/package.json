@@ -60,6 +60,7 @@
 			},
 			"license": "AGPL-3.0",
 			"systemPlugin": false,
+			"distribution": "registry",
 			"builtIn": false,
 			"envVars": [
 				{

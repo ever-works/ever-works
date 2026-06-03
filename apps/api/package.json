@@ -33,12 +33,9 @@
     "dependencies": {
         "@composio/core": "^0.10.0",
         "@ever-works/agent": "workspace:*",
-        "@ever-works/aws-s3-plugin": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/email-templates": "workspace:*",
-        "@ever-works/github-storage-plugin": "workspace:*",
         "@ever-works/local-fs-plugin": "workspace:*",
-        "@ever-works/minio-plugin": "workspace:*",
         "@ever-works/monitoring": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@ever-works/trigger-tasks": "workspace:*",
@@ -86,6 +83,9 @@
         "typeorm": "^0.3.28"
     },
     "devDependencies": {
+        "@ever-works/aws-s3-plugin": "workspace:*",
+        "@ever-works/github-storage-plugin": "workspace:*",
+        "@ever-works/minio-plugin": "workspace:*",
         "@nestjs/cli": "^11.0.18",
         "@nestjs/schematics": "^11.0.10",
         "@nestjs/testing": "^11.1.18",
