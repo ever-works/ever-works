@@ -60,9 +60,11 @@ export class SkillsFacadeService extends BaseFacadeService {
             return { entries: [], total: 0 };
         }
 
+        const requestedLimit = Math.max(1, options.limit);
+        const requestedOffset = Math.max(0, options.offset);
+        const providerLimit = Math.min(1000, requestedOffset + requestedLimit);
         const seenSlugs = new Set<string>();
         const merged: SkillCatalogEntry[] = [];
-        let totalAcrossProviders = 0;
 
         for (const wrapped of plugins) {
             const plugin = wrapped.plugin as ISkillsProviderPlugin;
@@ -73,13 +75,12 @@ export class SkillsFacadeService extends BaseFacadeService {
                           .catch(() => undefined)
                     : undefined;
                 const result = await plugin.listEntries({
-                    limit: options.limit,
-                    offset: options.offset,
+                    limit: providerLimit,
+                    offset: 0,
                     tags: options.tags,
                     search: options.search,
                     settings,
                 });
-                totalAcrossProviders += result.total;
                 for (const entry of result.entries) {
                     if (seenSlugs.has(entry.slug)) continue;
                     seenSlugs.add(entry.slug);
@@ -91,7 +92,10 @@ export class SkillsFacadeService extends BaseFacadeService {
                 );
             }
         }
-        return { entries: merged, total: totalAcrossProviders };
+        return {
+            entries: merged.slice(requestedOffset, requestedOffset + requestedLimit),
+            total: merged.length,
+        };
     }
 
     async getEntry(

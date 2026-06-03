@@ -11,7 +11,7 @@ import {
     HttpStatus,
     ParseEnumPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -30,6 +30,7 @@ const VALID_TIMEZONES = new Set<string>(
 
 // Security: HH:mm format — rejects arbitrary strings stored as quiet-hours times
 const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const NOTIFICATION_CATEGORY_VALUES = Object.values(NotificationCategory);
 
 class QuietHoursBody {
     // Security: must match HH:mm to prevent arbitrary strings in DB
@@ -53,8 +54,12 @@ class QuietHoursBody {
 
 class MuteBody {
     // Security: restrict category to the known NotificationCategory enum values
+    @ApiProperty({
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to mute.',
+    })
     @IsEnum(NotificationCategory, {
-        message: `category must be one of: ${Object.values(NotificationCategory).join(', ')}`,
+        message: `category must be one of: ${NOTIFICATION_CATEGORY_VALUES.join(', ')}`,
     })
     category: NotificationCategory;
 
@@ -127,11 +132,17 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
+    @ApiParam({
+        name: 'category',
+        type: String,
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to unmute.',
+    })
     async unmuteCategory(
         @CurrentUser() auth: AuthenticatedUser,
         // Security: ParseEnumPipe rejects path params not in NotificationCategory
-        @Param('category', new ParseEnumPipe(NotificationCategory)) category: NotificationCategory,
+        @Param('category', new ParseEnumPipe(NotificationCategory)) category: string,
     ) {
-        await this.service.unmuteCategory(auth.userId, category);
+        await this.service.unmuteCategory(auth.userId, category as NotificationCategory);
     }
 }

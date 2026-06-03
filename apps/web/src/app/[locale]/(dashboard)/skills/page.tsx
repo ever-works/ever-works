@@ -6,6 +6,28 @@ import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
 import { SkillsPageClient } from '@/components/skills/SkillsPageClient';
 import { PageHeader } from '@/components/common/PageHeader';
 
+const PAGE_SIZE = 50;
+const SECTIONS = ['installed', 'available', 'custom'] as const;
+type Section = (typeof SECTIONS)[number];
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+    return Array.isArray(value) ? value[0] : value;
+}
+
+function parseOffset(value: string | string[] | undefined): number {
+    const raw = firstParam(value);
+    if (!raw) return 0;
+    const parsed = Number(raw);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function parseSection(value: string | string[] | undefined): Section {
+    const raw = firstParam(value);
+    return SECTIONS.includes(raw as Section) ? (raw as Section) : 'installed';
+}
+
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.skillsPage');
     return { title: t('title') };
@@ -22,15 +44,35 @@ export async function generateMetadata(): Promise<Metadata> {
  * a flaky catalog plugin) still renders the page with the
  * sections that did load.
  */
-export default async function SkillsPage() {
+export default async function SkillsPage({
+    searchParams,
+}: {
+    searchParams?: Promise<SearchParams>;
+}) {
     const t = await getTranslations('dashboard.skillsPage');
+    const params = (await searchParams) ?? {};
+    const section = parseSection(params.section);
+    const search = firstParam(params.search)?.trim() ?? '';
+    const installedOffset = parseOffset(params.installedOffset);
+    const catalogOffset = parseOffset(params.catalogOffset);
     const [installed, catalog] = await Promise.all([
-        skillsAPI
-            .listInstalled({ limit: 50 })
-            .catch(() => ({ data: [] as Skill[], meta: { total: 0, limit: 50, offset: 0 } })),
-        skillsAPI
-            .listCatalog({ limit: 50 })
-            .catch(() => ({ entries: [] as SkillCatalogEntry[], total: 0 })),
+        skillsAPI.listInstalled({ limit: PAGE_SIZE, offset: installedOffset, search }).then(
+            (result) => ({ result, error: null as string | null }),
+            () => ({
+                result: {
+                    data: [] as Skill[],
+                    meta: { total: 0, limit: PAGE_SIZE, offset: installedOffset },
+                },
+                error: 'installed',
+            }),
+        ),
+        skillsAPI.listCatalog({ limit: PAGE_SIZE, offset: catalogOffset, search }).then(
+            (result) => ({ result, error: null as string | null }),
+            () => ({
+                result: { entries: [] as SkillCatalogEntry[], total: 0 },
+                error: 'catalog',
+            }),
+        ),
     ]);
 
     return (
@@ -41,7 +83,18 @@ export default async function SkillsPage() {
                 subtitle={t('subtitle')}
                 tone="success"
             />
-            <SkillsPageClient installed={installed.data ?? []} catalog={catalog.entries ?? []} />
+            <SkillsPageClient
+                installed={installed.result.data ?? []}
+                installedMeta={installed.result.meta}
+                catalog={catalog.result.entries ?? []}
+                catalogTotal={catalog.result.total ?? 0}
+                catalogLimit={PAGE_SIZE}
+                filters={{ section, search, installedOffset, catalogOffset }}
+                loadErrors={{
+                    installed: installed.error,
+                    catalog: catalog.error,
+                }}
+            />
         </div>
     );
 }
