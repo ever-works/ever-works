@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
+import { config } from './config/constants';
 import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
 import { WorksModule } from './works/works.module';
 import { KbStorageModule } from './uploads/kb-storage.module';
@@ -109,7 +110,20 @@ import { DatabaseModule } from '@ever-works/agent/database';
         SearchModule,
         AgentPluginsModule.forRootAsync({
             imports: [DatabaseModule],
-            useFactory: () => ({}),
+            // EW-693 — wire dynamic-distribution config into the plugins
+            // module. Default mode is `bundled` so a no-op deployment
+            // behaves identically to pre-EW-693. The fail-fast validate()
+            // throws when dynamic mode is selected without registry config.
+            useFactory: () => {
+                config.plugins.validate();
+                return {
+                    distributionMode: config.plugins.distributionMode(),
+                    registryUrl: config.plugins.registryUrl(),
+                    registryGithubUrl: config.plugins.registryGithubUrl(),
+                    registryToken: config.plugins.registryToken(),
+                    installDir: config.plugins.installDir(),
+                };
+            },
         }),
         PluginsModule,
         ComposioApiModule,
