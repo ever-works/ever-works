@@ -239,6 +239,47 @@ export class PluginManifestValidatorService {
             });
         }
 
+        // EW-693 — Dynamic plugin distribution. Both fields are optional
+        // and additive; absence is valid (forward-compat with older
+        // manifests). The platform falls back to systemPlugin-based
+        // default derivation when `distribution` is omitted.
+        if (m.distribution !== undefined) {
+            const validDistributions = ['core', 'registry'];
+            if (typeof m.distribution !== 'string' || !validDistributions.includes(m.distribution)) {
+                errors.push({
+                    path: 'distribution',
+                    message: `distribution must be one of: ${validDistributions.join(', ')}`,
+                    actual: m.distribution,
+                    expected: validDistributions.join(' | '),
+                });
+            } else if (m.distribution === 'registry' && m.systemPlugin === true) {
+                // FR-4: every systemPlugin must be core. Catch this early
+                // — a "system + registry" plugin would be both
+                // boot-critical AND runtime-installable, which the
+                // platform can't honour.
+                errors.push({
+                    path: 'distribution',
+                    message:
+                        'systemPlugin plugins must use distribution: "core" — they are bundled in the image and cannot be runtime-installable',
+                });
+            }
+        }
+
+        if (m.executionProfile !== undefined) {
+            const validProfiles = ['sync', 'long-running'];
+            if (
+                typeof m.executionProfile !== 'string' ||
+                !validProfiles.includes(m.executionProfile)
+            ) {
+                errors.push({
+                    path: 'executionProfile',
+                    message: `executionProfile must be one of: ${validProfiles.join(', ')}`,
+                    actual: m.executionProfile,
+                    expected: validProfiles.join(' | '),
+                });
+            }
+        }
+
         return {
             valid: errors.length === 0,
             errors: errors.length > 0 ? errors : undefined,

@@ -278,6 +278,91 @@ export interface PluginManifest {
 	 * `<pluginId>:<key>` to prevent collision with core event keys.
 	 */
 	readonly events?: readonly PluginNotificationEvent[];
+	/**
+	 * Dynamic plugin distribution (EW-693).
+	 *
+	 * Declares whether this plugin is bundled into the platform image
+	 * (`core`) or published to a registry and installed at runtime
+	 * (`registry`).
+	 *
+	 * Default derivation when omitted: `systemPlugin === true ⇒ 'core'`,
+	 * else `'registry'`. Use {@link resolvePluginDistribution} to apply
+	 * this rule consistently.
+	 *
+	 * In `bundled` distribution mode (the default), this field is
+	 * informational — every plugin is shipped in the image. In `dynamic`
+	 * mode the platform only bundles `core` plugins and pulls `registry`
+	 * plugins on first enable from the configured npm registries.
+	 */
+	readonly distribution?: PluginDistribution;
+	/**
+	 * Dynamic plugin distribution (EW-693).
+	 *
+	 * Declares the default execution profile for this plugin's
+	 * capability operations:
+	 * - `sync`: short, in-process calls (no job-runtime hop).
+	 * - `long-running`: dispatched through the pluggable job runtime
+	 *   (Trigger.dev today) for isolation + retries.
+	 *
+	 * Operation-level overrides (e.g. classifying a single capability
+	 * call as long-running) are resolved by the platform's execution
+	 * router. Omit to let the router fall back to its category-based
+	 * defaults (search/ai/extractor → `sync`, pipeline/deployment →
+	 * `long-running`).
+	 */
+	readonly executionProfile?: PluginExecutionProfile;
+}
+
+/**
+ * Dynamic plugin distribution (EW-693) — where this plugin's code lives.
+ *
+ * - `core`: bundled into the platform image; always available.
+ * - `registry`: published to one or more npm-compatible registries
+ *   (public npm + GitHub Packages by default) and installed on demand
+ *   when `PLUGIN_DISTRIBUTION_MODE=dynamic`.
+ */
+export type PluginDistribution = 'core' | 'registry';
+
+/**
+ * Dynamic plugin distribution (EW-693) — how this plugin's capability
+ * calls are routed at runtime.
+ *
+ * - `sync`: short, in-process via dynamic `import()` (no extra hop).
+ * - `long-running`: dispatched through the pluggable job runtime
+ *   (Trigger.dev today) for isolation, retries, and worker-side
+ *   `ensurePluginAvailable` lazy install.
+ */
+export type PluginExecutionProfile = 'sync' | 'long-running';
+
+/**
+ * Apply the EW-693 default-derivation rule for `distribution`:
+ * `systemPlugin === true ⇒ 'core'`, else `'registry'`.
+ *
+ * Used by the loader, validator, and any tool that needs a concrete
+ * `core | registry` answer for a manifest that may have been authored
+ * before the field was introduced (forward-compat).
+ */
+export function resolvePluginDistribution(
+	manifest: Pick<PluginManifest, 'distribution' | 'systemPlugin'>,
+): PluginDistribution {
+	if (manifest.distribution === 'core' || manifest.distribution === 'registry') {
+		return manifest.distribution;
+	}
+	return manifest.systemPlugin === true ? 'core' : 'registry';
+}
+
+/**
+ * Type guard for {@link PluginDistribution}.
+ */
+export function isPluginDistribution(value: unknown): value is PluginDistribution {
+	return value === 'core' || value === 'registry';
+}
+
+/**
+ * Type guard for {@link PluginExecutionProfile}.
+ */
+export function isPluginExecutionProfile(value: unknown): value is PluginExecutionProfile {
+	return value === 'sync' || value === 'long-running';
 }
 
 /**

@@ -21,3 +21,8 @@ export * from './data-sync/index.js';
 // EW-658 Tenants & Organizations Phase 6 — Org-create / list / update /
 // upgrade-from-account API wire-types.
 export * from './organization/index.js';
+
+// EW-693 Dynamic plugin distribution — install state, catalog, allowlist
+// wire-types for `/plugins/catalog`, `/plugins/:id/install*`, and
+// `/admin/plugins/allowlist*`.
+export * from './plugins/index.js';
