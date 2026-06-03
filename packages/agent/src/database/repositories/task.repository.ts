@@ -158,6 +158,12 @@ export class TaskRepository {
     /**
      * Find recurring Task templates due to spawn an instance. Used by
      * `TaskRecurrenceDispatcherService.dispatchDue` in Phase 17.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries. If a user-scoped variant is ever
+     * needed, create a separate `findDueRecurringTemplatesForUser(userId)`
+     * method rather than adding optional params here.
      */
     async findDueRecurringTemplates(limit: number, now: Date = new Date()): Promise<Task[]> {
         return this.repository
@@ -197,6 +203,15 @@ export class TaskRepository {
         return (result.affected ?? 0) > 0;
     }
 
+    /**
+     * Find recurring templates whose `nextOccurrenceAt` is stuck (not
+     * advanced) past `olderThan`. Used by the cron-based recovery path in
+     * `TaskRecurrenceDispatcherService`.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries.
+     */
     async findStuckRecurring(olderThan: Date): Promise<Task[]> {
         return this.repository.find({
             where: {

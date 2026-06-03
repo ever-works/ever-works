@@ -22,7 +22,9 @@ import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 
 const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
-const PREFIX_A = `/tenants/${TENANT_A}`;
+// Controllers now pass the raw tenant id (which selects that tenant's own
+// Twenty workspace credentials), not a `/tenants/{id}` path prefix.
+const PREFIX_A = TENANT_A;
 
 const authUser = (userId = 'user-1'): AuthenticatedUser =>
     ({ userId, email: 'u@x.test' }) as AuthenticatedUser;
@@ -125,7 +127,7 @@ describe('CompaniesController', () => {
             expect(client.deleteCompany).not.toHaveBeenCalled();
         });
 
-        it('two different callers are scoped to two different, non-overlapping prefixes', async () => {
+        it('two different callers are scoped to two different, non-overlapping tenant ids', async () => {
             client.getCompanies.mockResolvedValue([]);
 
             await controller.getCompanies(authUser('user-a'));
@@ -133,7 +135,7 @@ describe('CompaniesController', () => {
             await controller.getCompanies(authUser('user-b'));
 
             expect(client.getCompanies).toHaveBeenNthCalledWith(1, PREFIX_A);
-            expect(client.getCompanies).toHaveBeenNthCalledWith(2, `/tenants/${TENANT_B}`);
+            expect(client.getCompanies).toHaveBeenNthCalledWith(2, TENANT_B);
         });
     });
 

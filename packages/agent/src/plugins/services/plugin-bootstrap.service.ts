@@ -39,7 +39,18 @@ export interface PluginBootstrapResult {
 export class PluginBootstrapService {
     private readonly logger = new Logger(PluginBootstrapService.name);
 
-    /** Static flag to prevent multiple initializations across module instances */
+    /**
+     * Static flag to prevent multiple initializations across module instances
+     * within a single Node.js process.
+     *
+     * NOTE (cluster deployments): This flag is process-scoped, not cluster-scoped.
+     * In a multi-worker deployment (e.g. Node.js cluster, PM2, Kubernetes pods)
+     * each worker initialises its own plugin registry independently. This is
+     * intentional — plugins are stateless, and independent per-worker init is
+     * safe. If a future use-case requires cluster-wide single-init semantics,
+     * a distributed lock (e.g. Redis SETNX with TTL) should be introduced via
+     * a dedicated PluginBootstrapLockService rather than modifying this flag.
+     */
     private static initialized = false;
 
     constructor(

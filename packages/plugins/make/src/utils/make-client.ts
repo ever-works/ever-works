@@ -346,7 +346,10 @@ function extractErrorMessage(body: string): string | undefined {
 		const parsed = JSON.parse(body) as { message?: string; detail?: string; error?: string };
 		return parsed.message || parsed.detail || parsed.error || undefined;
 	} catch {
-		return truncate(body);
+		// Raw (non-JSON) upstream bodies are not echoed back to avoid leaking
+		// fragments of the request (e.g. auth tokens) that some APIs mirror in
+		// their plain-text error responses.
+		return undefined;
 	}
 }
 

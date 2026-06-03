@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
 import * as dotenv from 'dotenv';
 // Use relative path for ts-node compatibility (workspace package resolution doesn't work with ts-node)
 import { databaseConfig } from '../../packages/agent/src/database/database.config';
@@ -15,7 +15,7 @@ dotenv.config();
  */
 
 export default new DataSource({
-    ...(databaseConfig() as any),
+    ...(databaseConfig() as unknown as DataSourceOptions),
 
     migrationsRun: false,
     migrationsTableName: 'migrations',

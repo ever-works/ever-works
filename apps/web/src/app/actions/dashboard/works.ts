@@ -1187,6 +1187,28 @@ export async function updateWebsiteSettings(
         redirect(ROUTES.AUTH_LOGIN);
     }
 
+    // Validate the scalar fields that have well-defined safe bounds.
+    // Nested objects (header/homepage/footer/custom_menu) are passed through
+    // to the backend which applies its own class-validator checks.
+    const websiteSettingsScalarSchema = z.object({
+        company_name: z.string().max(200).optional(),
+        company_website: z.string().max(2000).optional(),
+        import_max_rows: z.number().int().min(1).max(2000).optional(),
+        categories_enabled: z.boolean().optional(),
+        companies_enabled: z.boolean().optional(),
+        tags_enabled: z.boolean().optional(),
+        surveys_enabled: z.boolean().optional(),
+        export_enabled: z.boolean().optional(),
+        import_enabled: z.boolean().optional(),
+    });
+    const scalarValidation = websiteSettingsScalarSchema.safeParse(data);
+    if (!scalarValidation.success) {
+        return {
+            success: false,
+            error: scalarValidation.error.errors[0].message,
+        };
+    }
+
     try {
         await workAPI.updateWebsiteSettings(workId, data);
         revalidatePath(`/works/${workId}/settings`);
