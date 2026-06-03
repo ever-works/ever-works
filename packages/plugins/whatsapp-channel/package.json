@@ -59,7 +59,12 @@
 						"title": "Graph API version (default v21.0)"
 					}
 				}
-			}
+			},
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

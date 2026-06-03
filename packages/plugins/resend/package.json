@@ -68,7 +68,12 @@
 				"required": [
 					"apiKey"
 				]
-			}
+			},
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

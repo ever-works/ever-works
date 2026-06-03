@@ -64,7 +64,12 @@
 						"title": "Default sender icon emoji (e.g. :robot_face:)"
 					}
 				}
-			}
+			},
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }
