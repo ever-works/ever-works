@@ -31,7 +31,7 @@ export class OnboardingController {
     @Post()
     @HttpCode(HttpStatus.ACCEPTED)
     // Security: reduced per-IP limit from 30→10/min to narrow account/work creation abuse window
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Zero-friction registration: account + Work in one call',
         description:

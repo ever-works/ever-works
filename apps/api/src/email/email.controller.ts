@@ -290,7 +290,7 @@ export class EmailController {
 
     @Public()
     @Post('inbound/:pluginId')
-    @Throttle({ default: { ttl: 60_000, limit: 600 } })
+    @Throttle({ long: { ttl: 60_000, limit: 600 } })
     @HttpCode(HttpStatus.ACCEPTED)
     @ApiOperation({ summary: 'Provider inbound-email webhook' })
     async inboundWebhook(
@@ -331,7 +331,7 @@ export class EmailController {
 
     @Public()
     @Post('events/:pluginId')
-    @Throttle({ default: { ttl: 60_000, limit: 600 } })
+    @Throttle({ long: { ttl: 60_000, limit: 600 } })
     @HttpCode(HttpStatus.ACCEPTED)
     @ApiOperation({ summary: 'Provider delivery-event webhook (bounces, opens, clicks)' })
     async eventsWebhook(

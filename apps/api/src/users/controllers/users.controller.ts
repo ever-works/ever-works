@@ -32,7 +32,7 @@ export class UsersController {
     @Public()
     // Security: reduced from 30 to 5 req/min to slow unauthenticated slug enumeration while
     // still supporting interactive signup UX (a user rarely needs more than a few checks/min).
-    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @Get('check-username')
     @ApiOperation({
         summary: 'Check username availability',

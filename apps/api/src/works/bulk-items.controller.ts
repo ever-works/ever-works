@@ -120,7 +120,7 @@ export class BulkItemsController {
 
     @Post(':id/items/bulk-delete')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({ summary: 'Bulk-delete items from a work' })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Per-item summary' })
@@ -178,7 +178,7 @@ export class BulkItemsController {
 
     @Post(':id/items/bulk-update')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({ summary: 'Bulk-update item metadata (featured / published)' })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Per-item summary' })
@@ -258,7 +258,7 @@ export class BulkItemsController {
 
     @Post(':id/items/bulk-publish')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Bulk-publish (or unpublish) items by setting their featured flag',
     })

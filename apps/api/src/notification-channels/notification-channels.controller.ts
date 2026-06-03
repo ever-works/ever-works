@@ -122,7 +122,7 @@ export class NotificationChannelsController {
     @UseGuards(AuthSessionGuard)
     @ApiBearerAuth('JWT-auth')
     @Patch(':id')
-    @Throttle({ default: { ttl: 60_000, limit: 30 } })
+    @Throttle({ long: { ttl: 60_000, limit: 30 } })
     @ApiOperation({ summary: 'Update a notification channel' })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
@@ -158,7 +158,7 @@ export class NotificationChannelsController {
 
     @Public()
     @Post('events/:pluginId')
-    @Throttle({ default: { ttl: 60_000, limit: 600 } })
+    @Throttle({ long: { ttl: 60_000, limit: 600 } })
     @HttpCode(HttpStatus.ACCEPTED)
     @ApiOperation({ summary: 'Provider delivery-event webhook for channels' })
     async eventsWebhook(

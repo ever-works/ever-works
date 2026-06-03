@@ -455,8 +455,16 @@ export class DataRepository {
         if (this.categories) {
             return this.categories;
         }
-        const categories = await fs.readFile(this.categoriesPath, 'utf-8');
-        this.categories = yaml.parse(categories);
+        try {
+            const categories = await fs.readFile(this.categoriesPath, 'utf-8');
+            this.categories = yaml.parse(categories);
+        } catch (err) {
+            if ((err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') {
+                this.categories = [];
+            } else {
+                throw err;
+            }
+        }
 
         return this.categories;
     }

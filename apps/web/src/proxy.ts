@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
-import { getAuthFromCookie } from './lib/auth';
+import { getAuthFromRequest } from './lib/auth';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
@@ -188,8 +188,12 @@ export default async function proxy(req: NextRequest) {
     }
 
     // 5) Auth gate — unauthenticated users go to /login (no locale prefix).
-    const auth = await getAuthFromCookie().catch(() => null);
-    if (!auth) {
+    // Keep this check local to the cookie. Calling `/auth/profile` here makes
+    // every page navigation consume API rate-limit budget, and a transient
+    // 429/5xx would otherwise look like "not authenticated" and clear a valid
+    // session cookie.
+    const auth = await getAuthFromRequest();
+    if (!auth.isAuthenticated || auth.isExpired) {
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
         const response = NextResponse.redirect(loginUrl);
 
