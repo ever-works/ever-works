@@ -38,7 +38,15 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
                 (typeof req.originalUrl === 'string' && req.originalUrl) ||
                 (typeof req.url === 'string' && req.url) ||
                 '';
-            if (rawUrl.split('?')[0].startsWith('/api/auth/')) {
+            const path = rawUrl.split('?')[0];
+            // `/api/claim/*` is auth-adjacent onboarding (claim a tokenised
+            // work-invitation; preview + accept are throttled 10/min/IP). The
+            // suite drives many claim probes from the single CI IP, so that cap
+            // trips incidentally — and no spec asserts a claim 429 (the claim
+            // specs `test.skip` when one surfaces). Skip it alongside the auth
+            // routes. NON-auth throttling (ingest / notification / global) stays
+            // active, and this whole branch is hard-gated off in production.
+            if (path.startsWith('/api/auth/') || path.startsWith('/api/claim/')) {
                 return true;
             }
         }
