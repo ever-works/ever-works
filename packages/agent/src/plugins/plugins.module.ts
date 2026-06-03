@@ -31,6 +31,8 @@ import { CustomCapabilityRegistryService } from './services/custom-capability-re
 import { PluginBootstrapService } from './services/plugin-bootstrap.service';
 // EW-693 — runtime installer (dynamic distribution).
 import { PluginInstallerService } from './services/plugin-installer.service';
+// EW-693 — sync vs long-running execution router.
+import { PluginExecutionRouterService } from './services/plugin-execution-router.service';
 
 // Constants and interfaces
 import { PLUGINS_MODULE_OPTIONS, DEFAULT_PLATFORM_VERSION } from './plugins.constants';
@@ -89,6 +91,10 @@ const PROVIDERS = [
     // EW-693 — runtime installer. Inert in bundled mode; active only
     // when PluginsModuleOptions.distributionMode === 'dynamic'.
     PluginInstallerService,
+    // EW-693 — execution router (Phase 7). Bundled mode always
+    // routes to in-process; the router still applies the
+    // ensurePluginAvailable gate for parity with dynamic mode.
+    PluginExecutionRouterService,
 ];
 
 /**
