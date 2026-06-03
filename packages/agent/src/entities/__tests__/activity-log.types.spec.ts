@@ -74,14 +74,16 @@ describe('activity-log.types', () => {
         });
 
         it('has the expected total number of literal values (catch silent additions)', () => {
-            // 84 documented literals — pinned so any silent addition is a
-            // deliberate change. Last bumped by post-PR-1019 follow-up FU-2
-            // (added AGENT_RUN_TRIGGERED + AGENT_TASK_ASSIGNED for the new
-            // controller endpoints; PR #1019 itself had added 30 Agent /
-            // Skill / Task lifecycle values that weren't pinned here at
-            // the time).
+            // 94 documented literals — pinned so any silent addition is a
+            // deliberate change. Last bumped by EW-643 Phase 3 slice 1
+            // (added 10 KB lock/reconcile/transcribe lifecycle values:
+            // KB_DOCUMENT_LOCKED, KB_DOCUMENT_UNLOCKED, KB_DOCUMENT_RESTORED,
+            // KB_DOCUMENT_LOCK_VIOLATION, KB_RECONCILE_COMPLETED,
+            // KB_UPLOAD_TOMBSTONED, KB_UPLOAD_REVIVED, KB_CONTEXT_TRUNCATED,
+            // KB_UPLOAD_TRANSCRIBED, KB_UPLOAD_TRANSCRIPTION_FAILED).
+            // Previously bumped by post-PR-1019 follow-up FU-2 (84).
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(84);
+            expect(literals).toHaveLength(94);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
