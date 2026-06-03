@@ -11,7 +11,7 @@ import {
     HttpStatus,
     ParseEnumPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -52,7 +52,12 @@ class QuietHoursBody {
 }
 
 class MuteBody {
-    // Security: restrict category to the known NotificationCategory enum values
+    // Security: restrict category to the known NotificationCategory enum values.
+    // Explicit @ApiProperty({ enum }) gives Swagger a plain string-enum schema —
+    // without it, Swagger reflects the enum type as a self-referential model and
+    // OpenAPI generation throws "circular dependency detected (property key:
+    // AI_CREDITS)".
+    @ApiProperty({ enum: NotificationCategory, enumName: 'NotificationCategory' })
     @IsEnum(NotificationCategory, {
         message: `category must be one of: ${Object.values(NotificationCategory).join(', ')}`,
     })
@@ -127,6 +132,11 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
+    // Explicit @ApiParam({ enum }) gives Swagger a string-enum schema for the
+    // path param; without it, Swagger reflects the enum type into a
+    // self-referential model and OpenAPI generation throws a circular-dependency
+    // error. Runtime validation is still enforced by the ParseEnumPipe below.
+    @ApiParam({ name: 'category', enum: NotificationCategory, enumName: 'NotificationCategory' })
     async unmuteCategory(
         @CurrentUser() auth: AuthenticatedUser,
         // Security: ParseEnumPipe rejects path params not in NotificationCategory
