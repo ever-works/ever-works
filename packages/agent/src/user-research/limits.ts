@@ -85,6 +85,48 @@ export class UserResearchLimitsService {
         return this.increment('runs', userId);
     }
 
+    /**
+     * Atomic check-and-increment for the daily "runs" bucket: inside the
+     * per-key serialised chain it reads the current count, throws
+     * {@link UserResearchRateLimitedError} (identical to {@link assertCanRun})
+     * when the cap is already reached, otherwise increments and returns the new
+     * value. Because the read+increment execute as a single chained step, two
+     * concurrent in-process calls for the same user cannot both pass the check
+     * and over-increment past the cap — the TOCTOU that a separate
+     * `assertCanRun()` then `incrementRuns()` (two un-chained awaits) allowed.
+     */
+    async tryIncrementRuns(userId: string): Promise<number> {
+        const bucket = 'runs';
+        const k = this.key(bucket, userId);
+        const previous = this.incrementChain.get(k) ?? Promise.resolve();
+        const run = previous.then(async () => {
+            const current = await this.read(bucket, userId);
+            if (current >= this.config.maxRunsPerDay) {
+                throw new UserResearchRateLimitedError(
+                    'maxRunsPerDay',
+                    current,
+                    this.config.maxRunsPerDay,
+                );
+            }
+            const next = current + 1;
+            if (this.cache) {
+                try {
+                    await this.cache.set(k, next, this.ttlMs);
+                    return next;
+                } catch (err) {
+                    this.logger.warn(`limits cache write failed: ${(err as Error).message}`);
+                }
+            }
+            this.fallback.set(k, next);
+            return next;
+        });
+        this.incrementChain.set(
+            k,
+            run.catch(() => undefined),
+        );
+        return run;
+    }
+
     private dayKey(): string {
         const d = new Date();
         return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(

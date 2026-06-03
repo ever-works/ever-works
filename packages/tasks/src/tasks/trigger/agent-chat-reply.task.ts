@@ -72,9 +72,13 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
             const tasks = appContext.get(TasksService);
             const chat = appContext.get(TaskChatService);
 
-            const agent = await agents.findById(payload.agentId);
+            const agent = await agents.findByIdAndUser(payload.agentId, payload.userId);
             if (!agent) {
-                return { status: 'skipped', reason: 'agent-not-found', agentId: payload.agentId };
+                return {
+                    status: 'skipped',
+                    reason: 'agent-not-found-or-forbidden',
+                    agentId: payload.agentId,
+                };
             }
 
             // T6 chat-dedup: re-use any in-flight (task, agent) run.
