@@ -10,6 +10,8 @@ import type {
     ChatCompletionChunk,
     EmbeddingOptions,
     EmbeddingResponse,
+    TranscriptionOptions,
+    TranscriptionResponse,
     AiRoutingOptions,
     AiModel,
     AiProviderConfig,
@@ -34,6 +36,24 @@ export class AiFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
         super(message, operation, provider, cause);
         this.name = 'AiFacadeError';
+    }
+}
+
+/**
+ * Thrown by `AiFacadeService.transcribe()` when no AI-provider plugin
+ * registered for the resolved user/work scope implements the optional
+ * `transcribe` capability AND no operator pin is configured.
+ *
+ * KB media-ingest catches this and marks the upload
+ * `extractionStatus='failed'` with `extractionError='no transcription
+ * provider'` — the workbench surfaces it as a banner so the operator
+ * can either configure a provider that supports Whisper or pin a
+ * specific one via `KB_TRANSCRIPTION_PROVIDER_ID`.
+ */
+export class TranscriptionNotConfiguredError extends AiFacadeError {
+    constructor(message: string, provider?: string) {
+        super(message, 'transcribe', provider);
+        this.name = 'TranscriptionNotConfiguredError';
     }
 }
 
@@ -535,6 +555,133 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 err instanceof Error ? err : undefined,
             );
         }
+    }
+
+    /**
+     * EW-643 Phase 3 — speech-to-text via the active AI provider plugin.
+     *
+     * Selection order (matches `IAiProviderPlugin.transcribe` JSDoc):
+     *   1. Operator-pinned provider via `KB_TRANSCRIPTION_PROVIDER_ID`
+     *      env var, threaded by callers as
+     *      `facadeOptions.providerOverride`. When set, only this
+     *      provider is tried; on missing-capability or call failure
+     *      `TranscriptionNotConfiguredError` is thrown (no silent
+     *      fallback). Auditable defaults for compliance-cleared vendor
+     *      lock.
+     *   2. The scope's currently-active provider (resolved by
+     *      `BaseFacadeService.resolvePlugin`). If it implements
+     *      `transcribe`, that one runs.
+     *   3. Otherwise iterate registry, picking the first available
+     *      AI-provider plugin whose `transcribe` is defined.
+     *   4. If no plugin qualifies, throw `TranscriptionNotConfiguredError`.
+     *
+     * Usage is recorded under `PluginUsageCapability.AI` with
+     * `metadata.operation='transcribe'`, `units=ceil(durationSeconds/60)`
+     * and `metadata.unit='audio_minutes'` so the ledger stays
+     * provider-neutral (Whisper bills per-minute, others may bill
+     * per-token — the consumer-facing line item is always audio minutes).
+     */
+    async transcribe(
+        options: TranscriptionOptions,
+        facadeOptions: FacadeOptions,
+    ): Promise<TranscriptionResponse> {
+        const plugin = await this.resolveTranscribePlugin(facadeOptions);
+
+        const settings = await this.getResolvedSettings(plugin.id, {
+            userId: facadeOptions.userId,
+            workId: facadeOptions.workId,
+        });
+
+        try {
+            // Selection above guarantees `transcribe` is defined. The
+            // non-null cast keeps the type system honest at the call
+            // site without an `as any` lying about the contract.
+            const response = await plugin.transcribe!({ ...options, settings });
+
+            const minutes = Math.max(1, Math.ceil((response.durationSeconds ?? 0) / 60));
+            await this.pluginUsageService?.record({
+                workId: facadeOptions.workId,
+                userId: facadeOptions.userId,
+                agentId: facadeOptions.agentId,
+                taskId: facadeOptions.taskId,
+                pluginId: plugin.id,
+                capability: PluginUsageCapability.AI,
+                units: minutes,
+                costCents: 0,
+                modelId: response.model,
+                metadata: {
+                    operation: 'transcribe',
+                    unit: 'audio_minutes',
+                    durationSeconds: response.durationSeconds,
+                    language: response.language,
+                    segmentCount: response.segments?.length,
+                },
+            });
+
+            return response;
+        } catch (err) {
+            if (err instanceof AiFacadeError) throw err;
+            throw new AiFacadeError(
+                `Transcribe call failed: ${err instanceof Error ? err.message : String(err)}`,
+                'transcribe',
+                plugin.id,
+                err instanceof Error ? err : undefined,
+            );
+        }
+    }
+
+    /**
+     * Helper for `transcribe()` — resolves the plugin per the documented
+     * selection chain. Kept separate from `transcribe()` so it can be
+     * unit-tested without mocking the entire usage-ledger surface.
+     */
+    private async resolveTranscribePlugin(
+        facadeOptions: FacadeOptions,
+    ): Promise<IAiProviderPlugin> {
+        // 1. Operator pin — caller responsible for passing the env var
+        // through `providerOverride`. When pinned we never fall back.
+        if (facadeOptions.providerOverride) {
+            const pinned = await this.resolvePlugin<IAiProviderPlugin>(
+                facadeOptions.providerOverride,
+                facadeOptions.userId,
+                facadeOptions.workId,
+            );
+            if (typeof pinned.transcribe !== 'function') {
+                throw new TranscriptionNotConfiguredError(
+                    `Pinned transcription provider '${pinned.id}' does not implement transcribe()`,
+                    pinned.id,
+                );
+            }
+            return pinned;
+        }
+
+        // 2. Scope-active provider — if it implements transcribe, use it.
+        const active = await this.resolvePlugin<IAiProviderPlugin>(
+            undefined,
+            facadeOptions.userId,
+            facadeOptions.workId,
+        );
+        if (typeof active.transcribe === 'function') return active;
+
+        // 3. Registry iteration — first available plugin whose
+        // transcribe is defined. The base class exposes the registry
+        // via `this.registry` (protected on BaseFacadeService); the
+        // capability filter matches `getByCapability` so we don't
+        // walk non-AI plugins.
+        const candidates = this.registry.getByCapability(this.CAPABILITY);
+        for (const candidate of candidates) {
+            const inst = candidate as unknown as IAiProviderPlugin;
+            if (typeof inst.transcribe === 'function' && inst.id !== active.id) {
+                return inst;
+            }
+        }
+
+        // 4. Nothing qualifies.
+        throw new TranscriptionNotConfiguredError(
+            `No AI-provider plugin in scope implements the transcribe() capability. ` +
+                `Configure an OpenAI plugin (or pin one via KB_TRANSCRIPTION_PROVIDER_ID).`,
+            active.id,
+        );
     }
 
     async testConnection(facadeOptions: FacadeOptions): Promise<{

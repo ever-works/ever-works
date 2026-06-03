@@ -18,6 +18,8 @@ import { WorkKnowledgeChunkRepository } from '../database/repositories/work-know
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
+import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-normalize.service';
+import { KnowledgeBaseTranscribeService } from './knowledge-base-transcribe.service';
 import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { KbAgentToolsService } from './kb-agent-tools.service';
 import { KbToolsFacadeAdapter } from './kb-tools-facade.adapter';
@@ -85,6 +87,8 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
+        KnowledgeBaseMediaNormalizeService,
+        KnowledgeBaseTranscribeService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
@@ -98,6 +102,8 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
+        KnowledgeBaseMediaNormalizeService,
+        KnowledgeBaseTranscribeService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
