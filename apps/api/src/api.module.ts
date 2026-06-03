@@ -224,8 +224,20 @@ export class ApiModule implements OnApplicationBootstrap {
     /**
      * Called after all modules have been initialized.
      * This is the single point where plugins are loaded.
+     *
+     * EW-693 / FR-13a — In dynamic mode (PLUGIN_DISTRIBUTION_MODE=dynamic)
+     * we also pre-install the DB-recorded distributable plugin set on
+     * this pod's local store so the first request after boot doesn't pay
+     * the install cost. `warmupDynamicPlugins()` is an internal no-op in
+     * bundled mode, and failures are logged but never rethrown — lazy
+     * install-on-use (FR-13) is the correctness mechanism, warmup is
+     * optimisation only. We run warmup BEFORE the API begins serving so
+     * the readiness probe in k8s flips green only after the store is
+     * primed (`startupProbe.initialDelaySeconds` covers the worst-case
+     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`).
      */
     async onApplicationBootstrap(): Promise<void> {
         await this.pluginBootstrap.bootstrap();
+        await this.pluginBootstrap.warmupDynamicPlugins();
     }
 }

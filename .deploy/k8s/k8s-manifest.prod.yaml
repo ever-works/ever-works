@@ -361,14 +361,54 @@ spec:
             timeoutSeconds: 3
             failureThreshold: 3
 
+          # EW-693 / FR-13a — Startup probe with a generous deadline so
+          # the boot reconcile warmup (`PluginBootstrapService.warmupDynamicPlugins`,
+          # wired in ApiModule.onApplicationBootstrap) has time to
+          # pre-install the DB-recorded distributable plugins from the
+          # configured registry into /app/plugins on a fresh pod. In
+          # bundled mode the warmup is a no-op and this probe still
+          # passes quickly via the normal /api/health path.
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3100
+            # 60 attempts * 5s = up to 5 min for the warmup install
+            # storm on a brand-new pod with an empty store. Tighten if
+            # observability shows it routinely finishes faster.
+            periodSeconds: 5
+            failureThreshold: 60
+            timeoutSeconds: 5
+
           volumeMounts:
             - name: git-repos
               mountPath: /tmp/ever-works-repos
+            # EW-693 / T30 — Writable runtime plugin store. Default
+            # PLUGIN_INSTALL_DIR is `/app/plugins`, set in
+            # apps/api/src/config/constants.ts. emptyDir is per-pod
+            # ephemeral, which is exactly what FR-13 expects: each
+            # replica's installer lazily installs distributable plugins
+            # on first use, and boot warmup pre-installs the DB-recorded
+            # set. NO shared RWX volume is required.
+            #
+            # For deployments that want to avoid cold-start install
+            # cost, swap `emptyDir` for a `persistentVolumeClaim` with
+            # `ReadWriteOnce` (the API's StatefulSet semantics tolerate
+            # per-pod PVCs). A shared `ReadWriteMany` PVC is supported
+            # but NOT required.
+            - name: plugin-install-dir
+              mountPath: /app/plugins
 
       volumes:
         - name: git-repos
           emptyDir:
             sizeLimit: 5Gi
+        # EW-693 / T30 — see volumeMounts above. 2Gi covers ~40
+        # distributable plugins at typical sizes (notion-extractor ≈
+        # 18 MB, screenshot plugins ≈ 5 MB, AI providers ≈ 1-5 MB);
+        # tighten or bump after observability confirms real usage.
+        - name: plugin-install-dir
+          emptyDir:
+            sizeLimit: 2Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
