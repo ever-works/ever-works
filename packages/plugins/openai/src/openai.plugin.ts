@@ -199,11 +199,26 @@ export class OpenAiPlugin extends BaseAiProvider {
 			throw new Error('OpenAI apiKey is required for transcribe()');
 		}
 		const baseUrl = (resolvedConfig.baseURL as string) || 'https://api.openai.com/v1';
-		const model = options.model || (resolvedConfig.transcriptionModel as string | undefined) || 'whisper-1';
+		// `transcriptionModel` is a plugin-settings field, not part of
+		// `AiOperationsConfig`. Read through an index access so TS doesn't
+		// reject the optional access on the narrower facade type. The OpenAI
+		// settings schema declares the default `whisper-1` — the explicit
+		// fallback below is defensive for callers that mutated settings.
+		const settingsBag = resolvedConfig as unknown as Record<string, unknown>;
+		const transcriptionModelSetting =
+			typeof settingsBag.transcriptionModel === 'string' ? (settingsBag.transcriptionModel as string) : undefined;
+		const model = options.model || transcriptionModelSetting || 'whisper-1';
 		const url = `${baseUrl.replace(/\/$/, '')}/audio/transcriptions`;
 
 		const bytes = await this.normaliseAudioInput(options.file);
-		const blob = new Blob([bytes], { type: this.detectMimeFromName(options.filename) });
+		// TS5.9 + lib.dom.d.ts narrowed Blob's BlobPart to ArrayBuffer
+		// instead of ArrayBufferLike, so a raw `Uint8Array<ArrayBufferLike>`
+		// no longer assigns. Slicing the underlying ArrayBuffer gives a
+		// fresh `ArrayBuffer` view that satisfies BlobPart without copying
+		// twice (we still own the bytes; the caller's Buffer/stream is
+		// fully drained by `normaliseAudioInput`).
+		const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+		const blob = new Blob([arrayBuffer], { type: this.detectMimeFromName(options.filename) });
 		const form = new FormData();
 		form.append('file', blob, options.filename);
 		form.append('model', model);
