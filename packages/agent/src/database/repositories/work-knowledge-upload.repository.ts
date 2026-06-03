@@ -19,6 +19,20 @@ export class WorkKnowledgeUploadRepository {
         return this.repository.findOne({ where: { workId, sha256 } });
     }
 
+    /**
+     * EW-643 Phase 3 slice 2b — partial update by id. Used by the media
+     * normalize service to persist `metadata.originalSha256` +
+     * `metadata.normalizedStoragePath` after ffmpeg succeeds without
+     * round-tripping every column the caller didn't touch.
+     */
+    async updateById(
+        workId: string,
+        uploadId: string,
+        patch: Partial<WorkKnowledgeUpload>,
+    ): Promise<void> {
+        await this.repository.update({ id: uploadId, workId }, patch);
+    }
+
     async list(workId: string, status?: KbUploadExtractionStatus): Promise<WorkKnowledgeUpload[]> {
         return this.repository.find({
             where: status ? { workId, extractionStatus: status } : { workId },

@@ -53,6 +53,41 @@ export class WorkKnowledgeDocumentRepository {
         return this.repository.findOne({ where: { workId, path } });
     }
 
+    /**
+     * EW-643 Phase 3 slice 2b — look up a Work-scope document whose
+     * `metadata[key] = value`. Used by `KnowledgeBaseTranscribeService`
+     * for idempotency on `metadata.transcribedFromUploadId` so a
+     * Trigger.dev retry never produces a duplicate transcript document.
+     *
+     * Uses raw `->>` JSON access — TypeORM's `Like`/`Equal` operators
+     * don't reach into `simple-json` columns. Safe because both inputs
+     * are parameterised.
+     */
+    async findByMetadataKey(
+        workId: string,
+        key: string,
+        value: string,
+    ): Promise<WorkKnowledgeDocument | null> {
+        return this.repository
+            .createQueryBuilder('doc')
+            .where('doc.workId = :workId', { workId })
+            .andWhere(`doc.metadata ->> :key = :value`, { key, value })
+            .getOne();
+    }
+
+    /**
+     * Partial update by id. Used by `KnowledgeBaseTranscribeService`
+     * to persist `metadata.transcribedFromUploadId` + provider id +
+     * duration on the freshly-created transcript document.
+     */
+    async updateById(
+        workId: string,
+        docId: string,
+        patch: Partial<WorkKnowledgeDocument>,
+    ): Promise<void> {
+        await this.repository.update({ id: docId, workId }, patch);
+    }
+
     async findOrgById(
         organizationId: string,
         docId: string,
