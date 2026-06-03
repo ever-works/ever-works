@@ -53,7 +53,7 @@ export class AdminUsageController {
 
     // Security: tight rate-limit on this PII-heavy endpoint; a compromised admin
     // key cannot bulk-extract the full user email list faster than 10 req/min.
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @Get()
     @ApiOperation({
         summary: 'Cross-user and cross-Work spend for self-hosted admins',

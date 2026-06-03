@@ -91,7 +91,7 @@ export class UploadsController {
      */
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
     @ApiOperation({
         summary: 'Upload an image',
@@ -128,7 +128,7 @@ export class UploadsController {
 
     @Post('image')
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
     @ApiOperation({ summary: 'Upload an image (alias of POST /api/uploads)' })
     async uploadImage(
@@ -158,7 +158,7 @@ export class UploadsController {
      */
     @Post('file')
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @UseInterceptors(
         FileInterceptor('file', {
             // Multer-level cap — UploadsService.saveFile re-validates with
@@ -258,7 +258,7 @@ export class UploadsController {
     @Public()
     @Post('anonymous')
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
     @ApiOperation({
         summary: 'Upload from an anonymous (pre-signup) visitor',
@@ -328,7 +328,7 @@ export class UploadsController {
     @Public()
     @Post('anonymous/file')
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @UseInterceptors(
         FileInterceptor('file', {
             // 50 MiB outer cap, same as the authenticated `/file` route;
@@ -395,7 +395,7 @@ export class UploadsController {
     @Public()
     @Post('presign')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Mint a presigned upload URL (when backend supports it)',
         description:

@@ -323,7 +323,7 @@ export class WorksController {
     // wizard's "Generate now" button. Throttled because each call kicks off
     // an AI pipeline + repo provisioning — same per-IP envelope as the
     // existing /works/:id/generate path.
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Quick-create + generate a work',
         description:
@@ -699,7 +699,7 @@ export class WorksController {
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
     // Validate parses the whole file synchronously; cap at 10/min/IP so a
     // user can't tie up the API by spamming large uploads.
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Parse + validate an item import file (dry-run, no writes)',
         description:
@@ -785,7 +785,7 @@ export class WorksController {
     // Execute clones the data repo, writes N YAMLs, commits + pushes, and
     // (usually) opens a PR. Cap aggressively at 3/min/IP — anyone needing
     // more should split their file.
-    @Throttle({ default: { limit: 3, ttl: 60_000 } })
+    @Throttle({ long: { limit: 3, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Execute a validated bulk item import',
         description:

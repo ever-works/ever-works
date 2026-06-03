@@ -136,7 +136,7 @@ export class TasksController {
     @Post()
     @ApiOperation({ summary: 'Create a Task.' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateTaskDto) {
         if (!body?.title) throw new BadRequestException('title is required.');
         return this.service.create(auth.userId, {
@@ -165,7 +165,7 @@ export class TasksController {
     @Patch(':id')
     @ApiOperation({ summary: 'Update Task fields.' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -177,7 +177,7 @@ export class TasksController {
     @Delete(':id')
     @ApiOperation({ summary: 'Delete a Task (cascades to side rows).' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
         return this.service.remove(auth.userId, id);
     }
@@ -188,7 +188,7 @@ export class TasksController {
             'Make this Task recurring (or update its rule). Body: {recurrenceRule (RFC 5545 RRULE), recurrenceTimezone?, recurrenceEndsAt?, recurrenceMaxOccurrences?}.',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async setRecurring(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -220,7 +220,7 @@ export class TasksController {
     @Post(':id/transition')
     @ApiOperation({ summary: 'State-machine transition.' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async transition(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -235,7 +235,7 @@ export class TasksController {
     @Post(':id/assignees')
     @ApiOperation({ summary: 'Add an assignee.' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async addAssignee(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -319,7 +319,7 @@ export class TasksController {
             'Attach an existing work_knowledge_upload to this Task. Upload via the existing KB pipeline first; pass the resulting uploadId here.',
     })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -437,7 +437,7 @@ export class TasksController {
             'Post a chat message. Server parses @mentions + [[kb]] tokens and drops unknown ones.',
     })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async postChat(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

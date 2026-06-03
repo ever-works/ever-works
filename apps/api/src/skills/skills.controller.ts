@@ -121,7 +121,7 @@ export class SkillsController {
     @Post()
     @ApiOperation({ summary: 'Create a custom Skill.' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateSkillDto) {
         return this.service.create(auth.userId, {
             ownerType: body.ownerType,
@@ -144,7 +144,7 @@ export class SkillsController {
     @Patch(':id')
     @ApiOperation({ summary: 'Update Skill body / frontmatter.' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -162,7 +162,7 @@ export class SkillsController {
     @Delete(':id')
     @ApiOperation({ summary: 'Delete a Skill (cascades to bindings).' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -173,7 +173,7 @@ export class SkillsController {
     @Post('install')
     @ApiOperation({ summary: 'Install a catalog skill at the requested scope.' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async install(@CurrentUser() auth: AuthenticatedUser, @Body() body: InstallCatalogSkillDto) {
         const found = await this.facade.getEntry(body.slug, { userId: auth.userId });
         if (!found) throw new NotFoundException(`Catalog skill "${body.slug}" not found.`);
@@ -202,7 +202,7 @@ export class SkillsController {
     @Post(':id/bindings')
     @ApiOperation({ summary: 'Create a binding for a Skill.' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async createBinding(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

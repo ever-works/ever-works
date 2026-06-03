@@ -50,7 +50,7 @@ export class ClaimController {
     @Public()
     @Get('preview')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Preview a claim invitation without consuming it',
         description:
@@ -77,7 +77,7 @@ export class ClaimController {
     @Post('accept')
     @HttpCode(HttpStatus.OK)
     @UseGuards(AuthSessionGuard)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Accept a claim invitation',
         description:

@@ -47,7 +47,7 @@ export class TelemetryController {
     @Public()
     @Post('funnel')
     @HttpCode(HttpStatus.NO_CONTENT)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Submit a zero-friction funnel event from the client',
         description:
