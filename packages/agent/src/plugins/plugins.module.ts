@@ -6,11 +6,15 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PluginEntity } from './entities/plugin.entity';
 import { UserPluginEntity } from './entities/user-plugin.entity';
 import { WorkPluginEntity } from './entities/work-plugin.entity';
+// EW-693 — dynamic plugin distribution allowlist.
+import { PluginAllowlistEntity } from './entities/plugin-allowlist.entity';
 
 // Repositories
 import { PluginRepository } from './repositories/plugin.repository';
 import { UserPluginRepository } from './repositories/user-plugin.repository';
 import { WorkPluginRepository } from './repositories/work-plugin.repository';
+// EW-693 — admin allowlist (third-party packages permitted to install).
+import { PluginAllowlistRepository } from './repositories/plugin-allowlist.repository';
 
 // Services
 import { PluginRegistryService } from './services/plugin-registry.service';
@@ -35,9 +39,19 @@ import type {
 } from './interfaces/plugins-module-options.interface';
 
 /**
- * Plugin entities for TypeORM registration
+ * Plugin entities for TypeORM registration.
+ *
+ * EW-693 added `PluginAllowlistEntity` for the dynamic-mode admin
+ * allowlist. The existing three entities are unchanged in shape; the
+ * `PluginEntity` only gained additive, defaulted columns (forward-only
+ * migration), so bundled-mode deployments see no behaviour change.
  */
-export const PLUGIN_ENTITIES = [PluginEntity, UserPluginEntity, WorkPluginEntity];
+export const PLUGIN_ENTITIES = [
+    PluginEntity,
+    UserPluginEntity,
+    WorkPluginEntity,
+    PluginAllowlistEntity,
+];
 
 /**
  * All plugin-related providers
@@ -51,6 +65,8 @@ const PROVIDERS = [
     PluginRepository,
     UserPluginRepository,
     WorkPluginRepository,
+    // EW-693 — admin allowlist repository.
+    PluginAllowlistRepository,
     // Validation services
     PluginManifestValidatorService,
     PluginVersionCheckerService,
@@ -78,6 +94,9 @@ const EXPORTS = [
     PluginRepository,
     UserPluginRepository,
     WorkPluginRepository,
+    // EW-693 — admin allowlist repository (consumed by the
+    // PluginInstallerService and the admin allowlist controller).
+    PluginAllowlistRepository,
     // Core services
     PluginRegistryService,
     PluginLoaderService,
