@@ -87,7 +87,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Transcription Model',
 				description:
-					"Speech-to-text model for Knowledge Base media (video/audio) ingest. whisper-1 is the broadest-supported and the cheapest at $0.006/min. gpt-4o-transcribe yields higher accuracy on noisy audio at higher cost.",
+					'Speech-to-text model for Knowledge Base media (video/audio) ingest. whisper-1 is the broadest-supported and the cheapest at $0.006/min. gpt-4o-transcribe yields higher accuracy on noisy audio at higher cost.',
 				default: 'whisper-1',
 				'x-widget': 'model-select',
 				'x-scope': 'global',
@@ -199,10 +199,7 @@ export class OpenAiPlugin extends BaseAiProvider {
 			throw new Error('OpenAI apiKey is required for transcribe()');
 		}
 		const baseUrl = (resolvedConfig.baseURL as string) || 'https://api.openai.com/v1';
-		const model =
-			options.model ||
-			(resolvedConfig.transcriptionModel as string | undefined) ||
-			'whisper-1';
+		const model = options.model || (resolvedConfig.transcriptionModel as string | undefined) || 'whisper-1';
 		const url = `${baseUrl.replace(/\/$/, '')}/audio/transcriptions`;
 
 		const bytes = await this.normaliseAudioInput(options.file);
@@ -238,25 +235,33 @@ export class OpenAiPlugin extends BaseAiProvider {
 		};
 	}
 
-	private async normaliseAudioInput(
-		input: TranscriptionOptions['file']
-	): Promise<Uint8Array> {
+	private async normaliseAudioInput(input: TranscriptionOptions['file']): Promise<Uint8Array> {
 		if (input instanceof Uint8Array) return input;
 		// Node Buffer is a Uint8Array subclass — handled above. Otherwise
 		// drain the Web ReadableStream into a single Uint8Array.
 		const reader = (input as ReadableStream<Uint8Array>).getReader();
 		const chunks: Uint8Array[] = [];
 		let total = 0;
-		// Loop until end-of-stream. We avoid `for await` so this runs
-		// unchanged on Node runtimes that don't yet expose async iteration
-		// on the global ReadableStream.
-		// eslint-disable-next-line no-constant-condition
-		while (true) {
-			const { value, done } = await reader.read();
-			if (done) break;
-			if (value) {
-				chunks.push(value);
-				total += value.byteLength;
+		try {
+			// Loop until end-of-stream. We avoid `for await` so this runs
+			// unchanged on Node runtimes that don't yet expose async
+			// iteration on the global ReadableStream.
+			// eslint-disable-next-line no-constant-condition
+			while (true) {
+				const { value, done } = await reader.read();
+				if (done) break;
+				if (value) {
+					chunks.push(value);
+					total += value.byteLength;
+				}
+			}
+		} finally {
+			// Greptile P2: must release the lock even on read() error —
+			// otherwise the stream stays locked and any retry blocks forever.
+			try {
+				reader.releaseLock();
+			} catch {
+				// releaseLock throws if the stream is already closed; ignore.
 			}
 		}
 		const out = new Uint8Array(total);

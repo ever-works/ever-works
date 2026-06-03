@@ -42,7 +42,7 @@ SCOPE=(
     "$ROOT/packages/tasks/src"
 )
 
-FORBIDDEN='\b(body|content|markdown|html|excerpt|snippet|chunk|raw|preview)\b\s*:'
+FORBIDDEN='\b(body|content|markdown|text|html|excerpt|snippet|chunk|raw|preview)\b\s*:'
 
 # Find emit-event-like call sites first (cheap), then check whether the next
 # ~10 lines after that call contain a forbidden property literal. This avoids

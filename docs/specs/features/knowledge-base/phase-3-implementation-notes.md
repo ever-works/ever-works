@@ -26,16 +26,16 @@ opt-in.
 
 ### What ships
 
-| Area | Path | Notes |
-|---|---|---|
-| `transcribe(file)` capability | `packages/plugin/src/contracts/capabilities/ai-provider.interface.ts` | Optional method on `IAiProviderPlugin`. New `TranscriptionOptions` + `TranscriptionResponse` + `TranscriptionSegment` types. Plugins that don't implement it leave the field `undefined` and `AiFacadeService.transcribe()` (next slice) falls through to the next available provider. |
-| OpenAI Whisper impl | `packages/plugins/openai/src/openai.plugin.ts` | Wraps `/v1/audio/transcriptions` directly with `fetch` + `FormData` to avoid the heavy `openai` SDK dependency. New `transcriptionModel` setting (default `whisper-1`, env override `OPENAI_TRANSCRIPTION_MODEL`). |
-| Activity-log lock events | `packages/agent/src/entities/activity-log.types.ts` | Adds `KB_DOCUMENT_LOCKED`, `KB_DOCUMENT_UNLOCKED`, `KB_DOCUMENT_RESTORED`, `KB_DOCUMENT_LOCK_VIOLATION`, `KB_RECONCILE_COMPLETED`, `KB_UPLOAD_TOMBSTONED`, `KB_UPLOAD_REVIVED`, `KB_CONTEXT_TRUNCATED`, `KB_UPLOAD_TRANSCRIBED`, `KB_UPLOAD_TRANSCRIPTION_FAILED`. Storage is `varchar` (no enum migration needed); API/service layer is the source of allowed strings. |
-| Typed PostHog event surface | `packages/monitoring/src/posthog/kb-events.ts` (new) | One module enumerating every KB-related telemetry event with its property type. Includes a defensive scrubber that strips body-ish properties (`body`, `content`, `markdown`, `text`, `html`, `excerpt`, `snippet`, `chunk`, `raw`, `preview`). In `NODE_ENV=test` the scrubber throws so unit tests can assert the gate; in `production` it strips silently to keep telemetry call sites zero-throw. |
-| Static CI gate | `scripts/ci/no-kb-body-in-events.sh` (new) | Greps every PostHog / activity-log / `emitKbEvent` call site within a tight scope (`apps/api`, `apps/web`, `apps/mcp`, `apps/cli`, `packages/agent`, `packages/tasks`) and looks for forbidden property keys near each emit. Whitelist comment: `// kb-events-allow: <reason>`. |
-| Vitest spec | `packages/monitoring/src/posthog/__tests__/kb-events.spec.ts` | Asserts forward path, no-op on null client, scrubber throws in test mode, and the forbidden-key list exists for the gate. |
+| Area                          | Path                                                                  | Notes                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `transcribe(file)` capability | `packages/plugin/src/contracts/capabilities/ai-provider.interface.ts` | Optional method on `IAiProviderPlugin`. New `TranscriptionOptions` + `TranscriptionResponse` + `TranscriptionSegment` types. Plugins that don't implement it leave the field `undefined` and `AiFacadeService.transcribe()` (next slice) falls through to the next available provider.                                                                                                                |
+| OpenAI Whisper impl           | `packages/plugins/openai/src/openai.plugin.ts`                        | Wraps `/v1/audio/transcriptions` directly with `fetch` + `FormData` to avoid the heavy `openai` SDK dependency. New `transcriptionModel` setting (default `whisper-1`, env override `OPENAI_TRANSCRIPTION_MODEL`).                                                                                                                                                                                    |
+| Activity-log lock events      | `packages/agent/src/entities/activity-log.types.ts`                   | Adds `KB_DOCUMENT_LOCKED`, `KB_DOCUMENT_UNLOCKED`, `KB_DOCUMENT_RESTORED`, `KB_DOCUMENT_LOCK_VIOLATION`, `KB_RECONCILE_COMPLETED`, `KB_UPLOAD_TOMBSTONED`, `KB_UPLOAD_REVIVED`, `KB_CONTEXT_TRUNCATED`, `KB_UPLOAD_TRANSCRIBED`, `KB_UPLOAD_TRANSCRIPTION_FAILED`. Storage is `varchar` (no enum migration needed); API/service layer is the source of allowed strings.                               |
+| Typed PostHog event surface   | `packages/monitoring/src/posthog/kb-events.ts` (new)                  | One module enumerating every KB-related telemetry event with its property type. Includes a defensive scrubber that strips body-ish properties (`body`, `content`, `markdown`, `text`, `html`, `excerpt`, `snippet`, `chunk`, `raw`, `preview`). In `NODE_ENV=test` the scrubber throws so unit tests can assert the gate; in `production` it strips silently to keep telemetry call sites zero-throw. |
+| Static CI gate                | `scripts/ci/no-kb-body-in-events.sh` (new)                            | Greps every PostHog / activity-log / `emitKbEvent` call site within a tight scope (`apps/api`, `apps/web`, `apps/mcp`, `apps/cli`, `packages/agent`, `packages/tasks`) and looks for forbidden property keys near each emit. Whitelist comment: `// kb-events-allow: <reason>`.                                                                                                                       |
+| Vitest spec                   | `packages/monitoring/src/posthog/__tests__/kb-events.spec.ts`         | Asserts forward path, no-op on null client, scrubber throws in test mode, and the forbidden-key list exists for the gate.                                                                                                                                                                                                                                                                             |
 
-### What is *not* in this slice
+### What is _not_ in this slice
 
 The audit in the parent session named these as the heaviest remaining
 Phase 3 deliverables. They land in follow-up slices on the same
@@ -67,9 +67,9 @@ small and reviewable:
 
 ### Configuration knobs (env)
 
-| Env var | Effect | Default |
-|---|---|---|
-| `OPENAI_TRANSCRIPTION_MODEL` | Whisper model the OpenAI plugin uses. `whisper-1` is cheapest at $0.006/min; `gpt-4o-transcribe` is higher accuracy on noisy audio at higher cost. | `whisper-1` |
+| Env var                        | Effect                                                                                                                                                                                                                                                           | Default                   |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `OPENAI_TRANSCRIPTION_MODEL`   | Whisper model the OpenAI plugin uses. `whisper-1` is cheapest at $0.006/min; `gpt-4o-transcribe` is higher accuracy on noisy audio at higher cost.                                                                                                               | `whisper-1`               |
 | `KB_TRANSCRIPTION_PROVIDER_ID` | Operator-pinned transcription provider for `AiFacadeService.transcribe()`. When set, only this provider is tried; on failure the call throws (no silent fallback). Useful when audit requires sticking to a specific compliance-cleared vendor. Read in slice 2. | _unset_ → first available |
 
 ## How the slice fits the modular plugin design
@@ -94,8 +94,7 @@ slice keeps that contract:
 ## How to verify locally
 
 ```bash
-# From repo root, then in the worktree:
-cd C:/Coding/Worktrees/wt-ew639-phase3
+# From the repo root of your local clone:
 
 # 1) Type-check the touched packages
 pnpm --filter @ever-works/plugin type-check
@@ -106,6 +105,6 @@ pnpm --filter '@ever-works/plugin-openai' type-check  # or whichever plugin id
 # 2) Run the new tests
 pnpm --filter @ever-works/monitoring test -- kb-events
 
-# 3) Run the static CI gate against the worktree
+# 3) Run the static CI gate against the repo
 bash scripts/ci/no-kb-body-in-events.sh .
 ```
