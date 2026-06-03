@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    InternalServerErrorException,
+    NotFoundException,
+} from '@nestjs/common';
 import { SkillsService } from '../skills.service';
 import { ActivityActionType } from '../../entities/activity-log.types';
 
@@ -116,6 +121,19 @@ describe('SkillsService', () => {
                     instructionsMd: 'x',
                 }),
             ).rejects.toThrow(NotFoundException);
+            expect(skills.findByOwnerSlug).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when a non-tenant ownership repository is unavailable', async () => {
+            await expect(
+                svc.create('u1', {
+                    ownerType: 'agent',
+                    ownerId: 'agent-1',
+                    title: 'X',
+                    description: 'd',
+                    instructionsMd: 'x',
+                }),
+            ).rejects.toThrow(InternalServerErrorException);
             expect(skills.findByOwnerSlug).not.toHaveBeenCalled();
         });
 

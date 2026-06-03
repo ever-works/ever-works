@@ -141,8 +141,8 @@ export class NotificationPreferencesController {
     async unmuteCategory(
         @CurrentUser() auth: AuthenticatedUser,
         // Security: ParseEnumPipe rejects path params not in NotificationCategory
-        @Param('category', new ParseEnumPipe(NotificationCategory)) category: string,
+        @Param('category', new ParseEnumPipe(NotificationCategory)) category: NotificationCategory,
     ) {
-        await this.service.unmuteCategory(auth.userId, category as NotificationCategory);
+        await this.service.unmuteCategory(auth.userId, category);
     }
 }

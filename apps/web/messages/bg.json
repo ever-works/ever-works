@@ -542,21 +542,52 @@
                 "sites": "Sites"
             }
         },
+        "agentsPreview": {
+            "title": "Агенти",
+            "add": "Добави",
+            "viewAll": "Виж всички ({n}) →",
+            "empty": {
+                "title": "Все още няма агенти.",
+                "subtitleLink": "Създай първия си агент",
+                "subtitleSuffix": "за делегиране на повтаряща се работа."
+            },
+            "scope": {
+                "tenant": "Работно пространство",
+                "mission": "Мисия",
+                "work": "Работа",
+                "idea": "Идея"
+            },
+            "cadence": "всяка {cadence}"
+        },
+        "recentTasks": {
+            "title": "Задачи",
+            "add": "Добави",
+            "viewAll": "Виж всички ({n}) →",
+            "empty": {
+                "title": "Все още няма задачи.",
+                "subtitle": "Създай една, за да започнеш да проследяваш работа."
+            },
+            "view": {
+                "label": "Превключване на изгледа на задачите",
+                "list": "Изглед като списък",
+                "cards": "Изглед като карти"
+            }
+        },
         "missionsPage": {
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
             "quickAdd": {
-                "label": "Започни нова Мисия",
-                "submitTitle": "Създай Мисия",
+                "label": "Започни нова мисия",
+                "submitTitle": "Създай мисия",
                 "minLength": "Описанието трябва да съдържа поне 10 символа.",
                 "created": "Мисията е създадена",
-                "error": "Не можа да се създаде Мисия. Моля, опитайте отново."
+                "error": "Не можа да се създаде мисия. Моля, опитай отново."
             },
             "empty": {
                 "title": "No Missions yet.",
                 "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Отворете обединения създател"
+                "openNew": "Отвори обединения създател"
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -611,10 +642,37 @@
                 "scopeMissionDesc": "Заключен в една Мисия",
                 "scopeWorkDesc": "Заключен в една Работа",
                 "scopeIdeaDesc": "Заключен в една Идея",
+                "parentLabel": "Избери {scope}",
+                "parentPlaceholder": "Избери…",
+                "parentRequired": "Избери родител, за да продължиш.",
+                "noMissions": "Все още нямате мисии — създайте една, за да обхванете агент тук.",
+                "noWorks": "Все още нямате работи — създайте една, за да обхванете агент тук.",
+                "noIdeas": "Все още нямате идеи — добавете една, за да обхванете агент тук.",
                 "cancel": "Отказ",
                 "back": "Назад",
                 "next": "Напред",
-                "create": "Създай Агент"
+                "create": "Създай Агент",
+                "templateStepTitle": "Започни от шаблон (по избор)",
+                "startFromScratch": "Започни от нулата",
+                "pickParentHint": "Избери {scope} по-горе, за да продължиш, или избери обхват на работното пространство.",
+                "nextDisabledReason": "Избери родител или избери обхват на работното пространство, за да продължиш."
+            },
+            "orDivider": "Или",
+            "createManually": "Създай агент ръчно",
+            "prompt": {
+                "label": "Опиши агента, който искаш",
+                "minLength": "Опиши агента си с още няколко думи.",
+                "submitTitle": "Изгради този агент"
+            },
+            "chips": {
+                "viewAll": "Виж всички",
+                "ariaLabel": "Избери шаблон за агент"
+            },
+            "catalog": {
+                "allTemplates": "Всички шаблони",
+                "yourTemplates": "Твоите шаблони",
+                "yourTemplatesEmpty": "Агентите, които създадеш, ще се появят тук като шаблони за многократна употреба.",
+                "openInWizard": "Отвори в помощник"
             }
         },
         "tasksPage": {
@@ -690,9 +748,56 @@
         "skillsPage": {
             "title": "Умения",
             "subtitle": "Възобновяеми, версиониращи се инструкции, които Агентите могат да използват при изпълнение, когато са релевантни.",
+            "tabs": {
+                "label": "Секции за умения",
+                "installed": "Инсталирани",
+                "available": "Налични",
+                "custom": "Персонализирани"
+            },
+            "search": {
+                "label": "Търсене на умения",
+                "placeholder": "Търсене на умения по заглавие, slug или описание",
+                "submit": "Търсене",
+                "clear": "Изчисти"
+            },
+            "errors": {
+                "installed": "Инсталираните умения не можаха да се заредят. Опитайте да опресните страницата.",
+                "catalog": "Каталогът с умения не можа да се зареди. Инсталираните и персонализираните умения все още са налични."
+            },
             "empty": {
                 "title": "Все още няма Умения.",
                 "subtitle": "Уменията ще бъдат добавени в по-късна фаза от rollout-а на Агенти/Умения/Задачи. Страницата е запазена, за маршрутът от навигацията в страничната лента да работи."
+            },
+            "catalog": {
+                "emptyTitle": "Няма налични умения от каталога.",
+                "emptySubtitle": "Активирайте плъгин за доставчик на умения или коригирайте търсенето.",
+                "install": "Инсталирай",
+                "installing": "Инсталиране...",
+                "installed": "Инсталирано",
+                "installFailed": "Инсталацията е неуспешна"
+            },
+            "custom": {
+                "summary": "{count, plural, =0 {Все още няма ръчно създадени умения.} =1 {1 ръчно създадено умение.} other {# ръчно създадени умения.}}",
+                "new": "Ново умение",
+                "formTitle": "Ново персонализирано умение",
+                "title": "Заглавие",
+                "titlePlaceholder": "напр. Чеклист за преглед на код",
+                "description": "Описание (по избор)",
+                "descriptionPlaceholder": "Едно изречение. Основното съдържание отива на страницата с детайли.",
+                "create": "Създай",
+                "creating": "Създаване...",
+                "cancel": "Отказ",
+                "titleRequired": "Заглавието е задължително.",
+                "createFailed": "Неуспешно създаване на умение"
+            },
+            "card": {
+                "fromCatalog": "от каталога"
+            },
+            "pagination": {
+                "showing": "Показване на {start}-{end} от {total}",
+                "emptyPage": "Няма резултати на тази страница",
+                "previous": "Предишна",
+                "next": "Следваща"
             },
             "list": {
                 "newSkill": "+ Ново Умение",
@@ -837,7 +942,7 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Добави Идея",
+                "submitTitle": "Добави идея",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -1036,6 +1141,7 @@
                 "totalItems": "Общо елементи"
             },
             "recent": "Works",
+            "add": "Добави",
             "viewAll": "Виж всички ({count})",
             "search": "Търси работи…",
             "create": "Създай работа",
@@ -1471,6 +1577,11 @@
             "totalItems": "Общо елементи",
             "activeWebsites": "Активни уебсайтове",
             "monthSpend": "Month Spend",
+            "agents": "Агенти",
+            "agentsActive": "{count} активни",
+            "tasksInFlight": "Задачи в процес",
+            "tasksBlocked": "{count} блокирани",
+            "tasksNoBlockers": "без блокери",
             "fromLastMonth": "от миналия месец"
         },
         "adminUsage": {
@@ -3272,13 +3383,15 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
             "chips": {
                 "mission": "Mission",
                 "idea": "Idea",
+                "agent": "Агент",
+                "task": "Задача",
                 "website": "Website",
                 "landing-page": "Landing Page",
                 "blog": "Blog",
@@ -3287,13 +3400,15 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Текуща Цел, с която Агентът продължава да работи — генерира Идеи по график или еднократно.",
-                "idea": "Еднократна бележка, която Агентът превръща в план за Работа, който можете да изградите.",
-                "website": "Многостраничен сайт за бизнес, услуга или марка — генерирано съдържание + код.",
-                "landing-page": "Фокусирана едностранична страница — списъци с чакащи, пускане на продукти, записване за уебинар, улавяне на лидове.",
-                "blog": "Блог с категории, RSS, подсветка на код и SEO-готово съдържание.",
-                "directory": "Куриран сайт с директория, с търсене, филтри и структурирани данни за елементи.",
-                "awesome-repo": "Awesome-list репозитори — markdown индекс, категоризирани линкове и освежаеми метаданни.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -3305,6 +3420,8 @@
             "toasts": {
                 "missionCreated": "Mission created",
                 "ideaCreated": "Idea added",
+                "agentDraft": "Отваряне на настройките на агента — завърши, за да създадеш.",
+                "taskDraft": "Отваряне на настройките на задачата — завърши, за да създадеш.",
                 "submitError": "Couldn't create. Please try again."
             },
             "cards": {
@@ -3329,6 +3446,30 @@
             "title": "Създаване на нов работа",
             "subtitle": "Изберете как искате да създадете работата си",
             "backToOptions": "Назад към опциите",
+            "promptLabel": "Какъв вид работа искаш да изградиш?",
+            "or": "или",
+            "kinds": {
+                "website": "Уебсайт",
+                "landing-page": "Landing страница",
+                "blog": "Блог",
+                "directory": "Директория",
+                "awesome-repo": "Awesome Repo"
+            },
+            "kindDescriptions": {
+                "website": "Многостраничен сайт за бизнес, услуга или марка — генерирано съдържание + код.",
+                "landing-page": "Фокусирана едностранна страница — списъци с чакащи, лансиране на продукти, регистрации за уебинари, улавяне на лидове.",
+                "blog": "Блог с категории, RSS, подчертаване на код и съдържание, готово за SEO.",
+                "directory": "Подбран сайт директория с търсене, филтри и структурирани данни за елементите.",
+                "awesome-repo": "Хранилище от тип awesome-list — markdown индекс, категоризирани връзки и обновяеми метаданни."
+            },
+            "promptHints": {
+                "minLength": "Добави описание (поне 10 символа), за да започнеш.",
+                "submitTitle": "Създай с ИИ"
+            },
+            "buttons": {
+                "manual": "Създай работа ръчно",
+                "import": "Импортирай съществуваща работа"
+            },
             "sidebar": {
                 "selectedProvider": "Git доставчик",
                 "selectedDeployProvider": "Доставчик за деплоймент"
@@ -3361,6 +3502,9 @@
                 "workNamePlaceholder": "нпр. Awesome AI Tools",
                 "workNameHelp": "AI ще предложи име, ако оставите това празно",
                 "promptLabel": "Опишете работата си",
+                "slugLabel": "Работен Slug",
+                "slugPlaceholder": "awesome-ai-tools",
+                "slugHelp": "Идентификатор, подходящ за URL. Автоматично генериран от името — редактирай, за да промениш.",
                 "githubRequired": "Моля, свържете първо вашата GitHub сметка.",
                 "promptPlaceholder": "Опишете каква работа искате да създадете, какви елементи трябва да съдържа и всякакви специфични изисквания...",
                 "inspirationText": "Търсите вдъхновение? Опитайте някоя от тези:",
@@ -4340,244 +4484,6 @@
             "toggleError": "Грешка при превключване на плъгина",
             "system": "Система",
             "goToPluginSettings": "Отиди на настройки на плъгина"
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
-            },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
         }
     },
     "layout": {
@@ -4839,6 +4745,11 @@
         "visibility": {
             "private": "Частен",
             "public": "Публичен"
+        },
+        "footer": {
+            "build": "Изграждане",
+            "web": "Уеб",
+            "api": "API"
         }
     },
     "organizations": {
@@ -4901,6 +4812,109 @@
             "title": "Create your first Organization",
             "description": "Organize your work, share with teammates, and collaborate as a team.",
             "cta": "Create Organization"
+        }
+    },
+    "notifications-v2": {
+        "emails": {
+            "title": "Имейл адреси",
+            "subtitle": "Адреси за входяща и изходяща поща, управлявани от клиента, за агенти.",
+            "addAddress": "Добави адрес",
+            "empty": "Все още няма имейл адреси. Натисни Добави адрес, за да регистрираш Postmark / Resend / Mailgun / Sendgrid / Mailchimp поща.",
+            "columns": {
+                "address": "Адрес",
+                "direction": "Посока",
+                "provider": "Доставчик",
+                "verified": "Потвърден"
+            },
+            "actions": {
+                "edit": "Редактирай",
+                "disable": "Деактивирай",
+                "remove": "Премахни",
+                "verify": "Изпрати отново потвърждение"
+            }
+        },
+        "channels": {
+            "title": "Канали за известия",
+            "subtitle": "Свържи Discord, Slack, Telegram, WhatsApp или Novu за доставка на известия през множество канали.",
+            "addChannel": "Добави канал",
+            "empty": "Все още няма канали. Добави Discord webhook, входящ Slack webhook, Telegram bot или Novu workflow, за да започнеш да разпращаш известия извън приложението.",
+            "columns": {
+                "name": "Име",
+                "provider": "Доставчик",
+                "verified": "Потвърден"
+            },
+            "actions": {
+                "test": "Тест",
+                "edit": "Редактирай",
+                "disable": "Деактивирай",
+                "remove": "Премахни"
+            },
+            "testResult": {
+                "delivered": "Тестът е доставен ✓",
+                "failed": "Тестът е неуспешен"
+            }
+        },
+        "preferences": {
+            "title": "Предпочитания за известия",
+            "subtitle": "Избери кои канали да доставят всяко събитие. Доставката в приложението винаги е включена.",
+            "empty": "Все още няма регистрирани типове събития. Производителите ще попълнят регистъра при първо излъчване.",
+            "columns": {
+                "event": "Събитие",
+                "inApp": "В приложението"
+            },
+            "quietHours": {
+                "title": "Тихи часове",
+                "start": "Начало",
+                "end": "Край",
+                "timezone": "Часова зона"
+            },
+            "mute": {
+                "title": "Заглушаване на категория",
+                "until": "Заглуши до",
+                "muted": "Заглушено",
+                "unmute": "Отключи"
+            }
+        },
+        "inbox": {
+            "title": "Входящи",
+            "subtitleCount": "Входяща и изходяща поща за този агент. {count} съобщения.",
+            "compose": "Напиши",
+            "empty": "Все още няма съобщения. Задайте входящ имейл адрес на този агент в Настройки → Интеграции → Имейли, за да започнете да получавате поща.",
+            "columns": {
+                "direction": "Посока",
+                "from": "От",
+                "subject": "Тема",
+                "when": "Кога",
+                "status": "Статус"
+            },
+            "directionIn": "вх.",
+            "directionOut": "изх.",
+            "back": "← Обратно към входящи"
+        },
+        "detail": {
+            "from": "От",
+            "to": "До",
+            "cc": "Копие",
+            "inbound": "входяща",
+            "outbound": "изходяща"
+        },
+        "composer": {
+            "title": "Напиши",
+            "to": "До",
+            "toPlaceholder": "получател@example.com, друг@example.com",
+            "cc": "Копие",
+            "ccOptional": "(по избор)",
+            "subject": "Тема",
+            "message": "Съобщение",
+            "send": "Изпрати",
+            "sending": "Изпращане…",
+            "sent": "Изпратено ✓",
+            "errors": {
+                "recipientRequired": "Изисква се поне един получател.",
+                "subjectRequired": "Темата е задължителна.",
+                "bodyRequired": "Тялото на съобщението е задължително.",
+                "sendFailed": "Изпращането е неуспешно."
+            }
         }
     }
 }

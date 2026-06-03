@@ -2,6 +2,7 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    InternalServerErrorException,
     Logger,
     NotFoundException,
     Optional,
@@ -301,14 +302,14 @@ export class SkillsService {
         }
 
         if (ownerType === 'agent') {
-            if (!this.agents) return;
+            if (!this.agents) this.throwMissingOwnershipRepository(ownerType);
             const agent = await this.agents.findByIdAndUser(ownerId, userId);
             if (!agent) throw new NotFoundException('Skill target not found.');
             return;
         }
 
         if (ownerType === 'work') {
-            if (!this.works) return;
+            if (!this.works) this.throwMissingOwnershipRepository(ownerType);
             const work = await this.works.findById(ownerId);
             if (!work || work.userId !== userId)
                 throw new NotFoundException('Skill target not found.');
@@ -316,17 +317,23 @@ export class SkillsService {
         }
 
         if (ownerType === 'idea') {
-            if (!this.ideas) return;
+            if (!this.ideas) this.throwMissingOwnershipRepository(ownerType);
             const idea = await this.ideas.findByIdForUser(ownerId, userId);
             if (!idea) throw new NotFoundException('Skill target not found.');
             return;
         }
 
         if (ownerType === 'mission') {
-            if (!this.missions) return;
+            if (!this.missions) this.throwMissingOwnershipRepository(ownerType);
             const mission = await this.missions.findOne({ where: { id: ownerId, userId } });
             if (!mission) throw new NotFoundException('Skill target not found.');
         }
+    }
+
+    private throwMissingOwnershipRepository(ownerType: Exclude<SkillOwnerType, 'tenant'>): never {
+        throw new InternalServerErrorException(
+            `Skill ${ownerType} ownership check is unavailable.`,
+        );
     }
 }
 

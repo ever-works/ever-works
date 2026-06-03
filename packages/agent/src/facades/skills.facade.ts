@@ -19,6 +19,9 @@ export class SkillsFacadeError extends FacadeError {
     }
 }
 
+const PROVIDER_CATALOG_PAGE_SIZE = 200;
+const MAX_PROVIDER_CATALOG_ENTRIES = 5000;
+
 /**
  * Skills feature — Phase 8.6 (ADR-012).
  *
@@ -62,7 +65,6 @@ export class SkillsFacadeService extends BaseFacadeService {
 
         const requestedLimit = Math.max(1, options.limit);
         const requestedOffset = Math.max(0, options.offset);
-        const providerLimit = Math.min(1000, requestedOffset + requestedLimit);
         const seenSlugs = new Set<string>();
         const merged: SkillCatalogEntry[] = [];
 
@@ -74,17 +76,27 @@ export class SkillsFacadeService extends BaseFacadeService {
                           .getResolvedSettings(plugin.id, facadeOptions)
                           .catch(() => undefined)
                     : undefined;
-                const result = await plugin.listEntries({
-                    limit: providerLimit,
-                    offset: 0,
-                    tags: options.tags,
-                    search: options.search,
-                    settings,
-                });
-                for (const entry of result.entries) {
-                    if (seenSlugs.has(entry.slug)) continue;
-                    seenSlugs.add(entry.slug);
-                    merged.push(entry);
+                let providerOffset = 0;
+                while (providerOffset < MAX_PROVIDER_CATALOG_ENTRIES) {
+                    const result = await plugin.listEntries({
+                        limit: PROVIDER_CATALOG_PAGE_SIZE,
+                        offset: providerOffset,
+                        tags: options.tags,
+                        search: options.search,
+                        settings,
+                    });
+                    for (const entry of result.entries) {
+                        if (seenSlugs.has(entry.slug)) continue;
+                        seenSlugs.add(entry.slug);
+                        merged.push(entry);
+                    }
+                    providerOffset += result.entries.length;
+                    if (result.entries.length === 0 || providerOffset >= result.total) break;
+                }
+                if (providerOffset >= MAX_PROVIDER_CATALOG_ENTRIES) {
+                    this.logger.warn(
+                        `Skills provider ${plugin.id} catalog exceeded ${MAX_PROVIDER_CATALOG_ENTRIES} entries; truncating aggregate.`,
+                    );
                 }
             } catch (err) {
                 this.logger.warn(
