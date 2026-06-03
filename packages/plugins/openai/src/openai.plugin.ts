@@ -11,6 +11,8 @@ import type {
 	ChatCompletionChunk,
 	EmbeddingOptions,
 	EmbeddingResponse,
+	TranscriptionOptions,
+	TranscriptionResponse,
 	AiModel,
 	AiModelCapabilities
 } from '@ever-works/plugin';
@@ -80,6 +82,16 @@ export class OpenAiPlugin extends BaseAiProvider {
 				default: 'text-embedding-3-small',
 				'x-widget': 'model-select',
 				'x-scope': 'global'
+			},
+			transcriptionModel: {
+				type: 'string',
+				title: 'Transcription Model',
+				description:
+					"Speech-to-text model for Knowledge Base media (video/audio) ingest. whisper-1 is the broadest-supported and the cheapest at $0.006/min. gpt-4o-transcribe yields higher accuracy on noisy audio at higher cost.",
+				default: 'whisper-1',
+				'x-widget': 'model-select',
+				'x-scope': 'global',
+				'x-envVar': 'OPENAI_TRANSCRIPTION_MODEL'
 			},
 			temperature: {
 				type: 'number',
@@ -160,6 +172,117 @@ export class OpenAiPlugin extends BaseAiProvider {
 			resolvedConfig.embeddingModel = 'text-embedding-3-small';
 		}
 		return this.aiOps.createEmbedding(options, resolvedConfig);
+	}
+
+	/**
+	 * Whisper-backed speech-to-text. Wraps OpenAI's `/v1/audio/transcriptions`
+	 * REST endpoint directly with `fetch` + `FormData` so the plugin avoids
+	 * pulling the heavy `openai` SDK just for this code path (we already do
+	 * everything else via LangChain).
+	 *
+	 * The handler accepts any of the three binary shapes the KB ingest task
+	 * forwards — Web ReadableStream (from the upload route), Node Buffer (from
+	 * the Trigger.dev local runner), or Uint8Array (from tests). We normalize
+	 * to a Blob before constructing the multipart body so the OpenAI server's
+	 * MIME sniffer sees a real file part with the original filename.
+	 *
+	 * Disabled-by-omission: when `apiKey` is unset the call throws — the
+	 * facade catches and falls through to the next provider in the chain.
+	 */
+	async transcribe(options: TranscriptionOptions): Promise<TranscriptionResponse> {
+		if (!this.aiOps) {
+			throw new Error('OpenAI plugin not loaded');
+		}
+		const resolvedConfig = this.resolveConfig(options.settings);
+		const apiKey = resolvedConfig.apiKey;
+		if (!apiKey || typeof apiKey !== 'string') {
+			throw new Error('OpenAI apiKey is required for transcribe()');
+		}
+		const baseUrl = (resolvedConfig.baseURL as string) || 'https://api.openai.com/v1';
+		const model =
+			options.model ||
+			(resolvedConfig.transcriptionModel as string | undefined) ||
+			'whisper-1';
+		const url = `${baseUrl.replace(/\/$/, '')}/audio/transcriptions`;
+
+		const bytes = await this.normaliseAudioInput(options.file);
+		const blob = new Blob([bytes], { type: this.detectMimeFromName(options.filename) });
+		const form = new FormData();
+		form.append('file', blob, options.filename);
+		form.append('model', model);
+		form.append('response_format', 'verbose_json');
+		if (options.language) form.append('language', options.language);
+		if (options.prompt) form.append('prompt', options.prompt);
+
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: { Authorization: `Bearer ${apiKey}` },
+			body: form
+		});
+		if (!response.ok) {
+			const errBody = await response.text();
+			throw new Error(`OpenAI transcribe HTTP ${response.status}: ${errBody.slice(0, 400)}`);
+		}
+		const payload = (await response.json()) as {
+			text: string;
+			language?: string;
+			duration?: number;
+			segments?: Array<{ start: number; end: number; text: string }>;
+		};
+		return {
+			text: payload.text,
+			model,
+			language: payload.language,
+			durationSeconds: payload.duration,
+			segments: payload.segments?.map((s) => ({ start: s.start, end: s.end, text: s.text }))
+		};
+	}
+
+	private async normaliseAudioInput(
+		input: TranscriptionOptions['file']
+	): Promise<Uint8Array> {
+		if (input instanceof Uint8Array) return input;
+		// Node Buffer is a Uint8Array subclass — handled above. Otherwise
+		// drain the Web ReadableStream into a single Uint8Array.
+		const reader = (input as ReadableStream<Uint8Array>).getReader();
+		const chunks: Uint8Array[] = [];
+		let total = 0;
+		// Loop until end-of-stream. We avoid `for await` so this runs
+		// unchanged on Node runtimes that don't yet expose async iteration
+		// on the global ReadableStream.
+		// eslint-disable-next-line no-constant-condition
+		while (true) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			if (value) {
+				chunks.push(value);
+				total += value.byteLength;
+			}
+		}
+		const out = new Uint8Array(total);
+		let offset = 0;
+		for (const c of chunks) {
+			out.set(c, offset);
+			offset += c.byteLength;
+		}
+		return out;
+	}
+
+	private detectMimeFromName(filename: string): string {
+		const ext = filename.toLowerCase().split('.').pop() ?? '';
+		const map: Record<string, string> = {
+			mp3: 'audio/mpeg',
+			m4a: 'audio/mp4',
+			mp4: 'audio/mp4',
+			mpeg: 'audio/mpeg',
+			mpga: 'audio/mpeg',
+			wav: 'audio/wav',
+			webm: 'audio/webm',
+			oga: 'audio/ogg',
+			ogg: 'audio/ogg',
+			flac: 'audio/flac'
+		};
+		return map[ext] ?? 'application/octet-stream';
 	}
 
 	async listModels(settings?: PluginSettings): Promise<readonly AiModel[]> {
