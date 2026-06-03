@@ -242,10 +242,21 @@ test.describe('Notification channels — settings CRUD + lifecycle + UI', () => 
         expect(ids.indexOf(discord.id)).toBeLessThan(ids.indexOf(novu.id));
 
         // pluginId is set at create and is NOT in the PATCH DTO — it is immutable.
-        // A PATCH that tries to smuggle a pluginId is silently ignored; the row
-        // keeps its original provider.
+        // A PATCH that tries to smuggle a pluginId is REJECTED by the global
+        // ValidationPipe (forbidNonWhitelisted), which is a stronger immutability
+        // guarantee than a silent no-op: the provider can never even be submitted
+        // for change.
+        const tamper = await request.patch(`${API_BASE}/api/notification-channels/${telegram.id}`, {
+            headers: authedHeaders(token),
+            data: { pluginId: 'slack-channel', name: 'Renamed Telegram' },
+            timeout: TIMEOUT,
+        });
+        expect(tamper.status(), `smuggled pluginId must be rejected: ${await tamper.text()}`).toBe(
+            400,
+        );
+
+        // A clean rename (no pluginId) succeeds and leaves the provider intact.
         const tampered = await patchChannel(request, token, telegram.id, {
-            pluginId: 'slack-channel',
             name: 'Renamed Telegram',
         });
         expect(tampered.pluginId, 'pluginId is immutable across PATCH').toBe('telegram-channel');
