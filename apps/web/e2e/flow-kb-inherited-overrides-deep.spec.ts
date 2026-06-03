@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { createOrganizationViaAPI } from './helpers/organizations';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
 
 /**
@@ -208,7 +209,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Override Restore ${runId}`,
@@ -306,7 +310,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Cross Class ${runId}`,
@@ -406,7 +413,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Re-Override ${runId}`,
@@ -479,7 +489,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Inherited Body Guard ${runId}`,
@@ -662,7 +675,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workAId } = await createWorkViaAPI(request, token, {
             name: `KB Shared Org A ${runId}`,
@@ -740,7 +756,10 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
 
         const token = await seededToken(request);
         const runId = freshRunId();
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Pair Toggle ${runId}`,

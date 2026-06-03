@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createWorkViaAPI, loginViaAPI } from './helpers/api';
+import { createOrganizationViaAPI } from './helpers/organizations';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
 
 /**
@@ -75,7 +76,11 @@ test.describe('Knowledge Base — A19+A20 inherited docs', () => {
         // 2. Seed an org-scope KB doc at `legal/privacy.md`. The slug
         //    embedded in the spec selector (`legal-privacy`) must
         //    match `slugFromPath('legal/privacy.md')` = 'privacy'.
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user — org-scope KB now
+        // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
+        // UUID 404s. `randomUUID()` only supplies a collision-proof name.
+        const orgId = (await createOrganizationViaAPI(request, access_token, `kb-org-${randomUUID()}`))
+            .id;
         const docTitle = `Privacy ${runId}`;
         const docBody = `# ${docTitle}\n\nOrganization privacy policy — inherited by every paired Work.\n`;
         await seedOrgKbDoc(request, access_token, {

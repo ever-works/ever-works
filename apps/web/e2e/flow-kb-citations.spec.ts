@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { createOrganizationViaAPI } from './helpers/organizations';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
 
 /**
@@ -461,7 +462,9 @@ test.describe('Flow — KB citations', () => {
         // Work-scoped: a citation can't enumerate consumers of a doc the Work
         // doesn't own. Seed an org doc, then ask for ITS citations via the
         // Work route.
-        const orgId = randomUUID();
+        // A REAL organization owned by the caller — org-scope KB now enforces
+        // tenant ownership (cross-tenant IDOR fix), so a bare random UUID 404s.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
         const orgDoc = await seedOrgKbDoc(request, token, {
             orgId,
             path: `legal/foreign-${runId}.md`,
@@ -482,7 +485,9 @@ test.describe('Flow — KB citations', () => {
         test.setTimeout(120_000);
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         const { token } = await registerFreshUser(request);
-        const orgId = randomUUID();
+        // A REAL organization owned by the caller — org-scope KB now enforces
+        // tenant ownership (cross-tenant IDOR fix), so a bare random UUID 404s.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Cite Inherited ${runId}`,
         });
@@ -558,7 +563,9 @@ test.describe('Flow — KB citations', () => {
         test.setTimeout(120_000);
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         const { token } = await registerFreshUser(request);
-        const orgId = randomUUID();
+        // A REAL organization owned by the caller — org-scope KB now enforces
+        // tenant ownership (cross-tenant IDOR fix), so a bare random UUID 404s.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Cite Override ${runId}`,
         });
