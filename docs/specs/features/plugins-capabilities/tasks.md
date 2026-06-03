@@ -106,7 +106,7 @@ spec backfill but are good candidates for a future hourly-tracker run.
 - [x] **T25**. Register the three event types in `ActivityLogListener`
       (consumer-side spec lives in [`activity-log`](../activity-log/spec.md)).
 
-## Phase 6 — Tests (per [`COVERAGE-TRACKER.md`](../../../../COVERAGE-TRACKER.md))
+## Phase 6 — Tests (per [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md))
 
 - [x] **T26**. `device-auth/device-auth.service.spec.ts` (6 tests) +
       `device-auth/device-auth.controller.spec.ts` (4 tests) — PR
@@ -216,4 +216,4 @@ screenshot,oauth,git-providers,device-auth}.md` with one Markdown
 - [x] All shipped tests passing on `develop`.
 - [x] Spec status set to `Implemented`; plan + tasks marked `Done`.
 - [ ] T34 + outstanding follow-ups tracked as separate hourly-tracker
-      candidates in [`COVERAGE-TRACKER.md`](../../../../COVERAGE-TRACKER.md).
+      candidates in [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md).
