@@ -455,16 +455,19 @@ export class AuthService {
             });
             throw new BadRequestException('Magic link expired');
         }
-        // Atomic single-use — wipe the column before returning the
-        // user. If another request races on the same token, only one
-        // wins. (We rely on the row-level write here, not a row-level
-        // lock; for the magic-link flow this is acceptable since the
-        // token's 256 bits of entropy + 15-minute TTL make collisions
-        // statistically impossible.)
-        await this.userRepository.update(user.id, {
-            magicLinkToken: null,
-            magicLinkExpires: null,
-        });
+        // Atomic single-use: clear the token ONLY if the row still holds this
+        // exact hash (a single conditional UPDATE). If another request races on
+        // the same token, only the first one's UPDATE matches — the loser
+        // affects 0 rows and is rejected, so a magic link can never be redeemed
+        // twice. (Previously this was a find-then-update, which let two
+        // concurrent requests both pass and both redeem.) Mirrors the
+        // password-reset single-use flow.
+        const consumed = await this.userRepository.consumeMagicLinkToken(user.id, tokenHash);
+        if (!consumed) {
+            // Lost the race, or the token was already consumed — return the same
+            // generic error as an unknown token so redemption state never leaks.
+            throw new BadRequestException('Invalid magic link');
+        }
 
         return user;
     }
