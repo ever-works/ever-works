@@ -1,7 +1,32 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { createAgentViaAPI } from './helpers/agents-tasks';
+
+// Skill owner scopes (mission/work/agent) are ownership-checked: a skill's
+// ownerId must reference a REAL entity owned by the caller, else the API
+// 404s "Skill target not found". These helpers mint a real owned mission /
+// work so the mixed-scope filter/collision specs below have valid ownerIds
+// (a bare randomUUID — the old approach — no longer passes the guard).
+async function createOwnedMissionId(request: APIRequestContext, token: string): Promise<string> {
+    const res = await request.post(`${API_BASE}/api/me/missions`, {
+        headers: authedHeaders(token),
+        data: {
+            title: `Skill Scope Mission ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            description: 'scope fixture',
+            type: 'one-shot',
+        },
+    });
+    expect(res.status(), `createOwnedMissionId body=${await res.text().catch(() => '')}`).toBe(201);
+    return (await res.json()).id as string;
+}
+
+async function createOwnedWorkId(request: APIRequestContext, token: string): Promise<string> {
+    const { id } = await createWorkViaAPI(request, token, {
+        name: `Skill Scope Work ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    });
+    return id;
+}
 
 /**
  * Skills — BULK operations + at-scale list semantics.
@@ -220,9 +245,9 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         const u = await registerUserViaAPI(request);
         const stamp = Date.now();
         const tenantOwner = u.user.id;
-        const missionA = crypto.randomUUID();
-        const missionB = crypto.randomUUID();
-        const workOwner = crypto.randomUUID();
+        const missionA = await createOwnedMissionId(request, u.access_token);
+        const missionB = await createOwnedMissionId(request, u.access_token);
+        const workOwner = await createOwnedWorkId(request, u.access_token);
 
         const tenantIds: string[] = [];
         const missionAIds: string[] = [];
@@ -327,7 +352,7 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         const stamp = Date.now();
         const token = u.access_token;
         const tenantOwner = u.user.id;
-        const missionOwner = crypto.randomUUID();
+        const missionOwner = await createOwnedMissionId(request, token);
         const tag = `Zephyr${stamp}`;
 
         // 4 matching across tenant + mission scopes.
@@ -577,7 +602,7 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         const token = u.access_token;
         const stamp = Date.now();
         const tenantOwner = u.user.id;
-        const missionOwner = crypto.randomUUID();
+        const missionOwner = await createOwnedMissionId(request, token);
 
         // Titles that all normalize to the same slug at the SAME tenant scope.
         const collidingTitles = [
