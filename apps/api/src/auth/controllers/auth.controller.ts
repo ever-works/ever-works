@@ -101,8 +101,17 @@ export class AuthController {
     // Security: cap unauthenticated mass-registration / verification-email
     // flooding. Keyed on the configured `long` tier (see throttler.config.ts)
     // because a `default`-keyed override binds to no real throttler and is
-    // silently ignored, leaving only the loose 1000/min global cap.
-    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    // silently ignored, leaving only the loose 1000/min global cap. The limit
+    // is env-tunable (default 5/min, kept strict in prod) so the e2e suite —
+    // which drives every spec from a single source IP and must register many
+    // users — can raise it via REGISTER_THROTTLE_LIMIT, mirroring the existing
+    // LOGIN_THROTTLE_LIMIT pattern below.
+    @Throttle({
+        long: {
+            limit: Number(process.env.REGISTER_THROTTLE_LIMIT ?? 5),
+            ttl: Number(process.env.REGISTER_THROTTLE_TTL_MS ?? 60_000),
+        },
+    })
     @ApiOperation({
         summary: 'Register a new user',
         description: 'Create a new user account with email and password',
