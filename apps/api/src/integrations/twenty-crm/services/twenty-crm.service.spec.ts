@@ -27,12 +27,13 @@ const buildConfig = (
     };
     return {
         twentyCrmConfig: base,
-        // Mirror CrmConfigService.configForTenant: a tenant with its own entry
-        // uses its own workspace credentials; otherwise it falls back to base.
+        // Mirror CrmConfigService.configForTenant: internal/system callers (no
+        // tenantId) use base; a tenant-scoped call is served ONLY if that tenant
+        // has its own entry WITH an apiKey, else it fails closed (null).
         configForTenant: (tenantId?: string) => {
             if (!tenantId) return base;
             const override = tenantOverrides[tenantId];
-            return override ? { ...base, ...override } : base;
+            return override?.apiKey ? { ...base, ...override } : null;
         },
     };
 };
@@ -115,16 +116,28 @@ describe('TwentyCrmService.makeRequest', () => {
         );
     });
 
-    it('routes schema/metadata calls to `/rest/metadata<endpoint>` regardless of tenantId', async () => {
+    it('routes schema/metadata calls to `/rest/metadata<endpoint>` (internal/system, no tenantId)', async () => {
         httpService.request.mockReturnValue(of({ data: { schema: true } }));
 
-        await service.makeRequest('GET', '/objects', undefined, undefined, true, 'tenant-1');
+        await service.makeRequest('GET', '/objects', undefined, undefined, true);
 
         expect(httpService.request).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: 'https://crm.example.com/rest/metadata/objects',
             }),
         );
+    });
+
+    it('fails closed (404) and makes NO HTTP call when a tenant-scoped call has no configured credentials', async () => {
+        // No per-tenant entry for 'ghost-tenant' → configForTenant returns null →
+        // the request must be refused, never sent with the shared default creds.
+        jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await expect(
+            service.makeRequest('GET', '/companies', undefined, undefined, false, 'ghost-tenant'),
+        ).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+        expect(httpService.request).not.toHaveBeenCalled();
     });
 
     it('routes to `${apiUrl}/rest/metadata<endpoint>` when schema=true', async () => {

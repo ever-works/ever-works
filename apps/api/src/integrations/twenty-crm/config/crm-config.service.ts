@@ -59,24 +59,29 @@ export class CrmConfigService {
     /**
      * Resolve the Twenty workspace credentials for a specific tenant.
      *
-     * Falls back to the shared default config when no per-tenant entry exists
-     * (the single-tenant / dev case). In a true multi-tenant deployment,
-     * configure an entry per tenant AND leave the shared `TWENTY_CRM_API_KEY`
-     * unset, so a tenant with no entry resolves to an empty key and fails closed
-     * (401 from Twenty) instead of silently sharing the default workspace.
+     * FAIL-CLOSED: a tenant-scoped call (non-empty `tenantId`) is served ONLY if
+     * that tenant has its own entry — with an API key — in `TWENTY_CRM_TENANTS`.
+     * Otherwise this returns `null` and the caller MUST refuse the request. We
+     * deliberately do NOT fall back to the shared `TWENTY_CRM_API_KEY` for
+     * tenant-scoped calls: doing so would route every unconfigured tenant into
+     * the same default workspace, re-opening the cross-tenant IDOR this change
+     * closes (a partially-populated map or a still-set legacy default would be
+     * enough to leak). The API key — not the `apiUrl`/`workspaceId`, which may
+     * inherit the shared base — is what actually grants workspace access, so it
+     * must come from the per-tenant entry.
      *
      * Internal/system callers (sync, metadata) pass no `tenantId` and use the
-     * default config.
+     * default config (they are not per-caller and not tenant-scoped).
      */
-    configForTenant(tenantId?: string): ResolvedTwentyCrmConfig {
+    configForTenant(tenantId?: string): ResolvedTwentyCrmConfig | null {
         const base = this.twentyCrmConfig;
         if (!tenantId) return base;
         const override = this.tenantOverrides[tenantId];
-        if (!override) return base;
+        if (!override || !override.apiKey) return null;
         return {
             ...base,
             apiUrl: override.apiUrl ?? base.apiUrl,
-            apiKey: override.apiKey ?? base.apiKey,
+            apiKey: override.apiKey,
             workspaceId: override.workspaceId ?? base.workspaceId,
         };
     }

@@ -58,10 +58,11 @@ the credential, not by a URL path prefix (Twenty's REST API exposes objects at `
 and has no tenant path routing).
 
 Configure `TWENTY_CRM_TENANTS` as a JSON map of `tenantId -> { apiKey, workspaceId, apiUrl? }`,
-e.g. `{"<tenant-uuid>":{"apiKey":"...","workspaceId":"..."}}`. A tenant with no entry falls back
-to the shared default credentials, so in a true multi-tenant deployment configure an entry per
-tenant **and** leave the shared `TWENTY_CRM_API_KEY` unset (an unconfigured tenant then fails
-closed instead of sharing the default workspace).
+e.g. `{"<tenant-uuid>":{"apiKey":"...","workspaceId":"..."}}`. A tenant-scoped call **fails closed**
+(refused with 404) unless that tenant has an explicit entry **with an API key** — the resolver never
+falls back to the shared `TWENTY_CRM_API_KEY` for per-caller calls, so a partially-populated map or a
+still-set legacy default cannot leak one tenant's records to another. The shared base values are used
+only by internal/system sync paths (which are not per-caller).
 
 ## Base REST Client
 

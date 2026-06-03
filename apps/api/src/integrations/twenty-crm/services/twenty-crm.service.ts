@@ -46,8 +46,21 @@ export class TwentyCrmService {
         // companies/people controllers ALWAYS pass a non-empty tenant id.
         tenantId?: string,
     ): Promise<T> {
+        // Resolve credentials OUTSIDE the try: a fail-closed refusal must not be
+        // swallowed/re-wrapped by the catch block below.
+        const config = this.configService.configForTenant(tenantId);
+        if (!config) {
+            // Fail closed: no per-tenant Twenty credentials for this caller. Do
+            // NOT fall back to shared credentials (that would re-open the
+            // cross-tenant IDOR). Surface as 404 to match the controllers'
+            // no-leak missing-Tenant contract.
+            this.logger.warn(
+                `Refusing tenant-scoped Twenty CRM request: no credentials configured for tenant ${tenantId}`,
+            );
+            throw new HttpException('Twenty CRM records not found', HttpStatus.NOT_FOUND);
+        }
+
         try {
-            const config = this.configService.configForTenant(tenantId);
             const apiRoot = `${config.apiUrl}/rest`;
             const url = schema ? `${apiRoot}/metadata${endpoint}` : `${apiRoot}${endpoint}`;
 
