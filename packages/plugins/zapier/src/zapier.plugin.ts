@@ -55,6 +55,9 @@ import {
 	getDefaultValues as formDefaults
 } from './form-schema.js';
 import { README } from './readme.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
  * Zapier Automation Plugin
@@ -165,7 +168,9 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			const client = new ZapierClient({
 				accessToken: trimOrUndefined(settings.accessToken),
 				credentials: readCredentials(settings),
-				baseUrl: (settings.baseUrl as string) || undefined,
+				// Security (SSRF): same guard as resolveZapierSettings — baseUrl is
+				// tenant-controlled and reaches the Zapier SDK with credentials attached.
+				baseUrl: resolveSafeBaseUrl(trimOrUndefined(settings.baseUrl)),
 				logger: this.context?.logger ?? console
 			});
 
@@ -494,8 +499,20 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			);
 		}
 
+		// Security (SSRF): baseUrl is tenant-controlled plugin settings and flows into
+		// `createZapierSdk` (zapier-client.ts), which sends every Zapier SDK request —
+		// carrying the access token / client credentials — to that host. Reject literal
+		// private/loopback/link-local/cloud-metadata hosts (e.g. http://169.254.169.254
+		// IMDS) and non-HTTP(S) schemes so a malicious baseUrl can't redirect the request
+		// and leak credentials to an internal endpoint. Mirrors the make plugin guard.
+		const baseUrl = resolveSafeBaseUrl(trimOrUndefined(pluginSettings.baseUrl));
+
 		const timeoutMinutes = (config.action_timeout as number) || 10;
-		const resultShape = ((config.result_shape as string) || 'structured') as ZapierResultShape;
+		// Security: result_shape arrives as a raw user/config string and is cast to the
+		// ZapierResultShape union. Validate against the known set and fall back to the
+		// safe 'structured' default for anything unrecognized, so an out-of-range value
+		// can't silently steer parsing into the wrong branch.
+		const resultShape = normalizeResultShape(config.result_shape);
 
 		const fieldMapping: ZapierFieldMapping = {
 			nameField: (config.name_field as string) || 'name',
@@ -512,7 +529,7 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 			accessToken,
 			clientId,
 			clientSecret,
-			baseUrl: trimOrUndefined(pluginSettings.baseUrl),
+			baseUrl,
 			defaultAppKey: trimOrUndefined(pluginSettings.defaultAppKey),
 			defaultActionType: (pluginSettings.defaultActionType as ZapierActionType) || undefined,
 			defaultActionKey: trimOrUndefined(pluginSettings.defaultActionKey),
@@ -525,7 +542,12 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 
 	private resolveActionRef(config: Record<string, unknown>, settings: ZapierSettings): ZapierActionRef {
 		const appKey = (trimOrUndefined(config.app_key) || settings.defaultAppKey || '').trim();
-		const actionType = ((config.action_type as ZapierActionType) || settings.defaultActionType) as ZapierActionType;
+		// Security: action_type arrives as a raw user/config string cast to the
+		// ZapierActionType union. Restrict it to the known Zapier action types; an
+		// unrecognized value becomes undefined and is rejected by
+		// collectMissingActionFields (missing action_type) instead of being forwarded
+		// verbatim to the Zapier SDK.
+		const actionType = (normalizeActionType(config.action_type) ?? settings.defaultActionType) as ZapierActionType;
 		const actionKey = (trimOrUndefined(config.action_key) || settings.defaultActionKey || '').trim();
 		const authenticationId = normalizeAuthId(config.authentication_id) ?? settings.defaultAuthenticationId ?? '';
 
@@ -582,6 +604,16 @@ export class ZapierPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 		for (const item of itemsNeedingImages) {
 			if (signal.aborted) break;
 
+			// Security (SSRF): item.source_url originates from the Zapier action
+			// response (untrusted external content). Before asking the screenshot
+			// provider to fetch it, reject literal private/loopback/link-local/
+			// cloud-metadata hosts and non-HTTP(S) schemes so a hostile Zap can't
+			// drive a server-side request to an internal endpoint (e.g. 169.254.169.254 IMDS).
+			if (typeof item.source_url !== 'string' || !isSafeWebhookUrl(item.source_url)) {
+				logger.warn(`Skipping screenshot for ${item.name}: source URL is not safe to fetch.`);
+				continue;
+			}
+
 			try {
 				const result = await screenshotFacade.getSmartImage(
 					{ url: item.source_url, itemName: item.name },
@@ -629,6 +661,46 @@ function trimOrUndefined(value: unknown): string | undefined {
 	if (typeof value !== 'string') return undefined;
 	const trimmed = value.trim();
 	return trimmed === '' ? undefined : trimmed;
+}
+
+/**
+ * Security (SSRF): validates a tenant-supplied Zapier SDK base URL before it
+ * reaches `createZapierSdk`. An empty/undefined value is passed through so the
+ * SDK uses its built-in default. A provided value must clear the lexical SSRF
+ * guard (HTTP(S) scheme, not a private/loopback/link-local/cloud-metadata host);
+ * anything else throws so the request — and its attached credentials — can never
+ * be redirected to an internal endpoint.
+ */
+function resolveSafeBaseUrl(baseUrl: string | undefined): string | undefined {
+	if (!baseUrl) return undefined;
+	if (!isSafeWebhookUrl(baseUrl)) {
+		throw new Error('Zapier API base URL is not safe to call (SSRF guard blocked the destination host).');
+	}
+	return baseUrl;
+}
+
+const ZAPIER_RESULT_SHAPES: readonly ZapierResultShape[] = ['structured', 'native', 'side-effect'] as const;
+
+/**
+ * Security: coerces a raw config value into a known {@link ZapierResultShape},
+ * defaulting to the safe `'structured'` shape for anything unrecognized so an
+ * out-of-range value can't silently select the wrong parsing branch.
+ */
+function normalizeResultShape(value: unknown): ZapierResultShape {
+	return typeof value === 'string' && (ZAPIER_RESULT_SHAPES as readonly string[]).includes(value)
+		? (value as ZapierResultShape)
+		: 'structured';
+}
+
+/**
+ * Security: restricts a raw config value to a known {@link ZapierActionType}.
+ * Returns undefined for anything unrecognized so the caller surfaces a clean
+ * "missing action_type" error instead of forwarding the value to the SDK.
+ */
+function normalizeActionType(value: unknown): ZapierActionType | undefined {
+	return typeof value === 'string' && (ZAPIER_ACTION_TYPES as readonly string[]).includes(value)
+		? (value as ZapierActionType)
+		: undefined;
 }
 
 function normalizeAuthId(value: unknown): string | number | undefined {

@@ -133,6 +133,16 @@ export interface PluginUiHints {
 	};
 	/** Show an external setup link (e.g. "Get API Token") inside the settings form. */
 	setupLink?: {
+		/**
+		 * Absolute HTTPS URL for the external setup page (e.g. a provider's
+		 * API-token dashboard). Must begin with `https://`.
+		 *
+		 * Security: this value originates from a plugin manifest that may be
+		 * authored by an untrusted third party. Consumers MUST validate this
+		 * field with {@link isValidSetupLinkUrl} before embedding it in an
+		 * `<a href>` or any other navigation context. A raw `javascript:` or
+		 * `data:` URI here would execute arbitrary code in the settings UI.
+		 */
 		url: string;
 		label: string;
 		/** Button label. Defaults to the value of `label`. */
@@ -161,6 +171,24 @@ export interface PluginUiHints {
 	 * returned `details` (cluster info, detected IngressClass list, ...).
 	 * Set on plugins whose API path auto-validates after save (e.g. k8s). */
 	verifiesOnSave?: boolean;
+}
+
+// Security: validates that a `setupLink.url` value is a safe absolute URL
+// before it is rendered in an <a href> or passed to window.open(). Only
+// `https:` is permitted — `http:`, `javascript:`, `data:`, and relative paths
+// are all rejected.  Mirrors the runtime checks in PluginSettings.tsx and
+// PluginSettingsInline.tsx so plugin authors can call the same predicate when
+// constructing manifests and callers can call it at plugin-load time.
+export function isValidSetupLinkUrl(value: string | undefined | null): boolean {
+	if (!value) return false;
+	const trimmed = value.trim();
+	if (trimmed.length === 0) return false;
+	try {
+		const parsed = new URL(trimmed);
+		return parsed.protocol === 'https:';
+	} catch {
+		return false;
+	}
 }
 
 /**

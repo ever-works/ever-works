@@ -44,11 +44,56 @@ describe('CrmTenantService', () => {
         });
     });
 
+    describe('resolveCallerTenantContext (per-caller tenant isolation)', () => {
+        it('derives the context from the authenticated user’s real tenantId', () => {
+            const ctx = service.resolveCallerTenantContext('user-1', 'tenant-abc');
+            expect(ctx).toEqual({ tenantId: 'tenant-abc', userId: 'user-1' });
+        });
+
+        it('fails closed (returns null) when the caller has no Tenant (null)', () => {
+            expect(service.resolveCallerTenantContext('user-1', null)).toBeNull();
+        });
+
+        it('fails closed (returns null) when tenantId is undefined or empty', () => {
+            expect(service.resolveCallerTenantContext('user-1', undefined)).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', '')).toBeNull();
+        });
+
+        it('rejects a malformed tenant id carrying path-traversal metacharacters', () => {
+            // Attack: a crafted tenant id must never be able to break out of the
+            // `/tenants/{id}` path segment.
+            expect(service.resolveCallerTenantContext('user-1', '../admin')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a/b')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a%2Fb')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a\\b')).toBeNull();
+        });
+    });
+
     describe('getTenantEndpointPrefix', () => {
         it('returns `/tenants/<tenantId>`', () => {
             expect(service.getTenantEndpointPrefix({ tenantId: 'work_42' })).toBe(
                 '/tenants/work_42',
             );
+        });
+
+        it('produces a per-caller prefix from a real (UUID-shaped) tenant id', () => {
+            const ctx = service.resolveCallerTenantContext(
+                'user-1',
+                '11111111-2222-3333-4444-555555555555',
+            )!;
+            expect(service.getTenantEndpointPrefix(ctx)).toBe(
+                '/tenants/11111111-2222-3333-4444-555555555555',
+            );
+        });
+
+        it('two different callers get two different, non-overlapping prefixes', () => {
+            const a = service.resolveCallerTenantContext('user-a', 'tenant-a')!;
+            const b = service.resolveCallerTenantContext('user-b', 'tenant-b')!;
+            const prefixA = service.getTenantEndpointPrefix(a);
+            const prefixB = service.getTenantEndpointPrefix(b);
+            expect(prefixA).toBe('/tenants/tenant-a');
+            expect(prefixB).toBe('/tenants/tenant-b');
+            expect(prefixA).not.toBe(prefixB);
         });
     });
 

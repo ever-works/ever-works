@@ -13,6 +13,13 @@ import type {
 } from '@ever-works/plugin';
 
 import { LangfuseClient } from '@langfuse/client';
+// Security (SSRF): the `baseUrl` plugin setting is tenant-controlled and flows
+// into the Langfuse SDK, which then sends every request — carrying the secret
+// key — to that host. Validate it against the shared lexical SSRF guard before
+// use. Imported from the explicit subpath because the guard pulls in Node-only
+// `node:net`/`node:dns` and is intentionally not re-exported from the helpers
+// barrel. Mirrors the composio / activepieces / zapier / make plugin guards.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /** All prompt keys available for customization, grouped by plugin. */
 const PROMPT_KEY_DOCS = `
@@ -176,11 +183,29 @@ export class LangfusePlugin implements IPlugin, IPromptProviderPlugin {
 			if (message.includes('not found') || message.includes('404')) {
 				return { success: true, message: 'Langfuse connection verified.' };
 			}
+			// Security (info-leak): the raw SDK error can embed an upstream HTTP
+			// response body (e.g. an internal service reached via a self-hosted
+			// baseUrl). Strip control characters and cap the length so a hostile
+			// reflected body can't dump unbounded internal detail into the UI.
 			return {
 				success: false,
-				message: `Langfuse connection failed: ${message}`
+				message: `Langfuse connection failed: ${this.sanitizeErrorMessage(message)}`
 			};
 		}
+	}
+
+	/**
+	 * Security (info-leak): collapses an arbitrary error string into a single
+	 * bounded line for surfacing to the user. Removes control characters
+	 * (newlines, NUL, etc.) and truncates so a reflected upstream response body
+	 * can't leak large internal detail or break the UI layout.
+	 */
+	private sanitizeErrorMessage(message: string, maxLength = 300): string {
+		// Collapse any run of control characters (newlines, NUL, etc.) into a
+		// single space so the message stays on one line.
+		// eslint-disable-next-line no-control-regex
+		const cleaned = message.replace(/[\x00-\x1f\x7f]+/g, ' ').trim();
+		return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}…` : cleaned;
 	}
 
 	async getPrompt(key: string, options?: GetPromptOptions): Promise<PromptProviderResult | null> {
@@ -251,7 +276,17 @@ export class LangfusePlugin implements IPlugin, IPromptProviderPlugin {
 		};
 
 		if (settings.baseUrl) {
-			opts.baseUrl = settings.baseUrl as string;
+			const baseUrl = settings.baseUrl as string;
+			// Security (SSRF): reject literal private/loopback/link-local/cloud-metadata
+			// hosts (e.g. http://169.254.169.254 IMDS, http://localhost:6443 k8s API) and
+			// non-HTTP(S) schemes so a malicious self-hosted baseUrl can't redirect the
+			// authenticated Langfuse requests to an internal endpoint (and reflect the
+			// response through the validateConnection error path). An empty value falls
+			// through to the SDK default (https://cloud.langfuse.com).
+			if (!isSafeWebhookUrl(baseUrl)) {
+				throw new Error('Langfuse base URL is not safe to call (SSRF guard blocked the destination host).');
+			}
+			opts.baseUrl = baseUrl;
 		}
 
 		return new LangfuseClient(opts);

@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { User, Work } from '@ever-works/agent/entities';
 import { Repository } from 'typeorm';
 import { IsPlatformAdminGuard } from '@src/auth/guards/platform-admin.guard';
+import { Throttle } from '@nestjs/throttler';
 
 interface AdminUsageRow {
     userId: string;
@@ -50,6 +51,9 @@ export class AdminUsageController {
         @InjectRepository(Work) private readonly workRepository: Repository<Work>,
     ) {}
 
+    // Security: tight rate-limit on this PII-heavy endpoint; a compromised admin
+    // key cannot bulk-extract the full user email list faster than 10 req/min.
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
     @Get()
     @ApiOperation({
         summary: 'Cross-user and cross-Work spend for self-hosted admins',

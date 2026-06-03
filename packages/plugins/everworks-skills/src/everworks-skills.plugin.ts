@@ -151,7 +151,10 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 	}
 
 	private async loadAll(settings?: PluginSettings): Promise<SkillCatalogEntry[]> {
-		const ttl = Number(settings?.cacheTtlSeconds ?? 3600) * 1000;
+		// Security: clamp TTL to [0, 86400] at runtime to prevent Infinity/NaN bypass of schema-only constraint
+		const rawTtl = Number(settings?.cacheTtlSeconds ?? 3600);
+		const ttlSeconds = isNaN(rawTtl) ? 3600 : Math.max(0, Math.min(rawTtl, 86400));
+		const ttl = ttlSeconds * 1000;
 		const now = Date.now();
 		if (this.cache && now - this.cache.fetchedAt < ttl) {
 			return this.cache.entries;

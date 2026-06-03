@@ -52,8 +52,13 @@ export class SkillBindingRepository {
         return this.repository.findOne({ where: { id, userId } });
     }
 
-    async findBySkillId(skillId: string): Promise<SkillBinding[]> {
-        return this.repository.find({ where: { skillId } });
+    async findBySkillId(skillId: string, userId?: string): Promise<SkillBinding[]> {
+        // Security: optional `userId` lets callers scope the lookup to the
+        // owner at the repository level (defense-in-depth vs. IDOR). Legacy
+        // callers that omit it are unchanged; new callers should pass it so a
+        // missing service-layer ownership check cannot leak another tenant's
+        // bindings (targetType/targetId of their Agents/Works).
+        return this.repository.find({ where: userId ? { skillId, userId } : { skillId } });
     }
 
     async findByTarget(
@@ -72,12 +77,27 @@ export class SkillBindingRepository {
         await this.repository.delete(id);
     }
 
+    // Security: ownership-scoped delete. Prefer this over `deleteById` so the
+    // `userId` is enforced in the WHERE clause regardless of caller — a
+    // miscounted/omitted service-layer guard then cannot delete another user's
+    // binding (cross-user IDOR). Additive: `deleteById` is retained.
+    async deleteByIdAndUser(id: string, userId: string): Promise<void> {
+        await this.repository.delete({ id, userId });
+    }
+
     async deleteByTarget(
         targetType: SkillBindingTargetType,
         targetId: string,
         skillId: string,
+        userId?: string,
     ): Promise<void> {
-        await this.repository.delete({ targetType, targetId, skillId });
+        // Security: optional `userId` scopes the delete to the owner at the
+        // repository level (defense-in-depth vs. IDOR via attacker-supplied
+        // `targetId`). Legacy callers that omit it are unchanged; new callers
+        // should pass it so a binding can only be unlinked by its owner.
+        await this.repository.delete(
+            userId ? { targetType, targetId, skillId, userId } : { targetType, targetId, skillId },
+        );
     }
 
     /**

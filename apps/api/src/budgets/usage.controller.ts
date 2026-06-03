@@ -163,7 +163,13 @@ export class UsageController {
         const body = lines.join('\n') + '\n';
 
         const periodSlug = window.periodStart.toISOString().slice(0, 7); // YYYY-MM
-        const filename = `usage-${workId}-${periodSlug}.csv`;
+        // Security: strip `"`/CR/LF before interpolating into the quoted
+        // Content-Disposition header so a quote/newline can't terminate the
+        // quoted-string and inject additional header parameters or split the
+        // response. Mirrors kb.controller.ts. Legitimate workIds are
+        // server-generated UUIDs and the slug is YYYY-MM, so valid inputs are
+        // unchanged.
+        const filename = `usage-${workId}-${periodSlug}.csv`.replace(/["\r\n]/g, '_');
 
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

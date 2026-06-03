@@ -117,13 +117,28 @@ export class WorkDetailService {
         this.logger.log(`Extracting details for work: ${name}`);
 
         try {
-            // Generate AI-extracted details via facade
+            // Generate AI-extracted details via facade.
+            // Security (prompt-injection hardening): `name` and `prompt` are
+            // attacker-controlled free text (any authenticated user supplies
+            // them at Work creation). They are interpolated verbatim into the
+            // instruction section of WORK_DETAIL_PROMPT via `substituteVariables`,
+            // so an embedded "ignore previous instructions" / exfiltration
+            // directive would otherwise be read as a command. Sanitize the
+            // values fed to the LLM (collapse newlines onto the single
+            // "Work Name:" / "User Prompt:" line, strip chat-template control
+            // markers, cap length) before substitution. This mirrors
+            // `sanitizePromptVariable` in item-health.service.ts. Only the
+            // LLM-bound copy is sanitized — the persisted `name`, slug and
+            // fallback below still use the original input verbatim.
             const { result } = await this.aiFacade.askJson(
                 WORK_DETAIL_PROMPT,
                 workDetailSchema,
                 {
                     temperature: 0,
-                    variables: { name, prompt },
+                    variables: {
+                        name: this.sanitizePromptVariable(name, 500),
+                        prompt: this.sanitizePromptVariable(prompt, 4000),
+                    },
                     routing: { complexity: 'simple' },
                 },
                 { userId: user.id, providerOverride: aiProvider },
@@ -160,6 +175,25 @@ export class WorkDetailService {
                 categories: [],
             };
         }
+    }
+
+    /**
+     * Security (prompt-injection hardening): neutralize untrusted free-text
+     * (`name` / `prompt`) before it is interpolated into the single-line
+     * "Work Name:" / "User Prompt:" slots of {@link WORK_DETAIL_PROMPT}:
+     *   - collapse newlines/carriage returns to spaces so the value cannot
+     *     escape its line and forge a new instruction line, and
+     *   - strip chat-template control markers that some models read as
+     *     out-of-band role/turn delimiters.
+     * Length is capped as a defense-in-depth guard against oversized
+     * payloads. Mirrors `sanitizePromptVariable` in item-health.service.ts.
+     * The cap is generous so legitimate names/prompts are never truncated.
+     */
+    private sanitizePromptVariable(value: string, maxLength: number): string {
+        return value
+            .replace(/\r?\n|\r/g, ' ')
+            .replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '')
+            .slice(0, maxLength);
     }
 
     /**

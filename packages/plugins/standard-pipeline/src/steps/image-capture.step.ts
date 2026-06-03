@@ -1,4 +1,5 @@
 import type { StepExecutionContext, DomainType, FacadeOptions } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { sanitizeErrorForUser } from '../utils/error.utils.js';
@@ -47,9 +48,24 @@ export class ImageCaptureStep extends BasePipelineStep {
 			return context;
 		}
 
-		const itemsNeedingImages = finalItems.filter(
-			(item) => item.source_url && (!item.images || item.images.length === 0)
-		);
+		const itemsNeedingImages = finalItems.filter((item) => {
+			if (!item.source_url || (item.images && item.images.length > 0)) {
+				return false;
+			}
+			// Security (SSRF, H-11): `source_url` is AI-extracted from untrusted
+			// external pages, so an attacker can plant a private/loopback/link-local
+			// or cloud-metadata URL (e.g. http://169.254.169.254/...). Apply the same
+			// lexical guard the sibling content-retrieval/source-validation steps use
+			// BEFORE forwarding to `screenshotFacade.getSmartImage` — the actual fetch
+			// happens inside the configured screenshot plugin, which may not enforce
+			// its own SSRF check. Skip (don't forward) blocked URLs. This is lexical
+			// only; DNS-rebinding hardening must live in the facade that issues the fetch.
+			if (!isSafeWebhookUrl(item.source_url)) {
+				logger.warn(`[${work.slug}] Skipping unsafe/blocked source URL for image capture: ${item.source_url}`);
+				return false;
+			}
+			return true;
+		});
 
 		if (itemsNeedingImages.length === 0) {
 			logger.debug(`[${work.slug}] No items need images`);

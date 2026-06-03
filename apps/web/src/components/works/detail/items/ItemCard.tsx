@@ -17,6 +17,29 @@ interface ItemCardProps {
     onUpdate?: (item: Partial<ItemData>) => void;
 }
 
+/**
+ * Security: scheme allow-list for the (AI-generated / imported / externally
+ * scraped) `item.source_url` before it becomes an `<a href>` via next-intl's
+ * `<Link>`. `<Link>` does NOT sanitize href, so a stored `javascript:` /
+ * `data:` / `vbscript:` URL would execute on click; `rel="noopener
+ * noreferrer"` + `target="_blank"` do not block it. Restricting to http/https
+ * neutralizes those schemes. Returns `undefined` for anything unparseable or
+ * not http(s); callers omit the link in that case. Mirrors `safeExternalUrl`
+ * in ComparisonDetailClient.tsx / ChatToolResult.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 export const ItemCard = memo(function ItemCard({
     item,
     viewMode,
@@ -53,6 +76,9 @@ const ItemCardList = memo(function ItemCardList({
     const t = useTranslations('dashboard.workDetail.items');
     const isFeatured = item.featured === true;
     const categoryName = getCategoryName(item.category);
+    // Security: only render the source link for http(s) URLs; rejects
+    // javascript:/data: payloads stored in source_url.
+    const safeSourceUrl = safeExternalUrl(item.source_url);
 
     return (
         <div
@@ -101,7 +127,7 @@ const ItemCardList = memo(function ItemCardList({
             <div className="flex items-center gap-1 shrink-0">
                 {workWebsite && item.slug && (
                     <Link
-                        href={`${workWebsite}/details/${item.slug}`}
+                        href={`${workWebsite}/details/${encodeURIComponent(item.slug)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
@@ -110,9 +136,9 @@ const ItemCardList = memo(function ItemCardList({
                         <Eye className="w-3.5 h-3.5" />
                     </Link>
                 )}
-                {item.source_url && (
+                {safeSourceUrl && (
                     <Link
-                        href={item.source_url}
+                        href={safeSourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
@@ -141,6 +167,9 @@ const ItemCardGrid = memo(function ItemCardGrid({
     const t = useTranslations('dashboard.workDetail.items');
     const isFeatured = item.featured === true;
     const categoryName = getCategoryName(item.category);
+    // Security: only render the source link for http(s) URLs; rejects
+    // javascript:/data: payloads stored in source_url.
+    const safeSourceUrl = safeExternalUrl(item.source_url);
 
     return (
         <div
@@ -197,7 +226,7 @@ const ItemCardGrid = memo(function ItemCardGrid({
                 <div className="flex items-center gap-2 shrink-0">
                     {workWebsite && item.slug && (
                         <Link
-                            href={`${workWebsite}/items/${item.slug}`}
+                            href={`${workWebsite}/items/${encodeURIComponent(item.slug)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 rounded-lg text-text-muted dark:text-text-muted-dark hover:text-primary hover:bg-primary/10 transition-colors"
@@ -206,9 +235,9 @@ const ItemCardGrid = memo(function ItemCardGrid({
                             <Eye className="w-3.5 h-3.5" />
                         </Link>
                     )}
-                    {item.source_url && (
+                    {safeSourceUrl && (
                         <Link
-                            href={item.source_url}
+                            href={safeSourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"

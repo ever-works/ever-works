@@ -1,4 +1,5 @@
 import type { FacadeOptions, ItemData } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 import type { ManagedAgentScreenshotFacade } from '../types.js';
 import { delayWithSignal } from './pipeline-helpers.js';
@@ -22,6 +23,21 @@ export async function captureScreenshots(
 		}
 
 		if (!item.source_url || (Array.isArray(item.images) && item.images.length > 0)) {
+			continue;
+		}
+
+		// Security (SSRF): `source_url` originates from untrusted, LLM-generated
+		// structured output (result-parser passes it through verbatim) and can be
+		// steered via direct or indirect prompt injection to point at internal /
+		// cloud-metadata targets (e.g. `http://169.254.169.254/...`, `file://`,
+		// a loopback admin port). It is fetched server-side by the screenshot
+		// provider, so gate it on the shared lexical SSRF guard (rejects non
+		// HTTP(S) schemes and literal private/loopback/link-local/metadata IPs)
+		// before handing it to the facade. Unsafe URLs are skipped; legitimate
+		// https item URLs are unaffected. Mirrors the sim-ai result-parser guard
+		// for the same `source_url` -> getSmartImage path.
+		if (!isSafeWebhookUrl(item.source_url)) {
+			logger.warn(`Skipping screenshot for ${item.name}: source_url failed SSRF safety check`);
 			continue;
 		}
 

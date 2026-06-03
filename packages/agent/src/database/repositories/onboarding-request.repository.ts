@@ -19,6 +19,11 @@ export class OnboardingRequestRepository {
         });
     }
 
+    // Security: this method performs a cross-tenant read — it returns the first row
+    // matching repoUrlCanonical regardless of which identity owns it. Callers MUST
+    // NOT expose the existence (or non-existence) of a matching row to the requesting
+    // user when the row belongs to a different identity; doing so creates a repo-URL
+    // enumeration oracle. Return a generic conflict indicator to the caller instead.
     async findByRepo(repoUrlCanonical: string): Promise<OnboardingRequest | null> {
         return this.repository.findOne({ where: { repoUrlCanonical } });
     }

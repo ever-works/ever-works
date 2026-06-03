@@ -79,17 +79,40 @@ export class TelemetryController {
             throw new BadRequestException(`unknown telemetry event: ${dto.event}`);
         }
 
+        // Security: this endpoint is @Public(), so the whole DTO — including
+        // the free-form `extra` bag — is fully attacker-controlled. Two
+        // hardenings are applied while building the payload:
+        //   1. Strip the identity keys (`userId`, `workId`) OUT of `extra`
+        //      before spreading it. These have dedicated, length-validated
+        //      (@MaxLength(64)) DTO fields and must ONLY come from there; a
+        //      free-form bag must never be able to inject/override the
+        //      analytics distinctId (`userId` becomes the PostHog distinctId
+        //      downstream) or the work attribution. Every other per-event
+        //      passthrough field is still forwarded verbatim.
+        //   2. Spread the (sanitized) `extra` FIRST and apply the validated
+        //      envelope + identity fields LAST, so a malicious `extra` can no
+        //      longer override the already-validated `event` (allow-list),
+        //      `funnelStep` (1..8), `timestamp` (ISO-8601) or `correlationId`
+        //      (regex) — which the previous extra-last ordering allowed.
+        const {
+            userId: _ignoredExtraUserId,
+            workId: _ignoredExtraWorkId,
+            ...safeExtra
+        } = (dto.extra ?? {}) as Record<string, unknown>;
+        void _ignoredExtraUserId;
+        void _ignoredExtraWorkId;
+
         // Merge envelope + optional per-event passthrough fields. The funnel
         // sink takes the discriminated union type; we cast through the
         // generic payload type since the runtime shape is validated above.
         const payload: ZeroFrictionFunnelPayload = {
+            ...safeExtra,
             event: dto.event,
             funnelStep: dto.funnelStep,
             timestamp: dto.timestamp,
             correlationId: dto.correlationId,
             ...(dto.workId ? { workId: dto.workId } : {}),
             ...(dto.userId ? { userId: dto.userId } : {}),
-            ...(dto.extra ?? {}),
         } as ZeroFrictionFunnelPayload;
 
         this.funnel.emit(payload);

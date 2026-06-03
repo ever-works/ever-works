@@ -106,9 +106,15 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
             }
             if (!run) {
+                // Security: stamp the run with the dispatch-asserted `payload.userId`
+                // (the user who actually triggered the chat reply), not the looked-up
+                // `agent.userId` (the agent's DB owner). For legitimate mentions these
+                // are equal, but using payload.userId keeps this fallback row consistent
+                // with the dispatcher's pre-created row and avoids attributing the run to
+                // a different owner should the lookup ever resolve a foreign agent.
                 run = await runs.createQueued({
                     agentId: agent.id,
-                    userId: agent.userId,
+                    userId: payload.userId,
                     triggerKind: 'chat',
                     taskId: payload.taskId,
                     chatMessageId: payload.triggeringMessageId,

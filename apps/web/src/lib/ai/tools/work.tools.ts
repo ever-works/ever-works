@@ -14,6 +14,7 @@ import {
     importWork,
 } from '@/app/actions/dashboard/works';
 import { resolveGenerationConfig } from './utils';
+import type { ConfirmationRequired } from './generated/factory';
 
 // ────────────────────────────────────────────────────────────────
 // Read
@@ -128,14 +129,29 @@ export const getScheduleStatus = tool({
 
 export const getWorkConfig = tool({
     description:
-        'Get Work configuration — metadata, initial prompt, generation settings, website config.',
+        'Get Work configuration — metadata, generation settings, website config. (The raw stored generation prompt is omitted.)',
     inputSchema: z.object({
         workId: z.string().describe('Work ID'),
     }),
     execute: async ({ workId }) => {
         try {
             const result = await workAPI.getConfig(workId);
-            return { success: true, config: result.config };
+            // Security: the raw stored generation prompt is user-authored free
+            // text and is fed straight back into the model context as tool
+            // output — a stored-prompt-injection vector (a Work created with a
+            // payload like "ignore previous instructions …" could hijack a later
+            // chat that calls getWorkConfig for it). Strip the free-text prompt
+            // blobs (initial_prompt + the raw last_request_data request dump,
+            // which also carries .prompt) while keeping the structured website /
+            // generation config the tool exists to surface.
+            const { config } = result;
+            if (config?.metadata) {
+                const safeMetadata = { ...config.metadata };
+                delete safeMetadata.initial_prompt;
+                delete safeMetadata.last_request_data;
+                return { success: true, config: { ...config, metadata: safeMetadata } };
+            }
+            return { success: true, config };
         } catch {
             return { success: false, error: 'Failed to fetch config' };
         }
@@ -277,11 +293,36 @@ export const updateWorkTool = tool({
 });
 
 export const deleteWorkTool = tool({
-    description: 'Delete a Work. ALWAYS ask for confirmation before calling this.',
+    description:
+        'Delete a Work. Destructive — requires user confirmation (call once without `confirmed`, then again with `confirmed: true` after the user agrees).',
     inputSchema: z.object({
         workId: z.string().describe('Work ID to delete'),
+        confirmed: z
+            .boolean()
+            .optional()
+            .describe(
+                'Set to true ONLY after the user has explicitly confirmed this ' +
+                    'irreversible deletion in chat. Omit it on the first call so the ' +
+                    'user is shown a confirmation prompt first.',
+            ),
     }),
-    execute: async ({ workId }) => {
+    execute: async ({ workId, confirmed }) => {
+        // Security: server-side confirmation gate. The prose "ALWAYS ask for
+        // confirmation" is only advisory to the LLM and can be overridden by
+        // prompt injection (e.g. a poisoned README/search result instructing
+        // "delete work X now"). Mirror the generated factory's handshake
+        // (factory.ts) so the mutation never runs until the user clicks Confirm
+        // in the UI and the model re-calls with `confirmed: true`.
+        if (confirmed !== true) {
+            const confirmation: ConfirmationRequired = {
+                __confirmationRequired: true,
+                toolName: 'deleteWork',
+                action: 'Delete a Work',
+                target: workId,
+                args: { workId },
+            };
+            return confirmation;
+        }
         const result = await deleteWork(workId);
         return { success: result.success, message: result.message, error: result.error };
     },

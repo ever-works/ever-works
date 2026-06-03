@@ -172,9 +172,16 @@ export class PluginBootstrapService {
     }
 
     /**
-     * Reset the initialization state (for testing purposes only)
+     * Reset the initialization state (for testing purposes only).
+     * This method is intentionally a no-op in production to prevent accidental
+     * state resets from reaching live plugin registries.
      */
+    // Security: guard resetForTesting() so it cannot take effect in production,
+    // preventing accidental or malicious calls from resetting plugin state on live workers.
     static resetForTesting(): void {
+        if (process.env.NODE_ENV === 'production') {
+            return;
+        }
         PluginBootstrapService.initialized = false;
     }
 }

@@ -4,6 +4,7 @@ import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as pluginPackage from '@ever-works/plugin';
 import {
+	cleanupWorkspace,
 	createWorkspace as createPluginWorkspace,
 	getWorkspacePath,
 	readGeneratedItems,
@@ -110,6 +111,44 @@ describe('workspace manager', () => {
 		expect(result.errors).toContain('Item 0 is missing required fields: source_url, category');
 		expect(result.errors).toContain('Item 0 has invalid tags: expected an array of strings');
 		expect(result.resultFilePath).toContain(path.join('_meta', 'hermes-result.json'));
+	});
+
+	it('removes a normal run directory recursively', async () => {
+		const workspace = await createPluginWorkspace('user-clean', 'dir-clean');
+		tmpDirs.push(path.resolve(BASE_TEMP_DIR));
+		await fs.writeFile(path.join(workspace, 'file.txt'), 'data', 'utf-8');
+
+		await cleanupWorkspace(workspace);
+
+		await expect(fs.access(workspace)).rejects.toBeTruthy();
+	});
+
+	it('does not follow a symlinked run directory into a sibling workspace (no data loss)', async () => {
+		const victim = await createPluginWorkspace('victim-user', 'victim-dir');
+		const attackerRoot = getWorkspacePath('attacker-user', 'attacker-dir');
+		await fs.mkdir(attackerRoot, { recursive: true });
+		tmpDirs.push(path.resolve(BASE_TEMP_DIR));
+
+		await fs.writeFile(path.join(victim, 'precious.txt'), 'keep me', 'utf-8');
+
+		// Attacker replaces its run dir with a symlink pointing at the victim
+		// workspace (both under BASE_TEMP_DIR, so a lexical prefix check passes).
+		const attackerLink = path.join(attackerRoot, 'run-deadbeef-link');
+		try {
+			await fs.symlink(victim, attackerLink, 'dir');
+		} catch {
+			// Platforms without unprivileged symlink support (e.g. Windows CI
+			// without developer mode) — nothing to exercise here.
+			return;
+		}
+
+		await cleanupWorkspace(attackerLink);
+
+		// The symlink itself is removed, but its target (the victim workspace and
+		// its file) MUST survive — realpath-following would have deleted it.
+		await expect(fs.access(attackerLink)).rejects.toBeTruthy();
+		const content = await fs.readFile(path.join(victim, 'precious.txt'), 'utf-8');
+		expect(content).toBe('keep me');
 	});
 
 	it('returns a friendly error when malformed JSON cannot be repaired', async () => {

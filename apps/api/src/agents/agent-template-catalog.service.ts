@@ -50,6 +50,24 @@ const AGENTS_REPO_NAME = 'agents';
 const MANIFEST_PATH = 'manifest.json';
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+// Security: allowlist pattern for safe slug values from the external manifest.
+const SAFE_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+// Security: max lengths to cap unbounded string fields from the external manifest.
+const MAX_TITLE_LEN = 120;
+const MAX_DESC_LEN = 500;
+const MAX_TAG_LEN = 60;
+
+/**
+ * Security: strip HTML tags from a manifest string field so that a
+ * compromised ever-works/agents repo cannot inject XSS payloads into
+ * values that the web frontend may render.  Uses a simple regex that is
+ * sufficient for the narrow set of plain-text fields we consume; a
+ * full DOM-based sanitizer is not available in the API runtime.
+ */
+function stripHtml(value: string): string {
+    return value.replace(/<[^>]*>/g, '');
+}
+
 /** `kanban-square` → `KanbanSquare` so the client icon map (PascalCase
  *  lucide names) can resolve repo `avatarIcon` ids. */
 function kebabToPascal(value: string): string {
@@ -67,16 +85,29 @@ function asStringArray(value: unknown): string[] | undefined {
 }
 
 function mapTemplate(row: RawManifestTemplate): AstTemplateEntry | null {
+    // Security: reject slugs that don't match the strict allowlist so that
+    // a compromised manifest cannot inject arbitrary strings as template ids.
     if (typeof row?.slug !== 'string' || row.slug.length === 0) return null;
-    const tags = asStringArray(row.tags);
-    const title =
+    if (!SAFE_SLUG_RE.test(row.slug)) return null;
+
+    // Security: strip HTML tags and cap lengths on every string field sourced
+    // from the external manifest to prevent XSS payloads reaching the frontend.
+    const rawTags = asStringArray(row.tags)?.map((t) => stripHtml(t).slice(0, MAX_TAG_LEN));
+    const tags = rawTags && rawTags.length > 0 ? rawTags : undefined;
+
+    const rawTitle =
         (typeof row.title === 'string' && row.title) ||
         (typeof row.name === 'string' && row.name) ||
         row.slug;
+    const title = stripHtml(rawTitle).slice(0, MAX_TITLE_LEN);
+
+    const rawDescription = typeof row.summary === 'string' ? row.summary : '';
+    const description = stripHtml(rawDescription).slice(0, MAX_DESC_LEN);
+
     return {
         slug: row.slug,
         title,
-        description: typeof row.summary === 'string' ? row.summary : '',
+        description,
         // First tag makes a friendlier chip label than the raw scope enum.
         category: tags?.[0] ? tags[0].charAt(0).toUpperCase() + tags[0].slice(1) : undefined,
         iconName: typeof row.avatarIcon === 'string' ? kebabToPascal(row.avatarIcon) : undefined,
@@ -103,6 +134,17 @@ export class AgentTemplateCatalogService {
         if (entity !== 'agent') return [];
 
         const ref = process.env.EVER_WORKS_AGENTS_REF || 'main';
+        // Security: warn operators when a mutable branch ref (not a pinned commit SHA
+        // or semver tag) is used, so they know to set EVER_WORKS_AGENTS_REF to a
+        // commit SHA (40 hex chars) or a version tag (vX.Y.Z) in production.
+        const isPinnedRef = /^[0-9a-f]{40}$/.test(ref) || /^v\d+\.\d+(\.\d+)?$/.test(ref);
+        if (!isPinnedRef) {
+            this.logger.warn(
+                `EVER_WORKS_AGENTS_REF is set to a mutable ref '${ref}'. ` +
+                    'Pin to a commit SHA (40 hex chars) or a version tag (vX.Y.Z) in production ' +
+                    'to prevent supply-chain substitution after cache expiry.',
+            );
+        }
         const cacheKey = `agent-templates:${entity}:${ref}`;
 
         const cached = await this.cache.get<AstTemplateEntry[]>(cacheKey).catch(() => undefined);

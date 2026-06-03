@@ -1,5 +1,5 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { UserRepository } from '@ever-works/agent/database';
+import { CanActivate, ExecutionContext, Injectable, Logger, Optional } from '@nestjs/common';
+import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import { ScopeContextService } from './scope-context.service';
 
 /**
@@ -58,6 +58,9 @@ export class SessionScopeGuard implements CanActivate {
     constructor(
         private readonly scopeContext: ScopeContextService,
         private readonly userRepository: UserRepository,
+        // Security: @Optional keeps tests that construct the guard directly (without DI)
+        // working; in production the DI container always provides this via DatabaseModule.
+        @Optional() private readonly organizationRepository?: OrganizationRepository,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -100,9 +103,27 @@ export class SessionScopeGuard implements CanActivate {
         // hydrated tenant.
         const scope = this.scopeContext.getScope();
         if (scope.tenantId === null && tenantId !== null) {
+            // Security: validate that lastScopeOrganizationId still belongs to
+            // this user's tenant before seeding it as the active scope.
+            // If the org is missing or owned by a different tenant (e.g. stale
+            // pointer after a data migration or future membership-removal feature),
+            // fall back to bare-tenant scope (organizationId: null) rather than
+            // stamping rows under a foreign org's scope.
+            let resolvedOrganizationId: string | null = dbUser?.lastScopeOrganizationId ?? null;
+            if (resolvedOrganizationId !== null && this.organizationRepository) {
+                const org = await this.organizationRepository.findById(resolvedOrganizationId);
+                if (!org || org.tenantId !== tenantId) {
+                    this.logger.warn(
+                        `Stale lastScopeOrganizationId ${resolvedOrganizationId} for user ${user.userId} ` +
+                            `(expected tenantId=${tenantId}, got tenantId=${org?.tenantId ?? 'null'}). ` +
+                            `Falling back to bare-tenant scope.`,
+                    );
+                    resolvedOrganizationId = null;
+                }
+            }
             this.scopeContext.setScope({
                 tenantId,
-                organizationId: dbUser?.lastScopeOrganizationId ?? null,
+                organizationId: resolvedOrganizationId,
             });
             this.logger.debug(`Seeded session scope for user ${user.userId}: tenantId=${tenantId}`);
         }

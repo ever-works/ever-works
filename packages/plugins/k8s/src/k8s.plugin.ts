@@ -383,7 +383,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		const replicas = clampReplicas(settings.replicas);
 		const registry = settings.registry ?? { kind: 'github' as const };
 		const opts = (config.options ?? {}) as DeployOptions;
-		const gitSha = (opts.gitSha ?? Date.now().toString(36)).slice(0, 12);
+		// Security: the caller-supplied gitSha is interpolated into the Docker
+		// image tag below. Strip any character outside the Docker tag charset so
+		// a crafted value (e.g. `latest@sha256:...`) cannot pin an unintended
+		// image or produce an invalid reference. Legitimate hex SHAs are
+		// unaffected. Fall back to a timestamp tag if nothing valid remains.
+		const gitSha = sanitiseDockerTag((opts.gitSha ?? '').slice(0, 12)) || Date.now().toString(36).slice(0, 12);
 		const slug = sanitiseSlug(config.projectName);
 		const createdAt = new Date().toISOString();
 
@@ -567,6 +572,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async addDomain(projectId: string, domain: string, kubeconfig: string): Promise<AddDomainResult> {
 		const settings = await this.loadSettings();
+		// Security: the domain is written verbatim as the Ingress `host:` rule.
+		// Reject anything that is not a strict RFC-1123 hostname so a value like
+		// `*` (catch-all rule that hijacks unmatched cluster traffic) or an empty
+		// / illegal-character host cannot be injected into the Ingress.
+		const host = normaliseIngressHost(domain);
+		if (!host) {
+			throw new K8sPluginError('UNKNOWN', 'Invalid domain: provide a valid hostname.');
+		}
 		const { namespace, name } = parseDeploymentId(projectId);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
@@ -578,7 +591,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		const patched = appendHostToIngress(
 			existing as { spec?: { rules?: unknown[]; tls?: unknown[]; ingressClassName?: string } },
 			{
-				host: domain,
+				// Security: write the validated/normalised host, never the raw input.
+				host,
 				serviceName: name,
 				strategy,
 				tlsIssuer: settings.tlsIssuer
@@ -702,7 +716,16 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		if (isClusterSource(raw.clusterSource)) out.clusterSource = raw.clusterSource;
 		if (typeof raw.kubeconfig === 'string') out.kubeconfig = raw.kubeconfig;
 		if (typeof raw.kubeContext === 'string') out.kubeContext = raw.kubeContext;
-		if (typeof raw.namespace === 'string') out.namespace = raw.namespace;
+		// Security: only accept a namespace that is a valid RFC-1123 DNS label.
+		// A free-form value could contain path traversal (`../kube-system`) or
+		// characters that alter the API request path. Invalid values are dropped
+		// so use sites fall back to DEFAULT_NAMESPACE. NOTE: this does NOT stop a
+		// tenant from setting a *valid* foreign namespace (e.g. `kube-system`) on
+		// a shared cluster — that requires a per-tenant namespace allowlist at the
+		// deploy/authorization layer (see deferred IDOR findings).
+		if (typeof raw.namespace === 'string' && isValidK8sNamespace(raw.namespace.trim())) {
+			out.namespace = raw.namespace;
+		}
 		if (typeof raw.ingressClass === 'string') out.ingressClass = raw.ingressClass;
 		if (typeof raw.ingressHost === 'string') out.ingressHost = raw.ingressHost;
 		if (typeof raw.tlsIssuer === 'string') out.tlsIssuer = raw.tlsIssuer;
@@ -810,6 +833,39 @@ function sanitiseSlug(input: string): string {
 		.replace(/^-+|-+$/g, '')
 		.replace(/-+/g, '-')
 		.slice(0, 63);
+}
+
+// Security: RFC-1123 DNS label (Kubernetes namespace rule). Lowercase
+// alphanumerics and hyphens, must start/end alphanumeric, 1–63 chars. Used to
+// reject namespace settings that could traverse paths or carry illegal chars.
+function isValidK8sNamespace(input: string): boolean {
+	return /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(input);
+}
+
+// Security: reduce a value to the Docker image-tag charset (`[A-Za-z0-9_.-]`)
+// and drop any leading separator so the result is a valid tag that cannot pin
+// an unintended digest (`@sha256:...`) or break the image reference. Returns an
+// empty string if nothing valid remains so the caller can fall back.
+function sanitiseDockerTag(input: string): string {
+	return input
+		.replace(/[^A-Za-z0-9_.-]+/g, '')
+		.replace(/^[._-]+/, '')
+		.slice(0, 128);
+}
+
+// Security: validate + normalise a hostname for use as an Ingress `host:` rule.
+// Accepts only a strict RFC-1123 hostname (one or more dot-separated DNS
+// labels). Rejects empty strings, bare/leading wildcards (`*`, `*.example.com`)
+// and any character outside the label set, preventing catch-all Ingress rules
+// that would hijack unmatched cluster traffic. Returns the lowercased host or
+// `null` when invalid.
+function normaliseIngressHost(input: string): string | null {
+	const host = (input ?? '').trim().toLowerCase();
+	if (!host || host.length > 253) return null;
+	const label = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+	const labels = host.split('.');
+	if (!labels.every((part) => label.test(part))) return null;
+	return host;
 }
 
 function clampReplicas(input: number | undefined): number {

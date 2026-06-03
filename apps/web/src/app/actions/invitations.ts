@@ -15,9 +15,11 @@ export async function listInvitations(workId: string): Promise<ActionResult<Work
         const res = await invitationsAPI.list(workId);
         return { ok: true, data: res.invitations };
     } catch (err) {
+        // Security: log full error server-side only; return generic message to avoid info-leak
+        console.error('[invitations] listInvitations error:', err);
         return {
             ok: false,
-            error: err instanceof Error ? err.message : 'list_failed',
+            error: 'Failed to load invitations. Please try again.',
         };
     }
 }
@@ -31,9 +33,11 @@ export async function createInvitation(
         revalidatePath(`/works/${workId}/settings/members`);
         return { ok: true, data: res as unknown as CreateInvitationResponse };
     } catch (err) {
+        // Security: log full error server-side only; return generic message to avoid info-leak
+        console.error('[invitations] createInvitation error:', err);
         return {
             ok: false,
-            error: err instanceof Error ? err.message : 'create_failed',
+            error: 'Failed to send invitation. Please try again.',
         };
     }
 }
@@ -47,9 +51,11 @@ export async function revokeInvitation(
         revalidatePath(`/works/${workId}/settings/members`);
         return { ok: true, data: true };
     } catch (err) {
+        // Security: log full error server-side only; return generic message to avoid info-leak
+        console.error('[invitations] revokeInvitation error:', err);
         return {
             ok: false,
-            error: err instanceof Error ? err.message : 'revoke_failed',
+            error: 'Failed to revoke invitation. Please try again.',
         };
     }
 }

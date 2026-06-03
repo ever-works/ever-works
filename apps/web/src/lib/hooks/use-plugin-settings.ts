@@ -252,14 +252,10 @@ export function usePluginSettings({
             router.refresh();
             successTimerRef.current = setTimeout(() => setSaveSuccess(false), 3000);
         } catch (error) {
+            // Security: log full error server-side only; never expose raw exception messages
+            // (which may contain internal hostnames, DB URLs, stack traces) to the client.
             console.error('Failed to save settings:', error);
-            const errorMessage =
-                error instanceof Error
-                    ? error.message
-                    : typeof error === 'object' && error !== null && 'message' in error
-                      ? String((error as { message: unknown }).message)
-                      : t('saveError');
-            setValidationError(errorMessage);
+            setValidationError(t('saveError'));
         } finally {
             setIsSaving(false);
         }

@@ -52,11 +52,24 @@ const STATIC_SECURITY_HEADERS: Record<string, string> = {
     'Strict-Transport-Security': 'max-age=15552000; includeSubDomains',
 };
 
+// Security: a CSP source-expression is a scheme/host/port (optionally with a
+// leading `*.` subdomain wildcard and a path), e.g. `https://api.tenant.io`.
+// `NEXT_PUBLIC_EXTRA_CONNECT_SRC` is operator-supplied but is NOT a secret and
+// gets interpolated raw into the `connect-src` directive, so a malformed/abusive
+// entry containing CSP delimiters (whitespace, `;`, quotes) could smuggle extra
+// directives or `'unsafe-inline'`/`*` into the policy. Accept only well-formed
+// host sources and drop anything else; legitimate hostnames pass unchanged.
+const SAFE_CSP_HOST_SOURCE =
+    /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
+
 function buildCsp(): string {
     const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
         .split(',')
         .map((s) => s.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        // Security: reject directive-injection payloads (whitespace/quotes/`;`/
+        // bare `*`) — keep only valid scheme+host[:port] connect-src sources.
+        .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
     let apiHost: string;
     try {

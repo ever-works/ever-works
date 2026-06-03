@@ -215,6 +215,15 @@ export class Mission {
     // migration 1779991006000-AddTenantIdAndOrganizationIdToTierA.
     // No @ManyToOne to avoid the entities import cycle that bit Phase 2 —
     // see user.entity.ts EW-654 comment.
+    //
+    // Security: These columns are intentionally nullable during Phase 6 backfill.
+    // Scoping by userId alone is correct and complete until Phase 6 backfill finishes.
+    // Once backfill is done, ALL queries on Mission MUST also filter by tenantId
+    // (and organizationId where applicable) to maintain multi-tenant isolation.
+    // Do NOT use these columns in queries without also handling the NULL case —
+    // rows that have not yet been backfilled will have NULL here and a naive
+    // `WHERE tenantId = $1` would silently drop pre-backfill rows.
+    // See MissionsService for the authoritative query patterns.
     @Column({ type: 'uuid', nullable: true })
     tenantId?: string | null;
 

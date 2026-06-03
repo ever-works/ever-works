@@ -16,6 +16,10 @@ import type {
 	ConfigurationMode
 } from '@ever-works/plugin';
 import type { AiOperationsConfig } from '@ever-works/plugin/ai';
+// Security (SSRF): isSafeWebhookUrl rejects private/loopback/link-local/cloud-metadata
+// hosts and non-HTTP(S) schemes. Direct import — ssrf-guard pulls in node:net/dns and
+// is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
  * OpenRouter AI provider plugin
@@ -90,6 +94,10 @@ export class OpenRouterPlugin extends BaseAiProvider {
 				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://openrouter.ai/api/v1',
 				'x-envVar': 'PLUGIN_OPENROUTER_BASE_URL',
+				// Security (SSRF): restrict baseUrl override to admin/global scope so a
+				// regular tenant can't repoint authenticated provider calls at an internal
+				// host. Mirrors the model-tier fields above which are all x-scope:'global'.
+				'x-scope': 'global',
 				'x-hidden': true
 			},
 			temperature: {
@@ -281,6 +289,15 @@ export class OpenRouterPlugin extends BaseAiProvider {
 		}
 
 		if (s.baseUrl && typeof s.baseUrl === 'string') {
+			// Security (SSRF): reject a baseUrl that targets a private/loopback/
+			// link-local/cloud-metadata host (e.g. http://169.254.169.254 IMDS) or a
+			// non-HTTP(S) scheme before it flows into AiOperations and carries the
+			// provider Bearer key to an attacker-chosen internal endpoint. Fail closed
+			// at the plugin boundary (defense-in-depth alongside AiOperations' own
+			// guard). An empty/unset value falls through to the OpenRouter default.
+			if (!isSafeWebhookUrl(s.baseUrl)) {
+				throw new Error('OpenRouter base URL is not safe to call (SSRF guard blocked the destination host).');
+			}
 			config.baseURL = s.baseUrl;
 		}
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { Agent, AgentScope, AgentStatus } from '../../entities/agent.entity';
+import { sanitizeLikePattern } from '../utils';
 
 /**
  * Filter shape for `findByUserIdScoped`. All fields optional — caller
@@ -96,9 +97,20 @@ export class AgentRepository {
             qb.andWhere('agent.workId = :workId', { workId: filter.workId });
         }
         if (filter.search) {
-            qb.andWhere('(agent.name LIKE :q OR agent.slug LIKE :q OR agent.title LIKE :q)', {
-                q: `%${filter.search}%`,
-            });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // search term and pair each predicate with an explicit ESCAPE
+            // clause. The value is already bound, so this is not SQLi, but
+            // unescaped wildcards otherwise let a caller bypass the filter
+            // (e.g. `%`) or force an index-defeating leading-wildcard scan
+            // (DoS amplification). Mirrors work.repository.ts /
+            // activity-log.repository.ts. Escape-only (no LOWER()) preserves
+            // the existing case-sensitive matching for legitimate input.
+            qb.andWhere(
+                "(agent.name LIKE :q ESCAPE '\\' OR agent.slug LIKE :q ESCAPE '\\' OR agent.title LIKE :q ESCAPE '\\')",
+                {
+                    q: `%${sanitizeLikePattern(filter.search)}%`,
+                },
+            );
         }
 
         const total = await qb.getCount();

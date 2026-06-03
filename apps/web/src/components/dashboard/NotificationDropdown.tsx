@@ -24,6 +24,24 @@ interface NotificationDropdownProps {
 
 const POLL_INTERVAL = 30000; // 30 seconds
 
+// Security: notification.actionUrl is server-sourced and only ever meant to be a
+// relative in-app path (e.g. "/works/123", "/settings"). Guard router.push against
+// open redirect: accept only same-origin absolute URLs or single-leading-slash
+// relative paths, rejecting protocol-relative ("//evil.com"), backslash-obfuscated
+// ("/\evil.com") and any other-origin/scheme target a compromised writer could inject.
+function isSafeNavTarget(raw: string): boolean {
+    const url = raw.trim();
+    if (!url) return false;
+    if (url.startsWith('/')) {
+        return !url.startsWith('//') && !url.startsWith('/\\');
+    }
+    try {
+        return new URL(url).origin === window.location.origin;
+    } catch {
+        return false;
+    }
+}
+
 function NotificationItem({
     notification,
     onMarkAsRead,
@@ -277,6 +295,8 @@ export function NotificationDropdown({ className }: NotificationDropdownProps) {
 
     const handleNavigate = (url: string) => {
         setIsOpen(false);
+        // Security: only navigate to same-origin/relative targets to prevent open redirect.
+        if (!isSafeNavTarget(url)) return;
         router.push(url);
     };
 

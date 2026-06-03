@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { StepExecutionContext, FacadeOptions } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
@@ -347,10 +348,19 @@ export class PromptProcessingStep extends BasePipelineStep {
 		return urls.filter((url) => {
 			try {
 				new URL(url);
-				return true;
 			} catch {
 				return false;
 			}
+			// Security (SSRF, H): these URLs flow into `context.extractedUrls`
+			// and are later fetched by the content-extractor facade in
+			// web-search / content-retrieval steps. `new URL()` alone accepts
+			// `file:`, `data:`, `gopher:` and LAN/loopback/cloud-metadata hosts
+			// (e.g. http://169.254.169.254/...). Restrict to HTTP(S) and reject
+			// private/loopback/link-local/metadata targets via the shared
+			// lexical SSRF guard, mirroring source-validation.step.ts. Note this
+			// is lexical only; the fetch call sites still DNS-pin via
+			// safeFetchWithDnsPin.
+			return isSafeWebhookUrl(url);
 		});
 	}
 

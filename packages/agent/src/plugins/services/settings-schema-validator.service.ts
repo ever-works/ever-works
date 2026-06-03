@@ -28,6 +28,16 @@ export class SettingsSchemaValidatorService {
     private readonly ajv: Ajv;
     private readonly schemaCache = new Map<string, ValidateFunction>();
 
+    /**
+     * Security: bound the compiled-validator cache to prevent unbounded
+     * memory growth. The cache key is derived from the (scope-filtered)
+     * schema JSON, so a tenant who installs many plugins with diverse or
+     * dynamic settings schemas could otherwise accumulate compiled Ajv
+     * validators indefinitely and OOM the shared API process. We cap the
+     * cache and evict in least-recently-used order (Map iteration order).
+     */
+    private static readonly MAX_CACHE_ENTRIES = 100;
+
     constructor() {
         this.ajv = new Ajv({
             allErrors: true,
@@ -268,12 +278,27 @@ export class SettingsSchemaValidatorService {
         // Create a cache key from the schema
         const cacheKey = JSON.stringify({ schema, scope });
 
-        let validate = this.schemaCache.get(cacheKey);
-        if (!validate) {
-            validate = this.ajv.compile(schema);
-            this.schemaCache.set(cacheKey, validate);
+        const cached = this.schemaCache.get(cacheKey);
+        if (cached) {
+            // Security: mark as most-recently-used by re-inserting so the
+            // LRU eviction below drops genuinely cold entries first.
+            this.schemaCache.delete(cacheKey);
+            this.schemaCache.set(cacheKey, cached);
+            return cached;
         }
 
+        const validate = this.ajv.compile(schema);
+
+        // Security: evict the least-recently-used entry (first key in
+        // insertion order) once the cache reaches its bound, capping memory.
+        if (this.schemaCache.size >= SettingsSchemaValidatorService.MAX_CACHE_ENTRIES) {
+            const oldestKey = this.schemaCache.keys().next().value;
+            if (oldestKey !== undefined) {
+                this.schemaCache.delete(oldestKey);
+            }
+        }
+
+        this.schemaCache.set(cacheKey, validate);
         return validate;
     }
 

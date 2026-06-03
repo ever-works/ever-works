@@ -1,6 +1,7 @@
 import type { ItemData } from '../common/index.js';
 import type { FacadeOptions } from '../facades/index.js';
 import type { StepStatus } from '../pipeline/step-types.js';
+import { isSafeWebhookUrl } from '../helpers/ssrf-guard.js';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
 
@@ -36,6 +37,17 @@ export async function captureScreenshots(items: ItemData[], ctx: ScreenshotConte
 
 		for (const item of itemsNeedingImages) {
 			if (ctx.signal.aborted) break;
+
+			// Security (SSRF): source_url is AI-generated and may contain
+			// private/loopback/link-local or cloud-metadata addresses. Apply the
+			// lexical SSRF guard before forwarding to the screenshot facade, which
+			// passes the URL to an external screenshot service whose network
+			// position is unknown. Skip items with unsafe URLs rather than aborting
+			// the whole capture run.
+			if (!isSafeWebhookUrl(item.source_url!)) {
+				ctx.logger.warn(`Skipping unsafe/blocked source URL for screenshot: ${item.source_url}`);
+				continue;
+			}
 
 			try {
 				const result = await ctx.screenshotFacade.getSmartImage(

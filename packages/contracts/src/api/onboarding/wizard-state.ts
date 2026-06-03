@@ -40,6 +40,11 @@ export interface OnboardingStateResponse {
  * Wire shape of `PATCH /api/onboarding/state`. All fields are optional;
  * `state` accepts a partial object that the server deep-merges with the
  * persisted version-2 shape (re-using existing values for missing keys).
+ *
+ * Security: `state.prompt` MUST be validated server-side with
+ * `@MaxLength(5000)` in `OnboardingStatePatchInnerDto` before it is
+ * persisted or forwarded to any LLM call. Do NOT wire user-controlled
+ * prompt text into agent generation without output constraints/sandboxing.
  */
 export interface OnboardingStatePatchRequest {
 	readonly state?: Partial<{
@@ -49,6 +54,7 @@ export interface OnboardingStatePatchRequest {
 		readonly deploy: Partial<{ choice: OnboardingDeployChoice }>;
 		readonly skippedSteps: readonly string[];
 		readonly pluginsReviewed: boolean;
+		/** Max 5 000 chars — enforced by `@MaxLength(5000)` in the server DTO. */
 		readonly prompt: string;
 	}>;
 }

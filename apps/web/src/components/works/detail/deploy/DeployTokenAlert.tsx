@@ -23,7 +23,9 @@ export function DeployTokenAlert({
     const t = useTranslations('dashboard.workDetail.deploy');
 
     const displayName = providerName || providerId || 'Deployment Provider';
-    const tokenUrl = providerHomepage || '';
+    // Security: reject non-https URLs (e.g. javascript:) from plugin manifests to prevent XSS via href
+    const rawTokenUrl = providerHomepage || '';
+    const tokenUrl = rawTokenUrl.startsWith('https://') ? rawTokenUrl : '';
 
     return (
         <div className="max-w-full mx-auto">

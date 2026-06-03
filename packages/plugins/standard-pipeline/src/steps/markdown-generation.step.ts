@@ -5,6 +5,77 @@ import { BasePipelineStep } from '../base-pipeline-step.js';
 import { getErrorStack } from '../utils/error.utils.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
 
+/**
+ * Security (prompt-injection hardening): chat-template control markers that some
+ * models interpret as out-of-band role/turn delimiters. Stripped from every
+ * untrusted value before it is interpolated into {@link MARKDOWN_PROMPT} so
+ * injected text cannot spoof a system/user turn. Mirrors the sibling
+ * `item-extraction.step.ts` / `source-validation.step.ts` and the canonical
+ * `sanitizePromptVariable` in `@ever-works/agent`'s `item-health.service.ts`.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the literal XML-style delimiter tags
+ * that fence the sections of {@link MARKDOWN_PROMPT}. The item JSON (whose
+ * `name`/`description`/`source_url` were AI-extracted from attacker-controlled
+ * page text) is interpolated inside `<item>` and the fetched page body inside
+ * `<content>`, so a value that prints its own `</item>`, `</content>`, or a
+ * forged `<rules>` block could break the fence and have trailing imperative text
+ * parsed as authoritative instructions. Matched (open or close) so the boundary
+ * token can be defused wherever it appears.
+ */
+const PROMPT_FENCE_TOKEN_PATTERN = /<\/?(?:item|content|rules)\b/gi;
+
+/**
+ * Security (prompt-injection hardening): defuse a forged fence boundary by
+ * inserting a zero-width space right after the opening `<` of any fence tag.
+ * This keeps the text human/model-readable while breaking the literal token the
+ * boundary keys on. Mirrors `prompt.utils.ts`'s `neutralizeCustomPrompt` and
+ * `item-extraction.step.ts`'s `neutralizeFenceTokens`.
+ */
+function neutralizeFenceTokens(value: string): string {
+	return value.replace(PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+}
+
+/**
+ * Security (prompt-injection hardening): sanitize raw web-page content before it
+ * is interpolated into the `<content>` block. Newlines are PRESERVED because
+ * legitimate pages are multi-line and the markdown structure is meaningful for
+ * summarization — only forged fence tokens and chat-template control markers are
+ * neutralized. The caller still applies the 4000-char cap.
+ */
+function sanitizePageContent(value: string): string {
+	return neutralizeFenceTokens(value.replace(CHAT_TEMPLATE_MARKER_PATTERN, ''));
+}
+
+/**
+ * Security (prompt-injection hardening): the item's `name`, `description`, and
+ * `source_url` are AI-extracted from attacker-controlled page text in the prior
+ * extraction step, then serialized via `JSON.stringify` into the `<item>` block.
+ * Sanitize each string field in place (forged fence tokens neutralized,
+ * chat-template markers stripped) BEFORE serialization so the JSON stays
+ * well-formed and benign content is unchanged, while an injected
+ * `</item><rules>…` payload can no longer break out of the fence. Nested
+ * string values (e.g. badge/array fields) are sanitized recursively.
+ */
+function sanitizePromptValue(value: unknown): unknown {
+	if (typeof value === 'string') {
+		return neutralizeFenceTokens(value.replace(CHAT_TEMPLATE_MARKER_PATTERN, ''));
+	}
+	if (Array.isArray(value)) {
+		return value.map(sanitizePromptValue);
+	}
+	if (value && typeof value === 'object') {
+		const out: Record<string, unknown> = {};
+		for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+			out[key] = sanitizePromptValue(val);
+		}
+		return out;
+	}
+	return value;
+}
+
 export const MARKDOWN_PROMPT = `
 You are work website builder and your task is to generate markdown summary for item:
 <item>
@@ -195,8 +266,15 @@ export class MarkdownGenerationStep extends BasePipelineStep {
 				{
 					temperature: 0.6,
 					variables: {
-						item: JSON.stringify(item),
-						content: rawContent.slice(0, 4000)
+						// Security (prompt-injection hardening): item fields
+						// (name/description/source_url) are AI-extracted from
+						// attacker-controlled page text and the page body is fetched
+						// from an attacker-controllable URL. Both are fenced inside
+						// <item>/<content>; sanitize each so forged fence tokens
+						// (</item>, </content>, <rules>) + chat-template markers
+						// cannot break out and inject authoritative instructions.
+						item: JSON.stringify(sanitizePromptValue(item)),
+						content: sanitizePageContent(rawContent).slice(0, 4000)
 					},
 					routing: {
 						complexity: 'simple',

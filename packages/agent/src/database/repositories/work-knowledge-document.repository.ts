@@ -9,6 +9,7 @@ import {
     KbDocumentStatus,
     KbLockMode,
 } from '../../entities/kb-types';
+import { sanitizeLikePattern } from '../utils';
 
 export interface KbDocumentListOptions {
     workId?: string;
@@ -86,6 +87,18 @@ export class WorkKnowledgeDocumentRepository {
     async list(
         opts: KbDocumentListOptions,
     ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
+        // Security: mandatory tenant-scope guard. The `workId`/`organizationId`
+        // filters below are applied only when truthy, so a caller that omits
+        // BOTH would otherwise produce a WHERE-less query returning every
+        // tenant's KB documents (cross-tenant metadata dump). Every legitimate
+        // caller already passes one scope key; this enforces that mechanically
+        // at the data layer instead of relying on call-site discipline.
+        if (!opts.workId && !opts.organizationId) {
+            throw new Error(
+                'WorkKnowledgeDocumentRepository.list requires workId or organizationId',
+            );
+        }
+
         const qb = this.repository.createQueryBuilder('doc');
 
         if (opts.workId) {
@@ -118,8 +131,16 @@ export class WorkKnowledgeDocumentRepository {
         }
 
         if (opts.q) {
-            qb.andWhere('(doc.title LIKE :q OR doc.description LIKE :q)', {
-                q: `%${opts.q}%`,
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // search term and pair each predicate with an explicit ESCAPE
+            // clause. The value is already bound, so this is not SQLi, but
+            // unescaped wildcards otherwise let a caller bypass the filter
+            // (e.g. `%`) or force an index-defeating leading-wildcard scan
+            // (DoS amplification within the caller's authorized Work/Org).
+            // Mirrors agent.repository.ts; escape-only (no LOWER()) preserves
+            // the existing matching for legitimate input.
+            qb.andWhere("(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')", {
+                q: `%${sanitizeLikePattern(opts.q)}%`,
             });
         }
 

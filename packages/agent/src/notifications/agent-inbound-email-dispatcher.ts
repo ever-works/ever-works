@@ -58,6 +58,16 @@ export interface InboundEmailTaskSpawnerInput {
     agentId: string;
     userId: string;
     emailMessageId: string;
+    // Security: `subject`, `bodyText` and `from` originate from an inbound
+    // email and are fully ATTACKER-CONTROLLED (any internet sender can reach
+    // a registered inbound address). They are NOT trusted instructions.
+    // Implementations of `spawnTaskForInboundEmail` that surface these values
+    // to an LLM/agent prompt MUST treat them as opaque untrusted data: cap
+    // their length and wrap them in clearly demarcated, non-instruction
+    // delimiters (e.g. `<email-subject>…</email-subject>` /
+    // `<email-body>…</email-body>`) so adversarial "ignore previous
+    // instructions"-style content inside an email cannot steer the agent
+    // (prompt injection).
     subject: string;
     bodyText: string;
     from: string;

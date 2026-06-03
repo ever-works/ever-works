@@ -84,7 +84,22 @@ export class McpConfigService {
 function parseAuthMode(raw: string | undefined): McpAuthMode {
 	const v = (raw || 'hybrid').trim().toLowerCase();
 	if (v === 'shared-key' || v === 'shared-key-jwt' || v === 'per-user-jwt' || v === 'hybrid') {
-		return v;
+		// Security: In production, `hybrid` and `shared-key` modes allow a single
+		// ambient shared key to authenticate any request with no per-user identity.
+		// If the operator has not explicitly configured a mode that enforces per-user
+		// tokens, refuse to boot so the deployment fails closed rather than silently
+		// running in a coarse single-identity mode. Use `shared-key-jwt` (shared key
+		// + per-user JWT) or `per-user-jwt` in production.
+		if (process.env.NODE_ENV === 'production' && (v === 'hybrid' || v === 'shared-key')) {
+			throw new Error(
+				`EVER_WORKS_MCP_AUTH_MODE="${v}" is not permitted in production (NODE_ENV=production) ` +
+					'because it allows requests authenticated with only a shared API key, providing ' +
+					'no per-user identity enforcement. ' +
+					'Set EVER_WORKS_MCP_AUTH_MODE to "per-user-jwt" (recommended) or "shared-key-jwt" ' +
+					'to enforce per-user tokens in production.'
+			);
+		}
+		return v as McpAuthMode;
 	}
 	throw new Error(
 		`Invalid EVER_WORKS_MCP_AUTH_MODE: "${raw}". Expected one of: shared-key, shared-key-jwt, per-user-jwt, hybrid.`

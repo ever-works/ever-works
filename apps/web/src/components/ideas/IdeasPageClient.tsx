@@ -154,8 +154,9 @@ export function IdeasPageClient({
                         .filter((row) => ideaMatchesFilter(row, filters?.status)),
                 );
                 toast.success(t('toasts.ideaQueued'));
-            } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.ideaQueueError'));
+            } catch {
+                // Security: never expose raw error messages (may contain internal details, API keys, stack fragments)
+                toast.error(t('toasts.ideaQueueError'));
             }
         });
     };

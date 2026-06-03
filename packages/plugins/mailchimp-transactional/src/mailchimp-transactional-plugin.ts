@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import mailchimp from '@mailchimp/mailchimp_transactional';
 import type {
 	IEmailOutboundPlugin,
@@ -128,7 +129,11 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 		// Mandrill verifies sending domains, not individual addresses. We
 		// emit a token; the platform-side verify route flips `verified`
 		// once the operator clicks the confirmation.
-		const verificationToken = `mc-${Math.random().toString(36).slice(2)}${Date.now()}`;
+		// Security: use a CSPRNG (256-bit) instead of Math.random() + Date.now()
+		// — the token grants control over a tenant email address, so it must be
+		// unpredictable. The `mc-` prefix is kept for log/debug readability
+		// (mirrors the sendgrid/postmark sibling plugins).
+		const verificationToken = `mc-${randomBytes(32).toString('hex')}`;
 		return {
 			address,
 			verificationToken,

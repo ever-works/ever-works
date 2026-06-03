@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -90,7 +90,24 @@ async function main() {
 		try {
 			generated = await readFile(expectedFile, 'utf-8');
 		} catch (error) {
-			const listing = await runCommand('bash', ['-lc', `find "${workspace}" -maxdepth 2 -type f | sort`]);
+			// Security: replaced bash -lc string interpolation of `workspace` path (command injection via TMPDIR)
+			// with a pure Node.js readdir walk — no shell metacharacter exposure.
+			const listFiles = async (dir, depth) => {
+				if (depth > 2) return [];
+				const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+				const results = [];
+				for (const entry of entries) {
+					const full = path.join(dir, entry.name);
+					if (entry.isDirectory()) {
+						results.push(...(await listFiles(full, depth + 1)));
+					} else {
+						results.push(full);
+					}
+				}
+				return results;
+			};
+			const files = await listFiles(workspace, 1);
+			const listing = { stdout: files.sort().join('\n') };
 			throw new Error(
 				[
 					`Expected generated file was not created: ${expectedFile}`,

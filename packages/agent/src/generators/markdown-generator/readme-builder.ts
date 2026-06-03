@@ -65,15 +65,53 @@ export class ReadmeBuilder {
         return toc;
     }
 
+    // Security: README.md is committed verbatim to the user's (often public)
+    // GitHub repo, and `item.name`/`description`/`source_url`/tag names are
+    // populated by the AI pipeline from externally-fetched, attacker-controllable
+    // web content. Escape Markdown control characters in text fields and validate
+    // the link target so a hostile page title/description/URL cannot inject extra
+    // links or break out of the list-item / inline-code context. Benign values
+    // (plain titles, descriptions, http(s) URLs) are left byte-for-byte unchanged.
+    private escapeMarkdownInline(value: string): string {
+        return String(value ?? '').replace(/[\\`[\]]/g, '\\$&');
+    }
+
+    // Security: only emit `http(s)` link targets; anything else (e.g.
+    // `javascript:`/`data:` URIs) collapses to an inert anchor. For accepted
+    // URLs, percent-encode the few characters that would otherwise terminate or
+    // break out of the Markdown link destination `(...)`. Legitimate http(s)
+    // URLs do not contain these characters, so they pass through verbatim.
+    private sanitizeMarkdownUrl(value: string): string {
+        const raw = String(value ?? '');
+        let parsed: URL;
+        try {
+            parsed = new URL(raw);
+        } catch {
+            return '#';
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            return '#';
+        }
+        return raw.replace(/[()<>\s]/g, encodeURIComponent);
+    }
+
     addItem(item: ItemData, options: { hasDetails?: boolean } = {}) {
         // TODO: consider making featured items bolder (item.featured)
-        this.content += `- [${item.name}](${item.source_url}) - ${item.description}`;
+        const name = this.escapeMarkdownInline(item.name);
+        const url = this.sanitizeMarkdownUrl(item.source_url);
+        const description = this.escapeMarkdownInline(item.description);
+        this.content += `- [${name}](${url}) - ${description}`;
         if (options.hasDetails) {
             this.content += ` ([Read more](/details/${item.slug}.md))`;
         }
 
         if (item.tags && item.tags.length > 0) {
-            const tags = item.tags.map((tag) => `\`${tag.name}\``).join(' ');
+            const tags = item.tags
+                .map(
+                    (tag) =>
+                        `\`${this.escapeMarkdownInline((tag as { name?: string }).name ?? String(tag))}\``,
+                )
+                .join(' ');
             this.content += ` ${tags}`;
         }
         this.content += '\n';

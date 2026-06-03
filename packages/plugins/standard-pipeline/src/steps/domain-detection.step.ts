@@ -9,11 +9,26 @@ import { PROMPT_KEYS } from '../prompt-keys.js';
  */
 const DOMAIN_DETECTION_PROMPT = `You are classifying the domain of a work topic.
 
-Topic name: "{name}"
-Topic description: "{description}"
+<topic_name untrusted="true">{name}</topic_name>
+<topic_description untrusted="true">{description}</topic_description>
 
 Choose a domain_type from: software, ecommerce, services, general.
 Return the classification with a confidence score and any useful cues (expected attributes, official patterns, aggregator domains, item noun).` as const;
+
+/**
+ * Security: sanitize user-supplied `name` and `description` before they are
+ * interpolated into the LLM prompt. Collapse newlines so injected text cannot
+ * fake new prompt lines, strip chat-template control markers that some models
+ * treat as out-of-band role/turn delimiters, and hard-truncate. Mirrors the
+ * canonical `sanitizePromptVariable` used by `badge-processing.step.ts` and
+ * `source-validation.step.ts` for the same class of untrusted user input.
+ */
+function sanitizePromptVariable(value: string, maxLength: number): string {
+	return value
+		.replace(/\r?\n|\r/g, ' ')
+		.replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '')
+		.slice(0, maxLength);
+}
 
 /**
  * Schema for domain detection AI response
@@ -64,7 +79,11 @@ export class DomainDetectionStep extends BasePipelineStep {
 				domainDetectionSchema,
 				{
 					temperature: 0.1,
-					variables: { name: name || '', description: prompt ?? '' },
+					// Security: sanitize user-supplied fields before LLM interpolation.
+					variables: {
+						name: sanitizePromptVariable(name || '', 500),
+						description: sanitizePromptVariable(prompt ?? '', 2000)
+					},
 					routing: {
 						complexity: 'simple',
 						taskId: 'domain-detection'

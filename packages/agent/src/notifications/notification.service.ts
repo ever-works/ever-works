@@ -8,6 +8,7 @@ import {
     NotificationType,
     NotificationCategory,
 } from '@src/entities';
+import { sanitizeName, sanitizeDescription } from '@src/utils/sanitize.util';
 
 /**
  * Notifications v2 (EW-664 / EW-678) — payload emitted on
@@ -53,6 +54,27 @@ export class NotificationService {
                 `Notifications v2 fanout emission failed for user=${payload.userId} event=${payload.eventKey}: ${String(err)}`,
             );
         }
+    }
+
+    /**
+     * Security: strip HTML angle brackets from user-supplied label strings before
+     * embedding them into notification message text. This is a defence-in-depth
+     * measure; the primary XSS guard lives in the frontend renderer. Uses the
+     * shared sanitizeName helper (100-char cap, removes control chars/newlines)
+     * and additionally removes < and > to neutralise any residual HTML payloads.
+     */
+    private sanitizeLabel(value: string): string {
+        return sanitizeName(value).replace(/[<>]/g, '');
+    }
+
+    /**
+     * Security: cap error-message strings at 500 characters before storing
+     * them in notifications. AI provider SDKs can embed endpoint URLs, request
+     * IDs, or stack traces in error messages; truncating limits accidental
+     * information leakage while still giving users actionable context.
+     */
+    private sanitizeErrorMessage(value: string): string {
+        return sanitizeDescription(value, 500);
     }
 
     /**
@@ -241,12 +263,15 @@ export class NotificationService {
         provider: string,
         errorMessage: string,
     ): Promise<void> {
+        // Security: cap error message to 500 chars to prevent AI provider SDK
+        // details (URLs, request IDs, stack traces) from leaking into stored notifications.
+        const safeError = this.sanitizeErrorMessage(errorMessage);
         await this.create({
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.AI_CREDITS,
             title: 'AI Provider Error',
-            message: `Error with ${provider}: ${errorMessage}`,
+            message: `Error with ${provider}: ${safeError}`,
             actionUrl: '/settings',
             actionLabel: 'Check Settings',
             deduplicationKey: `ai_provider_error_${provider.toLowerCase()}`,
@@ -255,7 +280,7 @@ export class NotificationService {
             userId,
             eventKey: 'ai_provider_error',
             title: 'AI Provider Error',
-            message: `Error with ${provider}: ${errorMessage}`,
+            message: `Error with ${provider}: ${safeError}`,
             actionUrl: '/settings',
             actionLabel: 'Check Settings',
             urgent: false,
@@ -268,12 +293,16 @@ export class NotificationService {
         workName: string,
         errorMessage: string,
     ): Promise<void> {
+        // Security: strip HTML from user-supplied work name (defence-in-depth vs XSS)
+        // and cap error message to prevent internal detail leakage.
+        const safeName = this.sanitizeLabel(workName);
+        const safeError = this.sanitizeErrorMessage(errorMessage);
         await this.create({
             userId,
             type: NotificationType.ERROR,
             category: NotificationCategory.GENERATION,
             title: 'Generation Failed',
-            message: `Generation for "${workName}" failed: ${errorMessage}`,
+            message: `Generation for "${safeName}" failed: ${safeError}`,
             actionUrl: `/works/${workId}`,
             actionLabel: 'View Work',
             metadata: { workId, workName },
@@ -283,7 +312,7 @@ export class NotificationService {
             userId,
             eventKey: 'generation_error',
             title: 'Generation Failed',
-            message: `Generation for "${workName}" failed: ${errorMessage}`,
+            message: `Generation for "${safeName}" failed: ${safeError}`,
             actionUrl: `/works/${workId}`,
             actionLabel: 'View Work',
             urgent: false,
@@ -296,12 +325,14 @@ export class NotificationService {
         workName: string,
         reason: string,
     ): Promise<void> {
+        // Security: strip HTML from user-supplied work name (defence-in-depth vs XSS).
+        const safeName = this.sanitizeLabel(workName);
         await this.create({
             userId,
             type: NotificationType.WARNING,
             category: NotificationCategory.GENERATION,
             title: 'Schedule Paused',
-            message: `Scheduled updates for "${workName}" paused: ${reason}`,
+            message: `Scheduled updates for "${safeName}" paused: ${reason}`,
             actionUrl: `/works/${workId}/generator/schedule`,
             actionLabel: 'View Schedule',
             metadata: { workId, workName },
@@ -311,7 +342,7 @@ export class NotificationService {
             userId,
             eventKey: 'schedule_paused',
             title: 'Schedule Paused',
-            message: `Scheduled updates for "${workName}" paused: ${reason}`,
+            message: `Scheduled updates for "${safeName}" paused: ${reason}`,
             actionUrl: `/works/${workId}/generator/schedule`,
             actionLabel: 'View Schedule',
             urgent: false,
@@ -330,9 +361,10 @@ export class NotificationService {
         currency: string;
     }): Promise<void> {
         const isError = args.threshold === '100' || args.threshold === 'overage';
+        // Security: strip HTML from pluginId (defence-in-depth vs XSS in notification messages).
         const scopeLabel =
             args.scope === 'plugin' && args.pluginId
-                ? `plugin '${args.pluginId}'`
+                ? `plugin '${this.sanitizeLabel(args.pluginId)}'`
                 : 'this directory';
         const titleByThreshold: Record<typeof args.threshold, string> = {
             '75': 'Budget at 75%',

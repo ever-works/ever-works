@@ -14,6 +14,21 @@ interface PluginDeviceAuthConnectionProps {
     onActivate?: () => void;
 }
 
+// Security: `verificationUri` originates from a plugin-returned DeviceAuthStatus
+// (untrusted under dynamic plugin distribution). Only allow http(s) before
+// handing it to `window.open`, so a malicious plugin cannot return a
+// `javascript:`/`data:` URI that executes script in the user's session.
+function toSafeVerificationUrl(value: string | undefined): string | null {
+    if (!value) return null;
+    try {
+        const parsed = new URL(value.trim());
+        const protocol = parsed.protocol.toLowerCase();
+        return protocol === 'https:' || protocol === 'http:' ? parsed.href : null;
+    } catch {
+        return null;
+    }
+}
+
 export function PluginDeviceAuthConnection({
     pluginId,
     pluginName,
@@ -32,6 +47,8 @@ export function PluginDeviceAuthConnection({
     const isConnected = status?.connected ?? false;
     const isPending = status?.pending ?? false;
     const prompt = status?.prompt;
+    // Security: scheme-validated URL used for the "Open" action below.
+    const safeVerificationUrl = toSafeVerificationUrl(prompt?.verificationUri);
 
     return (
         <div
@@ -120,12 +137,12 @@ export function PluginDeviceAuthConnection({
                 </div>
 
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    {prompt?.verificationUri && (
+                    {safeVerificationUrl && (
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() =>
-                                window.open(prompt.verificationUri, '_blank', 'noopener,noreferrer')
+                                window.open(safeVerificationUrl, '_blank', 'noopener,noreferrer')
                             }
                         >
                             <ExternalLink className="w-4 h-4 mr-1.5" />

@@ -13,6 +13,17 @@ export const listCommand = new Command('list')
         try {
             console.log(chalk.cyan.bold('\nWork List\n'));
 
+            // Security: validate --limit before use to prevent NaN from reaching API query params
+            let limitValue: number | undefined = undefined;
+            if (options.limit !== undefined) {
+                const parsed = parseInt(options.limit, 10);
+                if (isNaN(parsed) || parsed <= 0 || !isFinite(parsed)) {
+                    console.error(chalk.red('Error: --limit must be a positive integer'));
+                    process.exit(1);
+                }
+                limitValue = parsed;
+            }
+
             // Ensure user is authenticated
             await requireAuth();
 
@@ -21,7 +32,7 @@ export const listCommand = new Command('list')
 
             try {
                 const response = await apiService.getWorks({
-                    limit: options.limit ? parseInt(options.limit, 10) : undefined,
+                    limit: limitValue,
                 });
                 const works: Work[] = response.works || [];
 

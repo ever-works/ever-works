@@ -31,6 +31,13 @@ export class CreateWebhookDeliveriesTable_1779950000000 implements MigrationInte
                     },
                     { name: 'subscriptionId', type: 'uuid', isNullable: false },
                     { name: 'accountId', type: 'uuid', isNullable: false },
+                    // Security: include tenant scope columns at table-creation time so rows
+                    // written between this migration and the later Tier-C scope migration
+                    // (1779991009000) are never missing tenant isolation fields.
+                    // The later migration gates on hasColumn() and will skip adding these
+                    // columns, but will still add the FK constraints and indexes.
+                    { name: 'tenantId', type: 'uuid', isNullable: true },
+                    { name: 'organizationId', type: 'uuid', isNullable: true },
                     { name: 'event', type: 'varchar', length: '128', isNullable: false },
                     { name: 'payload', type: 'jsonb', isNullable: false },
                     {

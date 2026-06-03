@@ -58,6 +58,62 @@ describe('TwentyCrmService.makeRequest', () => {
         expect(result).toEqual({ ok: 1 });
     });
 
+    it('prepends the per-caller tenant prefix to the data-plane URL when provided', async () => {
+        // Security (cross-tenant IDOR fix): the 6th positional arg is the
+        // per-caller tenant endpoint prefix. When present, the outgoing URL is
+        // scoped to `/rest/tenants/{tenantId}/...` so a caller can only ever
+        // address rows inside their own tenant partition.
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await service.makeRequest(
+            'GET',
+            '/companies',
+            undefined,
+            undefined,
+            false,
+            '/tenants/tenant-1',
+        );
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/tenants/tenant-1/companies',
+            }),
+        );
+    });
+
+    it('keeps the data-plane URL un-prefixed when no tenant prefix is supplied (internal/system callers)', async () => {
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await service.makeRequest('GET', '/companies');
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/companies',
+            }),
+        );
+    });
+
+    it('does NOT apply the tenant prefix to schema/metadata (workspace-global admin) calls', async () => {
+        // Metadata calls are workspace-global admin operations, never tenant
+        // data — the prefix must not leak into them.
+        httpService.request.mockReturnValue(of({ data: { schema: true } }));
+
+        await service.makeRequest(
+            'GET',
+            '/objects',
+            undefined,
+            undefined,
+            true,
+            '/tenants/tenant-1',
+        );
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/metadata/objects',
+            }),
+        );
+    });
+
     it('routes to `${apiUrl}/rest/metadata<endpoint>` when schema=true', async () => {
         httpService.request.mockReturnValue(of({ data: { schema: true } }));
 

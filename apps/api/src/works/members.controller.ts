@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    NotFoundException,
     Param,
     Post,
     Put,
@@ -60,7 +61,18 @@ export class MembersController {
         @Body() dto: InviteMemberDto,
     ) {
         const user = await this.authService.getUser(auth.userId);
-        const result = await this.memberService.inviteMember(workId, user.id, dto);
+        let result;
+        try {
+            result = await this.memberService.inviteMember(workId, user.id, dto);
+        } catch (err) {
+            // Security: strip the probed email address from NotFoundException messages to prevent
+            // user-enumeration (service throws "User with email 'X' not found" which leaks
+            // registration status). Re-throw with a generic message instead.
+            if (err instanceof NotFoundException) {
+                throw new NotFoundException({ status: 'error', message: 'User not found' });
+            }
+            throw err;
+        }
 
         const workUrl = `${config.webAppUrl()}/works/${workId}`;
         this.eventEmitter.emit(

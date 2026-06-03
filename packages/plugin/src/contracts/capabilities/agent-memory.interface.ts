@@ -132,7 +132,19 @@ export interface AgentMemoryContextInput {
 }
 
 export interface AgentMemoryContext {
-	/** Text ready to splice into a system prompt. */
+	/**
+	 * Context payload for the next prompt.
+	 *
+	 * Security (prompt-injection): treat this as UNTRUSTED data. Memory is
+	 * populated from prior agent runs that may have processed hostile
+	 * external content (fetched URLs, git repo files, user task text), so a
+	 * malicious `saveMemory` payload can be reproduced here verbatim.
+	 * Consumers MUST NOT splice it raw into a system prompt — wrap it in a
+	 * clearly-delimited, lower-trust section (e.g. an XML-style
+	 * `<agent_memory>...</agent_memory>` fence) and never let it override
+	 * system instructions. The facade/consumer is responsible for the
+	 * delimiting + length cap; this contract only carries the text.
+	 */
 	readonly content: string;
 	/** Approximate token cost of `content` if the backend reports it. */
 	readonly approxTokens?: number;

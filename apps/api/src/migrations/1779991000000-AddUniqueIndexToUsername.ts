@@ -105,10 +105,11 @@ export class AddUniqueIndexToUsername1779991000000 implements MigrationInterface
         }
 
         if (renames.length > 0) {
+            // Security: log only count + user IDs; omit from/to username values to avoid
+            // emitting PII (account names) into log aggregation systems accessible to ops staff.
             // eslint-disable-next-line no-console
             console.warn(
-                `[migration] AddUniqueIndexToUsername renamed ${renames.length} duplicate username(s): ` +
-                    JSON.stringify(renames),
+                `[migration] AddUniqueIndexToUsername renamed ${renames.length} duplicate username(s): IDs=${renames.map((r) => r.id).join(',')}`,
             );
         }
     }

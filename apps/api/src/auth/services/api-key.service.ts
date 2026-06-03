@@ -20,18 +20,19 @@ const MAX_KEYS_PER_USER = 10;
  * bits, which is plenty of disambiguation entropy and adds nothing
  * useful to a brute-force attacker against the remaining 240 bits.
  *
- * **`MAX_KEYS_PER_USER` counts ALL rows, including expired ones.**
- * `countByUserId` does not filter on `expiresAt`, so a user who lets
- * 10 keys expire and never revokes them cannot create an 11th
- * without first deleting one. This is intentional (keeps the cap
- * predictable and forces hygiene) but operators occasionally hit
- * surprise "limit reached" errors with only expired keys. Document
- * "revoke expired keys to free a slot" in user-facing help.
+ * **`MAX_KEYS_PER_USER` counts only active (non-expired) rows.**
+ * `countByUserId` filters with `(expiresAt IS NULL) OR (expiresAt > NOW())`,
+ * so expired keys do NOT consume a slot — a user may create a new key
+ * even after letting previous keys expire, provided the active count is
+ * below the cap. Revoking (deleting) an active key frees a slot immediately.
+ * // Security: corrected misleading comment that claimed expired keys counted
+ * // toward the cap; the repository already excludes them, so a future
+ * // maintainer will not incorrectly "fix" countByUserId to include all rows.
  *
  * **Expired keys are not auto-purged.** {@link validateKey} returns
  * `null` for expired rows but leaves them in the database. A periodic
  * cleanup job (or a TypeORM cron-style task) is the long-term answer;
- * for now they're harmless except for the cap above.
+ * for now they're harmless (they do not count toward the cap).
  *
  * **`validateKey` does a DB lookup on the SHA-256 digest**, not a
  * string compare on the raw key — so byte-by-byte timing attacks

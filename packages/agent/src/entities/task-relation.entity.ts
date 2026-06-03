@@ -29,6 +29,13 @@ export class TaskRelation {
     @JoinColumn({ name: 'taskId' })
     task?: Task;
 
+    // Security: IDOR guard — callers MUST verify that both taskId and
+    // relatedTaskId belong to the same authenticated user (via
+    // TasksService.addRelation → tasks.findByIdAndUser) BEFORE calling
+    // TaskRelationRepository.add(). The entity schema carries no FK that
+    // enforces ownership on the related side (cycle-avoidance, EW-654).
+    // Any new code path that inserts a TaskRelation MUST re-implement the
+    // ownership check; bypassing TasksService.addRelation is not safe.
     @Column({ type: 'uuid' })
     relatedTaskId: string;
 

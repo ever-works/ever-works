@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Task, TaskStatus } from '../../entities/task.entity';
+import { sanitizeLikePattern } from '../utils';
 
 export interface ListTasksFilter {
     status?: TaskStatus | TaskStatus[];
@@ -73,16 +74,34 @@ export class TaskRepository {
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
 
         if (filter.search) {
-            qb.andWhere('(task.title LIKE :q OR task.slug LIKE :q OR task.description LIKE :q)', {
-                q: `%${filter.search}%`,
-            });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // search term and pair each predicate with an explicit ESCAPE
+            // clause. The value is already bound, so this is not SQLi, but
+            // unescaped wildcards otherwise let a caller bypass the filter
+            // (e.g. `%`) or force an index-defeating leading-wildcard scan.
+            // Mirrors agent.repository.ts. Escape-only (no LOWER()) preserves
+            // the existing case-sensitive matching for legitimate input.
+            qb.andWhere(
+                "(task.title LIKE :q ESCAPE '\\' OR task.slug LIKE :q ESCAPE '\\' OR task.description LIKE :q ESCAPE '\\')",
+                {
+                    q: `%${sanitizeLikePattern(filter.search)}%`,
+                },
+            );
         }
 
         // `labels` is a simple-json array; we hit it as a substring match
         // against the serialized JSON. v1 — proper jsonb indexing lands
         // when the catalog grows.
         if (filter.label) {
-            qb.andWhere('task.labels LIKE :label', { label: `%"${filter.label}"%` });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // label before wrapping it in the `"<label>"` JSON-token match,
+            // and add an explicit ESCAPE clause. Bound param (not SQLi), but
+            // unescaped wildcards would let `%` match every labelled task and
+            // break out of the intended quoted-token boundary. Escape-only
+            // preserves the exact match for legitimate, wildcard-free labels.
+            qb.andWhere("task.labels LIKE :label ESCAPE '\\'", {
+                label: `%"${sanitizeLikePattern(filter.label)}"%`,
+            });
         }
 
         const total = await qb.getCount();

@@ -66,9 +66,22 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             const runner = appContext.get(AgentRunService);
             const tasks = appContext.get(TasksService);
 
-            const agent = await agents.findById(payload.agentId);
+            // Security: scope the Agent lookup to the payload's userId
+            // (defense-in-depth IDOR guard). The legitimate dispatch path
+            // (`TaskTransitionService.fanOutAgentExecutions`) always derives
+            // `agentId` from an assignee of a task the `userId` owns, so this
+            // never rejects a real run — but if the Trigger.dev payload is
+            // forged with another tenant's `agentId`, `findByIdAndUser`
+            // returns null and we skip instead of executing a cross-tenant
+            // Agent. Mirrors `AgentRunRepository.findByIdAndUser` ownership
+            // posture (architecture/security §9, no-existence-leak).
+            const agent = await agents.findByIdAndUser(payload.agentId, payload.userId);
             if (!agent) {
-                return { status: 'skipped', reason: 'agent-not-found', agentId: payload.agentId };
+                // Security: do not echo the caller-supplied `agentId` back in
+                // the skip response — it would reflect a (possibly forged /
+                // cross-tenant) UUID into the persisted Trigger.dev run record
+                // and act as an existence oracle for dashboard-scoped viewers.
+                return { status: 'skipped', reason: 'agent-not-found' };
             }
 
             // Look up the dispatcher-queued in-flight run (created when

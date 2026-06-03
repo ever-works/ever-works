@@ -1,6 +1,10 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { config } from '../config';
-import { EverWorksDeployQuotaExceededError, type EverWorksDeployQuotaCounter } from './types';
+import {
+    EverWorksDeployMisconfiguredError,
+    EverWorksDeployQuotaExceededError,
+    type EverWorksDeployQuotaCounter,
+} from './types';
 
 /** DI token for the active-deploys counter implementation. */
 export const EVER_WORKS_DEPLOY_QUOTA_COUNTER = Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER');
@@ -31,9 +35,19 @@ export class EverWorksDeployQuotaService {
      */
     async assertWithinQuota(userId: string): Promise<void> {
         if (!this.counter) {
-            // No counter wired up — quota cannot be enforced. Fail safely OPEN
-            // because the env-level disabled flag is the primary gate; without
-            // a counter we assume the wiring is incomplete in a test/dev shell.
+            // Security: fail CLOSED when the deploy feature is actually enabled
+            // but the quota counter DI is missing. In that state the per-user cap
+            // (the primary abuse/DoS control for the shared k8s deploy path) would
+            // otherwise be silently unenforced, letting a user spin up unlimited
+            // namespaces. We still fail OPEN (no-op) when the feature is disabled,
+            // since the env flag is the primary gate and an absent counter then
+            // just means an incomplete test/dev shell.
+            if (config.everWorks.deploy.isEnabled()) {
+                throw new EverWorksDeployMisconfiguredError(
+                    'deploy quota counter is not wired up; refusing to create an Ever Works Deploy Work ' +
+                        'because the per-user cap cannot be enforced',
+                );
+            }
             return;
         }
         const count = await this.counter.countActiveDeploys(userId);

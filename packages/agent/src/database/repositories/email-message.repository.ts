@@ -39,6 +39,15 @@ export class EmailMessageRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    // Security: tenant-scoped single-message lookup. Service-layer callers that
+    // resolve a message on behalf of an authenticated user MUST use this instead
+    // of the unscoped findById so another tenant's message body/subject/recipients
+    // can never be returned (IDOR). The unscoped findById is retained for internal
+    // system paths keyed on a trusted id (e.g. provider delivery-status callbacks).
+    async findByIdAndUserId(id: string, userId: string): Promise<EmailMessage | null> {
+        return this.repository.findOne({ where: { id, userId } });
+    }
+
     async findByProviderMessageId(
         pluginId: string,
         providerMessageId: string,

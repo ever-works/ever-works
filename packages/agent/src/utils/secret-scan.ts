@@ -17,13 +17,26 @@
  * Patterns ride on the AI Conversation feature's existing regex plus
  * the additions explicitly listed in security spec §6:
  *
- *   - sk-…/key-…/token-…/Bearer … (generic OpenAI-ish + JWT-style)
+ *   - sk-…/key-…/token-…/Bearer … (generic OpenAI-ish + JWT-style;
+ *                          also covers sk-ant-…/sk-proj-… since they
+ *                          start with the sk- prefix)
  *   - AKIA…                (AWS access-key id)
  *   - ghp_…                (GitHub personal access token, classic)
  *   - gho_…                (GitHub OAuth token)
+ *   - ghs_…                (GitHub App installation token)
+ *   - github_pat_…         (GitHub fine-grained PAT — default since 2022)
  *   - glpat-…              (GitLab personal access token)
  *   - xoxb-… / xoxp-…      (Slack bot / user tokens)
  *   - pat_…                (catch-all PAT prefix)
+ *   - -----BEGIN … PRIVATE KEY----- (PEM private key block)
+ *   - AIza…                (Google API key)
+ *   - sk_live_… / rk_live_… / *_test_… (Stripe secret keys — note the
+ *                          underscore means the generic sk- does NOT
+ *                          catch these)
+ *   - npm_…                (npm automation / publish token)
+ *   - hf_…                 (HuggingFace token)
+ *   - eyJ….….…             (JWT — three base64url segments)
+ *   - SK<32 hex>           (Twilio API key sid)
  *
  * The exact regexes are intentionally conservative (length floors) to
  * minimize false positives on prose that happens to contain "sk-" or
@@ -44,9 +57,37 @@ const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
     { name: 'aws_access_key', re: /\bAKIA[A-Z0-9]{16}\b/g },
     { name: 'github_pat_classic', re: /\bghp_[A-Za-z0-9]{36,}\b/g },
     { name: 'github_oauth', re: /\bgho_[A-Za-z0-9]{36,}\b/g },
+    // Security: GitHub App installation token (ghs_) — previously unmatched.
+    { name: 'github_app_token', re: /\bghs_[A-Za-z0-9]{36,}\b/g },
+    // Security: GitHub fine-grained PAT (github_pat_) — the default GitHub
+    // token format since 2022; the legacy ghp_ pattern above did not match it.
+    { name: 'github_fine_grained_pat', re: /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g },
     { name: 'gitlab_pat', re: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
     { name: 'slack_token', re: /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g },
     { name: 'generic_pat', re: /\bpat_[A-Za-z0-9]{30,}\b/g },
+    // Security: PEM private-key block — the leak the scanner is documented to
+    // stop (header comment / spec §6). Literal marker keeps false positives ~0.
+    {
+        name: 'pem_private_key',
+        re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/g,
+    },
+    // Security: Google API key (AIza…) — fixed 4-char prefix + 35 chars.
+    { name: 'google_api_key', re: /\bAIza[0-9A-Za-z_-]{35}\b/g },
+    // Security: Stripe secret/restricted keys — the underscore form (sk_live_…)
+    // is NOT caught by the generic sk- prefix above.
+    { name: 'stripe_secret_key', re: /\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}\b/g },
+    // Security: npm automation/publish token (npm_…) — high length floor so it
+    // does not flag prose like "npm_config" or "npm_lifecycle_event".
+    { name: 'npm_token', re: /\bnpm_[A-Za-z0-9]{36,}\b/g },
+    // Security: HuggingFace token (hf_…) — long floor avoids common prefixes.
+    { name: 'huggingface_token', re: /\bhf_[A-Za-z0-9]{30,}\b/g },
+    // Security: JWT (three base64url segments) — eyJ is base64 of '{"'.
+    {
+        name: 'jwt',
+        re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+    },
+    // Security: Twilio API key SID — SK + exactly 32 hex chars.
+    { name: 'twilio_api_key', re: /\bSK[0-9a-fA-F]{32}\b/g },
 ];
 
 /**

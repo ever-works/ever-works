@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { getAuthFromCookie } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { ROUTES, GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import DashboardClient from './dashboard-client';
 import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
-import { GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import { missionsAPI } from '@/lib/api/missions';
 import { usageAPI } from '@/lib/api/usage';
@@ -89,6 +90,13 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             .list({ limit: 3 })
             .catch(() => ({ data: [], meta: { total: 0, limit: 3, offset: 0 } })),
     ]);
+
+    // Security: defense-in-depth guard — if middleware matcher is misconfigured and
+    // an unauthenticated request reaches this server component, redirect to login
+    // rather than throwing a TypeError from the non-null assertion on line below.
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
 
     const totalWorks = statsResponse.success ? statsResponse.totalWorks : worksResponse.total;
 

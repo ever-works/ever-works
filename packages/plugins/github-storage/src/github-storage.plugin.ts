@@ -194,7 +194,14 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 		// `separate-repo` global env vars.
 		const dr = decodeDataRepoKey(key);
 		const cfg = dr ? await this.cfgForReadFromWork(dr.workId) : this.cfgForRead();
-		const actualPath = dr ? dr.path : key;
+		// Security (path-traversal): in `data-repo` mode the `<path>` segment
+		// of a `dr:<workId>:<path>` key is attacker-influenced (a tenant who
+		// learns the key format can craft one) and is used verbatim as the
+		// Octokit `path` against the Work owner's repo with their OAuth token.
+		// Confine it to the configured uploads prefix so a key like
+		// `dr:<uuid>:.github/workflows/ci.yml` can't fetch arbitrary repo files.
+		// Legit keys minted by putObject/deriveKey are always `<prefix>/<ownerId>/<file>`.
+		const actualPath = dr ? assertConfinedDataRepoPath(dr.path, cfg.pathPrefix) : key;
 		const octokit = this.client(cfg.token);
 		const { data } = await octokit.rest.repos.getContent({
 			owner: cfg.owner,
@@ -234,7 +241,11 @@ export class GitHubStoragePlugin implements IPlugin, IStoragePlugin {
 	async deleteObject(key: string): Promise<void> {
 		const dr = decodeDataRepoKey(key);
 		const cfg = dr ? await this.cfgForReadFromWork(dr.workId) : this.cfgForRead();
-		const actualPath = dr ? dr.path : key;
+		// Security (path-traversal): confine the decoded data-repo path to the
+		// configured uploads prefix before it is used as the Octokit delete
+		// target — otherwise a crafted `dr:<workId>:<path>` key could delete
+		// arbitrary files (e.g. CI workflows) from the Work owner's repo.
+		const actualPath = dr ? assertConfinedDataRepoPath(dr.path, cfg.pathPrefix) : key;
 		const octokit = this.client(cfg.token);
 		try {
 			const { data } = await octokit.rest.repos.getContent({
@@ -814,6 +825,34 @@ export function decodeDataRepoKey(key: string): { workId: string; path: string }
 	const path = rest.slice(sep + 1);
 	if (!workId || !path) return null;
 	return { workId, path };
+}
+
+/**
+ * Security (path-traversal): assert that the `<path>` recovered from a
+ * `dr:<workId>:<path>` storage key stays inside the configured uploads
+ * prefix before it is handed to Octokit `getContent`/`deleteFile` against
+ * the Work owner's repo (with their OAuth token). `decodeDataRepoKey`
+ * splits only on the first `:`, so the path segment is otherwise
+ * unvalidated and attacker-influenced. Without this, a crafted key such as
+ * `dr:<uuid>:.github/workflows/ci.yml` — or `dr:<uuid>:uploads/../.git/...`
+ * — would read or delete arbitrary files outside the uploads scope.
+ *
+ * Legit keys minted by `putObject`/`deriveKey` are always
+ * `<prefix>/<ownerId>/<hash><ext>`, so this is a no-op for valid uploads.
+ * Returns the path unchanged on success; throws otherwise.
+ */
+function assertConfinedDataRepoPath(path: string, pathPrefix: string): string {
+	const prefix = pathPrefix.replace(/(^\/+|\/+$)/g, '');
+	// Reject `..` segments anywhere (so `uploads/../x` can't escape) and any
+	// leading `/` (absolute path), then require the configured prefix.
+	if (
+		path.startsWith('/') ||
+		/(^|\/)\.\.(\/|$)/.test(path) ||
+		(prefix.length > 0 && !path.startsWith(`${prefix}/`))
+	) {
+		throw new Error('github-storage: storage key path escapes the configured uploads prefix');
+	}
+	return path;
 }
 
 function sanitizeExt(filename: string): string {

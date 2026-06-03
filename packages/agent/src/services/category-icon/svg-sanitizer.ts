@@ -17,7 +17,7 @@
  *   - Comments / DOCTYPE / processing instructions / CDATA stripped so
  *     payloads cannot hide inside them.
  *   - Forbidden elements removed: <script>, <foreignObject>, <iframe>,
- *     <embed>, <object>, <animate*>, <set>, <handler>, <listener>.
+ *     <embed>, <object>, <animate*>, <set>, <handler>, <listener>, <use>.
  *   - Forbidden attributes removed: on* event handlers, xlink:href/href
  *     (the most common SVG XSS vector), inline style (can carry
  *     url(javascript:…)).
@@ -48,8 +48,12 @@ const CDATA_RE = /<!\[CDATA\[[\s\S]*?\]\]>/g;
 // attribute capture, a non-greedy body match would terminate at the
 // opening `>` and leave the body intact — which is exactly what we
 // were trying to remove.
+// Security: `use` is also forbidden — inline category icons have no need for
+// it, and even with href/xlink:href stripped, a bare <use> can still be
+// exploited via browser SVG quirks (filter/feImage chains). Blocking the
+// element server-side is the safest and simplest defence.
 const FORBIDDEN_ELEMENT_RE =
-    /<\s*(script|foreignObject|iframe|embed|object|animate|animateTransform|set|handler|listener)\b[^>]*(?:\/>|>[\s\S]*?<\/\s*\1\s*>)/gi;
+    /<\s*(script|foreignObject|iframe|embed|object|animate|animateTransform|set|handler|listener|use)\b[^>]*(?:\/>|>[\s\S]*?<\/\s*\1\s*>)/gi;
 
 const EVENT_HANDLER_ATTR_RE = /\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
 

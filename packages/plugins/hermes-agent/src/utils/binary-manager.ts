@@ -59,11 +59,17 @@ export async function validateProfile(settings: HermesRuntimeSettings, logger: L
 	const result = await runCommand(binaryPath, ['profile', 'show', profile]);
 
 	if (result.status !== 0) {
+		// Security: the Hermes CLI's stdout/stderr can contain internal filesystem
+		// paths and environment details. Surface only a generic, non-revealing
+		// message to the caller (this string is returned to API clients via
+		// validateConnection) and keep the raw subprocess output server-side.
 		const detail = [result.stderr, result.stdout].map((value) => value.trim()).find((value) => Boolean(value));
-		const suffix = detail ? ` Hermes output: ${detail}` : '';
+		if (detail) {
+			logger.log(`Hermes profile "${profile}" validation failed. Hermes output: ${detail}`);
+		}
 
 		throw new Error(
-			`Hermes profile "${profile}" is not available or not configured correctly on the backend machine.${suffix}`
+			`Hermes profile "${profile}" is not available or not configured correctly on the backend machine.`
 		);
 	}
 

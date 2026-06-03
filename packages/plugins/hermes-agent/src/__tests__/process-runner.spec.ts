@@ -82,29 +82,108 @@ describe('process-runner', () => {
 		expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
 	});
 
-	it('only forwards a Hermes-specific allowlisted environment to Hermes', () => {
+	it('forwards proxy/TLS plumbing and Hermes-namespaced config but never host secrets', () => {
 		process.env.DATABASE_URL = 'postgres://secret';
-		process.env.OPENAI_API_KEY = 'sk-openai';
-		process.env.GEMINI_API_KEY = 'sk-gemini';
 		process.env.HERMES_INFERENCE_PROVIDER = 'gemini';
 		process.env.HTTP_PROXY = 'http://proxy.local';
 		process.env.NODE_EXTRA_CA_CERTS = '/tmp/custom-ca.pem';
 
 		const env = buildHermesEnv('/tmp/workspace');
 
+		// Non-allowlisted host secrets must never reach the child.
 		expect(env.DATABASE_URL).toBeUndefined();
-		expect(env.OPENAI_API_KEY).toBe('sk-openai');
-		expect(env.GEMINI_API_KEY).toBe('sk-gemini');
+		// Proxy / TLS plumbing and Hermes-prefixed config pass through.
 		expect(env.HERMES_INFERENCE_PROVIDER).toBe('gemini');
 		expect(env.HTTP_PROXY).toBe('http://proxy.local');
 		expect(env.NODE_EXTRA_CA_CERTS).toBe('/tmp/custom-ca.pem');
 		expect(env.TERMINAL_CWD).toBe('/tmp/workspace');
 
 		delete process.env.DATABASE_URL;
-		delete process.env.OPENAI_API_KEY;
-		delete process.env.GEMINI_API_KEY;
 		delete process.env.HERMES_INFERENCE_PROVIDER;
 		delete process.env.HTTP_PROXY;
 		delete process.env.NODE_EXTRA_CA_CERTS;
+	});
+
+	it('forwards ONLY the active provider credential, not the broad multi-provider key set', () => {
+		process.env.OPENROUTER_API_KEY = 'sk-openrouter';
+		process.env.OPENAI_API_KEY = 'sk-openai';
+		process.env.GEMINI_API_KEY = 'sk-gemini';
+		process.env.ANTHROPIC_API_KEY = 'sk-anthropic';
+		process.env.NOUS_API_KEY = 'sk-nous';
+
+		// Active provider is openrouter -> only OPENROUTER_API_KEY is exposed.
+		const env = buildHermesEnv('/tmp/workspace', 'openrouter');
+
+		expect(env.OPENROUTER_API_KEY).toBe('sk-openrouter');
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+		expect(env.GEMINI_API_KEY).toBeUndefined();
+		expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+		expect(env.NOUS_API_KEY).toBeUndefined();
+
+		delete process.env.OPENROUTER_API_KEY;
+		delete process.env.OPENAI_API_KEY;
+		delete process.env.GEMINI_API_KEY;
+		delete process.env.ANTHROPIC_API_KEY;
+		delete process.env.NOUS_API_KEY;
+	});
+
+	it('forwards the provider base-URL override alongside its key when the provider needs one', () => {
+		process.env.GEMINI_API_KEY = 'sk-gemini';
+		process.env.GEMINI_BASE_URL = 'https://gemini.local';
+		process.env.OPENAI_API_KEY = 'sk-openai';
+
+		const env = buildHermesEnv('/tmp/workspace', 'gemini');
+
+		expect(env.GEMINI_API_KEY).toBe('sk-gemini');
+		expect(env.GEMINI_BASE_URL).toBe('https://gemini.local');
+		// A different provider's key is still withheld.
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+
+		delete process.env.GEMINI_API_KEY;
+		delete process.env.GEMINI_BASE_URL;
+		delete process.env.OPENAI_API_KEY;
+	});
+
+	it('resolves the active provider from HERMES_INFERENCE_PROVIDER when no explicit provider is passed', () => {
+		process.env.HERMES_INFERENCE_PROVIDER = 'openai';
+		process.env.OPENAI_API_KEY = 'sk-openai';
+		process.env.OPENROUTER_API_KEY = 'sk-openrouter';
+
+		const env = buildHermesEnv('/tmp/workspace');
+
+		expect(env.OPENAI_API_KEY).toBe('sk-openai');
+		expect(env.OPENROUTER_API_KEY).toBeUndefined();
+
+		delete process.env.HERMES_INFERENCE_PROVIDER;
+		delete process.env.OPENAI_API_KEY;
+		delete process.env.OPENROUTER_API_KEY;
+	});
+
+	it('forwards NO inference-provider credential when the provider cannot be identified', () => {
+		// No --provider override and no HERMES_INFERENCE_PROVIDER => profile is the
+		// source of truth; the plugin must not guess-and-leak any provider key.
+		process.env.OPENAI_API_KEY = 'sk-openai';
+		process.env.OPENROUTER_API_KEY = 'sk-openrouter';
+		process.env.ANTHROPIC_API_KEY = 'sk-anthropic';
+
+		const env = buildHermesEnv('/tmp/workspace');
+
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+		expect(env.OPENROUTER_API_KEY).toBeUndefined();
+		expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+
+		delete process.env.OPENAI_API_KEY;
+		delete process.env.OPENROUTER_API_KEY;
+		delete process.env.ANTHROPIC_API_KEY;
+	});
+
+	it('does not forward a provider key for an unknown provider name', () => {
+		process.env.OPENAI_API_KEY = 'sk-openai';
+
+		const env = buildHermesEnv('/tmp/workspace', 'totally-unknown-provider');
+
+		expect(env.OPENAI_API_KEY).toBeUndefined();
+
+		delete process.env.OPENAI_API_KEY;
 	});
 });

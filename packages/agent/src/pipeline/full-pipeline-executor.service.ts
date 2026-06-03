@@ -283,11 +283,20 @@ export class FullPipelineExecutorService {
         completedSteps: number,
         source: string,
     ): void {
+        // Security: sanitize error.message before emitting to the event bus.
+        // Raw error messages from plugin failures may contain credentials or
+        // internal paths (e.g. "connect ECONNREFUSED postgresql://user:pass@host/db").
+        // Strip URL-like tokens that might carry embedded credentials, then truncate
+        // to a safe length. The full message is still logged server-side above.
+        const sanitizedError = error.message
+            .replace(/\b\w+:\/\/[^\s"']+/g, '[url-redacted]')
+            .slice(0, 200);
+
         this.eventEmitter.emit(PipelineEvents.FAILED, {
             timestamp: new Date().toISOString(),
             workId,
             pipelineId: source,
-            error: error.message,
+            error: sanitizedError,
             failedStep,
             completedSteps,
         } as PipelineFailedPayload);

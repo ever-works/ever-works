@@ -32,7 +32,11 @@ export async function encrypt(text: string): Promise<string> {
             ttl: 0, // No expiration for the seal itself (cookies handle their own expiration)
         });
     } catch (error) {
-        console.error('Encryption error:', error);
+        // Security: log only the message, not the full error object, to avoid leaking stack traces or iron-session internals to log aggregators.
+        console.error(
+            'Encryption error:',
+            error instanceof Error ? error.message : 'Unknown error',
+        );
         throw new Error('Failed to encrypt cookie value');
     }
 }
@@ -46,7 +50,11 @@ export async function decrypt(encryptedText: string): Promise<string> {
         // unsealData returns the original value
         return unsealed as string;
     } catch (error) {
-        console.error('Decryption error:', error);
+        // Security: log only the message, not the full error object, to avoid leaking stack traces or iron-session internals to log aggregators.
+        console.error(
+            'Decryption error:',
+            error instanceof Error ? error.message : 'Unknown error',
+        );
         throw new Error('Failed to decrypt cookie value');
     }
 }

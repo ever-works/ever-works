@@ -18,6 +18,7 @@ import {
     type ResolvedWorksConfig,
 } from '@src/works-config/services/works-config.service';
 import { mergeWorksConfigIntoDataConfig } from '@src/works-config/works-config-data';
+import { sanitizePrompt } from '../utils/sanitize.util';
 
 export interface ExecuteBySourceTypeOptions {
     work: Work;
@@ -326,7 +327,21 @@ export class ImportExecutorService {
                     token,
                 ));
 
-            if (!resolvedWorksConfig?.initialPrompt) {
+            // Security: `initialPrompt` comes from the attacker-controlled
+            // `.works/works.yml` of an external repo and is used verbatim as the
+            // LLM generation prompt. Because `generationDto` is built as a plain
+            // object literal (not via class-transformer), the `sanitizePrompt`
+            // @Transform on CreateItemsGeneratorDto.prompt never fires here — so
+            // apply the same sanitizer explicitly. It strips control characters
+            // and enforces the 5000-char DTO cap while preserving legitimate
+            // newlines/whitespace, so real operator prompts are unaffected.
+            // (Prompt isolation/delimiting at the model call site is a separate,
+            // pipeline-layer concern tracked in `deferred`.)
+            const sanitizedInitialPrompt = resolvedWorksConfig?.initialPrompt
+                ? sanitizePrompt(resolvedWorksConfig.initialPrompt, 5000)
+                : '';
+
+            if (!resolvedWorksConfig?.initialPrompt || !sanitizedInitialPrompt) {
                 return {
                     success: false,
                     workId: work.id,
@@ -337,7 +352,7 @@ export class ImportExecutorService {
 
             const generationDto: CreateItemsGeneratorDto = {
                 name: work.name,
-                prompt: resolvedWorksConfig.initialPrompt,
+                prompt: sanitizedInitialPrompt,
                 model: resolvedWorksConfig.model,
                 providers: {
                     ...(resolvedWorksConfig.providers ?? {}),

@@ -13,6 +13,7 @@ import { getWorkOwner } from '../../utils/work.utils';
 import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
+import { redactSecrets } from '../../utils/secret-scan';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
@@ -180,7 +181,20 @@ export class MarkdownGeneratorService {
                 try {
                     const markdown = await dataRepo.getMarkdown(slug);
                     if (markdown) {
-                        await markdownRepo.writeDetails(slug, markdown);
+                        // Security (secrets): the data-repo item body can come from
+                        // hostile external content (import path clones an attacker
+                        // repo straight into the data repo, bypassing the generator's
+                        // own redaction) or biased LLM output. Redact live-looking
+                        // credentials before they are written to the published main
+                        // repo and pushed (later served / made public). Redact rather
+                        // than reject so legitimate markdown is unchanged.
+                        const { cleaned, redactions } = redactSecrets(markdown);
+                        if (redactions > 0) {
+                            this.logger.warn(
+                                `Redacted ${redactions} secret-like value(s) from item "${slug}" markdown before commit.`,
+                            );
+                        }
+                        await markdownRepo.writeDetails(slug, cleaned);
                         markdowns.add(slug);
                     }
 
@@ -244,7 +258,18 @@ export class MarkdownGeneratorService {
             throwIfGenerationCancelled(options.signal);
             const license = await dataRepo.getLicense();
             if (license) {
-                await markdownRepo.writeLicense(license);
+                // Security (secrets): same egress as item markdown — the license
+                // text comes from the (possibly imported / attacker-controlled)
+                // data repo and is pushed to the published main repo. Redact any
+                // credential-shaped values before writing.
+                const { cleaned: cleanedLicense, redactions: licenseRedactions } =
+                    redactSecrets(license);
+                if (licenseRedactions > 0) {
+                    this.logger.warn(
+                        `Redacted ${licenseRedactions} secret-like value(s) from LICENSE before commit.`,
+                    );
+                }
+                await markdownRepo.writeLicense(cleanedLicense);
             }
 
             throwIfGenerationCancelled(options.signal);
@@ -254,7 +279,17 @@ export class MarkdownGeneratorService {
                 groups,
                 categories,
             );
-            await markdownRepo.writeReadme(readme);
+            // Security (secrets): the README is assembled from item names /
+            // descriptions / category data sourced from the same untrusted data
+            // repo, so a credential-shaped value can be folded into it. Redact
+            // before writing it to the published main repo and pushing.
+            const { cleaned: cleanedReadme, redactions: readmeRedactions } = redactSecrets(readme);
+            if (readmeRedactions > 0) {
+                this.logger.warn(
+                    `Redacted ${readmeRedactions} secret-like value(s) from README before commit.`,
+                );
+            }
+            await markdownRepo.writeReadme(cleanedReadme);
 
             throwIfGenerationCancelled(options.signal);
             await this.gitFacade.addAll(provider, markdownPath);

@@ -105,13 +105,15 @@ export class SearchServicePromptService extends BasePromptService {
 
     private async testTavilyApiKey(apiKey: string): Promise<boolean> {
         try {
+            // Security: API key transmitted via Authorization header instead of request body
+            // to reduce exposure in access logs, proxy logs, and HTTP debugging tools.
             const response = await fetch('https://api.tavily.com/search', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    Authorization: `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
-                    api_key: apiKey,
                     query: 'test',
                     max_results: 1,
                 }),

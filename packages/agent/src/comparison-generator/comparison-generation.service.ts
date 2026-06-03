@@ -10,6 +10,7 @@ import { PromptFacadeService } from '../facades/prompt.facade';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
+import { WorkOwnershipService } from '../services/work-ownership.service';
 import { CacheEntry } from '../entities/cache.entity';
 import type { Work } from '../entities/work.entity';
 import type { ComparisonData } from '@ever-works/contracts';
@@ -36,6 +37,7 @@ import {
 import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { normalizeGeneratorError } from '../services/utils/error.utils';
+import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 const comparisonStructureSchema = z.object({
     title: z.string(),
@@ -74,6 +76,7 @@ export class ComparisonGenerationService {
         private readonly workRepository: WorkRepository,
         private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
         private readonly workPluginRepository: WorkPluginRepository,
+        private readonly workOwnershipService: WorkOwnershipService,
         @Optional() @Inject(CACHE_MANAGER) private readonly cacheManager?: Cache,
         @Optional()
         @InjectRepository(CacheEntry)
@@ -361,6 +364,17 @@ export class ComparisonGenerationService {
                 continue;
             }
 
+            // Security: seed URLs originate from attacker-controllable item data
+            // (source_url / suggested_source_url / markdown links — writable via
+            // auto-applied community PRs). Drop any URL that targets a private,
+            // loopback, link-local, or cloud-metadata address before it is handed
+            // to the content-extractor facade, mitigating SSRF (e.g. fetching
+            // http://169.254.169.254/...). The default extractor enforces the same
+            // lexical guard internally, but a swapped-in extractor plugin may not.
+            if (!isSafeWebhookUrl(url)) {
+                continue;
+            }
+
             deduped.set(url, {
                 url,
                 snippet: candidate.snippet,
@@ -379,6 +393,14 @@ export class ComparisonGenerationService {
         userId: string,
         options: { respectCadence?: boolean } = {},
     ): Promise<ComparisonResult> {
+        // Security: defense-in-depth authorization gate (IDOR). HTTP callers are
+        // already gated in works.controller.ts, but this membership-aware check
+        // ensures no future/internal caller can mutate another tenant's data repo
+        // by passing a foreign workId. Uses the shared access model (creator OR a
+        // work_members row of sufficient role) — NOT a creator-only equality check,
+        // which would wrongly reject legitimate EDITOR/MANAGER members. The
+        // scheduler passes the work's own creator id, so it always passes.
+        await this.workOwnershipService.ensureCanEdit(workId, userId);
         const work = await this.findWorkOrFail(workId);
         const lockToken = await this.tryAcquireGenerationLock(workId);
 
@@ -451,6 +473,9 @@ export class ComparisonGenerationService {
      * Count how many un-generated comparison pairs remain.
      */
     async getRemainingCount(workId: string, userId: string): Promise<number> {
+        // Security: defense-in-depth read authorization (IDOR). See
+        // generateNextComparison for rationale; view-level for a read path.
+        await this.workOwnershipService.ensureCanView(workId, userId);
         const work = await this.findWorkOrFail(workId);
 
         const gitOptions = this.getWorkGitOptions(work);
@@ -491,6 +516,10 @@ export class ComparisonGenerationService {
         itemASlug: string,
         itemBSlug: string,
     ): Promise<ComparisonResult> {
+        // Security: defense-in-depth authorization gate (IDOR). Edit-level —
+        // this writes a comparison to the work's data repo. See
+        // generateNextComparison for the full rationale.
+        await this.workOwnershipService.ensureCanEdit(workId, userId);
         const work = await this.findWorkOrFail(workId);
         const lockToken = await this.tryAcquireGenerationLock(workId);
 
@@ -554,6 +583,9 @@ export class ComparisonGenerationService {
      * List all comparisons for a work.
      */
     async listComparisons(workId: string, userId: string): Promise<ComparisonData[]> {
+        // Security: defense-in-depth read authorization (IDOR). View-level. See
+        // generateNextComparison for rationale.
+        await this.workOwnershipService.ensureCanView(workId, userId);
         const work = await this.findWorkOrFail(workId);
 
         const gitOptions = this.getWorkGitOptions(work);
@@ -587,6 +619,9 @@ export class ComparisonGenerationService {
         markdown?: string;
         extendedAnalysisMarkdown?: string;
     }> {
+        // Security: defense-in-depth read authorization (IDOR). View-level. See
+        // generateNextComparison for rationale.
+        await this.workOwnershipService.ensureCanView(workId, userId);
         const work = await this.findWorkOrFail(workId);
 
         const gitOptions = this.getWorkGitOptions(work);
@@ -622,6 +657,10 @@ export class ComparisonGenerationService {
         userId: string,
         slug: string,
     ): Promise<ComparisonResult> {
+        // Security: defense-in-depth authorization gate (IDOR). Edit-level —
+        // this removes a comparison from the work's data repo and pushes. See
+        // generateNextComparison for the full rationale.
+        await this.workOwnershipService.ensureCanEdit(workId, userId);
         const work = await this.findWorkOrFail(workId);
 
         const gitOptions = this.getWorkGitOptions(work);

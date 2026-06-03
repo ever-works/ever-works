@@ -212,7 +212,14 @@ export class AuthService {
         // back to the platform default.
         const validatedCallback = this.validateCallbackUrl(callbackUrl, 'verification');
         if (validatedCallback && !validatedCallback.includes('token=')) {
-            callbackUrl = `${validatedCallback}?token=${verificationToken}`;
+            // Security: append the token via URL/searchParams so a callback that
+            // already carries query params (e.g. ?locale=en) yields a valid
+            // ?locale=en&token=... instead of a malformed double-'?' string.
+            // validatedCallback is guaranteed parseable (validateCallbackUrl
+            // already constructed a URL from it).
+            const url = new URL(validatedCallback);
+            url.searchParams.set('token', verificationToken);
+            callbackUrl = url.toString();
         } else {
             callbackUrl = `${this.webAppUrl}/api/auth/verify-email?token=${verificationToken}`;
         }
@@ -297,7 +304,12 @@ export class AuthService {
         );
         let callbackUrl: string;
         if (validatedReset && !validatedReset.includes('token=')) {
-            callbackUrl = `${validatedReset}?token=${resetToken}`;
+            // Security: append via URL/searchParams so an existing query string
+            // on the callback yields a valid ?...&token=... rather than a
+            // malformed double-'?'. See sendVerificationEmail for rationale.
+            const url = new URL(validatedReset);
+            url.searchParams.set('token', resetToken);
+            callbackUrl = url.toString();
         } else {
             callbackUrl = `${this.webAppUrl}/api/auth/reset-password?token=${resetToken}`;
         }
@@ -392,7 +404,12 @@ export class AuthService {
         const validated = this.validateCallbackUrl(dto.magicLinkCallbackUrl, 'magic-link');
         let magicLinkUrl: string;
         if (validated && !validated.includes('token=')) {
-            magicLinkUrl = `${validated}?token=${rawToken}`;
+            // Security: append via URL/searchParams so an existing query string
+            // on the callback yields a valid ?...&token=... rather than a
+            // malformed double-'?'. See sendVerificationEmail for rationale.
+            const url = new URL(validated);
+            url.searchParams.set('token', rawToken);
+            magicLinkUrl = url.toString();
         } else {
             magicLinkUrl = `${this.webAppUrl}/login/magic-link?token=${rawToken}`;
         }
@@ -458,13 +475,31 @@ export class AuthService {
             throw new BadRequestException('User not found');
         }
 
-        // Return user data without sensitive fields
+        // Return user data without sensitive fields.
+        // Security: also strip the magic-link token/expiry, the login-lockout
+        // counters, the last-login IP, and the platform-admin flag. These
+        // columns were added after the original deny-list and are operational
+        // / security state that must never leave the server in the profile
+        // response (GET /api/auth/profile/fresh, PUT /api/auth/profile).
+        // - magicLinkToken is a sha256 hash, but leaking it confirms an
+        //   outstanding link and aids brute-force confirmation.
+        // - failedLoginAttempts / lockedUntil reveal how many guesses remain
+        //   before lockout.
+        // - lastLoginIp aids account-takeover / OSINT chains.
+        // - isPlatformAdmin is enforced server-side by IsPlatformAdminGuard via
+        //   its own DB lookup, so removing it from this payload is safe.
         const {
             password,
             emailVerificationToken,
             emailVerificationExpires,
             passwordResetToken,
             passwordResetExpires,
+            magicLinkToken,
+            magicLinkExpires,
+            failedLoginAttempts,
+            lockedUntil,
+            lastLoginIp,
+            isPlatformAdmin,
             ...userProfile
         } = user;
 

@@ -1,5 +1,18 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsBoolean,
+    IsEmail,
+    IsIn,
+    IsObject,
+    IsOptional,
+    IsString,
+    MaxLength,
+    ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { renderTemplate } from './templates/render';
 import {
     TenantEmailAddressRepository,
@@ -9,37 +22,104 @@ import {
 import type { TenantEmailAddress, EmailAddressDirection } from '@ever-works/agent/entities';
 import { EmailFacadeService } from '@ever-works/agent/facades';
 
-export interface CreateEmailAddressInput {
-    readonly address: string;
-    readonly direction: EmailAddressDirection;
-    readonly pluginId: string;
-    readonly providerSettings: Record<string, unknown>;
+// Security: these request bodies are bound directly via `@Body()` in
+// email.controller.ts. The global ValidationPipe (main.ts) runs with
+// `whitelist + forbidNonWhitelisted + transform`, but it only enforces
+// constraints on classes carrying class-validator metadata — a plain
+// `interface` type is treated as having no whitelist, so every field
+// (recipients, subject, raw HTML body, template slug/props) was passed
+// through unvalidated. Declaring these as decorated classes makes the
+// pipe strip unknown properties and reject malformed/oversized input
+// from authenticated callers while leaving legitimate payloads intact.
+
+export class CreateEmailAddressInput {
+    @IsEmail()
+    @MaxLength(320)
+    readonly address!: string;
+
+    @IsIn(['outbound', 'inbound', 'both'])
+    readonly direction!: EmailAddressDirection;
+
+    @IsString()
+    @MaxLength(128)
+    readonly pluginId!: string;
+
+    @IsObject()
+    readonly providerSettings!: Record<string, unknown>;
+
+    @IsOptional()
+    @IsBoolean()
     readonly defaultForReplies?: boolean;
 }
 
-export interface UpdateEmailAddressInput {
+export class UpdateEmailAddressInput {
+    @IsOptional()
+    @IsObject()
     readonly providerSettings?: Record<string, unknown>;
+
+    @IsOptional()
+    @IsBoolean()
     readonly defaultForReplies?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
     readonly disabled?: boolean;
 }
 
 /** A React-Email template handle (rendered server-side via @ever-works/email-templates). */
-export interface EmailTemplateRef {
-    readonly slug: string;
-    readonly props: Record<string, unknown>;
+export class EmailTemplateRef {
+    @IsString()
+    @MaxLength(128)
+    readonly slug!: string;
+
+    // Per-template props vary (discriminated by slug) and are consumed by
+    // the React-Email renderer; validate the container without recursing
+    // so legitimate template props are preserved verbatim.
+    @IsObject()
+    readonly props!: Record<string, unknown>;
 }
 
-export interface SendMessageInput {
-    readonly agentId: string;
-    readonly to: string[];
-    readonly subject: string;
+export class SendMessageInput {
+    @IsString()
+    @MaxLength(256)
+    readonly agentId!: string;
+
+    @IsArray()
+    @ArrayMaxSize(100)
+    @IsEmail({}, { each: true })
+    readonly to!: string[];
+
+    @IsString()
+    @MaxLength(998)
+    readonly subject!: string;
+
     /** Plain-text body. Optional when `template` is supplied (rendered then). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(1_000_000)
     readonly bodyText?: string;
+
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(100)
+    @IsEmail({}, { each: true })
     readonly cc?: string[];
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(2_000_000)
     readonly bodyHtml?: string;
+
     /** Render a registered React-Email template into bodyHtml + text on send. */
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => EmailTemplateRef)
     readonly template?: EmailTemplateRef;
+
     /** Specific tenant address to send from; defaults to the agent's primary outbound. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(256)
     readonly fromAddressId?: string;
 }
 

@@ -19,6 +19,12 @@ import type {
 
 import { Exa } from 'exa-js';
 
+// Security (SSRF): lexical guard that rejects non-HTTP(S) schemes and literal
+// private/loopback/link-local/cloud-metadata IPs. Imported directly from the
+// helper subpath because the plugin barrel intentionally does not re-export it
+// (it pulls in node:net / node:dns).
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+
 const SEARCH_TYPES = ['auto', 'neural', 'keyword'] as const;
 
 const CATEGORIES = ['', 'company', 'research paper', 'news', 'tweet', 'personal site', 'github'] as const;
@@ -180,6 +186,23 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 	async extract(options: ContentExtractionOptions): Promise<ContentExtractionResult> {
 		const startTime = Date.now();
 
+		// Security (SSRF): `extract()` relies on the caller invoking `canExtract()`
+		// first, which only validates the scheme and cannot be guaranteed.
+		// `options.url` is attacker-controllable (every item's source_url, including
+		// URLs the community-PR LLM picks) and is forwarded to the Exa API to fetch.
+		// Refuse non-HTTP(S) schemes and literal private/loopback/link-local/
+		// cloud-metadata targets (e.g. http://169.254.169.254/...) before issuing the
+		// request. Mirrors local-content-extractor / pdf-extractor / scrapfly.
+		// Legitimate https URLs pass.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				url: options.url,
+				error: `URL host is not safe to extract (SSRF guard blocked: ${options.url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
 		try {
 			const client = this.getClient(options.settings);
 			const response = await client.getContents([options.url], { text: true, livecrawl: 'fallback' });
@@ -221,14 +244,43 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 	): Promise<readonly ContentExtractionResult[]> {
 		const startTime = Date.now();
 
+		// Security (SSRF): every URL is attacker-controllable and is forwarded to the
+		// Exa API to fetch. `canExtract()` (scheme-only) is not guaranteed to run, so
+		// guard each URL here. Partition out non-HTTP(S) schemes and literal private/
+		// loopback/link-local/cloud-metadata targets; blocked URLs get a per-index
+		// failure result and are never sent upstream, while safe URLs proceed. Result
+		// order stays aligned with the input `urls`. All-legitimate batches behave
+		// exactly as before. Mirrors local-content-extractor / pdf-extractor / scrapfly.
+		const results: ContentExtractionResult[] = new Array(urls.length);
+		const safeUrls: string[] = [];
+		const safeIndexes: number[] = [];
+		urls.forEach((url, index) => {
+			if (isSafeWebhookUrl(url)) {
+				safeUrls.push(url);
+				safeIndexes.push(index);
+			} else {
+				results[index] = {
+					success: false,
+					url,
+					error: `URL host is not safe to extract (SSRF guard blocked: ${url})`,
+					duration: Date.now() - startTime
+				};
+			}
+		});
+
+		if (safeUrls.length === 0) {
+			return results;
+		}
+
 		try {
 			const client = this.getClient(options?.settings);
-			const response = await client.getContents([...urls], { text: true, livecrawl: 'fallback' });
+			const response = await client.getContents([...safeUrls], { text: true, livecrawl: 'fallback' });
 
-			return response.results.map((result, index) => {
+			response.results.forEach((result, i) => {
+				const originalIndex = safeIndexes[i];
 				const text = result.text || '';
-				const requestedUrl = urls[index] || result.url;
-				return {
+				const requestedUrl = safeUrls[i] || result.url;
+				results[originalIndex] = {
 					success: true,
 					url: requestedUrl,
 					finalUrl: result.url !== requestedUrl ? result.url : undefined,
@@ -238,13 +290,31 @@ export class ExaSearchPlugin implements IPlugin, ISearchPlugin, IContentExtracto
 					wordCount: text ? text.split(/\s+/).length : 0
 				};
 			});
+
+			// Fill any safe URLs the API did not return a result for so the output
+			// array has no holes (preserves the original positional contract).
+			safeIndexes.forEach((originalIndex, i) => {
+				if (!results[originalIndex]) {
+					results[originalIndex] = {
+						success: false,
+						url: safeUrls[i],
+						error: 'No content extracted',
+						duration: Date.now() - startTime
+					};
+				}
+			});
+
+			return results;
 		} catch (error) {
-			return urls.map((url) => ({
-				success: false,
-				url,
-				error: error instanceof Error ? error.message : String(error),
-				duration: Date.now() - startTime
-			}));
+			safeIndexes.forEach((originalIndex, i) => {
+				results[originalIndex] = {
+					success: false,
+					url: safeUrls[i],
+					error: error instanceof Error ? error.message : String(error),
+					duration: Date.now() - startTime
+				};
+			});
+			return results;
 		}
 	}
 

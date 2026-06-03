@@ -1,4 +1,5 @@
 import { promises as dnsPromises } from 'node:dns';
+import { isIP } from 'node:net';
 import type { AddDomainResult, DeploymentDomain, DeploymentDomainVerification } from '@ever-works/plugin';
 import type { IngressStrategy } from './ingress/strategy.js';
 
@@ -151,7 +152,29 @@ export async function verifyDomainResolution(
 	if (!resolved) {
 		try {
 			const a = await resolver.resolve4(domain);
-			resolved = a.length > 0;
+			if (expectedTarget) {
+				// Security: when a target is known, the A-record branch must
+				// actually point AT the cluster ingress — not merely resolve
+				// to "some IP". Previously `a.length > 0` marked any domain
+				// with any A record as verified, letting a user claim an
+				// unrelated domain that happens to point at their own server.
+				if (isIP(expectedTarget)) {
+					// Apex/flattened DNS: target is the LB's bare IP.
+					resolved = a.includes(expectedTarget);
+				} else {
+					// Target is the LB hostname; resolve it and require the
+					// domain's A records to overlap the LB's IPs.
+					let targetIps: string[] = [];
+					try {
+						targetIps = await resolver.resolve4(expectedTarget);
+					} catch {
+						targetIps = [];
+					}
+					resolved = targetIps.length > 0 && a.some((ip) => targetIps.includes(ip));
+				}
+			} else {
+				resolved = a.length > 0;
+			}
 		} catch {
 			resolved = false;
 		}

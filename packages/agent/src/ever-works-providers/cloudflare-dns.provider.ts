@@ -243,6 +243,11 @@ export class EverWorksDnsService {
 
     /** Compute the canonical ingress host for a given Work slug. */
     ingressHostFor(slug: string): string {
+        // Security: validate slug with the same rule enforced in CloudflareDnsProvider.assertSlug
+        // to prevent malformed/injected values from being stored as canonical URLs.
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+            throw new Error(`Invalid slug for ingress host: ${slug}`);
+        }
         const rootDomain = process.env.EVER_WORKS_DOMAIN?.trim() || 'ever.works';
         return `${slug}.${rootDomain}`;
     }

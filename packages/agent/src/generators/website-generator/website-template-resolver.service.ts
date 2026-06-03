@@ -51,12 +51,21 @@ export class WebsiteTemplateResolverService {
 
     private async findCatalogTemplateConfig(
         templateId?: string | null,
+        // Security: when a userId is supplied (user-preference path), use
+        // findVisibleById which enforces that custom templates are owned by
+        // this user — preventing cross-tenant IDOR via a guessed template UUID.
+        userId?: string | null,
     ): Promise<WebsiteTemplateConfig | null> {
         if (!templateId) {
             return null;
         }
 
-        const template = await this.templateRepository.findById(templateId);
+        // Use the visibility-scoped lookup when we have a user context so that
+        // custom templates belonging to other tenants are never returned.
+        const template = userId
+            ? await this.templateRepository.findVisibleById(templateId, userId)
+            : await this.templateRepository.findById(templateId);
+
         if (template && template.kind === 'website' && template.isActive) {
             return {
                 id: template.id,
@@ -107,7 +116,13 @@ export class WebsiteTemplateResolverService {
         );
 
         if (preference?.templateId) {
-            const preferredTemplate = await this.findCatalogTemplateConfig(preference.templateId);
+            // Security: pass work.userId so findCatalogTemplateConfig uses the
+            // visibility-scoped lookup, blocking cross-tenant access via a saved
+            // preference pointing at another user's custom template UUID.
+            const preferredTemplate = await this.findCatalogTemplateConfig(
+                preference.templateId,
+                work.userId,
+            );
             if (preferredTemplate) {
                 return preferredTemplate;
             }

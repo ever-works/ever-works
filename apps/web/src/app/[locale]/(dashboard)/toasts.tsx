@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { APP_NAME } from '@/lib/constants';
+import { OAuthProvider } from '@/lib/api/enums';
 
 export default function DashboardToasts() {
     const searchParams = useSearchParams();
@@ -14,7 +15,14 @@ export default function DashboardToasts() {
     const isVerified = searchParams.get('verified') === 'true';
     const isOAuthConnected = searchParams.get('oauth_connected') === 'true';
     const oauthError = searchParams.get('oauth_error');
-    const oauthProvider = searchParams.get('oauth_provider');
+    // Security: validate oauth_provider against a known allow-list before
+    // embedding it in toast messages. An attacker can craft a redirect URL with
+    // any arbitrary string in this query param (social-engineering / UI redress).
+    // Unrecognised values fall back to the default provider label.
+    const oauthProviderRaw = searchParams.get('oauth_provider');
+    const oauthProvider = Object.values(OAuthProvider).includes(oauthProviderRaw as OAuthProvider)
+        ? oauthProviderRaw
+        : null;
 
     const providerLabel = oauthProvider
         ? oauthProvider

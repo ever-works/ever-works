@@ -164,6 +164,16 @@ export function WorkImportForm({ gitProvider, deployProvider }: WorkImportFormPr
 
     const buildRelatedRepoUrl = (dataRepo: { owner: string; name: string }): string => {
         if (!analysisResult) return sourceUrl;
+        // Security: `dataRepo.owner`/`dataRepo.name` are derived from analysis of an
+        // external (potentially attacker-controlled) repository. Reject anything that
+        // is not a plain git owner/repo segment so crafted values (path-traversal
+        // `../`, slashes, leading dots) cannot redirect the constructed URL to an
+        // unintended host/repo. Fall back to the already-validated source URL.
+        const isSafeRepoSegment = (segment: string): boolean =>
+            /^[A-Za-z0-9_.-]+$/.test(segment) && segment !== '.' && segment !== '..';
+        if (!isSafeRepoSegment(dataRepo.owner) || !isSafeRepoSegment(dataRepo.name)) {
+            return analysisResult.sourceUrl;
+        }
         const base = analysisResult.sourceUrl.replace(/\/[^/]+\/[^/]+\/?$/, '');
         return `${base}/${dataRepo.owner}/${dataRepo.name}`;
     };

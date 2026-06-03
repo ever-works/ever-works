@@ -68,6 +68,9 @@ import {
 	getDefaultValues as formDefaults
 } from './form-schema.js';
 import { README } from './readme.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
  * Composio Integrations Plugin
@@ -192,7 +195,9 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		try {
 			const client = new ComposioClient({
 				apiKey: settings.apiKey as string,
-				baseUrl: (settings.baseUrl as string) || undefined,
+				// Security (SSRF): same guard as resolveComposioSettings — baseUrl is
+				// tenant-controlled and reaches the Composio SDK with the API key attached.
+				baseUrl: resolveSafeBaseUrl(trimOrUndefined(settings.baseUrl)),
 				logger: this.context?.logger ?? console
 			});
 
@@ -311,7 +316,11 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		try {
 			return await buildSkillCatalogEntries({
 				apiKey,
-				baseUrl: readBaseUrl(settings),
+				// Security (SSRF): baseUrl is tenant-controlled and reaches the Composio
+				// SDK (with the API key) inside buildSkillCatalogEntries. Block private/
+				// loopback/link-local/cloud-metadata hosts and non-HTTP(S) schemes; an
+				// unsafe value throws and is caught below, degrading to an empty catalog.
+				baseUrl: resolveSafeBaseUrl(readBaseUrl(settings)),
 				defaultUserId,
 				logger: this.context?.logger ?? console
 			});
@@ -588,7 +597,12 @@ export class ComposioPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 
 		return {
 			apiKey,
-			baseUrl: trimOrUndefined(pluginSettings.baseUrl),
+			// Security (SSRF): baseUrl is tenant-controlled plugin settings and flows into
+			// the ComposioClient used by the execute() pipeline below, which sends every
+			// Composio request — carrying the API key — to that host. Reject private/
+			// loopback/link-local/cloud-metadata hosts and non-HTTP(S) schemes here so a
+			// malicious baseUrl can't redirect the request to an internal endpoint.
+			baseUrl: resolveSafeBaseUrl(trimOrUndefined(pluginSettings.baseUrl)),
 			defaultUserId: trimOrUndefined(pluginSettings.defaultUserId),
 			defaultToolkit: trimOrUndefined(pluginSettings.defaultToolkit),
 			defaultToolSlug: trimOrUndefined(pluginSettings.defaultToolSlug),
@@ -699,6 +713,22 @@ function trimOrUndefined(value: unknown): string | undefined {
 	if (typeof value !== 'string') return undefined;
 	const trimmed = value.trim();
 	return trimmed === '' ? undefined : trimmed;
+}
+
+// Security (SSRF): the `baseUrl` plugin setting is tenant-controlled and flows into
+// the `@composio/core` SDK as `baseURL`, which sends every Composio request — carrying
+// the `x-api-key` header — to that host. Reject literal private/loopback/link-local/
+// cloud-metadata hosts (e.g. http://169.254.169.254 IMDS, http://localhost:2375 Docker)
+// and non-HTTP(S) schemes so a malicious baseUrl can't redirect those requests to an
+// internal endpoint (and reflect the response through the error path). Mirrors the
+// zapier / make plugin guards. Returns `undefined` for an empty value so the SDK falls
+// back to its default base URL.
+function resolveSafeBaseUrl(baseUrl: string | undefined): string | undefined {
+	if (!baseUrl) return undefined;
+	if (!isSafeWebhookUrl(baseUrl)) {
+		throw new Error('Composio API base URL is not safe to call (SSRF guard blocked the destination host).');
+	}
+	return baseUrl;
 }
 
 function safeStringify(value: unknown, maxLength = 500): string {

@@ -1,4 +1,5 @@
 import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { SimWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
@@ -42,7 +43,15 @@ export function buildWorkflowPayload(options: PayloadOptions): SimWorkflowInput 
 	}
 
 	// Strategy 2: GitHub repository reference
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: the user-supplied repo_url is forwarded to the external SIM
+	// workflow, which fetches it server-side. Without validation an attacker
+	// could point it at http://169.254.169.254/, a private/loopback host, or a
+	// non-HTTP scheme (file://) to probe internal services via the SIM runner
+	// (SSRF). Gate the dataSource on the shared lexical SSRF guard (rejects
+	// non-HTTP(S) schemes and literal private/loopback/link-local/cloud-metadata
+	// IPs). Legitimate https://github.com/... URLs are unaffected; an unsafe URL
+	// fails closed by omitting dataSource so the probe never reaches SIM.
+	if (config.pass_repo_access && config.repo_url && isSafeWebhookUrl(config.repo_url as string)) {
 		payload.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,

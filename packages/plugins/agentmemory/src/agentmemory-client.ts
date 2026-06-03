@@ -175,7 +175,17 @@ async function buildHttpError(response: Response, url: string): Promise<Error> {
 		// ignore
 	}
 
-	const baseMessage = `agentmemory request failed (${response.status} ${response.statusText}) for ${url}`;
+	// Security: use only the path portion of the URL in error messages to avoid
+	// disclosing internal hostnames, ports, or credentials from the baseUrl config.
+	let urlPath = url;
+	try {
+		const parsed = new URL(url);
+		urlPath = parsed.pathname + parsed.search;
+	} catch {
+		// If URL parsing fails, fall back to the full string (already a string, not a URL object).
+	}
+
+	const baseMessage = `agentmemory request failed (${response.status} ${response.statusText}) for ${urlPath}`;
 
 	if (response.status === 401 || response.status === 403) {
 		return new Error(
@@ -184,7 +194,7 @@ async function buildHttpError(response: Response, url: string): Promise<Error> {
 	}
 	if (response.status === 404) {
 		return new Error(
-			`agentmemory endpoint not found at ${url}. ` +
+			`agentmemory endpoint not found: ${urlPath}. ` +
 				'Either the server is an older version or the configured `baseUrl` is wrong.'
 		);
 	}

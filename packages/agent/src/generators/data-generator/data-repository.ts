@@ -16,6 +16,16 @@ import type {
 import type { ReferenceEntry } from '@ever-works/plugin';
 import { CreateItemsGeneratorDto } from '../../items-generator/dto';
 
+// Security (path-traversal hardening): item/comparison slugs are used verbatim
+// as directory names under the cloned data repo, and the value reaching the
+// remove/update/read sinks can be an attacker-supplied `item_slug` (validated
+// only as a non-empty string at the DTO layer). `path.basename` alone is
+// platform-dependent (POSIX leaves `..\\x` untouched) and lets through reserved
+// names like `.`/`..`, so we additionally require a strict allowlist matching
+// the `slugifyText` output charset ([A-Za-z0-9_-]) before any path is built.
+// Mirrors `GitHubSyncService.safeSlugDir`.
+const SAFE_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
 export type PRUpdate = {
     branch: string;
     title: string;
@@ -207,8 +217,35 @@ const mergeUniqueArray = (existing: unknown[], incoming: unknown[]): unknown[] =
     return merged;
 };
 
+// Security (prototype pollution): `.works/works.yml` (and the other config
+// files) come from an attacker-controllable cloned repo and are parsed with
+// `yaml.parse`, which surfaces a YAML `__proto__:` mapping key as an OWN
+// enumerable property. Feeding that straight into `mergeWith` is the classic
+// recursive-merge pollution vector. Rather than rely on lodash's internal
+// safe-key mitigation, strip the dangerous own keys from the parsed config
+// before merging. Behaviour is unchanged for legitimate configs — no valid
+// `works.yml` carries an own `__proto__`/`constructor`/`prototype` key.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+const stripPrototypePollution = <T>(value: T): T => {
+    if (Array.isArray(value)) {
+        value.forEach((entry) => stripPrototypePollution(entry));
+        return value;
+    }
+    if (value && typeof value === 'object') {
+        for (const key of Object.keys(value as Record<string, unknown>)) {
+            if (DANGEROUS_KEYS.has(key)) {
+                delete (value as Record<string, unknown>)[key];
+                continue;
+            }
+            stripPrototypePollution((value as Record<string, unknown>)[key]);
+        }
+    }
+    return value;
+};
+
 const mergeDataConfig = (base: IDataConfig, incoming: Partial<IDataConfig>): IDataConfig =>
-    mergeWith({}, base, incoming, (objValue, srcValue) => {
+    mergeWith({}, base, stripPrototypePollution(incoming), (objValue, srcValue) => {
         if (Array.isArray(objValue) && Array.isArray(srcValue)) {
             return mergeUniqueArray(objValue, srcValue);
         }
@@ -314,8 +351,37 @@ export class DataRepository {
         return collectionPath;
     }
 
+    /**
+     * Security helper: resolve a slug to a directory under `baseDir`, rejecting
+     * anything that is not a strict `[A-Za-z0-9_-]+` token or that would escape
+     * `baseDir` once resolved (e.g. `../../victim`). Throws on a hostile slug so
+     * the traversal never reaches an `fs.rm`/`fs.writeFile`/`fs.readFile` sink.
+     * Legitimate slugs are `slugifyText` output ([a-z0-9_-]) and pass unchanged.
+     * Mirrors `GitHubSyncService.safeSlugDir`.
+     */
+    private confineSlugPath(baseDir: string, slug: string): string {
+        const safeName = path.basename(slug);
+        // Reject empty results and anything outside the slug allowlist before
+        // building a path — defends against platform-dependent `basename`
+        // behaviour and OS-reserved names (`.`, `..`, etc.).
+        if (!safeName || safeName !== slug || !SAFE_SLUG_PATTERN.test(safeName)) {
+            throw new Error(`Invalid slug: ${slug}`);
+        }
+        // Build the path in the same `path.join` form the original code used so
+        // the return value is identical for legitimate slugs. Resolve BOTH sides
+        // only for the containment check — correct even when `baseDir` is not an
+        // absolute, normalized path.
+        const dirPath = path.join(baseDir, safeName);
+        const resolvedRoot = path.resolve(baseDir);
+        const resolvedChild = path.resolve(baseDir, safeName);
+        if (resolvedChild !== resolvedRoot && !resolvedChild.startsWith(resolvedRoot + path.sep)) {
+            throw new Error(`Invalid slug: ${slug}`);
+        }
+        return dirPath;
+    }
+
     private getItemPath(slug: string) {
-        return path.join(this.dataDir, slug);
+        return this.confineSlugPath(this.dataDir, slug);
     }
 
     async cleanup() {
@@ -621,7 +687,9 @@ export class DataRepository {
     }
 
     private getComparisonPath(slug: string): string {
-        return path.join(this.comparisonsDir, slug);
+        // Same path-traversal confinement as item slugs (see confineSlugPath):
+        // comparison slugs feed fs.rm / fs.writeFile / fs.readFile sinks.
+        return this.confineSlugPath(this.comparisonsDir, slug);
     }
 
     private normalizeComparisonSource(source: unknown): ComparisonSource | null {
@@ -776,7 +844,12 @@ export class DataRepository {
     }
 
     async createItemDir(item: ItemData) {
-        const itemDir = path.join(this.dataDir, item.slug);
+        // Security (path-traversal): route the slug through the same confinement
+        // guard the other item sinks use (writeItem/writeItemMarkdown) so a
+        // hostile `item.slug` (e.g. `../../victim`) cannot make fs.mkdir create
+        // directories outside `this.dataDir`. Legitimate slugifyText output is
+        // unchanged.
+        const itemDir = this.getItemPath(item.slug);
         await fs.mkdir(itemDir, { recursive: true });
     }
 

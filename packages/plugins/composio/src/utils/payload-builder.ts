@@ -9,6 +9,26 @@ interface PayloadOptions {
 	config: Record<string, unknown>;
 }
 
+// Security: the `github-repo` data source carries a repository access token
+// (often a GitHub PAT) verbatim into the third-party Composio tool arguments.
+// Confirm `repo_url` is an `https://github.com/...` URL before attaching it so a
+// malicious/typo'd `repo_url` (e.g. `https://attacker.example/x`) can never cause
+// the PAT to be forwarded to an attacker-controlled host. `URL.hostname` isolates
+// the authority host, so embedded credentials / `github.com.evil.com` tricks are
+// rejected by the exact host equality check. Legitimate inputs (the form's own
+// `https://github.com/org/repo` example) are unaffected.
+function isGitHubHttpsUrl(value: unknown): boolean {
+	if (typeof value !== 'string' || value.trim() === '') {
+		return false;
+	}
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' && url.hostname.toLowerCase() === 'github.com';
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Builds the `arguments` payload forwarded to the Composio tool.
  *
@@ -50,7 +70,10 @@ export function buildToolPayload(options: PayloadOptions): ComposioToolInput & R
 		};
 	}
 
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: only attach the token-bearing dataSource when repo_url is a real
+	// github.com HTTPS URL (see isGitHubHttpsUrl); otherwise the repo access token
+	// is withheld entirely so it cannot leak to a non-GitHub host.
+	if (config.pass_repo_access && isGitHubHttpsUrl(config.repo_url)) {
 		envelope.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,

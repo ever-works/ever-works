@@ -136,6 +136,18 @@ export class TypeORMKeyvAdapter extends EventEmitter {
     }
 
     async deleteUnscopedEntriesLike(likeTerm: string): Promise<void> {
+        // Security: refuse an empty/whitespace-only term. Because this runs an
+        // un-namespaced `LIKE '%term%'`, a blank term degenerates to `LIKE '%%'`
+        // which matches every row and would wipe the entire cache table across
+        // all namespaces/tenants. Emit (rather than throw) to match this class's
+        // swallow-and-emit error contract; callers see no behaviour change.
+        if (typeof likeTerm !== 'string' || likeTerm.trim().length === 0) {
+            this.emit(
+                'error',
+                new Error('deleteUnscopedEntriesLike: likeTerm must be a non-empty string'),
+            );
+            return;
+        }
         try {
             await this.repository.delete({ key: Like(`%${likeTerm}%`) });
         } catch (error) {

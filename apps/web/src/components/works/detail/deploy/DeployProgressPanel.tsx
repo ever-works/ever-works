@@ -30,6 +30,31 @@ interface DeployProgressPanelProps {
 const TERMINAL_STATES = new Set(['READY', 'ERROR', 'CANCELED', 'TIMEOUT']);
 
 /**
+ * Security: scheme allow-list for the `website` URL polled from
+ * `/api/works/:id/deploy/status` before it becomes an `<a href>`. That value
+ * originates from a deployment-provider plugin's external API response (e.g.
+ * Vercel) and is not scheme-validated upstream, so a compromised/rogue plugin
+ * or a corrupted provider response could deliver `javascript:` / `data:` and
+ * land a working XSS — `rel="noopener noreferrer"` and `target="_blank"` do
+ * not block this. Returns `undefined` for anything that isn't http/https
+ * (including non-string values, which throw in `new URL` and hit the catch);
+ * the JSX omits the link in that case. Mirrors `safeExternalUrl` in
+ * ComparisonDetailClient.tsx / ItemCard.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * Live deploy progress panel (EW-610 — MVP).
  *
  * Polls `/api/works/:id/deploy/status` every 3s while a deploy is in
@@ -159,6 +184,9 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
     const isError = stateKey === 'ERROR' || stateKey === 'TIMEOUT';
     const isCanceled = stateKey === 'CANCELED';
     const isInFlight = !isReady && !isError && !isCanceled && stateKey !== 'UNKNOWN';
+    // Security: only expose the deployed-website link for http(s) URLs; rejects
+    // javascript:/data: payloads (and non-string values) from the polled status.
+    const safeWebsite = safeExternalUrl(status.website);
 
     return (
         <div className="rounded-lg bg-surface dark:bg-surface-dark border border-border dark:border-border-dark p-6">
@@ -209,9 +237,9 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
                         {(STATE_LABELS[stateKey] || STATE_LABELS.UNKNOWN).message}
                     </p>
 
-                    {isReady && status.website && (
+                    {isReady && safeWebsite && (
                         <a
-                            href={status.website}
+                            href={safeWebsite}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 mt-3 text-sm text-primary hover:text-primary/80 font-medium"

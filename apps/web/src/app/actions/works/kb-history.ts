@@ -45,6 +45,14 @@ export async function restoreKbDocumentAction(args: {
     commitSha: string;
 }): Promise<ActionResult<KbDocumentBodyDto>> {
     const { workId, docId, path, commitSha } = args;
+    // Security: reject malformed commit SHAs before forwarding to the backend
+    // restore endpoint (which may pass the value to a git CLI/isomorphic-git).
+    // Git object IDs are 7-40 hex chars; this blocks shell metacharacters,
+    // git option-injection (e.g. "--upload-pack=...") and newlines. Mirrors the
+    // SHA shape already validated in `lib/build-info.ts`.
+    if (!/^[0-9a-f]{7,40}$/i.test(commitSha)) {
+        return { success: false, error: 'Invalid commit SHA' };
+    }
     try {
         const data = await kbAPI.restoreDocument(workId, docId, commitSha);
         revalidatePath(`/works/${workId}/kb`);

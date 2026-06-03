@@ -68,6 +68,35 @@ const CLOSE_TAG = '</kb>';
 const DOC_SEPARATOR = '\n---\n';
 
 /**
+ * Security (prompt-injection hardening): KB document bodies/titles are
+ * fully attacker-controlled — they are the verbatim extracted content of
+ * uploaded files or agent-imported repository/web content. This block is
+ * emitted into a `role:'system'` message wrapped in literal `<kb>` /
+ * `</kb>` delimiter lines that the model is told mark the trusted KB
+ * region (see the docstring above). Inserting a body verbatim lets a
+ * poisoned doc print its own `</kb>` line to forge the boundary and have
+ * the trailing imperative text parsed as out-of-band instructions.
+ *
+ * Neutralize the fence tokens (and chat-template control markers, the
+ * same way `prompt-assembler`'s `neutralizeTurnField` and item-health's
+ * `sanitizePromptVariable` do) so a body/title cannot close or re-open
+ * the trusted region or spoof a system turn. Unlike those single-line
+ * helpers, we deliberately PRESERVE newlines/whitespace because KB bodies
+ * are multi-line Markdown — only the forgeable delimiter/control tokens
+ * are defused, so legitimate content passes through unchanged. The
+ * zero-width space keeps the citation/body human-readable while breaking
+ * the literal token the parser keys on.
+ */
+const CONTROL_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+const FENCE_TOKEN_PATTERN = /<\/?kb>/gi;
+
+function neutralizeKbField(value: string): string {
+    return value
+        .replace(FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`)
+        .replace(CONTROL_MARKER_PATTERN, '');
+}
+
+/**
  * Build the `<kb>...</kb>` context block from a list of KB documents.
  *
  * Returns `<kb>\n</kb>` for empty input — callers can always treat the
@@ -93,9 +122,14 @@ export function formatKbContext(
     // straight from the DTO so the citation reference matches the row
     // 17 `@kb:` mention syntax.
     const entries = docs.map((doc) => {
-        const cite = `kb:${doc.class}/${doc.slug}`;
-        const heading = `## ${doc.title} (${cite})`;
-        const body = doc.body ?? '';
+        // Security: neutralize the trusted-region delimiter (and chat-template
+        // control markers) in every attacker-controlled field interpolated
+        // into the `<kb>` block — body AND the heading fields (title/class/
+        // slug) — so a poisoned doc cannot forge a `</kb>` boundary or spoof
+        // a system turn. Benign Markdown is unaffected.
+        const cite = `kb:${neutralizeKbField(doc.class)}/${neutralizeKbField(doc.slug)}`;
+        const heading = `## ${neutralizeKbField(doc.title)} (${cite})`;
+        const body = neutralizeKbField(doc.body ?? '');
         return { heading, body, full: `${heading}\n${body}` };
     });
 

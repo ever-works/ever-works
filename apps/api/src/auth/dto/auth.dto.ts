@@ -1,4 +1,12 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, Matches, IsOptional } from 'class-validator';
+import {
+    IsEmail,
+    IsNotEmpty,
+    IsString,
+    MinLength,
+    Matches,
+    IsOptional,
+    IsUUID,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -117,7 +125,9 @@ export class ClaimAccountDto {
         description:
             'Optional UUID v4 minted at funnel entry (landing page → wizard). Threaded into the zero-friction telemetry funnel; ignored when absent.',
     })
-    @IsString()
+    // Security: M-06 — enforce UUID v4 format to prevent arbitrary string injection into PostHog telemetry,
+    // matching the constraint already applied to CreateAnonymousDto.correlationId (the issuance side).
+    @IsUUID('4')
     @IsOptional()
     correlationId?: string;
 }

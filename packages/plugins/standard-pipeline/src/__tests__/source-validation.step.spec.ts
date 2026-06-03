@@ -3,6 +3,21 @@ import { SourceValidationStep } from '../steps/source-validation.step';
 import type { StepExecutionContext, WorkReference, GenerationRequest, MutableItemData } from '@ever-works/plugin';
 import type { MutableGenerationContext } from '../context/index.js';
 
+// Mock the SSRF guard so the source-validation probe does NOT perform real
+// DNS resolution in tests: `safeFetchWithDnsPin` here just delegates to the
+// test-controlled `global.fetch`. The real guard resolves DNS for every URL,
+// which hangs on network-restricted CI runners and timed out the 20-item
+// batch test. `isSafeWebhookUrl` keeps its real (lexical, DNS-free) behavior.
+vi.mock('@ever-works/plugin/helpers/ssrf-guard', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@ever-works/plugin/helpers/ssrf-guard')>();
+	return {
+		...actual,
+		safeFetchWithDnsPin: vi.fn((url: string | URL, opts?: RequestInit) =>
+			(globalThis.fetch as typeof fetch)(url, opts)
+		)
+	};
+});
+
 describe('SourceValidationStep', () => {
 	let step: SourceValidationStep;
 	let mockContext: MutableGenerationContext;
@@ -153,6 +168,11 @@ describe('SourceValidationStep', () => {
 		});
 
 		it('should process items in batches', async () => {
+			// Mock the network: the SSRF DNS-pinned probe (safeFetchWithDnsPin)
+			// would otherwise do real DNS/fetch for all 20 items, which is
+			// slow/flaky on network-restricted CI runners and tripped the 5s
+			// default timeout. Mirrors the sibling tests in this describe block.
+			global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 			mockContext.finalItems = Array.from({ length: 20 }, (_, i) =>
 				createMockItem(`Item ${i}`, `https://example${i}.com`)
 			);
@@ -162,7 +182,7 @@ describe('SourceValidationStep', () => {
 			expect(mockExecContext.logger.log).toHaveBeenCalledWith(
 				expect.stringContaining('Source validation complete')
 			);
-		});
+		}, 20000);
 
 		it('should accumulate metrics correctly', async () => {
 			global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));

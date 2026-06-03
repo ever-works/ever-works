@@ -1,4 +1,14 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import {
+    IsBoolean,
+    IsEnum,
+    IsInt,
+    IsOptional,
+    IsString,
+    Length,
+    Matches,
+    Max,
+    Min,
+} from 'class-validator';
 import { WorkBudgetScope } from '@ever-works/agent/entities';
 
 /**
@@ -18,6 +28,10 @@ export class CreateBudgetDto {
     @IsOptional()
     @IsString()
     @Length(1, 128)
+    // Security: restrict pluginId to safe identifier chars to prevent CRLF/HTML injection in error messages and alert emails
+    @Matches(/^[a-zA-Z0-9_\-\.@]+$/, {
+        message: 'pluginId must contain only letters, digits, underscores, hyphens, dots, or @',
+    })
     pluginId?: string;
 
     /**
@@ -47,6 +61,10 @@ export class CreateBudgetDto {
     @IsOptional()
     @IsString()
     @Length(2, 8)
+    // Security: restrict currency to alphabetic characters only to prevent HTML/injection via stored currency values
+    @Matches(/^[a-zA-Z]{2,8}$/, {
+        message: 'currency must be an alphabetic currency code (e.g. USD)',
+    })
     currency?: string;
 }
 
@@ -69,5 +87,9 @@ export class UpdateBudgetDto {
     @IsOptional()
     @IsString()
     @Length(2, 8)
+    // Security: restrict currency to alphabetic characters only to prevent HTML/injection via stored currency values
+    @Matches(/^[a-zA-Z]{2,8}$/, {
+        message: 'currency must be an alphabetic currency code (e.g. USD)',
+    })
     currency?: string;
 }

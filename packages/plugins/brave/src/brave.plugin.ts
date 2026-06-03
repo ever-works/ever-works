@@ -125,7 +125,9 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 			});
 
 			if (!response.ok) {
-				const errorText = await response.text();
+				// Security: truncate and strip control chars from third-party error body to prevent log injection
+				const rawError = await response.text();
+				const errorText = rawError.replace(/[\x00-\x1F\x7F]|(\x1B\[[0-9;]*[A-Za-z])/g, ' ').slice(0, 256);
 				throw new Error(`Brave Search request failed (${response.status}): ${errorText}`);
 			}
 
@@ -186,7 +188,9 @@ export class BraveSearchPlugin implements IPlugin, ISearchPlugin {
 			});
 
 			if (!response.ok) {
-				const errorText = await response.text();
+				// Security: truncate and strip control chars from third-party error body to prevent log injection
+				const rawError = await response.text();
+				const errorText = rawError.replace(/[\x00-\x1F\x7F]|(\x1B\[[0-9;]*[A-Za-z])/g, ' ').slice(0, 256);
 				return { success: false, message: `Brave Search connection failed (${response.status}): ${errorText}` };
 			}
 

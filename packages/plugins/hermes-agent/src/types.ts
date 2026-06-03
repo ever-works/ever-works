@@ -25,7 +25,15 @@ export function isHermesAgentStepId(value: string): value is HermesAgentStepId {
 export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'hermes-agent-generator');
 
 export const DEFAULT_PROFILE = 'default';
-export const DEFAULT_TOOLSETS = 'web,terminal,skills';
+// Security (audit C: RCE via terminal + --yolo): `terminal` is intentionally
+// NOT in the default toolset. The Hermes child processes untrusted / web-ingested
+// content, and `terminal` combined with `--yolo` (auto-approve) turns a successful
+// prompt injection into arbitrary command execution on the API host. Operators who
+// need shell access for a trusted profile can opt in by setting the (global-scoped,
+// operator-only) `toolsets` setting explicitly, e.g. 'web,terminal,skills'. The
+// hardcoded fallback in resolveHermesRuntimeSettings (pipeline-helpers.ts) MUST stay
+// identical to this value.
+export const DEFAULT_TOOLSETS = 'web,skills';
 export const DEFAULT_MAX_TURNS = 90;
 export const DEFAULT_PROVIDER = '';
 export const DEFAULT_MODEL = '';

@@ -85,11 +85,17 @@ function buildDescription(spec: OperationSpec): string {
  * The registry already excludes bulk endpoints, but this is a second line of
  * defence against a model trying to smuggle an array of ids through a body
  * field (e.g. `{ ids: [...] }`).
+ *
+ * Security: key-agnostic check — any array field with length > 1 is flagged,
+ * regardless of field name. The previous name-regex heuristic (/id|item|member|email/i)
+ * was bypassed by legitimate-looking fields such as `to`, `cc`, `channelIds`,
+ * `events`, `tags`, and `categories`.
  */
 function detectBulk(value: unknown): string | null {
     if (!value || typeof value !== 'object') return null;
     for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-        if (Array.isArray(val) && val.length > 1 && /id|item|member|email/i.test(key)) {
+        // Security: flag ANY array field with length > 1, not just those matching a name regex.
+        if (Array.isArray(val) && val.length > 1) {
             return `Multiple values were supplied for "${key}".`;
         }
     }

@@ -1,4 +1,9 @@
 export function buildPublicComparisonUrl(websiteUrl: string, comparisonSlug: string): string {
+    // Security: reject non-HTTP(S) schemes (e.g. javascript:, data:) to prevent stored XSS
+    // when a deployment plugin writes a malicious URL into work.website.
+    if (!websiteUrl.startsWith('https://') && !websiteUrl.startsWith('http://')) {
+        return '#';
+    }
     return `${websiteUrl.replace(/\/+$/, '')}/comparisons/${comparisonSlug}`;
 }
 

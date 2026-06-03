@@ -1,4 +1,24 @@
 import type { NotificationService } from '@src/notifications/notification.service';
+import { sanitizeDescription } from '../../utils/sanitize.util';
+
+// Security: the raw `error.message` captured here originates from external,
+// attacker-influenceable sources — AI provider HTTP error bodies (OpenRouter,
+// a misconfigured self-hosted Ollama, etc.) and git remotes. It flows verbatim
+// into NotificationService.notify* methods, which persist it to the in-app
+// notifications table AND emit it on the multi-channel fanout (email/webhook/
+// Slack). Sanitize it ONCE at this chokepoint so every downstream consumer is
+// covered: (1) cap length + strip control chars/newlines (drops noisy internal
+// diagnostics and bounds payload size), and (2) neutralize HTML angle brackets
+// so a `Invalid key<script>…</script>` body can never render as live markup if
+// a notification surface ever interpolates the message without HTML-encoding.
+const ERROR_MESSAGE_MAX_LENGTH = 500;
+
+function sanitizeErrorMessage(message: string): string {
+    // sanitizeDescription caps length, strips control chars, removes newlines
+    // and collapses whitespace — but it does NOT touch `<`/`>`, so strip those
+    // explicitly to defang stored-XSS payloads in the provider error string.
+    return sanitizeDescription(message, ERROR_MESSAGE_MAX_LENGTH).replace(/[<>]/g, '');
+}
 
 export type ErrorClassificationType =
     | 'ai_credits'
@@ -14,8 +34,13 @@ export type ErrorClassification = {
 };
 
 export function classifyGenerationError(error: unknown): ErrorClassification {
-    const message = error instanceof Error ? error.message : String(error);
-    const errorLower = message.toLowerCase();
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    // Security: sanitize the externally-sourced message before it is stored in
+    // `classification.message` and forwarded to user-facing notifications.
+    const message = sanitizeErrorMessage(rawMessage);
+    // Classification still keys off the (raw, lowercased) text so substring
+    // matching is unaffected by sanitization of the returned message.
+    const errorLower = rawMessage.toLowerCase();
 
     if (isAiCreditsError(errorLower)) {
         return { type: 'ai_credits', provider: detectAiProvider(errorLower), message };

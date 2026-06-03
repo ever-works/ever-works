@@ -23,6 +23,30 @@ interface OnboardingPluginStepProps {
     returnPath?: string;
 }
 
+/**
+ * Security: `plugin.uiHints.setupLink.url` comes from a plugin manifest
+ * (`PluginUiHints.setupLink.url`, typed as plain `string`). A malicious or
+ * compromised plugin could declare a `javascript:`/`data:` URL there; rendered
+ * straight into `<a href>` it becomes a clickable XSS payload that runs in the
+ * user's session on click (`rel="noopener noreferrer"` + `target="_blank"` do
+ * NOT block this). Returns `undefined` for anything that isn't http/https
+ * (including non-string values, which throw in `new URL` and hit the catch);
+ * the JSX omits the setup link in that case. Mirrors `safeExternalUrl` in
+ * DeployForm.tsx / ComparisonDetailClient.tsx / ItemCard.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 function OnboardingStatusLoading() {
     const t = useTranslations('onboarding.pluginStep');
 
@@ -90,9 +114,13 @@ function FieldBasedPluginStep({
 
     const displaySettings = plugin.resolvedSettings || plugin.settings || {};
     const setupLink = plugin.uiHints?.setupLink;
+    // Security: only render the setup link for an http(s) URL — a poisoned
+    // plugin manifest could supply a `javascript:`/`data:` href otherwise.
+    const safeSetupUrl = safeExternalUrl(setupLink?.url);
     const showsOnboardingWizard = Boolean(plugin.uiHints?.onboardingWizard);
     const showSetupButton =
         setupLink &&
+        Boolean(safeSetupUrl) &&
         (!setupLink.showWhenEmpty || setupLink.showWhenEmpty.every((f) => !displaySettings[f]));
 
     if (!hasSettings) {
@@ -127,7 +155,7 @@ function FieldBasedPluginStep({
                         {t('getTokenPrompt')}
                     </p>
                     <a
-                        href={setupLink!.url}
+                        href={safeSetupUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover"

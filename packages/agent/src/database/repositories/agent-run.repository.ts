@@ -14,6 +14,16 @@ export class AgentRunRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    /**
+     * @internal Background workers and internal services that have already
+     * verified agent ownership through another path (e.g. agent-run.service
+     * receives an `Agent` entity from an ownership-checked query) may use
+     * this method. HTTP handlers MUST use {@link findByAgentAndUser} instead
+     * to prevent latent IDOR if ownership gating is ever omitted upstream.
+     *
+     * Security: unscoped — caller is responsible for ensuring agentId
+     * belongs to the acting user before calling this method.
+     */
     async findByAgent(agentId: string, limit = 25, offset = 0): Promise<AgentRun[]> {
         return this.repository.find({
             where: { agentId },
@@ -23,8 +33,37 @@ export class AgentRunRepository {
         });
     }
 
+    /**
+     * @internal Background workers and internal services that have already
+     * verified agent ownership through another path may use this method.
+     * HTTP handlers MUST use {@link countByAgentAndUser} instead.
+     *
+     * Security: unscoped — caller is responsible for ensuring agentId
+     * belongs to the acting user before calling this method.
+     */
     async countByAgent(agentId: string): Promise<number> {
         return this.repository.count({ where: { agentId } });
+    }
+
+    // Security: user-scoped variants — use these in HTTP handlers instead of
+    // findByAgent/countByAgent to enforce ownership at the repository layer
+    // and prevent latent IDOR if a future caller omits the service-level guard.
+    async findByAgentAndUser(
+        agentId: string,
+        userId: string,
+        limit = 25,
+        offset = 0,
+    ): Promise<AgentRun[]> {
+        return this.repository.find({
+            where: { agentId, userId },
+            order: { createdAt: 'DESC' },
+            take: limit,
+            skip: offset,
+        });
+    }
+
+    async countByAgentAndUser(agentId: string, userId: string): Promise<number> {
+        return this.repository.count({ where: { agentId, userId } });
     }
 
     /**

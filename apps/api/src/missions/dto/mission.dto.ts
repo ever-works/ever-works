@@ -3,7 +3,6 @@ import {
     IsBoolean,
     IsEnum,
     IsInt,
-    IsObject,
     IsOptional,
     IsString,
     Matches,
@@ -11,8 +10,12 @@ import {
     Min,
     MinLength,
     ValidateIf,
+    ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { MissionType } from '@ever-works/agent/missions';
+// Security: import the typed guardrails DTO so guardrailsOverride is validated against a strict allowlist
+import { WorkAgentGuardrailsDto } from '../../work-agent/dto/work-agent.dto';
 
 /**
  * Phase 3 PR H — request body for `POST /me/missions`. Validated
@@ -82,9 +85,12 @@ export class CreateMissionDto {
         nullable: true,
         description: 'Sparse override of the user-level WorkAgentGuardrails for spawned Ideas.',
     })
+    // Security: use typed WorkAgentGuardrailsDto instead of @IsObject() to enforce field allowlist and
+    // numeric bounds, preventing unbounded JSON DoS via oversized or deeply-nested payloads.
     @IsOptional()
-    @IsObject()
-    guardrailsOverride?: Record<string, unknown> | null;
+    @ValidateNested()
+    @Type(() => WorkAgentGuardrailsDto)
+    guardrailsOverride?: WorkAgentGuardrailsDto | null;
 
     @ApiProperty({ required: false, nullable: true, maxLength: 200 })
     @IsOptional()
@@ -163,9 +169,12 @@ export class UpdateMissionDto {
     outstandingIdeasCap?: number | null;
 
     @ApiProperty({ required: false, nullable: true })
+    // Security: use typed WorkAgentGuardrailsDto instead of @IsObject() to enforce field allowlist and
+    // numeric bounds, preventing unbounded JSON DoS via oversized or deeply-nested payloads.
     @IsOptional()
-    @IsObject()
-    guardrailsOverride?: Record<string, unknown> | null;
+    @ValidateNested()
+    @Type(() => WorkAgentGuardrailsDto)
+    guardrailsOverride?: WorkAgentGuardrailsDto | null;
 
     @ApiProperty({ required: false, nullable: true, maxLength: 200 })
     @IsOptional()

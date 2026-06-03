@@ -1,17 +1,20 @@
 import {
     Body,
     Controller,
+    ForbiddenException,
     Get,
     HttpCode,
     HttpStatus,
+    NotFoundException,
     Param,
     Post,
     Query,
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { KnowledgeBaseService } from '@ever-works/agent/services';
+import { KnowledgeBaseService, WorkOwnershipService } from '@ever-works/agent/services';
 import { CreateKbDocumentDto, KbDocumentQueryDto } from '@ever-works/agent/dto';
+import { OrganizationMembershipService } from '../organizations/organization-membership.service';
 import type { KbDocumentClass, KbDocumentStatus } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -23,17 +26,57 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
  * per spec D2; the service-layer guard enforces that — controller
  * doesn't need a separate class filter.
  *
- * Permission gate: in this PR, access is restricted by membership in
- * the organization. A future PR will tighten this to an
- * `OrganizationAdminGuard` once the org-admin role concept lands
- * platform-wide.
+ * Permission gate: org-scoped routes require the caller to belong to
+ * the Tenant that owns the target Organization. The tenant-ownership
+ * check is delegated to the shared `OrganizationMembershipService`
+ * (`ensureMember` / `ensureAdmin`) so every raw
+ * `/api/organizations/:orgId/...` route platform-wide reuses ONE
+ * audited implementation instead of re-deriving the comparison.
+ * A future PR will tighten the write path to a true org-admin role
+ * once that role concept (a schema + product decision) lands; the
+ * `ensureAdmin` seam is already in place for it.
  */
 @ApiTags('Knowledge Base (Organization)')
 @ApiBearerAuth('JWT-auth')
 @Controller('api')
 @UseGuards(AuthSessionGuard)
 export class OrgKbController {
-    constructor(private readonly kb: KnowledgeBaseService) {}
+    constructor(
+        private readonly kb: KnowledgeBaseService,
+        // Security: these legacy un-prefixed `/api/organizations/:orgId/...`
+        // routes are NOT scope-prefixed, so ScopeResolverMiddleware yields
+        // EMPTY_SCOPE and ScopeOwnershipGuard passes trivially — i.e. the
+        // global scope guards do NOT authorize the attacker-supplied
+        // `:orgId`/`?orgId`. We resolve org→tenant and caller→tenant via
+        // the shared membership service (mirrors OrganizationService.update
+        // / upgradeFromAccount).
+        private readonly membership: OrganizationMembershipService,
+        private readonly ownershipService: WorkOwnershipService,
+    ) {}
+
+    /**
+     * Security: the inheritable Work routes accept an attacker-controlled
+     * `?orgId` query param that selects the org-scope to read from. Trust
+     * the Work, not the param: gate on view-access to the Work and resolve
+     * the org from the Work's real `organizationId`. Returns the org scope
+     * to actually query — `null` when the Work has no org (no inheritable
+     * org docs) — and rejects a supplied `orgId` that doesn't match the
+     * Work's org, preventing cross-tenant KB reads via a foreign orgId.
+     */
+    private async resolveWorkOrgScope(
+        workId: string,
+        userId: string,
+        suppliedOrgId: string | null | undefined,
+    ): Promise<string | null> {
+        const { work } = await this.ownershipService.ensureCanView(workId, userId);
+        const workOrgId = work.organizationId ?? null;
+        if (suppliedOrgId && suppliedOrgId !== workOrgId) {
+            throw new ForbiddenException(
+                'orgId does not match the organization of the requested Work',
+            );
+        }
+        return workOrgId;
+    }
 
     @Get('organizations/:orgId/kb/documents')
     @HttpCode(HttpStatus.OK)
@@ -41,10 +84,12 @@ export class OrgKbController {
     @ApiQuery({ name: 'class', required: false, description: 'Filter by class (legal|style|seo)' })
     @ApiResponse({ status: 200, description: 'List of org KB documents' })
     async listOrgDocuments(
-        @CurrentUser() _auth: AuthenticatedUser,
+        @CurrentUser() auth: AuthenticatedUser,
         @Param('orgId') orgId: string,
         @Query() query: KbDocumentQueryDto,
     ) {
+        // Security: reject cross-tenant reads of another org's KB docs.
+        await this.membership.ensureMember(orgId, auth.userId);
         return this.kb.listOrgDocuments(orgId, {
             class: query.class as KbDocumentClass | undefined,
         });
@@ -64,6 +109,11 @@ export class OrgKbController {
         @Param('orgId') orgId: string,
         @Body() body: CreateKbDocumentDto,
     ) {
+        // Security: reject cross-tenant writes (stored prompt-injection /
+        // repo poisoning of another tenant's org via attacker-supplied orgId).
+        // `ensureAdmin` is the write-side seam; today it's the same
+        // tenant-ownership check as `ensureMember` (org-admin role re-deferred).
+        await this.membership.ensureAdmin(orgId, auth.userId);
         return this.kb.createOrgDocument(orgId, auth.userId, {
             path: body.path,
             title: body.title,
@@ -87,11 +137,16 @@ export class OrgKbController {
     @ApiQuery({ name: 'orgId', required: true })
     @ApiResponse({ status: 200, description: 'Effective inheritable documents' })
     async resolveInheritable(
-        @CurrentUser() _auth: AuthenticatedUser,
+        @CurrentUser() auth: AuthenticatedUser,
         @Param('id') workId: string,
         @Query('orgId') orgId: string,
     ) {
-        return this.kb.resolveInheritableDocuments(workId, orgId ?? null);
+        // Security: `resolveInheritableDocuments` has no internal access
+        // gate, and the `orgId` query param is attacker-controlled. Gate on
+        // view-access to the Work and derive the org scope from the Work
+        // itself so a foreign `orgId` can't leak another tenant's org docs.
+        const orgScope = await this.resolveWorkOrgScope(workId, auth.userId, orgId ?? null);
+        return this.kb.resolveInheritableDocuments(workId, orgScope);
     }
 
     /**
@@ -125,6 +180,14 @@ export class OrgKbController {
         @Query('orgId') orgId: string,
     ) {
         const joinedIdOrPath = Array.isArray(idOrPath) ? idOrPath.join('/') : idOrPath;
-        return this.kb.getInheritedDocument(workId, orgId, joinedIdOrPath, auth.userId);
+        // Security: the service gates on `ensureCanView(workId)` but trusts
+        // the caller-supplied `orgId`. Validate it against the Work's real
+        // org so a foreign `orgId` can't read another tenant's org doc.
+        const orgScope = await this.resolveWorkOrgScope(workId, auth.userId, orgId ?? null);
+        if (!orgScope) {
+            // Work belongs to no organization ⇒ no inheritable org doc exists.
+            throw new NotFoundException(`KB inherited document not found: ${joinedIdOrPath}`);
+        }
+        return this.kb.getInheritedDocument(workId, orgScope, joinedIdOrPath, auth.userId);
     }
 }

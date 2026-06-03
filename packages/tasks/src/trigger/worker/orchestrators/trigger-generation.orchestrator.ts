@@ -26,6 +26,21 @@ export type TriggerGenerationOptions = {
     signal?: AbortSignal;
 };
 
+// Security: matches `scheme://user:password@host` userinfo so embedded credentials
+// (e.g. `https://oauth2:<token>@github.com/...` from isomorphic-git error chains) can be
+// redacted from messages before they are persisted or returned to users. The capture
+// group preserves the scheme + `://`; only the `user:password` portion is replaced.
+const URL_CREDENTIALS_PATTERN = /([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi;
+
+/**
+ * Strip `user:password` userinfo from any credential-bearing URL embedded in a
+ * free-form error message, replacing it with `***:***` while keeping the scheme and
+ * host. Messages without such userinfo (the legitimate case) are returned unchanged.
+ */
+function redactUrlCredentials(message: string): string {
+    return message.replace(URL_CREDENTIALS_PATTERN, '$1***:***@');
+}
+
 @Injectable()
 export class TriggerGenerationOrchestrator extends BaseOrchestrator {
     protected readonly logger = new Logger(TriggerGenerationOrchestrator.name);
@@ -226,7 +241,15 @@ export class TriggerGenerationOrchestrator extends BaseOrchestrator {
             };
         }
 
-        const errorMessage = normalizeGeneratorError(error);
+        // Security: git/network errors (e.g. from isomorphic-git) frequently embed
+        // credential-bearing URLs such as `https://oauth2:<token>@github.com/...` in
+        // their message chain. `normalizeGeneratorError` returns the verbatim chain
+        // when no known-pattern branch matches, and this string is persisted to
+        // `work.generateStatus.error` / generation history and served to users via the
+        // Works API. Strip any `scheme://user:password@host` userinfo before it leaves
+        // here so leaked tokens never reach storage. Legitimate messages have no such
+        // userinfo and are left unchanged.
+        const errorMessage = redactUrlCredentials(normalizeGeneratorError(error));
 
         return {
             status: GenerateStatusType.ERROR,

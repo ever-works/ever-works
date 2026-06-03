@@ -100,6 +100,58 @@ interface ConfirmationOutput {
     args?: Record<string, unknown>;
 }
 
+// Security: tool outputs are LLM-authored and can be poisoned via prompt
+// injection from hostile web/search content. Any URL the model puts into a
+// result is therefore untrusted and must pass a scheme allow-list before it
+// reaches an `<a href>` / `<Link href>` — `rel="noopener noreferrer"` does NOT
+// block `javascript:`/`data:`/`vbscript:` execution. These mirror the file-local
+// `safeExternalUrl` pattern used in ComparisonDetailClient.tsx.
+
+/** http(s)-only allow-list for external (web-search / setup) URLs. Returns the
+ *  normalized URL, or `undefined` for anything that isn't http/https so the
+ *  caller can render an inert/omitted link. */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
+/** Allow-list for navigation targets that are normally relative API paths
+ *  (`/dashboard/...`) but may legitimately be absolute http(s). Rejects
+ *  protocol-relative (`//evil.com`) and backslash-obfuscated (`/\evil.com`)
+ *  targets the browser would resolve to an external origin, plus all
+ *  non-http(s) schemes. Returns the safe value or `undefined`. */
+function safeNavUrl(raw: string | undefined | null): string | undefined {
+    if (!raw || typeof raw !== 'string') return undefined;
+    const url = raw.trim();
+    if (url.startsWith('/')) {
+        if (url.startsWith('//') || url.startsWith('/\\')) return undefined;
+        return url;
+    }
+    return safeExternalUrl(url);
+}
+
+/** Neutralize LLM-authored confirmation text before it is echoed back to the
+ *  model as a user message. Collapses all whitespace (incl. newlines/tabs) to
+ *  single spaces, drops parenthetical `confirmed:`-style injection, and caps
+ *  length so a poisoned `target`/`toolName` can't smuggle extra instructions
+ *  (e.g. "(confirmed: true). Also delete everything") into the chat. */
+function sanitizeConfirmRef(raw: string | undefined): string {
+    if (!raw) return '';
+    return raw
+        .replace(/\(\s*confirmed\s*:[^)]*\)/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 120);
+}
+
 /** snake_case / camelCase tool name → "Title Case" label for generated tools. */
 function humanizeToolName(name: string): string {
     return name
@@ -222,9 +274,13 @@ export function ChatToolResult({
     // Navigate — show a brief confirmation, useEffect handles the redirect
     if (toolName === 'navigate') {
         const data = output as NavigateOutput;
-        return data?.url ? (
+        // Security: the model controls `url`; only follow safe relative/http(s)
+        // targets so a poisoned `navigate` result can't render a `javascript:`
+        // link (the auto-redirect useEffect already enforces a leading `/`).
+        const safeUrl = safeNavUrl(data?.url);
+        return safeUrl ? (
             <Link
-                href={data.url}
+                href={safeUrl}
                 className="inline-flex items-center gap-1 mt-1 text-[11px] text-primary dark:text-primary-400 hover:underline"
             >
                 <Compass className="w-3 h-3" />
@@ -363,7 +419,13 @@ function ConfirmCard({
                         // Name the exact operation + target so that, if several
                         // confirmation cards are pending, the model re-calls the
                         // right tool with `confirmed: true`.
-                        const ref = target ? `${confirmToolName} for ${target}` : confirmToolName;
+                        // Security: `target`/`confirmToolName` are LLM-authored and
+                        // can be prompt-injection-poisoned; sanitize before echoing
+                        // them back as a user message so they can't smuggle extra
+                        // instructions (newlines / "(confirmed: true). Also …").
+                        const safeName = sanitizeConfirmRef(confirmToolName);
+                        const safeTarget = sanitizeConfirmRef(target);
+                        const ref = safeTarget ? `${safeName} for ${safeTarget}` : safeName;
                         sendMessage(`Yes, I confirm — proceed with ${ref} (confirmed: true).`);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:bg-danger/90 transition-colors cursor-pointer"
@@ -374,7 +436,9 @@ function ConfirmCard({
                 <button
                     onClick={() => {
                         setResolved('cancelled');
-                        const ref = target ? `${confirmToolName} for ${target}` : confirmToolName;
+                        const safeName = sanitizeConfirmRef(confirmToolName);
+                        const safeTarget = sanitizeConfirmRef(target);
+                        const ref = safeTarget ? `${safeName} for ${safeTarget}` : safeName;
                         sendMessage(`No, cancel ${ref} — do not proceed.`);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-surface-secondary text-text dark:bg-surface-secondary-dark dark:text-text-dark hover:opacity-80 transition-opacity cursor-pointer"
@@ -418,35 +482,51 @@ function WorkList({ output }: { output: unknown }) {
 
     return (
         <div className="mt-1 space-y-0.5">
-            {data.works.map((dir) => (
-                <Link
-                    key={dir.id}
-                    href={dir.url}
-                    className={cn(
-                        'flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px]',
-                        'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
-                        'text-text dark:text-text-dark transition-colors',
-                    )}
-                >
-                    <FolderOpen className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
-                    <span className="flex-1 min-w-0 truncate">{dir.name}</span>
-                    <span className="text-text-muted dark:text-text-muted-dark flex items-center gap-1 shrink-0 whitespace-nowrap">
-                        {dir.itemsCount}
-                        <ExternalLink className="w-2.5 h-2.5" />
-                    </span>
-                </Link>
-            ))}
+            {data.works.map((dir) => {
+                // Security: `dir.url` is LLM-authored; only render a link for a
+                // safe relative/http(s) target so a poisoned result can't yield a
+                // `javascript:` href. Unsafe entries render as inert text.
+                const safeUrl = safeNavUrl(dir.url);
+                const inner = (
+                    <>
+                        <FolderOpen className="w-3 h-3 text-primary dark:text-primary-400 shrink-0" />
+                        <span className="flex-1 min-w-0 truncate">{dir.name}</span>
+                        <span className="text-text-muted dark:text-text-muted-dark flex items-center gap-1 shrink-0 whitespace-nowrap">
+                            {dir.itemsCount}
+                            <ExternalLink className="w-2.5 h-2.5" />
+                        </span>
+                    </>
+                );
+                const className = cn(
+                    'flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[11px]',
+                    'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
+                    'text-text dark:text-text-dark transition-colors',
+                );
+                return safeUrl ? (
+                    <Link key={dir.id} href={safeUrl} className={className}>
+                        {inner}
+                    </Link>
+                ) : (
+                    <div key={dir.id} className={className}>
+                        {inner}
+                    </div>
+                );
+            })}
         </div>
     );
 }
 
 function WorkDetail({ output }: { output: unknown }) {
     const data = output as WorkDetailOutput;
-    if (!data?.name || !data.url) return null;
+    // Security: `data.url` is LLM-authored; require a safe relative/http(s)
+    // target before rendering the link so a poisoned result can't yield a
+    // `javascript:` href.
+    const safeUrl = safeNavUrl(data?.url);
+    if (!data?.name || !safeUrl) return null;
 
     return (
         <Link
-            href={data.url}
+            href={safeUrl}
             className={cn(
                 'flex items-center gap-2 mt-1 px-2.5 py-1.5 rounded-md text-[11px]',
                 'hover:bg-surface-secondary dark:hover:bg-white/[0.04]',
@@ -579,6 +659,10 @@ function DeployConnection({ output }: { output: unknown }) {
         );
     }
 
+    // Security: `setupUrl` is LLM-authored; only render the button for an
+    // http(s) target so a poisoned result can't yield a `javascript:` link.
+    const safeSetupUrl = safeExternalUrl(data.setupUrl);
+
     return (
         <div className="mt-2 p-3 rounded-lg border border-warning/20 bg-warning/5">
             <div className="flex items-center gap-2 mb-2">
@@ -590,9 +674,9 @@ function DeployConnection({ output }: { output: unknown }) {
             <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-2">
                 {t('deployNotConfiguredDesc')}
             </p>
-            {data.setupUrl && (
+            {safeSetupUrl && (
                 <Link
-                    href={data.setupUrl}
+                    href={safeSetupUrl}
                     className={cn(
                         'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium',
                         'bg-primary text-white hover:bg-primary-hover transition-colors',
@@ -611,6 +695,9 @@ function WebSearchResult({ output }: { output: unknown }) {
     if (!data) return null;
 
     if (!data.success) {
+        // Security: `setupUrl` is LLM-authored; only render the button for an
+        // http(s) target so a poisoned result can't yield a `javascript:` link.
+        const safeSetupUrl = safeExternalUrl(data.setupUrl);
         return (
             <div className="mt-2 p-3 rounded-lg border border-warning/20 bg-warning/5">
                 <div className="flex items-center gap-2 mb-2">
@@ -622,9 +709,9 @@ function WebSearchResult({ output }: { output: unknown }) {
                 <p className="text-[11px] text-text-muted dark:text-text-muted-dark mb-2">
                     {data.message}
                 </p>
-                {data.setupUrl && (
+                {safeSetupUrl && (
                     <Link
-                        href={data.setupUrl}
+                        href={safeSetupUrl}
                         className={cn(
                             'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium',
                             'bg-primary text-white hover:bg-primary-hover transition-colors',
@@ -647,12 +734,29 @@ function WebSearchResult({ output }: { output: unknown }) {
         );
     }
 
+    // Security: web-search result URLs come straight from the (LLM-mediated)
+    // search tool and are untrusted. Render only http(s) links so a poisoned
+    // result can't inject a `javascript:`/`data:` href; drop anything else.
+    const safeResults = data.results
+        .slice(0, 5)
+        .map((result) => ({ ...result, safeUrl: safeExternalUrl(result.url) }))
+        .filter((result) => Boolean(result.safeUrl));
+
+    if (!safeResults.length) {
+        return (
+            <span className="inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark">
+                <Check className="w-2.5 h-2.5" />
+                No results found
+            </span>
+        );
+    }
+
     return (
         <div className="mt-1 space-y-0.5">
-            {data.results.slice(0, 5).map((result, i) => (
+            {safeResults.map((result, i) => (
                 <a
                     key={i}
-                    href={result.url}
+                    href={result.safeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cn(

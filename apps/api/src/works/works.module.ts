@@ -11,6 +11,7 @@ import { SubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { ItemsGeneratorModule } from '@ever-works/agent/items-generator';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -42,6 +43,10 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         ItemsGeneratorModule,
         ActivityFeedModule,
         KnowledgeBaseModule,
+        // Provides OrganizationMembershipService — the reusable
+        // tenant-ownership guard OrgKbController uses to authorize its
+        // raw `/api/organizations/:orgId/...` routes.
+        OrganizationsModule,
     ],
     providers: [
         CacheEntryRepository,

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
 /**
@@ -25,8 +25,9 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
  *    chars), or raw utf-8 (32 chars) and surface a clear error
  *    otherwise.
  *  - With no key set we passthrough — fine for dev / tests, never in
- *    production. The controller surface refuses to create a
- *    subscription when this happens in production (see WebhooksService).
+ *    production. `generateSecret()` enforces this: it refuses to mint a
+ *    signing secret in any non-local env when no key is configured, so
+ *    we never persist a raw secret in cleartext at rest.
  *  - The IV is random per-record so the same plaintext encrypts to a
  *    different ciphertext each call.
  */
@@ -56,6 +57,28 @@ export class WebhookSecretService {
      * `X-Ever-Works-Signature-256: sha256=<hex>`.
      */
     generateSecret(): { raw: string; encrypted: string } {
+        // Security: enforce encryption-at-rest before issuing a signing secret.
+        // The class header promises "never in production" passthrough and that
+        // the issuance surface refuses to create a subscription when the key is
+        // missing — make that guarantee real at the single chokepoint both
+        // WebhooksService.create() and rotateSecret() funnel through. Without
+        // PLATFORM_ENCRYPTION_KEY the raw HMAC secret would be persisted in
+        // cleartext (encrypt() passthrough), so refuse to mint one in any
+        // non-local env. Local dev/test (NODE_ENV development/test/unset) keep
+        // the passthrough so fixtures and offline runs still work.
+        if (!this.isEnabled()) {
+            const env = process.env.NODE_ENV;
+            const isLocalEnv =
+                env === 'development' || env === 'test' || env === undefined || env === '';
+            if (!isLocalEnv) {
+                this.logger.error(
+                    'Refusing to issue a webhook signing secret: PLATFORM_ENCRYPTION_KEY is not configured, which would store the secret in cleartext at rest',
+                );
+                throw new InternalServerErrorException(
+                    'Webhook signing is temporarily unavailable (encryption-at-rest is not configured)',
+                );
+            }
+        }
         const raw = randomBytes(32).toString('base64url');
         const encrypted = this.encrypt(raw);
         return { raw, encrypted };

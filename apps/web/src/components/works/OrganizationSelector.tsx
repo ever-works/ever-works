@@ -27,9 +27,13 @@ export function OrganizationSelector({
 }: OrganizationSelectorProps) {
     const t = useTranslations('dashboard.workCreation');
     const cacheKey = providerId;
-    const [organizations, setOrganizations] = useState<GitOrganization[]>(
-        LOADED_ORGS.get(cacheKey) || [],
-    );
+    // Security: do not pre-populate state from the module-level cache — keying
+    // only by providerId means a second user logging in on the same tab would
+    // briefly see a previous user's organisations before the fresh fetch
+    // resolves. Always start with an empty list; the cache is only used to
+    // suppress the loading spinner for the *same* component remount within one
+    // session (via the isPending guard below), which requires no stale read.
+    const [organizations, setOrganizations] = useState<GitOrganization[]>([]);
     const [isPending, startTransition] = useTransition();
     const reconciledRef = useRef<string | undefined>(undefined);
 
@@ -72,7 +76,10 @@ export function OrganizationSelector({
         onChange(selectedValue, selectedValue !== '');
     };
 
-    if (isPending && organizations.length === 0) {
+    // Security: use the cache to suppress the spinner only (not to pre-populate
+    // state), so returning users do not see a flash of another user's data.
+    const hasCachedOrgs = LOADED_ORGS.has(cacheKey);
+    if (isPending && organizations.length === 0 && !hasCachedOrgs) {
         return (
             <div className="space-y-1.5">
                 <label className="block text-xs font-medium text-text-muted dark:text-text-muted-dark">

@@ -98,7 +98,16 @@ export function createToolCallRepairFn(
 			// Try to parse the repaired tool call from the model's response
 			try {
 				const repaired = JSON.parse(text);
-				if (repaired.toolName && repaired.input !== undefined) {
+				// Security: the repair response is model-generated free text and may be
+				// influenced by prompt injection from hostile fetched content. Only accept a
+				// repaired tool name that is an actually registered tool — this prevents
+				// routing to a non-existent/confusing tool and rejects prototype-pollution-style
+				// names (e.g. "__proto__", "constructor") that are never in the allowlist.
+				if (
+					typeof repaired.toolName === 'string' &&
+					toolNames.includes(repaired.toolName) &&
+					repaired.input !== undefined
+				) {
 					return {
 						type: 'tool-call' as const,
 						toolCallId: toolCall.toolCallId,

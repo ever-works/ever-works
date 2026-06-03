@@ -45,14 +45,15 @@ export class MistralOcrService {
 					throw new Error('Invalid Mistral API key. Please check your API key configuration.');
 				}
 				if (status === 400) {
-					throw new Error(
-						`Bad request to Mistral OCR API: ${error.response.data?.message || 'Invalid document or parameters'}`
-					);
+					// Security: do not reflect raw Mistral API error body; use a safe fixed string only.
+					throw new Error('Bad request to Mistral OCR API: invalid document or parameters.');
 				}
 				if (status === 429) {
 					throw new Error('Mistral OCR API rate limit exceeded. Please try again later.');
 				}
-				throw new Error(`Mistral OCR API error (${status}): ${error.response.data?.message || error.message}`);
+				// Security: do not reflect raw Mistral API error body (error.response.data?.message);
+				// include only the numeric status code which is non-sensitive.
+				throw new Error(`Mistral OCR API error (${status}): request failed.`);
 			}
 			throw error;
 		}
