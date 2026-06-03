@@ -8,7 +8,7 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { KnowledgeBaseService, KB_STORAGE_PLUGIN } from './knowledge-base.service';
 import type { IStoragePlugin } from '@ever-works/plugin';
-import type { KbDocumentClass } from '@ever-works/contracts';
+import { KbDocumentClass, KbDocumentSource } from '../entities/kb-types';
 
 /**
  * EW-643 Phase 3 — speech-to-text service backing the `kb-transcribe`
@@ -108,12 +108,19 @@ export class KnowledgeBaseTranscribeService {
             },
         );
 
-        const targetClass = config.kb.getTranscriptionTargetClass() as KbDocumentClass;
+        const targetClass = resolveTargetClass(config.kb.getTranscriptionTargetClass());
         const docPath = `${targetClass}/transcripts/${upload.id}.md`;
         const title = upload.originalFilename
             ? `Transcript — ${upload.originalFilename}`
             : `Transcript — ${upload.id}`;
 
+        // Atomic create: pass the transcript metadata through
+        // `CreateDocumentInput.metadata` so the document is born with its
+        // `transcribedFromUploadId` idempotency marker. The previous
+        // shape (create then updateById) left a window where a crash
+        // between the two writes would produce a transcript-shaped
+        // document without the marker — and the next retry would
+        // duplicate it (Greptile P2 on PR #1219).
         const created = await this.kb.createDocument({
             workId: payload.workId,
             userId: upload.uploadedById,
@@ -123,27 +130,19 @@ export class KnowledgeBaseTranscribeService {
             class: targetClass,
             body: response.text,
             tags: ['transcript'],
-            categories: null,
-            language: response.language ?? payload.language ?? null,
-            source: 'agent',
+            categories: undefined,
+            language: response.language ?? payload.language ?? undefined,
+            source: KbDocumentSource.AGENT,
             sourceUploadId: upload.id,
             sourceUrl: null,
             generatedByAgentRunId: null,
-        });
-
-        // Persist provider + duration on the doc's metadata so the
-        // workbench can surface it on the document detail panel and the
-        // reconciliation job can verify the transcript belongs to its
-        // origin upload.
-        await this.documents.updateById(payload.workId, created.id, {
             metadata: {
-                body: response.text,
                 transcribedFromUploadId: upload.id,
                 transcriptionProviderId: response.model,
                 durationSeconds: response.durationSeconds,
                 detectedLanguage: response.language,
                 segmentCount: response.segments?.length ?? 0,
-            } as Record<string, unknown>,
+            },
         });
 
         await this.recordTranscribedActivity(
@@ -194,6 +193,19 @@ export class KnowledgeBaseTranscribeService {
             );
         }
     }
+}
+
+/**
+ * Map the `KB_TRANSCRIPTION_TARGET_CLASS` env (a free-form string) to a
+ * concrete `KbDocumentClass` enum value. Unknown / misconfigured values
+ * fall back to RESEARCH per spec §14.3 so the pipeline stays unblocked
+ * — the operator sees the warning, doesn't see a runtime crash.
+ */
+function resolveTargetClass(raw: string): KbDocumentClass {
+    const allowed = Object.values(KbDocumentClass);
+    return allowed.includes(raw as KbDocumentClass)
+        ? (raw as KbDocumentClass)
+        : KbDocumentClass.RESEARCH;
 }
 
 function friendlyFilename(original: string, mimeType: string): string {

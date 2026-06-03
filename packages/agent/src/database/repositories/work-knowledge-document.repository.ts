@@ -59,9 +59,17 @@ export class WorkKnowledgeDocumentRepository {
      * for idempotency on `metadata.transcribedFromUploadId` so a
      * Trigger.dev retry never produces a duplicate transcript document.
      *
-     * Uses raw `->>` JSON access — TypeORM's `Like`/`Equal` operators
-     * don't reach into `simple-json` columns. Safe because both inputs
-     * are parameterised.
+     * The `metadata` column is `text` (TypeORM `simple-json`), not
+     * `jsonb`, so we must cast before applying `->>` — otherwise
+     * PostgreSQL throws `operator does not exist: text ->> unknown`
+     * and the entire transcribe pipeline crashes at the idempotency
+     * check (Greptile P2 on PR #1219). The cast is cheap and runs
+     * once per query. SQLite + Postgres path-pick differs but the
+     * `simple-json` columnar comparison still works because TypeORM
+     * stringifies on read and `LIKE` matches the JSON literal —
+     * we use the Postgres-shaped query because the production DB
+     * is Postgres; the test DB uses an in-memory mock at the repo
+     * layer (no SQL is exercised).
      */
     async findByMetadataKey(
         workId: string,
@@ -71,7 +79,7 @@ export class WorkKnowledgeDocumentRepository {
         return this.repository
             .createQueryBuilder('doc')
             .where('doc.workId = :workId', { workId })
-            .andWhere(`doc.metadata ->> :key = :value`, { key, value })
+            .andWhere(`(doc.metadata::jsonb) ->> :key = :value`, { key, value })
             .getOne();
     }
 

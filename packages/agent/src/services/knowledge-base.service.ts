@@ -76,6 +76,15 @@ interface CreateDocumentInput {
     sourceUrl?: string | null;
     sourceUploadId?: string | null;
     generatedByAgentRunId?: string | null;
+    /**
+     * EW-643 Phase 3 slice 2b — extra metadata merged onto the document's
+     * `metadata` simple-json column ALONGSIDE `body`. Used by
+     * `KnowledgeBaseTranscribeService` to atomically stamp
+     * `transcribedFromUploadId` + provider id at create time, so a
+     * Trigger.dev retry never sees a transcript-shaped document that
+     * lacks its idempotency marker (Greptile P2 on PR #1219).
+     */
+    metadata?: Record<string, unknown>;
 }
 
 interface UpdateDocumentInput {
@@ -674,7 +683,7 @@ export class KnowledgeBaseService {
             generatedByAgentRunId: input.generatedByAgentRunId ?? null,
             createdById: input.userId,
             updatedById: input.userId,
-            metadata: { body } as Record<string, unknown>,
+            metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
         });
 
         // Ensure any new tag slugs are in the tag catalog (create-on-first-use).
