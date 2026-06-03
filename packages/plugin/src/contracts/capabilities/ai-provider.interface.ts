@@ -255,6 +255,54 @@ export interface EmbeddingResponse {
 }
 
 /**
+ * Transcription options — speech-to-text capability (EW-643 Phase 3).
+ *
+ * Powers KB media ingest. Uploaded audio/video lands in `WorkKnowledgeUpload`;
+ * a Trigger.dev task fans the binary out to whichever AI provider plugin the
+ * operator has configured for the `transcribe` capability, then materializes
+ * the returned text as the body of the corresponding `WorkKnowledgeDocument`
+ * (class `research` or `originals` depending on classification).
+ */
+export interface TranscriptionOptions {
+	/** Audio/video bytes to transcribe. Accepts a Web ReadableStream, Node Buffer, or Uint8Array. */
+	readonly file: ReadableStream<Uint8Array> | Uint8Array | Buffer;
+	/** Original filename — provider may use the extension to detect format. */
+	readonly filename: string;
+	/** Provider-specific model override (e.g. OpenAI's `whisper-1`, `gpt-4o-transcribe`). */
+	readonly model?: string;
+	/** BCP-47 language hint (e.g. `'en'`, `'pt-BR'`). Providers detect on omission. */
+	readonly language?: string;
+	/** Optional bias prompt — caller-provided context (glossary terms, speaker names). */
+	readonly prompt?: string;
+	/** Resolved per-call settings, threaded through by the facade. */
+	readonly settings?: PluginSettings;
+}
+
+/**
+ * Transcription response. Tracks the original audio duration so the
+ * UsageLedgerEntry billing line for `kb-transcription` is computed in
+ * provider-neutral units (minutes).
+ */
+export interface TranscriptionResponse {
+	/** Concatenated transcript text. */
+	readonly text: string;
+	/** Model used (echoed by provider). */
+	readonly model: string;
+	/** Detected language as BCP-47, when the provider returns one. */
+	readonly language?: string;
+	/** Audio duration in seconds — used for cost reconciliation. */
+	readonly durationSeconds?: number;
+	/** Per-segment timing for downstream chapter / chunk synthesis. */
+	readonly segments?: readonly TranscriptionSegment[];
+}
+
+export interface TranscriptionSegment {
+	readonly start: number;
+	readonly end: number;
+	readonly text: string;
+}
+
+/**
  * AI provider plugin interface
  * Capability: 'ai-provider'
  */
@@ -327,6 +375,33 @@ export interface IAiProviderPlugin extends IPlugin {
 	 * than reject the response.
 	 */
 	createEmbedding?(options: EmbeddingOptions): Promise<EmbeddingResponse>;
+
+	/**
+	 * Transcribe audio/video to text — optional capability (EW-643 Phase 3).
+	 *
+	 * Implementations wrap the provider's speech-to-text endpoint (OpenAI
+	 * Whisper, Anthropic Claude audio, Google Speech-to-Text, Groq Whisper,
+	 * etc.). When the upstream has no STT endpoint, leave this `undefined`
+	 * and `AiFacadeService.transcribe()` falls back to the next available
+	 * provider in the chain.
+	 *
+	 * **Selection order** (resolved by the facade):
+	 *   1. Operator-pinned transcription provider, if configured
+	 *      (`pluginSettings.transcriptionProviderId`).
+	 *   2. First AI-provider plugin in the registry with `transcribe`
+	 *      defined AND `isAvailable()` resolving true.
+	 *   3. If none qualifies, the facade throws
+	 *      `TranscriptionNotConfiguredError`. The KB media-ingest task
+	 *      catches that and marks the upload `extractionStatus='failed'`
+	 *      with `extractionError='no transcription provider'`.
+	 *
+	 * **Cost note.** Caller is expected to populate
+	 * `UsageLedgerEntry.category='kb-transcription'` with
+	 * `unit='audio_minutes'` and `units=ceil(durationSeconds/60)`. Plugins
+	 * MUST NOT bill — billing lives at the facade layer so it stays
+	 * provider-neutral.
+	 */
+	transcribe?(options: TranscriptionOptions): Promise<TranscriptionResponse>;
 
 	/**
 	 * List available models
