@@ -664,13 +664,14 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         if (typeof active.transcribe === 'function') return active;
 
         // 3. Registry iteration — first available plugin whose
-        // transcribe is defined. The base class exposes the registry
-        // via `this.registry` (protected on BaseFacadeService); the
-        // capability filter matches `getByCapability` so we don't
-        // walk non-AI plugins.
+        // transcribe is defined. `getByCapability` returns
+        // `RegisteredPlugin` wrappers; the actual plugin instance lives
+        // on `.plugin`. Forgetting to unwrap is how the slice 2 CI run
+        // tripped the "first registry provider whose transcribe is
+        // defined" test on PR #1217.
         const candidates = this.registry.getByCapability(this.CAPABILITY);
         for (const candidate of candidates) {
-            const inst = candidate as unknown as IAiProviderPlugin;
+            const inst = candidate.plugin as unknown as IAiProviderPlugin;
             if (typeof inst.transcribe === 'function' && inst.id !== active.id) {
                 return inst;
             }
