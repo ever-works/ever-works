@@ -91,13 +91,11 @@ export default function SearchBar(): JSX.Element {
 		try {
 			setIndexLoading(true);
 			setError(null);
-			console.log('Loading search index with baseUrl:', searchBaseUrl);
 			// Dynamically import the search worker functions
 			const { fetchIndexesByWorker } =
 				await import('@easyops-cn/docusaurus-search-local/dist/client/client/theme/searchByWorker');
 			// Use searchBaseUrl to load the correct locale-specific search index
 			await fetchIndexesByWorker(searchBaseUrl, '');
-			console.log('Search index loaded successfully');
 			setIndexLoaded(true);
 		} catch (err) {
 			console.error('Failed to load search index:', err);
@@ -124,14 +122,6 @@ export default function SearchBar(): JSX.Element {
 			try {
 				setIsLoading(true);
 				setError(null);
-				console.log(
-					'Searching with baseUrl:',
-					searchBaseUrl,
-					'query:',
-					searchQuery,
-					'indexLoaded:',
-					indexLoaded
-				);
 				const { searchByWorker } =
 					(await import('@easyops-cn/docusaurus-search-local/dist/client/client/theme/searchByWorker')) as {
 						searchByWorker: (
@@ -150,8 +140,6 @@ export default function SearchBar(): JSX.Element {
 					searchQuery,
 					8 // searchResultLimits - max number of search results
 				);
-				console.log('Search results:', searchResults);
-
 				setResults(searchResults || []);
 				setSelectedIndex(0);
 			} catch (err) {
@@ -188,6 +176,10 @@ export default function SearchBar(): JSX.Element {
 	const navigateToResult = useCallback(
 		(result: SearchResult) => {
 			let url = result.document.u;
+			// Only navigate to relative paths — reject absolute URLs to prevent open redirect
+			if (!url.startsWith('/')) {
+				return;
+			}
 			if (result.document.h) {
 				url += result.document.h;
 			}
