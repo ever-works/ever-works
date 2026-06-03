@@ -20,6 +20,10 @@ export enum ActivityActionType {
     PLUGIN_ENABLED = 'plugin_enabled',
     PLUGIN_DISABLED = 'plugin_disabled',
     PLUGIN_CONFIGURED = 'plugin_configured',
+    // EW-693 — dynamic plugin distribution install lifecycle.
+    PLUGIN_INSTALLED = 'plugin_installed',
+    PLUGIN_INSTALL_FAILED = 'plugin_install_failed',
+    PLUGIN_UNINSTALLED = 'plugin_uninstalled',
 
     // Templates
     TEMPLATE_ADDED = 'template_added',

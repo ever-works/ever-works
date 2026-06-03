@@ -418,6 +418,39 @@ export class PluginInstallerService {
 				}`
 			);
 		}
+		// EW-693 / T37 — tag Sentry with the install context so the error
+		// shows up filterable by plugin_id + distribution_mode in the
+		// dashboard. Lazy-imported so packages/agent builds without
+		// @sentry/node resolved (bundled-mode-only deployments).
+		this.tagSentryError(pluginId, reason);
+	}
+
+	/**
+	 * EW-693 / T37 — best-effort Sentry tag pass. Lazy-imports
+	 * `@sentry/node`; silently no-ops when the SDK isn't installed or
+	 * isn't initialised. Tags `plugin_id`, `plugin_source` (always
+	 * `registry` for installer errors), and `distribution_mode` so the
+	 * EW-693 install errors are filterable in the Sentry UI.
+	 */
+	private tagSentryError(pluginId: string, reason: string): void {
+		void (async () => {
+			try {
+				const sentry = (await import('@sentry/node').catch(() => null)) as
+					| typeof import('@sentry/node')
+					| null;
+				if (!sentry?.withScope) return;
+				sentry.withScope((scope) => {
+					scope.setTag('plugin_id', pluginId);
+					scope.setTag('plugin_source', 'registry');
+					scope.setTag('distribution_mode', this.distributionMode);
+					scope.setLevel('error');
+					sentry.captureException(new Error(`plugin.install.failed: ${reason}`));
+				});
+			} catch {
+				// Best-effort — never surface Sentry errors back to the
+				// caller.
+			}
+		})();
 	}
 
 	private assertDynamicMode(operation: string): void {
