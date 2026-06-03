@@ -26,7 +26,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   This file pins the GUARDRAILS-specific contracts neither covers:
  *     1. REPLACE-not-merge + sparse-partial semantics of `guardrailsOverride`
  *        (a single-key PATCH drops the rest; clear-to-null; non-object 400;
- *        arbitrary keys pass through unvalidated — it is a stored sparse blob).
+ *        unknown keys 400 — it is a STRICT typed schema, not a free-form blob).
  *     2. Clone takes a SNAPSHOT of the source's CURRENT guardrails, after
  *        which source and clone are BIDIRECTIONALLY independent.
  *     3. Guardrails + missionTemplateRepo survive every lifecycle transition
@@ -53,9 +53,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   PATCH /:id { guardrailsOverride: {...} } REPLACES the whole stored object
  *     (NOT a deep merge) — patching one key drops the others.
  *   PATCH /:id { guardrailsOverride: null }      → clears it (stored null).
- *   PATCH /:id { guardrailsOverride: "string" }  → 400 (DTO @IsObject()).
- *   PATCH /:id { guardrailsOverride: { bogusKey } } → 200 (Mission layer does
- *     NOT per-key-validate the override; it is stored verbatim as a sparse blob).
+ *   PATCH /:id { guardrailsOverride: "string" }  → 400 (DTO rejects non-object).
+ *   PATCH /:id { guardrailsOverride: { bogusKey } } → 400 (WorkAgentGuardrailsDto
+ *     is a STRICT typed schema; forbidNonWhitelisted rejects unknown keys).
  *   missionTemplateRepo: free-form string @MaxLength(200); >200 ⇒ 400; null clears.
  *   POST /:id/clone snapshots guardrailsOverride + missionTemplateRepo from the
  *     source's CURRENT row; afterwards source/clone are independent.
@@ -188,14 +188,14 @@ async function runNow(
 
 test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, inheritance', () => {
     // ──────────────────────────────────────────────────────────────────
-    // FLOW 1 — guardrailsOverride IS A SPARSE BLOB WITH REPLACE-NOT-MERGE
-    // PATCH SEMANTICS. The full WorkAgentGuardrails shape round-trips; a
-    // single-key PATCH REPLACES the whole stored object (drops the rest);
-    // null clears; a non-object is rejected (DTO @IsObject); arbitrary keys
-    // pass through unvalidated (the Mission layer stores the sparse override
-    // verbatim — per-key bounds live on the user-pref DTO, not here).
+    // FLOW 1 — guardrailsOverride IS A SPARSE, STRICTLY-TYPED OVERRIDE WITH
+    // REPLACE-NOT-MERGE PATCH SEMANTICS. The full WorkAgentGuardrails shape
+    // round-trips; a single-key PATCH REPLACES the whole stored object (drops
+    // the rest); null clears; a non-object is rejected; unknown keys are
+    // rejected 400 (WorkAgentGuardrailsDto is an allowlist with per-key bounds,
+    // hardened by fix:security to block JSON-DoS / schema drift).
     // ──────────────────────────────────────────────────────────────────
-    test('guardrailsOverride round-trips the full shape, PATCH replaces (not merges), clears on null, rejects non-objects, stores arbitrary keys', async ({
+    test('guardrailsOverride round-trips the full shape, PATCH replaces (not merges), clears on null, rejects non-objects, rejects unknown keys', async ({
         request,
     }) => {
         const { access_token: token } = await registerUserViaAPI(request);
@@ -253,18 +253,16 @@ test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, in
         // The rejected PATCH did not write — still null from the clear above.
         expect((await getMission(request, token, mission.id)).guardrailsOverride).toBeNull();
 
-        // ── Arbitrary / unknown keys pass through: the Mission layer stores the
-        // sparse override AS-IS (it is a forward-compatible blob, not a strict
-        // per-key schema). A mix of a real key + a bogus key is preserved whole.
-        const arbitrary = { maxWorksPerRun: 3, futureFlag: 'x', nested: { a: 1 } };
-        const stored = await patchMission(request, token, mission.id, {
-            guardrailsOverride: arbitrary,
+        // ── Unknown keys are REJECTED: guardrailsOverride is a STRICT typed
+        // schema (WorkAgentGuardrailsDto), so the global ValidationPipe
+        // (forbidNonWhitelisted) 400s any non-guardrail key. Mixing a real key
+        // with bogus ones still rejects the whole PATCH — nothing is written.
+        const rejected = await patchMission(request, token, mission.id, {
+            guardrailsOverride: { maxWorksPerRun: 3, futureFlag: 'x', nested: { a: 1 } },
         });
-        expect(stored.http).toBe(200);
-        expect(stored.body.guardrailsOverride).toEqual(arbitrary);
-        expect((await getMission(request, token, mission.id)).guardrailsOverride).toEqual(
-            arbitrary,
-        );
+        expect(rejected.http).toBe(400);
+        // The rejected PATCH did not write — still null from the clear above.
+        expect((await getMission(request, token, mission.id)).guardrailsOverride).toBeNull();
 
         // ── An EMPTY object is a valid (if vacuous) override — distinct from null.
         const empty = await patchMission(request, token, mission.id, { guardrailsOverride: {} });
@@ -321,11 +319,11 @@ test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, in
 
         // ── Now edit the SOURCE again — the clone must be UNAFFECTED.
         await patchMission(request, token, source.id, {
-            guardrailsOverride: { maxWorksPerRun: 99 },
+            guardrailsOverride: { maxWorksPerRun: 19 },
         });
         const sourceAfter = await getMission(request, token, source.id);
         const cloneAfter = await getMission(request, token, clone.mission.id);
-        expect(sourceAfter.guardrailsOverride).toEqual({ maxWorksPerRun: 99 });
+        expect(sourceAfter.guardrailsOverride).toEqual({ maxWorksPerRun: 19 });
         // The snapshot is frozen — the clone kept the clone-time value.
         expect(cloneAfter.guardrailsOverride).toEqual({ maxWorksPerRun: 6, dryRunByDefault: true });
 
@@ -337,7 +335,7 @@ test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, in
             maxItemsPerWork: 12,
         });
         expect((await getMission(request, token, source.id)).guardrailsOverride).toEqual({
-            maxWorksPerRun: 99,
+            maxWorksPerRun: 19,
         });
 
         // ── A source with NULL guardrails clones to a NULL-guardrail clone.
@@ -676,7 +674,7 @@ test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, in
         // ── Stranger PATCH of the guardrails → 404 (cannot mutate the envelope).
         const strangerPatch = await request.patch(`${API_BASE}/api/me/missions/${mission.id}`, {
             headers: sh,
-            data: { guardrailsOverride: { maxWorksPerRun: 999 } },
+            data: { guardrailsOverride: { maxWorksPerRun: 25 } },
         });
         expect(strangerPatch.status()).toBe(404);
 
@@ -705,8 +703,8 @@ test.describe('flow: Mission guardrails + templateRepo persistence, snapshot, in
         });
         const ownerGet = await getMission(request, ownerToken, mission.id);
         expect(ownerGet.guardrailsOverride).toEqual({ maxWorksPerRun: 8, dryRunByDefault: true });
-        // Untouched by any stranger attempt — the 999 never landed.
-        expect(ownerGet.guardrailsOverride).not.toMatchObject({ maxWorksPerRun: 999 });
+        // Untouched by any stranger attempt — the stranger's value never landed.
+        expect(ownerGet.guardrailsOverride).not.toMatchObject({ maxWorksPerRun: 25 });
         expect(ownerGet.missionTemplateRepo).toBe('starter-business');
 
         const ownerList = (await (
