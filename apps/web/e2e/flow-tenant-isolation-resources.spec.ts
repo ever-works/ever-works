@@ -124,7 +124,10 @@ async function createSkill(
         headers: ctx.headers,
         data: {
             ownerType: 'tenant',
-            ownerId: ctx.tenantId,
+            // Tenant-scope skills are USER-owned (API filters by userId), so
+            // ownerId is the owner's user id; tenantId is auto-stamped from
+            // that user's tenant (== ctx.tenantId), so the assertion below holds.
+            ownerId: ctx.user.user.id,
             title,
             description: 'tenant-isolation probe skill',
             instructionsMd: '# instructions\nbody',

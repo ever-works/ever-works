@@ -208,7 +208,10 @@ async function buildVictim(request: APIRequestContext): Promise<Victim> {
         headers: a.headers,
         data: {
             ownerType: 'tenant',
-            ownerId: org.tenantId,
+            // Tenant-scope skills are USER-owned (API filters by userId); the
+            // ownerId is the owner's user id, not the tenant id. tenantId is
+            // auto-stamped from the owner's tenant.
+            ownerId: a.user.user.id,
             title: `Victim Skill ${sfx}`,
             description: 'scope-guard probe skill',
             instructionsMd: '# secret instructions',

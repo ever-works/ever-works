@@ -119,6 +119,7 @@ async function createMission(
 async function createSkill(
     request: APIRequestContext,
     headers: { Authorization: string },
+    userId: string,
     tenantId: string,
     title: string,
 ): Promise<string> {
@@ -126,7 +127,11 @@ async function createSkill(
         headers,
         data: {
             ownerType: 'tenant',
-            ownerId: tenantId,
+            // Tenant-scope skills are USER-owned (API filters by userId), so
+            // ownerId is the owner's user id. The skill's tenantId is then
+            // auto-stamped from that user's tenant — which is exactly
+            // `tenantId` here — so the isolation assertion below still holds.
+            ownerId: userId,
             title,
             description: 'cross-tenant-leak probe skill',
             instructionsMd: '# secret instructions',
@@ -163,7 +168,7 @@ async function buildTenant(request: APIRequestContext, label: string): Promise<B
         scope: 'tenant',
         name: `${marker} Agent`,
     });
-    const skillId = await createSkill(request, headers, org.tenantId, `${marker} Skill`);
+    const skillId = await createSkill(request, headers, user.user.id, org.tenantId, `${marker} Skill`);
     const missionId = await createMission(request, headers, `${marker} Mission`);
 
     return {
