@@ -330,4 +330,4 @@ This is a **retrospective** plan: every phase below has already shipped.
 - Source: [`apps/api/src/plugins-capabilities/`](../../../../apps/api/src/plugins-capabilities/)
 - Module wiring: [`apps/api/src/api.module.ts`](../../../../apps/api/src/api.module.ts) (lines 18-71)
 - Related ADRs: none specific to this surface; see the constitution.
-- Coverage tracker: [`COVERAGE-TRACKER.md`](../../../../COVERAGE-TRACKER.md)
+- Coverage tracker: [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md)
