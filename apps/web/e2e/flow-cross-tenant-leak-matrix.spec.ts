@@ -311,11 +311,18 @@ test.describe('Cross-tenant leak matrix (two tenants × every resource × every 
         expect(rowIds(tasksByStatus.body)).not.toContain(victim.taskId);
 
         // ── Positive control: the victim's OWN ownerId filter DOES return their
-        //    skill, proving the filter is functional (empty attacker = isolation). ──
+        //    skill, proving the filter is functional (empty attacker = isolation).
+        //    Tenant-scope Skills are USER-owned: `ownerId` stores the owner's
+        //    user id (assertOwnedScope enforces ownerId === userId for the
+        //    `tenant` ownerType), NOT the tenantId. So the victim's OWN filter
+        //    must key on victim.user.user.id — keying on victim.tenantId returns
+        //    0 rows (which is exactly why the attacker's tenantId pivot above
+        //    leaks nothing). Verified live: `?ownerId=<tenantId>` → [] for the
+        //    owner too; `?ownerId=<userId>` → the skill. ──
         const ownPivot = await getList(
             request,
             victim.headers,
-            `/api/skills?ownerType=tenant&ownerId=${victim.tenantId}&limit=200`,
+            `/api/skills?ownerType=tenant&ownerId=${victim.user.user.id}&limit=200`,
         );
         expect(rowIds(ownPivot.body)).toContain(victim.skillId);
     });

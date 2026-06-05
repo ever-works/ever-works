@@ -55,13 +55,14 @@ import { enablePluginViaAPI, patchPluginSettingsViaAPI } from './helpers/plugins
  *         and echoed. (The chat UI only OFFERS configured providers, but the API
  *         record layer is permissive.)
  *
- *   - PATCH /api/conversations/:id  → 204 No Content. The DTO is whitelisted to
- *     `{ title }` ONLY: a `providerId` in the body is SILENTLY IGNORED (204, the
- *     stored providerId is UNCHANGED — not applied, not a 400). ⇒ a conversation's
- *     provider is IMMUTABLE after creation via PATCH; switching the panel provider
- *     mid-thread changes which provider serves the NEXT message (the
- *     `providerOverride` the web /api/chat route forwards) but does NOT rewrite the
- *     conversation's recorded providerId.
+ *   - PATCH /api/conversations/:id  → a title-only body returns 204 No Content. The
+ *     DTO is whitelisted to `{ title }` ONLY and the global ValidationPipe runs with
+ *     forbidNonWhitelisted:true, so a `providerId` in the body is ACTIVELY REJECTED
+ *     with 400 "property providerId should not exist" — not applied, not silently
+ *     dropped. ⇒ a conversation's provider is IMMUTABLE after creation via PATCH (the
+ *     hardened API refuses the field outright); switching the panel provider mid-thread
+ *     changes which provider serves the NEXT message (the `providerOverride` the web
+ *     /api/chat route forwards) but cannot rewrite the conversation's recorded providerId.
  *
  *   - POST /api/conversations/:id/messages { messages:[{ role, content, model? }] }
  *       → 201 { success:true }. A per-message `model` is PERSISTED on the message
@@ -417,14 +418,41 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
             'the list summary echoes the recorded provider',
         ).toBe(DEFAULT_PROVIDER);
 
-        // IMMUTABILITY: a user who "switches" the conversation's provider via PATCH
-        // gets a 204, but the providerId is NOT rewritten — the PATCH DTO is
-        // whitelisted to { title } and silently drops providerId (no 400, no apply).
-        const patchRes = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
+        // IMMUTABILITY: a user who tries to "switch" the conversation's provider via
+        // PATCH is now ACTIVELY REJECTED. The PATCH DTO is whitelisted to { title }
+        // and the global ValidationPipe runs with forbidNonWhitelisted:true, so a
+        // `providerId` in the body is a 400 "property providerId should not exist" —
+        // the hardened API refuses the unknown field rather than silently dropping it.
+        // This proves immutability even more strongly: the provider-switch attempt
+        // cannot reach the persistence layer at all.
+        const switchAttempt = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
             headers: authedHeaders(token),
             data: { providerId: ALT_PROVIDER, title: 'Renamed but provider locked' },
         });
-        expect(patchRes.status(), 'PATCH returns 204 (title applied, providerId ignored)').toBe(
+        expect(
+            switchAttempt.status(),
+            'PATCH rejects a providerId field (whitelist + forbidNonWhitelisted) — provider is immutable',
+        ).toBe(400);
+        expect(
+            JSON.stringify((await switchAttempt.json().catch(() => null)) ?? {}),
+            'the 400 names the forbidden providerId field',
+        ).toMatch(/providerId/i);
+
+        // The conversation is untouched by the rejected switch — provider AND title
+        // are exactly as created (the whole PATCH was refused, not partially applied).
+        const afterReject = await getConversation(request, token, conv.id);
+        expect(
+            afterReject.providerId,
+            'the recorded provider is IMMUTABLE — the rejected PATCH never changed it',
+        ).toBe(DEFAULT_PROVIDER);
+
+        // The title IS mutable via a well-formed (whitelisted) PATCH → 204 No Content.
+        // This proves the field-level whitelist: title applies, provider can't be moved.
+        const renamePatch = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
+            headers: authedHeaders(token),
+            data: { title: 'Renamed but provider locked' },
+        });
+        expect(renamePatch.status(), 'a title-only PATCH succeeds 204 (title is whitelisted)').toBe(
             204,
         );
 
@@ -558,12 +586,20 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
         expect(onOpenAi.providerId, 'a third thread records its own provider').toBe('openai');
 
         // "Switching" the panel provider on ONE thread (a PATCH that tries to move it)
-        // must not bleed into the others. PATCH ignores providerId anyway, so all
-        // three keep their original record — strict per-conversation isolation.
-        await request.patch(`${API_BASE}/api/conversations/${onAnthropic.id}`, {
-            headers: authedHeaders(token),
-            data: { providerId: DEFAULT_PROVIDER, title: 'tried to switch' },
-        });
+        // is REJECTED at the DTO boundary (whitelist + forbidNonWhitelisted → 400 on
+        // the providerId field), so it cannot bleed into the others — all three keep
+        // their original record. The rejection itself is per-conversation isolation.
+        const isoSwitchAttempt = await request.patch(
+            `${API_BASE}/api/conversations/${onAnthropic.id}`,
+            {
+                headers: authedHeaders(token),
+                data: { providerId: DEFAULT_PROVIDER, title: 'tried to switch' },
+            },
+        );
+        expect(
+            isoSwitchAttempt.status(),
+            'a provider-switch PATCH on one thread is rejected (providerId not whitelisted)',
+        ).toBe(400);
 
         // Re-read ALL THREE: every provider record is exactly what it started as.
         const reOpenRouter = await getConversation(request, token, onOpenRouter.id);

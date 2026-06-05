@@ -466,14 +466,20 @@ test.describe('Notification email channel — deep integration', () => {
         });
 
         const farFuture = '2999-01-01T00:00:00.000Z';
+        // NOTE: the mute endpoint validates `category` against the
+        // NotificationCategory ENUM (@IsEnum), whose agent value is the SINGULAR
+        // 'agent' — NOT the plural 'agents' used as an event-type *category*. A
+        // plural 'agents' here 400s "category must be one of: …, agent, task".
+        // (The seeded event-type `agent_run_finished` lives under the plural
+        // 'agents' category, but that is a different vocabulary from the mute enum.)
         const muteUntil = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: authedHeaders(token),
-            data: { category: 'agents', mutedUntil: farFuture },
+            data: { category: 'agent', mutedUntil: farFuture },
             timeout: TIMEOUT,
         });
         expect(muteUntil.status()).toBe(201);
         expect((await muteUntil.json()).mute).toEqual({
-            category: 'agents',
+            category: 'agent',
             mutedUntil: farFuture,
         });
 
@@ -481,7 +487,7 @@ test.describe('Notification email channel — deep integration', () => {
         // duplicate row — the preferences view shows one entry per category.
         const reMute = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: authedHeaders(token),
-            data: { category: 'agents', mutedUntil: farFuture },
+            data: { category: 'agent', mutedUntil: farFuture },
             timeout: TIMEOUT,
         });
         expect(reMute.status()).toBe(201);
@@ -494,12 +500,12 @@ test.describe('Notification email channel — deep integration', () => {
         expect(prefs.preference?.quietHoursStart).toBe('23:30');
         const muteCats = prefs.mutes.map((m) => m.category);
         expect(muteCats).toContain('generation');
-        expect(muteCats).toContain('agents');
+        expect(muteCats).toContain('agent');
         expect(
-            muteCats.filter((c) => c === 'agents'),
+            muteCats.filter((c) => c === 'agent'),
             'mutes are upserted by category (no duplicate rows)',
         ).toHaveLength(1);
-        const agentsMute = prefs.mutes.find((m) => m.category === 'agents');
+        const agentsMute = prefs.mutes.find((m) => m.category === 'agent');
         expect(agentsMute?.mutedUntil).toBe(farFuture);
 
         // Unmute one category (204) — it disappears, the other mute + quiet-hours
@@ -511,7 +517,7 @@ test.describe('Notification email channel — deep integration', () => {
         expect(unmute.status()).toBe(204);
         const prefsAfterUnmute = await getPreferences(request, token);
         expect(prefsAfterUnmute.mutes.map((m) => m.category)).not.toContain('generation');
-        expect(prefsAfterUnmute.mutes.map((m) => m.category)).toContain('agents');
+        expect(prefsAfterUnmute.mutes.map((m) => m.category)).toContain('agent');
         expect(prefsAfterUnmute.preference?.timezone).toBe('America/New_York');
         expect(prefsAfterUnmute.subscriptions.map((s) => s.eventTypeKey)).toContain(
             'generation_error',
@@ -534,7 +540,7 @@ test.describe('Notification email channel — deep integration', () => {
         expect(cleared.timezone).toBeNull();
         const prefsFinal = await getPreferences(request, token);
         expect(prefsFinal.preference?.quietHoursStart ?? null).toBeNull();
-        expect(prefsFinal.mutes.map((m) => m.category)).toContain('agents');
+        expect(prefsFinal.mutes.map((m) => m.category)).toContain('agent');
     });
 
     test('email-bearing event (forgot-password) lands in MailHog — best-effort — alongside a same-address email channel', async ({

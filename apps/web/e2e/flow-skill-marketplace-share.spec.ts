@@ -35,7 +35,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   - POST /api/skills/install { slug, ownerType, ownerId }
  *       → 201 Skill (sourceCatalogSlug set) when the catalog has the slug;
  *         404 `Catalog skill "<slug>" not found.` when it doesn't (the CI path);
- *         400 `ownerId is required.` / `Invalid ownerType "<x>".` on bad input.
+ *         400 on bad input — the global ValidationPipe (whitelist +
+ *         forbidNonWhitelisted) rejects at the DTO layer with class-validator
+ *         messages: missing ownerId → `ownerId must be a UUID`; an off-lattice
+ *         ownerType → `ownerType must be one of the following values: …`
+ *         (these fire BEFORE the service's own scope/existence checks).
  *   - POST /api/skills { ownerType, ownerId, title, description, instructionsMd, frontmatter? }
  *       → 201 Skill { id, slug (slugified+lowercased), version:'1.0.0',
  *                     sourceCatalogSlug:null, frontmatter (verbatim, incl. custom keys) }
@@ -196,21 +200,32 @@ test.describe('Skill marketplace / share / visibility', () => {
         });
         expect(anon.status()).toBe(401);
 
-        // Missing ownerId → 400 with the exact contract message.
+        // Missing ownerId → 400 at the DTO layer. The global ValidationPipe
+        // (whitelist + forbidNonWhitelisted) runs class-validator BEFORE the
+        // service, so the InstallCatalogSkillDto `@IsUUID()` on the required
+        // `ownerId` rejects the absent value with the default message
+        // ("ownerId must be a UUID"). The contract being proven is unchanged:
+        // a scope without an ownerId cannot install.
         const noOwner = await request.post(`${API_BASE}/api/skills/install`, {
             headers,
             data: { slug: 'anything', ownerType: 'tenant' },
         });
         expect(noOwner.status()).toBe(400);
-        expect((await noOwner.json()).message).toMatch(/ownerId is required/i);
+        // message is an array of class-validator strings — stringify before matching.
+        expect(JSON.stringify((await noOwner.json()).message)).toMatch(/ownerId must be a UUID/i);
 
         // 'user' is not a valid skill owner scope → 400 (same lattice as create).
+        // The DTO `@IsEnum(SKILL_OWNER_TYPES)` rejects it up front with the
+        // class-validator enum message ("ownerType must be one of the following
+        // values: …"), not a service-level "Invalid ownerType".
         const badScope = await request.post(`${API_BASE}/api/skills/install`, {
             headers,
             data: { slug: 'anything', ownerType: 'user', ownerId: user.user.id },
         });
         expect(badScope.status()).toBe(400);
-        expect((await badScope.json()).message).toMatch(/invalid ownerType/i);
+        expect(JSON.stringify((await badScope.json()).message)).toMatch(
+            /ownerType must be one of the following values/i,
+        );
 
         // Well-formed request but slug absent from the catalog → 404 (the CI path).
         // If a provider were enabled and the slug existed, install would 201 with

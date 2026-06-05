@@ -599,13 +599,21 @@ test.describe('Skill ↔ Agent binding — deep resolution', () => {
             title: `Neg Skill ${stamp}`,
         });
 
-        // 400 — invalid targetType.
+        // 400 — invalid targetType. The hardened API validates `targetType`
+        // with class-validator's `@IsEnum(SKILL_BINDING_TARGET_TYPES)` on the
+        // CreateSkillBindingDto, so the global ValidationPipe rejects an
+        // unknown value BEFORE the service runs — the body is the standard
+        // ValidationPipe envelope (`message` is a string[] of constraint
+        // violations) rather than the service's "Invalid targetType …" string.
+        // Intent preserved: a bogus targetType is a 400 whose error names the
+        // offending `targetType` field. Coerce the array→string before matching.
         const badType = await request.post(`${API_BASE}/api/skills/${skill.id}/bindings`, {
             headers: authedHeaders(token),
             data: { targetType: 'bogus', targetId: agent.id },
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid targetType/i);
+        const badTypeMessage = (await badType.json()).message;
+        expect(JSON.stringify(badTypeMessage)).toMatch(/targetType must be one of/i);
 
         // 400 — non-tenant target missing its targetId.
         const noTarget = await request.post(`${API_BASE}/api/skills/${skill.id}/bindings`, {

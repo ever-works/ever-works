@@ -12,7 +12,8 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * full state machine of the comparison subsystem: the `comparisonsEnabled`
  * work flag, the comparison-generator plugin's user→work enable gate, the
  * Trigger/AI-gated generation endpoints with their full validation lattice,
- * the per-work `comparisonsCount` field, cross-user access control asymmetry,
+ * the per-work `comparisonsCount` field, cross-user access control (every
+ * comparison route — including generation-status — is owner/member-gated),
  * and the pure URL/date utility contract.
  *
  * ───────────── PROBED, TRUTHFUL contract (curl vs http://127.0.0.1:3100) ─────
@@ -27,9 +28,14 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *
  * COMPARISON ENDPOINTS (apps/api/src/works/works.controller.ts §Comparisons):
  *   - GET  /works/:id/comparisons/generation-status
- *       → 200 { generating:false } for ANY authed user (the controller only
- *         calls authService.getUser — NO ownership check, NO git read), even
- *         for a NONEXISTENT work id. Unauth → 401.
+ *       → 200 { generating:false } for the work OWNER / a member (the handler
+ *         now runs workOwnershipService.ensureAccess BEFORE reading the
+ *         in-memory progress cache — this closed a former IDOR where any authed
+ *         user could poll any work's status). So it is NO LONGER ownership-free:
+ *         a NONEXISTENT work id → 404 'Work with id ... not found' (the access
+ *         resolver runs first) and a NON-OWNER → 403 'You do not have permission
+ *         to access this work'. It is still git/repo-independent (it never
+ *         clones), so the OWNER always gets 200 even on a fresh Work. Unauth → 401.
  *   - GET  /works/:id/comparisons               (list)        — owner-gated +
  *   - GET  /works/:id/comparisons/remaining-count            — git-gated:
  *   - POST /works/:id/comparisons/generate                     these CLONE the
@@ -136,15 +142,17 @@ test.describe('Comparison generator — flag, generation gating, count, contract
         expect(ours.comparisonsEnabled).toBe(false);
     });
 
-    test('generation-status is repo-independent + ownership-free; list/remaining are git-gated', async ({
+    test('generation-status is repo-independent for the OWNER but ownership-gated (404 on ghost); list/remaining are git-gated', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const headers = authedHeaders(user.access_token);
         const workId = await makeWork(request, user.access_token, 'status');
 
-        // generation-status: deterministically 200 { generating:false } — it
-        // reads only the in-memory progress cache, never the git repo.
+        // generation-status for the OWNER: deterministically 200 { generating:false }
+        // — once the ownership gate passes it reads only the in-memory progress
+        // cache, never the git repo (so a fresh Work still 200s here, unlike the
+        // git-gated sibling list/remaining routes).
         const status = await request.get(`${workUrl(workId)}/comparisons/generation-status`, {
             headers,
             timeout: COMP_TIMEOUT,
@@ -154,15 +162,18 @@ test.describe('Comparison generator — flag, generation gating, count, contract
         expect(statusBody).toHaveProperty('generating');
         expect(statusBody.generating).toBe(false);
 
-        // Same route on a NONEXISTENT work still 200s — the handler never
-        // resolves the work, so it cannot 404 here (proves it is genuinely
-        // repo/ownership independent, unlike the sibling list/remaining routes).
+        // Same route on a NONEXISTENT work → 404. The handler now runs
+        // workOwnershipService.ensureAccess BEFORE touching the progress cache
+        // (this closed a former IDOR), and the access resolver 404s a work that
+        // does not exist. This proves the route is genuinely ownership-gated now,
+        // while still being repo-independent (it 404s at the resolver, never a
+        // git 5xx). Unauth/forbidden are covered in the cross-user spec.
         const ghostStatus = await request.get(
             `${API_BASE}/api/works/${ZERO_UUID}/comparisons/generation-status`,
             { headers, timeout: COMP_TIMEOUT },
         );
-        expect(ghostStatus.status()).toBe(200);
-        expect((await ghostStatus.json()).generating).toBe(false);
+        expect(ghostStatus.status()).toBe(404);
+        expect(JSON.stringify(await ghostStatus.json())).toContain('not found');
 
         // list + remaining-count CLONE the data repo → git-gated 5xx on a fresh
         // Work (never 404 — the routes exist and the resolver passed). If a real
@@ -271,7 +282,7 @@ test.describe('Comparison generator — flag, generation gating, count, contract
         ).toBe(true);
     });
 
-    test('cross-user access control: non-owner 403 on owner-gated routes, 200 on status route', async ({
+    test('cross-user access control: non-owner 403 on ALL owner-gated routes incl. generation-status', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -309,15 +320,30 @@ test.describe('Comparison generator — flag, generation gating, count, contract
         });
         expect(genManual.status()).toBe(403);
 
-        // ASYMMETRY: generation-status has NO ownership check → the intruder still
-        // gets 200 { generating:false }. This is the load-bearing contract that
-        // lets a shared progress poller work for any authed viewer.
+        // generation-status is now SYMMETRIC with the other owner-gated routes:
+        // the handler runs ensureAccess before reading the progress cache (former
+        // IDOR fix), so the intruder is rejected at the ownership guard with the
+        // same 403 'You do not have permission to access this work' — a shared
+        // progress poller must run as the owner / a member, not any authed viewer.
         const status = await request.get(`${workUrl(workId)}/comparisons/generation-status`, {
             headers: intruderHeaders,
             timeout: COMP_TIMEOUT,
         });
-        expect(status.status()).toBe(200);
-        expect((await status.json()).generating).toBe(false);
+        expect(status.status()).toBe(403);
+        expect(JSON.stringify(await status.json())).toContain(
+            'You do not have permission to access this work',
+        );
+
+        // Sanity: the OWNER is NOT 403 on the same status route — once the
+        // ownership gate passes they read the in-memory progress cache and get
+        // 200 { generating:false } (repo-independent, never a git 5xx). Confirms
+        // the 403 above is an ownership signal, not a blanket failure.
+        const ownerStatus = await request.get(
+            `${workUrl(workId)}/comparisons/generation-status`,
+            { headers: ownerHeaders, timeout: COMP_TIMEOUT },
+        );
+        expect(ownerStatus.status()).toBe(200);
+        expect((await ownerStatus.json()).generating).toBe(false);
 
         // Sanity: the OWNER is NOT 403 on the same list route (they hit the git
         // layer instead → 5xx on a fresh repo, or 200). Confirms 403 is an

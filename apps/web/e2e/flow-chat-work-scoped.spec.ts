@@ -37,19 +37,22 @@ import { isAiProviderConfigured } from './helpers/chat';
  *     another user → 404 { message:'Not Found', statusCode:404 }).
  *   GET  /api/conversations      → { conversations:[{ id, title, providerId,
  *       model, createdAt, updatedAt }], total }.
- *   PATCH /api/conversations/:id body { title } → 204 (title only; extra body
- *     fields like `metadata` are IGNORED — verified metadata stays null).
+ *   PATCH /api/conversations/:id body { title } → 204 (title only;
+ *     UpdateConversationDto whitelists ONLY `title`, so extra body fields like
+ *     `metadata` are REJECTED by the hardened ValidationPipe, not silently kept).
  *   POST /api/conversations/:id/messages body { messages:[{ role, content,
  *       model?, usage?, parts? }] } → 201 { success:true }; messages persist
  *     per-message `model` + `usage:{ promptTokens, completionTokens, totalTokens }`.
  *
  * ── HONEST DEVIATION (Flow 2: conversation<->work linkage) ───────────────────
  *   The Conversation entity (packages/agent/src/entities/conversation.entity.ts)
- *   has NO `workId` column. Probing confirmed `workId` (and `model`/`metadata`)
- *   sent to POST /api/conversations are silently dropped — only `title` +
- *   `providerId` persist at create. So a hard work-FK linkage is NOT a real
- *   platform feature today. The CLOSEST real, truthful linkage this suite drives
- *   instead:
+ *   has NO `workId` column, and `CreateConversationDto` whitelists ONLY
+ *   { title, providerId }. The hardened global ValidationPipe
+ *   (`forbidNonWhitelisted: true`, apps/api/src/main.ts) now REJECTS a create
+ *   body that smuggles `workId`/`metadata` with 400 "property X should not
+ *   exist" (verified) — it is not silently dropped. So a hard work-FK linkage is
+ *   NOT a real platform feature today. The CLOSEST real, truthful linkage this
+ *   suite drives instead:
  *     (a) a work-scoped chat completion (X-Work-Id) for work A and a separate one
  *         for work B both succeed independently — the chat layer is the genuine
  *         work-scoping surface;
@@ -242,18 +245,41 @@ test.describe('Work-scoped chat (chat ⇄ works integration)', () => {
         expect(workB.id).toBeTruthy();
 
         // --- Probe the real `workId` field behaviour at create (HONEST DEVIATION).
-        // The Conversation entity has NO workId column; we send workId anyway to
-        // document the platform's truthful response: it is silently dropped while
-        // title + providerId persist. We encode the work association in the TITLE
-        // (the only durable, queryable place today) so the linkage is observable.
+        // The Conversation entity has NO workId column and the CreateConversationDto
+        // whitelists ONLY { title, providerId }. The global ValidationPipe runs with
+        // `forbidNonWhitelisted: true` (apps/api/src/main.ts), so a create body that
+        // smuggles `workId`/`metadata` is now REJECTED outright (400 "property X
+        // should not exist") rather than silently dropped — this is the hardened,
+        // truthful contract and proves even more strongly that work-FK linkage is not
+        // a real feature. We assert that rejection first, then create cleanly,
+        // encoding the work association in the TITLE (the only durable, queryable
+        // place today) so the linkage is observable.
+        const rejected = await request.post(`${API_BASE}/api/conversations`, {
+            headers: authedHeaders(tokenA),
+            // Not part of the whitelist — sent to PROVE it is rejected, not persisted:
+            data: {
+                title: `work:${workA.id}`,
+                providerId: 'openrouter',
+                workId: workA.id,
+                metadata: { workId: workA.id },
+            },
+        });
+        expect(
+            rejected.status(),
+            'create rejects non-whitelisted workId/metadata (forbidNonWhitelisted)',
+        ).toBe(400);
+        const rejectedBody = (await rejected.json()) as { message?: string | string[] };
+        const rejectedMsg = Array.isArray(rejectedBody.message)
+            ? rejectedBody.message.join(' ')
+            : (rejectedBody.message ?? '');
+        expect(rejectedMsg, 'rejection names the workId property').toContain('workId');
+
+        // Clean create — only the whitelisted fields persist.
         const createA = await request.post(`${API_BASE}/api/conversations`, {
             headers: authedHeaders(tokenA),
             data: {
                 title: `work:${workA.id}`,
                 providerId: 'openrouter',
-                // Not part of the contract — sent to PROVE it is ignored, not persisted:
-                workId: workA.id,
-                metadata: { workId: workA.id },
             },
         });
         expect(createA.status(), 'create conversation A → 201').toBe(201);

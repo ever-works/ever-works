@@ -520,11 +520,21 @@ test.describe('Flow: mail deeplink resolution / callback allow-list / bounce', (
     }, testInfo) => {
         const origin = baseURL ?? 'http://localhost:3000';
 
-        // --- DTO hardening: non-string callback -> 400 'must be a string' (all three flavors) ---
+        // --- DTO hardening: a non-string callback is a typed 400 (all three flavors) ---
+        // The three callback fields are NOT validated identically by design:
+        //   register.emailVerificationCallbackUrl / forgot-password.resetPasswordCallbackUrl
+        //     are @IsString @IsOptional -> a non-string is '<field> must be a string'.
+        //   magic-link.magicLinkCallbackUrl is HARDENED with
+        //     @IsUrl({ protocols:['http','https'], require_tld:true }) (magic-link.dto.ts) so a
+        //     non-http(s)/malformed value is rejected at the DTO layer BEFORE the host-allowlist
+        //     check -> a non-string (or any non-URL) is '<field> must be a URL address'.
+        // We assert the SAME intent (a non-string callback is a typed 400, never silently
+        // accepted) but match each field's real validator message.
         const nonStringCases: Array<{
             path: string;
             data: Record<string, unknown>;
             field: string;
+            expectedMsg: string;
         }> = [
             {
                 path: '/api/auth/register',
@@ -535,22 +545,25 @@ test.describe('Flow: mail deeplink resolution / callback allow-list / bounce', (
                     emailVerificationCallbackUrl: ['x'],
                 },
                 field: 'emailVerificationCallbackUrl',
+                expectedMsg: 'emailVerificationCallbackUrl must be a string',
             },
             {
                 path: '/api/auth/forgot-password',
                 data: { email: uniqEmail('ns-r'), resetPasswordCallbackUrl: 12345 },
                 field: 'resetPasswordCallbackUrl',
+                expectedMsg: 'resetPasswordCallbackUrl must be a string',
             },
             {
                 path: '/api/auth/magic-link',
                 data: { email: uniqEmail('ns-m'), magicLinkCallbackUrl: { evil: true } },
                 field: 'magicLinkCallbackUrl',
+                expectedMsg: 'magicLinkCallbackUrl must be a URL address',
             },
         ];
         for (const c of nonStringCases) {
             const res = await request.post(`${API_BASE}${c.path}`, { data: c.data });
             expect(res.status(), `${c.path} non-string callback`).toBe(400);
-            expect(JSON.stringify(await res.json())).toContain(`${c.field} must be a string`);
+            expect(JSON.stringify(await res.json())).toContain(c.expectedMsg);
         }
 
         // --- forbidNonWhitelisted: an extra unknown prop -> 400 'property <x> should not exist' ---

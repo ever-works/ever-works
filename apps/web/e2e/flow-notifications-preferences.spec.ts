@@ -524,7 +524,14 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
                 data: {
                     quietHoursStart: '22:00:00',
                     quietHoursEnd: '07:00:00',
-                    timezone: 'Europe/Kyiv',
+                    // A real, non-UTC IANA zone for the midnight-crossing window.
+                    // The quiet-hours validator only accepts identifiers in
+                    // Intl.supportedValuesOf('timeZone') (a security allowlist) —
+                    // that canonical list OMITS tzdata link aliases like
+                    // 'Europe/Kyiv' (only the deprecated 'Europe/Kiev' is present
+                    // on the Node 22/24 ICU build), so we use a zone that has
+                    // never been renamed and is stable across ICU versions.
+                    timezone: 'America/New_York',
                 },
                 timeout: TIMEOUT,
             },
@@ -533,7 +540,7 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
         const pref1 = (await setQuiet.json()).preference;
         expect(pref1.quietHoursStart).toBe('22:00:00');
         expect(pref1.quietHoursEnd).toBe('07:00:00');
-        expect(pref1.timezone).toBe('Europe/Kyiv');
+        expect(pref1.timezone).toBe('America/New_York');
 
         // --- overwrite the window (upsert on the single-row PK = userId) ---
         const overwrite = await request.put(
@@ -550,13 +557,18 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
         expect(pref2.timezone).toBe('UTC');
 
         // --- mute two categories; one indefinite, one with a future expiry ---
+        // NOTE: the mute `category` is the strict NotificationCategory enum
+        // (ai_credits | subscription | generation | system | security | agent |
+        // task) — singular 'agent', NOT the event-type *category* label 'agents'
+        // (plural) that the registry uses on `agent_run_finished`. The MuteBody
+        // DTO is @IsEnum(NotificationCategory), so 'agents' would 400.
         const muteAgents = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: h,
-            data: { category: 'agents' },
+            data: { category: 'agent' },
             timeout: TIMEOUT,
         });
         expect(muteAgents.status()).toBe(201);
-        expect((await muteAgents.json()).mute).toEqual({ category: 'agents', mutedUntil: null });
+        expect((await muteAgents.json()).mute).toEqual({ category: 'agent', mutedUntil: null });
 
         const futureIso = new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString();
         const muteGen = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
@@ -566,17 +578,17 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
         });
         expect(muteGen.status()).toBe(201);
 
-        // --- mute upsert DEDUP: re-mute 'agents' with an expiry rewrites the SAME
-        //     row's mutedUntil — there is never a second 'agents' row. ---
+        // --- mute upsert DEDUP: re-mute 'agent' with an expiry rewrites the SAME
+        //     row's mutedUntil — there is never a second 'agent' row. ---
         const reMute = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: h,
-            data: { category: 'agents', mutedUntil: futureIso },
+            data: { category: 'agent', mutedUntil: futureIso },
             timeout: TIMEOUT,
         });
         expect(reMute.status()).toBe(201);
 
         const prefs1 = await getPreferences(request, token);
-        const agentsMutes = prefs1.mutes.filter((m) => m.category === 'agents');
+        const agentsMutes = prefs1.mutes.filter((m) => m.category === 'agent');
         expect(agentsMutes, 'mute upsert must not duplicate the (user,category) row').toHaveLength(
             1,
         );
@@ -600,26 +612,31 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
 
         // --- unmute one category (204), then unmute it AGAIN (idempotent 204),
         //     and unmute a NEVER-muted category (also 204) ---
+        // The unmute path param is ParseEnumPipe(NotificationCategory): the
+        // category must be a real enum value ('agent', 'security', …). An
+        // arbitrary string like 'never_muted_category' 400s at the pipe, so the
+        // never-muted-but-still-204 case uses a VALID enum value this test never
+        // muted ('security').
         const unmute = await request.delete(
-            `${API_BASE}/api/notifications/preferences/mute/agents`,
+            `${API_BASE}/api/notifications/preferences/mute/agent`,
             { headers: h, timeout: TIMEOUT },
         );
         expect(unmute.status()).toBe(204);
         const unmuteAgain = await request.delete(
-            `${API_BASE}/api/notifications/preferences/mute/agents`,
+            `${API_BASE}/api/notifications/preferences/mute/agent`,
             { headers: h, timeout: TIMEOUT },
         );
         expect(unmuteAgain.status()).toBe(204);
         const unmuteNever = await request.delete(
-            `${API_BASE}/api/notifications/preferences/mute/never_muted_category`,
+            `${API_BASE}/api/notifications/preferences/mute/security`,
             { headers: h, timeout: TIMEOUT },
         );
         expect(unmuteNever.status()).toBe(204);
 
-        // Final read-back: 'agents' gone, 'generation' kept, window cleared,
+        // Final read-back: 'agent' gone, 'generation' kept, window cleared,
         // subscription override still standing — every shape independent.
         const finalPrefs = await getPreferences(request, token);
-        expect(finalPrefs.mutes.map((m) => m.category)).not.toContain('agents');
+        expect(finalPrefs.mutes.map((m) => m.category)).not.toContain('agent');
         expect(finalPrefs.mutes.map((m) => m.category)).toContain('generation');
         expect(finalPrefs.preference?.quietHoursStart ?? null).toBeNull();
         expect(subFor(finalPrefs, 'agent_run_finished')!.channelIds).toEqual(['in-app']);
@@ -659,7 +676,7 @@ test.describe('Notification preferences — delivery gate, per-type, persistence
         expect(
             (
                 await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
-                    data: { category: 'agents' },
+                    data: { category: 'agent' },
                 })
             ).status(),
         ).toBe(401);

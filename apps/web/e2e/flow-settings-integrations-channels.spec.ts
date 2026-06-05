@@ -29,7 +29,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      is a scoped 404 "Channel not found", never a cross-tenant leak or hijack.
  *   5. Configure-validation edges — any pluginId+targetConfig is accepted at CONNECT
  *      (validation is deferred to test/send time), the disabled gate is also a SEND gate,
- *      and a missing `name` is the probed 500 (no DTO guard).
+ *      and a missing `name` is rejected up front by the CreateChannelDto guard with a 400
+ *      class-validator error (the hardened replacement for the former no-DTO-guard 500).
  *   6. UI Add-channel wizard (seeded storageState) at /settings/integrations/channels —
  *      open dialog → pick Slack → fill webhook → Create → row appears → Test shows the
  *      truthful failure badge → Remove drops the row.
@@ -50,8 +51,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *        even a non-hooks.slack.com URL is stored verbatim. The delivery plugin + its
  *        config schema are only resolved at test/send time. Multi-field secrets
  *        (telegram botToken+chatId, whatsapp accessToken+phoneNumberId+to) round-trip
- *        verbatim in targetConfig.  Omitting `name` -> 500 {"statusCode":500,
- *        "message":"Internal server error"} (no DTO guard) — asserted truthfully in flow 5.
+ *        verbatim in targetConfig.  Omitting `name` -> 400 {"statusCode":400,
+ *        "error":"Bad Request","message":[…"name …"]} — the CreateChannelDto guard
+ *        (`@IsString() @MinLength(1)`) rejects it via the global ValidationPipe BEFORE
+ *        persistence (hardened replacement for the former no-DTO-guard 500); flow 5.
  *     PATCH  /:id { name?, targetConfig?, disabled? } -> 200 { channel }.
  *        disabled:true stamps disabledAt (ISO) AND drops it from GET; disabled:false
  *        clears disabledAt back to null (reappears). targetConfig is REPLACED wholesale.
@@ -488,7 +491,7 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         });
     });
 
-    test('configure-validation edges — connect accepts any config (validation deferred to send), empty PATCH is a no-op, missing name is the probed 500', async ({
+    test('configure-validation edges — connect accepts any config (validation deferred to send), empty PATCH is a no-op, missing name is a 400 DTO-guard rejection', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request, { email: `sic-cfg-${Date.now()}@test.local` });
@@ -553,9 +556,12 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
             webhookUrl: 'https://evil.example.com/not-a-slack-hook',
         });
 
-        // PROBED truthful edge: omitting `name` at create has NO DTO guard, so the service
-        // hits a NOT-NULL persistence error and the controller surfaces a generic 500.
-        // (This file does not DEPEND on the edge elsewhere — it documents it truthfully.)
+        // PROBED truthful edge: omitting `name` at create is rejected up front by the
+        // CreateChannelDto guard (`@IsString() @MinLength(1)` on `name`), so the global
+        // ValidationPipe (whitelist + forbidNonWhitelisted) 400s BEFORE the service/persistence
+        // layer is reached. The body is the standard class-validator error: a `message` ARRAY of
+        // per-constraint strings (all naming `name`) plus `error:'Bad Request'`. This is the
+        // hardened replacement for the former no-DTO-guard 500 — the request never reaches the DB.
         const missingName = await request.post(`${API_BASE}/api/notification-channels`, {
             headers: authedHeaders(token),
             data: {
@@ -564,8 +570,11 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
             },
             timeout: TIMEOUT,
         });
-        expect(missingName.status()).toBe(500);
-        expect((await missingName.json()).message).toBe('Internal server error');
+        expect(missingName.status()).toBe(400);
+        const missingNameBody = (await missingName.json()) as { message: string[]; error: string };
+        expect(Array.isArray(missingNameBody.message)).toBe(true);
+        expect(missingNameBody.message.join(' ')).toContain('name');
+        expect(missingNameBody.error).toBe('Bad Request');
 
         // A foreign/unknown UUID PATCH is a scoped 404, not a create.
         const foreign = await request.patch(`${API_BASE}/api/notification-channels/${BOGUS_UUID}`, {

@@ -39,7 +39,9 @@
  *       organizationId, … } (entity returned directly, no wrapper)
  *     GET  /api/conversations            → { conversations:[…], total }  (NOT data/meta)
  *     GET  /api/conversations/:id        → 200 own (incl. `messages:[…]`) / 404
- *       cross / 404 non-uuid (plain @Param — NO ParseUUIDPipe → service-miss 404)
+ *       cross / 400 non-uuid (`:id` is guarded by ParseUUIDPipe — a malformed
+ *       id is rejected at the pipe layer before the service runs; a well-formed
+ *       unknown/foreign uuid still 404s)
  *     PATCH /api/conversations/:id { title } → 204 own / 404 cross
  *     DELETE /api/conversations/:id          → 204 own / 404 cross
  *     POST  /api/conversations/:id/messages { messages:[{role,content}] }
@@ -316,14 +318,19 @@ test.describe('Tenant isolation across every resource type', () => {
             ).status(),
         ).toBe(404);
         expect((await request.delete(crossUrl, { headers: b.headers })).status()).toBe(404);
-        // Plain @Param (no ParseUUIDPipe) → a non-uuid id is a clean service-miss 404.
+        // The :id param is now guarded by ParseUUIDPipe (hardened — mirrors the
+        // skills routes), so a malformed, non-uuid id is rejected at the pipe
+        // layer with 400 ("Validation failed (uuid is expected)") BEFORE the
+        // service can run. A well-formed but unknown/foreign uuid still 404s
+        // (proven by the cross-tenant GET above) — both codes prove a foreign
+        // caller can never read another tenant's thread by guessing an id.
         expect(
             (
                 await request.get(`${API_BASE}/api/conversations/not-a-uuid`, {
                     headers: b.headers,
                 })
             ).status(),
-        ).toBe(404);
+        ).toBe(400);
 
         // ── Cross-tenant message-append: the foreign user cannot inject ──
         const crossAppend = await request.post(`${crossUrl}/messages`, {

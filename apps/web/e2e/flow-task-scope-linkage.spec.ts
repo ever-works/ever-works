@@ -15,28 +15,33 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * `flow-multi-tenant-isolation.spec.ts` (tenant stamping of an UNSCOPED
  * post-org task + cross-user work/mission guards).
  *
- * Every contract below was probed against the LIVE stack (sqlite CI driver)
- * before it was asserted:
+ * Every contract below was reconciled against the HARDENED API source
+ * (`apps/api/src/tasks/*` + `packages/agent/src/tasks-domain/tasks.service.ts`):
  *
  *   POST /api/tasks { title, missionId?|ideaId?|workId? }            → 201
  *     - status:'backlog', priority:'p3', slug:'T-n' (per-user counter).
  *     - Scope columns are nullable + additive; service enforces "exactly
  *       zero or one of missionId/ideaId/workId" → popCount>1 is 400
  *       "...exactly zero or one of missionId / ideaId / workId.".
- *     - NO FK existence check on the scope id — a Task pinned to a ghost
- *       (never-created) workId is accepted (CREATED). Linkage is a pointer,
- *       not a referential constraint, at create time.
+ *     - The scope id is FK-enforced AND ownership-enforced at create time
+ *       (`assertScopeReachable`): a workId/missionId/ideaId that does not
+ *       exist — OR exists but is owned by another user — is a 400
+ *       ("Work <id> not found." / "Mission …" / "Idea …"). Linkage is a
+ *       REAL owned reference, not a free pointer. So each scoped Task must
+ *       be pinned to an entity the caller created and owns.
  *   GET  /api/tasks?workId=<id> / ?missionId= / ?ideaId=             → 200
  *       { data:[…], meta:{ total, limit, offset } }. The list is ALWAYS
  *       user-scoped first; the scope filter narrows within the caller's own
  *       Tasks. An orphan (unscoped) Task appears in NONE of the three.
  *       An unknown scope id → 200 with an empty page (never 4xx/5xx).
  *   PATCH /api/tasks/:id                                              → 200
- *       Accepts title/description/priority/labels/parentTaskId/
- *       requireAllApprovers ONLY. Scope (missionId/ideaId/workId) is
- *       IMMUTABLE post-create: the update DTO ignores those keys, so a
- *       Task NEVER moves between scopes via PATCH (probed — sending
- *       {workId:null, missionId:X} left workId unchanged, missionId null).
+ *       The UpdateTaskDto whitelists title/description/priority/labels/
+ *       parentTaskId/requireAllApprovers ONLY, and the global ValidationPipe
+ *       runs `forbidNonWhitelisted` — so a PATCH that even MENTIONS a scope
+ *       key (missionId/ideaId/workId) is rejected 400 "property <key> should
+ *       not exist". Scope is therefore IMMUTABLE post-create: a Task NEVER
+ *       moves between scopes via PATCH (the request is refused outright; a
+ *       title-only PATCH succeeds and leaves the scope untouched).
  *   GET  /api/tasks/:id (cross-user)                                  → 404
  *       (no existence leak; never 403).
  *
@@ -134,6 +139,18 @@ async function listTaskIds(
     return { ids: (body.data as Array<{ id: string }>).map((t) => t.id), total: body.meta.total };
 }
 
+/** POST /api/tasks raw (no helper 201-assertion); returns the response. */
+async function postTask(
+    request: APIRequestContext,
+    token: string,
+    data: Record<string, unknown>,
+) {
+    return request.post(`${API_BASE}/api/tasks`, {
+        headers: authedHeaders(token),
+        data,
+    });
+}
+
 test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
     test('full scope partition: one Task per scope + an orphan, each filter returns ONLY its own', async ({
         request,
@@ -223,7 +240,7 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         }
     });
 
-    test('scope exclusivity: every pair of scopes is a 400, single scope + ghost-id are accepted', async ({
+    test('scope exclusivity: every pair of scopes is a 400, a real single scope is accepted, a ghost id is rejected', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -262,22 +279,30 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         });
         expect(triple.status()).toBe(400);
 
-        // Linkage is a pointer, NOT a referential constraint: a Task pinned
-        // to a never-created ghost workId is accepted at create time (no FK
-        // check). It then lives in that ghost scope's filter — provably
-        // present for ?workId=<ghost> and absent from the orphan's view.
+        // Linkage is FK + ownership enforced (`assertScopeReachable`): a Task
+        // pinned to a never-created ghost workId is REJECTED at create time
+        // with a 400 "Work <id> not found." — the scope id must reference a
+        // real entity the caller owns, not a free pointer.
         const ghostId = UNKNOWN_UUID;
-        const ghostTask = await createTaskViaAPI(request, token, {
+        const ghostRes = await postTask(request, token, {
             title: `Ghost-scoped ${s}`,
             workId: ghostId,
         });
-        expect(asScoped(ghostTask).workId).toBe(ghostId);
+        expect(ghostRes.status(), `ghost workId should be 400`).toBe(400);
+        expect((await ghostRes.json()).message).toMatch(/not found/i);
 
-        const byGhost = await listTaskIds(request, token, `workId=${ghostId}`);
-        expect(byGhost.ids).toContain(ghostTask.id);
-        // …and the REAL work filter does not see it.
+        // The single REAL, owned work scope is accepted, and the work filter
+        // returns exactly that task.
+        const realTask = await createTaskViaAPI(request, token, {
+            title: `Real-scoped ${s}`,
+            workId,
+        });
+        expect(asScoped(realTask).workId).toBe(workId);
         const byReal = await listTaskIds(request, token, `workId=${workId}`);
-        expect(byReal.ids).not.toContain(ghostTask.id);
+        expect(byReal.ids).toContain(realTask.id);
+        // The ghost scope id resolves to an empty page (never created, no row).
+        const byGhost = await listTaskIds(request, token, `workId=${ghostId}`);
+        expect(byGhost.ids).not.toContain(realTask.id);
     });
 
     test('scope is immutable post-create: PATCH never moves a Task between scopes', async ({
@@ -301,20 +326,40 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         });
         expect(asScoped(task).workId).toBe(workId);
 
-        // PATCH attempts to (a) clear workId and (b) re-pin to a mission AND
-        // (c) rename. The update DTO whitelists only title/description/
-        // priority/labels/parentTaskId/requireAllApprovers — the scope keys
-        // are silently ignored. So: title CHANGES, scope DOES NOT MOVE.
+        // A PATCH that even MENTIONS a scope key is REFUSED outright: the
+        // UpdateTaskDto whitelists only title/description/priority/labels/
+        // parentTaskId/requireAllApprovers, and the global ValidationPipe runs
+        // `forbidNonWhitelisted`, so {workId, missionId, …} → 400 "property
+        // <key> should not exist". Scope therefore can never move via PATCH.
         const newTitle = `Renamed but pinned ${s}`;
-        const patchRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+        const rejectRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
             headers,
             data: { workId: null, missionId, title: newTitle },
+        });
+        expect(rejectRes.status(), `scope-key patch should be 400`).toBe(400);
+        expect((await rejectRes.json()).message).toEqual(
+            expect.arrayContaining([expect.stringMatching(/should not exist/i)]),
+        );
+
+        // The rejected request changed NOTHING — the row is byte-for-byte its
+        // birth state (original title, work scope intact, mission still null).
+        const afterReject = await (
+            await request.get(`${API_BASE}/api/tasks/${task.id}`, { headers })
+        ).json();
+        expect(afterReject.title).toBe(`Immutable scope ${s}`); // not renamed
+        expect(afterReject.workId).toBe(workId);
+        expect(afterReject.missionId).toBeNull();
+
+        // A title-only PATCH (whitelisted field) DOES succeed and leaves the
+        // scope untouched — mutable fields move, scope does not.
+        const patchRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+            headers,
+            data: { title: newTitle },
         });
         expect(patchRes.status(), `patch body=${await patchRes.text()}`).toBe(200);
         const patched = await patchRes.json();
         expect(patched.title).toBe(newTitle); // mutable field moved
-        expect(patched.workId).toBe(workId); // scope did NOT clear
-        expect(patched.missionId).toBeNull(); // scope did NOT re-pin
+        expect(patched.workId).toBe(workId); // scope unchanged
 
         // GET-by-id confirms the persisted row agrees (no eventual move).
         const after = await (
@@ -331,11 +376,13 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         expect(byMission.ids).not.toContain(task.id);
     });
 
-    test('cross-user scope isolation: same workId value, zero leakage; cross-read is 404', async ({
+    test('cross-user scope isolation: each user owns its own work scope, zero leakage; cross-read is 404', async ({
         request,
     }) => {
-        // Two independent users. Even if they happen to reference the SAME
-        // workId value, the list is user-scoped FIRST — neither sees the
+        // Two independent users. Scope linkage is ownership-enforced, so B
+        // CANNOT pin a Task to A's workId — referencing A's work id is a 400
+        // "Work <id> not found." (it is unreachable for B). Each user owns its
+        // own work scope; the list is user-scoped FIRST so neither sees the
         // other's Task, and a direct cross-user GET-by-id is a 404 (no
         // existence leak via 403).
         const userA = await registerUserViaAPI(request);
@@ -354,22 +401,33 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
             workId: workIdA,
         });
 
-        // B references the SAME workId value (no FK check lets B "claim" it),
-        // creating B's own Task pinned to that same scope id.
-        const taskB = await createTaskViaAPI(request, tokenB, {
-            title: `B scoped ${s}`,
+        // B CANNOT claim A's work scope — ownership enforcement rejects it 400.
+        const claimRes = await postTask(request, tokenB, {
+            title: `B tries A's scope ${s}`,
             workId: workIdA,
         });
-        expect(asScoped(taskB).workId).toBe(workIdA);
+        expect(claimRes.status(), `B claiming A's work should be 400`).toBe(400);
+        expect((await claimRes.json()).message).toMatch(/not found/i);
+
+        // B owns its OWN real work + a work-scoped Task on it.
+        const { id: workIdB } = await createWorkViaAPI(request, tokenB, {
+            name: `B Work ${s}`,
+            slug: `b-work-${s}`,
+        });
+        const taskB = await createTaskViaAPI(request, tokenB, {
+            title: `B scoped ${s}`,
+            workId: workIdB,
+        });
+        expect(asScoped(taskB).workId).toBe(workIdB);
         expect(taskB.id).not.toBe(taskA.id);
 
-        // A's ?workId= view shows A's Task and NOT B's; B's view is the
-        // mirror — despite the shared scope id, the user partition holds.
+        // A's ?workId= view shows A's Task; B's own-work view shows B's Task.
+        // The user partition holds — neither leaks into the other's filter.
         const aView = await listTaskIds(request, tokenA, `workId=${workIdA}`);
         expect(aView.ids).toContain(taskA.id);
         expect(aView.ids).not.toContain(taskB.id);
 
-        const bView = await listTaskIds(request, tokenB, `workId=${workIdA}`);
+        const bView = await listTaskIds(request, tokenB, `workId=${workIdB}`);
         expect(bView.ids).toContain(taskB.id);
         expect(bView.ids).not.toContain(taskA.id);
 

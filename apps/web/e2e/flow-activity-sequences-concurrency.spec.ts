@@ -256,13 +256,14 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         const postOrder = [4, 1, 6, 2, 7, 3, 5];
         const expectedIdByRung = new Map<number, string>();
         for (const n of postOrder) {
-            const res = await ingest(request, workId, {
+            // Retry on the per-IP rate-limit (429) so a parallel-run throttle
+            // bounce on the shared 60/min ingest budget can't drop a rung. The
+            // event is idempotent, so it still lands exactly once; `ingestAccepted`
+            // asserts the 202 contract internally (never weakening the throttle).
+            const res = await ingestAccepted(request, workId, {
                 occurredAt: isoAt(base, n),
                 summary: `rung-${n}`,
             });
-            expect(res.status(), `ingest rung-${n} body=${await res.text().catch(() => '')}`).toBe(
-                202,
-            );
             const { id } = await res.json();
             expect(typeof id).toBe('string');
             expectedIdByRung.set(n, id);
@@ -306,13 +307,36 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         // back to that row. The sequence must NOT gain duplicate rows.
         const eventId = uuid();
         const occurredAt = isoAt(new Date('2021-02-01T00:00:00.000Z'), 0);
-        const responses = await Promise.all(
+        // Fire the 10 SIMULTANEOUS ingests so the non-atomic check-then-insert
+        // actually races. A shared-IP parallel run can momentarily exhaust the
+        // 60/min per-IP ingest budget and bounce some of this wave to 429; that
+        // is a transient rate-limit, NOT a 409/5xx leaking the race, so we
+        // resolve each response to its accepted (202) outcome by retrying the
+        // SAME idempotent event. The (workId, eventId) idempotency guarantees a
+        // retry still lands on the one winning row, so the no-dup contract is
+        // asserted, never weakened.
+        const firstWave = await Promise.all(
             Array.from({ length: 10 }, () =>
                 ingest(request, workId, { eventId, occurredAt, summary: 'concurrent-idem' }),
             ),
         );
+        const responses = await Promise.all(
+            firstWave.map(async (r) => {
+                if (r.status() === 202) return r;
+                expect(
+                    r.status(),
+                    `concurrent ingest body=${await r.text().catch(() => '')}`,
+                ).toBe(429);
+                return ingestAccepted(request, workId, {
+                    eventId,
+                    occurredAt,
+                    summary: 'concurrent-idem',
+                });
+            }),
+        );
 
-        // Every concurrent caller gets a clean 202 (no 409/5xx leaking the race).
+        // Every concurrent caller ultimately gets a clean 202 (no 409/5xx
+        // leaking the race).
         for (const r of responses) {
             expect(r.status(), `concurrent ingest body=${await r.text().catch(() => '')}`).toBe(
                 202,
@@ -333,12 +357,13 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
 
         // A later (serial) replay of the same eventId still resolves to that same
         // row — the no-dup guarantee is durable, not just a race-window artifact.
-        const replay = await ingest(request, workId, {
+        // `ingestAccepted` tolerates a shared-IP 429 bounce while still asserting
+        // the 202 contract; idempotency pins the reply to the winning row id.
+        const replay = await ingestAccepted(request, workId, {
             eventId,
             occurredAt,
             summary: 'concurrent-idem-replay-ignored',
         });
-        expect(replay.status()).toBe(202);
         expect((await replay.json()).id).toBe(ids[0]);
         const after = await listActivities(request, owner.access_token, workId);
         expect(after.activities.filter((a) => a.id === ids[0]).length).toBe(1);
@@ -355,14 +380,29 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         // sequence must contain every one — no write lost to the contention.
         const base = new Date('2021-03-01T00:00:00.000Z');
         const count = 24;
+        const fields = Array.from({ length: count }, (_unused, i) => ({
+            eventId: uuid(),
+            occurredAt: isoAt(base, i),
+            summary: `burst-${String(i).padStart(2, '0')}`,
+            actionType: WEBSITE_ACTION_TYPES[i % WEBSITE_ACTION_TYPES.length],
+        }));
+        // Fire all 24 DISTINCT events concurrently so the insert storm actually
+        // contends. A shared-IP parallel run can momentarily exhaust the 60/min
+        // per-IP ingest budget and bounce part of the wave to 429 — a transient
+        // rate-limit, not a lost write. We pin an explicit eventId per event so
+        // each one is idempotent, then resolve every 429 to its accepted (202)
+        // outcome by retrying that SAME event. The retry lands on the same row,
+        // so the "every event present exactly once" contract holds and the 202
+        // is asserted, never weakened.
+        const firstWave = await Promise.all(
+            fields.map((f) => ingest(request, workId, f)),
+        );
         const responses = await Promise.all(
-            Array.from({ length: count }, (_unused, i) =>
-                ingest(request, workId, {
-                    occurredAt: isoAt(base, i),
-                    summary: `burst-${String(i).padStart(2, '0')}`,
-                    actionType: WEBSITE_ACTION_TYPES[i % WEBSITE_ACTION_TYPES.length],
-                }),
-            ),
+            firstWave.map(async (r, i) => {
+                if (r.status() === 202) return r;
+                expect(r.status(), `burst body=${await r.text().catch(() => '')}`).toBe(429);
+                return ingestAccepted(request, workId, fields[i]);
+            }),
         );
         for (const r of responses) {
             expect(r.status(), `burst body=${await r.text().catch(() => '')}`).toBe(202);
@@ -410,10 +450,13 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         const base = new Date('2021-04-01T00:00:00.000Z');
         for (let i = 0; i < 6; i += 1) {
             const occurredAt = isoAt(base, i);
-            const ra = await ingest(request, workA, { occurredAt, summary: `A-${i}` });
-            const rb = await ingest(request, workB, { occurredAt, summary: `B-${i}` });
-            expect(ra.status()).toBe(202);
-            expect(rb.status()).toBe(202);
+            // Retry on the per-IP rate-limit (429) so a parallel-run throttle
+            // bounce can't drop a rung — the events are idempotent and each
+            // must land with a 202. `ingestAccepted` asserts the 202 contract
+            // internally (never weakening the throttle), so the scope-isolation
+            // proof below still sees all six A-* and all six B-* rows.
+            await ingestAccepted(request, workA, { occurredAt, summary: `A-${i}` });
+            await ingestAccepted(request, workB, { occurredAt, summary: `B-${i}` });
         }
 
         const a = await listActivities(request, owner.access_token, workA);

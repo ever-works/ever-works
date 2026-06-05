@@ -369,9 +369,19 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         expect(sourceAfter.sourceMissionId).toBeNull();
 
         // ── Now mutate the SOURCE; the (completed) fork stays frozen ─────
+        // guardrailsOverride is a STRICT typed allowlist (WorkAgentGuardrailsDto):
+        // only the canonical guardrail keys are accepted and any unknown key
+        // (e.g. an arbitrary `sourceTouched`) is rejected 400 by the global
+        // ValidationPipe (forbidNonWhitelisted) — verified live against the API.
+        // Use a REAL allowlisted key that is deliberately DISTINCT from the
+        // fork's guardrails so the isolation intent is preserved: mutating the
+        // source's guardrails must not leak into the (independent) fork.
         const patchSource = await request.patch(`${API_BASE}/api/me/missions/${source.id}`, {
             headers,
-            data: { title: `Source Mutated ${s}`, guardrailsOverride: { sourceTouched: true } },
+            data: {
+                title: `Source Mutated ${s}`,
+                guardrailsOverride: { requireApprovalBeforeDelete: true },
+            },
         });
         expect(patchSource.status()).toBe(200);
 

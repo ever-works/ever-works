@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
@@ -43,7 +44,11 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  *        (invalid id → 400 { status:'error', message:'Unsupported website template: <id>' })
  *   PUT  /api/templates/default { kind,templateId } → { status:'success', kind, defaultTemplateId }
  *   GET  /api/templates/:id/customizations → { status:'success', customizations:[] }
- *   GET  /api/templates/customizations/:id (bogus) → 200 { status:'error', message:'Customization not found' }
+ *   GET  /api/templates/customizations/:id — :id is enforced as a UUID by a
+ *        ParseUUIDPipe (security hardening). A well-formed but unknown UUID →
+ *        200 { status:'error', message:'Customization not found' }. A non-UUID
+ *        (e.g. 'bogus-...') is rejected by the pipe with a 400 BadRequest BEFORE
+ *        the handler runs, so the not-found contract is probed with a real UUID.
  *   GET  /api/deploy/providers → { status:'success', providers:[{ id,name,enabled,configured,... }] }
  *   GET  /api/deploy/providers/:id/configured →
  *        { status:'success', configured, available, enabled?, message }
@@ -310,11 +315,15 @@ test.describe('Flow: template customization persists (user-scoped default)', () 
         expect(ledgerBody.status).toBe('success');
         expect(Array.isArray(ledgerBody.customizations), 'ledger is an array').toBe(true);
 
-        // --- A bogus customization id returns the truthful not-found payload
-        // (200 with status:'error') rather than throwing — pins the contract
-        // the polling UI relies on. ---
+        // --- An unknown (but well-formed) customization id returns the truthful
+        // not-found payload (200 with status:'error') rather than throwing —
+        // pins the contract the polling UI relies on. The id param is enforced
+        // as a UUID by a ParseUUIDPipe (security hardening: a non-UUID such as
+        // `bogus-...` is rejected with a 400 BEFORE the handler runs), so we
+        // probe the not-found branch with a real-but-nonexistent UUID. ---
+        const unknownCustomizationId = randomUUID();
         const bogus = await request.get(
-            `${API_BASE}/api/templates/customizations/bogus-${Date.now()}`,
+            `${API_BASE}/api/templates/customizations/${unknownCustomizationId}`,
             { headers: authedHeaders(user.access_token) },
         );
         expect(bogus.status()).toBeLessThan(500);

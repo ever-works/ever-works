@@ -27,8 +27,12 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       leave blank to fall back to your account email." Self-email → 200.
  *       An UNRELATED 3rd-party email (no matching account) → 200 (git author
  *       fields are not identity-verified; only the cross-tenant claim is blocked).
- *     - committerName '' (empty string) persists as NULL (`value || null`);
- *       a 200-char name persists in full (no max length). undefined fields are
+ *     - committerName is cleared by an explicit NULL (`value || null` server-side);
+ *       an EMPTY STRING is instead REJECTED 400 because the value is security-
+ *       hardened: @Matches(/^[^\r\n\x00-\x1F\x7F]+$/) (one-or-more, blocks newline/
+ *       control-char injection into git commit-object fields) plus @MaxLength(120)
+ *       (varchar(120) DB cap). So a 120-char name persists in full, a 200-char name
+ *       400s "must be shorter than or equal to 120 characters". undefined fields are
  *       untouched (partial PUT), so siblings survive.
  *     - emailBudgetAlerts DEFAULTS to true on a fresh user.
  *     - A single PUT with several invalid fields → 400 whose `message` array
@@ -370,7 +374,7 @@ test.describe('Profile identity deep — allowed-host avatar matrix + no-TLD rej
 });
 
 test.describe('Profile identity deep — committerName clear/long + partial-PUT independence + auth gate', () => {
-    test('empty committerName clears to null, a 200-char name persists, partial PUTs leave siblings intact, unauth is 401', async ({
+    test('null committerName clears (empty string is rejected), name is 120-capped, partial PUTs leave siblings intact, unauth is 401', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -394,22 +398,46 @@ test.describe('Profile identity deep — committerName clear/long + partial-PUT 
         expect(renamed.committerEmail).toBe(committerEmail);
         expect(renamed.emailBudgetAlerts).toBe(false);
 
-        // 3. An EMPTY string committerName is coerced to NULL server-side
-        //    (`value || null`) — the clear path. committerEmail/budget untouched.
-        const cleared = await putProfileOk(request, token, { committerName: '' });
+        // 3. The clear path is an explicit NULL — committerName === null is coerced
+        //    server-side (`value || null`) and the override is cleared. The other two
+        //    fields (committerEmail/budget) are untouched (partial PUT).
+        const cleared = await putProfileOk(request, token, { committerName: null });
         expect(cleared.committerName ?? null).toBeNull();
         expect(cleared.committerEmail).toBe(committerEmail);
         expect(cleared.emailBudgetAlerts).toBe(false);
         const freshCleared = await getFresh(request, token);
         expect(freshCleared.committerName ?? null).toBeNull();
 
-        // 4. There is no max length on committerName — a 200-char value persists
-        //    intact through PUT → GET.
-        const longName = 'C'.repeat(200);
-        const long = await putProfileOk(request, token, { committerName: longName });
-        expect(long.committerName).toBe(longName);
-        expect((await getFresh(request, token)).committerName).toBe(longName);
-        expect((await getFresh(request, token)).committerName?.length).toBe(200);
+        // 3b. An EMPTY string is NOT the clear path: the committerName validator
+        //     (@Matches /^[^\r\n\x00-\x1F\x7F]+$/ — one-or-more chars, hardened to
+        //     block newline/control injection into git commit-object fields) requires
+        //     at least one char, and @IsOptional() does NOT skip '' (only null/
+        //     undefined). So '' → 400 with the control-char message, and the row
+        //     stays cleared (nothing applied). To clear, send null (step 3).
+        const emptyClear = await putProfile(request, token, { committerName: '' });
+        expect(emptyClear.status()).toBe(400);
+        expect(await messageOf(emptyClear)).toContain(
+            'committerName must not contain newline or control characters',
+        );
+        expect((await getFresh(request, token)).committerName ?? null).toBeNull();
+
+        // 4. committerName is now length-capped to varchar(120) (DB column +
+        //    @MaxLength(120), hardened alongside the control-char guard). A name AT
+        //    the 120-char cap persists intact through PUT → GET…
+        const capName = 'C'.repeat(120);
+        const atCap = await putProfileOk(request, token, { committerName: capName });
+        expect(atCap.committerName).toBe(capName);
+        expect((await getFresh(request, token)).committerName).toBe(capName);
+        expect((await getFresh(request, token)).committerName?.length).toBe(120);
+
+        // 4b. …while a value OVER the cap (200 chars) is rejected atomically with the
+        //     max-length message, leaving the last good 120-char value intact.
+        const overCap = await putProfile(request, token, { committerName: 'C'.repeat(200) });
+        expect(overCap.status()).toBe(400);
+        expect(await messageOf(overCap)).toContain(
+            'committerName must be shorter than or equal to 120 characters',
+        );
+        expect((await getFresh(request, token)).committerName).toBe(capName);
 
         // 5. The whole surface is auth-gated: a PUT with NO bearer is 401 and
         //    cannot mutate the row.
@@ -417,8 +445,8 @@ test.describe('Profile identity deep — committerName clear/long + partial-PUT 
             data: { committerName: 'should-not-apply' },
         });
         expect(unauth.status()).toBe(401);
-        // The row is unchanged — still the 200-char name from step 4.
-        expect((await getFresh(request, token)).committerName).toBe(longName);
+        // The row is unchanged — still the 120-char cap name from step 4.
+        expect((await getFresh(request, token)).committerName).toBe(capName);
     });
 });
 
