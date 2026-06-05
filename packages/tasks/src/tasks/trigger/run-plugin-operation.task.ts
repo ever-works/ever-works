@@ -75,7 +75,7 @@ export const runPluginOperationTask = task<'run-plugin-operation', RunPluginOper
                 };
             }
 
-            const plugin = registered.plugin as Record<string, unknown>;
+            const plugin = registered.plugin as unknown as Record<string, unknown>;
             const method = plugin[payload.operation];
             if (typeof method !== 'function') {
                 return {
