@@ -97,6 +97,17 @@ test.describe('Knowledge Base — A19+A20 inherited docs', () => {
         //    via `kbAPI.listInheritableDocuments` (row 38b).
         await setWorkOrganizationId(request, access_token, workId, orgId);
 
+        // 3b. Warm-compile the dynamic KB *detail* route up front. The inherited
+        //     row below is a client-side <Link> to `/kb/legal/privacy.md`; on a
+        //     cold `next dev` that route's first compile is 15s+, which raced
+        //     the post-click URL wait under load (the click registered but the
+        //     URL hadn't flipped). Paying the compile here (it falls back to the
+        //     inherited-body endpoint pre-override) makes the later navigation
+        //     fast and deterministic.
+        await page
+            .goto(`/en/works/${workId}/kb/legal/privacy.md`, { waitUntil: 'domcontentloaded' })
+            .catch(() => undefined);
+
         // 4. Open the KB page and assert the inherited row is in the
         //    "Inherited from organization" section, with the lock
         //    marker + the expected `data-source="inherited"` data attr.
