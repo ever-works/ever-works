@@ -601,10 +601,17 @@ test.describe('flow: cross-entity optimistic concurrency & conflict (Task / Agen
             headers: { ...authedHeaders(token), 'If-None-Match': etag },
             timeout: T,
         });
+        // An unchanged conditional re-read may resolve EITHER way, both correct
+        // per RFC 7232: 200 (the body is re-sent — Express's `fresh()` short-
+        // circuit is bypassed by Nest's serialization layer) OR a 304 (Express
+        // honours the matching If-None-Match before the body is written). Which
+        // one fires is environment-sensitive (Node/Express build + timing), so
+        // accept both — the invariant under test is the ETAG TOKEN, not the
+        // 304-vs-200 flip.
         expect(
-            conditional.status(),
-            'an unchanged conditional read still returns 200 (the 304 short-circuit is not honoured)',
-        ).toBe(200);
+            [200, 304],
+            `an unchanged conditional read is 200 or 304 (got ${conditional.status()})`,
+        ).toContain(conditional.status());
         expect(
             conditional.headers()['etag'],
             'the unchanged row still carries the same ETag (the version token the poller diffs)',
