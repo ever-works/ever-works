@@ -566,30 +566,29 @@ test.describe('Idea → Work accept flow (seeded user UI)', () => {
             })
             .toBe('accepted');
 
-        // The /ideas page hides Accepted rows by default behind a "Show
-        // accepted" toggle / Accepted filter. Open the page, reveal accepted
-        // Ideas (retry-to-open for the dev hydration race), then assert the
-        // card body is visible. Branch on whichever affordance this build
-        // renders (toggle vs filter chip vs accepted tab) using .or().
+        // The /ideas page filters by status SERVER-SIDE via a URL-backed
+        // `?status=` query (a native <select name="status"> + "Apply" submit
+        // GET — there is no client toggle/switch/tab). The default filter is
+        // "Actionable" (pending/queued/building/failed), which EXCLUDES
+        // accepted Ideas, so we must land on the Accepted view explicitly.
+        // Navigating straight to `?status=accepted` is exactly the URL a user
+        // reaches by picking "Accepted" in the Status <select> and clicking
+        // Apply; the server then returns the accepted Ideas and the page
+        // renders them as Done cards.
         const origin = baseURL ?? 'http://localhost:3000';
-        await page.goto(`${origin}/ideas`, { waitUntil: 'domcontentloaded' });
 
-        // Reveal accepted Ideas. The label is the i18n "Show accepted" toggle
-        // or an "Accepted" filter — try each, tolerate absence (some builds
-        // render all statuses inline).
-        const reveal = page
-            .getByRole('button', { name: /accepted/i })
-            .or(page.getByRole('switch', { name: /accepted/i }))
-            .or(page.getByText(/show accepted/i))
-            .or(page.getByRole('tab', { name: /accepted/i }))
-            .first();
+        // Re-navigate inside the retry wrapper so a dev hydration/cold-compile
+        // race (the accepted row not yet rendered on the first paint) is
+        // retried by reloading the filtered URL, not just re-asserting a stale
+        // DOM.
         await expect(async () => {
-            if (await reveal.isVisible().catch(() => false)) {
-                await reveal.click({ timeout: 5_000 });
-            }
-            // After revealing, the accepted card (its description body) must
-            // be on the page. If the build already shows accepted inline, the
-            // reveal is a no-op and this still passes.
+            await page.goto(`${origin}/ideas?status=accepted`, {
+                waitUntil: 'domcontentloaded',
+            });
+            // The accepted card renders the Idea's description verbatim as its
+            // body text (IdeaCard renders `proposal.description`), and an
+            // accepted Idea with an acceptedWorkId shows the success-green
+            // "View Work" Done CTA.
             await expect(page.getByText(desc).first()).toBeVisible({ timeout: 10_000 });
         }).toPass({ timeout: 30_000 });
     });

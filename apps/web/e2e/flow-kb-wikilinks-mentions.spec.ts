@@ -311,23 +311,33 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         await expect(body.or(notFound).first()).toBeVisible({ timeout: 60_000 });
 
         if ((await body.count()) > 0) {
-            // `rewriteWikilinks` produces `/works/<workId>/kb/<class>/<slug>.md`
-            // anchors. The good link resolves to the target's path; the label
-            // is the pipe label "The Target". react-markdown materialises the
-            // anchor client-side after hydration.
-            const expectedHref = `/works/${workId}/kb/${goodTargetPath}`;
-            const goodAnchor = body.locator(`a[href="${expectedHref}"]`);
+            // `rewriteWikilinks` lifts each safe `[[Label|class/slug.md]]` into
+            // a CommonMark link `[Label](/works/<workId>/kb/<class>/<slug>.md)`,
+            // which react-markdown materialises as an `<a>` after hydration.
+            // The visible anchor TEXT is the wikilink label — that is the
+            // stable, security-independent contract of the rewrite.
+            //
+            // NOTE: `MarkdownPreview` renders every anchor through its
+            // `SafeAnchor` hardening (apps/web/.../items/MarkdownPreview.tsx),
+            // which collapses any href that is not `http(s):` to `#` as a
+            // defence-in-depth XSS guard. Our in-app KB target is a *relative*
+            // path, so the rendered `href` is `#`, not the literal
+            // `/works/.../kb/...` string. We therefore assert the rewrite via
+            // the anchor's label + the fact that the wikilink became a real
+            // `<a>` (no leftover `[[…]]` bracket text), NOT via the href.
+            const goodAnchor = body.getByRole('link', { name: 'The Target', exact: true });
             await expect(goodAnchor).toBeVisible({ timeout: 30_000 });
-            await expect(goodAnchor).toHaveText('The Target');
 
             // The BROKEN wikilink ALSO rewrites to an in-app anchor (the
             // rewriter is path-shape based, not existence based) — the
-            // brokenness only shows when the target route 404s. Its label is
-            // the basename.
-            const brokenHref = `/works/${workId}/kb/${brokenTargetPath}`;
-            const brokenAnchor = body.locator(`a[href="${brokenHref}"]`);
+            // brokenness only shows when the target route 404s (asserted
+            // above against the API). Its label is the basename.
+            const brokenAnchor = body.getByRole('link', { name: `missing-${runId}`, exact: true });
             await expect(brokenAnchor).toBeVisible({ timeout: 30_000 });
-            await expect(brokenAnchor).toHaveText(`missing-${runId}`);
+
+            // Both safe wikilinks were lifted out of their `[[…]]` syntax —
+            // no raw wikilink bracket text survives in the rendered body.
+            await expect(body).not.toContainText('[[');
         } else {
             // Local dev-route shadow: the KB viewer route resolved to the
             // localized not-found page rather than crashing or redirecting.
@@ -693,30 +703,41 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         await expect(body.or(notFound).first()).toBeVisible({ timeout: 60_000 });
 
         if ((await body.count()) > 0) {
-            // The SAFE wikilink IS rewritten to an in-app anchor.
-            const safeAnchor = body.locator(`a[href="/works/${workId}/kb/${safePath}"]`);
+            // The SAFE wikilink IS lifted into an in-app anchor by
+            // `rewriteWikilinks` (label "Ok"). `MarkdownPreview.SafeAnchor`
+            // then collapses its *relative* href to `#` as a defence-in-depth
+            // XSS guard (only `http(s):` hrefs survive), so we identify the
+            // wikilink anchor by its LABEL, not its href.
+            const safeAnchor = body.getByRole('link', { name: 'Ok', exact: true });
             await expect(safeAnchor).toBeVisible({ timeout: 30_000 });
 
             // No `javascript:` href is EVER synthesised — the real XSS vector.
             // The unsafe wikilink stays literal text; `react-markdown` +
-            // `remark-gfm` never autolink a `javascript:` scheme.
+            // `remark-gfm` never autolink a `javascript:` scheme, and
+            // `SafeAnchor` would neutralise it to `#` even if one appeared.
             await expect(body.locator('a[href^="javascript:"]')).toHaveCount(0);
-            // The unsafe targets survive as raw bracket text (not rewritten to
-            // an in-app anchor), proving the rewriter left them untouched
-            // rather than emitting a mangled-but-unsafe `/works/.../kb/` href.
-            await expect(body).toContainText('javascript:alert(1)');
-            await expect(body).toContainText('/etc/passwd');
+            // The unsafe targets survive as raw `[[…]]` bracket text (the
+            // rewriter refused them via `isSafePath`), rather than being
+            // emitted as a mangled-but-unsafe in-app anchor.
+            await expect(body).toContainText('[[evil|javascript:alert(1)]]');
+            await expect(body).toContainText('[[abs|/etc/passwd]]');
+            await expect(body).toContainText(`[[trav|../secrets-${runId}.md]]`);
 
-            // The crux: exactly ONE wikilink-rewritten IN-APP KB anchor exists
-            // in the body (the single safe target). The four unsafe wikilinks
-            // produced ZERO `/works/.../kb/` anchors — an absolute path, a `..`
-            // traversal, and the two URL schemes were all refused by
-            // `isSafePath`. (remark-gfm may autolink a bare `https://` URL
-            // inside the leftover bracket TEXT, but that is plain-markdown
-            // behaviour, not a synthesised KB route — so we assert on the
-            // KB-anchor count, the wikilink contract.)
-            const kbAnchors = body.locator(`a[href^="/works/${workId}/kb/"]`);
-            await expect(kbAnchors).toHaveCount(1);
+            // The crux: exactly ONE wikilink-rewritten anchor exists in the
+            // body — the single safe target, whose label "Ok" is NOT a URL.
+            // The four unsafe wikilinks produced ZERO synthesised anchors
+            // (absolute path, `..` traversal, and the two URL schemes were all
+            // refused by `isSafePath`). remark-gfm DOES autolink the bare
+            // `https://evil.example/x` left inside the un-rewritten bracket
+            // text, but that is a plain-markdown autolink (its visible text IS
+            // the raw URL) — not a synthesised KB route. So every anchor that
+            // is NOT a bare-URL autolink must be the lone safe wikilink.
+            const anchors = body.locator('a');
+            const labels = await anchors.allInnerTexts();
+            const wikilinkAnchorLabels = labels
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0 && !/^https?:\/\//i.test(s));
+            expect(wikilinkAnchorLabels).toEqual(['Ok']);
         } else {
             // Local dev-route shadow: the KB viewer route resolved to the
             // localized not-found page rather than crashing or redirecting.

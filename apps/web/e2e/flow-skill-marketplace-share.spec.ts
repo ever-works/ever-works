@@ -578,11 +578,12 @@ test.describe('Skill marketplace / share / visibility', () => {
         await page.goto('/skills', { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle');
 
-        // The three section toggle buttons are present (capitalize CSS; literal
-        // lowercase text content — match case-insensitively + exact-ish).
-        const installedTab = page.getByRole('button', { name: /^installed$/i });
-        const availableTab = page.getByRole('button', { name: /^available$/i });
-        const customTab = page.getByRole('button', { name: /^custom$/i });
+        // The three section toggles render as ARIA tabs (a `tablist` of
+        // `<button role="tab">`). Because the explicit role="tab" overrides the
+        // implicit "button" role, they are reachable only via getByRole('tab').
+        const installedTab = page.getByRole('tab', { name: /^installed$/i });
+        const availableTab = page.getByRole('tab', { name: /^available$/i });
+        const customTab = page.getByRole('tab', { name: /^custom$/i });
         await expect(installedTab.first()).toBeVisible({ timeout: 30_000 });
         await expect(availableTab.first()).toBeVisible({ timeout: 30_000 });
         await expect(customTab.first()).toBeVisible({ timeout: 30_000 });
@@ -592,11 +593,13 @@ test.describe('Skill marketplace / share / visibility', () => {
         // Install button. Accept either (retry-click to survive hydration race).
         await expect(async () => {
             await availableTab.first().click();
-            const emptyCopy = page.getByText(/no skills available/i);
-            // Anchor to the catalog card's exact "Install" CTA — an unanchored
-            // /^install/i also matches the "installed" section toggle button
-            // (accessible name "installed"), so when the empty-state shows the
-            // .or() would resolve to 2 elements and trip strict mode.
+            // CI empty-state copy is literally "No catalog Skills available."
+            // (t('catalog.emptyTitle')); match that real text, not a paraphrase.
+            const emptyCopy = page.getByText(/no catalog skills available/i);
+            // Anchor to the catalog card's exact "Install" CTA. The section
+            // toggles are role="tab" (not buttons), so this button-scoped,
+            // anchored locator can only ever match a catalog card's Install
+            // button — never a toggle — keeping the .or() to a single element.
             const installBtn = page.getByRole('button', { name: /^install$/i });
             await expect(emptyCopy.first().or(installBtn.first())).toBeVisible({ timeout: 10_000 });
         }).toPass({ timeout: 30_000 });

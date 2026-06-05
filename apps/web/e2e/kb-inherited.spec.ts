@@ -116,7 +116,18 @@ test.describe('Knowledge Base — A19+A20 inherited docs', () => {
         //    lookup 404s (row 38c-2), so the same URL serves both
         //    Work-scope and inherited views — the difference is the
         //    `data-inherited="true"` attribute + the banner.
+        // The inherited row is a Next.js <Link> (<a href>). Clicking it kicks
+        // off a client-side navigation that must cold-compile the
+        // `/kb/legal/privacy.md` dynamic detail route in `next dev` — the
+        // first hit can take 15s+ on its own, so the old 15s `toHaveURL` had
+        // no headroom and flaked (the click registered — the row showed as
+        // `[active]` in the failure snapshot — but the URL hadn't flipped yet).
+        // `waitForURL` is the canonical navigation-wait primitive; give it the
+        // same cold-compile budget the config reserves for first-hit routes,
+        // then settle the network before asserting on the rendered editor.
         await inheritedRow.click();
+        await page.waitForURL(/\/kb\/legal\/privacy\.md$/, { timeout: 60_000 });
+        await page.waitForLoadState('domcontentloaded');
         await expect(page).toHaveURL(/\/kb\/legal\/privacy\.md$/, { timeout: 15_000 });
 
         const editorRoot = page.getByTestId('kb-editor');
@@ -144,7 +155,15 @@ test.describe('Knowledge Base — A19+A20 inherited docs', () => {
         // inherited) and the editable Tiptap surface appears. We
         // tolerate either order — the banner may briefly stay
         // mounted during the transition.
-        await expect(banner).not.toBeVisible({ timeout: 30_000 });
+        //
+        // The override chains a server-action roundtrip (read inherited body →
+        // clone POST into Work scope) + a `router.push` that re-fetches and
+        // re-renders the now-Work-scope view. In `next dev` the editable Tiptap
+        // surface may also cold-compile on first mount, so 30s left no headroom
+        // and flaked with the banner still mounted. This is a web-first
+        // auto-retrying assertion — widen the budget to the cold-compile
+        // ceiling the config reserves for first-hit routes.
+        await expect(banner).not.toBeVisible({ timeout: 60_000 });
 
         // The Work-scope view drops the `data-inherited` attribute
         // entirely (the prop defaults to false on KbDocumentView).

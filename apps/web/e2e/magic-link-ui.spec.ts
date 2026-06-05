@@ -83,6 +83,14 @@ test.describe('Magic-link login UI — EW-633', () => {
         page,
         request,
     }) => {
+        // The redeem server action redirects to the dashboard root `/`,
+        // which on a cold `next dev` runner pays a 10–15s per-route
+        // compile PLUS the dashboard layout's fan-out of ~6 API calls.
+        // The register→dashboard spec (auth.spec.ts) hits the same cliff
+        // and budgets 240s for exactly this reason; mirror it so a slow
+        // cold compile isn't misread as a broken redemption.
+        test.setTimeout(240_000);
+
         if (!(await isMagicLinkEnabled(request))) {
             test.skip(true, 'MAGIC_LINK_ENABLED is false on this build');
         }
@@ -93,6 +101,13 @@ test.describe('Magic-link login UI — EW-633', () => {
         const u = await registerUserViaAPI(request);
         await waitForMessageTo(request, u.email, { timeoutMs: 10_000 }).catch(() => null);
         await clearMailhogInbox(request);
+
+        // Warm up the dashboard root `/` so its cold `next dev` compile +
+        // layout API fan-out is paid up-front. Without this, the cold
+        // compile happens DURING the post-redeem redirect and can blow
+        // past the navigation wait below — the same warm-up the
+        // register→dashboard spec (auth.spec.ts) relies on.
+        await page.goto('/', { waitUntil: 'domcontentloaded' });
 
         // Drive the UI to issue the link rather than hitting the API
         // directly — this asserts the form submission really wires up
@@ -141,15 +156,20 @@ test.describe('Magic-link login UI — EW-633', () => {
 
         await page.goto(pathAndQuery);
 
-        // On success the redeem server action redirects to the
-        // dashboard. PR #1052 (`localePrefix: 'never'`) dropped the
-        // URL-level locale prefix — the dashboard route is now the
-        // unprefixed root `/`. Legacy `/en/` URLs still 307-redirect
-        // to `/`, so accept both shapes during the rollout.
-        await page.waitForURL(/^https?:\/\/[^/]+(?:\/(en|fr|[a-z]{2}))?\/?(\?|#|$)/, {
-            timeout: 30_000,
-        });
-        expect(page.url()).not.toContain('/login');
+        // On success the redeem server action sets the session cookie and
+        // redirects to the dashboard root `/`. We don't pin the exact
+        // landing path — PR #1052 (`localePrefix: 'never'`) made it the
+        // unprefixed `/`, legacy `/en/` URLs still 307 to `/`, and the
+        // dashboard may client-redirect further (onboarding etc.). The
+        // single load-bearing signal is "the user is signed in", which we
+        // assert as: we left the redeem page AND were not bounced to
+        // `/login`. A web-first `toHaveURL` with a negative matcher
+        // auto-waits through the cold-compile redirect chain instead of
+        // racing a fixed timeout. (If redemption had failed, the redeem
+        // client stays on `/login/magic-link?token=…` and shows
+        // `magic-link-error`; if the session weren't honored, the
+        // dashboard bounces back to `/login` — both are caught here.)
+        await expect(page).not.toHaveURL(/\/login(\/magic-link)?(\?|#|$)/, { timeout: 120_000 });
     });
 
     // EW-633 follow-up — re-fixme'd after PR #906 attempted a fix that
