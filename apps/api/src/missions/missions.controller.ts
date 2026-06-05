@@ -92,7 +92,7 @@ export class MissionsController {
     @Post()
     @ApiOperation({ summary: 'Create a new mission' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async create(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateMissionDto,
@@ -145,7 +145,7 @@ export class MissionsController {
     @Patch(':id')
     @ApiOperation({ summary: 'Update mission fields (partial)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -169,7 +169,7 @@ export class MissionsController {
     @Delete(':id')
     @ApiOperation({ summary: 'Delete a mission (allowed from any status)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -180,7 +180,7 @@ export class MissionsController {
     @Post(':id/pause')
     @ApiOperation({ summary: 'Pause a mission (ACTIVE → PAUSED)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async pause(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -191,7 +191,7 @@ export class MissionsController {
     @Post(':id/resume')
     @ApiOperation({ summary: 'Resume a paused mission (PAUSED → ACTIVE)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async resume(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -202,7 +202,7 @@ export class MissionsController {
     @Post(':id/complete')
     @ApiOperation({ summary: 'Mark a mission complete ((ACTIVE|PAUSED) → COMPLETED)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async complete(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -216,7 +216,7 @@ export class MissionsController {
             'Full-fork clone: metadata + non-DISMISSED Ideas (as PENDING) + sourceMissionId backlink. Works NOT cloned (Decisions A25, A26).',
     })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async clone(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -233,7 +233,7 @@ export class MissionsController {
             'Manually trigger a Mission tick — bypasses cron, enforces the outstanding-Ideas cap',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async runNow(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -276,7 +276,7 @@ export class MissionsController {
     @Post(':id/attachments')
     @ApiOperation({ summary: 'Attach an uploaded file to a Mission' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

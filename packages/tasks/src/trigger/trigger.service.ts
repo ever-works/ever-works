@@ -18,6 +18,10 @@ import {
     KbEmbedDocumentDispatcher,
     KbOrgOverlayFanoutPayload,
     KbOrgOverlayFanoutDispatcher,
+    KbNormalizeMediaPayload,
+    KbNormalizeMediaDispatcher,
+    KbTranscribePayload,
+    KbTranscribeDispatcher,
 } from '@ever-works/agent/tasks';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
@@ -27,6 +31,9 @@ import { kbMirrorDocumentTask } from '../tasks/trigger/kb-mirror-document.task';
 import { kbBackfillSkeletonTask } from '../tasks/trigger/kb-backfill-skeleton.task';
 import { kbEmbedDocumentTask } from '../tasks/trigger/kb-embed-document.task';
 import { kbOrgOverlayFanoutTask } from '../tasks/trigger/kb-org-overlay-fanout.task';
+import { kbNormalizeVideoTask } from '../tasks/trigger/kb-normalize-video.task';
+import { kbNormalizeAudioTask } from '../tasks/trigger/kb-normalize-audio.task';
+import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -40,7 +47,9 @@ export class TriggerService
         KbMirrorDocumentDispatcher,
         KbBackfillSkeletonDispatcher,
         KbEmbedDocumentDispatcher,
-        KbOrgOverlayFanoutDispatcher
+        KbOrgOverlayFanoutDispatcher,
+        KbNormalizeMediaDispatcher,
+        KbTranscribeDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -351,6 +360,75 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch kb-org-overlay-fanout task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * EW-643 Phase 3 slice 2 — enqueue ffmpeg-backed normalization for
+     * one video/audio KB upload. Dispatched by `KnowledgeBaseService`
+     * from the upload acceptance path when the MIME family is video/*
+     * or audio/* AND `KB_MEDIA_NORMALIZE` is true.
+     *
+     * Picks the right task id from `payload.mediaKind` so callers don't
+     * need to remember the two task names. Concurrency keyed on `workId`
+     * — two videos uploaded back-to-back to the same Work serialize on
+     * the worker (ffmpeg is CPU-heavy and parallel transcodes fight for
+     * temp disk + DNS resolver slots).
+     */
+    async dispatchKbNormalizeMedia(payload: KbNormalizeMediaPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const taskHandle =
+                payload.mediaKind === 'video' ? kbNormalizeVideoTask : kbNormalizeAudioTask;
+            const handle = await taskHandle.trigger(payload, {
+                tags: [
+                    `kb-normalize-${payload.mediaKind}`,
+                    `work:${payload.workId}`,
+                    `upload:${payload.uploadId}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-normalize:${payload.workId}`,
+            });
+            return handle.id;
+        } catch (error) {
+            this.logger.error(
+                `Failed to dispatch kb-normalize-${payload.mediaKind} task`,
+                error as Error,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * EW-643 Phase 3 slice 2 — enqueue speech-to-text for one
+     * KB upload. Dispatched either directly from the upload route
+     * (when normalize is disabled) or from the normalize task's
+     * success path (when normalize ran first).
+     *
+     * `sourceStoragePath` is the bytes that get forwarded to Whisper —
+     * the normalized derivative if normalize ran, otherwise the
+     * original upload. Concurrency keyed on `workId`; the transcribe
+     * provider's rate limit is the actual ceiling but per-Work
+     * serialization keeps any single Work's queue well-behaved.
+     */
+    async dispatchKbTranscribe(payload: KbTranscribePayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await kbTranscribeTask.trigger(payload, {
+                tags: ['kb-transcribe', `work:${payload.workId}`, `upload:${payload.uploadId}`],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-transcribe:${payload.workId}`,
+            });
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch kb-transcribe task', error as Error);
             return null;
         }
     }

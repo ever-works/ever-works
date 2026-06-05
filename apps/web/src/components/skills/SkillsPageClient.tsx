@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { Download, Plus } from 'lucide-react';
+import { Download, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -11,57 +11,219 @@ import { createCustomSkillAction, installCatalogSkillAction } from '@/app/action
 
 type Section = 'installed' | 'available' | 'custom';
 
-/**
- * Agents/Skills/Tasks PR #1017 — Phase 9. Three-section Skills hub
- * client. Section toggle (Installed / Available / Custom) per
- * `features/skills/plan.md §6` table row.
- *
- * "Available" = catalog union from enabled skills-provider plugins.
- * "Custom" = user's installed Skills that have no sourceCatalogSlug
- * (hand-written, not catalog-derived).
- *
- * Install action installs the catalog entry at tenant scope
- * (ownerType=tenant, ownerId=userId). Picking a non-tenant target
- * happens from the per-target Skills tab (Phase 14 surface).
- */
+interface PageMeta {
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+interface SkillsPageClientProps {
+    installed: Skill[];
+    installedMeta: PageMeta;
+    catalog: SkillCatalogEntry[];
+    catalogTotal: number;
+    catalogLimit: number;
+    filters: {
+        section: Section;
+        search: string;
+        installedOffset: number;
+        catalogOffset: number;
+    };
+    loadErrors?: {
+        installed?: string | null;
+        catalog?: string | null;
+    };
+}
+
+const SECTIONS: Section[] = ['installed', 'available', 'custom'];
+
 export function SkillsPageClient({
     installed,
+    installedMeta,
     catalog,
-}: {
-    installed: Skill[];
-    catalog: SkillCatalogEntry[];
-}) {
-    const [section, setSection] = useState<Section>('installed');
+    catalogTotal,
+    catalogLimit,
+    filters,
+    loadErrors = {},
+}: SkillsPageClientProps) {
+    const t = useTranslations('dashboard.skillsPage');
+    const router = useRouter();
+    const [section, setSection] = useState<Section>(filters.section);
+    const [installedItems, setInstalledItems] = useState(installed);
+    const [search, setSearch] = useState(filters.search);
 
-    const installedSlugs = useMemo(() => new Set(installed.map((s) => s.slug)), [installed]);
-    const customSkills = useMemo(() => installed.filter((s) => !s.sourceCatalogSlug), [installed]);
+    useEffect(() => {
+        setSection(filters.section);
+        setSearch(filters.search);
+        setInstalledItems(installed);
+    }, [filters.section, filters.search, installed]);
+
+    const tenantCatalogSlugs = useMemo(
+        () =>
+            new Set(
+                installedItems
+                    .filter((s) => s.ownerType === 'tenant' && s.sourceCatalogSlug)
+                    .map((s) => s.sourceCatalogSlug as string),
+            ),
+        [installedItems],
+    );
+    const customSkills = useMemo(
+        () => installedItems.filter((s) => !s.sourceCatalogSlug),
+        [installedItems],
+    );
+
+    const updateUrl = (updates: Partial<typeof filters>) => {
+        const next = {
+            section,
+            search,
+            installedOffset: filters.installedOffset,
+            catalogOffset: filters.catalogOffset,
+            ...updates,
+        };
+        const params = new URLSearchParams();
+        if (next.section !== 'installed') params.set('section', next.section);
+        if (next.search.trim()) params.set('search', next.search.trim());
+        if (next.installedOffset > 0) params.set('installedOffset', String(next.installedOffset));
+        if (next.catalogOffset > 0) params.set('catalogOffset', String(next.catalogOffset));
+        router.replace(`${ROUTES.DASHBOARD_SKILLS}${params.size ? `?${params}` : ''}`);
+    };
+
+    const handleSectionChange = (next: Section) => {
+        setSection(next);
+        updateUrl({ section: next });
+    };
+
+    const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        updateUrl({ search: search.trim(), installedOffset: 0, catalogOffset: 0 });
+    };
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-                {(['installed', 'available', 'custom'] as Section[]).map((s) => (
+            <div
+                role="tablist"
+                aria-label={t('tabs.label')}
+                className="flex items-center gap-2 flex-wrap"
+            >
+                {SECTIONS.map((s) => (
                     <button
                         key={s}
+                        id={`skills-tab-${s}`}
                         type="button"
-                        onClick={() => setSection(s)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors capitalize ${
+                        role="tab"
+                        aria-selected={section === s}
+                        aria-controls={`skills-panel-${s}`}
+                        onClick={() => handleSectionChange(s)}
+                        className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
                             section === s
                                 ? 'border-primary bg-primary/10 text-primary'
                                 : 'border-border/60 dark:border-border-dark/60 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark'
                         }`}
                     >
-                        {s}
+                        {t(`tabs.${s}`)}
                     </button>
                 ))}
             </div>
 
-            {section === 'installed' && <InstalledList installed={installed} />}
+            <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+                <label className="sr-only" htmlFor="skills-search">
+                    {t('search.label')}
+                </label>
+                <div className="relative flex-1">
+                    <Search
+                        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted dark:text-text-muted-dark"
+                        aria-hidden="true"
+                    />
+                    <input
+                        id="skills-search"
+                        name="search"
+                        type="search"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder={t('search.placeholder')}
+                        className="h-9 w-full rounded-md border border-border/60 bg-card pl-8 pr-3 text-sm text-text outline-none focus:border-primary dark:border-border-dark/60 dark:bg-card-primary-dark dark:text-text-dark"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <Button type="submit" size="sm">
+                        {t('search.submit')}
+                    </Button>
+                    {filters.search ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                                updateUrl({ search: '', installedOffset: 0, catalogOffset: 0 })
+                            }
+                        >
+                            {t('search.clear')}
+                        </Button>
+                    ) : null}
+                </div>
+            </form>
+
+            {loadErrors.installed ? <LoadError message={t('errors.installed')} /> : null}
+            {loadErrors.catalog ? <LoadError message={t('errors.catalog')} /> : null}
+
+            {section === 'installed' && (
+                <section
+                    id="skills-panel-installed"
+                    role="tabpanel"
+                    aria-labelledby="skills-tab-installed"
+                    className="space-y-4"
+                >
+                    <InstalledList installed={installedItems} />
+                    <Pagination
+                        total={installedMeta.total}
+                        limit={installedMeta.limit}
+                        offset={installedMeta.offset}
+                        empty={installedItems.length === 0}
+                        onPage={(offset) => updateUrl({ installedOffset: offset })}
+                    />
+                </section>
+            )}
             {section === 'available' && (
-                <CatalogList entries={catalog} installedSlugs={installedSlugs} />
+                <section
+                    id="skills-panel-available"
+                    role="tabpanel"
+                    aria-labelledby="skills-tab-available"
+                    className="space-y-4"
+                >
+                    <CatalogList
+                        entries={catalog}
+                        installedSlugs={tenantCatalogSlugs}
+                        onInstalled={(skill) => setInstalledItems((prev) => [skill, ...prev])}
+                    />
+                    <Pagination
+                        total={catalogTotal}
+                        limit={catalogLimit}
+                        offset={filters.catalogOffset}
+                        empty={catalog.length === 0}
+                        onPage={(offset) => updateUrl({ catalogOffset: offset })}
+                    />
+                </section>
             )}
             {section === 'custom' && (
-                <CustomSection skills={customSkills} userIdHintAvailable={false} />
+                <section
+                    id="skills-panel-custom"
+                    role="tabpanel"
+                    aria-labelledby="skills-tab-custom"
+                >
+                    <CustomSection skills={customSkills} />
+                </section>
             )}
+        </div>
+    );
+}
+
+function LoadError({ message }: { message: string }) {
+    return (
+        <div
+            role="alert"
+            className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+        >
+            {message}
         </div>
     );
 }
@@ -70,8 +232,9 @@ function InstalledList({ installed }: { installed: Skill[] }) {
     const t = useTranslations('dashboard.skillsPage');
     if (installed.length === 0) {
         return (
-            <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                {t('empty.title')}
+            <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
+                <p className="font-medium text-text dark:text-text-dark">{t('empty.title')}</p>
+                <p className="mt-1">{t('empty.subtitle')}</p>
             </div>
         );
     }
@@ -81,7 +244,7 @@ function InstalledList({ installed }: { installed: Skill[] }) {
                 <Link
                     key={s.id}
                     href={ROUTES.DASHBOARD_SKILL(s.id)}
-                    className="block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
+                    className="block rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
                 >
                     <div className="flex items-start justify-between gap-2">
                         <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
@@ -97,7 +260,7 @@ function InstalledList({ installed }: { installed: Skill[] }) {
                     <div className="flex items-center gap-2 mt-3 text-[11px] text-text-secondary dark:text-text-secondary-dark">
                         <span className="font-mono">{s.slug}</span>
                         <span>v{s.version}</span>
-                        {s.sourceCatalogSlug && <span>· from catalog</span>}
+                        {s.sourceCatalogSlug && <span>{t('card.fromCatalog')}</span>}
                     </div>
                 </Link>
             ))}
@@ -108,21 +271,32 @@ function InstalledList({ installed }: { installed: Skill[] }) {
 function CatalogList({
     entries,
     installedSlugs,
+    onInstalled,
 }: {
     entries: SkillCatalogEntry[];
     installedSlugs: Set<string>;
+    onInstalled: (skill: Skill) => void;
 }) {
+    const t = useTranslations('dashboard.skillsPage');
     if (entries.length === 0) {
         return (
-            <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
-                No Skills available — install or enable a skills-provider plugin.
+            <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6 text-sm text-text-muted dark:text-text-muted-dark">
+                <p className="font-medium text-text dark:text-text-dark">
+                    {t('catalog.emptyTitle')}
+                </p>
+                <p className="mt-1">{t('catalog.emptySubtitle')}</p>
             </div>
         );
     }
     return (
         <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
             {entries.map((e) => (
-                <CatalogCard key={e.slug} entry={e} alreadyInstalled={installedSlugs.has(e.slug)} />
+                <CatalogCard
+                    key={e.slug}
+                    entry={e}
+                    alreadyInstalled={installedSlugs.has(e.slug)}
+                    onInstalled={onInstalled}
+                />
             ))}
         </div>
     );
@@ -131,30 +305,40 @@ function CatalogList({
 function CatalogCard({
     entry,
     alreadyInstalled,
+    onInstalled,
 }: {
     entry: SkillCatalogEntry;
     alreadyInstalled: boolean;
+    onInstalled: (skill: Skill) => void;
 }) {
+    const t = useTranslations('dashboard.skillsPage');
+    const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [done, setDone] = useState(alreadyInstalled);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setDone(alreadyInstalled);
+    }, [alreadyInstalled]);
 
     const handleInstall = () => {
         setError(null);
         startTransition(() => {
             void (async () => {
                 try {
-                    await installCatalogSkillAction({ slug: entry.slug });
+                    const skill = await installCatalogSkillAction({ slug: entry.slug });
                     setDone(true);
+                    onInstalled(skill);
+                    router.refresh();
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Install failed');
+                    setError(err instanceof Error ? err.message : t('catalog.installFailed'));
                 }
             })();
         });
     };
 
     return (
-        <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
+        <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
             <div className="flex items-start justify-between gap-2">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
                     {entry.title}
@@ -175,8 +359,12 @@ function CatalogCard({
                     disabled={pending || done}
                     className="gap-1.5"
                 >
-                    <Download className="w-3.5 h-3.5" />
-                    {done ? 'Installed' : pending ? '…' : 'Install'}
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    {done
+                        ? t('catalog.installed')
+                        : pending
+                          ? t('catalog.installing')
+                          : t('catalog.install')}
                 </Button>
             </div>
             {error && (
@@ -188,21 +376,8 @@ function CatalogCard({
     );
 }
 
-/**
- * PASS-4 review fix (CRITICAL UX): the Custom section was previously
- * unreachable — InstalledList just showed "No Skills installed at
- * this scope yet" with no CTA. Now exposes an inline "+ New Skill"
- * form that creates a hand-authored Skill at tenant scope. Body is
- * a tiny starter Markdown; the user can flesh it out via the
- * detail-page autosave editor (`/skills/[id]`).
- */
-function CustomSection({
-    skills,
-    userIdHintAvailable: _,
-}: {
-    skills: Skill[];
-    userIdHintAvailable: boolean;
-}) {
+function CustomSection({ skills }: { skills: Skill[] }) {
+    const t = useTranslations('dashboard.skillsPage');
     const [open, setOpen] = useState(false);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -210,28 +385,28 @@ function CustomSection({
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
-    const handleCreate = (e: React.FormEvent) => {
+    const handleCreate = (e: FormEvent) => {
         e.preventDefault();
         if (!title.trim()) {
-            setError('Title is required.');
+            setError(t('custom.titleRequired'));
             return;
         }
         setError(null);
         startTransition(() => {
             void (async () => {
                 try {
-                    // Tenant-scope by default. The action's getCurrentUserId
-                    // helper reads the auth cookie and supplies ownerId.
+                    const trimmedTitle = title.trim();
+                    const trimmedDescription = description.trim();
                     const created = await createCustomSkillAction({
                         ownerType: 'tenant',
-                        ownerId: '', // server-side action resolves via getAuthFromCookie
-                        title: title.trim(),
-                        description: description.trim() || `Custom Skill: ${title.trim()}`,
-                        instructionsMd: `# ${title.trim()}\n\n${description.trim() || '_Describe what this Skill teaches your Agent..._'}\n`,
+                        ownerId: '',
+                        title: trimmedTitle,
+                        description: trimmedDescription || `Custom Skill: ${trimmedTitle}`,
+                        instructionsMd: `# ${trimmedTitle}\n\n${trimmedDescription || '_Describe what this Skill teaches your Agent..._'}\n`,
                     });
                     router.push(ROUTES.DASHBOARD_SKILL(created.id));
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to create Skill');
+                    setError(err instanceof Error ? err.message : t('custom.createFailed'));
                 }
             })();
         });
@@ -239,10 +414,9 @@ function CustomSection({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    Hand-authored Skills you wrote yourself — not installed from a plugin catalog.{' '}
-                    {skills.length} {skills.length === 1 ? 'Skill' : 'Skills'}.
+                    {t('custom.summary', { count: skills.length })}
                 </p>
                 {!open && (
                     <Button
@@ -251,8 +425,8 @@ function CustomSection({
                         onClick={() => setOpen(true)}
                         className="gap-1.5"
                     >
-                        <Plus className="w-3.5 h-3.5" />
-                        New Skill
+                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                        {t('custom.new')}
                     </Button>
                 )}
             </div>
@@ -260,37 +434,47 @@ function CustomSection({
             {open && (
                 <form
                     onSubmit={handleCreate}
-                    className="rounded-xl border border-primary/30 bg-primary/5 p-5 space-y-3"
+                    className="rounded-md border border-primary/30 bg-primary/5 p-5 space-y-3"
                 >
                     <h3 className="text-sm font-medium text-text dark:text-text-dark">
-                        New custom Skill
+                        {t('custom.formTitle')}
                     </h3>
                     <div>
-                        <label className="block text-[10px] text-text-muted mb-1">Title</label>
+                        <label
+                            className="block text-[10px] text-text-muted mb-1"
+                            htmlFor="skill-title"
+                        >
+                            {t('custom.title')}
+                        </label>
                         <input
+                            id="skill-title"
                             type="text"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
-                            placeholder="e.g. Code review checklist"
+                            placeholder={t('custom.titlePlaceholder')}
                             className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
                             autoFocus
                         />
                     </div>
                     <div>
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            Description (optional)
+                        <label
+                            className="block text-[10px] text-text-muted mb-1"
+                            htmlFor="skill-description"
+                        >
+                            {t('custom.description')}
                         </label>
                         <input
+                            id="skill-description"
                             type="text"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            placeholder="One-liner. Body goes on the detail page."
+                            placeholder={t('custom.descriptionPlaceholder')}
                             className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
                         />
                     </div>
                     <div className="flex items-center gap-2">
                         <Button type="submit" size="sm" disabled={pending}>
-                            {pending ? '…' : 'Create'}
+                            {pending ? t('custom.creating') : t('custom.create')}
                         </Button>
                         <Button
                             type="button"
@@ -299,7 +483,7 @@ function CustomSection({
                             onClick={() => setOpen(false)}
                             disabled={pending}
                         >
-                            Cancel
+                            {t('custom.cancel')}
                         </Button>
                     </div>
                     {error && (
@@ -312,5 +496,58 @@ function CustomSection({
 
             <InstalledList installed={skills} />
         </div>
+    );
+}
+
+function Pagination({
+    total,
+    limit,
+    offset,
+    empty,
+    onPage,
+}: {
+    total: number;
+    limit: number;
+    offset: number;
+    empty: boolean;
+    onPage: (offset: number) => void;
+}) {
+    const t = useTranslations('dashboard.skillsPage');
+    const hasPrevious = offset > 0;
+    const hasNext = offset + limit < total;
+    if (!hasPrevious && !hasNext) return null;
+
+    return (
+        <nav className="flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
+            {empty ? (
+                <span>{t('pagination.emptyPage')}</span>
+            ) : (
+                <span>
+                    {t('pagination.showing', {
+                        start: offset + 1,
+                        end: Math.min(offset + limit, total),
+                        total,
+                    })}
+                </span>
+            )}
+            <div className="flex items-center gap-2">
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!hasPrevious}
+                    onClick={() => onPage(Math.max(0, offset - limit))}
+                >
+                    {t('pagination.previous')}
+                </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!hasNext}
+                    onClick={() => onPage(offset + limit)}
+                >
+                    {t('pagination.next')}
+                </Button>
+            </div>
+        </nav>
     );
 }

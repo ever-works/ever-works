@@ -156,7 +156,7 @@ export class OrganizationsController {
     }
 
     @Public()
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     @Get('check-slug')
     @ApiOperation({
         summary: 'Check Organization slug availability',

@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { authAPI } from '../api';
+import { ApiResponseError } from '../api/server-api';
 import type { UserProfile } from '../api/auth';
 import { getAuthFromRequest } from './middleware';
 import type { AuthUser, JwtPayload } from './middleware';
@@ -27,6 +28,17 @@ function normalizeProfileUser(user: UserProfile): AuthUser {
     };
 }
 
+async function clearAuthCookieOnUnauthorized(error: unknown): Promise<boolean> {
+    if (error instanceof ApiResponseError && error.statusCode === 401) {
+        console.warn(
+            'Auth session rejected by API; clearing auth cookie. Verify web/API AUTH_SECRET values and session storage if this happens after login.',
+        );
+        await removeAuthAccessCookies();
+        return true;
+    }
+    return false;
+}
+
 const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
@@ -42,8 +54,8 @@ const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
                 isActive: auth.user.isActive,
             };
         } catch (error) {
-            if (error instanceof Error && error.message.includes('Unauthorized')) {
-                await removeAuthAccessCookies();
+            if (!(await clearAuthCookieOnUnauthorized(error))) {
+                throw error;
             }
             return null;
         }
@@ -52,8 +64,8 @@ const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     try {
         return normalizeProfileUser(await authAPI.getProfile());
     } catch (error) {
-        if (error instanceof Error && error.message.includes('Unauthorized')) {
-            await removeAuthAccessCookies();
+        if (!(await clearAuthCookieOnUnauthorized(error))) {
+            throw error;
         }
         return null;
     }
@@ -68,8 +80,8 @@ const getAuthFromAPIImpl = async (): Promise<AuthUser | null> => {
     try {
         return normalizeProfileUser(await authAPI.getFreshProfile());
     } catch (error) {
-        if (error instanceof Error && error.message.includes('Unauthorized')) {
-            await removeAuthAccessCookies();
+        if (!(await clearAuthCookieOnUnauthorized(error))) {
+            throw error;
         }
         return null;
     }

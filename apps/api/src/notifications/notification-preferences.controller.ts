@@ -30,6 +30,7 @@ const VALID_TIMEZONES = new Set<string>(
 
 // Security: HH:mm format — rejects arbitrary strings stored as quiet-hours times
 const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const NOTIFICATION_CATEGORY_VALUES = Object.values(NotificationCategory);
 
 class QuietHoursBody {
     // Security: must match HH:mm to prevent arbitrary strings in DB
@@ -53,13 +54,14 @@ class QuietHoursBody {
 
 class MuteBody {
     // Security: restrict category to the known NotificationCategory enum values.
-    // Explicit @ApiProperty({ enum }) gives Swagger a plain string-enum schema —
-    // without it, Swagger reflects the enum type as a self-referential model and
-    // OpenAPI generation throws "circular dependency detected (property key:
-    // AI_CREDITS)".
-    @ApiProperty({ enum: NotificationCategory, enumName: 'NotificationCategory' })
+    // Keep Swagger on a plain values array; reflecting the enum object here can
+    // trigger a circular schema error on enum keys such as AI_CREDITS.
+    @ApiProperty({
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to mute.',
+    })
     @IsEnum(NotificationCategory, {
-        message: `category must be one of: ${Object.values(NotificationCategory).join(', ')}`,
+        message: `category must be one of: ${NOTIFICATION_CATEGORY_VALUES.join(', ')}`,
     })
     category: NotificationCategory;
 
@@ -132,11 +134,14 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
-    // Explicit @ApiParam({ enum }) gives Swagger a string-enum schema for the
-    // path param; without it, Swagger reflects the enum type into a
-    // self-referential model and OpenAPI generation throws a circular-dependency
-    // error. Runtime validation is still enforced by the ParseEnumPipe below.
-    @ApiParam({ name: 'category', enum: NotificationCategory, enumName: 'NotificationCategory' })
+    // Keep Swagger on a plain values array for the same reason as MuteBody.
+    // Runtime validation is still enforced by the ParseEnumPipe below.
+    @ApiParam({
+        name: 'category',
+        type: String,
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to unmute.',
+    })
     async unmuteCategory(
         @CurrentUser() auth: AuthenticatedUser,
         // Security: ParseEnumPipe rejects path params not in NotificationCategory

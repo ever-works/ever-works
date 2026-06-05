@@ -2,11 +2,14 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    InternalServerErrorException,
     Logger,
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
+import { Repository } from 'typeorm';
 import type { Skill, SkillFrontmatter, SkillOwnerType } from '../entities/skill.entity';
 import { SkillRepository, type ListSkillsFilter } from '../database/repositories/skill.repository';
 import {
@@ -18,6 +21,10 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 import { slugifyText } from '../utils/text.utils';
+import { AgentRepository } from '../database/repositories/agent.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkProposalRepository } from '../user-research/work-proposal.repository';
+import { Mission } from '../entities/mission.entity';
 
 export interface CreateSkillInput {
     ownerType: SkillOwnerType;
@@ -81,6 +88,11 @@ export class SkillsService {
         private readonly skills: SkillRepository,
         private readonly bindings: SkillBindingRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
+        @InjectRepository(Mission)
+        private readonly missions?: Repository<Mission>,
+        private readonly agents?: AgentRepository,
+        private readonly works?: WorkRepository,
+        private readonly ideas?: WorkProposalRepository,
     ) {}
 
     // ── Skill CRUD ────────────────────────────────────────────────
@@ -106,6 +118,7 @@ export class SkillsService {
             );
         }
         assertBody(input.instructionsMd, 'instructionsMd');
+        await this.assertOwnedScope(userId, input.ownerType, input.ownerId);
 
         const conflict = await this.skills.findByOwnerSlug(input.ownerType, input.ownerId, slug);
         if (conflict) {
@@ -134,7 +147,7 @@ export class SkillsService {
     }
 
     async update(userId: string, id: string, input: UpdateSkillInput): Promise<Skill> {
-        const skill = await this.getOne(userId, id);
+        await this.getOne(userId, id);
         const patch: Partial<Skill> = {};
         if (input.title !== undefined) patch.title = input.title;
         if (input.description !== undefined) patch.description = input.description;
@@ -145,8 +158,8 @@ export class SkillsService {
             patch.instructionsMd = input.instructionsMd;
             patch.contentHash = hashBody(input.instructionsMd);
         }
-        await this.skills.updateById(id, patch);
-        const refreshed = await this.skills.findById(id);
+        await this.skills.updateByIdAndUser(id, userId, patch);
+        const refreshed = await this.skills.findByIdAndUser(id, userId);
         if (!refreshed) throw new NotFoundException(`Skill ${id} vanished after update.`);
         return refreshed;
     }
@@ -154,12 +167,13 @@ export class SkillsService {
     async remove(userId: string, id: string): Promise<{ deleted: true }> {
         await this.getOne(userId, id);
         // FK CASCADE on skill_bindings.skillId handles the binding rows.
-        await this.skills.deleteById(id);
+        await this.skills.deleteByIdAndUser(id, userId);
         return { deleted: true };
     }
 
     async installFromCatalog(userId: string, input: InstallFromCatalogInput): Promise<Skill> {
         assertBody(input.entry.body, 'catalog body');
+        await this.assertOwnedScope(userId, input.ownerType, input.ownerId);
         const conflict = await this.skills.findByOwnerSlug(
             input.ownerType,
             input.ownerId,
@@ -208,6 +222,7 @@ export class SkillsService {
                 `targetId is required when targetType=${input.targetType}.`,
             );
         }
+        await this.assertOwnedScope(userId, input.targetType, input.targetId ?? userId);
         const binding = await this.bindings.create({
             skillId: input.skillId,
             targetType: input.targetType,
@@ -272,6 +287,53 @@ export class SkillsService {
         } catch (err) {
             this.logger.warn(`Failed to log activity ${args.actionType}: ${err}`);
         }
+    }
+
+    private async assertOwnedScope(
+        userId: string,
+        ownerType: SkillOwnerType | SkillBindingTargetType,
+        ownerId: string,
+    ): Promise<void> {
+        if (ownerType === 'tenant') {
+            if (ownerId !== userId) {
+                throw new NotFoundException('Skill target not found.');
+            }
+            return;
+        }
+
+        if (ownerType === 'agent') {
+            if (!this.agents) this.throwMissingOwnershipRepository(ownerType);
+            const agent = await this.agents.findByIdAndUser(ownerId, userId);
+            if (!agent) throw new NotFoundException('Skill target not found.');
+            return;
+        }
+
+        if (ownerType === 'work') {
+            if (!this.works) this.throwMissingOwnershipRepository(ownerType);
+            const work = await this.works.findById(ownerId);
+            if (!work || work.userId !== userId)
+                throw new NotFoundException('Skill target not found.');
+            return;
+        }
+
+        if (ownerType === 'idea') {
+            if (!this.ideas) this.throwMissingOwnershipRepository(ownerType);
+            const idea = await this.ideas.findByIdForUser(ownerId, userId);
+            if (!idea) throw new NotFoundException('Skill target not found.');
+            return;
+        }
+
+        if (ownerType === 'mission') {
+            if (!this.missions) this.throwMissingOwnershipRepository(ownerType);
+            const mission = await this.missions.findOne({ where: { id: ownerId, userId } });
+            if (!mission) throw new NotFoundException('Skill target not found.');
+        }
+    }
+
+    private throwMissingOwnershipRepository(ownerType: Exclude<SkillOwnerType, 'tenant'>): never {
+        throw new InternalServerErrorException(
+            `Skill ${ownerType} ownership check is unavailable.`,
+        );
     }
 }
 

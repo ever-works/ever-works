@@ -99,7 +99,7 @@ export class WebhooksController {
 
     @Post('deliveries/:deliveryId/redeliver')
     @HttpCode(HttpStatus.ACCEPTED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Re-enqueue a previous delivery by id',
         description:
@@ -127,7 +127,7 @@ export class WebhooksController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Create a webhook subscription',
         description:
@@ -143,7 +143,7 @@ export class WebhooksController {
     }
 
     @Patch(':id')
-    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     @ApiOperation({ summary: 'Pause / resume a subscription' })
     @ApiParam({ name: 'id', description: 'Subscription ID' })
     @ApiResponse({ status: 200, description: 'Updated subscription view' })
@@ -174,7 +174,7 @@ export class WebhooksController {
 
     @Post(':id/test')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Synchronously fire a test webhook to verify the URL',
         description:
@@ -189,7 +189,7 @@ export class WebhooksController {
 
     @Post(':id/rotate-secret')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Rotate the signing secret',
         description:

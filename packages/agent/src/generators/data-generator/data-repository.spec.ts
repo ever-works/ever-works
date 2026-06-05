@@ -75,6 +75,18 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('treats missing categories.yml and tags.yml as empty taxonomy lists', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+
+        const repository = await DataRepository.create(repoDir);
+
+        await expect(repository.getCategories()).resolves.toEqual([]);
+        await expect(repository.getTags()).resolves.toEqual([]);
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('uses .works/works.yml as the primary data config', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
