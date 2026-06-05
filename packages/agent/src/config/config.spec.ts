@@ -704,6 +704,14 @@ describe('agent/config', () => {
                 'github',
                 'githubApp',
                 'isCli',
+                // EW-643 Phase 3 slice 2b — `kb.*` group adds ffmpeg
+                // + transcribe operator knobs (KB_FFMPEG_BIN,
+                // KB_MEDIA_NORMALIZE, KB_VIDEO_OUTPUT_CODEC/EXT,
+                // KB_AUDIO_OUTPUT_CODEC/EXT,
+                // KB_TRANSCRIPTION_PROVIDER_ID,
+                // KB_TRANSCRIPTION_TARGET_CLASS,
+                // KB_TRANSCRIPTION_LANGUAGE). Pinned alphabetically.
+                'kb',
                 'platformSync',
                 'posthog',
                 'sentry',
