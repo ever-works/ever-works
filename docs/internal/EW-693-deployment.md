@@ -10,10 +10,10 @@ pre-EW-693 — every plugin is bundled — and existing deployments don't
 need to touch anything. Operators who want a leaner image and runtime
 plugin installs opt in to **dynamic mode** at build time and runtime.
 
-| Image variant | Build arg | Plugins in image | Runtime mode env |
-| ------------- | --------- | ---------------- | ---------------- |
-| **Bundled** (default) | `--build-arg PLUGIN_DISTRIBUTION_MODE=bundled` or omit | All plugins (`core` + `registry`) | `PLUGIN_DISTRIBUTION_MODE=bundled` (env) |
-| **Dynamic** (opt-in) | `--build-arg PLUGIN_DISTRIBUTION_MODE=dynamic` | **Core only** (`distribution: 'core'` or `systemPlugin: true`) | `PLUGIN_DISTRIBUTION_MODE=dynamic` |
+| Image variant         | Build arg                                              | Plugins in image                                               | Runtime mode env                         |
+| --------------------- | ------------------------------------------------------ | -------------------------------------------------------------- | ---------------------------------------- |
+| **Bundled** (default) | `--build-arg PLUGIN_DISTRIBUTION_MODE=bundled` or omit | All plugins (`core` + `registry`)                              | `PLUGIN_DISTRIBUTION_MODE=bundled` (env) |
+| **Dynamic** (opt-in)  | `--build-arg PLUGIN_DISTRIBUTION_MODE=dynamic`         | **Core only** (`distribution: 'core'` or `systemPlugin: true`) | `PLUGIN_DISTRIBUTION_MODE=dynamic`       |
 
 The Dockerfile sets the runtime `ENV PLUGIN_DISTRIBUTION_MODE` from the
 build arg so a `dynamic` image runs in `dynamic` mode by default — but
@@ -45,14 +45,14 @@ The strip step is **idempotent**. Re-running it is safe.
 
 ## Runtime config (apps/api/src/config/constants.ts)
 
-| Env var | Default | Purpose |
-| ------- | ------- | ------- |
-| `PLUGIN_DISTRIBUTION_MODE` | `bundled` | `bundled` (default) or `dynamic`. Anything else coerces to `bundled` (fail-safe). |
-| `PLUGIN_REGISTRY_URL` | `https://registry.npmjs.org` | Primary npm-compatible registry. Self-hosters mirror to a private one and set this. |
-| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | Secondary registry; used when an allowlist row's `source` is `github-packages`. |
-| `PLUGIN_REGISTRY_TOKEN` | (unset) | Bearer token. SECRET. Pulled from a Kubernetes secret in prod. |
-| `PLUGIN_INSTALL_DIR` | `/app/plugins` | Writable dir Node `import()`s installed plugins from. Must be writable in `dynamic` mode. |
-| `FEATURE_DYNAMIC_PLUGINS` | `false` | Independent master switch for the dynamic-distribution feature surface (catalog endpoint, install/uninstall API). |
+| Env var                      | Default                      | Purpose                                                                                                           |
+| ---------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`   | `bundled`                    | `bundled` (default) or `dynamic`. Anything else coerces to `bundled` (fail-safe).                                 |
+| `PLUGIN_REGISTRY_URL`        | `https://registry.npmjs.org` | Primary npm-compatible registry. Self-hosters mirror to a private one and set this.                               |
+| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | Secondary registry; used when an allowlist row's `source` is `github-packages`.                                   |
+| `PLUGIN_REGISTRY_TOKEN`      | (unset)                      | Bearer token. SECRET. Pulled from a Kubernetes secret in prod.                                                    |
+| `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | Writable dir Node `import()`s installed plugins from. Must be writable in `dynamic` mode.                         |
+| `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | Independent master switch for the dynamic-distribution feature surface (catalog endpoint, install/uninstall API). |
 
 `config.plugins.validate()` runs at boot from
 `AgentPluginsModule.forRootAsync` and **throws** when `dynamic` is
@@ -124,13 +124,13 @@ operator-self-host-only.
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-| ------- | ------------ | --- |
-| API boots, log shows `EW-693 boot warmup: pre-installing N dynamic plugin(s) from DB` then `EW-693 warmup failed for X: EROFS` | `/app/plugins` not writable | Add the `plugin-install-dir` emptyDir mount from `k8s-manifest.prod.yaml`, or set `PLUGIN_INSTALL_DIR` to a writable path. |
-| API boots, every install returns 502 | Registry unreachable from pod | Verify pod can reach `PLUGIN_REGISTRY_URL`; set `PLUGIN_REGISTRY_GITHUB_URL` as fallback. |
-| API refuses to boot with `PLUGIN_DISTRIBUTION_MODE=dynamic requires...` | Both registry URLs explicitly cleared | Set at least one of `PLUGIN_REGISTRY_URL` / `PLUGIN_REGISTRY_GITHUB_URL`. |
-| Install returns 409 with "not permitted" | Non-first-party package missing allowlist row | `POST /api/admin/plugins/allowlist` (platform-admin only) with `{packageName, versionRange}`. |
-| Install returns 424 | Integrity mismatch (FR-10) | Verify the version pin on the allowlist row matches what the registry serves; or clear the optional `integrity` field on the row and re-attempt. |
+| Symptom                                                                                                                        | Likely cause                                  | Fix                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| API boots, log shows `EW-693 boot warmup: pre-installing N dynamic plugin(s) from DB` then `EW-693 warmup failed for X: EROFS` | `/app/plugins` not writable                   | Add the `plugin-install-dir` emptyDir mount from `k8s-manifest.prod.yaml`, or set `PLUGIN_INSTALL_DIR` to a writable path.                       |
+| API boots, every install returns 502                                                                                           | Registry unreachable from pod                 | Verify pod can reach `PLUGIN_REGISTRY_URL`; set `PLUGIN_REGISTRY_GITHUB_URL` as fallback.                                                        |
+| API refuses to boot with `PLUGIN_DISTRIBUTION_MODE=dynamic requires...`                                                        | Both registry URLs explicitly cleared         | Set at least one of `PLUGIN_REGISTRY_URL` / `PLUGIN_REGISTRY_GITHUB_URL`.                                                                        |
+| Install returns 409 with "not permitted"                                                                                       | Non-first-party package missing allowlist row | `POST /api/admin/plugins/allowlist` (platform-admin only) with `{packageName, versionRange}`.                                                    |
+| Install returns 424                                                                                                            | Integrity mismatch (FR-10)                    | Verify the version pin on the allowlist row matches what the registry serves; or clear the optional `integrity` field on the row and re-attempt. |
 
 ## What's deliberately NOT in this PR
 

@@ -211,7 +211,7 @@ export class PluginRepository {
             integrity?: string | null;
             installError?: string | null;
             source?: 'bundled' | 'registry';
-        }
+        },
     ): Promise<PluginEntity | null> {
         const updateData: Partial<PluginEntity> = { installState };
         if (details?.registrySpec !== undefined) {
@@ -241,7 +241,7 @@ export class PluginRepository {
     async findByInstallState(installState: PluginInstallState): Promise<PluginEntity[]> {
         return this.repository.find({
             where: { installState },
-            order: { name: 'ASC' }
+            order: { name: 'ASC' },
         });
     }
 }

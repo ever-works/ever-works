@@ -343,7 +343,7 @@ export type PluginExecutionProfile = 'sync' | 'long-running';
  * before the field was introduced (forward-compat).
  */
 export function resolvePluginDistribution(
-	manifest: Pick<PluginManifest, 'distribution' | 'systemPlugin'>,
+	manifest: Pick<PluginManifest, 'distribution' | 'systemPlugin'>
 ): PluginDistribution {
 	if (manifest.distribution === 'core' || manifest.distribution === 'registry') {
 		return manifest.distribution;

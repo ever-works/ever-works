@@ -25,55 +25,55 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * that adds compensating columns rather than dropping these.
  */
 export class AddPluginDistributionColumns1780200000000 implements MigrationInterface {
-	name = 'AddPluginDistributionColumns1780200000000';
+    name = 'AddPluginDistributionColumns1780200000000';
 
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		await queryRunner.addColumns('plugins', [
-			new TableColumn({
-				name: 'source',
-				type: 'varchar',
-				default: "'bundled'"
-			}),
-			new TableColumn({
-				name: 'registrySpec',
-				type: 'varchar',
-				isNullable: true
-			}),
-			new TableColumn({
-				name: 'installedVersion',
-				type: 'varchar',
-				isNullable: true
-			}),
-			new TableColumn({
-				name: 'integrity',
-				type: 'varchar',
-				isNullable: true
-			}),
-			new TableColumn({
-				name: 'installState',
-				type: 'varchar',
-				default: "'available'"
-			}),
-			new TableColumn({
-				name: 'installError',
-				type: 'text',
-				isNullable: true
-			})
-		]);
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.addColumns('plugins', [
+            new TableColumn({
+                name: 'source',
+                type: 'varchar',
+                default: "'bundled'",
+            }),
+            new TableColumn({
+                name: 'registrySpec',
+                type: 'varchar',
+                isNullable: true,
+            }),
+            new TableColumn({
+                name: 'installedVersion',
+                type: 'varchar',
+                isNullable: true,
+            }),
+            new TableColumn({
+                name: 'integrity',
+                type: 'varchar',
+                isNullable: true,
+            }),
+            new TableColumn({
+                name: 'installState',
+                type: 'varchar',
+                default: "'available'",
+            }),
+            new TableColumn({
+                name: 'installError',
+                type: 'text',
+                isNullable: true,
+            }),
+        ]);
 
-		// Backfill: every existing row pre-dates dynamic mode, so it
-		// is bundled-in-image and effectively `installed` already. Set
-		// both columns explicitly — the column default 'available'
-		// only applies to fresh rows.
-		await queryRunner.query(
-			`UPDATE "plugins" SET "source" = 'bundled', "installState" = 'installed'`
-		);
-	}
+        // Backfill: every existing row pre-dates dynamic mode, so it
+        // is bundled-in-image and effectively `installed` already. Set
+        // both columns explicitly — the column default 'available'
+        // only applies to fresh rows.
+        await queryRunner.query(
+            `UPDATE "plugins" SET "source" = 'bundled', "installState" = 'installed'`,
+        );
+    }
 
-	public async down(): Promise<void> {
-		// Forward-only (NN #16 / Principle V). Reverting these columns
-		// would lose the install-lifecycle history; if reversion ever
-		// becomes necessary, ship a compensating migration that adds
-		// "deprecated_*" columns and stops writing to the originals.
-	}
+    public async down(): Promise<void> {
+        // Forward-only (NN #16 / Principle V). Reverting these columns
+        // would lose the install-lifecycle history; if reversion ever
+        // becomes necessary, ship a compensating migration that adds
+        // "deprecated_*" columns and stops writing to the originals.
+    }
 }

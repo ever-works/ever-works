@@ -78,7 +78,11 @@ export class PluginBootstrapService {
      *
      * In `bundled` mode this is a no-op.
      */
-    async warmupDynamicPlugins(): Promise<{ attempted: number; succeeded: number; failed: number }> {
+    async warmupDynamicPlugins(): Promise<{
+        attempted: number;
+        succeeded: number;
+        failed: number;
+    }> {
         if (!this.installer) {
             return { attempted: 0, succeeded: 0, failed: 0 };
         }

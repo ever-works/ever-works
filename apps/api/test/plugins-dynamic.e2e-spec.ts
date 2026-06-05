@@ -39,7 +39,7 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
             integrity: 'sha512-x',
             updatedAt: new Date('2026-06-03').toISOString(),
             ...overrides,
-        } as never);
+        }) as never;
 
     beforeEach(async () => {
         installer = {
@@ -207,14 +207,9 @@ describe('PluginsController (EW-693 dynamic distribution)', () => {
     describe('DELETE /api/plugins/:id/install', () => {
         it('refuses with 409 for systemPlugin / bundled plugins (T20)', async () => {
             installer.uninstall.mockRejectedValueOnce(
-                new HttpException(
-                    { statusCode: 409, message: 'core plugin' },
-                    HttpStatus.CONFLICT,
-                ),
+                new HttpException({ statusCode: 409, message: 'core plugin' }, HttpStatus.CONFLICT),
             );
-            await request(app.getHttpServer())
-                .delete('/api/plugins/local-fs/install')
-                .expect(409);
+            await request(app.getHttpServer()).delete('/api/plugins/local-fs/install').expect(409);
         });
 
         it('returns the post-uninstall available state for a non-core plugin', async () => {

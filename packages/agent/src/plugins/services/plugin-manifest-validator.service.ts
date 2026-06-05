@@ -245,7 +245,10 @@ export class PluginManifestValidatorService {
         // default derivation when `distribution` is omitted.
         if (m.distribution !== undefined) {
             const validDistributions = ['core', 'registry'];
-            if (typeof m.distribution !== 'string' || !validDistributions.includes(m.distribution)) {
+            if (
+                typeof m.distribution !== 'string' ||
+                !validDistributions.includes(m.distribution)
+            ) {
                 errors.push({
                     path: 'distribution',
                     message: `distribution must be one of: ${validDistributions.join(', ')}`,

@@ -22,20 +22,20 @@ import { AllowlistManager } from './allowlist-manager.client';
 export const dynamic = 'force-dynamic';
 
 export default async function PluginAllowlistAdminPage() {
-	const initial = await pluginAllowlistAPI.list();
+    const initial = await pluginAllowlistAPI.list();
 
-	return (
-		<main className="mx-auto max-w-4xl px-4 py-8">
-			<header className="mb-6">
-				<h1 className="text-2xl font-semibold">Plugin allowlist</h1>
-				<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-					Non-first-party packages permitted for runtime install (EW-693).
-					First-party <code>@ever-works/*</code> plugins are implicitly allowed
-					and are not listed here.
-				</p>
-			</header>
+    return (
+        <main className="mx-auto max-w-4xl px-4 py-8">
+            <header className="mb-6">
+                <h1 className="text-2xl font-semibold">Plugin allowlist</h1>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Non-first-party packages permitted for runtime install (EW-693). First-party{' '}
+                    <code>@ever-works/*</code> plugins are implicitly allowed and are not listed
+                    here.
+                </p>
+            </header>
 
-			<AllowlistManager initial={initial.entries as never} />
-		</main>
-	);
+            <AllowlistManager initial={initial.entries as never} />
+        </main>
+    );
 }

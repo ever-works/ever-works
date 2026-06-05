@@ -1,22 +1,19 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import {
-	PluginInstallerService,
-	PluginRegistryService
-} from '@ever-works/agent/plugins';
+import { PluginInstallerService, PluginRegistryService } from '@ever-works/agent/plugins';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 export interface RunPluginOperationPayload {
-	pluginId: string;
-	operation: string;
-	args?: Record<string, unknown>;
+    pluginId: string;
+    operation: string;
+    args?: Record<string, unknown>;
 }
 
 export interface RunPluginOperationOutcome {
-	ok: boolean;
-	result?: unknown;
-	error?: { message: string; code: string };
+    ok: boolean;
+    result?: unknown;
+    error?: { message: string; code: string };
 }
 
 /**
@@ -43,70 +40,70 @@ export interface RunPluginOperationOutcome {
  * if needed.
  */
 export const runPluginOperationTask = task<'run-plugin-operation', RunPluginOperationPayload>({
-	id: 'run-plugin-operation',
-	maxDuration: 3600,
-	run: async (payload): Promise<RunPluginOperationOutcome> => {
-		const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
-		appContext.useLogger(createTriggerLogger(`RunPluginOperation:${payload.pluginId}`));
+    id: 'run-plugin-operation',
+    maxDuration: 3600,
+    run: async (payload): Promise<RunPluginOperationOutcome> => {
+        const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
+        appContext.useLogger(createTriggerLogger(`RunPluginOperation:${payload.pluginId}`));
 
-		try {
-			const installer = appContext.get(PluginInstallerService, { strict: false });
-			const registry = appContext.get(PluginRegistryService, { strict: false });
+        try {
+            const installer = appContext.get(PluginInstallerService, { strict: false });
+            const registry = appContext.get(PluginRegistryService, { strict: false });
 
-			if (installer) {
-				try {
-					await installer.ensurePluginAvailable(payload.pluginId);
-				} catch (err) {
-					return {
-						ok: false,
-						error: {
-							message: err instanceof Error ? err.message : String(err),
-							code: 'WORKER_INSTALL_FAILED'
-						}
-					};
-				}
-			}
+            if (installer) {
+                try {
+                    await installer.ensurePluginAvailable(payload.pluginId);
+                } catch (err) {
+                    return {
+                        ok: false,
+                        error: {
+                            message: err instanceof Error ? err.message : String(err),
+                            code: 'WORKER_INSTALL_FAILED',
+                        },
+                    };
+                }
+            }
 
-			const registered = registry?.get(payload.pluginId);
-			if (!registered) {
-				return {
-					ok: false,
-					error: {
-						message: `Plugin "${payload.pluginId}" not registered in worker after ensurePluginAvailable.`,
-						code: 'PLUGIN_NOT_REGISTERED'
-					}
-				};
-			}
+            const registered = registry?.get(payload.pluginId);
+            if (!registered) {
+                return {
+                    ok: false,
+                    error: {
+                        message: `Plugin "${payload.pluginId}" not registered in worker after ensurePluginAvailable.`,
+                        code: 'PLUGIN_NOT_REGISTERED',
+                    },
+                };
+            }
 
-			const plugin = registered.plugin as Record<string, unknown>;
-			const method = plugin[payload.operation];
-			if (typeof method !== 'function') {
-				return {
-					ok: false,
-					error: {
-						message: `Plugin "${payload.pluginId}" does not implement operation "${payload.operation}".`,
-						code: 'OPERATION_NOT_FOUND'
-					}
-				};
-			}
+            const plugin = registered.plugin as Record<string, unknown>;
+            const method = plugin[payload.operation];
+            if (typeof method !== 'function') {
+                return {
+                    ok: false,
+                    error: {
+                        message: `Plugin "${payload.pluginId}" does not implement operation "${payload.operation}".`,
+                        code: 'OPERATION_NOT_FOUND',
+                    },
+                };
+            }
 
-			try {
-				const result = await (method as (a?: Record<string, unknown>) => unknown).call(
-					plugin,
-					payload.args
-				);
-				return { ok: true, result };
-			} catch (err) {
-				return {
-					ok: false,
-					error: {
-						message: err instanceof Error ? err.message : String(err),
-						code: 'WORKER_PLUGIN_THREW'
-					}
-				};
-			}
-		} finally {
-			await appContext.close();
-		}
-	}
+            try {
+                const result = await (method as (a?: Record<string, unknown>) => unknown).call(
+                    plugin,
+                    payload.args,
+                );
+                return { ok: true, result };
+            } catch (err) {
+                return {
+                    ok: false,
+                    error: {
+                        message: err instanceof Error ? err.message : String(err),
+                        code: 'WORKER_PLUGIN_THREW',
+                    },
+                };
+            }
+        } finally {
+            await appContext.close();
+        }
+    },
 });

@@ -46,12 +46,17 @@ describe('PluginInstallerService (EW-693)', () => {
         const repo: Partial<PluginRepository> = {
             findByPluginId: jest.fn(async (id: string) => (state[id] as PluginEntity) ?? null),
             updateInstallState: jest.fn(async (id, installState, details) => {
-                const next = { ...(state[id] || { pluginId: id }), installState, ...(details || {}) };
+                const next = {
+                    ...(state[id] || { pluginId: id }),
+                    installState,
+                    ...(details || {}),
+                };
                 state[id] = next;
                 return next as PluginEntity;
             }),
-            findByInstallState: jest.fn(async (s) =>
-                Object.values(state).filter((r) => r.installState === s) as PluginEntity[]
+            findByInstallState: jest.fn(
+                async (s) =>
+                    Object.values(state).filter((r) => r.installState === s) as PluginEntity[],
             ),
         };
         return repo as PluginRepository & { _state: typeof state };
@@ -61,7 +66,7 @@ describe('PluginInstallerService (EW-693)', () => {
         const repo: Partial<PluginAllowlistRepository> = {
             findByPackageName: jest.fn(
                 async (name) =>
-                    (entries.find((e) => e.packageName === name) as PluginAllowlistEntity) ?? null
+                    (entries.find((e) => e.packageName === name) as PluginAllowlistEntity) ?? null,
             ),
         };
         return repo as PluginAllowlistRepository;
@@ -88,7 +93,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 await fs.mkdir(dest, { recursive: true });
                 await fs.writeFile(
                     path.join(dest, 'package.json'),
-                    JSON.stringify({ name: spec.split('@').slice(0, -1).join('@') })
+                    JSON.stringify({ name: spec.split('@').slice(0, -1).join('@') }),
                 );
                 return undefined;
             },
@@ -101,7 +106,7 @@ describe('PluginInstallerService (EW-693)', () => {
             pluginRepo?: PluginRepository;
             allowlistRepo?: PluginAllowlistRepository | null;
             pacote?: PacoteLike | null;
-        } = {}
+        } = {},
     ) {
         const opts: PluginsModuleOptions = {
             distributionMode: 'dynamic',
@@ -114,7 +119,7 @@ describe('PluginInstallerService (EW-693)', () => {
             opts,
             overrides.pluginRepo ?? makePluginRepo(),
             overrides.allowlistRepo === undefined ? null : overrides.allowlistRepo,
-            overrides.pacote ?? null
+            overrides.pacote ?? null,
         );
         if (overrides.pacote !== undefined) installer.setPacoteForTests(overrides.pacote);
         return installer;
@@ -123,9 +128,9 @@ describe('PluginInstallerService (EW-693)', () => {
     describe('bundled mode (FR-22 — no behaviour change)', () => {
         it('install() refuses with 409 in bundled mode', async () => {
             const installer = makeInstaller({ options: { distributionMode: 'bundled' } });
-            await expect(installer.install({ pluginId: 'notion-extractor' })).rejects.toBeInstanceOf(
-                HttpException
-            );
+            await expect(
+                installer.install({ pluginId: 'notion-extractor' }),
+            ).rejects.toBeInstanceOf(HttpException);
         });
 
         it('ensurePluginAvailable() returns null in bundled mode (no IO)', async () => {
@@ -173,7 +178,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 installer.install({
                     pluginId: 'cool-plugin',
                     packageName: '@some-vendor/cool-plugin',
-                })
+                }),
             ).rejects.toMatchObject({ status: 409 });
             expect(pacote.manifestCalls).toEqual([]);
         });
@@ -194,7 +199,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 installer.install({
                     pluginId: 'cool-plugin',
                     packageName: '@some-vendor/cool-plugin',
-                })
+                }),
             ).rejects.toMatchObject({ status: 409 });
             expect(pacote.manifestCalls).toEqual([]);
         });
@@ -217,7 +222,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 installer.install({
                     pluginId: 'cool-plugin',
                     packageName: '@some-vendor/cool-plugin',
-                })
+                }),
             ).resolves.toMatchObject({ version: '2.1.3' });
         });
 
@@ -239,7 +244,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 installer.install({
                     pluginId: 'cool-plugin',
                     packageName: '@some-vendor/cool-plugin',
-                })
+                }),
             ).rejects.toMatchObject({ status: 409 });
         });
     });
@@ -258,7 +263,7 @@ describe('PluginInstallerService (EW-693)', () => {
                 installer.install({
                     pluginId: 'notion-extractor',
                     integrity: 'sha512-caller-expected-but-different',
-                })
+                }),
             ).rejects.toMatchObject({ status: 424 });
         });
 
@@ -285,7 +290,7 @@ describe('PluginInstallerService (EW-693)', () => {
                     installedVersion: '1.2.0',
                     integrity: 'sha512-match',
                     registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
-                })
+                }),
             );
         });
     });
@@ -370,10 +375,10 @@ describe('PluginInstallerService (EW-693)', () => {
             expect(pluginRepo.updateInstallState).toHaveBeenCalledWith(
                 'notion-extractor',
                 'available',
-                expect.objectContaining({ installError: null })
+                expect.objectContaining({ installError: null }),
             );
             await expect(
-                fs.stat(path.join(linkParent, 'notion-extractor-plugin'))
+                fs.stat(path.join(linkParent, 'notion-extractor-plugin')),
             ).rejects.toBeDefined();
         });
     });

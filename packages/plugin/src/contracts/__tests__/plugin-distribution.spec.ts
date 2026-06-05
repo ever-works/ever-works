@@ -1,22 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import {
-	isPluginDistribution,
-	isPluginExecutionProfile,
-	resolvePluginDistribution
-} from '../plugin-manifest.types.js';
+import { isPluginDistribution, isPluginExecutionProfile, resolvePluginDistribution } from '../plugin-manifest.types.js';
 
 describe('PluginManifest distribution (EW-693)', () => {
 	describe('resolvePluginDistribution', () => {
 		it('returns the explicit distribution when set to core', () => {
-			expect(resolvePluginDistribution({ distribution: 'core', systemPlugin: false })).toBe(
-				'core'
-			);
+			expect(resolvePluginDistribution({ distribution: 'core', systemPlugin: false })).toBe('core');
 		});
 
 		it('returns the explicit distribution when set to registry', () => {
-			expect(resolvePluginDistribution({ distribution: 'registry', systemPlugin: true })).toBe(
-				'registry'
-			);
+			expect(resolvePluginDistribution({ distribution: 'registry', systemPlugin: true })).toBe('registry');
 		});
 
 		it('defaults to core when omitted and systemPlugin is true', () => {

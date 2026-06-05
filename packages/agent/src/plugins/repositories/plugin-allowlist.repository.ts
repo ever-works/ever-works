@@ -19,7 +19,7 @@ import { PluginAllowlistEntity } from '../entities/plugin-allowlist.entity';
 export class PluginAllowlistRepository {
     constructor(
         @InjectRepository(PluginAllowlistEntity)
-        private readonly repository: Repository<PluginAllowlistEntity>
+        private readonly repository: Repository<PluginAllowlistEntity>,
     ) {}
 
     /**
@@ -37,7 +37,7 @@ export class PluginAllowlistRepository {
     async findEnabled(): Promise<PluginAllowlistEntity[]> {
         return this.repository.find({
             where: { enabled: true },
-            order: { packageName: 'ASC' }
+            order: { packageName: 'ASC' },
         });
     }
 
@@ -61,7 +61,7 @@ export class PluginAllowlistRepository {
 
     async update(
         id: string,
-        data: Partial<PluginAllowlistEntity>
+        data: Partial<PluginAllowlistEntity>,
     ): Promise<PluginAllowlistEntity | null> {
         await this.repository.update(id, data);
         return this.findById(id);

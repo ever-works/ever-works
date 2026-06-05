@@ -2,7 +2,7 @@ import {
     PluginExecutionRouterService,
     classifyOperation,
     type TriggerDispatcher,
-    type PluginExecutionTaskOutcome
+    type PluginExecutionTaskOutcome,
 } from '../services/plugin-execution-router.service';
 import type { PluginRegistryService, RegisteredPlugin } from '../services/plugin-registry.service';
 import type { PluginInstallerService } from '../services/plugin-installer.service';
@@ -25,7 +25,7 @@ import type { PluginsModuleOptions } from '../interfaces/plugins-module-options.
  */
 describe('PluginExecutionRouterService (EW-693)', () => {
     function makeRegistry(
-        plugins: Record<string, Partial<RegisteredPlugin> & { exec?: Record<string, unknown> }>
+        plugins: Record<string, Partial<RegisteredPlugin> & { exec?: Record<string, unknown> }>,
     ) {
         return {
             get: jest.fn((id: string) => {
@@ -50,12 +50,12 @@ describe('PluginExecutionRouterService (EW-693)', () => {
     function makeRouter(
         opts: Partial<PluginsModuleOptions>,
         registry: PluginRegistryService,
-        installer?: PluginInstallerService
+        installer?: PluginInstallerService,
     ) {
         return new PluginExecutionRouterService(
             { distributionMode: 'bundled', ...opts },
             registry,
-            installer
+            installer,
         );
     }
 
@@ -231,7 +231,7 @@ describe('PluginExecutionRouterService (EW-693)', () => {
                 makeDispatcher({
                     ok: false,
                     error: { message: 'worker exploded', code: 'WORKER_PLUGIN_THREW' },
-                })
+                }),
             );
 
             const result = await router.dispatchLongRunning('pipeliney', 'pipeline.run');

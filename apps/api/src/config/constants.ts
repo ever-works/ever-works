@@ -212,8 +212,7 @@ export const config = {
          * recommended but not enforced here (the installer will refuse
          * on a TLS error from the resolver).
          */
-        registryUrl: (): string =>
-            process.env.PLUGIN_REGISTRY_URL || 'https://registry.npmjs.org',
+        registryUrl: (): string => process.env.PLUGIN_REGISTRY_URL || 'https://registry.npmjs.org',
 
         /**
          * Secondary registry for GitHub Packages (`@ever-works` scope).
