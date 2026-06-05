@@ -143,7 +143,7 @@ export class PluginExecutionRouterService {
                     },
                 };
             }
-            const plugin = registered.plugin as Record<string, unknown>;
+            const plugin = registered.plugin as unknown as Record<string, unknown>;
             const method = plugin[operation];
             if (typeof method !== 'function') {
                 return {
@@ -234,7 +234,11 @@ export class PluginExecutionRouterService {
         // `@trigger.dev/sdk` available (e.g. in bundled-only deployments
         // or unit tests that mock the dispatcher).
         try {
-            const sdk = (await import('@trigger.dev/sdk')) as {
+            // String indirection — keeps TS from resolving the module at
+            // type-check time so packages/agent builds without the SDK
+            // in node_modules (bundled-only deployments don't install it).
+            const sdkModuleId = '@trigger.dev/sdk';
+            const sdk = (await import(sdkModuleId)) as {
                 tasks?: { trigger: typeof defaultTriggerFn };
                 wait?: { forRunToComplete?: typeof defaultWaitFn };
             };

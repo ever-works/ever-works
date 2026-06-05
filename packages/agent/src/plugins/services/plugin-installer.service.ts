@@ -439,9 +439,19 @@ export class PluginInstallerService {
     private tagSentryError(pluginId: string, reason: string): void {
         void (async () => {
             try {
-                const sentry = (await import('@sentry/node').catch(() => null)) as
-                    | typeof import('@sentry/node')
-                    | null;
+                // String indirection — keeps TS from resolving '@sentry/node'
+                // at type-check time so packages/agent builds without the
+                // SDK in node_modules (bundled-only deployments).
+                const sentryModuleId = '@sentry/node';
+                const sentry = (await import(sentryModuleId).catch(() => null)) as {
+                    withScope: (
+                        cb: (scope: {
+                            setTag: (k: string, v: string) => void;
+                            setLevel: (level: string) => void;
+                        }) => void,
+                    ) => void;
+                    captureException: (err: unknown) => string;
+                } | null;
                 if (!sentry?.withScope) return;
                 sentry.withScope((scope) => {
                     scope.setTag('plugin_id', pluginId);
