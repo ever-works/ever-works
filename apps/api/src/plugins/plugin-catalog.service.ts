@@ -7,7 +7,7 @@ import type {
     PluginInstallStateDto,
     PluginInstallState,
     PluginInstallSource,
-} from '@ever-works/contracts';
+} from '@ever-works/contracts/api';
 
 /**
  * EW-693 / T22 — Plugin catalog.

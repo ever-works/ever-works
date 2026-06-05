@@ -5,7 +5,7 @@ import type {
     PluginAllowlistEntryDto as AllowlistEntry,
     PluginAllowlistResponseDto as AllowlistResponse,
     UpdatePluginAllowlistEntryDto as UpdateAllowlistEntry,
-} from '@ever-works/contracts';
+} from '@ever-works/contracts/api';
 
 /**
  * EW-693 / T23 — admin allowlist DTOs. Pure wire-types layered with
