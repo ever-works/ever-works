@@ -346,7 +346,7 @@ export async function issueMagicLink(email: string) {
     try {
         await authAPI.requestMagicLink({
             email: validation.data,
-            magicLinkCallbackUrl: withAppUrl('/login/magic-link'),
+            magicLinkCallbackUrl: withAppUrl(ROUTES.AUTH_MAGIC_LINK),
         });
 
         return { success: true };

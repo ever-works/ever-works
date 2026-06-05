@@ -172,28 +172,17 @@ test.describe('Magic-link login UI — EW-633', () => {
         await expect(page).not.toHaveURL(/\/login(\/magic-link)?(\?|#|$)/, { timeout: 120_000 });
     });
 
-    // EW-633 follow-up — re-fixme'd after PR #906 attempted a fix that
-    // didn't work. We tried:
-    //   1. `goto('/login/magic-link')` (PR #884) — fail
-    //   2. `goto('/en/login/magic-link', { waitUntil: 'networkidle' })`
-    //      (PR #906) — also fail
-    //
-    // The error testId still doesn't render on CI even with the locale-
-    // prefixed URL and networkidle. Need deeper investigation: open the
-    // CI Playwright trace.zip artifact and confirm whether the page is
-    // 404, stuck in Suspense fallback, or rendering but with a different
-    // DOM than local. Tracked separately so we stop wasting cascade
-    // cycles on this.
-    //
-    // Real follow-ups for the next pickup:
-    //  - Add `data-testid="magic-link-loading"` already exists on the
-    //    Suspense fallback (page.tsx line 16-22) — assert THAT shows up
-    //    first, then the error swaps in. If the loading testid also
-    //    never appears, the route is the problem, not the rendering.
-    //  - Check if `MAGIC_LINK_ENABLED` is true in CI (the spec skips when
-    //    false). The fact that they REACH the assertion means the env is
-    //    set, but worth confirming via the trace.
-    test.fixme('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
+    // EW-633 — root cause finally found (was fixme through PR #884 / #906).
+    // `/login/magic-link` was NOT in PUBLIC_ROUTES, and the proxy's
+    // `isPublicRoute` uses path-to-regexp `match()` which matches EXACTLY
+    // (no sub-path wildcard), so `/login` did not cover `/login/magic-link`.
+    // Every hit to the landing page therefore tripped the proxy auth gate
+    // (unauthenticated → 307 to `/login`, cookie cleared) BEFORE the redeem
+    // client could render the error/loading UI — which is exactly why the
+    // testId never appeared on CI. Allow-listing the route (see
+    // ROUTES.AUTH_MAGIC_LINK in lib/constants.ts) lets the page render, so
+    // these error-path assertions now hold.
+    test('opening /login/magic-link without a token shows a friendly error and a resend CTA', async ({
         page,
         request,
     }) => {
@@ -211,7 +200,7 @@ test.describe('Magic-link login UI — EW-633', () => {
         await page.waitForURL(/\/login\?tab=magic-link/);
     });
 
-    test.fixme('opening /login/magic-link with an invalid token shows the error path', async ({
+    test('opening /login/magic-link with an invalid token shows the error path', async ({
         page,
         request,
     }) => {
