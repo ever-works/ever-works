@@ -111,17 +111,33 @@ export async function listMessages(
 export async function waitForMessageTo(
     request: APIRequestContext,
     recipient: string,
-    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+    options: { timeoutMs?: number; pollIntervalMs?: number; subject?: RegExp } = {},
 ): Promise<MailhogMessage | null> {
     const timeoutMs = options.timeoutMs ?? 10_000;
     const pollMs = options.pollIntervalMs ?? 300;
+    // Optional subject filter. On a cold CI runner an earlier email to the same
+    // address (e.g. the registration confirmation sent before this test's inbox
+    // clear) can land over SMTP AFTER the clear and sit in the box alongside the
+    // mail we actually triggered. Matching on recipient alone then returns the
+    // wrong message; callers that triggered a specific mail (password reset,
+    // verification, …) pass a `subject` so we wait for THAT email — mirroring
+    // magic-link.spec.ts's subject-filtered poll.
+    const subjectRe = options.subject;
     const deadline = Date.now() + timeoutMs;
     const recipientLower = recipient.toLowerCase();
     while (Date.now() < deadline) {
         const messages = await listMessages(request);
-        const match = messages.find((m) =>
-            m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === recipientLower),
-        );
+        const match = messages.find((m) => {
+            const toMatch = m.To?.some(
+                (t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === recipientLower,
+            );
+            if (!toMatch) return false;
+            if (subjectRe) {
+                const subject = headerOf(m, 'Subject') ?? '';
+                if (!subjectRe.test(subject)) return false;
+            }
+            return true;
+        });
         if (match) return match;
         await new Promise((r) => setTimeout(r, pollMs));
     }

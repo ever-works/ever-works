@@ -591,6 +591,10 @@ test.describe('Notification email channel — deep integration', () => {
         // Validate the email IF delivered; otherwise the API contract above stands.
         const message: MailhogMessage | null = await waitForMessageTo(request, u.email, {
             timeoutMs: 15_000,
+            // Wait for the RESET email specifically — a registration confirmation
+            // to the same address can race past the inbox clear on a cold CI
+            // runner and otherwise get picked instead.
+            subject: /password|reset/i,
         });
         if (!message) {
             test.info().annotations.push({

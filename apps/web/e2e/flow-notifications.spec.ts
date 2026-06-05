@@ -469,6 +469,10 @@ test.describe('Notifications end-to-end', () => {
 
         const message: MailhogMessage | null = await waitForMessageTo(request, user.email, {
             timeoutMs: 15_000,
+            // Wait for the RESET email specifically — a registration confirmation
+            // to the same address can race past the inbox clear on a cold CI
+            // runner and otherwise get picked instead.
+            subject: /password|reset/i,
         });
         // Mail DELIVERY is best-effort in the e2e env: MailHog's HTTP API is up
         // (isMailhogAvailable=true) but the SMTP send can fail ("Missing
