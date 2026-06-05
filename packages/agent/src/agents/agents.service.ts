@@ -23,6 +23,7 @@ import { AgentMembershipRepository } from '../database/repositories/agent-member
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { slugifyText } from '../utils/text.utils';
+import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
 
@@ -219,6 +220,18 @@ export class AgentsService {
             // a no-op commit identity.
             committerName: input.committerName?.trim() ? input.committerName.trim() : null,
             committerEmail: input.committerEmail?.trim() ? input.committerEmail.trim() : null,
+        }).catch((err: unknown) => {
+            // A concurrent same-name create burst can pass the existence
+            // pre-check above for every racer; the unique index then lets
+            // exactly one INSERT win and rejects the rest. Translate that lost
+            // race into the SAME named 409 a sequential duplicate would get,
+            // instead of leaking a raw 500 DB error.
+            if (isUniqueConstraintError(err)) {
+                throw new ConflictException(
+                    `An Agent named "${input.name}" already exists in this scope.`,
+                );
+            }
+            throw err;
         });
 
         // Materialize tenant-Agent memberships into the join table for

@@ -121,6 +121,24 @@ export class TaskRepository {
         await this.repository.update(id, data);
     }
 
+    /**
+     * Compare-and-swap status update: applies `data` (which advances the
+     * status) ONLY while the row is still at `expectedStatus`, in a single
+     * atomic `UPDATE … WHERE id=? AND status=?`. Returns true iff exactly one
+     * row changed — i.e. THIS caller won the race. Concurrent transitions from
+     * the same source state therefore resolve to exactly one winner
+     * (affected=1); the losers get affected=0 and a read-time conflict, instead
+     * of every racer clobbering the row (the state machine is the CAS lock).
+     */
+    async casUpdateStatus(
+        id: string,
+        expectedStatus: Task['status'],
+        data: Partial<Task>,
+    ): Promise<boolean> {
+        const result = await this.repository.update({ id, status: expectedStatus }, data);
+        return (result.affected ?? 0) === 1;
+    }
+
     async deleteById(id: string): Promise<void> {
         await this.repository.delete(id);
     }

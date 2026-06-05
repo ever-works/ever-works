@@ -39,7 +39,9 @@ describe('TaskTransitionService', () => {
 
     beforeEach(() => {
         tasks = {
-            updateById: jest.fn().mockResolvedValue(undefined),
+            // transition() now lands the status change via an atomic CAS
+            // (UPDATE … WHERE status=from). `true` = this caller won the race.
+            casUpdateStatus: jest.fn().mockResolvedValue(true),
             findById: jest.fn(),
         };
         blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
@@ -73,7 +75,7 @@ describe('TaskTransitionService', () => {
             const task = makeTask({ status: TaskStatus.TODO, startedAt: null });
             tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
             await svc.transition(task, TaskStatus.IN_PROGRESS);
-            const patch = tasks.updateById.mock.calls[0][1];
+            const patch = tasks.casUpdateStatus.mock.calls[0][2];
             expect(patch.status).toBe(TaskStatus.IN_PROGRESS);
             expect(patch.startedAt).toBeInstanceOf(Date);
         });
@@ -82,7 +84,7 @@ describe('TaskTransitionService', () => {
             const task = makeTask({ status: TaskStatus.IN_PROGRESS });
             tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.BLOCKED });
             await svc.transition(task, TaskStatus.BLOCKED);
-            const patch = tasks.updateById.mock.calls[0][1];
+            const patch = tasks.casUpdateStatus.mock.calls[0][2];
             expect(patch.previousStatus).toBe(TaskStatus.IN_PROGRESS);
         });
 
@@ -93,7 +95,7 @@ describe('TaskTransitionService', () => {
             });
             tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
             await svc.transition(task, TaskStatus.IN_PROGRESS);
-            const patch = tasks.updateById.mock.calls[0][1];
+            const patch = tasks.casUpdateStatus.mock.calls[0][2];
             expect(patch.previousStatus).toBeNull();
         });
 
@@ -130,7 +132,7 @@ describe('TaskTransitionService', () => {
             const task = makeTask({ status: TaskStatus.IN_REVIEW, requireAllApprovers: false });
             tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.DONE });
             await svc.transition(task, TaskStatus.DONE, { force: true });
-            const patch = tasks.updateById.mock.calls[0][1];
+            const patch = tasks.casUpdateStatus.mock.calls[0][2];
             expect(patch.completedAt).toBeInstanceOf(Date);
         });
     });
