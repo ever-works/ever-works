@@ -21,7 +21,7 @@ import type {
     PluginAllowlistEntryDto,
     CreatePluginAllowlistEntryDto,
     UpdatePluginAllowlistEntryDto,
-} from '@ever-works/contracts';
+} from '@ever-works/contracts/api';
 
 // Re-export the EW-693 wire-types so page components can import them
 // from this single barrel instead of pulling @ever-works/contracts in
@@ -38,7 +38,7 @@ export type {
     PluginAllowlistEntryDto,
     CreatePluginAllowlistEntryDto,
     UpdatePluginAllowlistEntryDto,
-} from '@ever-works/contracts';
+} from '@ever-works/contracts/api';
 
 // Re-export types from @ever-works/plugin/api for consistency
 export type {
