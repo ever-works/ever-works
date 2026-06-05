@@ -280,36 +280,43 @@ export class PluginInstallerService {
         const existing = this.inFlight.get(pluginId);
         if (existing) return existing;
 
-        const entity = await this.pluginRepository.findByPluginId(pluginId);
-        if (
-            entity?.installState === 'installed' &&
-            entity.registrySpec &&
-            entity.installedVersion
-        ) {
-            // Already installed on this node — fast path.
-            return {
-                pluginId,
-                packageName:
-                    this.packageNameFromSpec(entity.registrySpec) ||
-                    this.derivePackageName(pluginId),
-                version: entity.installedVersion,
-                integrity: entity.integrity,
-                installPath: this.symlinkPathFor(
-                    this.packageNameFromSpec(entity.registrySpec) ||
+        // FR-13 dedup: register the in-flight promise BEFORE any await so
+        // concurrent callers see the entry on their synchronous lookup.
+        // Otherwise both callers race past `findByPluginId` and each call
+        // install() — the second `pacote.manifest()` clobbers the first's
+        // resolver and one of the promises never settles.
+        const promise = (async (): Promise<PluginInstallResult | null> => {
+            const entity = await this.pluginRepository.findByPluginId(pluginId);
+            if (
+                entity?.installState === 'installed' &&
+                entity.registrySpec &&
+                entity.installedVersion
+            ) {
+                // Already installed on this node — fast path.
+                return {
+                    pluginId,
+                    packageName:
+                        this.packageNameFromSpec(entity.registrySpec) ||
                         this.derivePackageName(pluginId),
-                ),
-                registrySpec: entity.registrySpec,
-            };
-        }
+                    version: entity.installedVersion,
+                    integrity: entity.integrity,
+                    installPath: this.symlinkPathFor(
+                        this.packageNameFromSpec(entity.registrySpec) ||
+                            this.derivePackageName(pluginId),
+                    ),
+                    registrySpec: entity.registrySpec,
+                };
+            }
 
-        const promise = this.install({
-            pluginId,
-            packageName: entity?.registrySpec
-                ? (this.packageNameFromSpec(entity.registrySpec) ?? undefined)
-                : undefined,
-            version: entity?.installedVersion ?? undefined,
-            integrity: entity?.integrity ?? undefined,
-        }).finally(() => {
+            return this.install({
+                pluginId,
+                packageName: entity?.registrySpec
+                    ? (this.packageNameFromSpec(entity.registrySpec) ?? undefined)
+                    : undefined,
+                version: entity?.installedVersion ?? undefined,
+                integrity: entity?.integrity ?? undefined,
+            });
+        })().finally(() => {
             this.inFlight.delete(pluginId);
         });
         this.inFlight.set(pluginId, promise);
