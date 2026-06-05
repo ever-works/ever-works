@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
+import { isThrottleKeyCorsNoise } from './helpers/console-noise';
 
 /**
  * Hydration / console hygiene — DEEP, baseline-relative integration flows.
@@ -131,8 +132,13 @@ async function attachProbe(page: Page): Promise<ConsoleProbe> {
 
     page.on('console', (msg) => {
         const type = msg.type();
-        if (type === 'error') probe.errors.push(msg.text());
-        else if (type === 'warning') probe.warnings.push(msg.text());
+        const text = msg.text();
+        // Drop the harness's own `x-e2e-throttle-key` CORS preflight rejection
+        // (a test-env-only artifact; never reaches a real user). See
+        // helpers/console-noise.ts.
+        if (isThrottleKeyCorsNoise(text)) return;
+        if (type === 'error') probe.errors.push(text);
+        else if (type === 'warning') probe.warnings.push(text);
     });
     page.on('pageerror', (err) => probe.pageErrors.push(err.message));
 
