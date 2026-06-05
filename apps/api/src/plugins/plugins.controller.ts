@@ -117,7 +117,7 @@ export class PluginsController {
     // by the rest of the API; the global ThrottlerModule + UserAwareThrottlerGuard
     // pick up the override. 5 installs/min/user is generous for UI flows and
     // tight enough to thwart accidental loops.
-    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Install a distributable plugin (EW-693)',
         description:
