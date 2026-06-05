@@ -307,9 +307,17 @@ export class MailService {
                     ...this.getBrandingContext(),
                     inviteeName: data.invitee.username,
                     inviterName: data.inviter.username,
+                    // The member-invitation template renders {{directoryName}}/
+                    // {{directoryUrl}} (legacy naming for the invited Work). The
+                    // context previously passed workName/workUrl, leaving those
+                    // template vars undefined — and with Handlebars strict mode
+                    // (mail.module.ts) that THROWS, so the invitation email
+                    // silently failed to send. Provide both names.
                     workName: data.work.name,
-                    roleName: this.formatRoleName(data.role),
                     workUrl: data.workUrl,
+                    directoryName: data.work.name,
+                    directoryUrl: data.workUrl,
+                    roleName: this.formatRoleName(data.role),
                 },
             });
         } catch (error) {
