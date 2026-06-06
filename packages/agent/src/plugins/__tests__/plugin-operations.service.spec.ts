@@ -9,6 +9,7 @@ import { WorkPluginEntity } from '../entities/work-plugin.entity';
 import { PluginRegistryService } from '../services/plugin-registry.service';
 import { SettingsSchemaValidatorService } from '../services/settings-schema-validator.service';
 import { PluginSettingsService } from '../services/plugin-settings.service';
+import { WorkOwnershipService } from '../../services/work-ownership.service';
 import type { RegisteredPlugin } from '../services/plugin-registry.service';
 import type {
     IDeviceAuthProvider,
@@ -38,6 +39,7 @@ describe('PluginOperationsService', () => {
     let workPluginRepository: Repository<WorkPluginEntity>;
     let pluginRegistryService: PluginRegistryService;
     let settingsService: PluginSettingsService;
+    let workOwnershipService: WorkOwnershipService;
 
     const createSettingsSchema = (): JsonSchema =>
         ({
@@ -165,6 +167,17 @@ describe('PluginOperationsService', () => {
                         getAvailableModels: jest.fn().mockResolvedValue([]),
                     },
                 },
+                {
+                    provide: WorkOwnershipService,
+                    useValue: {
+                        // Default: caller is authorized. Individual tests
+                        // override these to assert the fail-closed path.
+                        ensureCanView: jest.fn().mockResolvedValue({}),
+                        ensureCanEdit: jest.fn().mockResolvedValue({}),
+                        ensureCanManageMembers: jest.fn().mockResolvedValue({}),
+                        ensureAccess: jest.fn().mockResolvedValue({}),
+                    },
+                },
             ],
         }).compile();
 
@@ -178,6 +191,7 @@ describe('PluginOperationsService', () => {
         );
         pluginRegistryService = module.get<PluginRegistryService>(PluginRegistryService);
         settingsService = module.get<PluginSettingsService>(PluginSettingsService);
+        workOwnershipService = module.get<WorkOwnershipService>(WorkOwnershipService);
     });
 
     describe('secret settings in API response', () => {
@@ -690,6 +704,84 @@ describe('PluginOperationsService', () => {
 
             expect(result.workEnabled).toBe(false);
             expect(workPluginRepository.save).toHaveBeenCalled();
+        });
+    });
+
+    describe('work-scoped ownership gate (IDOR defense-in-depth)', () => {
+        describe('listWorkPlugins', () => {
+            it('rejects a non-owner / foreign workId before touching any repository', async () => {
+                jest.spyOn(workOwnershipService, 'ensureCanView').mockRejectedValue(
+                    new NotFoundException(`Work with id 'dir-1' not found`),
+                );
+                const registryGet = jest.spyOn(pluginRegistryService, 'getAll');
+                const workFind = jest.spyOn(workPluginRepository, 'find');
+
+                await expect(service.listWorkPlugins('dir-1', 'attacker')).rejects.toThrow(
+                    NotFoundException,
+                );
+
+                expect(workOwnershipService.ensureCanView).toHaveBeenCalledWith(
+                    'dir-1',
+                    'attacker',
+                );
+                // Fail-closed BEFORE any registry/repository access.
+                expect(registryGet).not.toHaveBeenCalled();
+                expect(workFind).not.toHaveBeenCalled();
+            });
+
+            it('allows the legitimate owner (viewer access) to list work plugins', async () => {
+                const registered = createRegisteredPlugin();
+                jest.spyOn(pluginRegistryService, 'getAll').mockReturnValue([registered]);
+                jest.spyOn(userPluginRepository, 'find').mockResolvedValue([]);
+                jest.spyOn(workPluginRepository, 'find').mockResolvedValue([]);
+
+                const result = await service.listWorkPlugins('dir-1', 'owner-1');
+
+                expect(workOwnershipService.ensureCanView).toHaveBeenCalledWith('dir-1', 'owner-1');
+                expect(result.plugins.length).toBe(1);
+            });
+        });
+
+        describe('enablePluginForWork', () => {
+            it('rejects a non-owner / foreign workId before touching the registry', async () => {
+                jest.spyOn(workOwnershipService, 'ensureCanEdit').mockRejectedValue(
+                    new NotFoundException(`Work with id 'dir-1' not found`),
+                );
+                const registryGet = jest.spyOn(pluginRegistryService, 'get');
+
+                await expect(
+                    service.enablePluginForWork('dir-1', 'test-plugin', 'attacker'),
+                ).rejects.toThrow(NotFoundException);
+
+                expect(workOwnershipService.ensureCanEdit).toHaveBeenCalledWith(
+                    'dir-1',
+                    'attacker',
+                );
+                // Fail-closed BEFORE registry/repository access — no mutation possible.
+                expect(registryGet).not.toHaveBeenCalled();
+                expect(workPluginRepository.save).not.toHaveBeenCalled();
+            });
+
+            it('allows the legitimate owner (editor access) to enable a plugin for a work', async () => {
+                const autoEnablePlugin = createRegisteredPlugin();
+                autoEnablePlugin.manifest = {
+                    ...autoEnablePlugin.manifest,
+                    autoEnable: true,
+                } as PluginManifest;
+                jest.spyOn(pluginRegistryService, 'get').mockReturnValue(autoEnablePlugin);
+                jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+                jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                } as any);
+                jest.spyOn(workPluginRepository, 'findOne').mockResolvedValue(null);
+
+                const result = await service.enablePluginForWork('dir-1', 'test-plugin', 'owner-1');
+
+                expect(workOwnershipService.ensureCanEdit).toHaveBeenCalledWith('dir-1', 'owner-1');
+                expect(result.workEnabled).toBe(true);
+                expect(workPluginRepository.save).toHaveBeenCalled();
+            });
         });
     });
 
@@ -2091,6 +2183,15 @@ describe('PluginOperationsService', () => {
                     {
                         provide: AiFacadeService,
                         useValue: { getAvailableModels: jest.fn().mockResolvedValue([]) },
+                    },
+                    {
+                        provide: WorkOwnershipService,
+                        useValue: {
+                            ensureCanView: jest.fn().mockResolvedValue({}),
+                            ensureCanEdit: jest.fn().mockResolvedValue({}),
+                            ensureCanManageMembers: jest.fn().mockResolvedValue({}),
+                            ensureAccess: jest.fn().mockResolvedValue({}),
+                        },
                     },
                 ],
             }).compile();
