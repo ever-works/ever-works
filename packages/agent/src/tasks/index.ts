@@ -18,3 +18,5 @@ export * from './kb-normalize-media.types';
 export * from './kb-normalize-media-dispatcher';
 export * from './kb-transcribe.types';
 export * from './kb-transcribe-dispatcher';
+export * from './kb-reembed-work.types';
+export * from './kb-reembed-work-dispatcher';

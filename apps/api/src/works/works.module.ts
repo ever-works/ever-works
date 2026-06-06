@@ -14,9 +14,12 @@ import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import {
     KB_NORMALIZE_MEDIA_DISPATCHER,
+    KB_REEMBED_WORK_DISPATCHER,
     KB_TRANSCRIBE_DISPATCHER,
     type KbNormalizeMediaDispatcher,
     type KbNormalizeMediaPayload,
+    type KbReembedWorkDispatcher,
+    type KbReembedWorkPayload,
     type KbTranscribeDispatcher,
     type KbTranscribePayload,
 } from '@ever-works/agent/tasks';
@@ -139,6 +142,27 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
                             );
                             return null;
                         }
+                    },
+                };
+            },
+        },
+        // EW-642 D7 — bind the `kb-reembed-work` dispatcher. Same
+        // dynamic-import shape as the two KB media dispatchers above,
+        // but unlike them this dispatcher does NOT swallow errors and
+        // return `null` — a re-embed sweep that silently fails to
+        // dispatch would leave a Work permanently on the old embedding
+        // model with no signal to the operator. Errors propagate so
+        // the caller (typically the pgvector settings-change hook, see
+        // TODO in `packages/plugins/pgvector/src/pgvector.plugin.ts`)
+        // can surface them as a workbench banner.
+        {
+            provide: KB_REEMBED_WORK_DISPATCHER,
+            useFactory: (): KbReembedWorkDispatcher => {
+                return {
+                    async dispatchKbReembedWork(payload: KbReembedWorkPayload): Promise<string> {
+                        const { tasks } = await import('@trigger.dev/sdk');
+                        const handle = await tasks.trigger('kb-reembed-work', payload);
+                        return handle.id;
                     },
                 };
             },

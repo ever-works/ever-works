@@ -218,6 +218,11 @@ describe('FacadesModule + barrel re-exports', () => {
                     'NotificationChannelFacadeError',
                     'NotificationChannelFacadeService',
                     'NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER',
+                    // Vector store facade (EW-642 — KB embedded vs offline vector store).
+                    'EmbeddingModeResolver',
+                    'EmbeddingModeUnsupportedError',
+                    'VectorStoreFacadeService',
+                    'VectorStoreNotConfiguredError',
                 ].sort(),
             );
         });
