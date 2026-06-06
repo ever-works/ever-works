@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { KB_DOCUMENT_CLASSES } from '@ever-works/contracts';
 import type { KbDocumentClass, KbDocumentDto, KbDocumentStatus } from '@ever-works/contracts';
+import { KbDocumentContextMenu } from './KbDocumentContextMenu';
 
 /**
  * EW-641 slice A — workbench tree panel.
@@ -295,45 +296,47 @@ function KbTreeGroup({
                         const isActive = currentDocPath === doc.path;
                         return (
                             <li key={doc.id}>
-                                <Link
-                                    href={`${ROUTES.DASHBOARD_WORK_KB(workId)}/${doc.path}`}
-                                    data-testid={`kb-workbench-row-${doc.id}`}
-                                    data-doc-path={doc.path}
-                                    aria-current={isActive ? 'page' : undefined}
-                                    className={cn(
-                                        'flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors',
-                                        isActive
-                                            ? 'bg-primary/10 text-text dark:bg-primary/20 dark:text-text-dark'
-                                            : 'text-text-secondary hover:bg-card-hover hover:text-text dark:text-text-secondary-dark/80 dark:hover:bg-card-primary-dark/40 dark:hover:text-text-dark',
-                                    )}
-                                >
-                                    <FileText
-                                        className="h-3.5 w-3.5 shrink-0 text-text-muted dark:text-text-muted-dark/60"
-                                        aria-hidden="true"
-                                    />
-                                    <span className="truncate">{doc.title || doc.path}</span>
-                                    {doc.locked ? (
-                                        <Lock
-                                            data-testid={`kb-workbench-row-${doc.id}-lock`}
-                                            aria-label={lockedLabel}
-                                            className="ml-auto h-3 w-3 shrink-0 text-amber-600 dark:text-amber-300"
+                                <KbDocumentContextMenu workId={workId} document={doc}>
+                                    <Link
+                                        href={`${ROUTES.DASHBOARD_WORK_KB(workId)}/${doc.path}`}
+                                        data-testid={`kb-workbench-row-${doc.id}`}
+                                        data-doc-path={doc.path}
+                                        aria-current={isActive ? 'page' : undefined}
+                                        className={cn(
+                                            'flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors',
+                                            isActive
+                                                ? 'bg-primary/10 text-text dark:bg-primary/20 dark:text-text-dark'
+                                                : 'text-text-secondary hover:bg-card-hover hover:text-text dark:text-text-secondary-dark/80 dark:hover:bg-card-primary-dark/40 dark:hover:text-text-dark',
+                                        )}
+                                    >
+                                        <FileText
+                                            className="h-3.5 w-3.5 shrink-0 text-text-muted dark:text-text-muted-dark/60"
+                                            aria-hidden="true"
                                         />
-                                    ) : null}
-                                    {doc.status !== 'active' ? (
-                                        <span
-                                            data-testid={`kb-workbench-row-${doc.id}-status`}
-                                            className={cn(
-                                                'rounded-full px-1.5 py-0.5 text-[10px] uppercase',
-                                                doc.locked ? 'ml-1' : 'ml-auto',
-                                                doc.status === 'draft'
-                                                    ? 'bg-card-hover text-text-muted dark:bg-card-primary-dark/40 dark:text-text-muted-dark/70'
-                                                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-                                            )}
-                                        >
-                                            {statusLabel(doc.status)}
-                                        </span>
-                                    ) : null}
-                                </Link>
+                                        <span className="truncate">{doc.title || doc.path}</span>
+                                        {doc.locked ? (
+                                            <Lock
+                                                data-testid={`kb-workbench-row-${doc.id}-lock`}
+                                                aria-label={lockedLabel}
+                                                className="ml-auto h-3 w-3 shrink-0 text-amber-600 dark:text-amber-300"
+                                            />
+                                        ) : null}
+                                        {doc.status !== 'active' ? (
+                                            <span
+                                                data-testid={`kb-workbench-row-${doc.id}-status`}
+                                                className={cn(
+                                                    'rounded-full px-1.5 py-0.5 text-[10px] uppercase',
+                                                    doc.locked ? 'ml-1' : 'ml-auto',
+                                                    doc.status === 'draft'
+                                                        ? 'bg-card-hover text-text-muted dark:bg-card-primary-dark/40 dark:text-text-muted-dark/70'
+                                                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                                                )}
+                                            >
+                                                {statusLabel(doc.status)}
+                                            </span>
+                                        ) : null}
+                                    </Link>
+                                </KbDocumentContextMenu>
                             </li>
                         );
                     })}

@@ -20,6 +20,15 @@ vi.mock('@/app/actions/works/kb-lock', () => ({
     unlockKbDocumentAction: (...args: unknown[]) => unlockActionMock(...args),
 }));
 
+// Stub the slice-E Git history modal — its real dependency chain
+// (shared `Dialog` → `next-intl` navigation) trips Vitest module
+// resolution under the worktree's pnpm hoist. The metadata spec only
+// needs to verify the trigger button exists; the modal itself has its
+// own dedicated unit spec.
+vi.mock('./KbGitHistoryModal', () => ({
+    KbGitHistoryModal: () => null,
+}));
+
 import { KbMetadataPanel } from './KbMetadataPanel';
 import type { KbDocumentDto } from '@ever-works/contracts';
 
@@ -78,11 +87,10 @@ describe('KbMetadataPanel', () => {
         expect(screen.getByTestId('kb-workbench-metadata-history-button')).toBeTruthy();
     });
 
-    it('disables "View Git history" with a coming-in-slice-E tooltip', () => {
+    it('renders an enabled "View Git history" button wired to the history modal', () => {
         render(<KbMetadataPanel workId="work-1" document={doc()} />);
         const btn = screen.getByTestId('kb-workbench-metadata-history-button') as HTMLButtonElement;
-        expect(btn.disabled).toBe(true);
-        expect(btn.getAttribute('title')).toContain('historyComingSoon');
+        expect(btn.disabled).toBe(false);
     });
 
     it('adds a tag on Enter and PATCHes with the new list', async () => {
