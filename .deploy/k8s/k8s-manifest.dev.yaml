@@ -305,15 +305,13 @@ spec:
 
           resources:
             requests:
-              # Right-sized to measured steady-state (~370 MiB boot, ~0.4-1.2
-              # GiB under load) with headroom — see the NODE_OPTIONS note above.
               # 2026-06-06 dev right-sizing: live `kubectl top pod` measured
-              # ~379 MiB on this single replica (no chat load — dev sees
-              # near-zero traffic). 1 GiB request reserves honestly; 3 GiB
-              # limit untouched so it can still grow into the V8 2 GiB cap.
-              # CPU 500m → 100m: observed peak 3m, 100m is the prod-floor we
-              # use for "occasionally active" services and frees 0.4 cores.
-              memory: "1Gi"
+              # ~379 MiB on this single replica. 576 MiB request reserves
+              # ~1.5x current steady-state; 3 GiB limit untouched so the
+              # container can still grow into the V8 2 GiB cap if needed.
+              # CPU 500m → 100m: observed peak 3m, plenty of headroom and
+              # frees 0.4 cores cluster-wide.
+              memory: "576Mi"
               cpu: "100m"
             limits:
               memory: "3Gi"

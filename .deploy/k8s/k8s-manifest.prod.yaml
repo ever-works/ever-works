@@ -328,15 +328,16 @@ spec:
 
           resources:
             requests:
-              # Right-sized to measured steady-state (~370 MiB boot, ~0.4-1.2
-              # GiB under load) with headroom — see the NODE_OPTIONS note above.
-              # 2026-06-06 follow-up: live `kubectl top pod` measured ~430 MiB
-              # /replica warm-up across the 4 prod pods. Trimmed to 1.5 GiB so
-              # the documented ~1.2 GiB chat peak still fits inside the request
-              # with margin; 3 GiB limit still catches unexpected spikes.
-              # CPU 500m → 300m: observed peak ~58m/pod, 300m leaves >5x
-              # headroom and frees 0.4 cores cluster-wide across the 2 replicas.
-              memory: "1536Mi"
+              # 2026-06-06 right-sizing: live `kubectl top pod` measured ~430
+              # MiB / replica steady on the 2 prod pods (post-#1190 lazy-proxy
+              # fix). The historical "~0.4-1.2 GiB under load" range from the
+              # earlier comment block reflected the pre-#1190 chat regression
+              # and is no longer representative — 672 MiB request reserves
+              # ~1.5x current steady-state with the 3 GiB limit still
+              # catching any unexpected spike.
+              # CPU 500m → 300m: observed peak ~58m / pod, 300m leaves >5x
+              # headroom and frees 0.4 cores cluster-wide across 2 replicas.
+              memory: "672Mi"
               cpu: "300m"
             limits:
               memory: "3Gi"
