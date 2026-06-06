@@ -330,11 +330,14 @@ spec:
             requests:
               # Right-sized to measured steady-state (~370 MiB boot, ~0.4-1.2
               # GiB under load) with headroom — see the NODE_OPTIONS note above.
-              # Reserves honestly without over-packing the node (the previous
-              # 6 GiB reservation needlessly held ~24 GiB across the 4 api pods:
-              # prod x2 + stage + dev).
-              memory: "2Gi"
-              cpu: "500m"
+              # 2026-06-06 follow-up: live `kubectl top pod` measured ~430 MiB
+              # /replica warm-up across the 4 prod pods. Trimmed to 1.5 GiB so
+              # the documented ~1.2 GiB chat peak still fits inside the request
+              # with margin; 3 GiB limit still catches unexpected spikes.
+              # CPU 500m → 300m: observed peak ~58m/pod, 300m leaves >5x
+              # headroom and frees 0.4 cores cluster-wide across the 2 replicas.
+              memory: "1536Mi"
+              cpu: "300m"
             limits:
               memory: "3Gi"
               cpu: "2"
@@ -501,8 +504,13 @@ spec:
 
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "250m"
+              # 2026-06-06 right-sizing: live `kubectl top pod` measured
+              # ~71 MiB / replica steady (Next.js SSR, 2 prod replicas).
+              # 192 MiB request leaves ~2.5x headroom for SSR spikes; 512 MiB
+              # limit untouched. CPU 250m → 100m frees 0.3 cores across the
+              # 2 replicas (observed peak 9m, kept enough for SSR bursts).
+              memory: "192Mi"
+              cpu: "100m"
             limits:
               memory: "512Mi"
               cpu: "500m"

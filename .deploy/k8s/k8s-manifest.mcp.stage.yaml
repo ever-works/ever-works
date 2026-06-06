@@ -70,8 +70,12 @@ spec:
 
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "100m"
+              # 2026-06-06 right-sizing: live `kubectl top pod` measured
+              # ~62 MiB on the stage MCP replica. 96 MiB request reserves
+              # honestly with ~1.5x headroom; 256 MiB limit untouched.
+              # CPU 100m → 50m: observed peak 1m on this idle env.
+              memory: "96Mi"
+              cpu: "50m"
             limits:
               memory: "256Mi"
               cpu: "250m"
