@@ -306,12 +306,12 @@ spec:
           resources:
             requests:
               # 2026-06-06 dev right-sizing: live `kubectl top pod` measured
-              # ~379 MiB on this single replica. 576 MiB request reserves
-              # ~1.5x current steady-state; 3 GiB limit untouched so the
-              # container can still grow into the V8 2 GiB cap if needed.
-              # CPU 500m → 100m: observed peak 3m, plenty of headroom and
-              # frees 0.4 cores cluster-wide.
-              memory: "576Mi"
+              # ~379 MiB on this single replica. 672 MiB request matches prod
+              # for consistency (~1.8x current steady-state); 3 GiB limit
+              # untouched so the container can still grow into the V8 2 GiB
+              # cap if needed. CPU 500m → 100m: observed peak 3m, plenty of
+              # headroom and frees 0.4 cores cluster-wide.
+              memory: "672Mi"
               cpu: "100m"
             limits:
               memory: "3Gi"
