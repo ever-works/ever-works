@@ -5,6 +5,7 @@ import { workAPI } from '@/lib/api';
 import { kbAPI } from '@/lib/api/kb';
 import { WorkbenchShell } from '@/components/kb/workbench/WorkbenchShell';
 import { WorkbenchUploadCoordinator } from '@/components/kb/workbench/WorkbenchUploadCoordinator';
+import { KbSearchPalette } from '@/components/kb/workbench/KbSearchPalette';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.workDetail.kb');
@@ -46,16 +47,19 @@ export default async function WorkKnowledgeBasePage({ params }: Params) {
     });
 
     return (
-        <WorkbenchShell
-            left={<WorkbenchUploadCoordinator workId={id} />}
-            center={
-                <div
-                    data-testid="kb-workbench-empty"
-                    className="flex flex-1 items-center justify-center p-8 text-center text-sm text-text-muted dark:text-text-muted-dark/70"
-                >
-                    <p className="max-w-md">{t('workbench.empty')}</p>
-                </div>
-            }
-        />
+        <>
+            <KbSearchPalette workId={id} />
+            <WorkbenchShell
+                left={<WorkbenchUploadCoordinator workId={id} />}
+                center={
+                    <div
+                        data-testid="kb-workbench-empty"
+                        className="flex flex-1 items-center justify-center p-8 text-center text-sm text-text-muted dark:text-text-muted-dark/70"
+                    >
+                        <p className="max-w-md">{t('workbench.empty')}</p>
+                    </div>
+                }
+            />
+        </>
     );
 }

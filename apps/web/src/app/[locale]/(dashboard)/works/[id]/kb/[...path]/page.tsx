@@ -10,6 +10,7 @@ import { KbDocumentHeader } from '@/components/kb/workbench/KbDocumentHeader';
 import { TiptapEditor } from '@/components/kb/workbench/TiptapEditor';
 import { KbMetadataPanel } from '@/components/kb/workbench/KbMetadataPanel';
 import { KbDocumentViewerSwitch } from '@/components/kb/workbench/KbDocumentViewerSwitch';
+import { KbSearchPalette } from '@/components/kb/workbench/KbSearchPalette';
 import type { KbUploadDto } from '@ever-works/contracts';
 
 type Params = {
@@ -120,28 +121,31 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
     const downloadUrl = upload ? `/api/works/${id}/kb/uploads/${upload.id}/download` : undefined;
 
     return (
-        <WorkbenchShell
-            left={<WorkbenchUploadCoordinator workId={id} currentDocPath={doc.path} />}
-            center={
-                <div className="flex h-full flex-col">
-                    <KbDocumentHeader workId={id} document={doc} />
-                    {useInlineViewer && upload ? (
-                        <div className="flex-1 overflow-auto p-4">
-                            <KbDocumentViewerSwitch
-                                workId={id}
-                                document={doc}
-                                mimeType={upload.mimeType}
-                                fileSize={upload.fileSize}
-                                filename={upload.originalFilename}
-                                downloadUrl={downloadUrl}
-                            />
-                        </div>
-                    ) : (
-                        <TiptapEditor workId={id} document={doc} initialBody={doc.body} />
-                    )}
-                </div>
-            }
-            right={<KbMetadataPanel workId={id} document={doc} />}
-        />
+        <>
+            <KbSearchPalette workId={id} />
+            <WorkbenchShell
+                left={<WorkbenchUploadCoordinator workId={id} currentDocPath={doc.path} />}
+                center={
+                    <div className="flex h-full flex-col">
+                        <KbDocumentHeader workId={id} document={doc} />
+                        {useInlineViewer && upload ? (
+                            <div className="flex-1 overflow-auto p-4">
+                                <KbDocumentViewerSwitch
+                                    workId={id}
+                                    document={doc}
+                                    mimeType={upload.mimeType}
+                                    fileSize={upload.fileSize}
+                                    filename={upload.originalFilename}
+                                    downloadUrl={downloadUrl}
+                                />
+                            </div>
+                        ) : (
+                            <TiptapEditor workId={id} document={doc} initialBody={doc.body} />
+                        )}
+                    </div>
+                }
+                right={<KbMetadataPanel workId={id} document={doc} />}
+            />
+        </>
     );
 }

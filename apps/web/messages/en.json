@@ -3473,6 +3473,46 @@
                             "description": "No inline viewer is available for {mime}. Download the file to open it in a native application.",
                             "download": "Download original"
                         }
+                    },
+                    "contextMenu": {
+                        "rename": "Rename",
+                        "duplicate": "Duplicate",
+                        "lock": "Lock",
+                        "lock.full": "Full lock",
+                        "lock.additionsOnly": "Additions-only lock",
+                        "unlock": "Unlock",
+                        "archive": "Archive",
+                        "delete": "Delete",
+                        "copyPath": "Copy path",
+                        "copyWikilink": "Copy wikilink",
+                        "locked.disabled.tooltip": "Unlock the document to perform this action.",
+                        "delete.confirmTitle": "Delete document?",
+                        "delete.confirmInstruction": "Type \"{name}\" to confirm. This cannot be undone.",
+                        "delete.confirmInput": "Document name",
+                        "delete.cancel": "Cancel",
+                        "delete.confirm": "Delete"
+                    },
+                    "search": {
+                        "placeholder": "Search Knowledge Base documents…",
+                        "empty": "Type to search KB documents.",
+                        "noResults": "No documents matched your search.",
+                        "searching": "Searching…",
+                        "filter": {
+                            "class": "Class",
+                            "tags": "Tags",
+                            "status": "Status",
+                            "locked": "Locked only",
+                            "language": "Language"
+                        }
+                    },
+                    "history": {
+                        "title": "Document Git history",
+                        "placeholder": "No commits yet for this document.",
+                        "placeholder.description": "The Git-mirror background job will populate this list after the next edit lands. If this persists, the backend endpoint may still be rolling out — track follow-up at EW-732.",
+                        "restore": "Restore",
+                        "restored": "Restored",
+                        "failed": "Restore failed",
+                        "close": "Close"
                     }
                 }
             }

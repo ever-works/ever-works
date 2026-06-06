@@ -6,6 +6,7 @@ import { Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { updateKbDocumentAction } from '@/app/actions/works/kb-document';
 import { lockKbDocumentAction, unlockKbDocumentAction } from '@/app/actions/works/kb-lock';
+import { KbGitHistoryModal } from './KbGitHistoryModal';
 import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_STATUSES,
@@ -202,12 +203,7 @@ export function KbMetadataPanel({
                 }}
             />
 
-            <HistoryField
-                labels={{
-                    label: tMeta('history'),
-                    tooltip: tMeta('historyComingSoon'),
-                }}
-            />
+            <HistoryField workId={workId} document={current} label={tMeta('history')} />
         </div>
     );
 }
@@ -905,26 +901,39 @@ function SourceField({ document, labels }: { document: KbDocumentDto; labels: { 
 }
 
 // ---------------------------------------------------------------------------
-// View history (placeholder for slice E)
+// View Git history — slice E
 // ---------------------------------------------------------------------------
-function HistoryField({ labels }: { labels: { label: string; tooltip: string } }) {
-    // TODO(EW-731 slice E): wire to Git-history modal.
+function HistoryField({
+    workId,
+    document,
+    label,
+}: {
+    workId: string;
+    document: KbDocumentDto;
+    label: string;
+}) {
+    const [open, setOpen] = useState(false);
     return (
         <section className="flex flex-col gap-1.5" data-testid="kb-workbench-metadata-history">
             <button
                 type="button"
                 data-testid="kb-workbench-metadata-history-button"
-                disabled
-                aria-disabled="true"
-                title={labels.tooltip}
+                onClick={() => setOpen(true)}
                 className={cn(
                     'rounded-md border border-border dark:border-border-dark',
                     'bg-card/50 dark:bg-card-primary-dark/30 px-2 py-1.5 text-sm',
-                    'text-text-muted opacity-60 cursor-not-allowed',
+                    'text-text dark:text-text-dark',
+                    'hover:bg-card-hover dark:hover:bg-card-primary-dark/60',
                 )}
             >
-                {labels.label}
+                {label}
             </button>
+            <KbGitHistoryModal
+                workId={workId}
+                document={document}
+                open={open}
+                onOpenChange={setOpen}
+            />
         </section>
     );
 }
