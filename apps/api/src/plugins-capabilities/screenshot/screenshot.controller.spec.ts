@@ -11,6 +11,9 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     PluginSettingsService: class {},
 }));
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class {},
+}));
 jest.mock('../../auth', () => ({
     AuthSessionGuard: class {},
     CurrentUser: () => () => undefined,
@@ -18,9 +21,11 @@ jest.mock('../../auth', () => ({
 
 import { BadRequestException } from '@nestjs/common';
 import { ScreenshotController } from './screenshot.controller';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { NoProviderError } from '@ever-works/agent/facades';
 import type { ScreenshotFacadeService } from '@ever-works/agent/facades';
 import type { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
+import type { WorkOwnershipService } from '@ever-works/agent/services';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
 describe('ScreenshotController', () => {
@@ -30,6 +35,7 @@ describe('ScreenshotController', () => {
         getDefaultForCapabilityScoped: jest.Mock;
     };
     let pluginSettings: { getSettings: jest.Mock };
+    let ownershipService: { ensureCanView: jest.Mock };
     let controller: ScreenshotController;
     const auth: AuthenticatedUser = { userId: 'user-1' } as any;
 
@@ -40,10 +46,14 @@ describe('ScreenshotController', () => {
             getDefaultForCapabilityScoped: jest.fn(),
         };
         pluginSettings = { getSettings: jest.fn() };
+        // Security (EW-711 #30): default to "access granted" so the existing
+        // same-owner behavioural specs below stay unchanged.
+        ownershipService = { ensureCanView: jest.fn().mockResolvedValue({}) };
         controller = new ScreenshotController(
             screenshotFacade as unknown as ScreenshotFacadeService,
             pluginRegistry as unknown as PluginRegistryService,
             pluginSettings as unknown as PluginSettingsService,
+            ownershipService as unknown as WorkOwnershipService,
         );
     });
 
@@ -562,6 +572,93 @@ describe('ScreenshotController', () => {
                     });
                 }
             }
+        });
+    });
+
+    // Security (EW-711 #30): cross-work IDOR. Every work-scoped entry point
+    // must authorize the supplied workId via WorkOwnershipService.ensureCanView
+    // BEFORE reading that work's enabled providers/settings (secrets) or
+    // spending its credits. No workId ⇒ personal scope ⇒ no work to authorize.
+    describe('cross-work access control (EW-711 #30)', () => {
+        const dtoWithWork = {
+            url: 'https://example.com',
+            workId: 'other-users-work',
+        } as any;
+
+        it('checkAvailability authorizes the supplied workId before reading providers', async () => {
+            pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([]);
+            pluginRegistry.getDefaultForCapabilityScoped.mockResolvedValue(null);
+
+            await controller.checkAvailability(auth, 'work-42');
+
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-42', 'user-1');
+        });
+
+        it('does NOT authorize when no workId is supplied (personal scope)', async () => {
+            pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([]);
+            pluginRegistry.getDefaultForCapabilityScoped.mockResolvedValue(null);
+
+            await controller.checkAvailability(auth);
+
+            expect(ownershipService.ensureCanView).not.toHaveBeenCalled();
+        });
+
+        it('checkAvailability propagates ForbiddenException and never reads another work providers', async () => {
+            ownershipService.ensureCanView.mockRejectedValue(new ForbiddenException());
+
+            await expect(
+                controller.checkAvailability(auth, 'other-users-work'),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith(
+                'other-users-work',
+                'user-1',
+            );
+            expect(pluginRegistry.getEnabledPluginsScoped).not.toHaveBeenCalled();
+            // The includeSecrets:true settings read must not happen for a foreign work.
+            expect(pluginSettings.getSettings).not.toHaveBeenCalled();
+        });
+
+        it('capture rejects a foreign workId before resolving providers or spending credits', async () => {
+            ownershipService.ensureCanView.mockRejectedValue(new ForbiddenException());
+
+            await expect(controller.capture(auth, dtoWithWork)).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith(
+                'other-users-work',
+                'user-1',
+            );
+            expect(pluginRegistry.getEnabledPluginsScoped).not.toHaveBeenCalled();
+            expect(pluginSettings.getSettings).not.toHaveBeenCalled();
+            expect(screenshotFacade.capture).not.toHaveBeenCalled();
+        });
+
+        it('getScreenshotUrl rejects a foreign workId before resolving providers', async () => {
+            ownershipService.ensureCanView.mockRejectedValue(new NotFoundException());
+
+            await expect(controller.getScreenshotUrl(auth, dtoWithWork)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+
+            expect(pluginRegistry.getEnabledPluginsScoped).not.toHaveBeenCalled();
+            expect(screenshotFacade.getScreenshotUrl).not.toHaveBeenCalled();
+        });
+
+        it('capture authorizes the workId for the legitimate same-owner caller and proceeds', async () => {
+            pluginRegistry.getEnabledPluginsScoped.mockResolvedValue([registered('p')]);
+            pluginRegistry.getDefaultForCapabilityScoped.mockResolvedValue(null);
+            pluginSettings.getSettings.mockResolvedValue({});
+            screenshotFacade.capture.mockResolvedValue({
+                success: true,
+                imageUrl: 'https://x/i.png',
+            });
+
+            await controller.capture(auth, { url: 'https://example.com', workId: 'work-1' } as any);
+
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(screenshotFacade.capture).toHaveBeenCalled();
         });
     });
 });
