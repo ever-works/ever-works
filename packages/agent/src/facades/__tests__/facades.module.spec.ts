@@ -18,6 +18,8 @@ import { AgentMemoryFacadeService } from '../agent-memory.facade';
 // Notifications v2 (EW-650 + EW-663) — email + notification-channel facades.
 import { EmailFacadeService } from '../email.facade';
 import { NotificationChannelFacadeService } from '../notification-channel.facade';
+// EW-724 / EW-725 — vector-store facade.
+import { VectorStoreFacadeService } from '../vector-store.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -48,6 +50,8 @@ describe('FacadesModule + barrel re-exports', () => {
         // Notifications v2 (EW-650 + EW-663) — email + multi-channel notifications.
         EmailFacadeService,
         NotificationChannelFacadeService,
+        // EW-724 / EW-725 — vector-store facade (KB embeddings).
+        VectorStoreFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
