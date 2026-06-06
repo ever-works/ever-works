@@ -444,10 +444,9 @@ test.describe('Task assignees — deep integration', () => {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(
-            stillLiveAfterCross.status(),
-            'A still live after cross-task delete attempt',
-        ).toBe(500);
+        expect(stillLiveAfterCross.status(), 'A still live after cross-task delete attempt').toBe(
+            500,
+        );
 
         // A correct remove (right task + right id) succeeds → 200 { deleted:true }.
         const goodDelete = await deleteAssignee(request, token, taskA.id, rowA.id);

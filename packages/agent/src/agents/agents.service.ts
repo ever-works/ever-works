@@ -191,48 +191,52 @@ export class AgentsService {
         );
         this.validateHeartbeatCadence(input.heartbeatCadence ?? null);
 
-        const created = await this.agents.create({
-            userId,
-            scope: input.scope,
-            missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
-            ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
-            workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
-            name: input.name,
-            slug,
-            title: input.title ?? null,
-            capabilities: input.capabilities ?? null,
-            aiProviderId: input.aiProviderId ?? null,
-            modelId: input.modelId ?? null,
-            maxSkillContextTokens: input.maxSkillContextTokens ?? 4000,
-            status: AgentStatus.DRAFT,
-            permissions,
-            targets: input.targets ?? null,
-            heartbeatCadence: input.heartbeatCadence ?? null,
-            idleBehavior: input.idleBehavior ?? AgentIdleBehavior.PROPOSE,
-            pauseAfterFailures: input.pauseAfterFailures ?? 3,
-            errorCount: 0,
-            avatarMode,
-            avatarIcon: avatarMode === AgentAvatarMode.ICON ? (input.avatarIcon ?? null) : null,
-            avatarImageUploadId:
-                avatarMode === AgentAvatarMode.IMAGE ? (input.avatarImageUploadId ?? null) : null,
-            // FU-13 — committer identity. Empty strings normalise to
-            // null so a blank picker field doesn't accidentally persist
-            // a no-op commit identity.
-            committerName: input.committerName?.trim() ? input.committerName.trim() : null,
-            committerEmail: input.committerEmail?.trim() ? input.committerEmail.trim() : null,
-        }).catch((err: unknown) => {
-            // A concurrent same-name create burst can pass the existence
-            // pre-check above for every racer; the unique index then lets
-            // exactly one INSERT win and rejects the rest. Translate that lost
-            // race into the SAME named 409 a sequential duplicate would get,
-            // instead of leaking a raw 500 DB error.
-            if (isUniqueConstraintError(err)) {
-                throw new ConflictException(
-                    `An Agent named "${input.name}" already exists in this scope.`,
-                );
-            }
-            throw err;
-        });
+        const created = await this.agents
+            .create({
+                userId,
+                scope: input.scope,
+                missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
+                ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
+                workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
+                name: input.name,
+                slug,
+                title: input.title ?? null,
+                capabilities: input.capabilities ?? null,
+                aiProviderId: input.aiProviderId ?? null,
+                modelId: input.modelId ?? null,
+                maxSkillContextTokens: input.maxSkillContextTokens ?? 4000,
+                status: AgentStatus.DRAFT,
+                permissions,
+                targets: input.targets ?? null,
+                heartbeatCadence: input.heartbeatCadence ?? null,
+                idleBehavior: input.idleBehavior ?? AgentIdleBehavior.PROPOSE,
+                pauseAfterFailures: input.pauseAfterFailures ?? 3,
+                errorCount: 0,
+                avatarMode,
+                avatarIcon: avatarMode === AgentAvatarMode.ICON ? (input.avatarIcon ?? null) : null,
+                avatarImageUploadId:
+                    avatarMode === AgentAvatarMode.IMAGE
+                        ? (input.avatarImageUploadId ?? null)
+                        : null,
+                // FU-13 — committer identity. Empty strings normalise to
+                // null so a blank picker field doesn't accidentally persist
+                // a no-op commit identity.
+                committerName: input.committerName?.trim() ? input.committerName.trim() : null,
+                committerEmail: input.committerEmail?.trim() ? input.committerEmail.trim() : null,
+            })
+            .catch((err: unknown) => {
+                // A concurrent same-name create burst can pass the existence
+                // pre-check above for every racer; the unique index then lets
+                // exactly one INSERT win and rejects the rest. Translate that lost
+                // race into the SAME named 409 a sequential duplicate would get,
+                // instead of leaking a raw 500 DB error.
+                if (isUniqueConstraintError(err)) {
+                    throw new ConflictException(
+                        `An Agent named "${input.name}" already exists in this scope.`,
+                    );
+                }
+                throw err;
+            });
 
         // Materialize tenant-Agent memberships into the join table for
         // indexed lookup from the per-target tabs.

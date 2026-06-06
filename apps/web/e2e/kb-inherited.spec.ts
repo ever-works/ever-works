@@ -79,8 +79,9 @@ test.describe('Knowledge Base — A19+A20 inherited docs', () => {
         // A REAL organization owned by the seeded user — org-scope KB now
         // enforces tenant ownership (cross-tenant IDOR fix), so a bare random
         // UUID 404s. `randomUUID()` only supplies a collision-proof name.
-        const orgId = (await createOrganizationViaAPI(request, access_token, `kb-org-${randomUUID()}`))
-            .id;
+        const orgId = (
+            await createOrganizationViaAPI(request, access_token, `kb-org-${randomUUID()}`)
+        ).id;
         const docTitle = `Privacy ${runId}`;
         const docBody = `# ${docTitle}\n\nOrganization privacy policy — inherited by every paired Work.\n`;
         await seedOrgKbDoc(request, access_token, {

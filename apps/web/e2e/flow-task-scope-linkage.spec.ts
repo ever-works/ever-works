@@ -140,11 +140,7 @@ async function listTaskIds(
 }
 
 /** POST /api/tasks raw (no helper 201-assertion); returns the response. */
-async function postTask(
-    request: APIRequestContext,
-    token: string,
-    data: Record<string, unknown>,
-) {
+async function postTask(request: APIRequestContext, token: string, data: Record<string, unknown>) {
     return request.post(`${API_BASE}/api/tasks`, {
         headers: authedHeaders(token),
         data,
