@@ -19,9 +19,8 @@ jest.mock('../../auth', () => ({
     CurrentUser: () => () => undefined,
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ScreenshotController } from './screenshot.controller';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { NoProviderError } from '@ever-works/agent/facades';
 import type { ScreenshotFacadeService } from '@ever-works/agent/facades';
 import type { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
@@ -642,6 +641,10 @@ describe('ScreenshotController', () => {
                 NotFoundException,
             );
 
+            expect(ownershipService.ensureCanView).toHaveBeenCalledWith(
+                'other-users-work',
+                'user-1',
+            );
             expect(pluginRegistry.getEnabledPluginsScoped).not.toHaveBeenCalled();
             expect(screenshotFacade.getScreenshotUrl).not.toHaveBeenCalled();
         });
