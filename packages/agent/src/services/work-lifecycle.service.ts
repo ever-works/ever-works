@@ -10,6 +10,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import { WorkRepository } from '@src/database/repositories/work.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
+import { OrganizationRepository } from '@src/database/repositories/organization.repository';
 import {
     WorkCreatedEvent,
     WorkStatusChangedEvent,
@@ -99,6 +100,9 @@ export class WorkLifecycleService {
         private readonly everWorksDns: EverWorksDnsService,
         private readonly funnel: ZeroFrictionFunnelService,
         private readonly eventEmitter: EventEmitter2,
+        // Appended last (EW-711 #27) so existing positional test constructions
+        // keep their argument slots; NestJS DI resolves by type, not position.
+        private readonly organizationRepository: OrganizationRepository,
     ) {}
 
     /**
@@ -616,6 +620,26 @@ export class WorkLifecycleService {
             // org-overlay fan-out flow (row 37) reads this column to resolve
             // which Works receive `.content/kb/.org/...` materialization.
             if (updateDto.organizationId !== undefined) {
+                // Security (EW-711 #27): a Work could be enrolled into an
+                // ARBITRARY organizationId with no tenant check, fanning the
+                // Work's KB into another tenant's org. Before persisting a
+                // non-null target, resolve the Organization and require its
+                // tenant to match the Work's tenant. Reject with
+                // NotFoundException (not Forbidden) so a cross-tenant probe
+                // can't distinguish "org exists in another tenant" from "org
+                // does not exist" (existence-leak-safe). `organizationId ===
+                // null` is the clear-membership path and stays unguarded.
+                if (updateDto.organizationId !== null) {
+                    const targetOrg = await this.organizationRepository.findById(
+                        updateDto.organizationId,
+                    );
+                    if (!targetOrg || targetOrg.tenantId !== work.tenantId) {
+                        throw new NotFoundException({
+                            status: 'error',
+                            message: 'Organization not found',
+                        });
+                    }
+                }
                 updateData.organizationId = updateDto.organizationId;
             }
 

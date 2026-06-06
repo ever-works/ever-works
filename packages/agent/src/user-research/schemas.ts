@@ -1,4 +1,40 @@
 import { z } from 'zod';
+import { isSafeWebhookUrl } from '../utils/ssrf-guard';
+
+// Security (EW-715 #3): `sources[].url` is synthesized by the LLM from
+// attacker-controlled web content, persisted to `user.inferredInterests`, and
+// later re-fetched / re-injected into prompts. A bare `z.string().url()`
+// happily accepts `http://169.254.169.254/...`, `http://localhost/...`, or any
+// private-IP / cloud-metadata target, turning the persisted profile into a
+// stored SSRF payload. Tighten the field to require `https:` AND reject SSRF
+// targets via the shared lexical guard `isSafeWebhookUrl` (loopback / link-local
+// / RFC1918 / cloud-metadata hostnames). The guard also rejects `http:`, but we
+// additionally pin to `https:` here because every legitimate research source is
+// a public HTTPS page. This refine runs on BOTH live boundaries:
+//   - the `finalize` tool input (`finalize.tool.ts` → inputSchema), and
+//   - the persistence re-parse in `user-research.service.ts`
+//     (`inferredProfileSchema.parse(finalProfile)` before write).
+const isSafeHttpsSourceUrl = (raw: string): boolean => {
+    let parsed: URL;
+    try {
+        parsed = new URL(raw);
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== 'https:') return false;
+    // The shared lexical guard only recognises loopback by *literal IP*
+    // (127.0.0.0/8, ::1). The bare hostname `localhost` (and its IPv6 aliases)
+    // is not an IP literal, so `isSafeWebhookUrl('https://localhost/...')`
+    // returns true. A legitimate research source is never a loopback host, so
+    // reject those names here before deferring. (Kept local rather than widening
+    // the shared guard, which other callers — e.g. the agent-memory localhost
+    // default — intentionally allow.)
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === 'ip6-localhost' || host === 'ip6-loopback' || host.endsWith('.localhost')) {
+        return false;
+    }
+    return isSafeWebhookUrl(raw);
+};
 
 export const inferredProfileSchema = z.object({
     industry: z.string().optional(),
@@ -10,7 +46,13 @@ export const inferredProfileSchema = z.object({
     sources: z
         .array(
             z.object({
-                url: z.string().url(),
+                url: z
+                    .string()
+                    .url()
+                    .refine(isSafeHttpsSourceUrl, {
+                        message:
+                            'Source url must be a public https URL (no http, private IPs, loopback, link-local, or cloud-metadata targets)',
+                    }),
                 title: z.string(),
             }),
         )
