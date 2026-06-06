@@ -81,7 +81,9 @@ describe('AddAgentScopeTargetIdForDurableSlugCas1780300000000', () => {
     async function rowsById(): Promise<Record<string, { slug: string; scopeTargetId: string }>> {
         const rows: Array<{ id: string; slug: string; scopeTargetId: string }> =
             await dataSource.query(`SELECT "id", "slug", "scopeTargetId" FROM "agents"`);
-        return Object.fromEntries(rows.map((r) => [r.id, { slug: r.slug, scopeTargetId: r.scopeTargetId }]));
+        return Object.fromEntries(
+            rows.map((r) => [r.id, { slug: r.slug, scopeTargetId: r.scopeTargetId }]),
+        );
     }
 
     async function indexSql(): Promise<string | null> {
