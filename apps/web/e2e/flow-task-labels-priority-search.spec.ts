@@ -43,10 +43,11 @@ import { createTaskViaAPI, transitionTaskViaAPI, type Task } from './helpers/age
  *       array: `task.labels LIKE %"<label>"%`. So `?label=lbl` does NOT match a
  *       task whose label is `lbl0` (the quotes bound the token); `?label=lbl0`
  *       does. A task may carry MANY labels; a shared label matches all of them.
- *     - search is `(title LIKE %q% OR slug LIKE %q% OR description LIKE %q%)`.
- *       The `%` in `%q%` is NOT escaped, so a search value of `%` becomes a
- *       LIKE wildcard and matches EVERY row (un-escaped LIKE — a real, pinned
- *       behaviour, not a bug we assert against).
+ *     - search is `(title LIKE %q% OR slug LIKE %q% OR description LIKE %q%)`,
+ *       with the user term WILDCARD-ESCAPED (security hardening: `%`/`_`/`\` are
+ *       backslash-escaped via sanitizeLikePattern and each predicate carries an
+ *       explicit `ESCAPE '\'`). So a search value of `%` is a LITERAL percent —
+ *       it matches only rows whose text actually contains `%`, NOT every row.
  *     - empty `search=`/`label=`/`status=`/`priority=` are falsy → the filter
  *       is skipped entirely (no narrowing, no 400).
  *     - CLAMPS (probed exactly): limit missing→50, limit=0→50, limit=abc→50,
@@ -478,7 +479,7 @@ test.describe('Task labels · priority · search · pagination (deep API query s
         expect((await listTasks(request, other.access_token, '?limit=50')).meta.total).toBe(1);
     });
 
-    test('full-text search matches title OR slug OR description; the un-escaped `%` is a LIKE wildcard; empty search is ignored; no-match returns an empty window with the right meta', async ({
+    test('full-text search matches title OR slug OR description; an escaped `%` is treated as a literal (not a wildcard); empty search is ignored; no-match returns an empty window with the right meta', async ({
         request,
     }) => {
         const { access_token: token } = await registerUserViaAPI(request);
@@ -498,6 +499,11 @@ test.describe('Task labels · priority · search · pagination (deep API query s
             title: 'unrelated',
             description: 'nothing here',
         });
+        // A task carrying a LITERAL `%` in its title. The hardened search now
+        // escapes `%`/`_`/`\` before wrapping the term in `%…%` (LIKE … ESCAPE
+        // '\'), so a `?search=%` query matches the literal percent sign — this
+        // is the ONLY row it should hit (see the wildcard assertion below).
+        const byPercent = await seedTask(request, token, { title: 'literal 50% off banner' });
 
         // search hits title OR description.
         const hits = await listTasks(request, token, `?search=${encodeURIComponent(needle)}`);
@@ -510,13 +516,20 @@ test.describe('Task labels · priority · search · pagination (deep API query s
         expect(slugQ.meta.total, 'slug branch of the search OR').toBeGreaterThanOrEqual(1);
         expect(idsOf(slugQ.data)).toContain(bySlug.id);
 
-        // The `%` is NOT escaped before being wrapped in `%...%`, so search=%
-        // degrades to the LIKE wildcard `%%%` and matches EVERY row (all 4 here).
+        // SECURITY HARDENING: the repo now escapes LIKE wildcards (`%`/`_`/`\`)
+        // in the search term and pairs each predicate with an explicit ESCAPE
+        // '\' clause (task.repository.ts → sanitizeLikePattern). So `?search=%`
+        // is NO LONGER a `%%%` wildcard that matches every row — it is a LITERAL
+        // percent search that matches ONLY the row whose title contains `%`.
         const wildcard = await listTasks(request, token, '?search=%25');
-        expect(wildcard.meta.total, 'un-escaped % is a LIKE wildcard → matches all').toBe(4);
+        expect(
+            wildcard.meta.total,
+            'escaped % is now a literal — matches only the percent carrier, not every row',
+        ).toBe(1);
+        expect(idsOf(wildcard.data)).toEqual([byPercent.id]);
 
-        // Empty `search=` is falsy → the clause is skipped → unfiltered (all 4).
-        expect((await listTasks(request, token, '?search=')).meta.total).toBe(4);
+        // Empty `search=` is falsy → the clause is skipped → unfiltered (all 5).
+        expect((await listTasks(request, token, '?search=')).meta.total).toBe(5);
 
         // A genuine no-match → empty data[] with a correct meta (total 0, echoed window).
         const miss = await listTasks(request, token, '?search=definitelynothingmatches&limit=10');

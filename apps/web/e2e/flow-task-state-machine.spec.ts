@@ -40,11 +40,13 @@ import { createTaskViaAPI, transitionTaskViaAPI } from './helpers/agents-tasks';
  *       force on illegal → STILL 400 with the same message. `force` only
  *                          overrides the `→ done` approver gate; it is NOT a
  *                          lattice bypass (blockers/cycle are integrity rules).
- *       unknown enum   → 400 "Invalid target status: <value>" — this is the
- *                        CONTROLLER guard (`TasksController.transition`) and it
- *                        runs BEFORE the service lattice guard, so even from a
- *                        terminal `cancelled` state an unknown enum yields the
- *                        enum message, not "Cannot transition".
+ *       unknown enum   → 400 with a class-validator constraint message array
+ *                        ("to must be one of the following values: …"). This is
+ *                        the DTO-level `@IsEnum(TaskStatus)` guard, enforced by
+ *                        the global ValidationPipe BEFORE the request reaches the
+ *                        service lattice guard, so even from a terminal
+ *                        `cancelled` state an unknown enum yields the validation
+ *                        message, never "Cannot transition".
  *   - `in_review → done` succeeds WITHOUT force despite requireAllApprovers=true,
  *     because `allApproved()` is vacuously true when zero approvers are attached
  *     (probed: HTTP 200, completedAt set).
@@ -78,6 +80,17 @@ async function getTask(request: APIRequestContext, token: string, taskId: string
     });
     expect(res.status(), `getTask body=${await res.text().catch(() => '')}`).toBe(200);
     return res.json();
+}
+
+/**
+ * Normalise a Nest error `message` to a single string. The service-level
+ * lattice guard throws `BadRequestException(string)` (→ `message: string`),
+ * but the DTO-level `@IsEnum` rejection comes from the global ValidationPipe
+ * (→ `message: string[]`, one entry per failed constraint). Joining lets the
+ * same regex assertions cover both shapes.
+ */
+function errorText(message: unknown): string {
+    return Array.isArray(message) ? message.join(' | ') : String(message ?? '');
 }
 
 test.describe('Task state machine — exhaustive lattice + guard branches (API)', () => {
@@ -249,41 +262,49 @@ test.describe('Task state machine — exhaustive lattice + guard branches (API)'
         // Still cancelled after all the rejected attempts.
         expect((await getTask(request, token, t2.id)).status).toBe('cancelled');
 
-        // ── Branch 3: unknown status enum → 400 "Invalid target status: …".
-        // This is the CONTROLLER guard and it precedes the service lattice
-        // guard. Prove it on a fresh task (from backlog) AND on the terminal
-        // cancelled task: in both cases the enum message wins, never the
-        // "cannot transition" lattice message. ────────────────────────────
+        // ── Branch 3: unknown status enum → 400, rejected by the DTO-level
+        // `@IsEnum(TaskStatus)` guard. This validation fires in the global
+        // ValidationPipe BEFORE the request ever reaches the service lattice
+        // guard, so an invalid enum NEVER produces the "cannot transition"
+        // lattice message — the load-bearing precedence assertion of this
+        // branch. The ValidationPipe emits a `message` ARRAY listing the
+        // failed constraint(s) ("to must be one of the following values: …"),
+        // distinct from the service guard's plain-string message. Prove the
+        // precedence on a fresh task (from backlog) AND on the terminal
+        // cancelled task: in both cases the enum-validation message wins.
+        // (PROBED against the live stack: HTTP 400, body.message is a
+        // string[] of class-validator constraint messages.) ───────────────
         const t3 = await createTaskViaAPI(request, token, { title: `Bad enum ${stamp}` });
         const unknownFromBacklog = await rawTransition(request, token, t3.id, {
             to: 'frobnicate',
         });
         expect(unknownFromBacklog.status()).toBe(400);
         const unkBody = await unknownFromBacklog.json();
-        // PROBED wording: "Invalid target status: frobnicate".
-        expect(unkBody.message).toMatch(/invalid target status/i);
-        expect(unkBody.message).toContain('frobnicate');
-        expect(unkBody.message, 'enum guard fires before lattice guard').not.toMatch(
-            /cannot transition/i,
-        );
+        // PROBED wording: "to must be one of the following values: …".
+        expect(errorText(unkBody.message)).toMatch(/must be one of the following values/i);
+        expect(
+            errorText(unkBody.message),
+            'enum validation fires before the lattice guard',
+        ).not.toMatch(/cannot transition/i);
 
         // Same precedence even from the terminal cancelled state (where a
         // VALID enum would have produced the lattice "cannot transition").
         const unknownFromCancelled = await rawTransition(request, token, t2.id, { to: 'bogus' });
         expect(unknownFromCancelled.status()).toBe(400);
         const unkCancelBody = await unknownFromCancelled.json();
-        expect(unkCancelBody.message).toMatch(/invalid target status/i);
-        expect(unkCancelBody.message).toContain('bogus');
+        expect(errorText(unkCancelBody.message)).toMatch(/must be one of the following values/i);
         expect(
-            unkCancelBody.message,
-            'enum guard precedes lattice guard even on terminal tasks',
+            errorText(unkCancelBody.message),
+            'enum validation precedes the lattice guard even on terminal tasks',
         ).not.toMatch(/cannot transition/i);
 
-        // A missing `to` (empty body) is caught by the same controller guard
-        // as an invalid (undefined) enum value.
+        // A missing `to` (empty body) is an `undefined` enum value, caught by
+        // the same DTO-level `@IsEnum` constraint as an unknown string.
         const missingTo = await rawTransition(request, token, t3.id, {});
         expect(missingTo.status()).toBe(400);
-        expect((await missingTo.json()).message).toMatch(/invalid target status/i);
+        expect(errorText((await missingTo.json()).message)).toMatch(
+            /must be one of the following values/i,
+        );
 
         // t3 was never legally moved — still backlog after all bad-input attempts.
         expect((await getTask(request, token, t3.id)).status).toBe('backlog');

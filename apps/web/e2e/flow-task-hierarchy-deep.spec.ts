@@ -20,8 +20,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   4. cancel-of-a-parent does NOT cascade to subtasks either; contrast with the
  *      auto-unblock cascade (which IS real) so the fiction is never asserted.
  *   5. re-parent: legal subtree move, re-parent-to-root (null), and the cycle
- *      integrity guard (409) at several depths — plus the create-vs-PATCH
- *      asymmetry (create validates the parent exists; PATCH does not).
+ *      integrity guard (409) at several depths — plus the create-and-PATCH
+ *      parent-existence SYMMETRY (BOTH paths validate the parent exists and is
+ *      owned, so a bogus/foreign parent is rejected 400 on both).
  *   6. depth-64 parent-chain cap (400) + cross-user parent isolation.
  *
  * ───────────────────────────────────────────────────────────────────────────
@@ -46,9 +47,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *        { message:'Cannot set parent — would create a sub-task cycle.' }
  *        (self-parent included). TaskRepository.wouldCreateCycle walks the
  *        proposed parent's chain looking for the candidate child.
- *      → ASYMMETRY: PATCH does NOT validate that the new parent exists or is
- *        owned by the caller (unlike create) — it only runs the cycle check,
- *        so setting a bogus/foreign parentTaskId returns 200 (dangling edge).
+ *      → SYMMETRY (hardened): PATCH DOES validate that the new parent exists
+ *        and is owned by the caller (findByIdAndUser), just like create —
+ *        setting a bogus/foreign parentTaskId returns 400
+ *        { message:'Parent Task <id> not found.' } before the cycle check.
  *
  *   GET /api/tasks?parentTaskId=<id>
  *      → 200 { data:[…], meta:{ total, limit, offset } } — DIRECT children only
@@ -555,11 +557,13 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
     //           b. detach to root (parentTaskId:null);
     //           c. the cycle guard at several depths (self, ancestor under
     //              immediate child, ancestor under deep descendant) → 409;
-    //           d. the create-vs-PATCH asymmetry: create REJECTS a missing
-    //              parent (400) while PATCH ACCEPTS a bogus parent id (200,
-    //              cycle-check-only) — a documented dangling-edge asymmetry.
+    //           d. the create-and-PATCH parent-existence SYMMETRY: BOTH
+    //              create AND PATCH REJECT a bogus/foreign parent id (400,
+    //              "Parent Task <id> not found.") — the hardened update path
+    //              validates parent existence/ownership before the cycle
+    //              check, so there is no dangling-edge asymmetry.
     // ───────────────────────────────────────────────────────────────────────
-    test('reparent: legal move + detach-to-root + cycle guard (409) + create-vs-PATCH asymmetry', async ({
+    test('reparent: legal move + detach-to-root + cycle guard (409) + create/PATCH parent-existence symmetry', async ({
         request,
     }) => {
         test.setTimeout(120_000);
@@ -630,7 +634,13 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
             /sub-task cycle/i,
         );
 
-        // --- Step 4: CREATE-vs-PATCH asymmetry. ---
+        // --- Step 4: CREATE-and-PATCH parent-existence SYMMETRY. ---
+        // The parent-existence guard is now enforced on BOTH paths
+        // (TasksService.create + TasksService.update both call
+        // `findByIdAndUser` on the proposed parent and 400 when it's
+        // missing) — there is NO dangling-edge asymmetry. A bogus
+        // parentTaskId is rejected identically whether you create with
+        // it or PATCH it on.
         const bogus = '00000000-0000-0000-0000-000000000000';
         // create REJECTS an unknown parent (400, names it).
         const createOrphan = await request.post(`${API_BASE}/api/tasks`, {
@@ -642,17 +652,22 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
             String((await createOrphan.json()).message),
             'create names the missing parent',
         ).toMatch(/parent task .* not found/i);
-        // PATCH ACCEPTS the same bogus parent (200) — cycle-check-only, no
-        // existence validation. Documented dangling-edge asymmetry.
+        // PATCH likewise REJECTS the same bogus parent (400) — the update
+        // path validates parent existence/ownership before the cycle check.
         const patchOrphan = await patchTask(request, token, l2.id, { parentTaskId: bogus });
         expect(
             patchOrphan.status(),
-            `PATCH to a bogus parent is accepted (200) body=${await patchOrphan.text().catch(() => '')}`,
-        ).toBe(200);
+            `PATCH to a bogus parent is rejected (400) body=${await patchOrphan.text().catch(() => '')}`,
+        ).toBe(400);
         expect(
-            ((await patchOrphan.json()) as Task).parentTaskId,
-            'PATCH set the dangling edge',
-        ).toBe(bogus);
+            String((await patchOrphan.json()).message),
+            'PATCH names the missing parent',
+        ).toMatch(/parent task .* not found/i);
+        // The dangling edge was NOT applied — L2 still hangs off L1.
+        expect(
+            (await getTask(request, token, l2.id)).parentTaskId,
+            'L2 parent unchanged after the rejected PATCH',
+        ).toBe(l1.id);
     });
 
     // ───────────────────────────────────────────────────────────────────────
@@ -661,8 +676,11 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
     //      exceeds 64 hops is rejected at create with a "exceeds depth 64" 400.
     //   b. User B cannot create a child under User A's task (parent lookup is
     //      user-scoped → 400 "Parent Task <id> not found."), and the
-    //      `?parentTaskId` filter never leaks A's rows to B even when B owns a
-    //      task that (via the PATCH asymmetry) dangles off A's id.
+    //      `?parentTaskId` filter never leaks A's rows to B: the filter is
+    //      always AND-ed with the caller's userId, so B querying
+    //      `?parentTaskId=aRoot.id` sees ZERO rows (A's real child never
+    //      surfaces) while A's same query returns only A's own child — and the
+    //      symmetric check holds for B's own parent id vs A.
     // ───────────────────────────────────────────────────────────────────────
     test('depth-64 parent-chain cap + cross-user parent isolation', async ({ request }) => {
         // Building a 64-deep chain inherently spans ≥1 create-throttle window
@@ -772,22 +790,28 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
             expect(bGetA.status(), "B GET on A's task → 404").toBe(404);
         }).toPass({ timeout: 60_000 });
 
-        // --- Step 3: B owns a task and (via the PATCH cycle-check-only path)
-        //         dangles it off A's parent id. This does NOT leak A's rows:
-        //         B's `?parentTaskId=aRoot.id` returns ONLY B's own dangling
-        //         child, and A's same query returns ONLY A's own children. The
-        //         filter is always AND-ed with userId. ---
+        // --- Step 3: the `?parentTaskId` filter is ALWAYS AND-ed with the
+        //         caller's userId, so a parent id never leaks another user's
+        //         rows. B owns its OWN root + child (B can't dangle a row off
+        //         A's id any more — the hardened PATCH rejects a foreign parent
+        //         the same way create does, asserted in Step 2's create path).
+        //         We prove: A's real child under aRoot.id is visible to A but
+        //         NOT to B (B's `?parentTaskId=aRoot.id` is empty), and B's own
+        //         child under bRoot.id is visible to B but NOT to A. ---
         // Same throttle-resilient retry for the remaining writes (see Step 2).
-        let bTask!: Task;
+        let bRoot!: Task;
         await expect(async () => {
-            bTask = await createTask(request, tokenB, { title: `B Task ${sfx}` });
+            bRoot = await createTask(request, tokenB, { title: `B Root ${sfx}` });
         }).toPass({ timeout: 90_000 });
+        let bChild!: Task;
         await expect(async () => {
-            const bDangle = await patchTask(request, tokenB, bTask.id, { parentTaskId: aRoot.id });
-            expect(bDangle.status(), "B PATCH dangling off A's id is accepted (200)").toBe(200);
+            bChild = await createTask(request, tokenB, {
+                title: `B Child ${sfx}`,
+                parentTaskId: bRoot.id,
+            });
         }).toPass({ timeout: 90_000 });
 
-        // Give A a real child so both users have exactly one row under aRoot.id.
+        // Give A a real child under aRoot so A has exactly one row there.
         let aChild!: Task;
         await expect(async () => {
             aChild = await createTask(request, tokenA, {
@@ -797,24 +821,43 @@ test.describe('Task hierarchy (deep) — trees, completion rules, delete/cancel,
         }).toPass({ timeout: 90_000 });
 
         // Exact-count isolation assertions retried past any transient throttle
-        // (read-only GETs — retrying re-fetches; the strict `.toBe(1)` and the
+        // (read-only GETs — retrying re-fetches; the strict `.toBe(...)` and the
         // owned-row identity checks are unchanged).
+        // B querying A's parent id sees NOTHING — A's child is filtered out by
+        // the userId AND.
         await expect(async () => {
-            const bView = await listTasks(request, tokenB, `parentTaskId=${aRoot.id}`);
-            expect(bView.meta.total, "B's view of ?parentTaskId=aRoot has only B's own row").toBe(
-                1,
-            );
-            expect(bView.data[0]?.id, "B sees only its own dangling child — never A's").toBe(
-                bTask.id,
-            );
+            const bViewOfA = await listTasks(request, tokenB, `parentTaskId=${aRoot.id}`);
+            expect(
+                bViewOfA.meta.total,
+                "B's view of ?parentTaskId=aRoot is empty — never leaks A's child",
+            ).toBe(0);
         }).toPass({ timeout: 60_000 });
 
+        // A querying its own parent id sees only its own child.
         await expect(async () => {
             const aView = await listTasks(request, tokenA, `parentTaskId=${aRoot.id}`);
             expect(aView.meta.total, "A's view of ?parentTaskId=aRoot has only A's own child").toBe(
                 1,
             );
             expect(aView.data[0]?.id, "A sees only its own real child — never B's").toBe(aChild.id);
+        }).toPass({ timeout: 60_000 });
+
+        // Symmetric direction: A querying B's parent id is empty; B sees only
+        // its own child there.
+        await expect(async () => {
+            const aViewOfB = await listTasks(request, tokenA, `parentTaskId=${bRoot.id}`);
+            expect(
+                aViewOfB.meta.total,
+                "A's view of ?parentTaskId=bRoot is empty — never leaks B's child",
+            ).toBe(0);
+        }).toPass({ timeout: 60_000 });
+
+        await expect(async () => {
+            const bView = await listTasks(request, tokenB, `parentTaskId=${bRoot.id}`);
+            expect(bView.meta.total, "B's view of ?parentTaskId=bRoot has only B's own child").toBe(
+                1,
+            );
+            expect(bView.data[0]?.id, "B sees only its own real child — never A's").toBe(bChild.id);
         }).toPass({ timeout: 60_000 });
     });
 });

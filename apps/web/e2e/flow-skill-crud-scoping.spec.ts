@@ -26,14 +26,20 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       → 201 { id, userId, ownerType, ownerId, slug, title, description,
  *               frontmatter:{name,description,…}, instructionsMd, contentHash,
  *               version:'1.0.0' (default), sourceCatalogSlug:null, … }
- *       · ownerType ∈ {tenant,mission,idea,work,agent}; 'user'/'bogus' → 400 "Invalid ownerType".
- *       · missing ownerId → 400 "ownerId is required."
- *       · missing instructionsMd → 400 "title, description, and instructionsMd are required."
- *       · custom `slug` is stored VERBATIM (case + `_` preserved — NOT re-slugified).
+ *       · ownerType ∈ {tenant,mission,idea,work,agent}; 'user'/'bogus' → 400
+ *         (DTO @IsEnum → "ownerType must be one of the following values").
+ *       · missing ownerId → 400 (DTO @IsUUID → "ownerId must be a UUID").
+ *       · missing instructionsMd → 400 (DTO @IsString/@MaxLength →
+ *         "instructionsMd must be a string").
+ *       · custom `slug` is validated against `^[a-z0-9-]{1,80}$` (DTO @Matches) and,
+ *         when valid, stored VERBATIM (NOT re-derived from the title). Uppercase /
+ *         underscores / other chars in a supplied slug → 400.
  *       · no `slug` → slugifyText(title): NFKD-strip accents/punct, spaces→'-', lowercase.
  *       · title that slugifies to '' (e.g. all-CJK) → 400 "must contain at least one alphanumeric".
  *       · duplicate (ownerType,ownerId,slug) → 409 "A Skill with slug … already exists at …".
- *       · instructionsMd > 64 KB → 400 "instructionsMd exceeds max 64 KB."
+ *       · instructionsMd > 64 KB (65536 bytes) → 400. The DTO @MaxLength(65536) guard
+ *         fires before the service "exceeds max 64 KB" check; the surfaced message is
+ *         the class-validator length message.
  *       · secret-like body (ghp_…/AKIA…/sk-…) → 500 (assertNoSecrets throws a plain Error).
  *   - GET    /api/skills?ownerType=&ownerId=&search=&limit=&offset= → { data, meta:{total,limit,offset} }
  *   - GET    /api/skills/:id   → 200 owner; cross-user → 404; non-UUID → 400 (ParseUUIDPipe).
@@ -49,15 +55,29 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *     and validate per-scope ownerId semantics. The `idea` ownerType is on the
  *     entity lattice but Ideas have NO REST endpoint yet (POST /api/me/ideas →
  *     404), so the scope matrix exercises tenant/mission/work/agent only.
- *   - `ownerId` is NOT FK-validated at create time for any scope — the server
- *     trusts the supplied id. Flows therefore use REAL entity ids (mission/work/
- *     agent) so the scope is meaningful, but never assert a "bad ownerId → 4xx".
+ *   - `ownerId` IS ownership-validated at create time (SkillsService.assertOwnedScope):
+ *     tenant → ownerId must equal the caller's userId; mission/work/agent/idea →
+ *     ownerId must be a REAL entity the caller OWNS. A bad/foreign id → 404
+ *     "Skill target not found." Flows therefore create REAL owned entities first and
+ *     use their ids so the scope is reachable.
  *   - secret-scan rejection surfaces as a raw 500 (not a 400) — asserted truthfully.
  *   - Each mutating flow runs on a FRESH registerUserViaAPI() user (cross-spec
  *     isolation); the seeded storageState user is used ONLY for the UI flow.
  */
 
 const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
+
+/**
+ * Nest's global ValidationPipe (whitelist + forbidNonWhitelisted) surfaces
+ * class-validator failures as `{ message: string[] }`, while domain guards
+ * thrown from the service layer surface as `{ message: string }`. Normalize
+ * both shapes to one string so a single `.toMatch()` works regardless of which
+ * layer rejected the request.
+ */
+function messageText(body: { message?: unknown }): string {
+    const m = body?.message;
+    return Array.isArray(m) ? m.join(' | ') : String(m ?? '');
+}
 
 interface SkillRow {
     id: string;
@@ -122,11 +142,17 @@ test.describe('Skill CRUD + scope/owner validation', () => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const stamp = Date.now().toString(36);
-        const slug = `Keep_This-AS_IS-${stamp}`;
+        // The CreateSkillDto validates `slug` against `^[a-z0-9-]{1,80}$`
+        // (security: a custom slug is NOT permitted to smuggle uppercase /
+        // underscores / other chars). Supply a custom slug that is already
+        // within that charset — the point of this flow is that an EXPLICIT
+        // slug is stored verbatim (NOT re-derived from the title), which is
+        // exactly what a lowercase-hyphen slug distinct from the title proves.
+        const slug = `keep-this-as-is-${stamp}`;
 
-        // Custom slug + explicit version. Slug is stored EXACTLY as supplied —
-        // mixed case and underscores survive (no re-slugify). frontmatter.name
-        // defaults to the slug. version is honoured (not the 1.0.0 default).
+        // Custom slug + explicit version. The supplied slug is stored EXACTLY
+        // as given (no re-slugify from the title). frontmatter.name defaults to
+        // the slug. version is honoured (not the 1.0.0 default).
         const first = await createSkill(request, token, {
             ownerType: 'tenant',
             ownerId: user.user.id,
@@ -257,7 +283,9 @@ test.describe('Skill CRUD + scope/owner validation', () => {
         const token = user.access_token;
         const headers = authedHeaders(token);
 
-        // (a) missing instructionsMd → 400 with the combined required-fields message.
+        // (a) missing instructionsMd → 400. The required-field guard is the DTO
+        // (`@IsString()` / `@MaxLength` on instructionsMd), so the message is the
+        // class-validator array, not a hand-written "… are required" string.
         const noBody = await request.post(`${API_BASE}/api/skills`, {
             headers,
             data: {
@@ -268,9 +296,12 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             },
         });
         expect(noBody.status()).toBe(400);
-        expect((await noBody.json()).message).toMatch(/instructionsMd are required/i);
+        expect(messageText(await noBody.json())).toMatch(/instructionsMd must be a string/i);
 
-        // (b) oversize instructionsMd (> 64 KB) → 400 with the cap message.
+        // (b) oversize instructionsMd (> 64 KB) → 400. The DTO `@MaxLength(65536)`
+        // guard fires BEFORE the service's "exceeds max 64 KB" check ever runs, so
+        // the surfaced message is the class-validator length message (64 KB == 65536
+        // bytes — the same boundary, just enforced one layer earlier).
         const oversize = await request.post(`${API_BASE}/api/skills`, {
             headers,
             data: {
@@ -282,7 +313,9 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             },
         });
         expect(oversize.status()).toBe(400);
-        expect((await oversize.json()).message).toMatch(/exceeds max 64 ?KB/i);
+        expect(messageText(await oversize.json())).toMatch(
+            /instructionsMd must be shorter than or equal to 65536 characters/i,
+        );
 
         // (c) secret-like value in the body → 500. assertNoSecrets throws a plain
         // Error (no HttpException wrap), so this surfaces as Internal server error.
@@ -312,7 +345,11 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             },
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid ownerType/i);
+        // The enum guard is the DTO `@IsEnum(SKILL_OWNER_TYPES)`, whose default
+        // class-validator message is "ownerType must be one of the following values".
+        expect(messageText(await badType.json())).toMatch(
+            /ownerType must be one of the following values/i,
+        );
 
         // (e) missing ownerId → 400.
         const noOwner = await request.post(`${API_BASE}/api/skills`, {
@@ -325,7 +362,9 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             },
         });
         expect(noOwner.status()).toBe(400);
-        expect((await noOwner.json()).message).toMatch(/ownerId is required/i);
+        // ownerId is a required `@IsUUID()` field on the DTO; omitting it fails
+        // the UUID guard ("ownerId must be a UUID") at the ValidationPipe.
+        expect(messageText(await noOwner.json())).toMatch(/ownerId must be a UUID/i);
 
         // (f) malformed :id on the read path → 400 from ParseUUIDPipe (NOT 404).
         const badUuid = await request.get(`${API_BASE}/api/skills/not-a-real-uuid`, { headers });
@@ -628,7 +667,9 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             data: { slug: 'some-skill', ownerType: 'tenant' },
         });
         expect(installNoOwner.status()).toBe(400);
-        expect((await installNoOwner.json()).message).toMatch(/ownerId is required/i);
+        // ownerId is a required `@IsUUID()` field on InstallCatalogSkillDto; the
+        // DTO guard rejects the missing value before any catalog lookup runs.
+        expect(messageText(await installNoOwner.json())).toMatch(/ownerId must be a UUID/i);
 
         const installUnknown = await request.post(`${API_BASE}/api/skills/install`, {
             headers,

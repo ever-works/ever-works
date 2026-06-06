@@ -66,8 +66,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *          sourceType:'built_in',originType:'standard',isDefault }] } (2 rows)
  *   GET  /api/templates/:id/customizations → 200 { status:'success',
  *          customizations:[] } (200 empty even for unknown template id)
- *   GET  /api/templates/customizations/:bogus → 200 { status:'error',
- *          message:'Customization not found' }
+ *   GET  /api/templates/customizations/:id (valid-but-unknown UUID) → 200
+ *          { status:'error', message:'Customization not found' }
+ *        (:id is ParseUUIDPipe-guarded — a non-UUID id 400s "uuid is expected"
+ *         before the handler's soft not-found runs)
  *   GET  /api/templates/:id (no subpath) → 404 (no single-template route)
  *   Cross-user GET/PUT/switch on another user's work → 403
  *        { status:'error', message:'You do not have permission to access this work' }
@@ -555,17 +557,38 @@ test.describe('Flow: template customization ledger + not-found contracts', () =>
         expect(Array.isArray(unknownBody.customizations)).toBe(true);
         expect(unknownBody.customizations.length).toBe(0);
 
-        // --- A bogus single-customization lookup returns a 200 status:'error'
-        // envelope (NOT a thrown 404/500) — the UI relies on this soft
-        // not-found to poll without crashing. ---
+        // --- A single-customization lookup for a well-formed-but-unknown id
+        // returns a 200 status:'error' envelope (NOT a thrown 404/500) — the
+        // UI relies on this soft not-found to poll without crashing. The id
+        // MUST be a syntactically valid UUID: the route guards the param with
+        // a ParseUUIDPipe (security hardening — customization ids are UUIDs),
+        // so a non-UUID string is rejected with a 400 class-validator envelope
+        // BEFORE the handler runs. A valid-format-but-nonexistent UUID is what
+        // exercises the handler's soft not-found path the UI depends on. ---
+        const missingCustomizationId = `00000000-0000-4000-8000-${Date.now()
+            .toString()
+            .padStart(12, '0')
+            .slice(-12)}`;
         const bogus = await request.get(
-            `${API_BASE}/api/templates/customizations/bogus-${Date.now()}`,
+            `${API_BASE}/api/templates/customizations/${missingCustomizationId}`,
             { headers: authedHeaders(user.access_token) },
         );
         expect(bogus.status(), 'soft not-found is 200, never 5xx').toBeLessThan(500);
         const bogusBody = await bogus.json();
         expect(bogusBody.status).toBe('error');
         expect(String(bogusBody.message)).toContain('not found');
+
+        // --- A NON-UUID customization id is rejected up-front by the route's
+        // ParseUUIDPipe (security: ids are UUIDs) — a 400 validation error,
+        // never the soft 200 envelope above. Pins that the format guard runs
+        // before the not-found lookup. ---
+        const malformed = await request.get(
+            `${API_BASE}/api/templates/customizations/not-a-uuid-${Date.now()}`,
+            { headers: authedHeaders(user.access_token) },
+        );
+        expect(malformed.status(), 'non-UUID id rejected by ParseUUIDPipe').toBe(400);
+        const malformedBody = await malformed.json();
+        expect(String(malformedBody.message)).toMatch(/uuid is expected/i);
 
         // --- There is deliberately no bare single-template GET route; only
         // the collection (?kind=) and the per-id subresources exist. A bare

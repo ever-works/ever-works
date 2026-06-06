@@ -40,7 +40,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
 
     beforeEach(() => {
         tasks = {
-            updateById: jest.fn().mockResolvedValue(undefined),
+            casUpdateStatus: jest.fn().mockResolvedValue(true),
             findById: jest.fn(),
         };
         blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };

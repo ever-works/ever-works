@@ -134,7 +134,16 @@ export class TaskTransitionService {
             patch.previousStatus = null;
         }
 
-        await this.tasks.updateById(task.id, patch);
+        // Atomic CAS on the source state: the UPDATE only lands while the row
+        // is still at `from`, so a concurrent identical-transition burst
+        // resolves to exactly ONE winner. The losers (affected=0) raced after
+        // the winner already advanced the status, so they get the same
+        // read-time "Cannot transition" 400 a sequential stale caller would —
+        // never a silent double-write or a 5xx.
+        const won = await this.tasks.casUpdateStatus(task.id, from, patch);
+        if (!won) {
+            throw new BadRequestException(`Cannot transition Task from ${from} to ${to}.`);
+        }
         const refreshed = await this.tasks.findById(task.id);
         if (!refreshed) {
             throw new ConflictException(`Task ${task.id} vanished after transition.`);

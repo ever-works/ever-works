@@ -302,7 +302,12 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
         //                  the digest gate is effectively OFF (no deferral).
         const windows: { start: string; end: string; tz: string }[] = [
             { start: '23:30:00', end: '06:15:00', tz: 'America/New_York' }, // cross-midnight
-            { start: '22:00:00', end: '07:00:00', tz: 'Europe/Kyiv' }, // cross-midnight
+            // The validator's allowlist is the Node runtime's
+            // Intl.supportedValuesOf('timeZone'), whose ICU still exposes the
+            // legacy canonical name `Europe/Kiev` (the newer `Europe/Kyiv` alias
+            // is NOT in that list on the CI Node build, so it 400s — KEEP the
+            // validator, use the name the runtime canonicalizes to).
+            { start: '22:00:00', end: '07:00:00', tz: 'Europe/Kiev' }, // cross-midnight
             { start: '00:00:00', end: '08:00:00', tz: 'Asia/Tokyo' }, // same-day, midnight start
             { start: '12:00:00', end: '14:00:00', tz: 'UTC' }, // same-day midday
             { start: '09:00:00', end: '09:00:00', tz: 'Australia/Sydney' }, // degenerate
@@ -355,7 +360,7 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
         expect(final.preference?.quietHoursEnd ?? null).toBeNull();
     });
 
-    test('per-category digest OPT-OUT via mute — silence EVERY category at once, then selectively re-opt-in; in-app fallback always survives; expired-mute ROW persists through the read', async ({
+    test('per-category digest OPT-OUT via mute — silence every MUTABLE category at once, then selectively re-opt-in; non-mutable event categories are rejected; in-app fallback always survives; expired-mute ROW is filtered from the read', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -364,9 +369,48 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
         // The whole-account digest opt-out = mute every category. Muting drops
         // external channels (silence), but in-app ALWAYS survives for
         // retrospective viewing — the mute is "don't email me", never a data loss.
+        //
+        // HARDENING (KEEP): POST /preferences/mute validates `category` against
+        // the NotificationCategory enum via @IsEnum — the canonical mute
+        // vocabulary (ai_credits, subscription, generation, system, security,
+        // agent, task). The notification EVENT-TYPE registry, however, uses a
+        // partially-overlapping category vocabulary (it carries `integrations`
+        // and `agents` — note the plural — which are NOT enum members). So the
+        // event categories split into two buckets: those that ARE valid mute
+        // targets (muted -> 201) and those that are NOT (rejected -> 400). The
+        // 400 on a non-enum category is the intended whitelist, not a bug — we
+        // prove BOTH halves rather than weakening the validator.
+        const MUTABLE_CATEGORIES = new Set<string>([
+            'ai_credits',
+            'subscription',
+            'generation',
+            'system',
+            'security',
+            'agent',
+            'task',
+        ]);
+
         const events = await getEventTypes(request, token);
-        const categories = [...new Set(events.map((e) => e.category))];
+        const eventCategories = [...new Set(events.map((e) => e.category))];
+        expect(eventCategories.length).toBeGreaterThanOrEqual(3);
+
+        // Bucket the registry's categories by whether the mute enum accepts them.
+        const categories = eventCategories.filter((c) => MUTABLE_CATEGORIES.has(c));
+        const nonMutable = eventCategories.filter((c) => !MUTABLE_CATEGORIES.has(c));
+        // The core registry always contributes at least 3 mutable categories
+        // (ai_credits, generation, system) — enough to opt-out, snooze, unmute,
+        // and leave one untouched.
         expect(categories.length).toBeGreaterThanOrEqual(3);
+
+        // Non-mutable event categories (e.g. `integrations`, `agents`) are
+        // correctly REJECTED by the mute whitelist — assert the hardening holds.
+        for (const category of nonMutable) {
+            const res = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
+                headers: authedHeaders(token),
+                data: { category },
+            });
+            expect(res.status(), `non-enum category ${category} is rejected`).toBe(400);
+        }
 
         for (const category of categories) {
             const res = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
@@ -421,11 +465,13 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
         expect(afterUnmute.has(categories[1]), 'unmuted category gone').toBe(false);
         expect(afterUnmute.has(categories[2]), 'untouched category still opted out').toBe(true);
 
-        // Expired-mute nuance: a PAST mutedUntil writes a row that STILL appears
-        // in the API read (the read returns the row; the resolver's isMuted()
-        // applies expiry at SEND time, not the read layer). Assert tolerantly —
-        // the row's presence/absence is an internal detail, but the write 201s
-        // and never errors.
+        // Expired-mute nuance: a PAST mutedUntil writes a row that the API read
+        // FILTERS OUT — getPreferences() uses repo.findActiveByUser(), whose
+        // WHERE is `mutedUntil IS NULL OR mutedUntil > now`, so an already-expired
+        // mute never surfaces in GET /preferences.mutes (the resolver's expiry is
+        // applied at the read layer here, not only at send time). The write still
+        // 201s and never errors. Assert tolerantly — but since findActiveByUser
+        // filters it, the row should be absent.
         const pastMute = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: authedHeaders(token),
             data: { category: categories[1], mutedUntil: '2020-01-01T00:00:00.000Z' },
@@ -438,6 +484,9 @@ test.describe('Notification digest / batching — quiet-hours deferral, per-cate
             // If surfaced, its timestamp is the past instant we wrote (already
             // expired — the resolver would NOT silence on it).
             expect(new Date(pastRow.mutedUntil!).getTime()).toBeLessThan(Date.now());
+        } else {
+            // Expected path: findActiveByUser filtered the expired row out.
+            expect(pastRow).toBeUndefined();
         }
     });
 

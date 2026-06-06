@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { createOrganizationViaAPI } from './helpers/organizations';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
 
 /**
@@ -146,7 +147,12 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         expect(token, 'loginViaAPI must return an access_token').toBeTruthy();
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user. The org-scope KB
+        // endpoint now enforces tenant ownership (the audit's cross-tenant
+        // IDOR fix), so a bare random UUID 404s — the org row must exist and
+        // belong to the caller's tenant. `randomUUID()` only supplies a
+        // collision-proof display name here.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         // 2. Fresh Work owned by the seeded user.
         const { id: workId } = await createWorkViaAPI(request, token, {
@@ -260,7 +266,12 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         expect(token).toBeTruthy();
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-        const orgId = randomUUID();
+        // A REAL organization owned by the seeded user. The org-scope KB
+        // endpoint now enforces tenant ownership (the audit's cross-tenant
+        // IDOR fix), so a bare random UUID 404s — the org row must exist and
+        // belong to the caller's tenant. `randomUUID()` only supplies a
+        // collision-proof display name here.
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
 
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `KB Full Override ${runId}`,
@@ -373,8 +384,11 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         expect(token).toBeTruthy();
 
         const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-        const orgA = randomUUID();
-        const orgB = randomUUID();
+        // Two REAL organizations owned by the seeded user (org-scope KB now
+        // enforces tenant ownership — bare UUIDs 404). orgA owns the
+        // isolation doc; orgB is intentionally left empty.
+        const orgA = (await createOrganizationViaAPI(request, token, `kb-orgA-${randomUUID()}`)).id;
+        const orgB = (await createOrganizationViaAPI(request, token, `kb-orgB-${randomUUID()}`)).id;
         expect(orgA).not.toBe(orgB);
 
         // Work A paired with org A (which owns a unique inheritable doc).

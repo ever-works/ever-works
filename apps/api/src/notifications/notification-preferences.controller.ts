@@ -22,14 +22,22 @@ import { NotificationCategory } from '@ever-works/agent/entities';
 // by the global ValidationPipe. Valid IANA time zones computed once at startup.
 // `Intl.supportedValuesOf` is available on the Node 22 runtime but not in the
 // project's TS lib typings; cast to access it without widening the lib target.
-const VALID_TIMEZONES = new Set<string>(
-    (Intl as typeof Intl & { supportedValuesOf(key: string): string[] }).supportedValuesOf(
+// `Intl.supportedValuesOf('timeZone')` returns the canonical IANA zone list
+// but OMITS the universally-valid `UTC` / `GMT` aliases (V8 quirk), so add
+// them explicitly — rejecting `UTC` is a correctness bug, not hardening. Both
+// construct cleanly in `Intl.DateTimeFormat`, so there is no RangeError risk.
+const VALID_TIMEZONES = new Set<string>([
+    ...(Intl as typeof Intl & { supportedValuesOf(key: string): string[] }).supportedValuesOf(
         'timeZone',
     ),
-);
+    'UTC',
+    'GMT',
+]);
 
-// Security: HH:mm format — rejects arbitrary strings stored as quiet-hours times
-const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// Security: HH:mm (optionally with :ss) — rejects arbitrary strings stored as
+// quiet-hours times. Seconds are optional because callers commonly send the
+// full `HH:mm:ss` TIME form; both are accepted and stored verbatim.
+const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
 const NOTIFICATION_CATEGORY_VALUES = Object.values(NotificationCategory);
 
 class QuietHoursBody {

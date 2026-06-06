@@ -47,11 +47,15 @@ import {
  *       DIFFERENT type is a DIFFERENT row (uq is the triple) → both 201.
  *
  *   DELETE /api/tasks/:id/assignees/:assigneeId
- *     → 200 { deleted:true } — ALWAYS, even for an unknown / already-deleted
- *       id (the repo `delete(id)` is a by-PK no-op when absent → idempotent).
- *       The :id task is only an ownership gate; the row is deleted by its PK,
- *       so a valid assignee id removed under a DIFFERENT owned task still
- *       returns { deleted:true } and deletes the row. After a remove the same
+ *     → 200 { deleted:true } ONLY when a LIVE row with that PK exists UNDER the
+ *       given :id task. The service `removeForTask(taskId, assigneeId)` deletes
+ *       by the (taskId, id) pair and returns whether a row was affected; the
+ *       service then throws 404 "Assignee <id> not found." when nothing was
+ *       removed. So an unknown / already-deleted id 404s (NOT idempotent-200),
+ *       and the same id removed under a DIFFERENT owned task also 404s and does
+ *       NOT touch the original row (the :id is BOTH an ownership gate AND part
+ *       of the delete key — defense-in-depth IDOR hardening). A second remove of
+ *       the same id therefore 404s too. After a successful remove the same
  *       (type,id) can be re-added → fresh 201 (uq only conflicts with LIVE
  *       rows). Malformed assignee uuid → 400 ParseUUIDPipe.
  *
@@ -335,13 +339,17 @@ test.describe('Task assignees — deep integration', () => {
         const token = owner.access_token;
         const task = await createTaskViaAPI(request, token, { title: 'validation matrix' });
 
-        // Invalid actor type → 400 controller guard (precedes the service).
+        // Invalid actor type → 400. The DTO's `@IsIn(['user','agent'])` runs in
+        // the global ValidationPipe BEFORE the controller's assertActorType
+        // guard, so the message is the class-validator form, not the guard's
+        // "Invalid actor type" string. Assert the 400 + that it names the
+        // offending field / allowed values (message is an array here).
         const badType = await postAssignee(request, token, task.id, {
             assigneeType: 'robot',
             assigneeId: A_UUID,
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toContain('Invalid actor type');
+        expect(JSON.stringify((await badType.json()).message)).toContain('assigneeType');
 
         // Empty assigneeId → 400 "<type> id is required."
         const emptyId = await postAssignee(request, token, task.id, {
@@ -395,7 +403,7 @@ test.describe('Task assignees — deep integration', () => {
         expect(cleanAdd.status(), `clean add after matrix=${await cleanAdd.text()}`).toBe(201);
     });
 
-    test('remove is by-PK and idempotent; ownership-gate only, not a row↔task match', async ({
+    test('remove is task-scoped (taskId,id key) + ownership-gated; miss/cross-task/second-remove all 404', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -409,10 +417,11 @@ test.describe('Task assignees — deep integration', () => {
             assigneeId: A_UUID,
         });
 
-        // Removing an UNKNOWN id (never existed) is a no-op → still 200 deleted.
+        // Removing an UNKNOWN id (never existed) under task A removes nothing →
+        // the service 404s "Assignee <id> not found." (delete is by the
+        // (taskId,id) key; 0 rows affected → NotFound, NOT an idempotent 200).
         const ghost = await deleteAssignee(request, token, taskA.id, C_UUID);
-        expect(ghost.status()).toBe(200);
-        expect(await ghost.json()).toMatchObject({ deleted: true });
+        expect(ghost.status(), `ghost delete=${await ghost.text()}`).toBe(404);
         // A_UUID is still live on task A → duplicate add 500s (ghost delete
         // touched nothing).
         const stillLive = await postAssignee(request, token, taskA.id, {
@@ -421,35 +430,58 @@ test.describe('Task assignees — deep integration', () => {
         });
         expect(stillLive.status(), 'A still live after ghost delete').toBe(500);
 
-        // The :id is only an OWNERSHIP gate; the row is deleted by its PK. So
+        // The :id is BOTH an ownership gate AND part of the delete key
+        // (removeForTask deletes the (taskId,id) pair — IDOR hardening). So
         // removing rowA's id under task B (a DIFFERENT task the caller owns)
-        // returns { deleted:true } AND deletes the row from task A.
+        // matches no row under task B → 404, and leaves rowA on task A intact.
         const crossTaskDelete = await deleteAssignee(request, token, taskB.id, rowA.id);
-        expect(crossTaskDelete.status()).toBe(200);
-        expect(await crossTaskDelete.json()).toMatchObject({ deleted: true });
-        // Proof it really deleted A's row: A_UUID can now be re-added to task A.
+        expect(crossTaskDelete.status(), `cross-task delete=${await crossTaskDelete.text()}`).toBe(
+            404,
+        );
+        // Proof the cross-task delete did NOT touch A's row: A_UUID is still
+        // live on task A, so a duplicate add still 500s.
+        const stillLiveAfterCross = await postAssignee(request, token, taskA.id, {
+            assigneeType: 'user',
+            assigneeId: A_UUID,
+        });
+        expect(
+            stillLiveAfterCross.status(),
+            'A still live after cross-task delete attempt',
+        ).toBe(500);
+
+        // A correct remove (right task + right id) succeeds → 200 { deleted:true }.
+        const goodDelete = await deleteAssignee(request, token, taskA.id, rowA.id);
+        expect(goodDelete.status(), `in-task delete=${await goodDelete.text()}`).toBe(200);
+        expect(await goodDelete.json()).toMatchObject({ deleted: true });
+        // After a successful remove the same (type,id) re-adds cleanly → 201.
         const reAddA = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(reAddA.status(), `re-add after cross-task delete=${await reAddA.text()}`).toBe(201);
+        expect(reAddA.status(), `re-add after delete=${await reAddA.text()}`).toBe(201);
 
-        // Double-remove of the same id is idempotent → 200 both times.
+        // A SECOND remove of an already-deleted id is NOT idempotent: 0 rows
+        // affected → 404. (We delete the fresh re-added row once, then again.)
         const freshRow = await reAddA.json();
         const del1 = await deleteAssignee(request, token, taskA.id, freshRow.id);
         const del2 = await deleteAssignee(request, token, taskA.id, freshRow.id);
-        expect(del1.status()).toBe(200);
-        expect(del2.status()).toBe(200);
-        expect(await del2.json()).toMatchObject({ deleted: true });
+        expect(del1.status(), `first delete=${await del1.text()}`).toBe(200);
+        expect(await del1.json()).toMatchObject({ deleted: true });
+        expect(del2.status(), 'second delete of same id is not idempotent').toBe(404);
 
         // A stranger removing by a valid-but-foreign task id is blocked at the
-        // ownership gate → 404 (the task resolves not-found for them).
+        // ownership gate → 404 (the task resolves not-found for them). Re-add a
+        // row to task A first so the gate (not a missing row) is what blocks.
+        const rowA2 = await addTaskAssignee(request, token, taskA.id, {
+            assigneeType: 'user',
+            assigneeId: B_UUID,
+        });
         const stranger = await registerUserViaAPI(request);
         const strangerRemove = await deleteAssignee(
             request,
             stranger.access_token,
             taskA.id,
-            rowA.id,
+            rowA2.id,
         );
         expect(strangerRemove.status()).toBe(404);
     });

@@ -41,6 +41,17 @@ const SHA256_RE = /^[0-9a-f]{64}$/i;
 // inputs still pass while private-IP / non-TLS hosts are blocked.
 const TEMPLATE_REPO_SLUG_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
 
+// `missionTemplateRepo` ALSO doubles as the template SELECTOR for the seeded
+// catalog: the product's mission-create flow stores the chosen catalog id
+// (e.g. `starter-business` — see `NewPageClient` + `MISSION_TEMPLATES`)
+// directly in this column, and a scaffolder resolves it via
+// `findMissionTemplateConfig()` rather than cloning the raw string. A bare
+// single-segment slug (`[A-Za-z0-9._-]+`, no `/`) therefore must be accepted
+// too. It is SSRF-safe by construction: with no `:`, `/`, `@`, whitespace or
+// backslash it cannot encode a scheme, host, port or credential — the exact
+// vectors the URL branch below guards against.
+const TEMPLATE_REPO_BARE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
+
 /**
  * Input shape for `MissionsService.create`. Mirrors the writable
  * subset of `Mission` minus the FK fields the system owns
@@ -543,6 +554,9 @@ export class MissionsService {
         }
         // Accept the documented GitHub-style `owner/repo` shorthand outright.
         if (TEMPLATE_REPO_SLUG_RE.test(trimmed)) return trimmed;
+        // Accept a bare catalog-id selector (`starter-business`, etc.). Safe:
+        // a single `[A-Za-z0-9._-]+` segment cannot carry an SSRF payload.
+        if (TEMPLATE_REPO_BARE_SLUG_RE.test(trimmed)) return trimmed;
         // Otherwise the only other acceptable shape is a full HTTPS git URL on
         // a public host. Reuse the shared lexical SSRF guard, but additionally
         // require TLS (`isSafeWebhookUrl` allows http:) and reject embedded

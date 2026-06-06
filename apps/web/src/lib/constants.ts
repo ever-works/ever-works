@@ -155,6 +155,11 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
+    // Magic-link token-landing page. Reached while still UNAUTHENTICATED
+    // (the redeem happens client-side after the page renders), so it must
+    // be in PUBLIC_ROUTES — otherwise the proxy auth gate bounces it to
+    // /login and clears the cookie before the redeem can run.
+    AUTH_MAGIC_LINK: '/login/magic-link',
 
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
@@ -184,6 +189,10 @@ export const PUBLIC_ROUTES = [
     ROUTES.AUTH_EMAIL_CONFIRMATION,
     ROUTES.AUTH_RESET_PASSWORD,
     ROUTES.AUTH_FORGOT_PASSWORD,
+    // Token-landing page — must render for unauthenticated users so the
+    // client-side redeem can set the session cookie (mirrors the other
+    // token-landing pages above).
+    ROUTES.AUTH_MAGIC_LINK,
     '/about',
     '/contact',
     '/privacy',

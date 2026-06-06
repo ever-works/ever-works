@@ -176,7 +176,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         const token = owner.access_token;
         const s = stamp();
 
-        const guardrails = { maxWorksPerRun: 3, allowAutoMerge: false, nested: { depth: 2 } };
+        const guardrails = { maxWorksPerRun: 3, requireApprovalBeforeCreate: false };
         const sourceTitle = `Chain Source ${s}`;
         const source = await createMission(request, token, {
             title: sourceTitle,
@@ -314,7 +314,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         const headers = authedHeaders(token);
         const s = stamp();
 
-        const originalGuardrails = { orig: true, maxWorksPerRun: 4 };
+        const originalGuardrails = { requireApprovalBeforeCreate: true, maxWorksPerRun: 4 };
         const source = await createMission(request, token, {
             title: `Isolation Source ${s}`,
             description: `pristine source description ${s}`,
@@ -328,7 +328,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         const forkId = fork.mission.id;
 
         // ── Mutate EVERY writable field on the fork ─────────────────────
-        const mutatedGuardrails = { changed: true, maxWorksPerRun: 99 };
+        const mutatedGuardrails = { dryRunByDefault: true, maxWorksPerRun: 9 };
         const patchFork = await request.patch(`${API_BASE}/api/me/missions/${forkId}`, {
             headers,
             data: {
@@ -369,9 +369,19 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         expect(sourceAfter.sourceMissionId).toBeNull();
 
         // ── Now mutate the SOURCE; the (completed) fork stays frozen ─────
+        // guardrailsOverride is a STRICT typed allowlist (WorkAgentGuardrailsDto):
+        // only the canonical guardrail keys are accepted and any unknown key
+        // (e.g. an arbitrary `sourceTouched`) is rejected 400 by the global
+        // ValidationPipe (forbidNonWhitelisted) — verified live against the API.
+        // Use a REAL allowlisted key that is deliberately DISTINCT from the
+        // fork's guardrails so the isolation intent is preserved: mutating the
+        // source's guardrails must not leak into the (independent) fork.
         const patchSource = await request.patch(`${API_BASE}/api/me/missions/${source.id}`, {
             headers,
-            data: { title: `Source Mutated ${s}`, guardrailsOverride: { sourceTouched: true } },
+            data: {
+                title: `Source Mutated ${s}`,
+                guardrailsOverride: { requireApprovalBeforeDelete: true },
+            },
         });
         expect(patchSource.status()).toBe(200);
 
@@ -406,7 +416,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
             title: `Reverse Source ${s}`,
             description: `source with two forks ${s}`,
             type: 'one-shot',
-            guardrailsOverride: { keep: true },
+            guardrailsOverride: { dryRunByDefault: true },
         });
 
         const forkA = await clone(request, token, source.id, { title: `Fork A ${s}` });
@@ -438,7 +448,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         // Their own data is intact (deleting the source never cascades into
         // the clones — Decision A25: a clone is fully independent).
         expect(forkAAfter.title).toBe(`Fork A ${s}`);
-        expect(forkAAfter.guardrailsOverride).toEqual({ keep: true });
+        expect(forkAAfter.guardrailsOverride).toEqual({ dryRunByDefault: true });
         expect(forkBAfter.title).toBe(`Fork B ${s}`);
         // The backlink is either nulled (Postgres ON DELETE SET NULL) OR
         // left dangling at the deleted id (sqlite CI driver — no FK cascade).
@@ -476,7 +486,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
             title: `Ideas Source ${s}`,
             description: `mission with no linkable ideas ${s}`,
             type: 'one-shot',
-            guardrailsOverride: { g: 1 },
+            guardrailsOverride: { maxItemsPerWork: 1 },
         });
 
         // A standalone user-manual Idea — born missionId=null, status pending.
@@ -577,7 +587,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
             description: `will be paused before cloning ${s}`,
             type: 'one-shot',
             autoBuildWorks: true,
-            guardrailsOverride: { paused: true },
+            guardrailsOverride: { requireApprovalBeforeDelete: true },
         });
         expect(source.status).toBe('active');
 
@@ -594,7 +604,7 @@ test.describe('Mission clone (full fork) — deep integration', () => {
         expect(fork.mission.sourceMissionId).toBe(source.id);
         // Metadata still carried verbatim from a non-active source.
         expect(fork.mission.autoBuildWorks).toBe(true);
-        expect(fork.mission.guardrailsOverride).toEqual({ paused: true });
+        expect(fork.mission.guardrailsOverride).toEqual({ requireApprovalBeforeDelete: true });
 
         // The source is STILL paused — cloning is read-only on the source.
         const sourceAfter = await getMission(request, token, source.id);

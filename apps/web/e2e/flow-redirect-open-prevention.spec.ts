@@ -43,30 +43,33 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   GET .../authorize?redirect_uri=%2Fworks  (valid relative) → 307 /login
  *                                              + Set-Cookie redirect_url=%2Fworks; Path=/;
  *                                                Max-Age=600; HttpOnly; SameSite=lax
- *   GET .../authorize?redirect_uri=https://attacker.example.com/phish (valid absolute, off-allowlist)
- *                                              → 307 /login + Set-Cookie redirect_url=<that url>
+ *   GET .../authorize?redirect_uri=https://attacker.example.com/phish (off-allowlist absolute)
+ *                                              → 307 /auth/error?error=authorize_invalid_redirect_url
+ *                                                (HARD-BLOCKED — no redirect_url cookie minted)
  *   GET /en/api/auth/authorize?redirect_uri=https://x → 307 /api/auth/authorize?redirect_uri=... (locale strip)
  *
  * VERIFIED LIVE (AUTHED — seeded storageState cookie present):
  *   GET .../authorize?redirect_uri=%2Fworks                  → 307 /works   (same-origin, NO token)
  *   GET .../authorize?redirect_uri=http://localhost:3000/works (ALLOWLISTED)
  *                                              → 307 http://localhost:3000/works?sessionToken=<token>
- *   GET .../authorize?redirect_uri=https://attacker.example.com/phish (off-allowlist)
- *                                              → 307 https://attacker.example.com/phish  (NO sessionToken!)
- *   GET .../authorize?redirect_uri=%2F%2Fattacker.example.com (protocol-relative, off-allowlist)
- *                                              → 307 //attacker.example.com  (NO sessionToken — credential safe)
+ *   GET .../authorize?redirect_uri=https://attacker.example.com/phish (off-allowlist absolute)
+ *                                              → 307 /auth/error ... (HARD-BLOCKED, NO sessionToken)
+ *   GET .../authorize?redirect_uri=%2F%2Fattacker.example.com (protocol-relative)
+ *                                              → 307 /auth/error ... (rejected by isValidRedirectUrl,
+ *                                                                      NO sessionToken — credential safe)
  *
- * HONESTY NOTE (the real, narrow contract — not a fictional one):
- *   The authorize route is CREDENTIAL-scoped, not destination-scoped, for
- *   inputs that pass `isValidRedirectUrl`. An absolute or protocol-relative
- *   off-allowlist URL IS issued as the Location for an authenticated user, but
- *   the platform session token is NEVER appended to it — so an attacker can at
- *   most bounce a logged-in user to their own page WITHOUT receiving the
- *   session credential. We therefore assert the TRUE invariant — "sessionToken
- *   never rides a non-allowlisted host" + "dangerous schemes/malformed inputs
- *   hard-block to /auth/error" — and never assert the (false) "external
- *   Location is blocked". The hard block only applies to scheme/shape-invalid
- *   inputs; valid-but-external is gated at the credential layer instead.
+ * HARDENING NOTE (the real contract, post `fix: security` 84fb8ee7):
+ *   The authorize route is now BOTH destination-scoped AND credential-scoped.
+ *   `isRelativeOrAllowedRedirectHost` (in the route handler) HARD-BLOCKS any
+ *   absolute http(s) target whose host is not in ALLOWED_REDIRECT_URLS to
+ *   /auth/error — it is never echoed as the Location and never stashed in the
+ *   redirect cookie. Protocol-relative (`//host`) and backslash targets are
+ *   rejected even earlier by `isValidRedirectUrl`. The only absolute targets
+ *   that survive to addSessionTokenToUrl are allow-listed hosts, and the session
+ *   token is only ever appended for those — so the credential can NEVER ride a
+ *   non-allowlisted host. We therefore assert: (1) dangerous schemes/malformed
+ *   inputs AND off-allowlist absolute hosts hard-block to /auth/error with no
+ *   cookie minted, and (2) the sessionToken never rides a non-allowlisted host.
  */
 
 const AUTHORIZE = '/api/auth/authorize';
@@ -197,13 +200,23 @@ test.describe('flow: /api/auth/authorize dangerous-scheme + malformed allow-list
 
 test.describe('flow: redirect_url cookie integrity for VALID targets (unauth → /login)', () => {
     /**
-     * A target that PASSES isValidRedirectUrl (a relative path, OR a valid
-     * absolute http(s) URL even off-allowlist) is NOT a hard block — instead the
-     * route stashes it verbatim in the `redirect_url` cookie and sends the
-     * unauth user to the FIXED same-origin /login path. The open-redirect
-     * defence at THIS step is that the Location is always /login (never the raw
-     * target), and the stash cookie is hardened (HttpOnly, scoped, short TTL) so
-     * page JS can't read or widen it. No existing spec asserts this cookie.
+     * A target that PASSES the authorize gate (a RELATIVE path, OR an absolute
+     * http(s) URL whose host is in ALLOWED_REDIRECT_URLS) is NOT a hard block —
+     * instead the route stashes it verbatim in the `redirect_url` cookie and
+     * sends the unauth user to the FIXED same-origin /login path. The
+     * open-redirect defence at THIS step is that the Location is always /login
+     * (never the raw target), and the stash cookie is hardened (HttpOnly,
+     * scoped, short TTL) so page JS can't read or widen it.
+     *
+     * HARDENING NOTE (verified against the route handler, not a fictional
+     * contract): the authorize route adds a DESTINATION-scoped gate on top of
+     * isValidRedirectUrl — `isRelativeOrAllowedRedirectHost` (apps/web/src/app/
+     * api/auth/authorize/route.ts). An absolute http(s) URL is only honoured if
+     * its host is in ALLOWED_REDIRECT_URLS (default `localhost,127.0.0.1`); an
+     * off-allowlist absolute host (even though syntactically valid) is now
+     * HARD-BLOCKED to /auth/error and NEVER stashed in the redirect cookie. So
+     * the "valid target" path this block exercises is the relative one; the
+     * off-allowlist absolute case is asserted as a hard block below.
      */
     test('a valid RELATIVE target lands on same-origin /login and is stashed in a hardened cookie', async ({
         browser,
@@ -249,17 +262,21 @@ test.describe('flow: redirect_url cookie integrity for VALID targets (unauth →
         }
     });
 
-    test('a VALID-but-EXTERNAL absolute target is deferred to /login, never used as the Location (unauth)', async ({
+    test('an OFF-ALLOWLIST absolute target is hard-blocked to /auth/error, never used as the Location nor stashed (unauth)', async ({
         browser,
         baseURL,
     }) => {
         const base = webOrigin(baseURL);
-        // https://attacker.example.com/phish passes isValidRedirectUrl (it IS a
-        // well-formed http URL), so it is NOT hard-blocked — but the unauth
-        // Location must still be the same-origin /login, never the attacker URL.
-        // Use a fresh cookie-less context: the authed-project `request` fixture
-        // inherits the seeded auth cookie, which would make the route bounce an
-        // *authenticated* caller straight to the (token-less) target instead.
+        // https://attacker.example.com/phish is syntactically valid (passes
+        // isValidRedirectUrl) but its host is NOT in ALLOWED_REDIRECT_URLS, so the
+        // route's destination-scoped gate (isRelativeOrAllowedRedirectHost)
+        // HARD-BLOCKS it to the same-origin /auth/error gate — the strongest
+        // open-redirect defence: the attacker host is never echoed as the
+        // Location AND never stashed in the redirect cookie. Use a fresh
+        // cookie-less context: the authed-project `request` fixture inherits the
+        // seeded auth cookie, but the hard block fires BEFORE the auth check so it
+        // is identical either way; the anon context keeps this purely the
+        // gate-level contract.
         const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         try {
             const res = await authorizeAnon(
@@ -267,20 +284,23 @@ test.describe('flow: redirect_url cookie integrity for VALID targets (unauth →
                 base,
                 encodeURIComponent('https://attacker.example.com/phish'),
             );
-            expect(res.status(), 'valid external target (unauth) → 307').toBe(307);
+            // Same-origin 3xx to the auth-error gate, never a 5xx.
+            expect(res.status(), 'off-allowlist external target → 3xx').toBeGreaterThanOrEqual(300);
+            expect(res.status(), 'off-allowlist external target → 3xx').toBeLessThan(400);
             const location = res.headers()['location'] || '';
+            // The Location is the same-origin /auth/error gate — never the attacker host.
+            expect(location, 'off-allowlist target routed to the auth-error gate').toContain(
+                AUTH_ERROR_MARKER,
+            );
             expect(location, 'unauth user is NOT bounced to the external host').not.toMatch(
                 /attacker\.example\.com/i,
             );
-            expect(location, 'unauth user parks at same-origin /login').toMatch(/\/login$/);
-            // The external target is stashed (it is "valid"); the post-login consumer
-            // re-validates + the credential gate (next flow) prevents token leak.
-            const stashed = decodeURIComponent(
-                cookieValue(res.headers()['set-cookie'], 'redirect_url') || '',
-            );
-            expect(stashed, 'external target is stashed verbatim for later re-validation').toBe(
-                'https://attacker.example.com/phish',
-            );
+            // The defining invariant for a HARD block: NO redirect_url cookie is
+            // minted for an off-allowlist (open-redirect) target.
+            expect(
+                cookieValue(res.headers()['set-cookie'], 'redirect_url'),
+                'off-allowlist target must NOT be stashed in the redirect cookie',
+            ).toBeUndefined();
         } finally {
             await anon.close();
         }
@@ -290,12 +310,16 @@ test.describe('flow: redirect_url cookie integrity for VALID targets (unauth →
 test.describe('flow: authenticated credential (sessionToken) allow-list gate', () => {
     /**
      * For an AUTHENTICATED user the authorize route redirects straight to the
-     * (valid) target and — for allow-listed hosts ONLY — appends the platform
-     * session token via addSessionTokenToUrl. The security invariant, verified
-     * live, is CREDENTIAL-scoped: the session token must NEVER ride a
-     * non-allowlisted host (external or protocol-relative). We use the ambient
-     * seeded storageState cookie (this file runs in the authed project) by
-     * driving the route through the authenticated `page`.
+     * (valid, allow-listed) target and — for allow-listed hosts ONLY — appends
+     * the platform session token via addSessionTokenToUrl. The security
+     * invariant is two-layered and conservative: (a) an off-allowlist absolute
+     * host is HARD-BLOCKED at the destination gate (Location → /auth/error), and
+     * (b) even if a target reaches addSessionTokenToUrl, the session token is
+     * only ever appended for an allow-listed host — so the credential can NEVER
+     * ride a non-allowlisted host. We assert the load-bearing invariant: the
+     * session token (and any auth credential) is absent for any off-allowlist
+     * target. We use the ambient seeded storageState cookie (this file runs in
+     * the authed project) by driving the route through the authenticated `page`.
      */
     async function authorizeAuthedLocation(page: Page, base: string, rawRedirectQuery: string) {
         // Use the PAGE's request context: it carries the page's cookies (the
@@ -335,8 +359,10 @@ test.describe('flow: authenticated credential (sessionToken) allow-list gate', (
             });
         }
 
-        // 2) Off-allowlist external host. Whatever the Location, the credential
-        // (sessionToken) must NEVER be appended — that is the real invariant.
+        // 2) Off-allowlist external host. The destination gate hard-blocks it to
+        // /auth/error, but the load-bearing invariant we assert is host-agnostic:
+        // whatever the Location, the credential (sessionToken) must NEVER be
+        // appended for an off-allowlist host — that is the real invariant.
         const external = await authorizeAuthedLocation(
             page,
             base,
@@ -357,10 +383,11 @@ test.describe('flow: authenticated credential (sessionToken) allow-list gate', (
         baseURL,
     }) => {
         const base = webOrigin(baseURL);
-        // `//attacker.example.com` passes isValidRedirectUrl as a relative path
-        // (starts with `/`), and a browser would resolve it to https://attacker...
-        // The Location MAY be the protocol-relative value, but the credential gate
-        // keeps the session token off it — that is the verified, narrow contract.
+        // `//attacker.example.com` is REJECTED by isValidRedirectUrl (it
+        // explicitly bars protocol-relative `//` targets, which browsers resolve
+        // to an external host), so the route hard-blocks it to /auth/error. Either
+        // way the load-bearing invariant holds: the session token is never
+        // appended to a protocol-relative off-allowlist target.
         const loc = await authorizeAuthedLocation(
             page,
             base,
@@ -372,7 +399,7 @@ test.describe('flow: authenticated credential (sessionToken) allow-list gate', (
         ).toBe(false);
         test.info().annotations.push({
             type: 'note',
-            description: `protocol-relative target Location was "${loc}" — credential-gated (no token), host-deferral not applied at this layer`,
+            description: `protocol-relative target Location was "${loc}" — rejected by isValidRedirectUrl + credential gate (no token ever appended)`,
         });
     });
 });

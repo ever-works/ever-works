@@ -574,7 +574,7 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
     test('the /ideas catalog reflects the lifecycle: a queued Idea shows by default, an accepted Idea only with the "Show accepted" toggle', async ({
         page,
         request,
-    }, testInfo) => {
+    }) => {
         // Use the seeded user — its storageState is the browser session's
         // identity, so Ideas created under it are the rows /ideas renders.
         const token = await seededToken(request);
@@ -616,35 +616,31 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
         // The QUEUED Idea is in ACTIONABLE_STATUSES → visible immediately.
         await expect(page.getByText(queuedDesc).first()).toBeVisible({ timeout: 30_000 });
 
-        // The ACCEPTED (terminal) Idea is hidden by default.
+        // The ACCEPTED (terminal) Idea is hidden under the default
+        // `actionable` Status filter (accepted ∉ ACTIONABLE_STATUSES).
         await expect(page.getByText(acceptedDesc).first()).toHaveCount(0);
 
-        // Flip the "Show accepted" toggle (label text from i18n
-        // dashboard.ideasPage.toggles.showAccepted = "Show accepted").
-        // Retry-to-click guards against the dev hydration race where the
-        // first click pre-hydration is swallowed.
-        const showAccepted = page.getByText('Show accepted', { exact: false }).first();
-        await expect(showAccepted).toBeVisible({ timeout: 30_000 });
-        await expect(async () => {
-            await showAccepted.click();
-            await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 5_000 });
-        }).toPass({ timeout: 30_000 });
+        // Reveal accepted Ideas via the real filter surface: the page is
+        // server-filtered through a Status <select> (`name="status"`) +
+        // an "Apply" submit, which navigates to `/ideas?status=<value>`.
+        // (There is no client-side "Show accepted" toggle — selecting the
+        // "Accepted" option and applying is how the catalog surfaces them.)
+        const statusSelect = page.locator('select[name="status"]');
+        await expect(statusSelect).toBeVisible({ timeout: 30_000 });
+        await statusSelect.selectOption({ label: 'Accepted' });
+        await page.getByRole('button', { name: 'Apply' }).click();
 
-        // Best-effort: the "Done" filter chip narrows to accepted-with-Work
-        // Ideas. Some next-dev route/render divergence can hide chips locally;
-        // guard with a presence check and annotate rather than hard-fail.
-        const doneChip = page.getByRole('button', { name: /Done/i }).first();
-        if (await doneChip.count()) {
-            await expect(async () => {
-                await doneChip.click();
-                await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 5_000 });
-            }).toPass({ timeout: 20_000 });
-        } else {
-            testInfo.annotations.push({
-                type: 'note',
-                description:
-                    'Done filter chip not rendered in this environment; skipped chip assertion.',
-            });
-        }
+        // The Apply submit reloads the route under the accepted filter.
+        await page.waitForURL(/[?&]status=accepted\b/, { timeout: 30_000 });
+        await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
+
+        // The "Done" filter (status=done → accepted-with-Work) is the same
+        // server-filter surface. Re-select it and apply; the accepted Idea
+        // (backed by a real Work) stays visible.
+        await expect(statusSelect).toBeVisible({ timeout: 30_000 });
+        await statusSelect.selectOption({ label: 'Done' });
+        await page.getByRole('button', { name: 'Apply' }).click();
+        await page.waitForURL(/[?&]status=done\b/, { timeout: 30_000 });
+        await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
     });
 });

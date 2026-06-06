@@ -31,11 +31,15 @@ import { createAgentViaAPI } from './helpers/agents-tasks';
  *   - POST /api/skills/:id/bindings { targetType, targetId?, priority?, injectIntoAgent? }
  *       → 201 binding row. targetType ∈ agent|work|mission|idea|tenant.
  *       * non-tenant targetType WITHOUT targetId → 400 "targetId is required when targetType=<t>."
- *       * unknown targetType → 400 'Invalid targetType "<t>".'
+ *       * unknown targetType → 400 (class-validator enum guard:
+ *         "targetType must be one of the following values: …").
  *       * an IDENTICAL (skill+targetType+targetId) binding → 500 (uq_skill_binding).
- *       * NO targetId-ownership check: a user may bind their own skill to a
- *         FOREIGN work/agent id and get 201 — but the resolver is userId-scoped,
- *         so it NEVER surfaces onto the other user's agent.
+ *       * targetId OWNERSHIP IS ENFORCED (hardened): a non-tenant targetId must
+ *         be a REAL entity the caller owns — SkillsService.createBinding runs
+ *         assertOwnedScope(userId, targetType, targetId). Binding onto a FOREIGN
+ *         (another tenant's) work/agent id → 404 "Skill target not found." The
+ *         userId-scoped resolver is the second line of defense; the ownership
+ *         check at write time is the first.
  *   - GET /api/agents/:id/skills → { data:[{ bindingId, priority, targetType,
  *       skill:{id,slug,title,version} }] } — userId-scoped, priority ASC,
  *       deduped by skillId (highest-priority binding wins), injectIntoAgent:false
@@ -361,19 +365,20 @@ test.describe('Skill binding — permission gate, scope rules, cross-tenant isol
     });
 
     /**
-     * Flow 4 — cross-tenant skill binding is forbidden, and the userId-scoped
-     * resolver is the REAL isolation boundary. Alice owns a work + work-agent +
-     * skill. Bob (a separate tenant):
+     * Flow 4 — cross-tenant skill binding is forbidden at BOTH the write-time
+     * ownership check AND the userId-scoped resolver. Alice owns a work +
+     * work-agent + skill. Bob (a separate tenant):
      *   (a) cannot read Alice's skill (404, no existence leak),
      *   (b) cannot bind a target onto Alice's skill (404),
      *   (c) cannot read Alice's agent's resolved skills (404),
      *   (d) cannot delete one of Alice's bindings (404).
-     * BUT Bob CAN bind HIS OWN skill to Alice's FOREIGN work id / agent id and get
-     * a 201 — the API does not validate targetId ownership. That binding is inert:
-     * because resolveActive filters by userId, it NEVER surfaces onto Alice's
-     * agent. Alice's resolved set is unchanged throughout.
+     * Bob ALSO cannot bind HIS OWN skill to Alice's FOREIGN work id / agent id:
+     * SkillsService.createBinding now runs assertOwnedScope on the targetId, so a
+     * foreign work/agent target → 404 "Skill target not found." (the hardened
+     * posture — the older build accepted such writes and relied solely on the
+     * resolver to keep them inert). Alice's resolved set is unchanged throughout.
      */
-    test('cross-tenant: binding ONTO another tenant’s skill 404s, and a foreign-target binding never resolves across tenants', async ({
+    test('cross-tenant: binding ONTO another tenant’s skill 404s, and a foreign-target binding is rejected at write time', async ({
         request,
     }) => {
         const alice = await registerUserViaAPI(request);
@@ -437,48 +442,52 @@ test.describe('Skill binding — permission gate, scope rules, cross-tenant isol
         );
         expect(bobDelete.status()).toBe(404);
 
-        // Bob CAN bind his OWN skill to Alice's FOREIGN work id AND agent id — the
-        // API performs no targetId-ownership check, so both 201.
+        // Bob CANNOT bind his OWN skill to Alice's FOREIGN work id NOR agent id —
+        // SkillsService.createBinding runs assertOwnedScope(userId, targetType,
+        // targetId), and Bob owns neither Alice's work nor her agent, so both
+        // writes 404 "Skill target not found." (the write-time ownership guard).
         const bobSkill = await createSkill(request, bobToken, {
             ownerType: 'tenant',
             ownerId: bob.user.id,
             title: `Bob Skill ${s}`,
         });
-        const bobToAliceWork = await bindSkill(request, bobToken, bobSkill.id, {
-            targetType: 'work',
-            targetId: workId,
-            priority: 1,
-        });
-        const bobToAliceAgent = await bindSkill(request, bobToken, bobSkill.id, {
-            targetType: 'agent',
-            targetId: aliceAgent.id,
-            priority: 1,
-        });
-        expect(bobToAliceWork.id).toBeTruthy();
-        expect(bobToAliceAgent.id).toBeTruthy();
+        const bobToAliceWork = await request.post(
+            `${API_BASE}/api/skills/${bobSkill.id}/bindings`,
+            {
+                headers: authedHeaders(bobToken),
+                data: { targetType: 'work', targetId: workId, priority: 1 },
+            },
+        );
+        expect(bobToAliceWork.status()).toBe(404);
+        expect((await bobToAliceWork.json()).message).toMatch(/skill target not found/i);
 
-        // …yet those bindings are inert across the tenant boundary: Alice's agent
-        // still resolves ONLY her own skill (the resolver filters by userId).
+        const bobToAliceAgent = await request.post(
+            `${API_BASE}/api/skills/${bobSkill.id}/bindings`,
+            {
+                headers: authedHeaders(bobToken),
+                data: { targetType: 'agent', targetId: aliceAgent.id, priority: 1 },
+            },
+        );
+        expect(bobToAliceAgent.status()).toBe(404);
+        expect((await bobToAliceAgent.json()).message).toMatch(/skill target not found/i);
+
+        // The rejected writes left no rows: Alice's agent still resolves ONLY her
+        // own skill, and Bob's skill has ZERO bindings.
         const aliceResolvedAfter = await listAgentSkills(request, aliceToken, aliceAgent.id);
         expect(aliceResolvedAfter.map((r) => r.skill.id)).toEqual([aliceSkill.id]);
         expect(aliceResolvedAfter.map((r) => r.skill.id)).not.toContain(bobSkill.id);
 
-        // Bob's foreign-target binding is also invisible to Bob via the agent
-        // resolve path (he can't read Alice's agent at all) — but his own skill's
-        // bindings list confirms the rows persisted under his ownership.
         const bobBindings = await (
             await request.get(`${API_BASE}/api/skills/${bobSkill.id}/bindings`, {
                 headers: authedHeaders(bobToken),
             })
         ).json();
-        expect(bobBindings.map((b: { id: string }) => b.id).sort()).toEqual(
-            [bobToAliceWork.id, bobToAliceAgent.id].sort(),
-        );
+        expect(bobBindings).toEqual([]);
 
         test.info().annotations.push({
             type: 'note',
             description:
-                'The API does not validate that a binding targetId belongs to the caller; the userId-scoped resolveActive query is the enforced isolation boundary, so a cross-tenant foreign-target binding is created (201) but never surfaces onto the other tenant’s agent.',
+                'Hardened: SkillsService.createBinding enforces targetId ownership via assertOwnedScope, so a cross-tenant foreign-target binding is rejected at write time with 404 "Skill target not found." The userId-scoped resolveActive query remains the second line of defense.',
         });
     });
 
@@ -518,13 +527,17 @@ test.describe('Skill binding — permission gate, scope rules, cross-tenant isol
             /targetId is required when targetType=work/i,
         );
 
-        // Unknown targetType → 400.
+        // Unknown targetType → 400. The DTO enforces the enum via
+        // class-validator (@IsEnum on SKILL_BINDING_TARGET_TYPES), so the
+        // rejection message is the standard "must be one of the following
+        // values" list, not a hand-rolled 'Invalid targetType' string.
         const badType = await request.post(`${API_BASE}/api/skills/${skill.id}/bindings`, {
             headers: authedHeaders(token),
             data: { targetType: 'bogus', targetId: agent.id },
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid targetType/i);
+        const badTypeMsg = JSON.stringify((await badType.json()).message);
+        expect(badTypeMsg).toMatch(/targetType must be one of the following values/i);
 
         // A valid work binding succeeds…
         const wb = await bindSkill(request, token, skill.id, {

@@ -164,8 +164,12 @@ function ingestPayload(workId: string, overrides: IngestOverrides = {}): Record<
     return body;
 }
 
-/** POST an ingest event with a given bearer (defaults to the platform token). */
-async function ingest(
+/**
+ * POST an ingest event with a given bearer (defaults to the platform token).
+ * RAW: returns whatever the endpoint says, INCLUDING a 429 — used only by the
+ * rate-limit burst test, which must OBSERVE throttling rather than ride it out.
+ */
+async function ingestRaw(
     request: APIRequestContext,
     body: Record<string, unknown>,
     bearer: string | null = PLATFORM_API_SECRET_TOKEN,
@@ -177,36 +181,106 @@ async function ingest(
 }
 
 /**
- * Ingest with the platform token, transparently riding out the Redis-backed
- * throttler that is SHARED across the whole CI shard. A single local run rarely
- * trips it, but in CI a sibling burst (or this file's own rate-limit spec) can
- * already have saturated the `short` 50/1s tier, so a cold first ingest comes
- * back 429 `ThrottlerException: Too Many Requests`. When a test genuinely needs
- * the row to LAND (so later list/detail/feed reads can find it) a bare 202
- * assertion is wrong — we must wait for the window to drain and retry. We honour
- * the `X-RateLimit-Reset-short` header (seconds-until-reset, emitted by the
- * throttler) when present and otherwise fall back to a capped exponential delay,
- * then return the final response so the caller still asserts on it normally.
+ * The ingest route is hardened with a strict per-IP throttle
+ * (`@Throttle({ long: { limit: 60, ttl: 60_000 } })` on top of the global
+ * `short` 50/1s and `medium` 300/10s tiers — see
+ * apps/api/src/activity-log/activity-log.controller.ts and
+ * apps/api/src/config/throttler.config.ts). The `ThrottlerGuard` runs BEFORE
+ * the PlatformSecretGuard AND before the validation pipe, so once the per-IP
+ * window is saturated EVERY ingest call returns 429 — masking the 202 / 400 /
+ * 401 a test actually wants to assert. (Probed live: a saturated window turns
+ * a no-bearer 401, a bad-DTO 400, and a valid 202 all into 429.)
+ *
+ * In CI the ENTIRE shard shares one source IP and runs serially, and this very
+ * file fires ~150+ ingest POSTs (the rate-limit burst alone sends 120), so the
+ * 60/60s `long` bucket is routinely exhausted across tests. We KEEP the
+ * throttle (it is intentional hardening) and instead make the test resilient:
+ * `ingest()` transparently rides out a 429 by waiting for the binding window to
+ * drain, then retries, so the caller still asserts on the TRUE terminal status.
+ *
+ * The throttler emits seconds-until-reset per tier; when the `long` tier is the
+ * one biting, the reset surfaces as `Retry-After-long` (and the per-tier
+ * `X-RateLimit-Reset-*` headers otherwise). We wait on the LARGEST advertised
+ * reset (so a `long`-tier 429 isn't under-waited the way a short-only backoff
+ * would be), capped just over one `long` window, and retry. A single test's own
+ * ingest count is < 60, so one full-window drain is always enough — and one
+ * ~60s wait still fits comfortably inside the 90s per-test timeout.
  */
-async function ingestRideThrottle(
-    request: APIRequestContext,
-    body: Record<string, unknown>,
-    maxAttempts = 8,
+function resetSecondsFromHeaders(headers: Record<string, string>): number {
+    // Playwright lower-cases header names. Honour every reset/Retry-After the
+    // throttler might emit and wait on the longest, padding a little. When the
+    // `long` (60/60s) tier is the limiter the reset arrives as `retry-after-long`
+    // (~59s); short/medium expose `x-ratelimit-reset-*`.
+    const candidates = [
+        'retry-after-long',
+        'retry-after-medium',
+        'retry-after-short',
+        'x-ratelimit-reset-long',
+        'x-ratelimit-reset-medium',
+        'x-ratelimit-reset-short',
+    ];
+    let max = 0;
+    for (const key of candidates) {
+        const v = Number(headers[key]);
+        if (Number.isFinite(v) && v > max) max = v;
+    }
+    return max;
+}
+
+/**
+ * Re-run `send()` until it stops returning 429, draining the per-IP throttle
+ * window between attempts. Returns the first non-429 response (or the last 429
+ * if we run out of attempts). Used to wrap ANY ingest POST whose TRUE terminal
+ * status (202 / 400 / 401) a test needs to assert.
+ */
+async function rideThrottle(
+    send: () => Promise<Awaited<ReturnType<APIRequestContext['post']>>>,
+    maxAttempts = 12,
 ) {
-    let res = await ingest(request, body);
+    let res = await send();
     for (let attempt = 1; res.status() === 429 && attempt < maxAttempts; attempt++) {
-        const resetSec = Number(res.headers()['x-ratelimit-reset-short']);
-        // Header is seconds-to-reset; pad a little. Fall back to capped backoff
-        // (1s, 1.5s, 2s, …) when the header is absent or unparseable.
+        const resetSec = resetSecondsFromHeaders(res.headers());
+        // `resetSec` is seconds-until-reset; pad ~1s and cap just past one full
+        // `long` window. Fall back to a capped backoff when no header is present.
         const waitMs =
-            Number.isFinite(resetSec) && resetSec > 0
-                ? Math.min(resetSec * 1000 + 250, 5_000)
-                : Math.min(750 + attempt * 500, 5_000);
+            resetSec > 0
+                ? Math.min(resetSec * 1000 + 1_000, 62_000)
+                : Math.min(1_000 + attempt * 750, 5_000);
         await new Promise((r) => setTimeout(r, waitMs));
-        res = await ingest(request, body);
+        res = await send();
     }
     return res;
 }
+
+/** Throttle-resilient ingest with the standard Bearer header (or none). */
+async function ingest(
+    request: APIRequestContext,
+    body: Record<string, unknown>,
+    bearer: string | null = PLATFORM_API_SECRET_TOKEN,
+) {
+    return rideThrottle(() => ingestRaw(request, body, bearer));
+}
+
+/**
+ * Throttle-resilient ingest with arbitrary headers (e.g. a non-Bearer
+ * `Authorization: Basic …` scheme that the guard must still reject as
+ * "missing"). Rides out a 429 so the test asserts the TRUE guard verdict.
+ */
+async function ingestWithHeaders(
+    request: APIRequestContext,
+    body: Record<string, unknown>,
+    headers: Record<string, string>,
+) {
+    return rideThrottle(() => request.post(INGEST_PATH, { headers, data: body }));
+}
+
+/**
+ * Back-compat alias: the resilient `ingest()` IS the ride-out-the-throttle
+ * variant now, so the read-surface test that previously needed a special helper
+ * just calls `ingest()`. Kept as a named alias for clarity at the one call site
+ * that documents the "must LAND" intent.
+ */
+const ingestRideThrottle = ingest;
 
 /** Create a Work and flip it to push mode; returns the Work id. */
 async function createPushWork(
@@ -237,6 +311,18 @@ function messagesOf(body: unknown): string[] {
     if (typeof m === 'string') return [m];
     return [];
 }
+
+// The ingest route's intentional per-IP throttle (`long` 60/60s, on top of the
+// global short 50/1s / medium 300/10s tiers) is SHARED across the whole serial
+// CI shard and runs BEFORE the guard/validation, so a test may need to ride out
+// up to one full ~60s `long` window (see the `rideThrottle` rationale above)
+// before its ingest reaches its true 202/400/401. That single drain plus the
+// test's own setup/polling can exceed the 90s default, so raise the per-test
+// budget for this throttle-heavy file. (We accommodate the hardening, never
+// weaken it.)
+test.beforeEach(() => {
+    test.setTimeout(180_000);
+});
 
 test.describe('Platform ingest — DTO validation matrix (exact class-validator messages)', () => {
     test('every required field rejects with its real i18n message, independent of the mode gate', async ({
@@ -398,9 +484,8 @@ test.describe('Platform ingest — PlatformSecretGuard isolation (@Public, beare
         );
 
         // A non-Bearer Authorization scheme is also rejected as "missing".
-        const basic = await request.post(INGEST_PATH, {
-            headers: { Authorization: 'Basic ' + Buffer.from('x:y').toString('base64') },
-            data: payload,
+        const basic = await ingestWithHeaders(request, payload, {
+            Authorization: 'Basic ' + Buffer.from('x:y').toString('base64'),
         });
         expect(basic.status()).toBe(401);
         expect(((await basic.json()) as { message?: string }).message).toBe('Missing Bearer token');
@@ -450,23 +535,24 @@ test.describe('Platform ingest — PlatformSecretGuard isolation (@Public, beare
         // only the platform bearer (exactly how a deployed directory site calls it).
         const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         try {
+            // The anon context shares the same source IP, so the same per-IP
+            // throttle window applies — ride it out so we assert the guard's
+            // verdict, not a 429 from this file's accumulated ingest traffic.
             const eventId = uuid();
-            const res = await anon.request.post(INGEST_PATH, {
-                headers: { Authorization: `Bearer ${PLATFORM_API_SECRET_TOKEN}` },
-                data: ingestPayload(workId, {
+            const res = await ingest(
+                anon.request,
+                ingestPayload(workId, {
                     eventId,
                     actionType: 'website_report_filed',
                     summary: 'anon-context ingest',
                 }),
-            });
+            );
             expect(res.status(), `anon ingest body=${await res.text().catch(() => '')}`).toBe(202);
             const { id } = await res.json();
             expect(id).toBeTruthy();
 
             // Same anon context, missing bearer → 401 (the guard is the ONLY gate).
-            const noToken = await anon.request.post(INGEST_PATH, {
-                data: ingestPayload(workId),
-            });
+            const noToken = await ingest(anon.request, ingestPayload(workId), null);
             expect(noToken.status()).toBe(401);
         } finally {
             await anon.close();
@@ -705,15 +791,37 @@ test.describe('Platform ingest — rate limit (sustained burst eventually 429s)'
         const owner = await registerUserViaAPI(request);
         const workId = await createPushWork(request, owner.access_token, 'IngestRate');
 
+        // This file fires ~150+ ingest POSTs before this test, all from the
+        // single CI IP, so the per-IP `long` 60/60s window is very likely
+        // already saturated on entry. A bare burst from a saturated window is
+        // ALL 429 (accepted=0), which can't prove "throttling kicks in AFTER
+        // accepted events". So first ride the resilient `ingest()` once: it
+        // waits out the current window and returns a real 202, guaranteeing the
+        // burst below starts against a freshly-drained window with real
+        // headroom. (We KEEP the throttle; we just stop fighting our own prior
+        // traffic.)
+        const warmup = await ingest(
+            request,
+            ingestPayload(workId, {
+                actionType: 'website_user_registered',
+                summary: 'rate-limit warmup (drain to a fresh window)',
+            }),
+        );
+        expect(
+            warmup.status(),
+            `rate-limit warmup body=${await warmup.text().catch(() => '')}`,
+        ).toBe(202);
+
         // Fire a sustained burst of DISTINCT valid events as fast as the test
         // runner will go. The throttler caps per-IP throughput, so after some
         // accepted 202s the endpoint starts returning 429. The exact threshold
         // is env-shaped (global `short` 50/1s vs medium/long vs the route's
         // 60/min), so we assert the OBSERVABLE contract, not a magic number.
+        // RAW ingest here (no ride-out) — this test must OBSERVE the 429s.
         const BURST = 120;
         const statuses: number[] = [];
         for (let i = 0; i < BURST; i++) {
-            const res = await ingest(
+            const res = await ingestRaw(
                 request,
                 ingestPayload(workId, {
                     actionType: 'website_user_registered',

@@ -594,7 +594,11 @@ test.describe('IDOR — guessable ids, sub-resource-requires-parent, cross-user 
             headers: alice.headers,
             data: {
                 ownerType: 'tenant',
-                ownerId: org.tenantId,
+                // Tenant-scope skills are USER-owned: the API filters skills by
+                // userId, so a tenant skill's ownerId is the owner's user id
+                // (not the tenant id). tenantId is auto-stamped from the owner's
+                // tenant, so cross-tenant isolation still holds.
+                ownerId: alice.user.user.id,
                 title: `Alice Skill ${sfx}`,
                 description: 'idor probe skill',
                 instructionsMd: '# secret',

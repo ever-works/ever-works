@@ -71,9 +71,13 @@ class CreateChannelDto {
 }
 
 class UpdateChannelDto {
+    // No @MinLength here (unlike create): the service treats a falsy name as
+    // "leave unchanged" (`if (input.name) patch.name = …`), so an empty-string
+    // PATCH is a deliberate no-op that preserves the existing name. A
+    // @MinLength(1) would preempt that graceful-skip with a 400 and break the
+    // partial-PATCH contract. @MaxLength still caps any non-empty value.
     @IsOptional()
     @IsString()
-    @MinLength(1)
     @MaxLength(120)
     name?: string;
 

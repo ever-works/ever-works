@@ -51,6 +51,21 @@ interface BoundSkillRow {
     skill: { id: string; slug: string; title: string; version: string };
 }
 
+/**
+ * Flatten a NestJS error body's `message` into a single searchable string.
+ *
+ * The API's global ValidationPipe (apps/api/src/main.ts) runs with the default
+ * exception factory, so DTO validation failures (CreateSkillDto's
+ * `@IsEnum(SKILL_OWNER_TYPES)` / `@IsUUID()` on ownerType/ownerId) surface as
+ * `{ statusCode, error, message: string[] }` — `message` is an ARRAY of the
+ * default class-validator strings, not a single custom sentence. Asserting on
+ * the array directly (`.toMatch`) throws, so collapse it to one string first.
+ */
+function errorMessageText(body: unknown): string {
+    const msg = (body as { message?: unknown })?.message;
+    return Array.isArray(msg) ? msg.join(' ') : String(msg ?? '');
+}
+
 async function createSkill(
     request: APIRequestContext,
     token: string,
@@ -245,7 +260,13 @@ test.describe('Agent + Skills binding', () => {
         expect(agentSkill.ownerId).toBe(agent.id);
 
         // Scope/owner validation: a non-lattice ownerType is rejected, and a
-        // missing ownerId is rejected — both with truthful 400 messages.
+        // missing ownerId is rejected — both 400 via the DTO's class-validator
+        // constraints (CreateSkillDto `@IsEnum(SKILL_OWNER_TYPES)` /
+        // `@IsUUID()`). 'user' is not in the {tenant,mission,idea,work,agent}
+        // lattice, so the ValidationPipe rejects ownerType before the service
+        // ever runs — the default message names the offending `ownerType`
+        // field + its enum constraint (not a custom "invalid ownerType"
+        // sentence).
         const badType = await request.post(`${API_BASE}/api/skills`, {
             headers: authedHeaders(token),
             data: {
@@ -257,8 +278,13 @@ test.describe('Agent + Skills binding', () => {
             },
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid ownerType/i);
+        expect(errorMessageText(await badType.json())).toMatch(
+            /ownerType must be one of the following values/i,
+        );
 
+        // ownerId is a required `@IsUUID()` field; omitting it fails that
+        // constraint, so the default message names `ownerId` (not a custom
+        // "ownerId is required" sentence).
         const noOwner = await request.post(`${API_BASE}/api/skills`, {
             headers: authedHeaders(token),
             data: {
@@ -269,7 +295,7 @@ test.describe('Agent + Skills binding', () => {
             },
         });
         expect(noOwner.status()).toBe(400);
-        expect((await noOwner.json()).message).toMatch(/ownerId is required/i);
+        expect(errorMessageText(await noOwner.json())).toMatch(/ownerId must be a uuid/i);
 
         // The list endpoint rejects an unknown ownerType filter the same way.
         const badFilter = await request.get(`${API_BASE}/api/skills?ownerType=bogus`, {

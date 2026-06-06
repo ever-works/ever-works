@@ -34,7 +34,11 @@ import { createTaskViaAPI, transitionTaskViaAPI, createAgentViaAPI } from './hel
  *   - POST /api/tasks/:id/approvers { approverType:'user'|'agent', approverId }
  *       → 201 { id, taskId, approverType, approverId, approvalState:'pending',
  *               approvedAt:null, createdAt }. ALWAYS born 'pending'.
- *       · invalid approverType → 400 "Invalid actor type: <v>".
+ *       · invalid approverType → 400. `AddApproverDto.approverType` is
+ *         `@IsIn(['user','agent'])`, so the global ValidationPipe rejects it
+ *         first with the class-validator array message "approverType must be
+ *         one of the following values: user, agent" (NOT the controller's
+ *         "Invalid actor type" string, which the pipe never reaches).
  *       · approverType:'agent' with a non-owned/unknown agent id → 400
  *         "Agent <id> is not reachable for this user — cannot assign."
  *       · DUPLICATE (same taskId+type+id) → 500 (uq_task_approver unique idx).
@@ -392,13 +396,21 @@ test.describe('Task approver gate — requireAllApprovers on → done (API)', ()
 
         const task = await createTaskViaAPI(request, token, { title: `Approver edges ${stamp}` });
 
-        // (a) Invalid actor type → 400 "Invalid actor type".
+        // (a) Invalid actor type → 400. The `AddApproverDto.approverType`
+        // field is constrained with `@IsIn(['user', 'agent'])`, so the
+        // global ValidationPipe (whitelist + forbidNonWhitelisted) rejects
+        // `'robot'` BEFORE the controller's `assertActorType` runs. The
+        // resulting body is the class-validator default — an array message
+        // "approverType must be one of the following values: user, agent"
+        // (not the controller's "Invalid actor type" string). The hardening
+        // intent is identical: an unknown actor type is refused with 400.
         const badType = await rawAddApprover(request, token, task.id, {
             approverType: 'robot',
             approverId: u.user.id,
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid actor type/i);
+        // class-validator returns `message` as a string[]; coerce before matching.
+        expect(String((await badType.json()).message)).toMatch(/one of the following values/i);
 
         // (b) Agent approver pointing at an unknown / non-owned agent → 400
         // "Agent <id> is not reachable for this user — cannot assign."

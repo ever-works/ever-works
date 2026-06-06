@@ -11,6 +11,7 @@ type ThrottledRequest = Record<string, unknown> & {
     originalUrl?: unknown;
     ip?: unknown;
     ips?: unknown;
+    headers?: Record<string, unknown>;
     socket?: {
         remoteAddress?: unknown;
     };
@@ -38,7 +39,22 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
                 (typeof req.originalUrl === 'string' && req.originalUrl) ||
                 (typeof req.url === 'string' && req.url) ||
                 '';
-            if (rawUrl.split('?')[0].startsWith('/api/auth/')) {
+            const path = rawUrl.split('?')[0];
+            // Incidental per-IP throttles that the single CI IP trips
+            // cumulatively across the suite (none asserted as a 429 by any
+            // rate-limit spec):
+            //   - `/api/auth/*`                     — register/login/etc.
+            //   - `/api/claim/*`                    — tokenised invitation claim (10/min)
+            //   - `/api/organizations/check-slug`   — public slug-availability (30/60s)
+            // Skipping these keeps the bulk-setup paths green. NON-auth
+            // throttling (ingest / notification / global) stays active so the
+            // dedicated rate-limit specs keep coverage, and this whole branch is
+            // hard-gated off in production.
+            if (
+                path.startsWith('/api/auth/') ||
+                path.startsWith('/api/claim/') ||
+                path === '/api/organizations/check-slug'
+            ) {
                 return true;
             }
         }
@@ -49,6 +65,22 @@ export class UserAwareThrottlerGuard extends ThrottlerGuard {
         const userId = firstString(req.user?.userId, req.user?.id, req.user?.sub);
         if (userId) {
             return Promise.resolve(`user:${userId}`);
+        }
+
+        // E2E per-worker bucketing (non-prod only). The suite runs every shard's
+        // Playwright workers from ONE machine IP, so platform-bearer endpoints
+        // that throttle per-IP (e.g. activity-log ingest) get saturated by
+        // CROSS-worker load — one worker's legitimate seed bounces 429 because
+        // siblings filled the shared bucket. When Playwright stamps a stable
+        // per-worker `x-e2e-throttle-key`, bucket by that instead so each worker
+        // is isolated, WHILE a single worker's intentional burst still trips its
+        // own bucket (the ingest rate-limit specs keep their 429 coverage).
+        // Hard-gated off in production, where no client sends this header.
+        if (process.env.NODE_ENV !== 'production') {
+            const e2eKey = firstString(req.headers?.['x-e2e-throttle-key']);
+            if (e2eKey) {
+                return Promise.resolve(`e2e:${e2eKey}`);
+            }
         }
 
         const proxiedIp =
