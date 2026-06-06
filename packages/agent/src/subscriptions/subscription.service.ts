@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ForbiddenException,
     Injectable,
     Logger,
     NotFoundException,
@@ -195,23 +196,86 @@ export class SubscriptionService implements OnModuleInit {
         return SubscriptionPlanCode.FREE;
     }
 
+    /**
+     * A plan that carries a recurring subscription price must be paid for
+     * through a billing-verified path; only free plans (`monthlyPrice` 0) are
+     * self-serviceable. (Per-run overage is metered separately and does not
+     * make a plan "paid" to switch onto.)
+     */
+    private isPaidPlan(plan: SubscriptionPlan): boolean {
+        const raw = plan.monthlyPrice;
+        // Fail closed: a plan is free (self-serviceable) ONLY when its
+        // `monthlyPrice` is explicitly present and parses to a finite,
+        // non-positive number. A missing / null / NaN / positive value is
+        // treated as PAID so a malformed plan row can never be self-granted.
+        // (`Number(null)` is 0 and `Number(undefined)` is NaN — neither should
+        // read as "free", hence the explicit null/undefined guard.)
+        if (raw === null || raw === undefined) {
+            return true;
+        }
+        const price = Number(raw);
+        return !(Number.isFinite(price) && price <= 0);
+    }
+
+    private async resolvePlanOrThrow(planCode: SubscriptionPlanCode): Promise<SubscriptionPlan> {
+        const plan = await this.planRepository.findByCode(this.normalizePlanCode(planCode));
+        if (!plan) {
+            throw new NotFoundException('Plan not found');
+        }
+        return plan;
+    }
+
+    private async persistDefaultPlan(
+        user: User,
+        plan: SubscriptionPlan,
+    ): Promise<SubscriptionPlan> {
+        await this.userRepository.update(user.id, { defaultPlanId: plan.id });
+        user.defaultPlan = plan;
+        user.defaultPlanId = plan.id;
+        return plan;
+    }
+
+    /**
+     * PRIVILEGED grant — assigns ANY plan (including paid tiers) with NO
+     * self-service gate. Call this ONLY from a billing-verified path (a
+     * payment-provider webhook, once wired) or an admin/platform context.
+     *
+     * Security (EW-711 #23): user-initiated plan changes MUST go through
+     * {@link changePlanSelfService}, which refuses paid plans — otherwise any
+     * authenticated user could escalate to a paid tier without paying.
+     */
     async assignPlanToUser(user: User, planCode: SubscriptionPlanCode): Promise<SubscriptionPlan> {
         if (!this.isEnabled()) {
             throw new BadRequestException('Subscriptions are disabled');
         }
+        const plan = await this.resolvePlanOrThrow(planCode);
+        return this.persistDefaultPlan(user, plan);
+    }
 
-        const normalized = this.normalizePlanCode(planCode);
-        const plan = await this.planRepository.findByCode(normalized);
-
-        if (!plan) {
-            throw new NotFoundException('Plan not found');
+    /**
+     * User-initiated (self-service) plan change. May only move the caller to a
+     * FREE plan — the sign-up default, a self-downgrade, or a cancel. A paid
+     * plan requires a billing-verified grant ({@link assignPlanToUser}), so a
+     * self-assignment of one is rejected with 403.
+     *
+     * EW-711 #23 — closes the free→paid privilege escalation on
+     * `POST /api/subscriptions/plan` (any authenticated user could previously
+     * self-grant PREMIUM/STANDARD with no payment).
+     */
+    async changePlanSelfService(
+        user: User,
+        planCode: SubscriptionPlanCode,
+    ): Promise<SubscriptionPlan> {
+        if (!this.isEnabled()) {
+            throw new BadRequestException('Subscriptions are disabled');
         }
-
-        await this.userRepository.update(user.id, { defaultPlanId: plan.id });
-        user.defaultPlan = plan;
-        user.defaultPlanId = plan.id;
-
-        return plan;
+        const plan = await this.resolvePlanOrThrow(planCode);
+        if (this.isPaidPlan(plan)) {
+            throw new ForbiddenException(
+                'Paid plans must be activated through billing and cannot be self-assigned.',
+            );
+        }
+        return this.persistDefaultPlan(user, plan);
     }
 
     async summarizePlan(user: User) {

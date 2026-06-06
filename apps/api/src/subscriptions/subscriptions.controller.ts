@@ -66,11 +66,13 @@ export class SubscriptionsController {
     @Post('plan')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({
-        summary: 'Update subscription plan',
-        description: 'Update the subscription plan for the user',
+        summary: 'Update subscription plan (self-service)',
+        description:
+            'Self-service plan change for the authenticated user. Only FREE plans may be set this way (sign-up default / downgrade / cancel); a paid plan must be activated through billing and is rejected with 403. (EW-711 #23.)',
     })
     @ApiResponse({ status: 200, description: 'Subscription plan updated' })
     @ApiResponse({ status: 400, description: 'Subscriptions are disabled' })
+    @ApiResponse({ status: 403, description: 'Paid plans cannot be self-assigned' })
     async updatePlan(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() dto: UpdateSubscriptionPlanDto,
@@ -80,7 +82,10 @@ export class SubscriptionsController {
         }
 
         const user = await this.authService.getUser(auth.userId);
-        const plan = await this.subscriptionService.assignPlanToUser(user, dto.planCode);
+        // Security (EW-711 #23): self-service may only set a FREE plan; a paid
+        // plan requires a billing-verified grant. `changePlanSelfService`
+        // enforces this (403 on a paid plan), closing the free->paid escalation.
+        const plan = await this.subscriptionService.changePlanSelfService(user, dto.planCode);
         const summary = await this.subscriptionService.summarizePlan(user);
 
         return {
