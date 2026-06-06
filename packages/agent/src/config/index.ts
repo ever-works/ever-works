@@ -444,5 +444,28 @@ export const config = {
             const raw = parseInt(process.env.KB_RECONCILE_STALE_AFTER_MS || '', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 24 * 60 * 60 * 1000;
         },
+        /**
+         * EW-642 — operator-pinned vector-store provider plugin id.
+         * When set, `VectorStoreFacadeService` ONLY tries this provider
+         * — no silent fallback. Leave unset to let the facade resolve
+         * via per-Work pin → scope-active → first-available chain.
+         * Mirrors the `KB_TRANSCRIPTION_PROVIDER_ID` knob shape.
+         */
+        getVectorStoreProviderId(): string | undefined {
+            const v = process.env.KB_VECTOR_STORE_PROVIDER_ID;
+            return v && v.length > 0 ? v : undefined;
+        },
+        /**
+         * EW-642 — embedding routing mode. `'pgvector'` keeps the
+         * legacy `WorkKnowledgeChunkRepository` SQL path; `'external'`
+         * forces the facade-routed `IVectorStorePlugin` path; `'auto'`
+         * (default) lets the facade pick based on whether a non-pgvector
+         * vector-store plugin is registered. Free-form string so the
+         * future "hybrid" / "shadow-write" modes don't need a contract
+         * bump.
+         */
+        getEmbeddingMode(): 'pgvector' | 'external' | 'auto' | string {
+            return process.env.KB_EMBEDDING_MODE || 'auto';
+        },
     },
 };

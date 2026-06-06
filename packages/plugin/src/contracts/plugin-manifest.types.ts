@@ -22,7 +22,11 @@ export const PLUGIN_CATEGORIES = [
 	// See `capabilities/email-provider.interface.ts` and
 	// `capabilities/notification-channel.interface.ts`.
 	'email-provider',
-	'notification-channel'
+	'notification-channel',
+	// EW-642 — pluggable vector-store backends (pgvector, Qdrant, Pinecone, …).
+	// See `capabilities/vector-store.interface.ts` and the RFC at
+	// `docs/specs/features/knowledge-base/phase-2-vector-plugin-design.md`.
+	'vector-store'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
