@@ -24,7 +24,7 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 describe('SubscriptionsController', () => {
     let subscriptionService: jest.Mocked<
-        Pick<SubscriptionService, 'summarizePlan' | 'isEnabled' | 'assignPlanToUser'>
+        Pick<SubscriptionService, 'summarizePlan' | 'isEnabled' | 'changePlanSelfService'>
     >;
     let authService: jest.Mocked<Pick<AuthService, 'getUser'>>;
     let controller: SubscriptionsController;
@@ -48,7 +48,7 @@ describe('SubscriptionsController', () => {
         subscriptionService = {
             summarizePlan: jest.fn(),
             isEnabled: jest.fn(),
-            assignPlanToUser: jest.fn(),
+            changePlanSelfService: jest.fn(),
         } as any;
         authService = {
             getUser: jest.fn().mockResolvedValue(user),
@@ -116,7 +116,7 @@ describe('SubscriptionsController', () => {
     });
 
     describe('updatePlan', () => {
-        it('throws BadRequestException when subscriptions are disabled (and never calls getUser/assignPlanToUser)', async () => {
+        it('throws BadRequestException when subscriptions are disabled (and never calls getUser/changePlanSelfService)', async () => {
             subscriptionService.isEnabled.mockReturnValue(false);
 
             await expect(
@@ -126,12 +126,12 @@ describe('SubscriptionsController', () => {
                 'Subscriptions are disabled',
             );
             expect(authService.getUser).not.toHaveBeenCalled();
-            expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+            expect(subscriptionService.changePlanSelfService).not.toHaveBeenCalled();
         });
 
         it('assigns plan and returns mapped envelope when enabled', async () => {
             subscriptionService.isEnabled.mockReturnValue(true);
-            subscriptionService.assignPlanToUser.mockResolvedValue({
+            subscriptionService.changePlanSelfService.mockResolvedValue({
                 code: 'starter',
                 displayName: 'Starter',
             } as any);
@@ -144,7 +144,7 @@ describe('SubscriptionsController', () => {
             const result = await controller.updatePlan(auth, { planCode: 'starter' as any });
 
             expect(authService.getUser).toHaveBeenCalledWith('user-1');
-            expect(subscriptionService.assignPlanToUser).toHaveBeenCalledWith(user, 'starter');
+            expect(subscriptionService.changePlanSelfService).toHaveBeenCalledWith(user, 'starter');
             expect(subscriptionService.summarizePlan).toHaveBeenCalledWith(user);
             expect(result).toEqual({
                 status: 'success',
@@ -157,15 +157,15 @@ describe('SubscriptionsController', () => {
             });
         });
 
-        it('uses the assignPlanToUser response (not summarizePlan) for code/name', async () => {
+        it('uses the changePlanSelfService response (not summarizePlan) for code/name', async () => {
             subscriptionService.isEnabled.mockReturnValue(true);
-            subscriptionService.assignPlanToUser.mockResolvedValue({
+            subscriptionService.changePlanSelfService.mockResolvedValue({
                 code: 'pro',
                 displayName: 'Pro Plan',
             } as any);
             subscriptionService.summarizePlan.mockResolvedValue({
                 enabled: true,
-                // a different plan in the summary — controller must trust assignPlanToUser
+                // a different plan in the summary — controller must trust changePlanSelfService
                 plan: { code: 'free', displayName: 'Free' },
                 allowances: ['weekly'],
             } as any);
@@ -179,9 +179,11 @@ describe('SubscriptionsController', () => {
             });
         });
 
-        it('propagates assignPlanToUser errors', async () => {
+        it('propagates changePlanSelfService errors', async () => {
             subscriptionService.isEnabled.mockReturnValue(true);
-            subscriptionService.assignPlanToUser.mockRejectedValue(new Error('plan not found'));
+            subscriptionService.changePlanSelfService.mockRejectedValue(
+                new Error('plan not found'),
+            );
 
             await expect(
                 controller.updatePlan(auth, { planCode: 'unknown' as any }),
@@ -196,7 +198,7 @@ describe('SubscriptionsController', () => {
             await expect(controller.updatePlan(auth, { planCode: 'pro' as any })).rejects.toThrow(
                 'User not found',
             );
-            expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+            expect(subscriptionService.changePlanSelfService).not.toHaveBeenCalled();
         });
     });
 });

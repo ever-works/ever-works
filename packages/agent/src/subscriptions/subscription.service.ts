@@ -203,7 +203,11 @@ export class SubscriptionService implements OnModuleInit {
      * make a plan "paid" to switch onto.)
      */
     private isPaidPlan(plan: SubscriptionPlan): boolean {
-        return Number(plan.monthlyPrice) > 0;
+        const price = Number(plan.monthlyPrice);
+        // Fail closed: only a finite, non-positive price is a free (and thus
+        // self-serviceable) plan. A missing / NaN / positive `monthlyPrice` is
+        // treated as PAID, so a malformed plan row can never be self-granted.
+        return !(Number.isFinite(price) && price <= 0);
     }
 
     private async resolvePlanOrThrow(planCode: SubscriptionPlanCode): Promise<SubscriptionPlan> {

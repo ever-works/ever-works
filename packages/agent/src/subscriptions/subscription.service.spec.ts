@@ -672,6 +672,19 @@ describe('SubscriptionService', () => {
             },
         );
 
+        // Fail-closed: a malformed plan row (missing / NaN monthlyPrice) must be
+        // treated as PAID and rejected, never silently self-grantable.
+        it('rejects a plan whose monthlyPrice is missing/NaN (fail-closed) and does NOT persist', async () => {
+            const malformed = { ...FREE_PLAN, monthlyPrice: undefined as any };
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue(malformed),
+            });
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as any, SubscriptionPlanCode.FREE),
+            ).rejects.toThrow(ForbiddenException);
+            expect(userRepository.update).not.toHaveBeenCalled();
+        });
+
         it('still lets the PRIVILEGED assignPlanToUser grant a paid plan (billing/admin seam unchanged)', async () => {
             const user = { id: 'u1' } as any;
             const { service, userRepository } = makeService({
