@@ -133,6 +133,69 @@ export interface PgVectorPluginOptions {
 	readonly chunkRepository?: PgVectorChunkRepositoryPort;
 	/** Optional cheap probe — round-trips to the Postgres instance. */
 	readonly pingDatabase?: () => Promise<boolean>;
+	/**
+	 * Optional re-embed hook. When wired in, `handleEmbeddingSettingsChange`
+	 * fans `kb-reembed-work` dispatches out over every affected Work. See
+	 * `PgVectorReembedHook` for the producer-side contract.
+	 */
+	readonly reembedHook?: PgVectorReembedHook;
+}
+
+/**
+ * Producer-side dispatcher the plugin calls when `embeddingModel` or
+ * `embeddingDimensions` flip in this plugin's settings. Symmetric with
+ * `KbReembedWorkDispatcher` in `@ever-works/agent/tasks` — the host
+ * adapts that interface to this one. We keep the surface local to the
+ * plugin package so the package doesn't take a hard dependency on
+ * `@ever-works/agent`.
+ */
+export interface PgVectorReembedDispatcher {
+	dispatchKbReembedWork(payload: {
+		readonly workId: string;
+		readonly previousModel: string;
+		readonly newModel: string;
+		readonly newDims: number;
+	}): Promise<string>;
+}
+
+/**
+ * Read-side port for "which Works currently route their KB chunk store
+ * through THIS plugin instance?". Production binds to a small DB
+ * lookup (read `work_knowledge_chunk_coordinates` filtered to
+ * `vector_store_id = 'pgvector'` and project the distinct work_id set,
+ * for example). Tests provide an in-memory fake.
+ */
+export interface PgVectorAffectedWorksPort {
+	listAffectedWorkIds(): Promise<ReadonlyArray<string>>;
+}
+
+/**
+ * Combined hook bag. Bundled so the host wires both halves in one
+ * setter call — separating them would create a partially-wired state
+ * (dispatcher set, port still missing) that's just a foot-gun.
+ */
+export interface PgVectorReembedHook {
+	readonly dispatcher: PgVectorReembedDispatcher;
+	readonly affectedWorks: PgVectorAffectedWorksPort;
+}
+
+/**
+ * Public input to `handleEmbeddingSettingsChange`. The host computes
+ * this from a settings diff and hands it to the plugin — the plugin
+ * does not subscribe to a settings-change event itself, which keeps
+ * the host firmly in control of WHEN the sweep happens.
+ */
+export interface PgVectorEmbeddingChangeArgs {
+	readonly previousModel: string;
+	readonly previousDims: number;
+	readonly newModel: string;
+	readonly newDims: number;
+}
+
+/** One dispatched re-embed run. */
+export interface PgVectorReembedRunRef {
+	readonly workId: string;
+	readonly runId: string;
 }
 
 const PGVECTOR_PROVIDER_TYPE: VectorStoreProviderType = 'pgvector';
@@ -234,11 +297,13 @@ export class PgVectorPlugin extends BaseVectorStore {
 
 	private chunkRepository?: PgVectorChunkRepositoryPort;
 	private pingDatabase?: () => Promise<boolean>;
+	private reembedHook?: PgVectorReembedHook;
 
 	constructor(options: PgVectorPluginOptions = {}) {
 		super();
 		this.chunkRepository = options.chunkRepository;
 		this.pingDatabase = options.pingDatabase;
+		this.reembedHook = options.reembedHook;
 	}
 
 	/**
@@ -258,44 +323,114 @@ export class PgVectorPlugin extends BaseVectorStore {
 
 	async onUnload(): Promise<void> {
 		this.chunkRepository = undefined;
+		this.reembedHook = undefined;
 		await super.onUnload();
 	}
 
-	// TODO(EW-642 D7 follow-up): wire the settings-change → re-embed
-	// dispatch hook here. When the operator flips `embeddingModel` (or
-	// `embeddingDimensions`) in this plugin's settings UI, the host
-	// should fan out a `kb-reembed-work` Trigger.dev run per affected
-	// Work so the existing chunks get re-embedded against the new model
-	// before retrieval drifts into a mixed vector space.
-	//
-	// Expected call shape (KB_REEMBED_WORK_DISPATCHER lives in
-	// `@ever-works/agent/tasks`):
-	//
-	//   await dispatcher.dispatchKbReembedWork({
-	//       workId,
-	//       previousModel: oldSettings.embeddingModel,
-	//       newModel:      newSettings.embeddingModel,
-	//       newDims:       newSettings.embeddingDimensions,
-	//   });
-	//
-	// Sketch (host wires the dispatcher on `onLoad` via context):
-	//
-	//   async onSettingsChange(diff: SettingsDiff, ctx: PluginContext) {
-	//       if (diff.changed('embeddingModel') || diff.changed('embeddingDimensions')) {
-	//           const affectedWorkIds = await ctx.kb.listWorksUsingThisStore('pgvector');
-	//           for (const workId of affectedWorkIds) {
-	//               await ctx.dispatchers.kbReembedWork({
-	//                   workId,
-	//                   previousModel: diff.previous.embeddingModel,
-	//                   newModel: diff.next.embeddingModel,
-	//                   newDims: diff.next.embeddingDimensions,
-	//               });
-	//           }
-	//       }
-	//   }
-	//
-	// Out of scope for this slice — see `kb-reembed-work.task.ts` and
-	// `KnowledgeBaseReembedService` for the receiver side.
+	/**
+	 * Setter mirror of `setChunkRepository` — lets the host bind the
+	 * re-embed hook after construction (matches how the NestJS DI graph
+	 * wires the chunk repository on `onLoad`). Passing `undefined`
+	 * unbinds the hook; subsequent `handleEmbeddingSettingsChange`
+	 * calls then throw a `unavailable` error rather than silently
+	 * no-op'ing — silent drops on the re-embed path leave Works pinned
+	 * to a stale model with no operator signal, which the
+	 * `KbReembedWorkDispatcher` docstring explicitly forbids.
+	 */
+	setReembedHook(hook: PgVectorReembedHook | undefined): void {
+		this.reembedHook = hook;
+	}
+
+	/**
+	 * EW-642 D7 — fan a `kb-reembed-work` Trigger.dev run out over every
+	 * Work whose KB chunk store routes through this plugin instance.
+	 *
+	 * The host calls this method when the operator flips
+	 * `embeddingModel` or `embeddingDimensions` in the plugin's settings.
+	 * If neither changed, the call is a no-op (early return) — callers
+	 * can invoke it on every settings save without filtering first.
+	 *
+	 * Error semantics: the dispatch fans out sequentially. On the FIRST
+	 * dispatch failure the method throws, surfacing both the underlying
+	 * error AND the list of run-refs that DID dispatch successfully
+	 * before the failure. This trades a small risk of partial sweep for
+	 * a strong observability guarantee — the receiver task
+	 * (`kb-reembed-work` + `KnowledgeBaseReembedService`) is idempotent
+	 * because it watermarks every coordinate by `embedding_model`, so a
+	 * retry that re-dispatches an already-completed Work just no-ops
+	 * inside the task. Per the `KbReembedWorkDispatcher` docstring, "a
+	 * silent drop would leave a Work permanently on the old embedding
+	 * model with no operator signal" — propagating the error is the
+	 * intentional choice.
+	 *
+	 * Host wiring sketch — the actual call site lives in whatever
+	 * plugin-settings UPDATE handler the platform exposes (e.g.
+	 * `apps/api/src/works/works.module.ts` adapter that watches the
+	 * pgvector settings doc):
+	 *
+	 *   const diff = computeSettingsDiff(previous, next);
+	 *   if (diff.changed('embeddingModel') || diff.changed('embeddingDimensions')) {
+	 *       const result = await pgvectorPlugin.handleEmbeddingSettingsChange({
+	 *           previousModel: previous.embeddingModel,
+	 *           previousDims: previous.embeddingDimensions,
+	 *           newModel: next.embeddingModel,
+	 *           newDims: next.embeddingDimensions,
+	 *       });
+	 *       logger.log(`pgvector re-embed sweep dispatched ${result.length} runs`);
+	 *   }
+	 *
+	 * The dispatcher + affected-works port are bound via
+	 * `setReembedHook` (or `PgVectorPluginOptions.reembedHook` at
+	 * construction time). See the in-flight slice-2 dispatcher token
+	 * `KB_REEMBED_WORK_DISPATCHER` in `@ever-works/agent/tasks` for the
+	 * platform-side producer.
+	 */
+	async handleEmbeddingSettingsChange(
+		args: PgVectorEmbeddingChangeArgs
+	): Promise<ReadonlyArray<PgVectorReembedRunRef>> {
+		// No model or dim change → nothing to do. Lets the host invoke
+		// this on every settings save without diffing first.
+		if (args.previousModel === args.newModel && args.previousDims === args.newDims) {
+			return [];
+		}
+
+		if (!this.reembedHook) {
+			throw this.wrapVendorError(
+				new Error(
+					'pgvector re-embed hook not wired in — call setReembedHook() on the plugin before changing embeddingModel / embeddingDimensions'
+				),
+				'unavailable',
+				false
+			);
+		}
+
+		const { dispatcher, affectedWorks } = this.reembedHook;
+		const workIds = await affectedWorks.listAffectedWorkIds();
+
+		const dispatched: PgVectorReembedRunRef[] = [];
+		for (const workId of workIds) {
+			try {
+				const runId = await dispatcher.dispatchKbReembedWork({
+					workId,
+					previousModel: args.previousModel,
+					newModel: args.newModel,
+					newDims: args.newDims
+				});
+				dispatched.push({ workId, runId });
+			} catch (err) {
+				const cause = err instanceof Error ? err.message : String(err);
+				throw this.wrapVendorError(
+					new Error(
+						`kb-reembed-work dispatch failed for work=${workId} after ${dispatched.length} prior successful dispatch(es); cause: ${cause}`
+					),
+					'internal',
+					true
+				);
+			}
+		}
+
+		return dispatched;
+	}
 
 	/** Cosine distance ∈ `[0, 2]` → normalized ∈ `[0, 1]`. */
 	normalize(rawScore: number): number {
