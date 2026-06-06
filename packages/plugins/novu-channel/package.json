@@ -59,7 +59,12 @@
 						"title": "Novu API base (default https://api.novu.co; set for self-hosted / EU region)"
 					}
 				}
-			}
+			},
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

@@ -18,3 +18,5 @@ export * from './work-import.task';
 export * from './work-onboarding.task';
 export * from './work-schedule-dispatcher.task';
 export * from './webhook-delivery.task';
+// EW-693 — long-running plugin execution (Phase 7 / T27).
+export * from './run-plugin-operation.task';

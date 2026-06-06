@@ -13,6 +13,8 @@ export class LocalPluginStore implements Omit<
     | 'findByCapability'
     | 'findByPluginIds'
     | 'updateSettings'
+    | 'updateInstallState'
+    | 'findByInstallState'
 > {
     private readonly data = new Map<string, PluginEntity>();
 

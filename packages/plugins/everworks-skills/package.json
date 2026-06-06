@@ -8,7 +8,7 @@
 		"url": "https://ever.co"
 	},
 	"license": "MIT",
-	"private": true,
+	"private": false,
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
@@ -49,7 +49,12 @@
 			],
 			"defaultForCapabilities": [
 				"skills-provider"
-			]
+			],
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

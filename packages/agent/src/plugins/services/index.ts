@@ -11,3 +11,7 @@ export * from './custom-capability-registry.service';
 export * from './plugin-bootstrap.service';
 export * from './settings-schema-validator.service';
 export * from './plugin-operations.service';
+// EW-693 — runtime installer for dynamic plugin distribution.
+export * from './plugin-installer.service';
+// EW-693 — sync vs long-running execution router (Phase 7).
+export * from './plugin-execution-router.service';

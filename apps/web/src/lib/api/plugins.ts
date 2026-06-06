@@ -11,6 +11,34 @@ import type {
     SettingsMenuCategory as ISettingsMenuCategory,
     SettingsMenuPlugin as ISettingsMenuPlugin,
 } from '@ever-works/plugin/api';
+// EW-693 — dynamic plugin distribution wire-types.
+import type {
+    PluginCatalogResponse,
+    PluginInstallRequestDto,
+    PluginInstallResponseDto,
+    PluginInstallStateDto,
+    PluginAllowlistResponseDto,
+    PluginAllowlistEntryDto,
+    CreatePluginAllowlistEntryDto,
+    UpdatePluginAllowlistEntryDto,
+} from '@ever-works/contracts/api';
+
+// Re-export the EW-693 wire-types so page components can import them
+// from this single barrel instead of pulling @ever-works/contracts in
+// directly. Matches the pattern used for @ever-works/plugin/api above.
+export type {
+    PluginCatalogResponse,
+    PluginCatalogEntry,
+    PluginInstallRequestDto,
+    PluginInstallResponseDto,
+    PluginInstallStateDto,
+    PluginInstallState,
+    PluginInstallSource,
+    PluginAllowlistResponseDto,
+    PluginAllowlistEntryDto,
+    CreatePluginAllowlistEntryDto,
+    UpdatePluginAllowlistEntryDto,
+} from '@ever-works/contracts/api';
 
 // Re-export types from @ever-works/plugin/api for consistency
 export type {
@@ -267,6 +295,135 @@ export const pluginsAPI = {
             endpoint: `/works/${workId}/plugins/${pluginId}/capability`,
             data: { capability },
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ============================================
+    // EW-693 — Dynamic plugin distribution
+    // ============================================
+
+    /**
+     * EW-693 — List distributable plugins merged with this replica's
+     * install state. Returns `degraded: true` when the catalog is
+     * empty (e.g. bundled-mode deployment where every plugin is
+     * already in the image). UI gracefully degrades to "nothing to
+     * install at runtime".
+     */
+    getCatalog: async (): Promise<PluginCatalogResponse> => {
+        return serverFetch<PluginCatalogResponse>('/plugins/catalog');
+    },
+
+    /**
+     * EW-693 — Per-plugin install lifecycle row. Distinct from the
+     * enable state. The UI uses this to poll after `install()` until
+     * `installState === 'installed' | 'error'`.
+     */
+    getInstallStatus: async (pluginId: string): Promise<PluginInstallStateDto> => {
+        return serverFetch<PluginInstallStateDto>(`/plugins/${pluginId}/install-status`);
+    },
+
+    /**
+     * EW-693 — Install a distributable plugin (allow-list + integrity
+     * verified server-side). The server enforces FR-10 / FR-11; the
+     * client just surfaces the result envelope.
+     *
+     * Returns 200 with the post-install state envelope. Errors surface
+     * as thrown exceptions via `serverFetch`:
+     * - 409: plugin not on the allowlist.
+     * - 424: integrity mismatch.
+     * - 502/504: registry unreachable.
+     */
+    install: async (
+        pluginId: string,
+        body: PluginInstallRequestDto = {},
+    ): Promise<PluginInstallResponseDto> => {
+        return serverMutation<PluginInstallResponseDto>({
+            endpoint: `/plugins/${pluginId}/install`,
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * EW-693 — Uninstall a distributable plugin. Refused server-side
+     * for systemPlugin / bundled rows (409). Default retention keeps
+     * the package files on disk so a subsequent install re-links
+     * without re-downloading.
+     */
+    uninstall: async (pluginId: string): Promise<PluginInstallStateDto> => {
+        return serverMutation<PluginInstallStateDto>({
+            endpoint: `/plugins/${pluginId}/install`,
+            data: null,
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * EW-693 — Convenience poller used by the settings page's Install
+     * button. Polls `getInstallStatus` at `intervalMs` until the
+     * state is terminal (`installed` | `error`) or `timeoutMs`
+     * elapses. The terminal row is returned; a timeout returns the
+     * last-observed row with no synthetic error so the UI can show
+     * the installer's actual state.
+     */
+    pollInstallStatus: async (
+        pluginId: string,
+        opts: { intervalMs?: number; timeoutMs?: number } = {},
+    ): Promise<PluginInstallStateDto> => {
+        const interval = opts.intervalMs ?? 1500;
+        const deadline = Date.now() + (opts.timeoutMs ?? 90_000);
+        let last: PluginInstallStateDto = await pluginsAPI.getInstallStatus(pluginId);
+        while (
+            (last.installState === 'installing' || last.installState === 'available') &&
+            Date.now() < deadline
+        ) {
+            await new Promise((r) => setTimeout(r, interval));
+            last = await pluginsAPI.getInstallStatus(pluginId);
+        }
+        return last;
+    },
+};
+
+/**
+ * EW-693 — Admin allowlist client. Mounted under `/api/admin/plugins/allowlist`;
+ * the controller is gated by `IsPlatformAdminGuard`, so non-admin
+ * pages should not surface these calls. The allowlist page in
+ * `/admin/plugins/allowlist` is the only intended caller.
+ */
+export const pluginAllowlistAPI = {
+    list: async (): Promise<PluginAllowlistResponseDto> => {
+        return serverFetch<PluginAllowlistResponseDto>('/admin/plugins/allowlist');
+    },
+
+    create: async (body: CreatePluginAllowlistEntryDto): Promise<PluginAllowlistEntryDto> => {
+        return serverMutation<PluginAllowlistEntryDto>({
+            endpoint: '/admin/plugins/allowlist',
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    update: async (
+        id: string,
+        body: UpdatePluginAllowlistEntryDto,
+    ): Promise<PluginAllowlistEntryDto> => {
+        return serverMutation<PluginAllowlistEntryDto>({
+            endpoint: `/admin/plugins/allowlist/${id}`,
+            data: body,
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    remove: async (id: string): Promise<void> => {
+        return serverMutation<void>({
+            endpoint: `/admin/plugins/allowlist/${id}`,
+            data: null,
+            method: 'DELETE',
             wrapInData: false,
         });
     },

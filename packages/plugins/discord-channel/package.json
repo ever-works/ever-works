@@ -63,7 +63,12 @@
 						"title": "Default sender avatar URL"
 					}
 				}
-			}
+			},
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

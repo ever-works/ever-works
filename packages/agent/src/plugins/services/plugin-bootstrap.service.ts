@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PluginLoaderService } from './plugin-loader.service';
 import { PluginLifecycleManagerService } from './plugin-lifecycle-manager.service';
 import { PluginContextFactoryService } from './plugin-context-factory.service';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginRepository } from '../repositories/plugin.repository';
+// EW-693 — boot-time dynamic plugin warmup (FR-13a). Optional so
+// bundled-mode deployments don't structurally depend on it.
+import { PluginInstallerService } from './plugin-installer.service';
 
 /**
  * Result of the bootstrap operation
@@ -59,7 +62,32 @@ export class PluginBootstrapService {
         private readonly contextFactory: PluginContextFactoryService,
         private readonly registry: PluginRegistryService,
         private readonly pluginRepository: PluginRepository,
+        // EW-693 — optional installer for the dynamic-mode boot warmup.
+        // Bundled-mode boots ignore it entirely (FR-22).
+        @Optional()
+        private readonly installer?: PluginInstallerService,
     ) {}
+
+    /**
+     * EW-693 / FR-13a — Pre-install DB-recorded dynamic plugins at boot.
+     *
+     * Call AFTER {@link bootstrap}, so the install dir already exists
+     * and the loader's path-discovery has populated the registry with
+     * core plugins. Failures are logged but non-fatal — lazy
+     * install-on-use (FR-13) is the correctness mechanism.
+     *
+     * In `bundled` mode this is a no-op.
+     */
+    async warmupDynamicPlugins(): Promise<{
+        attempted: number;
+        succeeded: number;
+        failed: number;
+    }> {
+        if (!this.installer) {
+            return { attempted: 0, succeeded: 0, failed: 0 };
+        }
+        return this.installer.warmupFromDb();
+    }
 
     /**
      * Check if the plugin system has been initialized

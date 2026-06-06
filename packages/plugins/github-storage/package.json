@@ -59,6 +59,7 @@
 			},
 			"license": "AGPL-3.0",
 			"systemPlugin": false,
+			"distribution": "registry",
 			"builtIn": false,
 			"envVars": [
 				{
@@ -129,5 +130,10 @@
 				}
 			]
 		}
+	},
+	"private": false,
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

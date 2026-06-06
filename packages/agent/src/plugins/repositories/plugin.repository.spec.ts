@@ -551,4 +551,122 @@ describe('PluginRepository', () => {
             expect(typeormRepo.update).not.toHaveBeenCalled();
         });
     });
+
+    // EW-693 — install-lifecycle transitions. Distinct from
+    // `updateState` above which tracks the LOAD lifecycle. Pinned
+    // so the installer's state machine is observable in tests.
+    describe('updateInstallState', () => {
+        it('writes only the installState when no details are provided', async () => {
+            const { repo, typeormRepo } = makeService({
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                findOne: jest.fn().mockResolvedValue({ id: 'p-1' }),
+            });
+
+            await repo.updateInstallState('notion-extractor', 'installing');
+
+            expect(typeormRepo.update).toHaveBeenCalledWith(
+                { pluginId: 'notion-extractor' },
+                { installState: 'installing' },
+            );
+        });
+
+        it('persists registrySpec + installedVersion + integrity on success', async () => {
+            const { repo, typeormRepo } = makeService({
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                findOne: jest.fn().mockResolvedValue({ id: 'p-1' }),
+            });
+
+            await repo.updateInstallState('notion-extractor', 'installed', {
+                registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+                installedVersion: '1.2.0',
+                integrity: 'sha512-abc',
+                source: 'registry',
+            });
+
+            expect(typeormRepo.update.mock.calls[0][1]).toEqual({
+                installState: 'installed',
+                registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+                installedVersion: '1.2.0',
+                integrity: 'sha512-abc',
+                source: 'registry',
+            });
+        });
+
+        it('persists installError on error', async () => {
+            const { repo, typeormRepo } = makeService({
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                findOne: jest.fn().mockResolvedValue({ id: 'p-1' }),
+            });
+
+            await repo.updateInstallState('notion-extractor', 'error', {
+                installError: 'integrity mismatch',
+            });
+
+            expect(typeormRepo.update.mock.calls[0][1]).toMatchObject({
+                installState: 'error',
+                installError: 'integrity mismatch',
+            });
+        });
+
+        it('treats null details as explicit clears (uses `!== undefined`)', async () => {
+            // Passing `installError: null` writes null (clears the prior
+            // error). Passing `installError: undefined` omits the field.
+            // Pinned so a future "if (value)" truthy-check (which would
+            // silently drop null clears) is a deliberate diff.
+            const { repo, typeormRepo } = makeService({
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                findOne: jest.fn().mockResolvedValue({ id: 'p-1' }),
+            });
+
+            await repo.updateInstallState('notion-extractor', 'installed', {
+                installError: null,
+                installedVersion: '1.2.0',
+            });
+
+            const args = typeormRepo.update.mock.calls[0][1];
+            expect(args).toEqual({
+                installState: 'installed',
+                installError: null,
+                installedVersion: '1.2.0',
+            });
+        });
+
+        it('omits undefined detail fields entirely', async () => {
+            const { repo, typeormRepo } = makeService({
+                update: jest.fn().mockResolvedValue({ affected: 1 }),
+                findOne: jest.fn().mockResolvedValue({ id: 'p-1' }),
+            });
+
+            await repo.updateInstallState('notion-extractor', 'installing', {
+                registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+                // installedVersion, integrity, installError all undefined
+            });
+
+            const args = typeormRepo.update.mock.calls[0][1];
+            expect(args).toEqual({
+                installState: 'installing',
+                registrySpec: '@ever-works/notion-extractor-plugin@1.2.0',
+            });
+            expect(args).not.toHaveProperty('installedVersion');
+            expect(args).not.toHaveProperty('integrity');
+            expect(args).not.toHaveProperty('installError');
+        });
+    });
+
+    describe('findByInstallState', () => {
+        it('queries by installState with name ASC order', async () => {
+            const rows = [{ pluginId: 'notion-extractor' }];
+            const { repo, typeormRepo } = makeService({
+                find: jest.fn().mockResolvedValue(rows),
+            });
+
+            const result = await repo.findByInstallState('error');
+
+            expect(typeormRepo.find).toHaveBeenCalledWith({
+                where: { installState: 'error' },
+                order: { name: 'ASC' },
+            });
+            expect(result).toBe(rows);
+        });
+    });
 });

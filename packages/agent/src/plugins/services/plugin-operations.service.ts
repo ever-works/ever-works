@@ -56,6 +56,9 @@ import {
     removeActiveCapability,
 } from '../utils/active-capabilities.util';
 import { buildProviderModelSummaries } from '../utils/plugin-model-settings.utils';
+// EW-693 — install-on-enable hook (T18). Optional so bundled-mode
+// deployments don't structurally depend on the installer.
+import { PluginInstallerService } from './plugin-installer.service';
 
 @Injectable()
 export class PluginOperationsService {
@@ -74,7 +77,36 @@ export class PluginOperationsService {
         private readonly aiFacade: AiFacadeService,
         @Optional()
         private readonly eventEmitter?: EventEmitter2,
+        // EW-693 — optional install-on-enable hook. Inert in bundled
+        // mode; in dynamic mode it lazily installs distributable
+        // plugins before the existing registry.get() lookup.
+        @Optional()
+        private readonly pluginInstaller?: PluginInstallerService,
     ) {}
+
+    /**
+     * EW-693 / T18 — Lazy install-on-enable.
+     *
+     * Called at the top of every enable path. In bundled mode this is
+     * a no-op (the installer is undefined or returns immediately). In
+     * dynamic mode, if the plugin isn't already registered, this calls
+     * `installer.ensurePluginAvailable(pluginId)` so the package is
+     * downloaded + verified + placed under the install dir's
+     * `node_modules/`, then prompts a re-discover via the loader (the
+     * existing path scan picks up the new symlink). If install fails,
+     * the original NotFoundException-with-context is thrown so the
+     * caller surfaces the registry/install error.
+     *
+     * Failure here MUST NOT register a half-loaded plugin (FR-14).
+     * `ensurePluginAvailable` writes installState='error' on its own;
+     * this method only forwards the error.
+     */
+    private async ensurePluginInstalledOrThrow(pluginId: string): Promise<void> {
+        if (!this.pluginInstaller) return;
+        if (this.pluginInstaller.getDistributionMode() !== 'dynamic') return;
+        if (this.pluginRegistryService.get(pluginId)) return;
+        await this.pluginInstaller.ensurePluginAvailable(pluginId);
+    }
 
     // ============================================
     // Plugin List Operations
@@ -395,6 +427,12 @@ export class PluginOperationsService {
         secretSettings?: Record<string, unknown>,
         autoEnableForWorks?: boolean,
     ): Promise<UserPluginResponse> {
+        // EW-693 / T18 — install-on-enable for dynamic-mode plugins.
+        // No-op in bundled mode; in dynamic mode this fetches +
+        // verifies + places the plugin under installDir/node_modules
+        // before the registry lookup below runs.
+        await this.ensurePluginInstalledOrThrow(pluginId);
+
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);

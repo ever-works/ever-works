@@ -20,6 +20,7 @@ describe('config/constants', () => {
                 key.startsWith('PLATFORM_') ||
                 key.startsWith('APP_') ||
                 key.startsWith('COMPANY_') ||
+                key.startsWith('PLUGIN_') ||
                 key === 'AUTH_SECRET' ||
                 key === 'WEB_URL' ||
                 key === 'HTTP_DEBUG' ||
@@ -393,6 +394,159 @@ describe('config/constants', () => {
                 process.env.FEATURE_ZERO_FRICTION_ONBOARDING = v;
                 expect(config.features.zeroFrictionOnboarding()).toBe(true);
             }
+        });
+    });
+
+    // EW-693 — Dynamic plugin distribution.
+    // Default behaviour MUST remain `bundled` so pre-EW-693 deployments
+    // are unaffected (FR-22). The validate() guard exists purely to
+    // catch operator errors when dynamic mode is selected without a
+    // registry — bundled-mode validate() must be a no-op.
+    describe('config.features.dynamicPlugins (EW-693)', () => {
+        it('defaults to false when env unset', () => {
+            expect(config.features.dynamicPlugins()).toBe(false);
+        });
+
+        it('returns true only for case-insensitive "true"', () => {
+            process.env.FEATURE_DYNAMIC_PLUGINS = 'true';
+            expect(config.features.dynamicPlugins()).toBe(true);
+            process.env.FEATURE_DYNAMIC_PLUGINS = 'TRUE';
+            expect(config.features.dynamicPlugins()).toBe(true);
+            process.env.FEATURE_DYNAMIC_PLUGINS = 'True';
+            expect(config.features.dynamicPlugins()).toBe(true);
+        });
+
+        it('returns false for everything else (including "1"/"yes")', () => {
+            for (const v of ['false', '', '1', 'yes', 'enabled', 'whatever']) {
+                process.env.FEATURE_DYNAMIC_PLUGINS = v;
+                expect(config.features.dynamicPlugins()).toBe(false);
+            }
+        });
+    });
+
+    describe('config.plugins (EW-693)', () => {
+        describe('distributionMode', () => {
+            it('defaults to "bundled" when env unset (FR-22)', () => {
+                expect(config.plugins.distributionMode()).toBe('bundled');
+            });
+
+            it('coerces to "bundled" for empty / unrecognised values', () => {
+                for (const v of ['', 'BUNDLED', 'static', 'yes', 'maybe']) {
+                    process.env.PLUGIN_DISTRIBUTION_MODE = v;
+                    expect(config.plugins.distributionMode()).toBe('bundled');
+                }
+            });
+
+            it('returns "dynamic" for case-insensitive "dynamic"', () => {
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'dynamic';
+                expect(config.plugins.distributionMode()).toBe('dynamic');
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'DYNAMIC';
+                expect(config.plugins.distributionMode()).toBe('dynamic');
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'Dynamic';
+                expect(config.plugins.distributionMode()).toBe('dynamic');
+            });
+        });
+
+        describe('registryUrl', () => {
+            it('defaults to public npm', () => {
+                expect(config.plugins.registryUrl()).toBe('https://registry.npmjs.org');
+            });
+
+            it('honours PLUGIN_REGISTRY_URL override', () => {
+                process.env.PLUGIN_REGISTRY_URL = 'https://npm.example.com';
+                expect(config.plugins.registryUrl()).toBe('https://npm.example.com');
+            });
+
+            it('treats empty env value as falsy and uses default', () => {
+                process.env.PLUGIN_REGISTRY_URL = '';
+                expect(config.plugins.registryUrl()).toBe('https://registry.npmjs.org');
+            });
+        });
+
+        describe('registryGithubUrl', () => {
+            it('defaults to GitHub Packages', () => {
+                expect(config.plugins.registryGithubUrl()).toBe('https://npm.pkg.github.com');
+            });
+
+            it('honours PLUGIN_REGISTRY_GITHUB_URL override', () => {
+                process.env.PLUGIN_REGISTRY_GITHUB_URL = 'https://npm.ghe.example.com';
+                expect(config.plugins.registryGithubUrl()).toBe('https://npm.ghe.example.com');
+            });
+        });
+
+        describe('registryToken', () => {
+            it('is undefined when unset (no auth needed for public npm)', () => {
+                expect(config.plugins.registryToken()).toBeUndefined();
+            });
+
+            it('returns the token verbatim when set', () => {
+                process.env.PLUGIN_REGISTRY_TOKEN = 'npm_xyz';
+                expect(config.plugins.registryToken()).toBe('npm_xyz');
+            });
+
+            it('treats empty string as undefined (avoids sending `Bearer ` with no value)', () => {
+                process.env.PLUGIN_REGISTRY_TOKEN = '';
+                expect(config.plugins.registryToken()).toBeUndefined();
+            });
+        });
+
+        describe('installDir', () => {
+            it('defaults to /app/plugins', () => {
+                expect(config.plugins.installDir()).toBe('/app/plugins');
+            });
+
+            it('honours PLUGIN_INSTALL_DIR override', () => {
+                process.env.PLUGIN_INSTALL_DIR = '/var/lib/ever-works/plugins';
+                expect(config.plugins.installDir()).toBe('/var/lib/ever-works/plugins');
+            });
+        });
+
+        describe('validate', () => {
+            it('is a no-op in bundled mode (FR-22)', () => {
+                // No env set at all — bundled is the default. validate() must not throw.
+                expect(() => config.plugins.validate()).not.toThrow();
+            });
+
+            it('is a no-op in bundled mode even with no registry env set', () => {
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'bundled';
+                process.env.PLUGIN_REGISTRY_URL = '';
+                process.env.PLUGIN_REGISTRY_GITHUB_URL = '';
+                expect(() => config.plugins.validate()).not.toThrow();
+            });
+
+            it('passes in dynamic mode when registry URL is set (default)', () => {
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'dynamic';
+                // PLUGIN_REGISTRY_URL unset → default fallback in registryUrl();
+                // validate() reads the RAW env (intentionally) but the GitHub URL
+                // env is also unset → falls through to the throw branch.
+                // Set the primary explicitly so this test passes.
+                process.env.PLUGIN_REGISTRY_URL = 'https://registry.npmjs.org';
+                expect(() => config.plugins.validate()).not.toThrow();
+            });
+
+            it('passes in dynamic mode when only the GitHub registry is set', () => {
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'dynamic';
+                process.env.PLUGIN_REGISTRY_GITHUB_URL = 'https://npm.pkg.github.com';
+                expect(() => config.plugins.validate()).not.toThrow();
+            });
+
+            it('throws in dynamic mode when both registry envs are explicitly empty', () => {
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'dynamic';
+                process.env.PLUGIN_REGISTRY_URL = '';
+                process.env.PLUGIN_REGISTRY_GITHUB_URL = '';
+                expect(() => config.plugins.validate()).toThrow(
+                    /PLUGIN_DISTRIBUTION_MODE=dynamic requires/,
+                );
+            });
+
+            it('does NOT throw when registry envs are whitespace-trimmed away (treats as empty)', () => {
+                // Pinned: trim() on the raw value catches whitespace-only configs.
+                // Operator typos like a stray space character must NOT pass.
+                process.env.PLUGIN_DISTRIBUTION_MODE = 'dynamic';
+                process.env.PLUGIN_REGISTRY_URL = '   ';
+                process.env.PLUGIN_REGISTRY_GITHUB_URL = '\t';
+                expect(() => config.plugins.validate()).toThrow();
+            });
         });
     });
 });

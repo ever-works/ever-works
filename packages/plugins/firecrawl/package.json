@@ -8,7 +8,7 @@
 		"url": "https://ever.co"
 	},
 	"license": "AGPL-3.0",
-	"private": true,
+	"private": false,
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
@@ -67,7 +67,12 @@
 					"secret": true,
 					"description": "Firecrawl API key (optional - can be set via admin/user settings)"
 				}
-			]
+			],
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }
