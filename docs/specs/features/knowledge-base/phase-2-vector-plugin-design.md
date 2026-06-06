@@ -41,10 +41,10 @@ The semantic-search code path is therefore **already pluggable on the embedding 
 
 ## 3. Design decisions (top of the doc — vote here)
 
-| # | Decision | Default recommendation |
-|---|---|---|
-| **D1** | Vector stores become a new plugin category `vector-store` with the `IVectorStorePlugin` contract in §4. | Adopt. |
-| **D2** | The plugin **owns its own store**. The platform Postgres keeps only `(workId, documentId, chunkCount, lastEmbeddedAt)` coordinates for invalidation; the actual chunks + vectors live wherever the plugin puts them. | Adopt. |
+| #      | Decision                                                                                                                                                                                                                                                              | Default recommendation                 |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| **D1** | Vector stores become a new plugin category `vector-store` with the `IVectorStorePlugin` contract in §4.                                                                                                                                                               | Adopt.                                 |
+| **D2** | The plugin **owns its own store**. The platform Postgres keeps only `(workId, documentId, chunkCount, lastEmbeddedAt)` coordinates for invalidation; the actual chunks + vectors live wherever the plugin puts them.                                                  | Adopt.                                 |
 | **D3** | Embedding generation stays on `IAiProviderPlugin.createEmbedding` (no separate plugin category). Selection is controlled by a per-Work setting `kbEmbeddingProviderId` plus an operator env pin `KB_EMBEDDING_PROVIDER_ID`, mirroring `KB_TRANSCRIPTION_PROVIDER_ID`. | Adopt; document the alternative in §5. |
 
 The rest of the doc justifies each of these and sketches the contract + migration.
@@ -62,87 +62,87 @@ import type { PluginSettings } from '../../settings/settings.types.js';
 export type VectorStoreProviderType = string;
 
 export interface VectorStoreCapabilities {
-    /** Server-side metadata filter pushdown (every retrieval query must filter by workId). */
-    readonly supportsMetadataFilter: boolean;
-    /** Hybrid (vector + keyword) scoring in a single round trip. */
-    readonly supportsHybridSearch: boolean;
-    /** Multi-tenant namespace / collection per Work without a per-Work index. */
-    readonly supportsNamespaces: boolean;
-    /** Server-side hard delete (vs soft delete + sweep). */
-    readonly supportsDelete: boolean;
-    /** Native embedding dimensions the backend was provisioned for. 0 = backend-managed. */
-    readonly nativeDimensions: number;
-    /** Backend can re-embed on write (e.g. Weaviate text2vec modules). */
-    readonly embedsOnWrite: boolean;
+	/** Server-side metadata filter pushdown (every retrieval query must filter by workId). */
+	readonly supportsMetadataFilter: boolean;
+	/** Hybrid (vector + keyword) scoring in a single round trip. */
+	readonly supportsHybridSearch: boolean;
+	/** Multi-tenant namespace / collection per Work without a per-Work index. */
+	readonly supportsNamespaces: boolean;
+	/** Server-side hard delete (vs soft delete + sweep). */
+	readonly supportsDelete: boolean;
+	/** Native embedding dimensions the backend was provisioned for. 0 = backend-managed. */
+	readonly nativeDimensions: number;
+	/** Backend can re-embed on write (e.g. Weaviate text2vec modules). */
+	readonly embedsOnWrite: boolean;
 }
 
 export interface KnowledgeChunk {
-    readonly id: string;
-    readonly workId: string;
-    readonly documentId: string;
-    readonly chunkIndex: number;
-    readonly content: string;
-    readonly tokenCount: number;
-    /** Caller-side embedding. May be null when `capabilities.embedsOnWrite === true`. */
-    readonly embedding?: number[] | null;
-    readonly metadata?: Record<string, unknown> | null;
-    readonly tenantId?: string | null;
-    readonly organizationId?: string | null;
+	readonly id: string;
+	readonly workId: string;
+	readonly documentId: string;
+	readonly chunkIndex: number;
+	readonly content: string;
+	readonly tokenCount: number;
+	/** Caller-side embedding. May be null when `capabilities.embedsOnWrite === true`. */
+	readonly embedding?: number[] | null;
+	readonly metadata?: Record<string, unknown> | null;
+	readonly tenantId?: string | null;
+	readonly organizationId?: string | null;
 }
 
 export interface UpsertChunksInput {
-    readonly workId: string;
-    readonly documentId: string;
-    readonly chunks: readonly KnowledgeChunk[];
-    readonly settings?: PluginSettings;
+	readonly workId: string;
+	readonly documentId: string;
+	readonly chunks: readonly KnowledgeChunk[];
+	readonly settings?: PluginSettings;
 }
 
 export interface UpsertChunksResult {
-    readonly written: number;
-    readonly skipped: number;
+	readonly written: number;
+	readonly skipped: number;
 }
 
 export interface QueryChunksInput {
-    readonly workId: string;
-    /** Either the embedded query vector (preferred) or raw text when `embedsOnWrite`. */
-    readonly queryEmbedding?: number[];
-    readonly queryText?: string;
-    readonly topK: number;
-    /** Caller-side metadata filter, AND-combined with the mandatory workId filter. */
-    readonly filter?: Record<string, unknown>;
-    readonly settings?: PluginSettings;
+	readonly workId: string;
+	/** Either the embedded query vector (preferred) or raw text when `embedsOnWrite`. */
+	readonly queryEmbedding?: number[];
+	readonly queryText?: string;
+	readonly topK: number;
+	/** Caller-side metadata filter, AND-combined with the mandatory workId filter. */
+	readonly filter?: Record<string, unknown>;
+	readonly settings?: PluginSettings;
 }
 
 export interface QueryChunkHit {
-    readonly chunk: KnowledgeChunk;
-    /** Distance / score is plugin-defined; consumers must treat it as ordinal only. */
-    readonly score: number;
+	readonly chunk: KnowledgeChunk;
+	/** Distance / score is plugin-defined; consumers must treat it as ordinal only. */
+	readonly score: number;
 }
 
 export interface QueryChunksResult {
-    readonly hits: readonly QueryChunkHit[];
+	readonly hits: readonly QueryChunkHit[];
 }
 
 export interface IVectorStorePlugin extends IPlugin {
-    readonly providerType: VectorStoreProviderType;
-    readonly providerName: string;
-    readonly capabilities: VectorStoreCapabilities;
+	readonly providerType: VectorStoreProviderType;
+	readonly providerName: string;
+	readonly capabilities: VectorStoreCapabilities;
 
-    upsertChunks(input: UpsertChunksInput): Promise<UpsertChunksResult>;
-    queryChunks(input: QueryChunksInput): Promise<QueryChunksResult>;
-    deleteByDocument(input: { workId: string; documentId: string; settings?: PluginSettings }): Promise<void>;
-    deleteByWork(input: { workId: string; settings?: PluginSettings }): Promise<void>;
+	upsertChunks(input: UpsertChunksInput): Promise<UpsertChunksResult>;
+	queryChunks(input: QueryChunksInput): Promise<QueryChunksResult>;
+	deleteByDocument(input: { workId: string; documentId: string; settings?: PluginSettings }): Promise<void>;
+	deleteByWork(input: { workId: string; settings?: PluginSettings }): Promise<void>;
 
-    /** Optional escape hatch for ad-hoc non-chunk embeddings (e.g. summary vectors for §27 future work). */
-    upsertEmbedding?(input: {
-        readonly workId: string;
-        readonly key: string;
-        readonly embedding: number[];
-        readonly metadata?: Record<string, unknown>;
-        readonly settings?: PluginSettings;
-    }): Promise<void>;
+	/** Optional escape hatch for ad-hoc non-chunk embeddings (e.g. summary vectors for §27 future work). */
+	upsertEmbedding?(input: {
+		readonly workId: string;
+		readonly key: string;
+		readonly embedding: number[];
+		readonly metadata?: Record<string, unknown>;
+		readonly settings?: PluginSettings;
+	}): Promise<void>;
 
-    isAvailable(settings?: PluginSettings): Promise<boolean>;
+	isAvailable(settings?: PluginSettings): Promise<boolean>;
 }
 ```
 
@@ -178,12 +178,12 @@ Rationale:
 
 **Alternative considered** — dedicated `embedding-provider` plugin category with its own `IEmbeddingProviderPlugin` interface. Trade-offs:
 
-| Aspect | Keep on `IAiProviderPlugin` (recommended) | Dedicated `IEmbeddingProvider` |
-|---|---|---|
-| Vendor packaging | One plugin per vendor | Two plugins per vendor that does both |
-| Lib growth | Optional method, current shape | New facade, new category, new selection chain |
+| Aspect                                      | Keep on `IAiProviderPlugin` (recommended)                       | Dedicated `IEmbeddingProvider`                   |
+| ------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------ |
+| Vendor packaging                            | One plugin per vendor                                           | Two plugins per vendor that does both            |
+| Lib growth                                  | Optional method, current shape                                  | New facade, new category, new selection chain    |
 | Embedding-only vendors (Voyage, Mixedbread) | Still ships as an "AI provider" with chat methods unimplemented | Cleaner — declares only the capability it serves |
-| Future "embedding-only" routing UX | Harder — UI groups by provider, not capability | Easier — separate dropdown |
+| Future "embedding-only" routing UX          | Harder — UI groups by provider, not capability                  | Easier — separate dropdown                       |
 
 We can adopt the alternative later if/when the embedding-only vendor list grows past 2-3 and the chat-completion-shaped plugin shell starts to feel like a lie. Today it doesn't.
 
@@ -262,10 +262,10 @@ Implementation:
 
 ## 9. Next-up plugin packages (post-EW-642)
 
-| Plugin | Backend | License | Why ship next |
-|---|---|---|---|
-| `@ever-works/qdrant-plugin` | Qdrant (self-host or Cloud) | Apache 2.0 | Strong throughput, good k8s story, vendor-neutral. Easiest non-Postgres path. |
-| `@ever-works/pinecone-plugin` | Pinecone (managed only) | proprietary | Customer ask — Pinecone is the default in many enterprises and serverless customers don't want to operate Postgres extensions. |
+| Plugin                        | Backend                     | License     | Why ship next                                                                                                                  |
+| ----------------------------- | --------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `@ever-works/qdrant-plugin`   | Qdrant (self-host or Cloud) | Apache 2.0  | Strong throughput, good k8s story, vendor-neutral. Easiest non-Postgres path.                                                  |
+| `@ever-works/pinecone-plugin` | Pinecone (managed only)     | proprietary | Customer ask — Pinecone is the default in many enterprises and serverless customers don't want to operate Postgres extensions. |
 
 **Surveyed but not shipped first** (each gets a plugin package only when a customer asks):
 
