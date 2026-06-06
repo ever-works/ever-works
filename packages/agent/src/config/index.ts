@@ -432,5 +432,17 @@ export const config = {
             const v = process.env.KB_TRANSCRIPTION_LANGUAGE;
             return v && v.length > 0 ? v : undefined;
         },
+        /**
+         * EW-643 Phase 3 slice 4a — how long an upload may sit in
+         * `extractionStatus='running'` before the daily reconcile sweep
+         * declares it stale and force-marks it `failed`. Default 24h —
+         * comfortably longer than the `kb-transcribe` task's 30-minute
+         * `maxDuration`, so a slow-but-legitimate retry isn't mistaken
+         * for a dead row.
+         */
+        getReconcileStaleAfterMs(): number {
+            const raw = parseInt(process.env.KB_RECONCILE_STALE_AFTER_MS || '', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 24 * 60 * 60 * 1000;
+        },
     },
 };
