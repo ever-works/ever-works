@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { z } from 'zod';
+// Security: reuse the canonical MCP response sanitiser so any sensitive field
+// (accessToken, apiKey, token, …) the upstream API echoes back in a success or
+// error body is stripped before the payload is surfaced to the LLM.
+import { sanitizeResponse } from './api-client/sanitize.js';
 
 const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const PRINTABLE_ASCII = /^[\x21-\x7E]+$/;
@@ -78,6 +82,11 @@ export class RegisterWorkTool {
 			} catch {
 				parsed = { raw: text };
 			}
+			// Security: this tool bypasses ApiClientService, so the upstream body
+			// is not sanitised yet. Strip sensitive fields (token, accessToken,
+			// apiKey, …) before it reaches the LLM tool result — both the success
+			// and error envelopes serialise `parsed`.
+			parsed = sanitizeResponse(parsed);
 
 			if (response.status >= 200 && response.status < 300) {
 				return {

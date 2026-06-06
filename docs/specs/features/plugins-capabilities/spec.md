@@ -405,7 +405,7 @@ DEPLOYMENT` rows. The single `'work.deployed'` activity-log entry
   settings cascade) — see [`plugin-system`](../plugin-system/spec.md).
 - The **plugin-management HTTP surface** (`/api/plugins/*`) for
   enable/disable/configure operations — see the `plugins.controller`
-  spec line in [`COVERAGE-TRACKER.md`](../../../../COVERAGE-TRACKER.md).
+  spec line in [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md).
 - The **content-extractor** capability — currently has no dedicated
   HTTP controller; surfaces via the work generation pipeline only.
 - The **AI-provider / pipeline / prompt-provider** capabilities —
@@ -505,4 +505,4 @@ redirects users to the work-specific endpoint?]` — see OQ-1.
 - Related feature: [`activity-log`](../activity-log/spec.md) (`ActivityLogListener` for deploy events)
 - Related feature: [`integrations-github-app`](../integrations-github-app/spec.md) (alternative GitHub auth path)
 - Constitution: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
-- Coverage tracker: [`COVERAGE-TRACKER.md`](../../../../COVERAGE-TRACKER.md)
+- Coverage tracker: [`COVERAGE-TRACKER.md`](../../../internal/COVERAGE-TRACKER.md)

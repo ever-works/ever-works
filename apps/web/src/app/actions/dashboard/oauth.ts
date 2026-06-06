@@ -3,6 +3,7 @@
 import { oauthAPI, gitProvidersAPI } from '@/lib/api';
 import { setOAuthStateCookie } from '@/lib/auth';
 import { ROUTES, routeWithParams, withAppUrl } from '@/lib/constants';
+import { isValidRedirectUrl } from '@/lib/utils';
 
 export async function checkGitProviderConnection(providerId: string) {
     try {
@@ -50,9 +51,17 @@ export async function connectOAuthProvider(
             return { success: false, error: 'Provider ID is required' };
         }
 
+        // Security: confine returnPath to safe same-origin relative paths.
+        // Reject protocol-relative ("//evil.com"), backslash-obfuscated ("/\evil"),
+        // and absolute URLs to prevent open-redirect after the OAuth callback.
+        const safeReturnPath =
+            returnPath && returnPath.startsWith('/') && isValidRedirectUrl(returnPath)
+                ? returnPath
+                : undefined;
+
         const params = new URLSearchParams();
-        if (returnPath) {
-            params.append('returnPath', returnPath);
+        if (safeReturnPath) {
+            params.append('returnPath', safeReturnPath);
         }
 
         const queryString = params.toString();
@@ -105,9 +114,17 @@ export async function connectReadPackagesOAuthProvider(
             return { success: false, error: 'Provider ID is required' };
         }
 
+        // Security: confine returnPath to safe same-origin relative paths.
+        // Reject protocol-relative ("//evil.com"), backslash-obfuscated ("/\evil"),
+        // and absolute URLs to prevent open-redirect after the OAuth callback.
+        const safeReturnPath =
+            returnPath && returnPath.startsWith('/') && isValidRedirectUrl(returnPath)
+                ? returnPath
+                : undefined;
+
         const params = new URLSearchParams();
-        if (returnPath) {
-            params.append('returnPath', returnPath);
+        if (safeReturnPath) {
+            params.append('returnPath', safeReturnPath);
         }
 
         const queryString = params.toString();

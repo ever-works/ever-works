@@ -1,6 +1,12 @@
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const MODELS_DEV_URL = 'https://models.dev/api.json';
 const FETCH_TIMEOUT_MS = 10_000;
+// Security (supply-chain DoS): cap the catalog response body before buffering
+// it into memory. These are hardcoded first-party endpoints, but a DNS/BGP
+// hijack or a compromised upstream could return a multi-gigabyte body that
+// OOMs the process at `response.json()`. Real payloads are well under 1 MB;
+// 16 MB is a generous ceiling that never trips for legitimate responses.
+const MAX_CATALOG_BYTES = 16 * 1024 * 1024;
 const QUANT_PATTERN = /[-_](?:q\d[_a-z0-9]*|fp16|fp32|bf16|f16|f32|gguf|iq\d[_a-z0-9]*)$/i;
 const PARAM_SIZE_PATTERN = /^(\d+\.?\d*[bm](?:-a\d+[bm])?)/i;
 
@@ -65,6 +71,60 @@ function fetchWithTimeout(url: string): Promise<Response> {
     }).finally(() => {
         clearTimeout(timer);
     });
+}
+
+/**
+ * Read and JSON-parse a catalog response while enforcing {@link MAX_CATALOG_BYTES}.
+ *
+ * Security (supply-chain DoS): a hijacked/compromised upstream could advertise
+ * (or stream) a multi-gigabyte body. We reject early on an over-large
+ * `Content-Length`, then stream the body and abort once the accumulated bytes
+ * exceed the cap, so memory stays bounded even when the header lies or is
+ * absent. Callers already treat a thrown error as "fetch failed → null".
+ */
+async function readJsonWithCap(response: Response): Promise<unknown> {
+    const declaredLength = Number(response.headers?.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_CATALOG_BYTES) {
+        throw new Error(`Catalog response exceeds ${MAX_CATALOG_BYTES} bytes`);
+    }
+
+    const body = response.body;
+    if (!body || typeof body.getReader !== 'function') {
+        // No readable stream available (real `fetch` always provides one; this
+        // guards non-streamable Response shapes). Fall back to the buffered
+        // parse — the Content-Length check above still applies when present.
+        return response.json();
+    }
+
+    const reader = body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+                total += value.byteLength;
+                if (total > MAX_CATALOG_BYTES) {
+                    throw new Error(`Catalog response exceeds ${MAX_CATALOG_BYTES} bytes`);
+                }
+                chunks.push(value);
+            }
+        }
+    } finally {
+        // Release the stream so an aborted/over-large read doesn't leak the socket.
+        await reader.cancel().catch(() => undefined);
+    }
+
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.byteLength;
+    }
+
+    return JSON.parse(new TextDecoder().decode(merged));
 }
 
 function buildOpenRouterEntry(raw: Record<string, unknown>): ModelCatalogEntry | null {
@@ -259,7 +319,7 @@ export async function fetchOpenRouterModelCatalog(): Promise<ModelCatalogEntry[]
         const response = await fetchWithTimeout(OPENROUTER_MODELS_URL);
         if (!response.ok) return null;
 
-        const body = (await response.json()) as OpenRouterModelsResponse;
+        const body = (await readJsonWithCap(response)) as OpenRouterModelsResponse;
         const data = Array.isArray(body?.data) ? body.data : null;
         if (!data) return null;
 
@@ -280,7 +340,7 @@ export async function fetchModelsDevCatalog(): Promise<ModelCatalogEntry[] | nul
         const response = await fetchWithTimeout(MODELS_DEV_URL);
         if (!response.ok) return null;
 
-        const body = await response.json();
+        const body = await readJsonWithCap(response);
         const entries = buildModelsDevEntries(body);
         return entries.length > 0 ? entries : null;
     } catch {

@@ -58,7 +58,11 @@ export class InitiateConnectionRequestDto {
             'Where Composio should redirect after the OAuth dance completes. Defaults to the platform-configured callback page.',
     })
     @IsOptional()
-    @IsUrl({ require_tld: false })
+    // Security: restrict to http/https and require a protocol so caller-supplied
+    // callback URLs can't smuggle javascript:/data:/file: schemes into the OAuth
+    // redirect (open-redirect / XSS). class-validator's IsUrl does NOT restrict
+    // schemes unless protocols/require_protocol are set explicitly.
+    @IsUrl({ require_tld: false, require_protocol: true, protocols: ['http', 'https'] })
     callbackUrl?: string;
 }
 

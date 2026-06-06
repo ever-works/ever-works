@@ -16,6 +16,11 @@ import {
     GitProviderConnectionInfo,
 } from '@/lib/api';
 import type { Work } from '@/lib/api/types-only';
+// Security: server actions are reachable as POST endpoints via the
+// `Next-Action` header, so every exported action must independently verify
+// authentication at the Next.js layer before proxying to backend
+// mutation/read endpoints — UI gating alone is not a security boundary.
+// Mirrors work-proposals.ts / work-schedule.ts.
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkGitProviderConnection } from './oauth';
 import { getTranslations } from 'next-intl/server';
@@ -122,6 +127,12 @@ const checkOrganization = (
 };
 
 export async function createWork(data: CreateWorkDto) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const createWorkSchema = await getCreateWorkSchema();
@@ -165,7 +176,8 @@ export async function createWork(data: CreateWorkDto) {
         validation.data.gitProvider = providerId;
         validation.data.deployProvider = data.deployProvider || undefined;
 
-        console.log('Creating Work:', validation.data);
+        // Security: do not log validated work-creation payload (contains git
+        // provider id, owner/org, slug, name, description) to server stdout.
 
         // Create the work with validated data
         const { work } = await workAPI.create(validation.data);
@@ -223,6 +235,13 @@ interface AIWorkOptions {
 }
 
 export async function createWorkWithAI(request: AIWorkOptions) {
+    // Security: verify authentication at the server-action boundary before
+    // triggering AI work generation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     // AI prompt validation schema. `slug` is optional — when the
@@ -358,8 +377,11 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             prompt: generationPrompt,
             providers: request.providers || undefined,
             pluginConfig: {
-                target_keywords: workDetails.keywords,
                 ...(request.pluginConfig || {}),
+                // Security: server-authoritative key listed AFTER the
+                // user-supplied spread so a malicious caller cannot override
+                // the generation target keywords via pluginConfig.
+                target_keywords: workDetails.keywords,
             },
         });
 
@@ -407,6 +429,12 @@ export async function fetchWorkGenerationHistory(
 }
 
 export async function updateWork(workId: string, data: UpdateWorkDto) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const updateWorkSchema = z.object({
@@ -472,6 +500,12 @@ export async function updateWork(workId: string, data: UpdateWorkDto) {
 }
 
 export async function updateWorkTemplate(workId: string, websiteTemplateId: string | null) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
@@ -511,6 +545,12 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
 }
 
 export async function deleteWork(workId: string, options?: DeleteWorkDto) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     // Delete work validation schema
@@ -584,6 +624,13 @@ interface GetWorksParams {
 }
 
 export async function getWorks(params: GetWorksParams = {}) {
+    // Security: verify authentication at the server-action boundary before
+    // enumerating works.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     try {
@@ -610,6 +657,13 @@ export async function getWorks(params: GetWorksParams = {}) {
 }
 
 export async function getWorkStats() {
+    // Security: verify authentication at the server-action boundary before
+    // returning aggregate stats.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const stats = await workAPI.getStats();
         return {
@@ -635,6 +689,12 @@ export async function getWorkStats() {
 // Import actions
 
 export async function analyzeRepository(sourceUrl: string, providerId?: string) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
@@ -702,6 +762,13 @@ function isImportWorkProviderErrors(value: unknown): value is ImportWorkProvider
 }
 
 export async function importWork(data: ImportWorkRequest) {
+    // Security: verify authentication at the server-action boundary before
+    // importing from an external source URL.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const importSchema = z.object({
@@ -819,6 +886,12 @@ interface GetUserRepositoriesParams {
 }
 
 export async function analyzeForLinking(sourceUrl: string, providerId: string) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     const urlSchema = z.string().url(t('import.invalidUrl'));
@@ -860,6 +933,12 @@ export async function analyzeForLinking(sourceUrl: string, providerId: string) {
 }
 
 export async function getUserRepositories(params: GetUserRepositoriesParams) {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     const t = await getTranslations('actions.works');
 
     try {
@@ -1106,6 +1185,28 @@ export async function updateWebsiteSettings(
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    // Validate the scalar fields that have well-defined safe bounds.
+    // Nested objects (header/homepage/footer/custom_menu) are passed through
+    // to the backend which applies its own class-validator checks.
+    const websiteSettingsScalarSchema = z.object({
+        company_name: z.string().max(200).optional(),
+        company_website: z.string().max(2000).optional(),
+        import_max_rows: z.number().int().min(1).max(2000).optional(),
+        categories_enabled: z.boolean().optional(),
+        companies_enabled: z.boolean().optional(),
+        tags_enabled: z.boolean().optional(),
+        surveys_enabled: z.boolean().optional(),
+        export_enabled: z.boolean().optional(),
+        import_enabled: z.boolean().optional(),
+    });
+    const scalarValidation = websiteSettingsScalarSchema.safeParse(data);
+    if (!scalarValidation.success) {
+        return {
+            success: false,
+            error: scalarValidation.error.errors[0].message,
+        };
     }
 
     try {

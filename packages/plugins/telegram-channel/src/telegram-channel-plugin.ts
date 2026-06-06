@@ -92,10 +92,21 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 	}
 
 	async send(payload: ChannelSendInput, options: ChannelOptions): Promise<ChannelSendResult> {
-		const cached = this.idempotencyCache.get(payload.messageRef);
+		const { botToken, chatId } = getTarget(payload.target ?? {});
+
+		// Security: this plugin is a module-level singleton shared across all
+		// tenants, so keying the idempotency cache on payload.messageRef alone
+		// lets a second tenant that reuses another tenant's messageRef get back
+		// the first tenant's ChannelSendResult and silently skip real delivery
+		// (or pre-poison the cache to suppress it). Scope the key to the actual
+		// delivery target (bot token + chat id) + the per-tenant channel row id
+		// so the de-dupe stays per-channel while a bare messageRef can no longer
+		// collide across tenants. Legitimate same-channel retries still hit.
+		// Mirrors the discord-channel plugin.
+		const cacheKey = `${options.channelId ?? ''} ${botToken} ${chatId} ${payload.messageRef}`;
+		const cached = this.idempotencyCache.get(cacheKey);
 		if (cached) return cached;
 
-		const { botToken, chatId } = getTarget(payload.target ?? {});
 		const isMarkdown = payload.rich?.kind === 'telegram-markdown';
 		const text = isMarkdown ? String(payload.rich.payload) : payload.text;
 		const other: { parse_mode?: 'MarkdownV2'; disable_notification?: boolean } = {};
@@ -118,7 +129,7 @@ export class TelegramChannelPlugin implements INotificationChannelPlugin {
 			providerMessageId: messageId,
 			deliveredAt: new Date()
 		};
-		this.idempotencyCache.set(payload.messageRef, result);
+		this.idempotencyCache.set(cacheKey, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

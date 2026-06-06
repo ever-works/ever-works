@@ -1,0 +1,222 @@
+name: Publish Plugins
+
+# EW-693 — Dynamic plugin distribution publish pipeline.
+#
+# Builds the plugin SDK + every distributable plugin, then publishes
+# each one (independently versioned via Changesets) to BOTH:
+#   1. npmjs.org      — `npm publish --access restricted`
+#                        (per user directive 2026-06-03, all packages
+#                         ship PRIVATE until each is explicitly cleared.)
+#   2. GitHub Packages — `npm publish --registry=https://npm.pkg.github.com`
+#
+# Triggers:
+#   - push to main with a tag matching `plugin-v*` (cuts a real release).
+#   - workflow_dispatch (manual). Supports `dry_run` for safe previews
+#     and `skip_github_packages` for npm-only publishes.
+#
+# Credentials (set as repo secrets):
+#   - NPM_TOKEN         — npmjs.org automation token, restricted scope.
+#   - GITHUB_TOKEN      — provided automatically; needs `packages:write`.
+#
+# Local equivalents:
+#   pnpm publish:plugins:dry           # dry-run via the orchestrator script.
+#   pnpm publish:plugins               # real publish to npm.
+#
+# Spec: docs/specs/features/dynamic-plugin-distribution/{spec,plan,tasks}.md
+# Mirrors the auth pattern of .github/workflows/publish-cli.yml.
+
+on:
+  push:
+    tags:
+      - 'plugin-v*'
+      - '@ever-works/*@*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual publish to either registry)'
+        required: true
+        type: boolean
+        default: true
+      skip_github_packages:
+        description: 'Skip GitHub Packages publish (npmjs.org only)'
+        required: true
+        type: boolean
+        default: false
+      filter:
+        description: 'Plugin name substring filter (empty = all distributable)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build plugin SDK + every plugin
+        run: pnpm build:plugins
+
+      - name: List distributable plugins (debug)
+        run: |
+          node -e "
+          const fs = require('fs');
+          const path = require('path');
+          const dir = 'packages/plugins';
+          const resolve = m =>
+            m.distribution ?? (m.systemPlugin === true ? 'core' : 'registry');
+          for (const name of fs.readdirSync(dir)) {
+            const pkgPath = path.join(dir, name, 'package.json');
+            if (!fs.existsSync(pkgPath)) continue;
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+            const m = pkg.everworks?.plugin ?? {};
+            const dist = resolve(m);
+            console.log(\`\${dist.padEnd(10)} \${pkg.name}@\${pkg.version} (private:\${pkg.private})\`);
+          }
+          "
+
+      - name: Upload built packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugins-dist
+          path: |
+            packages/plugin/dist/
+            packages/plugins/*/dist/
+            packages/plugins/*/package.json
+            packages/plugin/package.json
+
+  publish-npm:
+    name: Publish to npmjs.org
+    needs: build
+    runs-on: ubuntu-latest
+    # Push of a plugin-* tag, OR manual dispatch.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (
+        startsWith(github.ref, 'refs/tags/plugin-v') ||
+        startsWith(github.ref, 'refs/tags/@ever-works/')
+      ))
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js (npmjs.org auth)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: plugins-dist
+          path: .
+
+      - name: Configure npm token
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish distributable plugins (npmjs.org)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          FILTER="${{ github.event.inputs.filter || '' }}"
+          ARGS=()
+          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
+          if [ -n "$FILTER" ]; then ARGS+=(--filter "$FILTER"); fi
+          node scripts/publish-plugins.mjs --registry=https://registry.npmjs.org "${ARGS[@]}"
+
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs: build
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && (
+        startsWith(github.ref, 'refs/tags/plugin-v') ||
+        startsWith(github.ref, 'refs/tags/@ever-works/')
+      ) ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.skip_github_packages != 'true')
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js (GitHub Packages auth)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@ever-works'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore built packages
+        uses: actions/download-artifact@v4
+        with:
+          name: plugins-dist
+          path: .
+
+      - name: Configure GitHub Packages token
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+          echo "@ever-works:registry=https://npm.pkg.github.com" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish distributable plugins (GitHub Packages)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+          FILTER="${{ github.event.inputs.filter || '' }}"
+          ARGS=()
+          if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
+          if [ -n "$FILTER" ]; then ARGS+=(--filter "$FILTER"); fi
+          node scripts/publish-plugins.mjs --registry=https://npm.pkg.github.com "${ARGS[@]}"

@@ -1,4 +1,5 @@
 import { slugify, unslugify } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 type ReadFn = (path: string) => Promise<string>;
 type WriteFn = (path: string, content: string) => Promise<void>;
@@ -87,12 +88,32 @@ function extractBrandName(brand: unknown): string {
 }
 
 function extractBrandLogo(brand: unknown, fallbackLogo: unknown): string | undefined {
+	// Security: logo URLs originate from LLM-generated content (potentially
+	// influenced by hostile web pages). Validate each candidate against the
+	// shared SSRF guard (blocks private IPs, cloud-metadata endpoints, etc.)
+	// and restrict to HTTPS-only before storing in the workspace metadata file.
 	if (typeof brand === 'object' && brand !== null && 'logo_url' in brand) {
 		const url = (brand as { logo_url?: unknown }).logo_url;
-		if (typeof url === 'string') return url;
+		if (typeof url === 'string' && isSafeLogo(url)) return url;
 	}
-	if (typeof fallbackLogo === 'string') return fallbackLogo;
+	if (typeof fallbackLogo === 'string' && isSafeLogo(fallbackLogo)) return fallbackLogo;
 	return undefined;
+}
+
+/**
+ * Returns true only if `url` is an HTTPS URL that passes the SSRF lexical
+ * guard (no private IPs, no cloud-metadata endpoints, no non-HTTP schemes).
+ * Logo URLs written to workspace metadata must always be HTTPS; plain HTTP
+ * is rejected to prevent potential server-side downgrade exploitation.
+ */
+function isSafeLogo(url: string): boolean {
+	if (!isSafeWebhookUrl(url)) return false;
+	// isSafeWebhookUrl allows both http: and https:; we restrict logos to https: only.
+	try {
+		return new URL(url).protocol === 'https:';
+	} catch {
+		return false;
+	}
 }
 
 // ── Path helpers ────────────────────────────────────────────────────

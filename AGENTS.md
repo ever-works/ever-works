@@ -45,6 +45,9 @@ These are minimal, high-signal reminders; full details are in `CLAUDE.md`.
 - Shared logic: `packages/agent`, `packages/monitoring`, `packages/cli-shared`.
 - Use **pnpm** only (no npm/yarn). Node.js **≥22**.
 - Respect **Prettier** and **TypeScript** rules described in `CLAUDE.md`.
+- **No stray docs in the repo root.** Working/progress/plan/summary/tracker
+  markdown belongs under `docs/internal/` (or `docs/specs/<feature>/`), never the
+  root — see the "Documentation layout" rule in `CLAUDE.md`.
 
 For architecture, testing patterns, deployment, and detailed conventions, **do not restate them here**—instead, **read and follow `CLAUDE.md`**.
 

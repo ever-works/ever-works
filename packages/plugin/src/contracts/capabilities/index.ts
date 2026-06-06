@@ -19,3 +19,5 @@ export * from './task-tracker.interface.js';
 export * from './email-provider.interface.js';
 export * from './notification-channel.interface.js';
 export * from './agent-memory.interface.js';
+// EW-642 — pluggable vector-store backends.
+export * from './vector-store.interface.js';

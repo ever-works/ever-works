@@ -38,6 +38,21 @@ const iconMap: Record<string, React.FC<{ className?: string }>> = {
 	)
 };
 
+function sanitizeHref(href: string): string {
+	try {
+		const url = new URL(href);
+		if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+			return '#';
+		}
+	} catch {
+		// Relative URLs are acceptable; block only explicit dangerous protocols
+		if (/^javascript:/i.test(href) || /^data:/i.test(href) || /^vbscript:/i.test(href)) {
+			return '#';
+		}
+	}
+	return href;
+}
+
 export function SocialLinks({ links }: SocialLinksProps): React.ReactElement {
 	if (!links || links.length < 1) return <></>;
 
@@ -48,7 +63,7 @@ export function SocialLinks({ links }: SocialLinksProps): React.ReactElement {
 				return (
 					<a
 						key={index}
-						href={link.href}
+						href={sanitizeHref(link.href)}
 						target="_blank"
 						rel="noopener noreferrer"
 						title={link.title}

@@ -536,6 +536,9 @@ export class OrganizationService {
             // create-Organization transaction. Behaviour on Postgres is unchanged.
             const isPostgres = manager.connection?.options?.type === 'postgres';
             for (const { table, userColumn } of allTables) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(userColumn);
                 const sql = isPostgres
                     ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
                     : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`;
@@ -759,6 +762,9 @@ export class OrganizationService {
             // (Codex P1 on PR #1058 caught this.)
             let tierARowsUpdated = 0;
             for (const { table, userColumn } of TIER_A_BACKFILL_TABLES) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
@@ -773,6 +779,9 @@ export class OrganizationService {
             // no other way to express "not-yet-stamped".
             let tierBRowsUpdated = 0;
             for (const { table, userColumn } of TIER_B_BACKFILL_TABLES) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
                     [tenantId, userId],
@@ -788,6 +797,9 @@ export class OrganizationService {
             // than its tenantId for filtering — same shape as Tier A.)
             let tierCRowsUpdated = 0;
             for (const { table, userColumn } of TIER_C_DIRECT_USER_BACKFILL_TABLES) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
@@ -815,6 +827,11 @@ export class OrganizationService {
                 parentFkColumn,
                 parentUserColumn,
             } of TIER_C_BACKFILL_TABLES) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(parentTable);
+                this.assertSafeSqlIdentifier(parentFkColumn);
+                this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${parentFkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
@@ -833,6 +850,11 @@ export class OrganizationService {
                 parentTable,
                 parentUserColumn,
             } of INDIRECT_BOTH_BACKFILL_TABLES) {
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(fkColumn);
+                this.assertSafeSqlIdentifier(parentTable);
+                this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
@@ -847,6 +869,11 @@ export class OrganizationService {
             {
                 const { table, fkColumn, parentTable, parentUserColumn } =
                     INDIRECT_TENANT_ONLY_VIA_WORK;
+                // Security: validate interpolated identifiers (defense-in-depth).
+                this.assertSafeSqlIdentifier(table);
+                this.assertSafeSqlIdentifier(fkColumn);
+                this.assertSafeSqlIdentifier(parentTable);
+                this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
                     `UPDATE "${table}" SET "tenantId" = $1 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $2 AND "${table}"."tenantId" IS NULL`,
                     [tenantId, userId],
@@ -938,6 +965,32 @@ export class OrganizationService {
         desired: string,
     ): Promise<{ available: boolean; normalized: string; suggestion?: string }> {
         return this.usernameAllocator.suggest(desired);
+    }
+
+    /**
+     * Security: defense-in-depth guard for the raw-SQL backfill loops.
+     *
+     * Every table / column / FK name interpolated into the backfill
+     * UPDATEs below comes from the compile-time `*_BACKFILL_TABLES`
+     * constants (all hardcoded literals today), so this is NOT reachable
+     * by an untrusted actor. But the constants are typed as plain
+     * `string`, and the identifiers are spliced into SQL via
+     * double-quoting only — a future entry containing a `"` (or any
+     * other metacharacter) would break out of the identifier context and
+     * become injectable. This assertion makes that failure loud and
+     * immediate instead of silent: any identifier that isn't a bare
+     * `[A-Za-z_][A-Za-z0-9_]*` name (which all current entries are) is
+     * rejected before it can reach `manager.query`.
+     */
+    private static readonly SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+    private assertSafeSqlIdentifier(identifier: string): string {
+        if (!OrganizationService.SAFE_SQL_IDENTIFIER.test(identifier)) {
+            throw new Error(
+                `Unsafe SQL identifier in backfill table map: ${JSON.stringify(identifier)}`,
+            );
+        }
+        return identifier;
     }
 
     /**

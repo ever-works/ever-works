@@ -1,0 +1,42 @@
+{
+	"$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
+	"changelog": "@changesets/cli/changelog",
+	"commit": false,
+	"fixed": [],
+	"linked": [],
+	"access": "restricted",
+	"baseBranch": "develop",
+	"updateInternalDependencies": "patch",
+	"ignore": [
+		"ever-works-api",
+		"ever-works-web",
+		"ever-works-cli",
+		"ever-works-internal-cli",
+		"ever-works-mcp",
+		"ever-works-admin",
+		"ever-works-docs",
+		"@ever-works/agent",
+		"@ever-works/contracts",
+		"@ever-works/cli-shared",
+		"@ever-works/email-templates",
+		"@ever-works/monitoring",
+		"@ever-works/trigger-tasks"
+	],
+	"___ew693_notes": [
+		"EW-693 — Dynamic plugin distribution.",
+		"This config enables INDEPENDENT per-plugin versioning so a plugin",
+		"release does not require a platform release (FR-7). Today every",
+		"@ever-works/*-plugin is at 1.0.0 lockstep; Changesets lets each one",
+		"bump on its own changelog entry.",
+		"",
+		"access: restricted (per user directive 2026-06-03) — plugins publish",
+		"as PRIVATE packages on npm until the user explicitly authorises",
+		"flipping any of them to public. Override per-changeset only with",
+		"explicit reviewer + ticket reference.",
+		"",
+		"ignore: internal apps + cross-cutting packages NOT meant for",
+		"public/private npm publication. They version with the platform.",
+		"@ever-works/plugin is intentionally NOT in ignore — it ships to npm",
+		"as the SDK consumed by 3rd-party plugin authors."
+	]
+}

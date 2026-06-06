@@ -39,8 +39,12 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
-import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
-import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
+import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import {
+    TaskChatService,
+    TaskRecurrenceDispatcherService,
+    TasksService,
+} from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -79,6 +83,44 @@ const DANGEROUS_METHOD_NAMES = new Set<string>([
 ]);
 
 const METHOD_NAME_RE = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
+/**
+ * Security (deserialization): the legitimate Trigger.dev worker always sends
+ * `args` as a SuperJSON envelope — a plain object with exactly a `json` field
+ * and an optional `meta` field (see `TriggerInternalApiClient.callRemote`).
+ * Before handing the value to `superjson.deserialize`, assert that strict
+ * shape so an attacker who learns `TRIGGER_INTERNAL_SECRET` cannot smuggle a
+ * crafted envelope (extra top-level keys, a non-object `meta`, or a
+ * `__proto__`/`constructor`/`prototype` sentinel at the top level) into the
+ * deserializer. This is behaviour-preserving for every real caller because
+ * SuperJSON's own output never contains keys other than `json`/`meta`.
+ */
+const FORBIDDEN_ENVELOPE_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
+
+function assertSuperJsonEnvelope(
+    value: unknown,
+): asserts value is { json: unknown; meta?: object } {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new BadRequestException('Invalid args envelope');
+    }
+    // Reject prototype-polluting envelopes (own keys only — inherited keys are
+    // not iterated here, but the explicit set blocks the sentinel names).
+    for (const key of Object.keys(value)) {
+        if (FORBIDDEN_ENVELOPE_KEYS.has(key)) {
+            throw new BadRequestException('Invalid args envelope');
+        }
+        if (key !== 'json' && key !== 'meta') {
+            throw new BadRequestException('Invalid args envelope');
+        }
+    }
+    if (!('json' in value)) {
+        throw new BadRequestException('Invalid args envelope');
+    }
+    const meta = (value as { meta?: unknown }).meta;
+    if (meta !== undefined && (typeof meta !== 'object' || meta === null || Array.isArray(meta))) {
+        throw new BadRequestException('Invalid args envelope');
+    }
+}
 
 /**
  * C-05 RPC half — at module-init time, build a per-service allow-list of
@@ -160,10 +202,15 @@ export class TriggerInternalController implements OnModuleInit {
         // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
         // one-shot worker over the internal RPC channel.
         private readonly agentScheduleDispatcherService: AgentScheduleDispatcherService,
+        // Agent runtime execution stays API-owned because the API module
+        // binds AI/tool/finalizer facades. Trigger workers call it over RPC.
+        private readonly agentRunService: AgentRunService,
         private readonly agentRepositoryRef: AgentRepository,
         private readonly agentRunRepositoryRef: AgentRunRepository,
         // Phase 17 — recurring Task dispatcher.
         private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
+        private readonly tasksService: TasksService,
+        private readonly taskChatService: TaskChatService,
         // Notifications v2 (EW-663) — exposed for the
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
@@ -200,10 +247,13 @@ export class TriggerInternalController implements OnModuleInit {
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
+            AgentRunService: this.agentRunService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,
             // Phase 17 — recurring Task dispatcher.
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
+            TasksService: this.tasksService,
+            TaskChatService: this.taskChatService,
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,
@@ -292,6 +342,14 @@ export class TriggerInternalController implements OnModuleInit {
         if (typeof fn !== 'function') {
             throw new BadRequestException(`Unknown method: ${body.method}`);
         }
+
+        // Security (deserialization): validate the SuperJSON envelope shape
+        // before deserializing so a crafted `args` (extra top-level keys, a
+        // non-object `meta`, or a `__proto__`/`constructor`/`prototype`
+        // sentinel) cannot reach the deserializer. Legitimate callers always
+        // send `{ json, meta? }` (SuperJSON's own output), so this is a no-op
+        // for real traffic.
+        assertSuperJsonEnvelope(body.args);
 
         // Deserialize args with SuperJSON (supports Date, Map, Set, etc.)
         const args = superjson.deserialize(body.args as any) as unknown[];

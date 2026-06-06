@@ -45,15 +45,18 @@ export function detectInformationalServices(): ServiceStatus[] {
     const mailer = process.env.MAILER_PROVIDER?.trim();
     const emailConfigured = !!mailer && !['faker', 'none'].includes(mailer);
 
+    // Security: Strip provider/backend names from public-facing mode labels so that
+    // the unauthenticated /api/health/ready response does not reveal the third-party
+    // integration topology (which AI gateway, email provider, storage backend, etc.).
+    // All entries now emit only 'enabled' | 'disabled' — boolean visibility without
+    // naming the vendor.
+    const storageConfigured = has(process.env.STORAGE_BACKEND);
+
     return [
         {
             key: 'ai_provider',
             configured: aiConfigured,
-            mode: has(process.env.PLUGIN_OPENROUTER_API_KEY)
-                ? 'openrouter'
-                : aiConfigured
-                  ? 'direct'
-                  : 'disabled',
+            mode: aiConfigured ? 'enabled' : 'disabled',
         },
         {
             key: 'sentry',
@@ -78,12 +81,12 @@ export function detectInformationalServices(): ServiceStatus[] {
         {
             key: 'email',
             configured: emailConfigured,
-            mode: mailer || 'none',
+            mode: emailConfigured ? 'enabled' : 'disabled',
         },
         {
             key: 'storage',
-            configured: has(process.env.STORAGE_BACKEND),
-            mode: process.env.STORAGE_BACKEND?.trim() || 'local-fs',
+            configured: storageConfigured,
+            mode: storageConfigured ? 'enabled' : 'disabled',
         },
     ];
 }

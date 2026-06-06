@@ -74,11 +74,16 @@ export class NotificationsController {
         @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
         @Query('category') category?: string,
     ) {
+        const validCategory =
+            category !== undefined &&
+            (Object.values(NotificationCategory) as string[]).includes(category)
+                ? (category as NotificationCategory)
+                : undefined;
         const notifications = await this.notificationService.getNotifications(auth.userId, {
             unreadOnly,
             limit: Math.min(limit, 100), // Cap at 100
             offset,
-            category: category as NotificationCategory,
+            category: validCategory,
         });
 
         return { notifications };

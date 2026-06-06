@@ -13,6 +13,7 @@ import type {
     ComposioConnectedAccount,
     ComposioToolkit,
 } from '@/lib/api/plugins-capabilities/composio';
+import { isValidRedirectUrl } from '@/lib/utils';
 
 interface ComposioConnectionsPanelProps {
     /** Optional callback URL Composio should redirect to after OAuth completes. */
@@ -126,11 +127,17 @@ export function ComposioConnectionsPanel({ callbackUrl }: ComposioConnectionsPan
                     setError(result.error ?? 'Failed to initiate connection');
                     return;
                 }
-                window.open(
-                    result.data.redirectUrl,
-                    '_blank',
-                    'noopener,noreferrer,width=600,height=700',
-                );
+                // Security: the OAuth redirect URL is returned by the third-party Composio
+                // API and is opened in a popup. A compromised/crafted response (or a malicious
+                // authConfig) could return a `javascript:`/`data:`/protocol-relative target,
+                // turning window.open() into an XSS/open-redirect sink. Only open http(s) URLs
+                // (legitimate OAuth URLs are always https); reject anything else.
+                const redirectUrl = result.data.redirectUrl;
+                if (!isValidRedirectUrl(redirectUrl)) {
+                    setError('Received an unsafe redirect URL from Composio. Connection aborted.');
+                    return;
+                }
+                window.open(redirectUrl, '_blank', 'noopener,noreferrer,width=600,height=700');
                 startPolling(toolkit.slug);
             } finally {
                 setConnectingSlug(null);

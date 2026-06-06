@@ -86,4 +86,34 @@ describe('MissionsList (Phase 6 PR Q + quick-add)', () => {
         const { container } = render(<MissionsList missions={missions} />);
         expect(container.querySelector('textarea')).not.toBeNull();
     });
+
+    it('renders a load error instead of the empty-state surface', () => {
+        render(<MissionsList missions={[]} loadError="API unavailable" />);
+        expect(screen.getByText('Could not load Missions.')).toBeTruthy();
+        expect(screen.getByText('API unavailable')).toBeTruthy();
+        expect(screen.queryByText('empty.title')).toBeNull();
+    });
+
+    it('renders pagination links when the server page provides pagination state', () => {
+        render(
+            <MissionsList
+                missions={[mkMission('a')]}
+                pagination={{
+                    offset: 24,
+                    hasPrevious: true,
+                    hasNext: true,
+                    previousHref: '/missions?offset=0',
+                    nextHref: '/missions?offset=48',
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Showing 25-25')).toBeTruthy();
+        expect(screen.getByText('Previous').closest('a')?.getAttribute('href')).toBe(
+            '/missions?offset=0',
+        );
+        expect(screen.getByText('Next').closest('a')?.getAttribute('href')).toBe(
+            '/missions?offset=48',
+        );
+    });
 });

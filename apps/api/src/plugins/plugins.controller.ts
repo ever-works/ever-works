@@ -10,12 +10,23 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    NotFoundException,
+    Optional,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { WorkOwnershipService } from '@ever-works/agent/services';
-import { PluginOperationsService } from '@ever-works/agent/plugins';
+import { PluginOperationsService, PluginInstallerService } from '@ever-works/agent/plugins';
+// EW-693 — catalog + install endpoints.
+import { PluginCatalogService } from './plugin-catalog.service';
+import {
+    PluginCatalogResponseDto,
+    PluginInstallRequestBodyDto,
+    PluginInstallResultDto,
+    PluginInstallStateResponseDto,
+} from './dto/plugin-install.dto';
 import {
     PluginListResponseDto,
     UserPluginResponseDto,
@@ -43,7 +54,127 @@ export class PluginsController {
         private readonly ownershipService: WorkOwnershipService,
         private readonly pluginValidationService: PluginValidationService,
         private readonly activityLogService: ActivityLogService,
+        // EW-693 — runtime installer + catalog. Optional so bundled-mode
+        // deployments without the dynamic-distribution providers wired up
+        // (e.g. tests) still construct.
+        @Optional()
+        private readonly catalogService?: PluginCatalogService,
+        @Optional()
+        private readonly installer?: PluginInstallerService,
     ) {}
+
+    // ============================================
+    // EW-693 — Dynamic plugin distribution
+    // ============================================
+
+    @Get('plugins/catalog')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List distributable plugins (EW-693)',
+        description:
+            'Returns the listable set of distributable plugins (manifest `distribution: "registry"`) ' +
+            'merged with per-replica install state. Includes plugins that are NOT yet installed on ' +
+            'this node — the UI uses `install.installState` to decide between Install / Enable.',
+    })
+    @ApiResponse({ status: 200, type: PluginCatalogResponseDto })
+    async getCatalog(): Promise<PluginCatalogResponseDto> {
+        if (!this.catalogService) {
+            // Bundled-mode deployment without the catalog wired up — surface an empty
+            // catalog rather than 500ing, so the UI degrades gracefully.
+            return { entries: [], fetchedAt: new Date().toISOString(), degraded: true };
+        }
+        return this.catalogService.listCatalog();
+    }
+
+    @Get('plugins/:pluginId/install-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Per-plugin install status (EW-693)',
+        description:
+            'Read-only progress endpoint. Returns the install lifecycle row distinct from the ' +
+            'enable state. Poll this after `POST /api/plugins/:id/install` until ' +
+            '`installState === "installed" | "error"`.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, type: PluginInstallStateResponseDto })
+    @ApiResponse({ status: 404, description: 'Plugin not found' })
+    async getInstallStatus(
+        @Param('pluginId') pluginId: string,
+    ): Promise<PluginInstallStateResponseDto> {
+        if (!this.catalogService) {
+            throw new NotFoundException(
+                `Plugin "${pluginId}" install status unavailable — dynamic mode not wired.`,
+            );
+        }
+        const state = await this.catalogService.getInstallState(pluginId);
+        if (!state) throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        return state;
+    }
+
+    @Post('plugins/:pluginId/install')
+    @HttpCode(HttpStatus.OK)
+    // Rate-limit installs (registry protection). Same Throttle decorator used
+    // by the rest of the API; the global ThrottlerModule + UserAwareThrottlerGuard
+    // pick up the override. 5 installs/min/user is generous for UI flows and
+    // tight enough to thwart accidental loops.
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Install a distributable plugin (EW-693)',
+        description:
+            'Allow-list + integrity-verified install (FR-10, FR-11). Refuses with: ' +
+            '409 (non-allowlisted), 424 (integrity mismatch), 502/504 (registry unreachable). ' +
+            'Idempotent — repeating after a successful install is a no-op.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, type: PluginInstallResultDto })
+    @ApiResponse({ status: 409, description: 'Plugin not permitted by the allowlist' })
+    @ApiResponse({ status: 424, description: 'Integrity mismatch' })
+    @ApiResponse({ status: 502, description: 'Registry unreachable / failed' })
+    async installPlugin(
+        @Param('pluginId') pluginId: string,
+        @Body() body: PluginInstallRequestBodyDto,
+    ): Promise<PluginInstallResultDto> {
+        if (!this.installer || !this.catalogService) {
+            throw new NotFoundException(
+                `Plugin install unavailable — PLUGIN_DISTRIBUTION_MODE=dynamic not configured.`,
+            );
+        }
+        await this.installer.install({
+            pluginId,
+            version: body.version,
+            integrity: body.integrity,
+            source: body.source,
+        });
+        const install = await this.catalogService.getInstallState(pluginId);
+        if (!install) throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        return { pluginId, install };
+    }
+
+    @Delete('plugins/:pluginId/install')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Uninstall a distributable plugin (EW-693)',
+        description:
+            'Removes the node_modules symlink + marks installState="available". ' +
+            'Refuses with 409 for core / `systemPlugin` plugins. Default retention = ' +
+            'keep installed package files on disk; a subsequent install re-links without re-downloading.',
+    })
+    @ApiParam({ name: 'pluginId', description: 'Plugin ID' })
+    @ApiResponse({ status: 200, type: PluginInstallStateResponseDto })
+    @ApiResponse({ status: 409, description: 'Core/systemPlugin plugins cannot be uninstalled' })
+    async uninstallPlugin(
+        @Param('pluginId') pluginId: string,
+    ): Promise<PluginInstallStateResponseDto> {
+        if (!this.installer || !this.catalogService) {
+            throw new NotFoundException(
+                `Plugin uninstall unavailable — PLUGIN_DISTRIBUTION_MODE=dynamic not configured.`,
+            );
+        }
+        await this.installer.uninstall(pluginId);
+        const install = await this.catalogService.getInstallState(pluginId);
+        if (!install) throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        return install;
+    }
 
     // ============================================
     // Plugin Listing

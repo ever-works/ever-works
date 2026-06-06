@@ -44,11 +44,28 @@ describe('CrmTenantService', () => {
         });
     });
 
-    describe('getTenantEndpointPrefix', () => {
-        it('returns `/tenants/<tenantId>`', () => {
-            expect(service.getTenantEndpointPrefix({ tenantId: 'work_42' })).toBe(
-                '/tenants/work_42',
-            );
+    describe('resolveCallerTenantContext (per-caller tenant isolation)', () => {
+        it('derives the context from the authenticated user’s real tenantId', () => {
+            const ctx = service.resolveCallerTenantContext('user-1', 'tenant-abc');
+            expect(ctx).toEqual({ tenantId: 'tenant-abc', userId: 'user-1' });
+        });
+
+        it('fails closed (returns null) when the caller has no Tenant (null)', () => {
+            expect(service.resolveCallerTenantContext('user-1', null)).toBeNull();
+        });
+
+        it('fails closed (returns null) when tenantId is undefined or empty', () => {
+            expect(service.resolveCallerTenantContext('user-1', undefined)).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', '')).toBeNull();
+        });
+
+        it('rejects a malformed tenant id carrying path-traversal metacharacters', () => {
+            // Attack: a crafted tenant id must never be usable as a traversal
+            // vector or an injection into the credential-map lookup / logs.
+            expect(service.resolveCallerTenantContext('user-1', '../admin')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a/b')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a%2Fb')).toBeNull();
+            expect(service.resolveCallerTenantContext('user-1', 'a\\b')).toBeNull();
         });
     });
 

@@ -109,7 +109,7 @@ export class OnboardingTerminalService {
     private async deliveryFor(
         url: string,
         payload: StateMarkerPayload,
-        secret = process.env.WEBHOOK_FALLBACK_SECRET ?? 'ever-works-dev-secret',
+        secret = this.resolveFallbackSecret(),
     ): Promise<DeliveryResult> {
         return this.delivery.deliver({
             url,
@@ -117,6 +117,38 @@ export class OnboardingTerminalService {
             event: 'onboarding.terminal',
             payload: payload as unknown as Record<string, unknown>,
         });
+    }
+
+    /**
+     * Resolve the HMAC signing secret for the per-request onboarding webhook
+     * when no per-subscription secret is supplied.
+     *
+     * Security: never sign with a hardcoded, source-visible secret in a
+     * deployed environment. If `WEBHOOK_FALLBACK_SECRET` is set it must carry
+     * real entropy (>= 32 chars, mirroring `config.auth.secret`); a missing or
+     * weak value is fatal in production/staging so signatures cannot be forged
+     * with the well-known dev placeholder. Only the explicit local dev/test
+     * envs fall back to a static string so the fan-out still runs there.
+     */
+    private resolveFallbackSecret(): string {
+        const secret = process.env.WEBHOOK_FALLBACK_SECRET;
+        const env = process.env.NODE_ENV;
+        const isLocalEnv =
+            env === 'development' || env === 'test' || env === undefined || env === '';
+
+        if (secret && secret.length >= 32) {
+            return secret;
+        }
+        if (!isLocalEnv) {
+            throw new Error(
+                'WEBHOOK_FALLBACK_SECRET must be set to at least 32 characters of high-entropy ' +
+                    'material outside local dev/test. Refusing to sign onboarding webhooks with a ' +
+                    'source-visible placeholder, which would let any reader forge valid signatures.',
+            );
+        }
+        // Local dev/test only: a short or unset secret degrades to a static
+        // placeholder so the fan-out is exercisable without configuration.
+        return secret ?? 'ever-works-dev-secret';
     }
 }
 

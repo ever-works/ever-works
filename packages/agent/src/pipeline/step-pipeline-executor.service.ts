@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import * as superjson from 'superjson';
+import { z } from 'zod';
 import type {
     WorkReference,
     GenerationRequest,
@@ -49,6 +50,26 @@ export interface CheckpointData {
     completedSteps: string[];
     schemaVersion: number;
 }
+
+// Security: strict envelope schema for checkpoint blobs read back from the
+// (potentially shared) cache store. SuperJSON faithfully revives whatever
+// shape it was given, so a malformed or attacker-poisoned cache entry could
+// otherwise reach `contextFromSnapshot()` or be used as `skipSteps`. We
+// reject anything whose envelope doesn't match before trusting it. `context`
+// stays opaque (`unknown`) — it's a plugin-specific snapshot validated by the
+// owning plugin via `isCheckpointViable()` / `contextFromSnapshot()` — but
+// the structural fields the engine itself consumes are pinned to their
+// expected types. `completedSteps` in particular feeds `skipSteps`, so it must
+// be a clean array of strings.
+const checkpointDataSchema = z.object({
+    stepIndex: z.number(),
+    stepName: z.string(),
+    pipelineId: z.string(),
+    timestamp: z.string(),
+    context: z.unknown(),
+    completedSteps: z.array(z.string()),
+    schemaVersion: z.number(),
+});
 
 const CHECKPOINT_TTL_MS = 24 * 60 * 60 * 1000;
 const CURRENT_CHECKPOINT_VERSION = 4;
@@ -757,7 +778,26 @@ export class StepPipelineExecutorService {
                 return null;
             }
 
-            const data = superjson.parse<CheckpointData>(serialized);
+            const raw = superjson.parse<unknown>(serialized);
+
+            // Security: validate the deserialized envelope shape before
+            // trusting it. SuperJSON revives any structure it's handed, so a
+            // corrupt or poisoned cache entry could otherwise inject an
+            // attacker-controlled `context` into `contextFromSnapshot()` or a
+            // non-array `completedSteps` into `skipSteps`. A structural
+            // mismatch is treated like a missing/incompatible checkpoint:
+            // drop it and fall back to a fresh run.
+            const parsed = checkpointDataSchema.safeParse(raw);
+            if (!parsed.success) {
+                this.logger.warn(
+                    `Checkpoint for work ${workId} failed structural validation. ` +
+                        `Clearing malformed checkpoint.`,
+                );
+                await this.cacheManager.del(checkpointKey);
+                return null;
+            }
+            const data = parsed.data as CheckpointData;
+
             const schemaVersion = data.schemaVersion ?? 0;
             if (schemaVersion !== CURRENT_CHECKPOINT_VERSION) {
                 this.logger.warn(

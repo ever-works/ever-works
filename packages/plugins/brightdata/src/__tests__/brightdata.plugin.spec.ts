@@ -4,7 +4,9 @@ import type { PluginContext, SearchOptions, ContentExtractionOptions } from '@ev
 const { searchMock, scrapeMock, BdClientCtorMock } = vi.hoisted(() => {
 	const search = vi.fn();
 	const scrape = vi.fn();
-	const ctor = vi.fn().mockImplementation(() => ({ search, scrape }));
+	const ctor = vi.fn().mockImplementation(function () {
+		return { search, scrape };
+	});
 	return { searchMock: search, scrapeMock: scrape, BdClientCtorMock: ctor };
 });
 

@@ -41,10 +41,30 @@ export function usePluginDeviceAuth({
             return;
         }
 
+        // Security: `verificationUri` originates from a plugin-returned DeviceAuthStatus
+        // (untrusted under dynamic plugin distribution). This hook auto-opens it via
+        // window.open() on start/poll, so a malicious plugin could supply a
+        // `javascript:`/`data:` URI that executes script in the user's session. Only allow
+        // http(s) (legitimate device-auth verification URLs are always https); reject anything
+        // else. Mirrors toSafeVerificationUrl in PluginDeviceAuthConnection.tsx.
+        let safeVerificationUri: string;
+        try {
+            const parsed = new URL(verificationUri.trim());
+            const protocol = parsed.protocol.toLowerCase();
+            if (protocol !== 'https:' && protocol !== 'http:') {
+                handledVerificationUriRef.current = verificationUri;
+                return;
+            }
+            safeVerificationUri = parsed.href;
+        } catch {
+            handledVerificationUriRef.current = verificationUri;
+            return;
+        }
+
         // Browsers can return null for noopener/noreferrer popups even when the tab opens.
         // Treat the URL as handled once we attempt to open it so polling does not reopen it.
         handledVerificationUriRef.current = verificationUri;
-        window.open(verificationUri, '_blank', 'noopener,noreferrer');
+        window.open(safeVerificationUri, '_blank', 'noopener,noreferrer');
     }, []);
 
     const refresh = useCallback(async () => {

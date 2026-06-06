@@ -98,8 +98,12 @@ export class WorksConfigRepositorySyncService {
                 throw error;
             }
 
+            // Security: a force push rewrites remote history and can silently
+            // discard commits made by a concurrent push. Emit an auditable
+            // WARNING including the repository directory so operators can trace
+            // every history-overwriting recovery to a specific repo/run.
             this.logger.warn(
-                '.works/works.yml sync push was rejected as non-fast-forward; force pushing',
+                `.works/works.yml sync push was rejected as non-fast-forward for ${dir}; force pushing (remote history will be overwritten)`,
             );
             await this.gitFacade.push({ dir, force: true }, { userId, providerId });
         }

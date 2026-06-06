@@ -1,5 +1,18 @@
 .env
 
+# Agent/e2e build scratch — never commit. Put transient agent files under one of
+# these blanket-ignored dirs (preferred); the explicit patterns below also catch
+# scratch that has historically leaked to the repo root from agent workflow runs.
+/scratch/
+/.agent/
+**/.agent-scratch/
+/wf-*.js
+/missing-themes.json
+/wave-*.json
+/_tsc.txt
+/probe-routes.txt
+/apps/fix-w*.json
+
 # compiled output
 dist
 tmp

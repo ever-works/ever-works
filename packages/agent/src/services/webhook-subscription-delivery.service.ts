@@ -76,8 +76,17 @@ export class WebhookSubscriptionDeliveryService {
      */
     private decryptSecret: (encrypted: string) => string = (s) => s;
 
+    // Security: tracks whether a real decryptor was wired via
+    // setSecretDecryptor(). The identity default above only exists so unit
+    // tests can pass a raw secret on the subscription row. If production
+    // wiring is ever missed, we must NOT silently HMAC-sign payloads with the
+    // raw AES-256-GCM ciphertext (leaks ciphertext in the signature header and
+    // produces invalid signatures); dispatch() fails closed instead.
+    private secretDecryptorWired = false;
+
     setSecretDecryptor(decrypt: (encrypted: string) => string): void {
         this.decryptSecret = decrypt;
+        this.secretDecryptorWired = true;
     }
 
     private get maxConsecutiveFailures(): number {
@@ -131,6 +140,40 @@ export class WebhookSubscriptionDeliveryService {
                     ok: false,
                     outcome: 'client_error',
                     error: `subscription_${sub.status}`,
+                    deliveryId: input.deliveryId ?? sub.id,
+                },
+                subscription: { id: sub.id, status: sub.status },
+                shouldRetry: false,
+                consecutiveFailures: sub.consecutiveFailures,
+            };
+        }
+
+        // Security: fail closed if no real decryptor was wired in production.
+        // Without this, a module that forgot to call setSecretDecryptor() would
+        // fall back to the identity default and HMAC-sign the payload with the
+        // raw ciphertext from `secretEncrypted` — leaking it in the signature
+        // header and shipping cryptographically invalid signatures. Dev/test
+        // (NODE_ENV !== 'production') keep the identity passthrough so fixtures
+        // that store a raw secret still work.
+        if (!this.secretDecryptorWired && process.env.NODE_ENV === 'production') {
+            this.logger.error(
+                `webhook.decryptor_unwired sub=${sub.id} event=${input.event} — refusing to deliver (no secret decryptor registered)`,
+            );
+            if (input.deliveryId) {
+                await this.deliveries
+                    .recordAttempt(input.deliveryId, {
+                        status: 'failed',
+                        lastOutcome: 'decrypt_failed',
+                        lastError: 'secret_decryptor_not_registered',
+                        triggerRunId: input.triggerRunId ?? null,
+                    })
+                    .catch(() => {});
+            }
+            return {
+                result: {
+                    ok: false,
+                    outcome: 'client_error',
+                    error: 'decrypt_failed',
                     deliveryId: input.deliveryId ?? sub.id,
                 },
                 subscription: { id: sub.id, status: sub.status },

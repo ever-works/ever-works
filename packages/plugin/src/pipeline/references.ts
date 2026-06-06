@@ -32,6 +32,23 @@ export function getDefaultReferenceTtlDays(): number {
 	return DEFAULT_REFERENCE_TTL_DAYS;
 }
 
+// Security: ReferenceEntry.error is populated from error messages that
+// originate from fetching hostile, attacker-controlled URLs (a malicious
+// server can shape the message via its response). Strip control characters
+// (newlines, tabs, ANSI/ESC, other C0/C1 codes) to prevent log injection when
+// entries are serialized into structured logs, and cap the length so a crafted
+// error body can't bloat persisted entries / API responses. The class covers
+// C0 (0x00-0x1F), DEL + C1 (0x7F-0x9F) and leaves all printable text
+// (including accented Latin at 0xC0 and above) untouched.
+const MAX_REFERENCE_ERROR_LENGTH = 512;
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_PATTERN = /[\x00-\x1F\x7F-\x9F]/g;
+
+function sanitizeReferenceError(error: string): string {
+	const cleaned = error.replace(CONTROL_CHARS_PATTERN, ' ');
+	return cleaned.length > MAX_REFERENCE_ERROR_LENGTH ? cleaned.slice(0, MAX_REFERENCE_ERROR_LENGTH) : cleaned;
+}
+
 export function normalizeReferenceUrl(raw: string): string {
 	const trimmed = raw.trim();
 	if (!trimmed) {
@@ -40,6 +57,15 @@ export function normalizeReferenceUrl(raw: string): string {
 
 	try {
 		const parsed = new URL(trimmed);
+		// Security: only http(s) references may be normalized + stored. `new URL`
+		// happily parses javascript:, data:, file:, blob: etc., which would then
+		// land in ReferenceEntry.normalized_url and could reach a frontend that
+		// renders source_url as <a href> (stored XSS) or a server-side fetcher
+		// (SSRF). Reject any non-HTTP(S) scheme by returning an empty string so
+		// the entry never matches and is never rendered as a live link.
+		if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+			return '';
+		}
 		const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
 		const searchParams = [...parsed.searchParams.entries()]
 			.filter(([key]) => {
@@ -169,7 +195,9 @@ export function createReferenceEntry(options: {
 		items_created: options.itemsCreated,
 		pipeline: options.pipeline,
 		provider: options.provider,
-		error: options.error
+		// Security: sanitize the attacker-influenced error string (control-char
+		// strip + length cap) before it is persisted into the reference entry.
+		error: options.error !== undefined ? sanitizeReferenceError(options.error) : undefined
 	};
 }
 

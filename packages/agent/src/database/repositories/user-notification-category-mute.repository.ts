@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { IsNull, MoreThan, Repository } from 'typeorm';
 import { UserNotificationCategoryMute } from '../../entities/user-notification-category-mute.entity';
 
 /**
@@ -50,7 +50,7 @@ export class UserNotificationCategoryMuteRepository {
         const now = new Date();
         return this.repository.find({
             where: [
-                { userId, mutedUntil: undefined },
+                { userId, mutedUntil: IsNull() }, // Security: IsNull() generates IS NULL; undefined is silently ignored by TypeORM
                 { userId, mutedUntil: MoreThan(now) },
             ],
         });

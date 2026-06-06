@@ -15,31 +15,32 @@ interface UploadedFileMeta {
 
 interface Props {
     taskId: string;
+    workId?: string | null;
     initial: TaskAttachmentRow[];
+    initialError?: string | null;
 }
 
 /**
  * FU-5 — task attachments panel mounted between transitions and
  * conversation on TaskDetailClient.
  *
- * Drag-and-drop file picker uploads via the proxy route at
- * `/api/uploads` (which forwards to the NestJS multipart endpoint),
- * then wires the returned uploadId into the Task via the existing
+ * Drag-and-drop file picker uploads through the Work KB proxy route,
+ * then wires the returned upload row id into the Task via the existing
  * `POST /api/tasks/:id/attachments` endpoint. Filename + size are
  * captured client-side so the list reads as something more useful
  * than a bare uuid even before the joined upload metadata lands on
  * the API response.
  *
- * Image-only upload restriction comes from the api-side controller —
- * we surface the upstream error verbatim so the user sees the right
- * 413 / 415 / 400 message instead of a generic toast.
+ * Upload validation comes from the Work KB controller; upstream
+ * errors are surfaced verbatim so the user sees the right 413 / 415 /
+ * 400 message instead of a generic toast.
  */
-export function TaskAttachmentsSection({ taskId, initial }: Props) {
+export function TaskAttachmentsSection({ taskId, workId, initial, initialError = null }: Props) {
     const [rows, setRows] = useState<TaskAttachmentRow[]>(initial);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
     const [pending, startTransition] = useTransition();
     const [dragOver, setDragOver] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(initialError);
     const [busy, setBusy] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -51,9 +52,12 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
             void (async () => {
                 for (const file of files) {
                     try {
+                        if (!workId) {
+                            throw new Error('Attachments are available for Work-scoped tasks.');
+                        }
                         const form = new FormData();
                         form.append('file', file);
-                        const resp = await fetch('/api/uploads', {
+                        const resp = await fetch(`/api/works/${workId}/kb/uploads`, {
                             method: 'POST',
                             body: form,
                         });
@@ -61,11 +65,15 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
                             const text = await resp.text().catch(() => '');
                             throw new Error(text || `Upload failed (${resp.status})`);
                         }
-                        const body = (await resp.json()) as { id?: string };
-                        if (!body?.id) {
-                            throw new Error('Upload succeeded but response missing id field.');
+                        const body = (await resp.json()) as {
+                            id?: string;
+                            upload?: { id?: string };
+                        };
+                        const uploadId = body.upload?.id ?? body.id;
+                        if (!uploadId) {
+                            throw new Error('Upload succeeded but response missing upload id.');
                         }
-                        const row = await attachUploadAction(taskId, body.id);
+                        const row = await attachUploadAction(taskId, uploadId);
                         setRows((prev) => [row, ...prev]);
                         setMeta((prev) => ({
                             ...prev,
@@ -130,42 +138,50 @@ export function TaskAttachmentsSection({ taskId, initial }: Props) {
                 </p>
             </header>
 
-            <div
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                className={cn(
-                    'rounded-lg border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-2 text-center',
-                    dragOver
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border/60 dark:border-border-dark/60',
-                    busy && 'opacity-60',
-                )}
-            >
-                <Upload className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
-                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                    Drag &amp; drop a file here or
-                </p>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => inputRef.current?.click()}
-                    disabled={busy}
+            {workId ? (
+                <div
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={cn(
+                        'rounded-lg border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-2 text-center',
+                        dragOver
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border/60 dark:border-border-dark/60',
+                        busy && 'opacity-60',
+                    )}
                 >
-                    {busy ? 'Uploading…' : 'Browse'}
-                </Button>
-                <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    onChange={handleSelect}
-                    className="hidden"
-                />
-            </div>
+                    <Upload className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        Drag &amp; drop a file here or
+                    </p>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={busy}
+                    >
+                        {busy ? 'Uploading…' : 'Browse'}
+                    </Button>
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        multiple
+                        onChange={handleSelect}
+                        className="hidden"
+                    />
+                </div>
+            ) : (
+                <div className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        Attachments are available after the task is scoped to a Work.
+                    </p>
+                </div>
+            )}
 
             {error && (
                 <p className="text-xs text-danger mt-2" role="alert">

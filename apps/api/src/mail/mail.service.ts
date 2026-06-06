@@ -168,10 +168,12 @@ export class MailService {
                     ...this.getBrandingContext(),
                     firstName: data.user.username,
                     changedAt: this.formatDateTime(data.changedAt),
-                    ipAddress: data.ipAddress,
-                    location: data.location,
-                    device: data.device,
-                    browser: data.browser,
+                    // Security: strip HTML tags from header-derived fields before
+                    // passing them into the Handlebars context (defence-in-depth).
+                    ipAddress: this.stripHtmlTags(data.ipAddress),
+                    location: this.stripHtmlTags(data.location),
+                    device: this.stripHtmlTags(data.device),
+                    browser: this.stripHtmlTags(data.browser),
                     secureAccountUrl,
                 },
             });
@@ -236,10 +238,12 @@ export class MailService {
                     ...this.getBrandingContext(),
                     firstName: data.user.username,
                     loginTime: this.formatDateTime(data.loginTime),
-                    device: data.device,
-                    browser: data.browser,
-                    location: data.location,
-                    ipAddress: data.ipAddress,
+                    // Security: strip HTML tags from header-derived fields before
+                    // passing them into the Handlebars context (defence-in-depth).
+                    device: this.stripHtmlTags(data.device),
+                    browser: this.stripHtmlTags(data.browser),
+                    location: this.stripHtmlTags(data.location),
+                    ipAddress: this.stripHtmlTags(data.ipAddress),
                     verifyUrl,
                     verifyToken: data.verifyToken,
                     secureAccountUrl,
@@ -303,9 +307,17 @@ export class MailService {
                     ...this.getBrandingContext(),
                     inviteeName: data.invitee.username,
                     inviterName: data.inviter.username,
+                    // The member-invitation template renders {{directoryName}}/
+                    // {{directoryUrl}} (legacy naming for the invited Work). The
+                    // context previously passed workName/workUrl, leaving those
+                    // template vars undefined — and with Handlebars strict mode
+                    // (mail.module.ts) that THROWS, so the invitation email
+                    // silently failed to send. Provide both names.
                     workName: data.work.name,
-                    roleName: this.formatRoleName(data.role),
                     workUrl: data.workUrl,
+                    directoryName: data.work.name,
+                    directoryUrl: data.workUrl,
+                    roleName: this.formatRoleName(data.role),
                 },
             });
         } catch (error) {
@@ -451,6 +463,23 @@ export class MailService {
                 error?.stack ?? error,
             );
         }
+    }
+
+    /**
+     * Security: strip HTML tags from a value derived from untrusted HTTP
+     * request headers (User-Agent, X-Forwarded-For, geo-lookup strings)
+     * before placing it in a Handlebars email context.  Handlebars
+     * double-brace syntax (`{{ }}`) HTML-escapes its output, so the risk
+     * with current templates is low, but sanitising here provides
+     * defence-in-depth against any future template that uses triple-brace
+     * (`{{{ }}}`) unescaped output.  The regex matches the house-style
+     * pattern used in agent-template-catalog.service.ts.
+     */
+    private stripHtmlTags(value: string | null | undefined): string {
+        if (!value) {
+            return '';
+        }
+        return value.replace(/<[^>]*>/g, '');
     }
 
     /**

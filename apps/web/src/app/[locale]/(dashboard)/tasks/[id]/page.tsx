@@ -3,6 +3,10 @@ import { notFound } from 'next/navigation';
 import { tasksAPI, type TaskChatMessage } from '@/lib/api/tasks';
 import { TaskDetailClient } from '@/components/tasks/TaskDetailClient';
 
+function errorMessage(err: unknown, fallback: string): string {
+    return err instanceof Error ? err.message : fallback;
+}
+
 export async function generateMetadata({
     params,
 }: {
@@ -26,21 +30,36 @@ export async function generateMetadata({
  */
 export default async function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const [task, chat, attachments] = await Promise.all([
-        tasksAPI.get(id),
-        tasksAPI.listChat(id, { limit: 50 }).catch(() => ({ data: [] as TaskChatMessage[] })),
+    const task = await tasksAPI.get(id);
+    if (!task) notFound();
+
+    const [chatResult, attachmentResult] = await Promise.allSettled([
+        tasksAPI.listChat(id, { limit: 50 }),
         // FU-5 — list initial attachments alongside the chat thread so
         // the detail page hydrates in one round-trip and the panel
         // renders without a client-side flash of "no attachments".
-        tasksAPI.listAttachments(id).catch(() => []),
+        tasksAPI.listAttachments(id),
     ]);
-    if (!task) notFound();
+
+    const chat =
+        chatResult.status === 'fulfilled' ? chatResult.value : { data: [] as TaskChatMessage[] };
+    const attachments = attachmentResult.status === 'fulfilled' ? attachmentResult.value : [];
 
     return (
         <TaskDetailClient
             task={task}
             initialChat={chat.data ?? []}
             initialAttachments={attachments}
+            initialChatError={
+                chatResult.status === 'rejected'
+                    ? errorMessage(chatResult.reason, 'Failed to load conversation')
+                    : null
+            }
+            initialAttachmentsError={
+                attachmentResult.status === 'rejected'
+                    ? errorMessage(attachmentResult.reason, 'Failed to load attachments')
+                    : null
+            }
         />
     );
 }

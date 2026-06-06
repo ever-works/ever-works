@@ -40,8 +40,16 @@ function ScrollableTable(props: ComponentPropsWithoutRef<'table'>) {
     );
 }
 
+// Security: Strip non-http/https href protocols (e.g. javascript:) to prevent
+// stored XSS via attacker-influenced markdown content (AI-generated, scraped, imported).
+function SafeAnchor({ href, ...props }: ComponentPropsWithoutRef<'a'>) {
+    const safeHref = /^https?:/i.test(href ?? '') ? href : '#';
+    return <a href={safeHref} {...props} />;
+}
+
 const markdownComponents = {
     table: ScrollableTable,
+    a: SafeAnchor,
 };
 
 export function MarkdownPreview({ content }: MarkdownPreviewProps) {

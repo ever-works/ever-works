@@ -1,11 +1,13 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { WorkInvitationService } from '../work-invitation.service';
+import { WorkOwnershipService } from '../work-ownership.service';
 import { WorkInvitationRepository } from '../../database/repositories/work-invitation.repository';
 import { WorkInvitation } from '../../entities/work-invitation.entity';
 import { WorkInvitationStatus, INVITATION_ROLE_OWNER_CLAIM } from '../../entities/types';
 
 type RepoMock = jest.Mocked<WorkInvitationRepository>;
+type OwnershipMock = jest.Mocked<WorkOwnershipService>;
 
 function sha256(s: string): string {
     return createHash('sha256').update(s).digest('hex');
@@ -23,6 +25,18 @@ function buildRepoMock(): RepoMock {
         expireBefore: jest.fn(),
         findExpiredPending: jest.fn(),
     } as unknown as RepoMock;
+}
+
+function buildOwnershipMock(): OwnershipMock {
+    return {
+        ensureAccess: jest.fn(),
+        ensureCanView: jest.fn(),
+        ensureCanEdit: jest.fn(),
+        ensureCanManageMembers: jest.fn().mockResolvedValue(undefined),
+        ensureIsOwner: jest.fn(),
+        hasAccess: jest.fn(),
+        getUserRole: jest.fn(),
+    } as unknown as OwnershipMock;
 }
 
 function makeInvitation(overrides: Partial<WorkInvitation> = {}): WorkInvitation {
@@ -47,11 +61,13 @@ function makeInvitation(overrides: Partial<WorkInvitation> = {}): WorkInvitation
 
 describe('WorkInvitationService', () => {
     let repo: RepoMock;
+    let ownership: OwnershipMock;
     let service: WorkInvitationService;
 
     beforeEach(() => {
         repo = buildRepoMock();
-        service = new WorkInvitationService(repo);
+        ownership = buildOwnershipMock();
+        service = new WorkInvitationService(repo, ownership);
     });
 
     describe('issue', () => {
@@ -240,11 +256,26 @@ describe('WorkInvitationService', () => {
     });
 
     describe('revoke', () => {
-        it('marks pending as revoked', async () => {
-            repo.findById.mockResolvedValue(makeInvitation());
+        it('marks pending as revoked for a manager and gates on the work', async () => {
+            repo.findById.mockResolvedValue(makeInvitation({ workId: 'work-1' }));
             repo.markRevoked.mockResolvedValue(true);
             await expect(service.revoke('inv-1', 'user-1')).resolves.toBeUndefined();
+            expect(ownership.ensureCanManageMembers).toHaveBeenCalledWith('work-1', 'user-1');
             expect(repo.markRevoked).toHaveBeenCalledWith('inv-1');
+        });
+
+        it('rejects a non-manager actor and does not mutate state', async () => {
+            repo.findById.mockResolvedValue(makeInvitation({ workId: 'work-1' }));
+            ownership.ensureCanManageMembers.mockRejectedValue(
+                new ForbiddenException(
+                    'You do not have the required permission level for this action',
+                ),
+            );
+            await expect(service.revoke('inv-1', 'intruder')).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(ownership.ensureCanManageMembers).toHaveBeenCalledWith('work-1', 'intruder');
+            expect(repo.markRevoked).not.toHaveBeenCalled();
         });
 
         it('throws NotFound when missing', async () => {

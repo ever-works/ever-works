@@ -237,6 +237,7 @@ export class SourceRepoAnalyzerService {
 
             return response;
         } catch (error: any) {
+            // Security: log full error server-side only; never surface raw SDK error messages to callers
             this.logger.error(`Failed to analyze repository: ${sourceUrl}`, error);
             return {
                 sourceUrl,
@@ -245,7 +246,7 @@ export class SourceRepoAnalyzerService {
                 detectedType: null,
                 isPublic: false,
                 requiresAuth: false,
-                error: `Failed to analyze repository: ${error.message}`,
+                error: 'Failed to analyze repository.',
             };
         }
     }
@@ -657,6 +658,7 @@ export class SourceRepoAnalyzerService {
                 categoryCount,
             };
         } catch (error: any) {
+            // Security: log full error server-side only; never surface raw SDK error messages to callers
             this.logger.error(`Failed to analyze for linking: ${sourceUrl}`, error);
             return {
                 canLink: false,
@@ -666,7 +668,7 @@ export class SourceRepoAnalyzerService {
                     markdown: { exists: false, name: null },
                     website: { exists: false, name: null },
                 },
-                error: error instanceof Error ? error.message : 'Failed to analyze repository',
+                error: 'Failed to analyze repository.',
             };
         }
     }

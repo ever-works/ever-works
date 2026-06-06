@@ -11,8 +11,12 @@ const buildConfig = (
         workspaceId: string;
         timeout: number;
     }> = {},
-) => ({
-    twentyCrmConfig: {
+    tenantOverrides: Record<
+        string,
+        { apiUrl?: string; apiKey?: string; workspaceId?: string }
+    > = {},
+) => {
+    const base = {
         apiUrl: 'https://crm.example.com',
         apiKey: 'secret',
         workspaceId: 'ws-1',
@@ -20,8 +24,19 @@ const buildConfig = (
         retryAttempts: 3,
         retryDelay: 1000,
         ...overrides,
-    },
-});
+    };
+    return {
+        twentyCrmConfig: base,
+        // Mirror CrmConfigService.configForTenant: internal/system callers (no
+        // tenantId) use base; a tenant-scoped call is served ONLY if that tenant
+        // has its own entry WITH an apiKey, else it fails closed (null).
+        configForTenant: (tenantId?: string) => {
+            if (!tenantId) return base;
+            const override = tenantOverrides[tenantId];
+            return override?.apiKey ? { ...base, ...override } : null;
+        },
+    };
+};
 
 describe('TwentyCrmService.makeRequest', () => {
     let httpService: { request: jest.Mock };
@@ -56,6 +71,73 @@ describe('TwentyCrmService.makeRequest', () => {
             timeout: 30000,
         });
         expect(result).toEqual({ ok: 1 });
+    });
+
+    it("authenticates with the caller-tenant's OWN workspace credentials when a tenantId is provided", async () => {
+        // Security (cross-tenant IDOR fix): the 6th positional arg is the caller
+        // tenant id. It selects that tenant's own Twenty workspace credentials
+        // (one workspace + API key per tenant) — the URL stays `/rest/<object>`
+        // (Twenty has no tenant path routing), and isolation comes from the
+        // workspace-scoped API key.
+        configService = buildConfig(
+            {},
+            { 'tenant-1': { apiKey: 'tenant-1-key', workspaceId: 'tenant-1-ws' } },
+        ) as unknown as CrmConfigService;
+        service = new TwentyCrmService(httpService as unknown as HttpService, configService);
+        jest.spyOn((service as any).logger, 'debug').mockImplementation(() => undefined);
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await service.makeRequest('GET', '/companies', undefined, undefined, false, 'tenant-1');
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/companies',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer tenant-1-key',
+                    'X-Workspace-Id': 'tenant-1-ws',
+                }),
+            }),
+        );
+    });
+
+    it('uses the default credentials when no tenantId is supplied (internal/system callers)', async () => {
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await service.makeRequest('GET', '/companies');
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/companies',
+                headers: expect.objectContaining({
+                    Authorization: 'Bearer secret',
+                    'X-Workspace-Id': 'ws-1',
+                }),
+            }),
+        );
+    });
+
+    it('routes schema/metadata calls to `/rest/metadata<endpoint>` (internal/system, no tenantId)', async () => {
+        httpService.request.mockReturnValue(of({ data: { schema: true } }));
+
+        await service.makeRequest('GET', '/objects', undefined, undefined, true);
+
+        expect(httpService.request).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://crm.example.com/rest/metadata/objects',
+            }),
+        );
+    });
+
+    it('fails closed (404) and makes NO HTTP call when a tenant-scoped call has no configured credentials', async () => {
+        // No per-tenant entry for 'ghost-tenant' → configForTenant returns null →
+        // the request must be refused, never sent with the shared default creds.
+        jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+        httpService.request.mockReturnValue(of({ data: [] }));
+
+        await expect(
+            service.makeRequest('GET', '/companies', undefined, undefined, false, 'ghost-tenant'),
+        ).rejects.toMatchObject({ status: HttpStatus.NOT_FOUND });
+        expect(httpService.request).not.toHaveBeenCalled();
     });
 
     it('routes to `${apiUrl}/rest/metadata<endpoint>` when schema=true', async () => {

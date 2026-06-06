@@ -8,7 +8,7 @@
 		"url": "https://ever.co"
 	},
 	"license": "MIT",
-	"private": true,
+	"private": false,
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
@@ -35,7 +35,7 @@
 	"devDependencies": {
 		"tsup": "^8.3.0",
 		"typescript": "^5.9.3",
-		"vitest": "^3.0.0"
+		"vitest": "^4.1.0"
 	},
 	"everworks": {
 		"plugin": {
@@ -48,7 +48,12 @@
 			],
 			"defaultForCapabilities": [
 				"task-tracker"
-			]
+			],
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

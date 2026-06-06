@@ -24,10 +24,19 @@ const withNextIntl = createNextIntlPlugin();
  * endpoints. Add hosts via `NEXT_PUBLIC_EXTRA_CONNECT_SRC` (comma-sep) for
  * tenant-specific integrations without redeploying.
  */
+// Security: `NEXT_PUBLIC_EXTRA_CONNECT_SRC` is interpolated verbatim into the
+// `connect-src` directive. A poisoned deploy env var (supply-chain/insider)
+// could otherwise smuggle directive separators (`;`), `'unsafe-inline'`, or a
+// bare `*` into the policy and widen the whole CSP. Accept only well-formed
+// scheme+host[:port] sources and drop anything else; legitimate hosts pass
+// unchanged. Mirrors the `SAFE_CSP_HOST_SOURCE` filter in `src/proxy.ts`.
+const SAFE_CSP_HOST_SOURCE =
+    /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
 const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
     .split(',')
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
 const apiHost = (() => {
     try {

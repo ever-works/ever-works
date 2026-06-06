@@ -5,6 +5,7 @@ import {
     IsBoolean,
     IsEmail,
     IsIn,
+    IsUUID,
     ValidateNested,
     MaxLength,
 } from 'class-validator';
@@ -78,9 +79,15 @@ export class UpdateWorkDto {
     @IsBoolean()
     communityPrAutoClose?: boolean;
 
-    @ApiPropertyOptional({ description: 'Custom git committer name for this work' })
+    @ApiPropertyOptional({ description: 'Custom git committer name for this work', maxLength: 120 })
     @IsString()
     @IsOptional()
+    @MaxLength(120)
+    // Security: bound + sanitize committer name (flows into git commit author
+    // metadata via Work.resolveCommitter). Prevents oversized/control-char
+    // names from being embedded in git objects. Null (clear override) passes
+    // through untouched. 120 matches the agent entity's varchar(120) column.
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 120) : value))
     committerName?: string | null;
 
     @ApiPropertyOptional({ description: 'Custom git committer email for this work' })
@@ -104,6 +111,14 @@ export class UpdateWorkDto {
     })
     @IsString()
     @IsOptional()
+    // Security: require a well-formed UUID (was @IsString() only), rejecting
+    // arbitrary attacker-supplied strings used to probe/guess foreign org ids.
+    // Runs after the Transform below, which maps null/'' -> null; @IsOptional()
+    // skips this for null so the "clear membership" path is unaffected.
+    // NOTE: this is input-shape hardening only — it does NOT verify the caller
+    // is a member of the referenced organization. The membership/authorization
+    // check must be enforced in the service layer (see deferred finding).
+    @IsUUID()
     @Transform(({ value }) =>
         value === null || value === '' ? null : typeof value === 'string' ? value.trim() : value,
     )

@@ -14,11 +14,23 @@ export function sanitizeLikePattern(search: string): string {
 /**
  * Builds a portable case-insensitive LIKE clause for PostgreSQL, MySQL, and SQLite.
  * The explicit ESCAPE clause makes backslash escaping behave consistently.
+ *
+ * @param columnExpression - Must be a trusted, hardcoded column identifier (e.g. 'work.name'
+ *   or a TypeORM-generated alias). Never pass user-controlled input here.
+ * @param paramName - The named parameter token used in the LIKE clause.
  */
 export function buildCaseInsensitiveLikeClause(
     columnExpression: string,
     paramName = 'search',
 ): string {
+    // Security: allowlist check — column expressions must be dotted SQL identifiers or
+    // TypeORM-generated aliases (alphanumeric, underscores, dots). Reject anything else
+    // to prevent SQL injection if a future caller inadvertently passes user-controlled input.
+    if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(columnExpression)) {
+        throw new Error(
+            `buildCaseInsensitiveLikeClause: columnExpression must be a trusted SQL identifier, got: ${JSON.stringify(columnExpression)}`,
+        );
+    }
     return `LOWER(${columnExpression}) LIKE :${paramName} ESCAPE '\\'`;
 }
 

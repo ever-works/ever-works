@@ -26,12 +26,11 @@ describe('taxonomy-watcher', () => {
 			const item = JSON.stringify({ name: 'Tool', category: 'Cloud Services', tags: ['cloud'] });
 			await writeFile(join(workspacePath, 'tool.json'), item, 'utf-8');
 
-			// Wait for debounce (50ms) + file read + processing
-			await sleep(300);
-
-			// Check that _meta/categories.json was created
+			// Wait for debounce (50ms) + file read + processing. fs.watch latency is
+			// OS/load-dependent, so poll for the synced file rather than a fixed sleep.
 			const { readFile: rf } = await import('node:fs/promises');
-			const catContent = await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8');
+			const catPath = join(workspacePath, '_meta', 'categories.json');
+			const catContent = await waitForFile(rf, catPath);
 			const categories = JSON.parse(catContent);
 			expect(categories).toEqual([{ id: 'cloud-services', name: 'Cloud Services' }]);
 		} finally {
@@ -204,4 +203,27 @@ describe('taxonomy-watcher', () => {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll for a file produced asynchronously by the watcher, returning its contents
+ * once available. Avoids fixed-sleep flakiness when fs.watch latency spikes under
+ * concurrent test load.
+ */
+async function waitForFile(
+	rf: (p: string, enc: 'utf-8') => Promise<string>,
+	path: string,
+	timeoutMs = 5000
+): Promise<string> {
+	const deadline = Date.now() + timeoutMs;
+	let lastErr: unknown;
+	while (Date.now() < deadline) {
+		try {
+			return await rf(path, 'utf-8');
+		} catch (err) {
+			lastErr = err;
+			await sleep(25);
+		}
+	}
+	throw lastErr ?? new Error(`Timed out waiting for ${path}`);
 }

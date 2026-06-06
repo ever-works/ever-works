@@ -5,6 +5,7 @@ describe('DiscordChannelPlugin', () => {
 	let plugin: DiscordChannelPlugin;
 
 	beforeEach(() => {
+		vi.restoreAllMocks();
 		plugin = new DiscordChannelPlugin();
 	});
 

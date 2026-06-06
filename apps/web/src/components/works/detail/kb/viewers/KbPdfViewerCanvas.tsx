@@ -5,13 +5,8 @@ import { cn } from '@/lib/utils/cn';
 interface KbPdfViewerCanvasProps {
     url: string;
     title: string;
-    /**
-     * Sandbox: by default we permit `allow-same-origin` (PDF.js needs
-     * to fetch the file URL) but withhold `allow-scripts` so embedded
-     * PDFs can't execute JavaScript in the operator's origin. Operators
-     * uploading PDFs cannot inject XSS through annotations / forms.
-     */
-    sandbox?: string;
+    // Security: sandbox is intentionally NOT a prop — callers must not be able to
+    // add `allow-scripts` to a same-origin iframe (would enable sandbox escape).
 }
 
 /**
@@ -30,17 +25,15 @@ interface KbPdfViewerCanvasProps {
  * is trivial today but the upgrade path is to swap this canvas for a
  * react-pdf wrapper without touching `KbPdfViewer`).
  */
-export function KbPdfViewerCanvas({
-    url,
-    title,
-    sandbox = 'allow-same-origin',
-}: KbPdfViewerCanvasProps) {
+export function KbPdfViewerCanvas({ url, title }: KbPdfViewerCanvasProps) {
     return (
         <iframe
             src={url}
             title={title}
             data-testid="kb-pdf-iframe"
-            sandbox={sandbox}
+            // Security: hard-coded — never include `allow-scripts` here;
+            // combining allow-same-origin + allow-scripts enables sandbox escape.
+            sandbox="allow-same-origin"
             className={cn(
                 'h-[36rem] w-full rounded-md border',
                 'border-border dark:border-border-dark',

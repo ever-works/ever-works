@@ -114,7 +114,8 @@ export const deployAPI = {
     // Deploy work to its configured provider
     deploy: async (workId: string, data: DeployWebsiteDto) => {
         return serverMutation<DeployWebsiteResponseDto>({
-            endpoint: `/deploy/works/${workId}`,
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}`,
             data: { teamScope: data.teamScope },
             method: 'POST',
             wrapInData: false,
@@ -144,7 +145,8 @@ export const deployAPI = {
     // Get teams for a specific work
     getTeamsForWork(workId: string) {
         return serverMutation<DeploymentTeamResponse>({
-            endpoint: `/deploy/works/${workId}/teams`,
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/teams`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -153,7 +155,8 @@ export const deployAPI = {
 
     lookupExistingDeployment(workId: string, data?: DeployWebsiteDto) {
         return serverMutation<LookupDeploymentResponseDto>({
-            endpoint: `/deploy/works/${workId}/lookup`,
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/lookup`,
             data: data ? { teamScope: data.teamScope } : {},
             method: 'POST',
             wrapInData: false,
@@ -165,7 +168,8 @@ export const deployAPI = {
      */
     checkDeploymentCapability(workId: string) {
         return serverMutation<DeploymentCapabilityResponseDto>({
-            endpoint: `/deploy/works/${workId}/check`,
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/check`,
             data: {},
             method: 'POST',
             wrapInData: false,
@@ -176,7 +180,10 @@ export const deployAPI = {
      * Get domains for a deployed work
      */
     getDomains(workId: string) {
-        return serverFetch<DomainsResponseDto>(`/deploy/works/${workId}/domains`);
+        // Security: encode workId to prevent path-segment injection
+        return serverFetch<DomainsResponseDto>(
+            `/deploy/works/${encodeURIComponent(workId)}/domains`,
+        );
     },
 
     /**
@@ -184,7 +191,8 @@ export const deployAPI = {
      */
     addDomain(workId: string, domain: string) {
         return serverMutation<AddDomainResponseDto>({
-            endpoint: `/deploy/works/${workId}/domains`,
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/domains`,
             data: { domain },
             method: 'POST',
             wrapInData: false,
@@ -208,7 +216,8 @@ export const deployAPI = {
      */
     verifyDomain(workId: string, domain: string) {
         return serverMutation<VerifyDomainResponseDto>({
-            endpoint: `/deploy/works/${workId}/domains/${encodeURIComponent(domain)}/verify`,
+            // Security: encode workId to prevent path-segment injection (domain was already encoded)
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/domains/${encodeURIComponent(domain)}/verify`,
             data: {},
             method: 'POST',
             wrapInData: false,

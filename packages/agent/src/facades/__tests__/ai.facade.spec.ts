@@ -1371,4 +1371,142 @@ describe('AiFacadeService', () => {
             );
         });
     });
+
+    // EW-643 Phase 3 slice 2 — selection chain for `transcribe()`:
+    //   1. Operator pin (providerOverride) — no fallback
+    //   2. Active scope provider (if it implements transcribe)
+    //   3. First registry plugin whose transcribe is defined
+    //   4. Throw TranscriptionNotConfiguredError
+    describe('transcribe', () => {
+        const audioBytes = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00]); // ID3 tag prefix
+
+        const mockTranscriptionResponse = {
+            text: 'hello world',
+            model: 'whisper-1',
+            language: 'en',
+            durationSeconds: 12,
+            segments: [{ start: 0, end: 12, text: 'hello world' }],
+        };
+
+        const addTranscribe = (plugin: IAiProviderPlugin) => {
+            (plugin as any).transcribe = jest.fn().mockResolvedValue(mockTranscriptionResponse);
+            return plugin;
+        };
+
+        it('uses the active scope provider when it implements transcribe', async () => {
+            const active = addTranscribe(createMockAiPlugin('openai', 'OpenAI'));
+            const registered = createRegisteredPlugin(active, { capabilities: ['ai-provider'] });
+            registry.getByCapability.mockReturnValue([registered]);
+
+            const result = await service.transcribe(
+                { file: audioBytes, filename: 'clip.mp3' },
+                defaultFacadeOptions,
+            );
+
+            expect(result).toEqual(mockTranscriptionResponse);
+            expect((active as any).transcribe).toHaveBeenCalledTimes(1);
+        });
+
+        it('falls back to the first registry provider whose transcribe is defined', async () => {
+            // Active provider does NOT implement transcribe.
+            const active = createMockAiPlugin('anthropic', 'Anthropic', {
+                providerType: 'anthropic',
+            });
+            const fallback = addTranscribe(createMockAiPlugin('openai', 'OpenAI'));
+            const activeReg = createRegisteredPlugin(active, { capabilities: ['ai-provider'] });
+            const fallbackReg = createRegisteredPlugin(fallback, { capabilities: ['ai-provider'] });
+            // `resolvePlugin(undefined, ...)` picks whichever is "active" — the
+            // BaseFacadeService consults the first plugin returned by
+            // getByCapability. Both calls go through the same mock, so order
+            // matters: put the no-transcribe one first.
+            registry.getByCapability.mockReturnValue([activeReg, fallbackReg]);
+
+            const result = await service.transcribe(
+                { file: audioBytes, filename: 'clip.mp3' },
+                defaultFacadeOptions,
+            );
+
+            expect(result).toEqual(mockTranscriptionResponse);
+            expect((fallback as any).transcribe).toHaveBeenCalledTimes(1);
+        });
+
+        it('uses the operator-pinned provider when providerOverride is set', async () => {
+            const pinned = addTranscribe(createMockAiPlugin('openai-pinned', 'OpenAI Pinned'));
+            const pinnedReg = createRegisteredPlugin(pinned, { capabilities: ['ai-provider'] });
+            registry.getByCapability.mockReturnValue([pinnedReg]);
+            registry.get.mockReturnValue(pinnedReg);
+
+            const result = await service.transcribe(
+                { file: audioBytes, filename: 'clip.mp3' },
+                { ...defaultFacadeOptions, providerOverride: 'openai-pinned' },
+            );
+
+            expect(result).toEqual(mockTranscriptionResponse);
+            expect((pinned as any).transcribe).toHaveBeenCalledTimes(1);
+        });
+
+        it('throws TranscriptionNotConfiguredError when the pinned provider lacks transcribe (no silent fallback)', async () => {
+            const pinned = createMockAiPlugin('anthropic-pinned', 'Anthropic Pinned', {
+                providerType: 'anthropic',
+            });
+            const fallback = addTranscribe(createMockAiPlugin('openai', 'OpenAI'));
+            const pinnedReg = createRegisteredPlugin(pinned, { capabilities: ['ai-provider'] });
+            const fallbackReg = createRegisteredPlugin(fallback, { capabilities: ['ai-provider'] });
+            registry.getByCapability.mockReturnValue([pinnedReg, fallbackReg]);
+            registry.get.mockReturnValue(pinnedReg);
+
+            await expect(
+                service.transcribe(
+                    { file: audioBytes, filename: 'clip.mp3' },
+                    { ...defaultFacadeOptions, providerOverride: 'anthropic-pinned' },
+                ),
+            ).rejects.toMatchObject({
+                name: 'TranscriptionNotConfiguredError',
+                operation: 'transcribe',
+                provider: 'anthropic-pinned',
+            });
+            expect((fallback as any).transcribe).not.toHaveBeenCalled();
+        });
+
+        it('throws TranscriptionNotConfiguredError when no provider in scope implements transcribe', async () => {
+            const a = createMockAiPlugin('anthropic', 'Anthropic', { providerType: 'anthropic' });
+            const b = createMockAiPlugin('google', 'Google', { providerType: 'google' });
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(a, { capabilities: ['ai-provider'] }),
+                createRegisteredPlugin(b, { capabilities: ['ai-provider'] }),
+            ]);
+
+            await expect(
+                service.transcribe(
+                    { file: audioBytes, filename: 'clip.mp3' },
+                    defaultFacadeOptions,
+                ),
+            ).rejects.toMatchObject({
+                name: 'TranscriptionNotConfiguredError',
+                operation: 'transcribe',
+            });
+        });
+
+        it('records usage in audio_minutes (provider-neutral unit)', async () => {
+            const active = addTranscribe(createMockAiPlugin('openai', 'OpenAI'));
+            registry.getByCapability.mockReturnValue([
+                createRegisteredPlugin(active, { capabilities: ['ai-provider'] }),
+            ]);
+
+            await service.transcribe(
+                { file: audioBytes, filename: 'clip.mp3' },
+                { ...defaultFacadeOptions, workId: 'work-1' },
+            );
+
+            expect(pluginUsageService.record).toHaveBeenCalledTimes(1);
+            const recordCall = pluginUsageService.record.mock.calls[0][0];
+            expect(recordCall.units).toBe(1); // ceil(12 / 60) = 1 minute
+            expect(recordCall.metadata).toMatchObject({
+                operation: 'transcribe',
+                unit: 'audio_minutes',
+                durationSeconds: 12,
+                language: 'en',
+            });
+        });
+    });
 });

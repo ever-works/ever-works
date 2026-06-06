@@ -15,7 +15,7 @@ jest.mock('../../auth', () => ({
     CurrentUser: () => () => undefined,
 }));
 
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AgentMemoryController } from './agent-memory.controller';
 import { NoProviderError } from '@ever-works/agent/facades';
 import type { AgentMemoryFacadeService } from '@ever-works/agent/facades';
@@ -34,7 +34,7 @@ describe('AgentMemoryController', () => {
         buildContext: jest.Mock;
         deleteEntry: jest.Mock;
     };
-    let ownership: { ensureCanView: jest.Mock };
+    let ownership: { ensureCanView: jest.Mock; ensureCanEdit: jest.Mock };
     let controller: AgentMemoryController;
     const auth: AuthenticatedUser = { userId: 'user-1' } as any;
 
@@ -52,7 +52,10 @@ describe('AgentMemoryController', () => {
             buildContext: jest.fn().mockResolvedValue({ content: 'ctx' }),
             deleteEntry: jest.fn().mockResolvedValue(undefined),
         };
-        ownership = { ensureCanView: jest.fn().mockResolvedValue(undefined) };
+        ownership = {
+            ensureCanView: jest.fn().mockResolvedValue(undefined),
+            ensureCanEdit: jest.fn().mockResolvedValue(undefined),
+        };
         controller = new AgentMemoryController(
             agentMemory as unknown as AgentMemoryFacadeService,
             ownership as unknown as WorkOwnershipService,
@@ -109,7 +112,8 @@ describe('AgentMemoryController', () => {
                 expect.objectContaining({
                     content: 'remember this',
                     tags: ['bug'],
-                    metadata: { file: 'a.ts' },
+                    // Security (EW-711 #29): owner stamp folded into record metadata.
+                    metadata: { file: 'a.ts', ownerUserId: 'user-1' },
                     sessionId: 'sess-9',
                     projectId: 'proj-A',
                 }),
@@ -142,11 +146,20 @@ describe('AgentMemoryController', () => {
     });
 
     describe('sessions', () => {
-        it('openSession returns the facade session payload', async () => {
+        it('openSession returns the facade session payload + stamps the owner', async () => {
             const result = await controller.openSession(auth, { metadata: { from: 'web' } });
             expect(result.session).toEqual({ id: 's1', startedAt: 'now' });
+            // Security (EW-711 #29): owner stamp is folded into session metadata.
             expect(agentMemory.openSession).toHaveBeenCalledWith(
-                { from: 'web' },
+                { from: 'web', ownerUserId: 'user-1' },
+                expect.objectContaining({ userId: 'user-1' }),
+            );
+        });
+
+        it('openSession owner stamp cannot be spoofed from the request body', async () => {
+            await controller.openSession(auth, { metadata: { ownerUserId: 'user-2' } as any });
+            expect(agentMemory.openSession).toHaveBeenCalledWith(
+                { ownerUserId: 'user-1' },
                 expect.objectContaining({ userId: 'user-1' }),
             );
         });
@@ -157,9 +170,11 @@ describe('AgentMemoryController', () => {
             );
         });
 
-        it('closeSession enforces ownership + scopes by workId when one is supplied', async () => {
+        it('closeSession enforces EDIT ownership + scopes by workId when one is supplied', async () => {
+            // Security (EW-711 #29): mutating handler requires edit access, not view.
             await controller.closeSession(auth, 'sess-1', { workId: 'work-1' });
-            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
             expect(agentMemory.closeSession).toHaveBeenCalledWith(
                 'sess-1',
                 expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
@@ -167,11 +182,45 @@ describe('AgentMemoryController', () => {
         });
 
         it('closeSession propagates an ownership rejection (cannot close another user Work session)', async () => {
-            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('not your work'));
             await expect(
                 controller.closeSession(auth, 'sess-1', { workId: 'work-x' }),
             ).rejects.toThrow('not your work');
             expect(agentMemory.closeSession).not.toHaveBeenCalled();
+        });
+
+        it('closeSession rejects a foreign session even when workId is omitted (EW-711 #29 IDOR)', async () => {
+            // The session surfaces in the caller's (shared-project) scope but
+            // was opened by another user — the owner stamp must block the close.
+            agentMemory.listSessions.mockResolvedValueOnce([
+                { id: 'sess-foreign', metadata: { ownerUserId: 'user-2' } },
+            ]);
+            await expect(controller.closeSession(auth, 'sess-foreign', {})).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
+            expect(agentMemory.closeSession).not.toHaveBeenCalled();
+        });
+
+        it('closeSession allows the caller to close their own session (workId omitted)', async () => {
+            agentMemory.listSessions.mockResolvedValueOnce([
+                { id: 'sess-mine', metadata: { ownerUserId: 'user-1' } },
+            ]);
+            await controller.closeSession(auth, 'sess-mine', {});
+            expect(agentMemory.closeSession).toHaveBeenCalledWith(
+                'sess-mine',
+                expect.objectContaining({ userId: 'user-1' }),
+            );
+        });
+
+        it('closeSession fails open when the provider does not support listSessions', async () => {
+            // A backend without the optional governance surface can't be
+            // enumerated — don't break the legit flow on a missing method.
+            agentMemory.listSessions.mockRejectedValueOnce(
+                new Error('Agent-memory provider "x" does not support listSessions'),
+            );
+            await controller.closeSession(auth, 'sess-1', {});
+            expect(agentMemory.closeSession).toHaveBeenCalledWith('sess-1', expect.any(Object));
         });
 
         it('listSessions forwards limit + projectId', async () => {
@@ -198,9 +247,11 @@ describe('AgentMemoryController', () => {
             );
         });
 
-        it('enforces ownership + scopes by workId when one is supplied', async () => {
+        it('enforces EDIT ownership + scopes by workId when one is supplied', async () => {
+            // Security (EW-711 #29): forget is a mutation → requires edit access.
             await controller.deleteEntry(auth, 'mem-42', { workId: 'work-1' });
-            expect(ownership.ensureCanView).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(ownership.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(ownership.ensureCanView).not.toHaveBeenCalled();
             expect(agentMemory.deleteEntry).toHaveBeenCalledWith(
                 'mem-42',
                 expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
@@ -208,11 +259,56 @@ describe('AgentMemoryController', () => {
         });
 
         it('propagates an ownership rejection (cannot forget another user Work entry)', async () => {
-            ownership.ensureCanView.mockRejectedValueOnce(new Error('not your work'));
+            ownership.ensureCanEdit.mockRejectedValueOnce(new Error('not your work'));
             await expect(
                 controller.deleteEntry(auth, 'mem-42', { workId: 'work-x' }),
             ).rejects.toThrow('not your work');
             expect(agentMemory.deleteEntry).not.toHaveBeenCalled();
+        });
+
+        it('rejects a foreign entry even when workId is omitted (EW-711 #29 IDOR)', async () => {
+            // The record surfaces in the caller's shared-project search scope
+            // but was saved by another user — the owner stamp must block it.
+            agentMemory.searchMemory.mockResolvedValueOnce({
+                results: [
+                    {
+                        id: 'mem-foreign',
+                        content: 'x',
+                        createdAt: 'now',
+                        metadata: { ownerUserId: 'user-2' },
+                    },
+                ],
+            });
+            await expect(controller.deleteEntry(auth, 'mem-foreign', {})).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(agentMemory.deleteEntry).not.toHaveBeenCalled();
+        });
+
+        it('allows the caller to forget their own entry (workId omitted)', async () => {
+            agentMemory.searchMemory.mockResolvedValueOnce({
+                results: [
+                    {
+                        id: 'mem-mine',
+                        content: 'x',
+                        createdAt: 'now',
+                        metadata: { ownerUserId: 'user-1' },
+                    },
+                ],
+            });
+            await controller.deleteEntry(auth, 'mem-mine', {});
+            expect(agentMemory.deleteEntry).toHaveBeenCalledWith(
+                'mem-mine',
+                expect.objectContaining({ userId: 'user-1' }),
+            );
+        });
+
+        it('fails open when the provider does not support searchMemory enumeration', async () => {
+            agentMemory.searchMemory.mockRejectedValueOnce(
+                new Error('Agent-memory provider "x" does not support searchMemory'),
+            );
+            await controller.deleteEntry(auth, 'mem-1', {});
+            expect(agentMemory.deleteEntry).toHaveBeenCalledWith('mem-1', expect.any(Object));
         });
     });
 

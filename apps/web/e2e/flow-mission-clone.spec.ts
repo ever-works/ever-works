@@ -124,7 +124,7 @@ test.describe('Mission clone + guardrails', () => {
         const token = owner.access_token;
         const stamp = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
-        const guardrails = { maxWorksPerRun: 3, allowAutoMerge: false };
+        const guardrails = { maxWorksPerRun: 3, requireApprovalBeforeCreate: false };
         const sourceTitle = `Source Mission ${stamp}`;
         const source = await createMission(request, token, {
             title: sourceTitle,
@@ -352,7 +352,7 @@ test.describe('Mission clone + guardrails', () => {
         expect(oneShotBody.schedule).toBeNull();
 
         // ── PATCH guardrailsOverride + outstandingIdeasCap round-trips ───
-        const nextGuardrails = { maxWorksPerRun: 2, allowAutoMerge: true };
+        const nextGuardrails = { maxWorksPerRun: 2, requireApprovalBeforeCreate: true };
         const patchGuard = await request.patch(`${API_BASE}/api/me/missions/${mission.id}`, {
             headers,
             data: { guardrailsOverride: nextGuardrails, outstandingIdeasCap: 12 },

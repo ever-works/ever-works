@@ -48,6 +48,9 @@ import {
 	getDefaultValues as formDefaults
 } from './form-schema.js';
 import { README } from './readme.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 /**
  * Activepieces Automation Plugin
@@ -145,7 +148,13 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 		}
 
 		try {
-			const baseUrl = (settings.baseUrl as string) || DEFAULT_BASE_URL;
+			// Security (SSRF): baseUrl is tenant-controlled plugin settings and flows into
+			// ActivepiecesClient, which sends every request — carrying the API key in the
+			// Authorization header — to that host. Reject literal private/loopback/link-local/
+			// cloud-metadata hosts (e.g. http://169.254.169.254 IMDS) and non-HTTP(S) schemes so
+			// a malicious baseUrl can't redirect the request and leak the key to an internal
+			// endpoint. Mirrors the zapier/make plugin guards.
+			const baseUrl = resolveSafeBaseUrl(settings.baseUrl);
 			const client = new ActivepiecesClient({
 				apiKey,
 				baseUrl,
@@ -381,9 +390,13 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			setState('collect-results', 'running');
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
+			// Security (secrets): a misconfigured/hostile flow can echo the trigger body —
+			// which may include dataSource.accessToken — back in its Return Response. Redact
+			// secret-named keys before logging the raw output so the repository token (and any
+			// other credential-shaped field) can't leak into Ever Works pipeline logs.
 			logger.log(
 				`Raw Activepieces output type: ${typeof execResult.output}, ` +
-					`value: ${JSON.stringify(execResult.output).substring(0, 500)}`
+					`value: ${redactedPreview(execResult.output)}`
 			);
 
 			const parsed = parseActivepiecesOutput(execResult.output);
@@ -478,12 +491,22 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			throw new Error('Activepieces API key is not configured. Please set it in plugin settings.');
 		}
 
-		const timeoutMinutes = (config.flow_timeout as number) || 60;
-		const webhookMode: WebhookMode = (config.webhook_mode as WebhookMode) || 'sync';
+		// Security (DoS): flow_timeout is raw user/config input. The form schema caps it at
+		// 120 minutes client-side, but that is not re-validated here — an unbounded value
+		// (e.g. 99999) would push the AbortController timeout and async polling deadline out
+		// to weeks, pinning a worker slot. Clamp to the documented [1, 120] minute range.
+		const timeoutMinutes = Math.min(Math.max(1, Number(config.flow_timeout) || 60), 120);
+		// Security: webhook_mode arrives as a raw user/config string cast to the WebhookMode
+		// union. Restrict it to the known modes and fall back to the safe 'sync' default for
+		// anything unrecognized, so an out-of-range value can't steer execution into an
+		// unexpected branch.
+		const webhookMode: WebhookMode = normalizeWebhookMode(config.webhook_mode);
 
 		return {
 			apiKey,
-			baseUrl: (pluginSettings.baseUrl as string) || DEFAULT_BASE_URL,
+			// Security (SSRF): see resolveSafeBaseUrl — reject internal/metadata hosts before
+			// the tenant-supplied baseUrl reaches the API-key-bearing client.
+			baseUrl: resolveSafeBaseUrl(pluginSettings.baseUrl),
 			projectId: pluginSettings.projectId as string | undefined,
 			defaultFlowId: pluginSettings.defaultFlowId as string | undefined,
 			webhookMode,
@@ -531,6 +554,16 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 		for (const item of itemsNeedingImages) {
 			if (signal.aborted) break;
 
+			// Security (SSRF): item.source_url originates from the Activepieces flow's
+			// Return Response — untrusted external content. Guard against hostile flows
+			// targeting internal endpoints by running the URL through the same SSRF check
+			// used for baseUrl and webhook URLs in this plugin.
+			if (typeof item.source_url !== 'string' || !isSafeWebhookUrl(item.source_url)) {
+				logger.warn(`Skipping screenshot for "${item.name}": source_url failed SSRF guard`);
+				errors.push(`source_url for "${item.name}" is not a safe URL`);
+				continue;
+			}
+
 			try {
 				const result = await screenshotFacade.getSmartImage(
 					{ url: item.source_url, itemName: item.name },
@@ -574,6 +607,69 @@ export class ActivepiecesPlugin implements IPlugin, IPipelinePlugin, IFormSchema
 			}
 		}
 		return flat;
+	}
+}
+
+/**
+ * Security (SSRF): validates a tenant-supplied Activepieces API base URL before it
+ * reaches {@link ActivepiecesClient}. An empty/undefined value falls back to the
+ * built-in {@link DEFAULT_BASE_URL}. A provided value must clear the lexical SSRF
+ * guard (HTTP(S) scheme, not a private/loopback/link-local/cloud-metadata host);
+ * anything else throws so the request — and the attached API key — can never be
+ * redirected to an internal endpoint. Mirrors the zapier/make plugin guards.
+ */
+function resolveSafeBaseUrl(rawBaseUrl: unknown): string {
+	const baseUrl = typeof rawBaseUrl === 'string' && rawBaseUrl.trim() !== '' ? rawBaseUrl.trim() : DEFAULT_BASE_URL;
+	if (!isSafeWebhookUrl(baseUrl)) {
+		throw new Error('Activepieces API base URL is not safe to call (SSRF guard blocked the destination host).');
+	}
+	return baseUrl;
+}
+
+const WEBHOOK_MODES: readonly WebhookMode[] = ['sync', 'async'] as const;
+
+/**
+ * Security: coerces a raw config value into a known {@link WebhookMode}, defaulting
+ * to the safe `'sync'` mode for anything unrecognized so an out-of-range value can't
+ * select an unexpected execution branch.
+ */
+function normalizeWebhookMode(value: unknown): WebhookMode {
+	return typeof value === 'string' && (WEBHOOK_MODES as readonly string[]).includes(value)
+		? (value as WebhookMode)
+		: 'sync';
+}
+
+/** Key names whose values are redacted before raw flow output is logged. */
+const SECRET_KEY_PATTERN = /(access[_-]?token|^token$|secret|api[_-]?key|password|authorization|bearer)/i;
+
+/**
+ * Security (secrets): returns a deep copy of `value` with the values of any
+ * secret-named keys replaced by `'[redacted]'`. Recursion is depth-bounded to avoid
+ * runaway/cyclic structures; non-plain values pass through unchanged.
+ */
+function redactSecrets(value: unknown, depth = 0): unknown {
+	if (depth > 6 || value === null || typeof value !== 'object') return value;
+	if (Array.isArray(value)) return value.map((entry) => redactSecrets(entry, depth + 1));
+
+	const out: Record<string, unknown> = {};
+	for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+		out[key] = SECRET_KEY_PATTERN.test(key) ? '[redacted]' : redactSecrets(entry, depth + 1);
+	}
+	return out;
+}
+
+/**
+ * Security (secrets): stringifies flow output for logging with secret-named keys
+ * redacted and the result truncated to 500 chars. Falls back to the value's type on
+ * stringify failure so logging can never throw.
+ */
+function redactedPreview(value: unknown, maxLength = 500): string {
+	try {
+		const s = JSON.stringify(redactSecrets(value));
+		if (s === undefined) return typeof value;
+		return s.length > maxLength ? `${s.slice(0, maxLength)}...` : s;
+	} catch {
+		return typeof value;
 	}
 }
 

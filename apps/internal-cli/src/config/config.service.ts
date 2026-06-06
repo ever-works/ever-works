@@ -10,8 +10,46 @@ import {
 
 @Injectable()
 export class ConfigService {
+    private readonly logger = new Logger(ConfigService.name);
     private readonly configDir = path.join(os.homedir(), '.ever-works');
     private readonly configPath = path.join(this.configDir, 'config.json');
+
+    /**
+     * Security: explicit allowlist of config keys that may be copied into
+     * process.env. Mirrors the `EverWorksConfig` interface key set. Anything
+     * NOT in this set (e.g. PATH, NODE_OPTIONS, LD_PRELOAD, NODE_PATH,
+     * __proto__) found in ~/.ever-works/config.json is ignored so a tampered
+     * config file cannot inject arbitrary environment variables into the CLI
+     * or the agent subprocesses it spawns.
+     */
+    private static readonly ALLOWED_ENV_KEYS: ReadonlySet<string> = new Set<keyof EverWorksConfig>([
+        'APP_TYPE',
+        'GIT_PROVIDER',
+        'GIT_TOKEN',
+        'GIT_OWNER',
+        'GIT_NAME',
+        'GIT_EMAIL',
+        'DEPLOY_PROVIDER',
+        'DEPLOY_TOKEN',
+        'PLUGIN_OPENROUTER_API_KEY',
+        'PLUGIN_OPENROUTER_DEFAULT_MODEL',
+        'PLUGIN_OPENAI_API_KEY',
+        'PLUGIN_OPENAI_DEFAULT_MODEL',
+        'PLUGIN_GOOGLE_API_KEY',
+        'PLUGIN_GOOGLE_DEFAULT_MODEL',
+        'PLUGIN_ANTHROPIC_API_KEY',
+        'PLUGIN_ANTHROPIC_DEFAULT_MODEL',
+        'PLUGIN_GROQ_API_KEY',
+        'PLUGIN_GROQ_DEFAULT_MODEL',
+        'PLUGIN_OLLAMA_BASE_URL',
+        'PLUGIN_OLLAMA_DEFAULT_MODEL',
+        'EXTRACT_CONTENT_SERVICE',
+        'WEB_SEARCH_SERVICE',
+        'PLUGIN_TAVILY_API_KEY',
+        'DATABASE_TYPE',
+        'DATABASE_IN_MEMORY',
+        'DATABASE_LOGGING',
+    ]);
 
     /**
      * Ensures the configuration work exists
@@ -90,11 +128,24 @@ export class ConfigService {
             return;
         }
 
-        // Load all config values into process.env
+        // Load config values into process.env.
+        // Security: only copy keys on the explicit allowlist (mirrors the
+        // EverWorksConfig interface). Reject any other key (PATH, NODE_OPTIONS,
+        // LD_PRELOAD, __proto__, etc.) so a tampered config file cannot inject
+        // arbitrary environment variables. Also guard against prototype-chain
+        // keys via Object.hasOwn.
         Object.entries(config).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                process.env[key] = String(value);
+            if (value === undefined || value === null) {
+                return;
             }
+            if (!Object.prototype.hasOwnProperty.call(config, key)) {
+                return;
+            }
+            if (!ConfigService.ALLOWED_ENV_KEYS.has(key)) {
+                this.logger.warn(`Ignoring unrecognised config key not on env allowlist: ${key}`);
+                return;
+            }
+            process.env[key] = String(value);
         });
 
         // Default git provider to 'github' if not set

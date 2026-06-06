@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    InternalServerErrorException,
+    NotFoundException,
+} from '@nestjs/common';
 import { SkillsService } from '../skills.service';
 import { ActivityActionType } from '../../entities/activity-log.types';
 
@@ -38,7 +43,9 @@ describe('SkillsService', () => {
             findByUserIdFiltered: jest.fn(),
             create: jest.fn(),
             updateById: jest.fn(),
+            updateByIdAndUser: jest.fn(),
             deleteById: jest.fn(),
+            deleteByIdAndUser: jest.fn(),
         };
         bindings = {
             findBySkillId: jest.fn().mockResolvedValue([]),
@@ -104,6 +111,32 @@ describe('SkillsService', () => {
             ).rejects.toThrow(ConflictException);
         });
 
+        it('rejects tenant scope for another user id', async () => {
+            await expect(
+                svc.create('u1', {
+                    ownerType: 'tenant',
+                    ownerId: 'u2',
+                    title: 'X',
+                    description: 'd',
+                    instructionsMd: 'x',
+                }),
+            ).rejects.toThrow(NotFoundException);
+            expect(skills.findByOwnerSlug).not.toHaveBeenCalled();
+        });
+
+        it('fails closed when a non-tenant ownership repository is unavailable', async () => {
+            await expect(
+                svc.create('u1', {
+                    ownerType: 'agent',
+                    ownerId: 'agent-1',
+                    title: 'X',
+                    description: 'd',
+                    instructionsMd: 'x',
+                }),
+            ).rejects.toThrow(InternalServerErrorException);
+            expect(skills.findByOwnerSlug).not.toHaveBeenCalled();
+        });
+
         it('happy path persists + sets contentHash', async () => {
             skills.findByOwnerSlug.mockResolvedValueOnce(null);
             skills.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'new', ...d }));
@@ -136,15 +169,23 @@ describe('SkillsService', () => {
 
         it('recomputes contentHash when instructionsMd changes', async () => {
             skills.findByIdAndUser.mockResolvedValueOnce(makeSkill());
-            skills.findById.mockResolvedValueOnce(makeSkill({ instructionsMd: '# New' }));
+            skills.findByIdAndUser.mockResolvedValueOnce(makeSkill({ instructionsMd: '# New' }));
             await svc.update('u1', 'sk1', { instructionsMd: '# New' });
-            expect(skills.updateById).toHaveBeenCalledWith(
+            expect(skills.updateByIdAndUser).toHaveBeenCalledWith(
                 'sk1',
+                'u1',
                 expect.objectContaining({
                     instructionsMd: '# New',
                     contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
                 }),
             );
+        });
+
+        it('uses ownership-scoped delete', async () => {
+            skills.findByIdAndUser.mockResolvedValueOnce(makeSkill());
+            await svc.remove('u1', 'sk1');
+            expect(skills.deleteByIdAndUser).toHaveBeenCalledWith('sk1', 'u1');
+            expect(skills.deleteById).not.toHaveBeenCalled();
         });
     });
 
@@ -215,6 +256,18 @@ describe('SkillsService', () => {
             expect(activity.log).toHaveBeenCalledWith(
                 expect.objectContaining({ actionType: ActivityActionType.SKILL_ATTACHED_TO_AGENT }),
             );
+        });
+
+        it('rejects binding to another tenant id', async () => {
+            skills.findByIdAndUser.mockResolvedValueOnce(makeSkill());
+            await expect(
+                svc.createBinding('u1', {
+                    skillId: 'sk1',
+                    targetType: 'tenant',
+                    targetId: 'u2',
+                }),
+            ).rejects.toThrow(NotFoundException);
+            expect(bindings.create).not.toHaveBeenCalled();
         });
     });
 

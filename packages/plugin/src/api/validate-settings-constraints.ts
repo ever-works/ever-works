@@ -51,12 +51,28 @@ export function validateSettingsConstraints(
 				});
 			}
 			if (propSchema.pattern) {
-				try {
-					if (!new RegExp(propSchema.pattern).test(val)) {
-						errors.push({ field: key, message: `${label} has an invalid format` });
+				// Security (ReDoS): `pattern` comes from a (possibly third-party) plugin's
+				// JSON schema and `val` is user-supplied, so a pathological pattern such as
+				// `(a+)+$` against a long value can trigger catastrophic (exponential)
+				// backtracking and stall the event loop. The built-in RegExp engine has no
+				// timeout, so bound both inputs before evaluating. Exponential blow-up scales
+				// with the tested string length, so capping the value short enough keeps even
+				// worst-case patterns to a few milliseconds; every legitimate pattern-checked
+				// setting (slugs, keys, hostnames, semver, etc.) is far shorter than this.
+				// Over-length inputs are reported as a format failure (additive — never
+				// silently passed). Patterns are also length-capped as defense-in-depth.
+				const MAX_PATTERN_LENGTH = 1000;
+				const MAX_PATTERN_TEST_LENGTH = 512;
+				if (propSchema.pattern.length > MAX_PATTERN_LENGTH || val.length > MAX_PATTERN_TEST_LENGTH) {
+					errors.push({ field: key, message: `${label} has an invalid format` });
+				} else {
+					try {
+						if (!new RegExp(propSchema.pattern).test(val)) {
+							errors.push({ field: key, message: `${label} has an invalid format` });
+						}
+					} catch {
+						// ignore invalid regex from schema
 					}
-				} catch {
-					// ignore invalid regex from schema
 				}
 			}
 		}

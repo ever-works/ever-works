@@ -126,8 +126,18 @@ async function parallelBatch<T>(tasks: (() => Promise<T>)[], concurrency: number
 	return results;
 }
 
+// Security: allowlist path segments (mirrors sanitizeUserId in codex-home.ts)
+// so a crafted userId/workId containing `..` or `/` cannot escape BASE_TEMP_DIR
+// once path.join normalizes traversal sequences. Legitimate IDs (CUID/UUID,
+// `user-<ts>`, slugs) only use [a-zA-Z0-9._-] and pass through unchanged.
+function sanitizeWorkspaceSegment(segment: string): string {
+	return segment.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
 export function getWorkspacePath(userId: string, workId: string, runId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, `${workId}-${runId}`);
+	const safeUserId = sanitizeWorkspaceSegment(userId);
+	const safeWorkId = sanitizeWorkspaceSegment(workId);
+	return path.join(BASE_TEMP_DIR, safeUserId, `${safeWorkId}-${runId}`);
 }
 
 export async function createWorkspace(userId: string, workId: string): Promise<string> {

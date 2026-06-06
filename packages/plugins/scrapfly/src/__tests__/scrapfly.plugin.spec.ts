@@ -3,8 +3,12 @@ import type { PluginContext, ScreenshotOptions, ContentExtractionOptions } from 
 
 const { scrapeMock, ClientCtorMock, ScrapeConfigCtorMock } = vi.hoisted(() => {
 	const scrape = vi.fn();
-	const client = vi.fn().mockImplementation(() => ({ scrape }));
-	const scrapeConfig = vi.fn().mockImplementation((cfg: unknown) => ({ __cfg: cfg }));
+	const client = vi.fn().mockImplementation(function () {
+		return { scrape };
+	});
+	const scrapeConfig = vi.fn().mockImplementation(function (cfg: unknown) {
+		return { __cfg: cfg };
+	});
 	return { scrapeMock: scrape, ClientCtorMock: client, ScrapeConfigCtorMock: scrapeConfig };
 });
 

@@ -178,6 +178,23 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			};
 		}
 
+		// Security: reject IDs that contain anything other than the Apify ID alphabet
+		// (alphanumerics, hyphen, underscore). This prevents path-traversal sequences
+		// (e.g. `../../actor-runs/OTHER_RUN`) being interpolated into the API URL and
+		// silently redirecting the request to a different Apify endpoint.
+		if (datasetId && !ApifyPlugin.isSafeApifyId(datasetId)) {
+			return {
+				valid: false,
+				errors: [{ path: 'apify_datasetId', message: 'Dataset ID has an invalid format' }]
+			};
+		}
+		if (actorRunId && !ApifyPlugin.isSafeApifyId(actorRunId)) {
+			return {
+				valid: false,
+				errors: [{ path: 'apify_actorRunId', message: 'Actor Run ID has an invalid format' }]
+			};
+		}
+
 		return { valid: true };
 	}
 
@@ -232,6 +249,19 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 			return { items: [], hasMore: false };
 		}
 
+		// Security: validate the IDs at the sink as well as in validateFormInput, since
+		// query() can be invoked with settings supplied directly via pluginConfig that
+		// never passed through form validation. Reject anything outside the Apify ID
+		// alphabet so traversal sequences cannot be interpolated into the request path.
+		if (datasetId && !ApifyPlugin.isSafeApifyId(datasetId)) {
+			this.context?.logger.error('Invalid Apify dataset ID format');
+			return { items: [], hasMore: false };
+		}
+		if (actorRunId && !ApifyPlugin.isSafeApifyId(actorRunId)) {
+			this.context?.logger.error('Invalid Apify actor run ID format');
+			return { items: [], hasMore: false };
+		}
+
 		try {
 			// Build API URL
 			const baseUrl = datasetId
@@ -239,13 +269,17 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 				: `https://api.apify.com/v2/actor-runs/${actorRunId}/dataset/items`;
 
 			const url = new URL(baseUrl);
-			url.searchParams.set('token', apiToken);
+			// Security: send the API token via the Authorization header instead of a
+			// `?token=` query param so the credential is not captured in access logs,
+			// proxy/CDN logs, Referer headers, or error messages that include the URL.
 			if (maxItems > 0) {
 				url.searchParams.set('limit', maxItems.toString());
 			}
 
 			// Fetch data from Apify
-			const response = await fetch(url.toString());
+			const response = await fetch(url.toString(), {
+				headers: { Authorization: `Bearer ${apiToken}` }
+			});
 			if (!response.ok) {
 				throw new Error(`Apify API error: ${response.status} ${response.statusText}`);
 			}
@@ -312,7 +346,11 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 		}
 
 		try {
-			const response = await fetch(`https://api.apify.com/v2/users/me?token=${apiToken}`);
+			// Security: pass the API token in the Authorization header rather than the
+			// query string to keep the credential out of logs and Referer headers.
+			const response = await fetch('https://api.apify.com/v2/users/me', {
+				headers: { Authorization: `Bearer ${apiToken}` }
+			});
 
 			if (!response.ok) {
 				return {
@@ -333,6 +371,17 @@ export class ApifyPlugin implements IPlugin, IDataSourcePlugin, IFormSchemaProvi
 	// ============================================================================
 	// Private Helper Methods
 	// ============================================================================
+
+	/**
+	 * Security: validate an Apify dataset/actor-run ID before it is interpolated
+	 * into an API URL path. Apify IDs are short identifiers; allow only the
+	 * alphanumeric + hyphen/underscore alphabet. This blocks path-traversal
+	 * sequences (`/`, `.`, `%`, `\`, `?`, `#`, `:`) that `new URL()` would
+	 * otherwise normalize into a different Apify endpoint.
+	 */
+	private static isSafeApifyId(id: string): boolean {
+		return /^[A-Za-z0-9_-]{1,128}$/.test(id);
+	}
 
 	/**
 	 * Map an Apify item to ItemData format using field mapping.

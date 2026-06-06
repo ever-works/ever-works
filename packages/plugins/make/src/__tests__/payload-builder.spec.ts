@@ -134,6 +134,53 @@ describe('buildWorkflowPayload', () => {
 		expect(payload.dataSource?.branch).toBe('data');
 	});
 
+	// Security (SSRF): repo_url + access token are forwarded to the external
+	// Make.com runner, which fetches the URL server-side. Malicious URLs must
+	// fail closed — no dataSource, so neither the SSRF probe nor the access
+	// token reaches the runner. Legitimate https://github.com/... is unaffected.
+	it.each([
+		['cloud-metadata IP', 'http://169.254.169.254/latest/meta-data/'],
+		['loopback host', 'http://127.0.0.1:8080/internal'],
+		['private RFC1918 host', 'http://10.0.0.5/admin'],
+		['non-HTTP scheme', 'file:///etc/passwd'],
+		['malformed url', 'not-a-url']
+	])('should NOT attach dataSource (or token) for a malicious repo_url: %s', (_label, repoUrl) => {
+		const payload = buildWorkflowPayload(
+			createOptions({
+				config: {
+					target_items: 50,
+					pass_repo_access: true,
+					repo_url: repoUrl,
+					repo_access_token: 'ghp_secret_should_not_leak'
+				}
+			})
+		);
+
+		expect(payload.dataSource).toBeUndefined();
+	});
+
+	it('should attach dataSource with the token for a legitimate github https repo_url', () => {
+		const payload = buildWorkflowPayload(
+			createOptions({
+				config: {
+					target_items: 50,
+					pass_repo_access: true,
+					repo_url: 'https://github.com/org/repo',
+					repo_access_token: 'ghp_test123',
+					repo_branch: 'main'
+				}
+			})
+		);
+
+		expect(payload.dataSource).toEqual({
+			type: 'github-repo',
+			repoUrl: 'https://github.com/org/repo',
+			accessToken: 'ghp_test123',
+			branch: 'main',
+			path: 'items/'
+		});
+	});
+
 	it('should include custom scenario params', () => {
 		const payload = buildWorkflowPayload(
 			createOptions({

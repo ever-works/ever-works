@@ -280,12 +280,17 @@ test.describe('Notifications end-to-end', () => {
         expect(preference.quietHoursEnd).toBe('07:00');
         expect(preference.timezone).toBe('UTC');
 
+        // The MuteBody DTO validates `category` against the NotificationCategory
+        // enum (ai_credits|subscription|generation|system|security|agent|task) —
+        // the SINGULAR `agent`. (The event-type registry row above carries the
+        // free-form display category 'agents', a different field; muting must use
+        // the enum value or it 400s "category must be one of: …".)
         const mute = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers: h,
-            data: { category: 'agents' },
+            data: { category: 'agent' },
         });
         expect(mute.status()).toBe(201);
-        expect((await mute.json()).mute).toEqual({ category: 'agents', mutedUntil: null });
+        expect((await mute.json()).mute).toEqual({ category: 'agent', mutedUntil: null });
 
         // --- Step 5: read-back proves every preference persisted together ---
         const prefs1 = await (
@@ -295,7 +300,7 @@ test.describe('Notifications end-to-end', () => {
         expect(prefs1.subscriptions[0].eventTypeKey).toBe('agent_run_finished');
         expect(prefs1.subscriptions[0].channelIds).toEqual(['in-app']);
         expect(prefs1.preference?.timezone).toBe('UTC');
-        expect(prefs1.mutes.map((m: { category: string }) => m.category)).toContain('agents');
+        expect(prefs1.mutes.map((m: { category: string }) => m.category)).toContain('agent');
 
         // --- Step 6: validation gates reject typo'd event + foreign channel ---
         const unknownEvent = await request.put(
@@ -320,15 +325,17 @@ test.describe('Notifications end-to-end', () => {
         );
 
         // --- Step 7: unmute clears the gate (204, then absent on read-back) ---
+        // The :category path param is parsed by ParseEnumPipe(NotificationCategory),
+        // so it must be the SINGULAR enum value 'agent' (a plural 'agents' 400s).
         const unmute = await request.delete(
-            `${API_BASE}/api/notifications/preferences/mute/agents`,
+            `${API_BASE}/api/notifications/preferences/mute/agent`,
             { headers: h },
         );
         expect(unmute.status()).toBe(204);
         const prefs2 = await (
             await request.get(`${API_BASE}/api/notifications/preferences`, { headers: h })
         ).json();
-        expect(prefs2.mutes.map((m: { category: string }) => m.category)).not.toContain('agents');
+        expect(prefs2.mutes.map((m: { category: string }) => m.category)).not.toContain('agent');
         // The subscription + quiet-hours overrides survive the unmute.
         expect(prefs2.subscriptions).toHaveLength(1);
         expect(prefs2.preference?.timezone).toBe('UTC');
@@ -462,6 +469,10 @@ test.describe('Notifications end-to-end', () => {
 
         const message: MailhogMessage | null = await waitForMessageTo(request, user.email, {
             timeoutMs: 15_000,
+            // Wait for the RESET email specifically — a registration confirmation
+            // to the same address can race past the inbox clear on a cold CI
+            // runner and otherwise get picked instead.
+            subject: /password|reset/i,
         });
         // Mail DELIVERY is best-effort in the e2e env: MailHog's HTTP API is up
         // (isMailhogAvailable=true) but the SMTP send can fail ("Missing

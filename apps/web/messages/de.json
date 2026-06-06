@@ -542,14 +542,45 @@
                 "sites": "Sites"
             }
         },
+        "agentsPreview": {
+            "title": "Agenten",
+            "add": "Hinzufügen",
+            "viewAll": "Alle anzeigen ({n}) →",
+            "empty": {
+                "title": "Noch keine Agenten.",
+                "subtitleLink": "Erstellen Sie Ihren ersten Agenten",
+                "subtitleSuffix": "um wiederkehrende Aufgaben zu delegieren."
+            },
+            "scope": {
+                "tenant": "Arbeitsbereich",
+                "mission": "Mission",
+                "work": "Arbeit",
+                "idea": "Idee"
+            },
+            "cadence": "alle {cadence}"
+        },
+        "recentTasks": {
+            "title": "Aufgaben",
+            "add": "Hinzufügen",
+            "viewAll": "Alle anzeigen ({n}) →",
+            "empty": {
+                "title": "Noch keine Aufgaben.",
+                "subtitle": "Erstellen Sie eine, um mit der Arbeitserfassung zu beginnen."
+            },
+            "view": {
+                "label": "Aufgabenansicht wechseln",
+                "list": "Listenansicht",
+                "cards": "Kartenansicht"
+            }
+        },
         "missionsPage": {
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
             "quickAdd": {
-                "label": "Starte eine neue Mission",
+                "label": "Neue Mission starten",
                 "submitTitle": "Mission erstellen",
-                "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
+                "minLength": "Die Beschreibung muss mindestens 10 Zeichen enthalten.",
                 "created": "Mission erstellt",
                 "error": "Mission konnte nicht erstellt werden. Bitte versuchen Sie es erneut."
             },
@@ -611,10 +642,37 @@
                 "scopeMissionDesc": "Auf eine Mission beschränkt",
                 "scopeWorkDesc": "Auf eine Aufgabe beschränkt",
                 "scopeIdeaDesc": "Auf eine Idee beschränkt",
+                "parentLabel": "Wählen Sie ein {scope}",
+                "parentPlaceholder": "Auswählen...",
+                "parentRequired": "Wählen Sie ein übergeordnetes Element aus, um fortzufahren.",
+                "noMissions": "Sie haben noch keine Missionen — erstellen Sie eine, um hier einen Agenten zu definieren.",
+                "noWorks": "Sie haben noch keine Arbeiten — erstellen Sie eine, um hier einen Agenten zu definieren.",
+                "noIdeas": "Sie haben noch keine Ideen — fügen Sie eine hinzu, um hier einen Agenten zu definieren.",
                 "cancel": "Abbrechen",
                 "back": "Zurück",
                 "next": "Weiter",
-                "create": "Agent erstellen"
+                "create": "Agent erstellen",
+                "templateStepTitle": "Von einer Vorlage aus starten (optional)",
+                "startFromScratch": "Von Grundlage starten",
+                "pickParentHint": "Wählen Sie ein {scope} oben aus, um fortzufahren, oder wählen Sie den Arbeitsbereich.",
+                "nextDisabledReason": "Wählen Sie ein übergeordnetes Element oder wählen Sie den Arbeitsbereich aus, um fortzufahren."
+            },
+            "orDivider": "Oder",
+            "createManually": "Agent manuell erstellen",
+            "prompt": {
+                "label": "Beschreiben Sie den gewünschten Agenten",
+                "minLength": "Beschreiben Sie Ihren Agenten in ein paar weiteren Worten.",
+                "submitTitle": "Diesen Agenten erstellen"
+            },
+            "chips": {
+                "viewAll": "Alle anzeigen",
+                "ariaLabel": "Agentenvorlage auswählen"
+            },
+            "catalog": {
+                "allTemplates": "Alle Vorlagen",
+                "yourTemplates": "Ihre Vorlagen",
+                "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
+                "openInWizard": "Assistent öffnen"
             }
         },
         "tasksPage": {
@@ -690,9 +748,56 @@
         "skillsPage": {
             "title": "Fähigkeiten",
             "subtitle": "Wiederverwendbare, versionierte Anweisungen, die Agenten bei Bedarf in einen Lauf einbinden können.",
+            "tabs": {
+                "label": "Skill-Bereiche",
+                "installed": "Installiert",
+                "available": "Verfügbar",
+                "custom": "Benutzerdefiniert"
+            },
+            "search": {
+                "label": "Skills suchen",
+                "placeholder": "Skills nach Titel, Slug oder Beschreibung suchen",
+                "submit": "Suchen",
+                "clear": "Löschen"
+            },
+            "errors": {
+                "installed": "Installierte Skills konnten nicht geladen werden. Versuchen Sie, die Seite zu aktualisieren.",
+                "catalog": "Der Skills-Katalog konnte nicht geladen werden. Installierte und benutzerdefinierte Skills sind weiterhin verfügbar."
+            },
             "empty": {
                 "title": "Noch keine Fähigkeiten.",
                 "subtitle": "Fähigkeiten erscheinen in einer späteren Phase der Agenten/Fähigkeiten/Aufgaben-Einführung. Die Seite ist reserviert, damit der Navigationsweg der Seitenleiste aufgelöst wird."
+            },
+            "catalog": {
+                "emptyTitle": "Keine Katalog-Skills verfügbar.",
+                "emptySubtitle": "Aktivieren Sie ein Skills-Provider-Plugin oder passen Sie die Suche an.",
+                "install": "Installieren",
+                "installing": "Wird installiert...",
+                "installed": "Installiert",
+                "installFailed": "Installation fehlgeschlagen"
+            },
+            "custom": {
+                "summary": "{count, plural, =0 {Noch keine manuell erstellten Skills.} =1 {1 manuell erstellter Skill.} other {# manuell erstellte Skills.}}",
+                "new": "Neuer Skill",
+                "formTitle": "Neuer benutzerdefinierter Skill",
+                "title": "Titel",
+                "titlePlaceholder": "z.B. Code-Review-Checkliste",
+                "description": "Beschreibung (optional)",
+                "descriptionPlaceholder": "Einzeiler. Der Hauptteil kommt auf der Detailseite.",
+                "create": "Erstellen",
+                "creating": "Erstellen...",
+                "cancel": "Abbrechen",
+                "titleRequired": "Titel ist erforderlich.",
+                "createFailed": "Skill konnte nicht erstellt werden"
+            },
+            "card": {
+                "fromCatalog": "aus dem Katalog"
+            },
+            "pagination": {
+                "showing": "Zeige {start}-{end} von {total}",
+                "emptyPage": "Keine Ergebnisse auf dieser Seite",
+                "previous": "Vorherige",
+                "next": "Nächste"
             },
             "list": {
                 "newSkill": "+ Neue Fähigkeit",
@@ -1036,6 +1141,7 @@
                 "totalItems": "Elemente gesamt"
             },
             "recent": "Works",
+            "add": "Hinzufügen",
             "viewAll": "Alle anzeigen ({count})",
             "search": "Werke durchsuchen…",
             "create": "Werk erstellen",
@@ -1471,6 +1577,11 @@
             "totalItems": "Insgesamt Einträge",
             "activeWebsites": "Aktive Websites",
             "monthSpend": "Month Spend",
+            "agents": "Agenten",
+            "agentsActive": "{count} aktiv",
+            "tasksInFlight": "Laufende Aufgaben",
+            "tasksBlocked": "{count} blockiert",
+            "tasksNoBlockers": "keine Blocker",
             "fromLastMonth": "vom letzten Monat"
         },
         "adminUsage": {
@@ -3272,13 +3383,15 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
             "chips": {
                 "mission": "Mission",
                 "idea": "Idea",
+                "agent": "Agent",
+                "task": "Aufgabe",
                 "website": "Website",
                 "landing-page": "Landing Page",
                 "blog": "Blog",
@@ -3287,13 +3400,15 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Ein fortlaufendes Ziel, an dem der Agent weiterarbeitet - generiert Ideen nach einem Zeitplan oder einmalig.",
-                "idea": "Ein einmaliger Brief, den der Agent in einen Arbeitsplan umwandelt, den Sie ausbauen können.",
-                "website": "Eine mehrseitige Website für ein Unternehmen, eine Dienstleistung oder eine Marke - generierter Inhalt + Code.",
-                "landing-page": "Eine fokussierte Ein-Seiten-Website - Wartelisten, Produktstarts, Webinare-Anmeldungen, Lead-Erfassung.",
-                "blog": "Ein Blog mit Kategorien, RSS, Code-Hervorhebung und SEO-gerechtem Inhalt.",
-                "directory": "Eine kuratierte Verzeichniswebsite mit Suchfunktion, Filtern und strukturierten Artikeldaten.",
-                "awesome-repo": "Ein Awesome-List-Repository - Markdown-Index, kategorisierte Links und aktualisierbare Metadaten.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -3305,6 +3420,8 @@
             "toasts": {
                 "missionCreated": "Mission created",
                 "ideaCreated": "Idea added",
+                "agentDraft": "Agenteneinstellung wird geöffnet — zum Erstellen fertigstellen.",
+                "taskDraft": "Aufgabeneinstellung wird geöffnet — zum Erstellen fertigstellen.",
                 "submitError": "Couldn't create. Please try again."
             },
             "cards": {
@@ -3329,6 +3446,30 @@
             "title": "Neues Werk erstellen",
             "subtitle": "Wählen Sie aus, wie Sie Ihr Werk erstellen möchten",
             "backToOptions": "Zurück zu den Optionen",
+            "promptLabel": "Art der Arbeit, die Sie erstellen möchten?",
+            "or": "oder",
+            "kinds": {
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Verzeichnis",
+                "awesome-repo": "Awesome Repo"
+            },
+            "kindDescriptions": {
+                "website": "Eine mehrseitige Website für ein Unternehmen, eine Dienstleistung oder eine Marke — generierte Inhalte + Code.",
+                "landing-page": "Eine fokussierte One-Page-Seite — Wartelisten, Produktstarts, Webanmeldungen, Lead-Erfassung.",
+                "blog": "Ein Blog mit Kategorien, RSS, Code-Highlighting und SEO-optimierten Inhalten.",
+                "directory": "Eine kuratierte Verzeichnis-Website mit Suche, Filtern und strukturierten Artikeldaten.",
+                "awesome-repo": "Ein awesome-list Repo — Markdown-Index, kategorisierte Links und aktualisierbare Metadaten."
+            },
+            "promptHints": {
+                "minLength": "Fügen Sie eine Beschreibung (mindestens 10 Zeichen) hinzu, um zu beginnen.",
+                "submitTitle": "Mit KI erstellen"
+            },
+            "buttons": {
+                "manual": "Arbeit manuell erstellen",
+                "import": "Vorhandene Arbeit importieren"
+            },
             "sidebar": {
                 "selectedProvider": "Git-Anbieter",
                 "selectedDeployProvider": "Deploy-Anbieter"
@@ -3361,6 +3502,9 @@
                 "workNamePlaceholder": "z. B. Awesome AI Tools",
                 "workNameHelp": "KI schlägt einen Namen vor, wenn Sie dies leer lassen",
                 "promptLabel": "Beschreiben Sie Ihr Werk",
+                "slugLabel": "Arbeit-Slug",
+                "slugPlaceholder": "awesome-ki-tools",
+                "slugHelp": "URL-freundlicher Bezeichner. Wird automatisch aus dem Namen generiert — zum Überschreiben bearbeiten.",
                 "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
                 "promptPlaceholder": "Beschreiben Sie, welches Werk Sie erstellen möchten, welche Einträge es enthalten soll und spezifische Anforderungen…",
                 "inspirationText": "Brauchen Sie Inspiration? Probieren Sie eines davon aus:",
@@ -4340,244 +4484,6 @@
             "toggleError": "Plugin konnte nicht umgeschaltet werden",
             "system": "System",
             "goToPluginSettings": "Zu Plugin-Einstellungen"
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
-            },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
         }
     },
     "layout": {
@@ -4839,6 +4745,11 @@
         "visibility": {
             "private": "Privat",
             "public": "Öffentlich"
+        },
+        "footer": {
+            "build": "Bauen",
+            "web": "Web",
+            "api": "API"
         }
     },
     "organizations": {
@@ -4901,6 +4812,109 @@
             "title": "Create your first Organization",
             "description": "Organize your work, share with teammates, and collaborate as a team.",
             "cta": "Create Organization"
+        }
+    },
+    "notifications-v2": {
+        "emails": {
+            "title": "E-Mail-Adressen",
+            "subtitle": "Vom Mandanten verwaltete eingehende und ausgehende Adressen für Agenten.",
+            "addAddress": "Adresse hinzufügen",
+            "empty": "Noch keine E-Mail-Adressen. Klicken Sie auf Adresse hinzufügen, um einen Postmark / Resend / Mailgun / Sendgrid / Mailchimp-Postfach zu registrieren.",
+            "columns": {
+                "address": "Adresse",
+                "direction": "Richtung",
+                "provider": "Anbieter",
+                "verified": "Verifiziert"
+            },
+            "actions": {
+                "edit": "Bearbeiten",
+                "disable": "Deaktivieren",
+                "remove": "Entfernen",
+                "verify": "Verifizierung erneut senden"
+            }
+        },
+        "channels": {
+            "title": "Benachrichtigungskanäle",
+            "subtitle": "Verbinden Sie Discord, Slack, Telegram, WhatsApp oder Novu für die Zustellung über mehrere Kanäle.",
+            "addChannel": "Kanal hinzufügen",
+            "empty": "Noch keine Kanäle. Fügen Sie einen Discord-Webhook, einen eingehenden Slack-Webhook, einen Telegram-Bot oder einen Novu-Workflow hinzu, um Benachrichtigungen über die App hinaus zu verteilen.",
+            "columns": {
+                "name": "Name",
+                "provider": "Anbieter",
+                "verified": "Verifiziert"
+            },
+            "actions": {
+                "test": "Testen",
+                "edit": "Bearbeiten",
+                "disable": "Deaktivieren",
+                "remove": "Entfernen"
+            },
+            "testResult": {
+                "delivered": "Test zugestellt ✓",
+                "failed": "Test fehlgeschlagen"
+            }
+        },
+        "preferences": {
+            "title": "Benachrichtigungseinstellungen",
+            "subtitle": "Wählen Sie, welche Kanäle jedes Ereignis zustellen. Die Zustellung in der App ist immer aktiviert.",
+            "empty": "Noch keine Ereignistypen registriert. Anbieter werden das Verzeichnis bei der ersten Ausgabe füllen.",
+            "columns": {
+                "event": "Ereignis",
+                "inApp": "In-App"
+            },
+            "quietHours": {
+                "title": "Stille Stunden",
+                "start": "Start",
+                "end": "Ende",
+                "timezone": "Zeitzone"
+            },
+            "mute": {
+                "title": "Kategorie stumm schalten",
+                "until": "Bis stumm schalten",
+                "muted": "Stumm",
+                "unmute": "Laut schalten"
+            }
+        },
+        "inbox": {
+            "title": "Posteingang",
+            "subtitleCount": "Eingehende und ausgehende E-Mails für diesen Agenten. {count} Nachrichten.",
+            "compose": "Verfassen",
+            "empty": "Noch keine Nachrichten. Weisen Sie diesem Agenten unter Einstellungen → Integrationen → E-Mails eine eingehende E-Mail-Adresse zu, um den Empfang von E-Mails zu starten.",
+            "columns": {
+                "direction": "Richtung",
+                "from": "Von",
+                "subject": "Betreff",
+                "when": "Wann",
+                "status": "Status"
+            },
+            "directionIn": "eingehend",
+            "directionOut": "ausgehend",
+            "back": "← Zurück zum Posteingang"
+        },
+        "detail": {
+            "from": "Von",
+            "to": "An",
+            "cc": "Cc",
+            "inbound": "eingehend",
+            "outbound": "ausgehend"
+        },
+        "composer": {
+            "title": "Verfassen",
+            "to": "An",
+            "toPlaceholder": "empfänger@example.com, andere@example.com",
+            "cc": "Cc",
+            "ccOptional": "(optional)",
+            "subject": "Betreff",
+            "message": "Nachricht",
+            "send": "Senden",
+            "sending": "Wird gesendet...",
+            "sent": "Gesendet ✓",
+            "errors": {
+                "recipientRequired": "Mindestens ein Empfänger ist erforderlich.",
+                "subjectRequired": "Betreff ist erforderlich.",
+                "bodyRequired": "Nachrichtentext ist erforderlich.",
+                "sendFailed": "Senden fehlgeschlagen."
+            }
         }
     }
 }

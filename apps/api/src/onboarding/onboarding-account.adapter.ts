@@ -157,6 +157,11 @@ export class OnboardingAccountAdapter implements OnboardingAccountUpsert {
     }
 }
 
+// Security: strip known GitHub token patterns from error messages before logging to prevent
+// credential fragments leaking into log aggregators (Sentry, Datadog) via Octokit error text.
+const GITHUB_TOKEN_PATTERN = /\b(?:ghp_|gho_|ghs_|github_pat_)[A-Za-z0-9_]{10,}\b/g;
+
 function describeError(err: unknown): string {
-    return err instanceof Error ? err.message : String(err);
+    const raw = err instanceof Error ? err.message : String(err);
+    return raw.replace(GITHUB_TOKEN_PATTERN, '[REDACTED]');
 }

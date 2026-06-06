@@ -5,6 +5,7 @@ import {
     IsOptional,
     IsString,
     IsUrl,
+    Matches,
     MaxLength,
     Min,
 } from 'class-validator';
@@ -14,6 +15,17 @@ import type { UpdateItemDto as IUpdateItemDto } from '@ever-works/contracts/api'
 export class UpdateItemDto implements IUpdateItemDto {
     @ApiProperty({ description: 'Slug of the item to update' })
     @IsString()
+    @IsNotEmpty()
+    // Security (path traversal): defence-in-depth at the DTO boundary, mirroring
+    // `RemoveItemDto.item_slug`. `item_slug` is attacker-controlled and flows
+    // into `DataRepository.getItem` / `updateItemMetadata`
+    // (`path.join(dataDir, slug)`, no confinement). The service already
+    // normalises it via `slugifyText`, but reject path separators / `.` here
+    // too. The character set mirrors `slugifyText` output ([a-z0-9_-]) so no
+    // legitimately-created slug is rejected, while `.`, `/`, `\` cannot pass.
+    @Matches(/^[a-z0-9_-]+$/, {
+        message: 'item_slug must contain only lowercase letters, digits, hyphens, and underscores',
+    })
     item_slug: string;
 
     @ApiPropertyOptional({ description: 'Whether the item is featured' })

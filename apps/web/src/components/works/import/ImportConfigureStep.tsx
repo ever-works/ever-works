@@ -236,6 +236,11 @@ export function ImportConfigureStep({
                                     {getDetectedTypeBadge(analysisResult.detectedType)}
                                 </span>
                             </div>
+                            {/* Security: owner, repo, initialPrompt, and scheduleCadence originate from
+                                an attacker-controlled external repository's works.yml (hostile external content).
+                                They are rendered as React text nodes (NOT dangerouslySetInnerHTML), so React's
+                                default HTML escaping prevents XSS. If any of these fields are ever passed to a
+                                markdown renderer or dangerouslySetInnerHTML, sanitize them with DOMPurify first. */}
                             <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                                 {analysisResult.owner}/{analysisResult.repo}
                             </p>

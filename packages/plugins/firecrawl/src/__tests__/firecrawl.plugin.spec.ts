@@ -5,7 +5,9 @@ const { searchMock, scrapeMock, batchScrapeMock, FirecrawlAppCtorMock } = vi.hoi
 	const search = vi.fn();
 	const scrape = vi.fn();
 	const batchScrape = vi.fn();
-	const ctor = vi.fn().mockImplementation(() => ({ search, scrape, batchScrape }));
+	const ctor = vi.fn().mockImplementation(function () {
+		return { search, scrape, batchScrape };
+	});
 	return {
 		searchMock: search,
 		scrapeMock: scrape,

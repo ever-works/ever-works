@@ -114,6 +114,20 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				},
 				timeout,
 				maxRedirects: 5,
+				// Security (SSRF): the lexical guard above only vets the INITIAL
+				// url. axios/follow-redirects will transparently follow up to 5
+				// 3xx hops, so a public, guard-passing page can redirect to
+				// http://169.254.169.254/... (cloud metadata) or http://127.0.0.1.
+				// Re-run isSafeWebhookUrl on every redirect target (follow-redirects
+				// populates options.href with the fully-resolved next URL before
+				// invoking this hook); throwing here aborts the request and is
+				// surfaced by the catch block below as a failed extraction.
+				beforeRedirect: (options: Record<string, unknown>) => {
+					const next = typeof options.href === 'string' ? options.href : '';
+					if (!next || !isSafeWebhookUrl(next)) {
+						throw new Error(`Redirect blocked by SSRF guard: ${next || '<unknown target>'}`);
+					}
+				},
 				validateStatus: (status) => status >= 200 && status < 400
 			});
 

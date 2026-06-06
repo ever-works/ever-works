@@ -31,6 +31,7 @@ RUN pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
 COPY packages/plugins/ packages/plugins/
 COPY scripts/prepare-docker-plugins.js scripts/prepare-docker-plugins.js
+COPY scripts/strip-non-core-plugins.js scripts/strip-non-core-plugins.js
 
 # Use turbo directly to bypass the root `pnpm build` script's
 # `--filter=!./apps/docs` which fails in the pruned workspace where
@@ -39,6 +40,26 @@ RUN pnpm exec turbo build --filter=ever-works-api...
 RUN pnpm exec turbo build --filter="./packages/plugins/*"
 RUN pnpm deploy --filter=ever-works-api --prod --legacy /app/deploy
 RUN node scripts/prepare-docker-plugins.js
+
+# EW-693 / T29 — dual-mode image.
+#
+# `bundled` (default): every plugin is built into /app/deploy/plugins
+# above, exactly as before this PR. No behaviour change.
+#
+# `dynamic` (opt-in via --build-arg PLUGIN_DISTRIBUTION_MODE=dynamic):
+# after prepare-docker-plugins.js writes the full tree, we strip every
+# plugin whose manifest resolves to `distribution: 'registry'`. Core
+# plugins (systemPlugin=true OR distribution='core') stay so the API
+# can boot. The runtime installer (Phase 5) lazily pulls registry
+# plugins on first enable; warmup (Phase 5 + this entrypoint via
+# warmupDynamicPlugins) pre-installs the DB-recorded set on boot.
+ARG PLUGIN_DISTRIBUTION_MODE=bundled
+ENV PLUGIN_DISTRIBUTION_MODE=$PLUGIN_DISTRIBUTION_MODE
+RUN if [ "$PLUGIN_DISTRIBUTION_MODE" = "dynamic" ]; then \
+        PLUGINS_DIR=/app/deploy/plugins node /app/scripts/strip-non-core-plugins.js; \
+    else \
+        echo "==> EW-693: bundled image (PLUGIN_DISTRIBUTION_MODE=$PLUGIN_DISTRIBUTION_MODE) — keeping every plugin."; \
+    fi
 
 #-- Production
 FROM node:22-alpine
@@ -64,11 +85,19 @@ ARG GIT_SHA=
 ARG GIT_REF=
 ARG BUILD_RUN=
 ARG BUILD_TIME=
+# EW-693 — propagate the build-time mode into the runtime image so
+# operators can confirm the image variant at GET /api/version. The
+# runtime config (apps/api/src/config/constants.ts) reads
+# PLUGIN_DISTRIBUTION_MODE at request time, so this is informational
+# in the runtime image but ensures `bundled` vs `dynamic` is set
+# correctly by default for each image variant.
+ARG PLUGIN_DISTRIBUTION_MODE=bundled
 ENV BUILD_VERSION=$BUILD_VERSION \
     GIT_SHA=$GIT_SHA \
     GIT_REF=$GIT_REF \
     BUILD_RUN=$BUILD_RUN \
-    BUILD_TIME=$BUILD_TIME
+    BUILD_TIME=$BUILD_TIME \
+    PLUGIN_DISTRIBUTION_MODE=$PLUGIN_DISTRIBUTION_MODE
 
 COPY --from=installer --chown=node:node /app/deploy/dist ./dist
 COPY --from=installer --chown=node:node /app/deploy/node_modules ./node_modules

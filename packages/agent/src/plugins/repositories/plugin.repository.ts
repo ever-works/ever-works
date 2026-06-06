@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { PluginEntity } from '../entities/plugin.entity';
+import { PluginEntity, type PluginInstallState } from '../entities/plugin.entity';
 import type { PluginCategory, PluginState } from '@ever-works/plugin';
 
 /**
@@ -179,5 +179,69 @@ export class PluginRepository {
             return this.findByPluginId(data.pluginId);
         }
         return this.create(data);
+    }
+
+    /**
+     * EW-693 — transition a plugin's INSTALL lifecycle (distinct from
+     * the load `state` updated by {@link updateState}).
+     *
+     * Used by the runtime installer to record progress through
+     * `available → installing → installed | error`. The optional
+     * `details` payload pins the install metadata so a fresh replica
+     * can reconcile from the DB:
+     * - `registrySpec`: the exact npm spec resolved.
+     * - `installedVersion`: the version actually on disk now.
+     * - `integrity`: sha512 used to verify the install (FR-10).
+     * - `installError`: cleared on success, recorded on error.
+     *
+     * Behaviour pinned by tests:
+     * - When transitioning to `'error'` the installer is expected to
+     *   pass `details.installError` — passing `undefined` here will
+     *   NOT clear an existing error (use an empty string `''` for that).
+     * - When transitioning to `'installed'` the installer is expected
+     *   to pass `installedVersion` + `integrity`. The repository does
+     *   not synthesise either — it's a thin pass-through.
+     */
+    async updateInstallState(
+        pluginId: string,
+        installState: PluginInstallState,
+        details?: {
+            registrySpec?: string | null;
+            installedVersion?: string | null;
+            integrity?: string | null;
+            installError?: string | null;
+            source?: 'bundled' | 'registry';
+        },
+    ): Promise<PluginEntity | null> {
+        const updateData: Partial<PluginEntity> = { installState };
+        if (details?.registrySpec !== undefined) {
+            updateData.registrySpec = details.registrySpec;
+        }
+        if (details?.installedVersion !== undefined) {
+            updateData.installedVersion = details.installedVersion;
+        }
+        if (details?.integrity !== undefined) {
+            updateData.integrity = details.integrity;
+        }
+        if (details?.installError !== undefined) {
+            updateData.installError = details.installError;
+        }
+        if (details?.source !== undefined) {
+            updateData.source = details.source;
+        }
+        return this.updateByPluginId(pluginId, updateData);
+    }
+
+    /**
+     * EW-693 — list plugins by install state. Used by:
+     * - the boot reconciler to find `installed`/`installing` rows
+     *   that need warmup on a fresh replica;
+     * - the admin UI to surface plugins stuck in `error`.
+     */
+    async findByInstallState(installState: PluginInstallState): Promise<PluginEntity[]> {
+        return this.repository.find({
+            where: { installState },
+            order: { name: 'ASC' },
+        });
     }
 }

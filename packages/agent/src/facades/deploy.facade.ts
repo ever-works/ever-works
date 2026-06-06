@@ -23,6 +23,14 @@ import type { User } from '../entities/user.entity';
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
 
+// Security: allow-list of plugin IDs whose secret settings the deploy
+// orchestrator is permitted to read via `getOtherPluginSettings`. The k8s
+// deploy only needs the GitHub plugin's `readPackagesPat*` to mint a GHCR
+// imagePullSecret. Restricting this prevents the open-ended "fetch any
+// plugin's secrets" method from being repurposed to exfiltrate unrelated
+// credentials (e.g. an AI provider's API key) for the request's user.
+const CROSS_PLUGIN_SETTINGS_ALLOWLIST: ReadonlySet<string> = new Set(['github']);
+
 function resolvePluginProviderId(providerId: string): string {
     return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
         ? KUBERNETES_DEPLOY_PROVIDER_ID
@@ -390,6 +398,17 @@ export class DeployFacadeService implements IDeployFacade {
         pluginId: string,
         options: DeployFacadeOptions,
     ): Promise<Record<string, unknown>> {
+        // Security: only allow reading secret settings for plugins the deploy
+        // flow legitimately stitches across (currently just `github`). Reject
+        // any other pluginId so this method cannot be used to fetch arbitrary
+        // plugins' secrets for the request's user.
+        if (!CROSS_PLUGIN_SETTINGS_ALLOWLIST.has(pluginId)) {
+            throw new DeployFacadeError(
+                `Cross-plugin settings access is not permitted for plugin '${pluginId}'`,
+                'getOtherPluginSettings',
+                pluginId,
+            );
+        }
         return this.settingsService.getSettings(pluginId, {
             userId: options.userId,
             workId: options.workId,

@@ -142,6 +142,23 @@ const TEXT_LIKE_MIMES: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
+ * Security: the subset of accepted MIME types whose bytes a browser would
+ * render or execute if served inline with their real Content-Type
+ * (HTML document, CSS that can exfiltrate via attribute selectors, and
+ * JavaScript). These are stored (e.g. as LLM context) but must NEVER be
+ * handed back to a browser with an active Content-Type. `readFile`
+ * collapses them to `application/octet-stream`; the serve controller does
+ * the same as an outer layer. Kept in sync with the controller's
+ * `ACTIVE_MIMES`.
+ */
+const ACTIVE_RENDERABLE_MIMES: ReadonlySet<string> = new Set([
+    'text/html',
+    'text/css',
+    'text/javascript',
+    'application/javascript',
+]);
+
+/**
  * Union of all extensions writable by saveImage + saveFile. Used by
  * `assertValidFilename` to validate filenames on the serve path.
  */
@@ -581,7 +598,21 @@ export class UploadsService {
         // a malicious storage backend (or operator misconfig) handing back
         // bytes whose Content-Type metadata doesn't match the payload.
         const sniffed = this.sniffMagicBytes(result.buffer);
-        const mimeType = sniffed?.mime ?? result.mimeType ?? 'application/octet-stream';
+        const rawMimeType = sniffed?.mime ?? result.mimeType ?? 'application/octet-stream';
+        // Security: defense-in-depth against serving attacker-uploaded
+        // active content with its renderable MIME. `saveFile`'s text
+        // allow-list (TEXT_LIKE_MIMES) admits text/html, text/css and
+        // (application/)javascript, which a browser would render / execute
+        // if a downstream tier ever served them inline with their real
+        // Content-Type. The serve controller already collapses these (and
+        // pins a strict CSP + nosniff), but we also neutralize them at the
+        // service boundary so NO caller of `readFile` can ever obtain an
+        // active Content-Type for stored bytes. Images / JSON / markdown /
+        // PDFs and every other type pass through untouched.
+        const baseMime = rawMimeType.split(';')[0].trim().toLowerCase();
+        const mimeType = ACTIVE_RENDERABLE_MIMES.has(baseMime)
+            ? 'application/octet-stream'
+            : rawMimeType;
         return { buffer: result.buffer, mimeType };
     }
 

@@ -14,6 +14,9 @@ import type { AgentScope, CreateAgentInput } from '@/lib/api/agents';
 // template catalog so the templates flow has an actual on-ramp into
 // Agent creation.
 import { listAstTemplates, type AstTemplateEntry } from '@/lib/api/agent-templates';
+// Security: shared sanitizer used to strip control characters from
+// untrusted URL-derived input (mirrors use-start-from-prompt.tsx).
+import { sanitizeName } from '@/lib/utils/sanitize';
 
 type CreateAgentFn = (input: CreateAgentInput) => Promise<{ id: string }>;
 
@@ -140,9 +143,9 @@ export function NewAgentDialog({
         const trimmed = promptParam.trim();
         if (!trimmed) return;
         const firstBreak = trimmed.indexOf('\n');
-        const candidateName =
+        const rawName =
             firstBreak > 0 ? trimmed.slice(0, firstBreak).trim() : trimmed.slice(0, 80).trim();
-        const candidateTitle =
+        const rawTitle =
             firstBreak > 0
                 ? trimmed
                       .slice(firstBreak + 1)
@@ -151,6 +154,14 @@ export function NewAgentDialog({
                 : trimmed.length > 80
                   ? trimmed.slice(0, 120)
                   : '';
+        // Security: the `?prompt=` query param is untrusted (e.g. a
+        // shared phishing deep-link). Strip control characters and
+        // normalize before pre-populating the form so a crafted URL
+        // can't inject control chars / hidden content into the agent
+        // name + title that get submitted as metadata. Legitimate
+        // plain-text prompts pass through unchanged; caps preserved.
+        const candidateName = sanitizeName(rawName, 80);
+        const candidateTitle = sanitizeName(rawTitle, 120);
         if (!name && candidateName) setName(candidateName);
         if (!title && candidateTitle) setTitle(candidateTitle);
         // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -5,6 +5,15 @@ import { GitFacadeService } from '@src/facades/git.facade';
 import type { RepositoryTarget } from '@src/entities/work.entity';
 
 const WORKS_CONFIG_FILEPATHS = ['.works/works.yml'] as const;
+
+// Security: `.works/works.yml` is attacker-controlled external content. The
+// `initial_prompt` it carries is forwarded verbatim into the LLM generation
+// pipeline, so a hostile repo could embed a multi-kilobyte prompt-injection /
+// resource-exhaustion payload. Bound the accepted length (defense-in-depth);
+// legitimate prompts are a sentence or short paragraph, far below this cap, so
+// no real input is affected. Isolation/delimiting of the prompt at the model
+// call site is handled separately by the generation layer.
+const MAX_INITIAL_PROMPT_LENGTH = 8000;
 export interface WorksConfigSummary {
     name?: string;
     initialPrompt?: string;
@@ -244,15 +253,23 @@ export class WorksConfigService {
     }
 
     private readInitialPrompt(raw: Record<string, unknown>): string | undefined {
-        return (
+        const value =
             this.readString(raw, ['initial_prompt', 'initialPrompt', 'prompt']) ??
             this.readString(this.readMetadata(raw), [
                 'initial_prompt',
                 'initialPrompt',
                 'prompt',
             ]) ??
-            this.asString(this.readLastRequestData(raw)?.prompt)
-        );
+            this.asString(this.readLastRequestData(raw)?.prompt);
+
+        // Security: clamp the externally-sourced prompt to a sane upper bound
+        // so an oversized injection/DoS payload from a hostile works.yml cannot
+        // be forwarded wholesale into the generation pipeline.
+        if (value && value.length > MAX_INITIAL_PROMPT_LENGTH) {
+            return value.slice(0, MAX_INITIAL_PROMPT_LENGTH);
+        }
+
+        return value;
     }
 
     private readModel(raw: Record<string, unknown>): string | undefined {

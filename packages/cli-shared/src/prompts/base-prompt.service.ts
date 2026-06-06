@@ -276,8 +276,12 @@ export abstract class BasePromptService {
 	}
 
 	protected validateApiKeyWithProvider(apiKey: string, providerName: string): string | boolean {
-		if (apiKey.length < 5) {
-			return `${providerName} API key seems too short. Please check and try again`;
+		// Security: align minimum length with validateApiKey (was 5, now 10) to prevent trivially short/invalid keys
+		if (apiKey.length < 10) {
+			return `${providerName} API key seems too short (minimum 10 characters). Please check and try again`;
+		}
+		if (apiKey.length > 200) {
+			return `${providerName} API key seems too long (maximum 200 characters)`;
 		}
 		if (apiKey.includes(' ')) {
 			return 'API key should not contain spaces';

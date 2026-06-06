@@ -3,6 +3,7 @@ import {
     Body,
     Controller,
     Delete,
+    ForbiddenException,
     Get,
     NotFoundException,
     Param,
@@ -26,13 +27,26 @@ import {
 } from './dto/agent-memory.dto';
 
 /**
+ * Security (EW-711 #29): metadata key used to stamp the creating user onto
+ * every session / record. The agent-memory backend partitions by `project`
+ * (shared across users), so this stamp is the per-resource ownership marker
+ * the mutating handlers verify before close/delete. Forced from the
+ * authenticated principal at write time — never read from the request body.
+ */
+const OWNER_METADATA_KEY = 'ownerUserId';
+
+/**
  * REST surface for the `agent-memory` capability (follow-up to PR #1073
  * + #1081 + #1084). Lets the web admin UI list, search, save, and
  * forget memory observations / sessions for the signed-in user.
  *
- * All endpoints are JWT-protected; mutating ones additionally enforce
- * `WorkOwnershipService.ensureCanView` when a `workId` is supplied so
- * users can't read another user's Work memory.
+ * All endpoints are JWT-protected. Reads enforce
+ * `WorkOwnershipService.ensureCanView` when a `workId` is supplied so users
+ * can't read another user's Work memory. Mutating, id-addressed handlers
+ * (`closeSession` / `deleteEntry`) require `ensureCanEdit` for Work-scoped
+ * calls AND verify the target session/entry's `ownerUserId` stamp so an
+ * omitted or foreign `workId` cannot be used to mutate another user's
+ * resource (EW-711 #29).
  *
  * Routing is mounted under `/api/agent-memory` to match the sibling
  * capability controllers (`/api/search`, `/api/agent/memory` was
@@ -88,6 +102,14 @@ export class AgentMemoryController {
         // actually scopes to the requested namespace.
         const metadata: Record<string, unknown> = { ...(dto.metadata ?? {}) };
         if (dto.projectId) metadata.projectId = dto.projectId;
+        // Security (EW-711 #29): stamp the creating user onto the session so
+        // close/delete can verify per-session ownership. The agent-memory
+        // backend partitions only by `project` (shared across users), so the
+        // owner stamp is the only thing binding a session to its creator —
+        // without it a user could close another user's session by id when
+        // `workId` is omitted. `ownerUserId` overrides any caller-supplied
+        // value of the same key so it can't be spoofed from the request body.
+        metadata[OWNER_METADATA_KEY] = auth.userId;
         try {
             const session = await this.agentMemory.openSession(
                 metadata,
@@ -108,9 +130,18 @@ export class AgentMemoryController {
         @Query() query: MemoryScopeQueryDto,
     ) {
         if (!sessionId) throw new BadRequestException('sessionId is required');
-        await this.assertWorkAccess(auth, query.workId);
+        // Security (EW-711 #29): this is a mutating, id-addressed handler.
+        // Previously the workId gate ran `ensureCanView` and was skipped
+        // entirely when `workId` was omitted, so a user could close ANOTHER
+        // user's session by guessing the id. Now: (1) a Work-scoped close
+        // requires EDIT access (a viewer must not end a shared session), and
+        // (2) we ALWAYS verify the session belongs to the caller via its
+        // owner stamp — closing the `workId` bypass.
+        await this.assertWorkEditAccess(auth, query.workId);
+        const facadeOptions = this.facadeOptions(auth, query.workId);
+        await this.assertOwnsSession(sessionId, auth, facadeOptions);
         try {
-            await this.agentMemory.closeSession(sessionId, this.facadeOptions(auth, query.workId));
+            await this.agentMemory.closeSession(sessionId, facadeOptions);
             return { status: 'success' };
         } catch (error) {
             throw this.toHttpError(error, 'closeSession');
@@ -141,12 +172,22 @@ export class AgentMemoryController {
     @ApiResponse({ status: 201, description: 'Saved record' })
     async save(@CurrentUser() auth: AuthenticatedUser, @Body() dto: SaveMemoryDto) {
         await this.assertWorkAccess(auth, dto.workId);
+        // Security (EW-711 #29): stamp the creating user onto the record so
+        // `deleteEntry` can verify per-entry ownership. Same rationale as
+        // `openSession` — the backend is project-scoped, not user-scoped, so
+        // the owner stamp is what lets us reject a cross-user forget by id.
+        // `ownerUserId` is forced from the authenticated principal and
+        // overrides any caller-supplied key of the same name.
+        const metadata: Record<string, unknown> = {
+            ...(dto.metadata ?? {}),
+            [OWNER_METADATA_KEY]: auth.userId,
+        };
         try {
             const record = await this.agentMemory.saveMemory(
                 {
                     content: dto.content,
                     tags: dto.tags,
-                    metadata: dto.metadata,
+                    metadata,
                     sessionId: dto.sessionId,
                     projectId: dto.projectId,
                 },
@@ -211,9 +252,16 @@ export class AgentMemoryController {
         @Query() query: MemoryScopeQueryDto,
     ) {
         if (!entryId) throw new BadRequestException('entryId is required');
-        await this.assertWorkAccess(auth, query.workId);
+        // Security (EW-711 #29): mutating, id-addressed handler — same IDOR
+        // class as closeSession. A Work-scoped forget now requires EDIT
+        // access, and we ALWAYS verify the entry belongs to the caller via
+        // its owner stamp so an omitted/foreign `workId` can't be used to
+        // delete another user's memory record by id.
+        await this.assertWorkEditAccess(auth, query.workId);
+        const facadeOptions = this.facadeOptions(auth, query.workId);
+        await this.assertOwnsEntry(entryId, auth, facadeOptions);
         try {
-            await this.agentMemory.deleteEntry(entryId, this.facadeOptions(auth, query.workId));
+            await this.agentMemory.deleteEntry(entryId, facadeOptions);
             return { status: 'success' };
         } catch (error) {
             throw this.toHttpError(error, 'deleteEntry');
@@ -233,6 +281,112 @@ export class AgentMemoryController {
     ): Promise<void> {
         if (!workId) return;
         await this.ownership.ensureCanView(workId, auth.userId);
+    }
+
+    /**
+     * Security (EW-711 #29): edit-level variant of {@link assertWorkAccess}
+     * for the mutating, id-addressed handlers (`closeSession` /
+     * `deleteEntry`). A Work viewer can read shared memory but must not be
+     * able to end sessions or forget records, so these gate on
+     * `ensureCanEdit` rather than `ensureCanView`. As before, an absent
+     * `workId` leaves provider/project resolution unscoped — but ownership
+     * is no longer skipped: the per-session/per-entry stamp check below
+     * runs unconditionally.
+     */
+    private async assertWorkEditAccess(
+        auth: AuthenticatedUser,
+        workId: string | undefined,
+    ): Promise<void> {
+        if (!workId) return;
+        await this.ownership.ensureCanEdit(workId, auth.userId);
+    }
+
+    /**
+     * Security (EW-711 #29): verify the target session was opened by the
+     * caller. The agent-memory backend partitions by `project`, not by
+     * user, so without this check any user sharing a project could close a
+     * session they merely know the id of. We resolve the sessions visible in
+     * the caller's scope via the existing `listSessions` read seam and, if
+     * the target surfaces, reject when its `ownerUserId` stamp belongs to a
+     * different user.
+     *
+     * Fail-open is deliberate ONLY for the cases that cannot be a cross-user
+     * attack on a stamped resource: providers that don't implement
+     * `listSessions`, and legacy/unstamped sessions (no `ownerUserId`). A
+     * present, foreign stamp is always rejected. This preserves the
+     * legitimate same-user flow (the caller's own sessions always carry
+     * their own stamp) while closing the IDOR.
+     */
+    private async assertOwnsSession(
+        sessionId: string,
+        auth: AuthenticatedUser,
+        facadeOptions: FacadeOptions,
+    ): Promise<void> {
+        let sessions: readonly { id: string; metadata?: Record<string, unknown> }[];
+        try {
+            sessions = await this.agentMemory.listSessions(undefined, facadeOptions);
+        } catch (error) {
+            // Provider doesn't expose `listSessions` → we cannot enumerate to
+            // verify. Don't grant a free pass on a real failure, but a
+            // missing optional method is not an attack signal: let the
+            // downstream call proceed (the backend itself still scopes by the
+            // resolved project/credentials).
+            if (this.isUnsupportedError(error)) return;
+            throw this.toHttpError(error, 'closeSession');
+        }
+        const session = sessions.find((s) => s.id === sessionId);
+        this.assertStampMatches(session?.metadata, auth.userId);
+    }
+
+    /**
+     * Security (EW-711 #29): per-entry analogue of {@link assertOwnsSession}
+     * for `deleteEntry`. There is no get-by-id seam on the capability, so we
+     * locate the record within the caller's scope via the existing
+     * `searchMemory` read seam (broad query, generous limit) and reject when
+     * the matched record carries a foreign `ownerUserId` stamp. Same
+     * fail-open posture for unsupported providers / unstamped records as
+     * sessions; a present, foreign stamp is always rejected.
+     */
+    private async assertOwnsEntry(
+        entryId: string,
+        auth: AuthenticatedUser,
+        facadeOptions: FacadeOptions,
+    ): Promise<void> {
+        let records: readonly { id: string; metadata?: Record<string, unknown> }[];
+        try {
+            const response = await this.agentMemory.searchMemory(
+                { query: '*', limit: 100 },
+                facadeOptions,
+            );
+            records = response.results;
+        } catch (error) {
+            if (this.isUnsupportedError(error)) return;
+            throw this.toHttpError(error, 'deleteEntry');
+        }
+        const record = records.find((r) => r.id === entryId);
+        this.assertStampMatches(record?.metadata, auth.userId);
+    }
+
+    /**
+     * Security (EW-711 #29): throw 403 when a resource's `ownerUserId`
+     * stamp is present and belongs to a different user. Absent stamp (legacy
+     * / not-found) is left to the caller's fail-open policy.
+     */
+    private assertStampMatches(
+        metadata: Record<string, unknown> | undefined,
+        userId: string,
+    ): void {
+        const owner = metadata?.[OWNER_METADATA_KEY];
+        if (typeof owner === 'string' && owner !== userId) {
+            throw new ForbiddenException({
+                status: 'error',
+                message: 'You do not have permission to modify this agent-memory resource',
+            });
+        }
+    }
+
+    private isUnsupportedError(error: unknown): boolean {
+        return error instanceof Error && error.message.includes('does not support');
     }
 
     private facadeOptions(auth: AuthenticatedUser, workId?: string): FacadeOptions {

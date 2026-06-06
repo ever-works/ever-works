@@ -229,8 +229,11 @@ export class KbMentionResolverService {
             // Forbidden / unexpected error — treat as not-resolved.
             // The user sees their message go through; the LLM just
             // doesn't get that specific KB doc as context.
+            // Security: truncate user-controlled reference to limit log verbosity and
+            // omit userId to prevent work↔user correlation in log aggregation systems.
+            const safeRef = reference.length > 64 ? `${reference.slice(0, 64)}…` : reference;
             this.logger.debug(
-                `KB mention resolution skipped for "${reference}" (work=${workId}, user=${userId}): ${
+                `KB mention resolution skipped for "${safeRef}" (work=${workId}): ${
                     (err as Error).message
                 }`,
             );

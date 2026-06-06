@@ -182,11 +182,20 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         const body = await res
                             .json()
                             .catch(() => ({ error: 'Failed to create Organization' }));
-                        setSubmitError(
+                        // Security: cap displayed server message length to avoid leaking
+                        // verbose internal error details (stack traces, DB constraint names).
+                        // Fall back to the generic i18n string for unexpected errors.
+                        const MAX_ERR_LEN = 200;
+                        const rawMsg =
                             (body as { message?: string; error?: string }).message ??
-                                (body as { error?: string }).error ??
-                                t('errors.generic'),
-                        );
+                            (body as { error?: string }).error;
+                        const displayMsg =
+                            typeof rawMsg === 'string' && rawMsg.length > 0
+                                ? rawMsg.length <= MAX_ERR_LEN
+                                    ? rawMsg
+                                    : t('errors.generic')
+                                : t('errors.generic');
+                        setSubmitError(displayMsg);
                         return;
                     }
                     const org = (await res.json()) as OrganizationResponse;
@@ -213,7 +222,12 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         setShowUpgradeDialog(true);
                     } else {
                         onOpenChange(false);
-                        router.push(`/${org.slug}/dashboard`);
+                        // Security: validate slug matches expected alphanumeric-dash
+                        // pattern before interpolating into the router path to prevent
+                        // an open redirect if the API ever returns a malformed slug.
+                        if (/^[a-z0-9-]+$/.test(org.slug)) {
+                            router.push(`/${org.slug}/dashboard`);
+                        }
                     }
                 } catch (err) {
                     setSubmitError(err instanceof Error ? err.message : t('errors.generic'));
@@ -232,7 +246,12 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
             setCreatedOrg(null);
             onOpenChange(false);
             if (target) {
-                router.push(`/${target.slug}/dashboard`);
+                // Security: validate slug matches expected alphanumeric-dash
+                // pattern before interpolating into the router path to prevent
+                // an open redirect if the API ever returns a malformed slug.
+                if (/^[a-z0-9-]+$/.test(target.slug)) {
+                    router.push(`/${target.slug}/dashboard`);
+                }
                 // Pull the freshly-upgraded org list (tenantId is now set
                 // on the user, so subsequent fetches reflect that).
                 if (didUpgrade) void mutate();

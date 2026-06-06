@@ -41,7 +41,7 @@ export class TaskChatController {
             'Edit a chat message within the 5-min window. Past the window returns 403. Only the original author can edit.',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async editChat(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

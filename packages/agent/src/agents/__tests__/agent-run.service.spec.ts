@@ -102,6 +102,26 @@ describe('AgentRunService', () => {
         expect(runs.markFailed).not.toHaveBeenCalled();
     });
 
+    it('Security (IDOR): refuses a run when the requesting user does not own the Agent', async () => {
+        // The Agent fixture belongs to 'u1'; a caller whose context.userId is
+        // a DIFFERENT tenant must not be able to drive a run against it. The
+        // service loads by id but enforces same-owner before any prompt /
+        // budget / memory work — returning agent-not-found (no existence leak)
+        // and never touching the budget or assembling a (cross-tenant) prompt.
+        agents.findById.mockResolvedValueOnce(makeAgent({ userId: 'u1' }));
+        const result = await svc.execute({
+            runId: 'r1',
+            agentId: 'a1',
+            userId: 'attacker-u2',
+            kind: 'heartbeat',
+        });
+        expect(result.status).toBe('agent-not-found');
+        expect(result.prompt).toBeUndefined();
+        expect(result.budgetCheck).toBeUndefined();
+        expect(budgets.findByAgentId).not.toHaveBeenCalled();
+        expect(runs.markFailed).not.toHaveBeenCalled();
+    });
+
     it('happy heartbeat path — assembles a prompt and writes an INFO log row', async () => {
         agents.findById.mockResolvedValueOnce(makeAgent());
         const result = await svc.execute({

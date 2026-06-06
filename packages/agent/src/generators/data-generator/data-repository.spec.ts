@@ -75,6 +75,18 @@ describe('DataRepository', () => {
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
+    it('treats missing categories.yml and tags.yml as empty taxonomy lists', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+
+        const repository = await DataRepository.create(repoDir);
+
+        await expect(repository.getCategories()).resolves.toEqual([]);
+        await expect(repository.getTags()).resolves.toEqual([]);
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
     it('uses .works/works.yml as the primary data config', async () => {
         const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
 
@@ -150,6 +162,42 @@ describe('DataRepository', () => {
                 items_created: 4,
             }),
         ]);
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
+    it('confines item slugs to dataDir: rejects traversal slugs, preserves legit paths', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        await fs.mkdir(path.join(repoDir, 'data'), { recursive: true });
+
+        const repository = await DataRepository.create(repoDir);
+        const dataDir = path.join(repoDir, 'data');
+
+        // (a) Malicious slugs that would escape dataDir must throw before any
+        // fs sink (rm/mkdir/access) is reached — fail closed, never fail open.
+        for (const hostile of ['../victim', '../../etc', '..', '.', 'a/b', 'a\\b', 'foo/../bar']) {
+            await expect(repository.itemExists(hostile)).rejects.toThrow(/Invalid slug/);
+            await expect(repository.removeItem(hostile)).rejects.toThrow(/Invalid slug/);
+            await expect(repository.createItemDir({ slug: hostile } as any)).rejects.toThrow(
+                /Invalid slug/,
+            );
+        }
+
+        // Sanity: the guard actually prevented escape — no directory was
+        // created outside dataDir for any hostile slug.
+        await expect(fs.readdir(dataDir)).resolves.toEqual([]);
+
+        // (b) A legitimate slugifyText-shaped slug still passes unchanged: the
+        // item directory lands exactly at path.join(dataDir, slug) (the
+        // pre-guard return value) and round-trips through the public API.
+        const legitSlug = 'compare_cloud-pricing1';
+        const expectedDir = path.join(dataDir, legitSlug);
+
+        await expect(repository.itemExists(legitSlug)).resolves.toBe(false);
+        await repository.createItemDir({ slug: legitSlug } as any);
+        await expect(fs.stat(expectedDir)).resolves.toBeDefined();
+        await expect(repository.itemExists(legitSlug)).resolves.toBe(true);
+        await expect(fs.readdir(dataDir)).resolves.toEqual([legitSlug]);
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });

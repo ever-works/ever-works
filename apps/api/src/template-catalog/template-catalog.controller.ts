@@ -6,6 +6,7 @@ import {
     HttpStatus,
     InternalServerErrorException,
     Param,
+    ParseUUIDPipe,
     Post,
     Put,
     Query,
@@ -104,6 +105,9 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template updated' })
     async updateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
         @Param('templateId') templateId: string,
         @Body() body: UpdateCustomTemplateDto,
     ) {
@@ -141,6 +145,9 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Custom template archived' })
     async archiveCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
         @Param('templateId') templateId: string,
         @Body() body: ArchiveCustomTemplateDto,
     ) {
@@ -314,6 +321,9 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization scheduled' })
     async iterateCustomTemplate(
         @CurrentUser() auth: AuthenticatedUser,
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
         @Param('templateId') templateId: string,
         @Body() body: IterateCustomTemplateDto,
     ) {
@@ -356,6 +366,9 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Template synced' })
     async syncCustomTemplateFromBase(
         @CurrentUser() auth: AuthenticatedUser,
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
         @Param('templateId') templateId: string,
     ) {
         const result = await this.templateCustomizationService.syncFromBase(
@@ -411,7 +424,7 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization status' })
     async getCustomization(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('customizationId') customizationId: string,
+        @Param('customizationId', ParseUUIDPipe) customizationId: string, // Security: enforce UUID format
     ) {
         const customization = await this.templateCustomizationService.getByIdForUser(
             customizationId,
@@ -427,6 +440,9 @@ export class TemplateCatalogController {
     @ApiResponse({ status: 200, description: 'Customization list' })
     async listCustomizationsForTemplate(
         @CurrentUser() auth: AuthenticatedUser,
+        // Custom template IDs are `custom-<uuid>` (varchar), not bare UUIDs, so a
+        // UUID-only pipe would reject every valid id; the service does the
+        // ownership check and uses the id in a parameterized lookup.
         @Param('templateId') templateId: string,
     ) {
         const customizations = await this.templateCustomizationService.listForTemplate(

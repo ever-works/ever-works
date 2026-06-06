@@ -24,16 +24,18 @@ class RequestErrorMock extends Error {
 }
 
 vi.mock('octokit', () => ({
-	Octokit: vi.fn().mockImplementation(() => ({
-		rest: {
-			repos: {
-				getContent: octokitMockState.getContent,
-				createOrUpdateFileContents: octokitMockState.createOrUpdateFileContents,
-				deleteFile: octokitMockState.deleteFile,
-				get: octokitMockState.get
+	Octokit: vi.fn().mockImplementation(function () {
+		return {
+			rest: {
+				repos: {
+					getContent: octokitMockState.getContent,
+					createOrUpdateFileContents: octokitMockState.createOrUpdateFileContents,
+					deleteFile: octokitMockState.deleteFile,
+					get: octokitMockState.get
+				}
 			}
-		}
-	})),
+		};
+	}),
 	RequestError: RequestErrorMock
 }));
 
@@ -45,12 +47,14 @@ const gitOpsMockState = {
 };
 
 vi.mock('@ever-works/plugin/git', () => ({
-	GitOperations: vi.fn().mockImplementation(() => ({
-		cloneOrPull: gitOpsMockState.cloneOrPull,
-		add: gitOpsMockState.add,
-		commit: gitOpsMockState.commit,
-		push: gitOpsMockState.push
-	}))
+	GitOperations: vi.fn().mockImplementation(function () {
+		return {
+			cloneOrPull: gitOpsMockState.cloneOrPull,
+			add: gitOpsMockState.add,
+			commit: gitOpsMockState.commit,
+			push: gitOpsMockState.push
+		};
+	})
 }));
 
 // EW-644 — mock the git-cli LFS transport so orchestrator tests don't

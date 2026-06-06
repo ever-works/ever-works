@@ -388,17 +388,23 @@ export function HistoryTable({ entries, locale }: HistoryTableProps) {
                                                                         : t('trigger.api')}
                                                                 </span>
                                                             )}
-                                                        {entry.triggerRunId && (
-                                                            <a
-                                                                href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
-                                                            >
-                                                                <span>Trigger.dev</span>
-                                                                <ExternalLink className="h-3 w-3" />
-                                                            </a>
-                                                        )}
+                                                        {entry.triggerRunId &&
+                                                            // Security: validate triggerRunId to a safe alphanumeric/dash/underscore
+                                                            // format before interpolating into the URL, preventing open-redirect
+                                                            // if a malicious value was stored in the DB.
+                                                            (/^[a-zA-Z0-9_-]{1,128}$/.test(
+                                                                entry.triggerRunId,
+                                                            ) ? (
+                                                                <a
+                                                                    href={`https://cloud.trigger.dev/runs/${entry.triggerRunId}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="flex items-center gap-1 text-xs text-primary hover:underline dark:text-primary-dark"
+                                                                >
+                                                                    <span>Trigger.dev</span>
+                                                                    <ExternalLink className="h-3 w-3" />
+                                                                </a>
+                                                            ) : null)}
                                                     </div>
                                                 </div>
                                             </div>

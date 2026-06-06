@@ -33,6 +33,7 @@ describe('WorkLifecycleService', () => {
     let websiteGenerator: any;
     let websiteUpdateService: any;
     let ownershipService: any;
+    let organizationRepository: any;
     let deployFacade: any;
     let templateCatalogService: any;
     let websiteRepositoryState: any;
@@ -74,6 +75,12 @@ describe('WorkLifecycleService', () => {
         ownershipService = {
             ensureCanEdit: jest.fn(),
             ensureIsOwner: jest.fn(),
+        };
+        // EW-711 #27: org-KB enrollment tenant guard resolves the target org
+        // before persisting a non-null organizationId. Default to no lookup;
+        // tests that enroll into an org stub this explicitly.
+        organizationRepository = {
+            findById: jest.fn(),
         };
         deployFacade = {
             getAvailableProviders: jest.fn().mockReturnValue([]),
@@ -131,6 +138,7 @@ describe('WorkLifecycleService', () => {
             everWorksDns,
             funnel,
             eventEmitter as never,
+            organizationRepository,
         );
     });
 
@@ -177,6 +185,7 @@ describe('WorkLifecycleService', () => {
                 owner: 'ever-works',
                 organization: false,
                 organizationId: null,
+                tenantId: 'tenant-a',
                 readmeConfig: {},
                 gitProvider: 'github',
                 userId: user.id,
@@ -187,13 +196,20 @@ describe('WorkLifecycleService', () => {
                 ...overrides,
             }) as any;
 
-        it('persists a non-null organizationId from the DTO', async () => {
+        it('persists a non-null organizationId from the DTO (org in the same tenant)', async () => {
             const work = baseWork();
             ownershipService.ensureCanEdit.mockResolvedValue({ work });
+            // EW-711 #27: enrolling into a non-null org now resolves the target
+            // and requires a tenant match. A same-tenant org persists as before.
+            organizationRepository.findById.mockResolvedValue({
+                id: 'org-42',
+                tenantId: 'tenant-a',
+            });
             workRepository.update.mockResolvedValueOnce({ ...work, organizationId: 'org-42' });
 
             await service.updateWork(work.id, { organizationId: 'org-42' } as any, user);
 
+            expect(organizationRepository.findById).toHaveBeenCalledWith('org-42');
             expect(workRepository.update).toHaveBeenCalledWith(
                 work.id,
                 expect.objectContaining({ organizationId: 'org-42' }),

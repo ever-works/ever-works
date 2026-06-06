@@ -13,6 +13,10 @@ import { WorkPromptService } from './work-prompt.service';
 import { ConfigCheckService } from './config-check.service';
 import { handleCliError } from './error';
 import { Work, GenerateStatusType, User } from '@ever-works/agent/entities';
+// Security (SSRF): lexical guard reused to reject source URLs that point at
+// private/loopback/link-local or cloud-metadata addresses before they reach
+// the generation pipeline (which later fetches them as source content).
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 import {
     getDynamicStepText,
     getDynamicStepProgress,
@@ -645,6 +649,15 @@ export class GenerateSubCommand extends CommandRunner {
             new URL(url);
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 return 'URL must start with http:// or https://';
+            }
+            // Security (SSRF): source URLs are later fetched by the generation
+            // pipeline as source content, so reject any URL whose literal host is
+            // a private/loopback/link-local IP or a known cloud-metadata hostname
+            // (e.g. 127.0.0.1, 169.254.169.254, 10.x/172.16-31.x/192.168.x). This
+            // is a lexical guard reusing the canonical SSRF helper; DNS-rebinding
+            // hostnames are additionally re-checked downstream via safeFetchWithDnsPin.
+            if (!isSafeWebhookUrl(url)) {
+                return 'URL must be a public address (private, loopback, link-local, and cloud-metadata hosts are not allowed)';
             }
             return true;
         } catch {

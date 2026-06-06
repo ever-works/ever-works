@@ -1,6 +1,7 @@
 import type { ItemData } from '@ever-works/plugin';
 import type { FacadeOptions } from '@ever-works/plugin';
 import type { StepStatus } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const IMAGE_CAPTURE_DELAY_MS = 500;
 
@@ -40,6 +41,21 @@ export async function captureScreenshots(
 		for (const item of itemsNeedingImages) {
 			if (ctx.signal.aborted) {
 				break;
+			}
+
+			// Security (SSRF): `source_url` originates from untrusted, Hermes-/LLM-
+			// generated result items (written verbatim into the result JSON) and can
+			// be steered via direct or indirect prompt injection to point at internal
+			// / cloud-metadata targets (e.g. `http://169.254.169.254/...`, `file://`,
+			// a loopback admin port). It is fetched server-side by the screenshot
+			// provider, so gate it on the shared lexical SSRF guard (rejects non
+			// HTTP(S) schemes and literal private/loopback/link-local/metadata IPs)
+			// before handing it to the facade. Unsafe URLs are skipped; legitimate
+			// https item URLs are unaffected. Mirrors the claude-managed-agent /
+			// sim-ai guards for the same `source_url` -> getSmartImage path.
+			if (!isSafeWebhookUrl(item.source_url!)) {
+				ctx.logger.warn(`Skipping image for ${item.name}: source_url failed SSRF safety check`);
+				continue;
 			}
 
 			try {

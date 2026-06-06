@@ -97,9 +97,26 @@ export interface MissionRunNowResponse {
     message?: string;
 }
 
+export interface ListMissionsInput {
+    status?: MissionStatus;
+    search?: string;
+    limit?: number;
+    offset?: number;
+}
+
+function buildListEndpoint(input?: ListMissionsInput): string {
+    const params = new URLSearchParams();
+    if (input?.status) params.set('status', input.status);
+    if (input?.search) params.set('search', input.search);
+    if (input?.limit) params.set('limit', String(input.limit));
+    if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
+    const qs = params.toString();
+    return qs ? `/me/missions?${qs}` : '/me/missions';
+}
+
 export const missionsAPI = {
-    async list(): Promise<Mission[]> {
-        return serverFetch<Mission[]>('/me/missions', { method: 'GET' });
+    async list(input?: ListMissionsInput): Promise<Mission[]> {
+        return serverFetch<Mission[]>(buildListEndpoint(input), { method: 'GET' });
     },
 
     async get(id: string): Promise<Mission | null> {

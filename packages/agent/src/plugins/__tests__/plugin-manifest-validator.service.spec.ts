@@ -397,4 +397,82 @@ describe('PluginManifestValidatorService', () => {
             expect(manifest).toBeNull();
         });
     });
+
+    // EW-693 — dynamic plugin distribution. The manifest gains
+    // `distribution` and `executionProfile`; both optional and additive
+    // so older manifests remain valid (forward-compat).
+    describe('EW-693: distribution + executionProfile', () => {
+        const baseManifest = {
+            id: 'test-plugin',
+            name: 'Test Plugin',
+            version: '1.0.0',
+            category: 'utility',
+        };
+
+        it('accepts manifest without distribution (forward-compat default)', () => {
+            const result = service.validate(baseManifest);
+            expect(result.valid).toBe(true);
+        });
+
+        it('accepts distribution: core', () => {
+            const result = service.validate({ ...baseManifest, distribution: 'core' });
+            expect(result.valid).toBe(true);
+        });
+
+        it('accepts distribution: registry', () => {
+            const result = service.validate({ ...baseManifest, distribution: 'registry' });
+            expect(result.valid).toBe(true);
+        });
+
+        it('rejects unknown distribution value', () => {
+            const result = service.validate({ ...baseManifest, distribution: 'npm' });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'distribution')).toBe(true);
+        });
+
+        it('rejects non-string distribution', () => {
+            const result = service.validate({ ...baseManifest, distribution: 1 });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'distribution')).toBe(true);
+        });
+
+        it('rejects systemPlugin + distribution: registry (FR-4)', () => {
+            const result = service.validate({
+                ...baseManifest,
+                systemPlugin: true,
+                distribution: 'registry',
+            });
+            expect(result.valid).toBe(false);
+            const err = result.errors?.find((e) => e.path === 'distribution');
+            expect(err?.message).toMatch(/systemPlugin/i);
+        });
+
+        it('accepts systemPlugin + distribution: core', () => {
+            const result = service.validate({
+                ...baseManifest,
+                systemPlugin: true,
+                distribution: 'core',
+            });
+            expect(result.valid).toBe(true);
+        });
+
+        it('accepts executionProfile: sync', () => {
+            const result = service.validate({ ...baseManifest, executionProfile: 'sync' });
+            expect(result.valid).toBe(true);
+        });
+
+        it('accepts executionProfile: long-running', () => {
+            const result = service.validate({
+                ...baseManifest,
+                executionProfile: 'long-running',
+            });
+            expect(result.valid).toBe(true);
+        });
+
+        it('rejects unknown executionProfile value', () => {
+            const result = service.validate({ ...baseManifest, executionProfile: 'async' });
+            expect(result.valid).toBe(false);
+            expect(result.errors?.some((e) => e.path === 'executionProfile')).toBe(true);
+        });
+    });
 });

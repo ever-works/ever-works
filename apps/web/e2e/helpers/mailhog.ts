@@ -60,7 +60,30 @@ export async function clearMailhogInbox(request: APIRequestContext): Promise<voi
 }
 
 /**
+ * Decode a quoted-printable transport body. MailHog returns the raw
+ * on-the-wire body, and our HTML templates are sent with
+ * `Content-Transfer-Encoding: quoted-printable` — so `=` becomes `=3D`
+ * and long lines are soft-wrapped with a trailing `=\r\n`. That wrapping
+ * splits links mid-token (`…?token=3D982a…=\r\n8bd5…`), so a regex like
+ * `…?token=[a-f0-9]+` never matches the raw body. Strip soft breaks
+ * first, then resolve `=XX` hex escapes. Byte-wise decode is fine here —
+ * every token/link we fish out is ASCII.
+ */
+export function decodeQuotedPrintable(input: string): string {
+    return input
+        .replace(/=\r?\n/g, '')
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+/**
  * List the most-recent N messages (default 50), newest first.
+ *
+ * Quoted-printable bodies are decoded in place so every downstream
+ * consumer (`extractLinkFromBody`, per-spec token regexes, raw
+ * `Content.Body` reads) sees the logical content rather than the
+ * `=3D`/soft-wrapped transport encoding. Only QP-encoded messages are
+ * touched — decoding a 7bit/plain body that legitimately contains
+ * `=<hex>` (e.g. `?token=ab12…`) would corrupt it.
  */
 export async function listMessages(
     request: APIRequestContext,
@@ -69,7 +92,14 @@ export async function listMessages(
     const res = await request.get(`${MAILHOG_URL}/api/v2/messages?limit=${limit}`);
     if (!res.ok()) return [];
     const body = (await res.json()) as MailhogListResponse;
-    return body.items ?? [];
+    const items = body.items ?? [];
+    for (const message of items) {
+        const cte = headerOf(message, 'Content-Transfer-Encoding');
+        if (cte && cte.toLowerCase() === 'quoted-printable' && message.Content?.Body) {
+            message.Content.Body = decodeQuotedPrintable(message.Content.Body);
+        }
+    }
+    return items;
 }
 
 /**
@@ -81,17 +111,33 @@ export async function listMessages(
 export async function waitForMessageTo(
     request: APIRequestContext,
     recipient: string,
-    options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+    options: { timeoutMs?: number; pollIntervalMs?: number; subject?: RegExp } = {},
 ): Promise<MailhogMessage | null> {
     const timeoutMs = options.timeoutMs ?? 10_000;
     const pollMs = options.pollIntervalMs ?? 300;
+    // Optional subject filter. On a cold CI runner an earlier email to the same
+    // address (e.g. the registration confirmation sent before this test's inbox
+    // clear) can land over SMTP AFTER the clear and sit in the box alongside the
+    // mail we actually triggered. Matching on recipient alone then returns the
+    // wrong message; callers that triggered a specific mail (password reset,
+    // verification, …) pass a `subject` so we wait for THAT email — mirroring
+    // magic-link.spec.ts's subject-filtered poll.
+    const subjectRe = options.subject;
     const deadline = Date.now() + timeoutMs;
     const recipientLower = recipient.toLowerCase();
     while (Date.now() < deadline) {
         const messages = await listMessages(request);
-        const match = messages.find((m) =>
-            m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === recipientLower),
-        );
+        const match = messages.find((m) => {
+            const toMatch = m.To?.some(
+                (t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === recipientLower,
+            );
+            if (!toMatch) return false;
+            if (subjectRe) {
+                const subject = headerOf(m, 'Subject') ?? '';
+                if (!subjectRe.test(subject)) return false;
+            }
+            return true;
+        });
         if (match) return match;
         await new Promise((r) => setTimeout(r, pollMs));
     }

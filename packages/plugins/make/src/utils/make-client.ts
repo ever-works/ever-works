@@ -7,6 +7,9 @@ import type {
 	MakeWorkflowInput
 } from '../types.js';
 import { DEFAULT_MAX_POLL_ATTEMPTS, DEFAULT_POLL_INTERVAL_MS } from '../types.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 export interface MakeExecutionResult {
 	output: unknown;
@@ -194,6 +197,17 @@ export class MakeClient {
 	 * final output inline when the scenario uses a "Webhook Response" module.
 	 */
 	async invokeWebhook(webhookUrl: string, input: MakeWorkflowInput, signal?: AbortSignal): Promise<unknown> {
+		// SSRF guard: webhookUrl is tenant-controlled (generator form / plugin
+		// settings) and the call site at make.plugin.ts also forwards a hook URL
+		// returned by the Make REST API. Reject literal private/loopback/
+		// link-local/cloud-metadata IPs and non-HTTP(S) schemes before issuing
+		// the request, so a malicious config can't make the server POST to (and
+		// return the body of) an internal endpoint such as 169.254.169.254 IMDS.
+		// Mirrors the content-extractor / pdf-extractor / source-validation guards.
+		if (!isSafeWebhookUrl(webhookUrl)) {
+			throw new Error('Make.com webhook URL is not safe to call (SSRF guard blocked the destination host).');
+		}
+
 		const response = await fetch(webhookUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -275,7 +289,18 @@ export class MakeClient {
 				}
 			}
 		}
-		return url.toString();
+		// Security (SSRF): baseUrl is tenant-controlled plugin settings and flows
+		// into every authenticated REST call (which carries the Make API token in
+		// an `Authorization: Token …` header). Reject literal private/loopback/
+		// link-local/cloud-metadata hosts and non-HTTP(S) schemes so a malicious
+		// baseUrl (e.g. http://169.254.169.254 or http://10.0.0.1) can't redirect
+		// the request — and the bearer token — to an internal endpoint and leak
+		// its response back through the error path. Mirrors the invokeWebhook guard.
+		const finalUrl = url.toString();
+		if (!isSafeWebhookUrl(finalUrl)) {
+			throw new Error('Make.com API base URL is not safe to call (SSRF guard blocked the destination host).');
+		}
+		return finalUrl;
 	}
 
 	private wrapHttpError(status: number, statusText: string, rawBody: string): Error {
@@ -321,7 +346,10 @@ function extractErrorMessage(body: string): string | undefined {
 		const parsed = JSON.parse(body) as { message?: string; detail?: string; error?: string };
 		return parsed.message || parsed.detail || parsed.error || undefined;
 	} catch {
-		return truncate(body);
+		// Raw (non-JSON) upstream bodies are not echoed back to avoid leaking
+		// fragments of the request (e.g. auth tokens) that some APIs mirror in
+		// their plain-text error responses.
+		return undefined;
 	}
 }
 

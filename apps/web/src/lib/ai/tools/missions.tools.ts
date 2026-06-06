@@ -70,7 +70,8 @@ export const listMissions = tool({
 export const getMissionDetails = tool({
     description: 'Get detailed info about a specific Mission.',
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await missionsAPI.get(missionId);
@@ -83,7 +84,8 @@ export const getMissionBudget = tool({
     description:
         'Get current-period spend + global cap status for a Mission. Use when the user asks about cost or budget.',
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         try {
@@ -174,7 +176,8 @@ export const updateMission = tool({
         'Tri-state semantics: omit a field to leave it unchanged; pass `null` to reset to default; pass a value to override.',
     ].join(' '),
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
         title: z.string().optional(),
         description: z.string().optional(),
         type: z.enum(['one-shot', 'scheduled']).optional(),
@@ -196,7 +199,8 @@ export const pauseMission = tool({
     description:
         'Pause an active Mission. The cron tick worker will skip it until resumed. Only valid when status="active".',
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await pauseMissionAction(missionId);
@@ -208,7 +212,8 @@ export const resumeMission = tool({
     description:
         'Resume a paused Mission. Tick worker picks it back up on the next cron match. Only valid when status="paused".',
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await resumeMissionAction(missionId);
@@ -222,7 +227,8 @@ export const completeMission = tool({
         'Existing Ideas + Works remain; only the Mission itself stops spawning. Not reversible — surface a confirmation in chat before calling.',
     ].join(' '),
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await completeMissionAction(missionId);
@@ -236,7 +242,8 @@ export const deleteMission = tool({
         'Removes the Mission row and detaches its Ideas (the Ideas themselves remain in the catalog).',
     ].join(' '),
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         await deleteMissionAction(missionId);
@@ -250,7 +257,8 @@ export const runMissionNow = tool({
         'For one-shot Missions this is the primary way to spawn Ideas. For scheduled Missions it does an out-of-band run while still honoring the outstanding-Ideas cap.',
     ].join(' '),
     inputSchema: z.object({
-        missionId: z.string().describe('Mission ID'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const result = await runMissionNowAction(missionId);
@@ -264,7 +272,8 @@ export const cloneMission = tool({
         'Use when the user wants to "duplicate" or "fork" a Mission.',
     ].join(' '),
     inputSchema: z.object({
-        missionId: z.string().describe('Source Mission ID to clone from'),
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Source Mission ID to clone from'),
         title: z
             .string()
             .optional()

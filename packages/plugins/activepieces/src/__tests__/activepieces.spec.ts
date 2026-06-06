@@ -8,11 +8,13 @@ const mockExecuteFlow = vi.fn();
 const mockPing = vi.fn();
 
 vi.mock('../utils/activepieces-client.js', () => ({
-	ActivepiecesClient: vi.fn().mockImplementation(() => ({
-		validateFlow: mockValidateFlow,
-		executeFlow: mockExecuteFlow,
-		ping: mockPing
-	}))
+	ActivepiecesClient: vi.fn().mockImplementation(function () {
+		return {
+			validateFlow: mockValidateFlow,
+			executeFlow: mockExecuteFlow,
+			ping: mockPing
+		};
+	})
 }));
 
 function createMockContext(): PluginContext {

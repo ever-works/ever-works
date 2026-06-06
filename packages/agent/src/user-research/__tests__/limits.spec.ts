@@ -68,4 +68,31 @@ describe('UserResearchLimitsService', () => {
         }
         await expect(svc.assertCanRun('u2')).resolves.toBeUndefined();
     });
+
+    it('tryIncrementRuns returns the new count and throws once the cap is reached', async () => {
+        const cap = DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay;
+        for (let i = 1; i <= cap; i++) {
+            await expect(svc.tryIncrementRuns('u1')).resolves.toBe(i);
+        }
+        await expect(svc.tryIncrementRuns('u1')).rejects.toBeInstanceOf(
+            UserResearchRateLimitedError,
+        );
+    });
+
+    it('tryIncrementRuns is atomic under concurrency — never overshoots the cap', async () => {
+        const cap = DEFAULT_USER_RESEARCH_LIMITS.maxRunsPerDay;
+        const attempts = cap + 5;
+        const results = await Promise.allSettled(
+            Array.from({ length: attempts }, () => svc.tryIncrementRuns('u1')),
+        );
+        const fulfilled = results.filter((r) => r.status === 'fulfilled');
+        const rejected = results.filter((r) => r.status === 'rejected');
+        // Exactly `cap` calls succeed; the rest are rate-limited. No double-count.
+        expect(fulfilled.length).toBe(cap);
+        expect(rejected.length).toBe(attempts - cap);
+        const counts = fulfilled
+            .map((r) => (r as PromiseFulfilledResult<number>).value)
+            .sort((a, b) => a - b);
+        expect(counts).toEqual(Array.from({ length: cap }, (_, i) => i + 1));
+    });
 });

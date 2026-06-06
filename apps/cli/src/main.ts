@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { authCommand } from './commands/auth';
 import { workCommand } from './commands/work';
 import { pluginsCommand } from './commands/plugins';
+import { registerKbCommands } from './commands/kb';
 
 // Load environment variables
 dotenv.config({ debug: false, quiet: true });
@@ -22,6 +23,7 @@ program
 program.addCommand(authCommand);
 program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
+registerKbCommands(program);
 
 // Parse arguments
 program.parse(process.argv);

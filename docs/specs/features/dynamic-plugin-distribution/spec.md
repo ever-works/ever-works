@@ -5,10 +5,10 @@
 > lives in [`plan.md`](./plan.md); execution in [`tasks.md`](./tasks.md).
 
 **Feature ID**: `dynamic-plugin-distribution`
-**Branch**: `feat/dynamic-plugin-distribution`
-**Status**: `Draft`
+**Branch**: `session/ew693-dynamic-plugins`
+**Status**: `Implemented`
 **Created**: 2026-05-28
-**Last updated**: 2026-05-28
+**Last updated**: 2026-06-03
 **Owner**: @evereq
 
 ---

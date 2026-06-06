@@ -1,0 +1,80 @@
+{
+	"name": "@ever-works/pgvector-plugin",
+	"version": "0.1.0",
+	"description": "Default pgvector-backed vector store plugin for Ever Works Knowledge Base (EW-642).",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"pg": "^8.13.0",
+		"tsup": "^8.0.0",
+		"typeorm": "0.3.28",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"peerDependencies": {
+		"pg": "^8.13.0",
+		"typeorm": "^0.3.28"
+	},
+	"peerDependenciesMeta": {
+		"pg": {
+			"optional": true
+		},
+		"typeorm": {
+			"optional": true
+		}
+	},
+	"everworks": {
+		"plugin": {
+			"id": "pgvector",
+			"name": "Ever Works PgVector Store",
+			"version": "0.1.0",
+			"category": "vector-store",
+			"capabilities": [
+				"vector-store"
+			],
+			"defaultForCapabilities": [
+				"vector-store"
+			],
+			"description": "Default pgvector-backed vector store for Ever Works Knowledge Base. Stores chunk embeddings in the same Postgres instance the API already uses.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"systemPlugin": true,
+			"autoEnable": true,
+			"distribution": "core"
+		}
+	}
+}

@@ -76,7 +76,9 @@ export default async function WorkSchedulePage({ params }: Params) {
     try {
         scheduleRes = await workAPI.getSchedule(id);
     } catch (error) {
-        scheduleErrorMessage = error instanceof Error ? error.message : t('loadFailed');
+        // Security: do not expose raw backend error messages to the client; log server-side only
+        console.error('[WorkSchedulePage] failed to load schedule for work %s:', id, error);
+        scheduleErrorMessage = t('loadFailed');
     }
 
     if (!canManageSchedule(work.userRole)) {

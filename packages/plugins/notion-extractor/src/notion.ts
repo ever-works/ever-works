@@ -523,8 +523,12 @@ export class NotionService {
 			if (error.response?.status === 404) {
 				throw new Error('Notion page not found. Make sure the page is shared with your integration.');
 			}
+			// Security: log full detail server-side for diagnostics, but throw a generic
+			// error so the raw Axios error object/message (which can carry the request
+			// config, URL and page ID) does not propagate to the caller and surface in the
+			// client-facing extraction `error` field.
 			this.logger.error(`Error fetching Notion page with official API: ${error.message}`);
-			throw error;
+			throw new Error('Failed to fetch Notion page via the official API.');
 		}
 	}
 
@@ -761,7 +765,14 @@ export class NotionService {
 			return false;
 		}
 
-		return url.includes('notion.site') || url.includes('notion.so');
+		// Security: validate the parsed hostname instead of a substring match so spoofed
+		// URLs like `https://evil.com/notion.so/<id>` are rejected. Mirrors the regex used
+		// by NotionExtractorPlugin.canExtract to keep hostname validation consistent.
+		try {
+			return /^([\w-]+\.)?notion\.(so|site)$/.test(new URL(url).hostname);
+		} catch {
+			return false;
+		}
 	}
 
 	/**

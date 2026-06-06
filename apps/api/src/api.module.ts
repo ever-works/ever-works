@@ -1,10 +1,12 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
+import { config } from './config/constants';
+import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
 import { WorksModule } from './works/works.module';
 import { KbStorageModule } from './uploads/kb-storage.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -108,7 +110,20 @@ import { DatabaseModule } from '@ever-works/agent/database';
         SearchModule,
         AgentPluginsModule.forRootAsync({
             imports: [DatabaseModule],
-            useFactory: () => ({}),
+            // EW-693 — wire dynamic-distribution config into the plugins
+            // module. Default mode is `bundled` so a no-op deployment
+            // behaves identically to pre-EW-693. The fail-fast validate()
+            // throws when dynamic mode is selected without registry config.
+            useFactory: () => {
+                config.plugins.validate();
+                return {
+                    distributionMode: config.plugins.distributionMode(),
+                    registryUrl: config.plugins.registryUrl(),
+                    registryGithubUrl: config.plugins.registryGithubUrl(),
+                    registryToken: config.plugins.registryToken(),
+                    installDir: config.plugins.installDir(),
+                };
+            },
         }),
         PluginsModule,
         ComposioApiModule,
@@ -186,7 +201,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         },
         {
             provide: APP_GUARD,
-            useClass: ThrottlerGuard,
+            useClass: UserAwareThrottlerGuard,
         },
         {
             provide: APP_INTERCEPTOR,
@@ -209,8 +224,20 @@ export class ApiModule implements OnApplicationBootstrap {
     /**
      * Called after all modules have been initialized.
      * This is the single point where plugins are loaded.
+     *
+     * EW-693 / FR-13a — In dynamic mode (PLUGIN_DISTRIBUTION_MODE=dynamic)
+     * we also pre-install the DB-recorded distributable plugin set on
+     * this pod's local store so the first request after boot doesn't pay
+     * the install cost. `warmupDynamicPlugins()` is an internal no-op in
+     * bundled mode, and failures are logged but never rethrown — lazy
+     * install-on-use (FR-13) is the correctness mechanism, warmup is
+     * optimisation only. We run warmup BEFORE the API begins serving so
+     * the readiness probe in k8s flips green only after the store is
+     * primed (`startupProbe.initialDelaySeconds` covers the worst-case
+     * warmup time; see `.deploy/k8s/k8s-manifest.prod.yaml`).
      */
     async onApplicationBootstrap(): Promise<void> {
         await this.pluginBootstrap.bootstrap();
+        await this.pluginBootstrap.warmupDynamicPlugins();
     }
 }

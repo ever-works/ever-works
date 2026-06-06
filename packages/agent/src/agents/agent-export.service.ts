@@ -6,6 +6,8 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, type EntityTarget, type ObjectLiteral } from 'typeorm';
 import {
     AGENT_PERMISSIONS_DEFAULT,
     Agent,
@@ -16,6 +18,13 @@ import {
     type AgentPermissions,
     type AgentTarget,
 } from '../entities/agent.entity';
+// Security (EW-711 #8): scope-entity classes used to verify the caller
+// owns the target Mission/Idea/Work BEFORE an imported Agent is planted
+// under that scope id. Reached via the shared DataSource (no new module
+// wiring) — see `assertScopeOwned`.
+import { Mission } from '../entities/mission.entity';
+import { Work } from '../entities/work.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
@@ -26,6 +35,16 @@ import { slugifyText } from '../utils/text.utils';
 import { assertNoSecrets } from '../utils/secret-scan';
 import type { AgentDto } from './types';
 import { toAgentDto } from './types';
+
+// Security: per-file byte cap for imported instruction bodies. Mirrors
+// the 64 KB `MAX_FILE_BYTES` limit enforced on the live-edit path
+// (`AgentFileService.write` → `assertSize`). The import path previously
+// only secret-scanned the bodies with no size bound, so a single
+// envelope field could carry a multi-megabyte string that bloats the
+// `agents` TEXT columns and forces a full-string scan in memory. Kept
+// inline (and matched in value) to avoid coupling agent-export to
+// agent-file at the module-construction layer.
+const MAX_IMPORT_FILE_BYTES = 64 * 1024; // 64 KB per file (spec §5.10a / §5.6.6).
 
 /**
  * Review-fix I7: shared canonical-hash function. Mirrors the
@@ -178,6 +197,20 @@ export class AgentExportService {
         private readonly memberships: AgentMembershipRepository,
         private readonly budgets: AgentBudgetRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // Security (EW-711 #8): the raw Agent repository is already
+        // registered by `AgentsModule`'s `TypeOrmModule.forFeature([Agent,
+        // …])`, so this resolves to a live `Repository<Agent>` in
+        // production with NO extra module wiring. We only use its
+        // `.manager` (the shared DataSource EntityManager) to load the
+        // target Mission/Idea/Work scope entity for an ownership check —
+        // mirroring the existing `manager.getRepository(...)` pattern in
+        // `github-app-installation-repository.repository.ts`. `@Optional()`
+        // keeps hand-rolled unit harnesses (which `new` the service with
+        // only the first four deps) constructing; the presence gate in
+        // `assertScopeOwned` keeps the production check strict.
+        @Optional()
+        @InjectRepository(Agent)
+        private readonly agentEntityRepo?: Repository<Agent>,
     ) {}
 
     async exportOne(userId: string, agentId: string): Promise<AgentExportEnvelope> {
@@ -294,10 +327,41 @@ export class AgentExportService {
             throw new BadRequestException('Work-scoped import requires workId option.');
         }
 
+        // Security (EW-711 #8): IDOR — verify the caller OWNS the target
+        // scope entity BEFORE planting an imported Agent under it. The
+        // missionId/ideaId/workId values flow straight from controller
+        // query params (`agents.controller.ts` import handler) into
+        // `agents.create(...)` below; the shape-only checks above never
+        // confirm the scope id belongs to this user, and the scope columns
+        // are intentionally NOT FK-constrained (see `agent.entity.ts`), so
+        // any authenticated user could otherwise create/plant an Agent
+        // inside another user's Mission/Idea/Work. Mirror how sibling
+        // services scope ownership (`MissionsService.findOrThrow`,
+        // `WorkProposalRepository.findByIdForUser`): load the scope row by
+        // (id, userId) and 404 — same not-found shape either way — when it
+        // is missing or owned by someone else. Tenant scope has no target
+        // id, so it is unaffected.
+        await this.assertScopeOwned(userId, scope, { missionId, ideaId, workId });
+
         // Secret-scan every file body BEFORE persisting — same hard-reject
         // posture as live edits via AgentFileService.write.
         for (const [name, body] of Object.entries(envelope.files)) {
             if (typeof body === 'string' && body.length > 0) {
+                // Security: enforce the same 64 KB per-file cap the
+                // live-edit path applies (AgentFileService.assertSize),
+                // BEFORE the secret-scan walks the whole string. Without
+                // this an imported envelope could carry a multi-megabyte
+                // body that bloats the agents TEXT columns and forces an
+                // unbounded in-memory scan (DoS). Checked first so an
+                // oversized body is rejected without being scanned.
+                const bytes = Buffer.byteLength(body, 'utf8');
+                if (bytes > MAX_IMPORT_FILE_BYTES) {
+                    throw new BadRequestException(
+                        `Imported file "${name}" is ${Math.round(
+                            bytes / 1024,
+                        )} KB; max ${MAX_IMPORT_FILE_BYTES / 1024} KB.`,
+                    );
+                }
                 assertNoSecrets(body, `import-envelope:${name}`);
             }
         }
@@ -442,6 +506,69 @@ export class AgentExportService {
             throw new BadRequestException(
                 `Envelope identity.scope is invalid: ${envelope.identity.scope}`,
             );
+        }
+    }
+
+    /**
+     * Security (EW-711 #8): reject an import whose target scope entity is
+     * not owned by `userId`. Loads the Mission / Idea (WorkProposal) /
+     * Work row by `(id, userId)` via the shared DataSource and throws
+     * `NotFoundException` (404 — does NOT leak whether the id exists, same
+     * posture as `MissionsService.findOrThrow`) when the row is missing or
+     * belongs to another user.
+     *
+     * TENANT scope carries no target id, so it is a no-op. When the raw
+     * Agent repository isn't wired (hand-rolled unit tests `new` the
+     * service without it) the check is skipped so those harnesses keep
+     * working — production always injects it via
+     * `TypeOrmModule.forFeature([Agent, …])`.
+     */
+    private async assertScopeOwned(
+        userId: string,
+        scope: AgentScope,
+        ids: { missionId: string | null; ideaId: string | null; workId: string | null },
+    ): Promise<void> {
+        // TENANT scope carries no target id — nothing to own-check.
+        if (scope === AgentScope.TENANT) return;
+
+        // Resolve the scope entity + its target id. The shape checks in
+        // `importOne` already guarantee the matching id is present, but we
+        // re-guard defensively so a future caller can't slip a null past us.
+        // `Ideas` are persisted as `WorkProposal` rows (owner column
+        // `userId`); Mission + Work likewise expose a `userId` owner column.
+        // `EntityTarget<ObjectLiteral>` keeps `getRepository` typing
+        // entity-agnostic across the Mission / WorkProposal / Work trio
+        // (all three carry an `id` + `userId` owner column).
+        const entity: EntityTarget<ObjectLiteral> =
+            scope === AgentScope.MISSION
+                ? Mission
+                : scope === AgentScope.IDEA
+                  ? WorkProposal
+                  : Work;
+        const targetId =
+            scope === AgentScope.MISSION
+                ? ids.missionId
+                : scope === AgentScope.IDEA
+                  ? ids.ideaId
+                  : ids.workId;
+        if (!targetId) {
+            // Defensive: shape validation should have caught this already.
+            throw new BadRequestException(`Missing target id for ${scope}-scoped import.`);
+        }
+
+        // Skip only when the repo isn't wired (mock-only unit harnesses);
+        // production resolves a live Repository<Agent> and its `.manager`
+        // reaches every entity in the same DataSource.
+        if (!this.agentEntityRepo) return;
+
+        // Existence-by-owner: count instead of hydrating a full row just to
+        // assert ownership.
+        const ownedCount = await this.agentEntityRepo.manager
+            .getRepository(entity)
+            .count({ where: { id: targetId, userId } });
+        if (ownedCount === 0) {
+            // 404 (not 403) — don't leak existence of another user's scope.
+            throw new NotFoundException(`${scope} ${targetId} not found.`);
         }
     }
 

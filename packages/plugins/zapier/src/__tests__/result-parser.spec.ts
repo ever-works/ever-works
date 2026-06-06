@@ -245,6 +245,94 @@ describe('parseZapierOutput — native shape', () => {
 	});
 });
 
+describe('parseZapierOutput — SSRF filtering (native shape)', () => {
+	it('should drop SSRF image URLs and null out an SSRF source_url, keeping safe ones', () => {
+		const mapping: ZapierFieldMapping = { nameField: 'title', urlField: 'link', imageField: 'imgs' };
+		const result = parseZapierOutput(
+			[
+				{
+					title: 'Item',
+					link: 'http://169.254.169.254/latest/meta-data/',
+					imgs: [
+						'http://169.254.169.254/logo.png',
+						'http://127.0.0.1/internal.png',
+						'http://10.0.0.5/private.png',
+						'https://cdn.example.com/safe.png'
+					]
+				}
+			],
+			'native',
+			mapping
+		);
+
+		// Cloud-metadata source_url dropped to empty string.
+		expect(result.items[0].source_url).toBe('');
+		// Only the public https image survives the lexical guard.
+		expect(result.items[0].images).toEqual(['https://cdn.example.com/safe.png']);
+	});
+
+	it('should drop a single SSRF image-string mapping entirely', () => {
+		const mapping: ZapierFieldMapping = { nameField: 'title', imageField: 'img' };
+		const result = parseZapierOutput([{ title: 'Item', img: 'http://127.0.0.1/x.png' }], 'native', mapping);
+		expect(result.items[0].images).toBeUndefined();
+	});
+
+	it('should preserve a legitimate https source_url and image unchanged', () => {
+		const mapping: ZapierFieldMapping = { nameField: 'title', urlField: 'link', imageField: 'img' };
+		const result = parseZapierOutput(
+			[{ title: 'Item', link: 'https://example.com/page', img: 'https://example.com/a.png' }],
+			'native',
+			mapping
+		);
+		expect(result.items[0].source_url).toBe('https://example.com/page');
+		expect(result.items[0].images).toEqual(['https://example.com/a.png']);
+	});
+});
+
+describe('parseZapierOutput — SSRF filtering (structured shape)', () => {
+	it('should drop SSRF images and null out an SSRF source_url, keeping safe ones', () => {
+		const result = parseZapierOutput(
+			{
+				items: [
+					{
+						name: 'Item',
+						url: 'http://169.254.169.254/latest/meta-data/',
+						images: [
+							'http://127.0.0.1/internal.png',
+							'http://10.1.2.3/private.png',
+							'https://cdn.example.com/safe.png'
+						]
+					}
+				]
+			},
+			'structured',
+			EMPTY_MAPPING
+		);
+
+		expect(result.items[0].source_url).toBe('');
+		expect(result.items[0].images).toEqual(['https://cdn.example.com/safe.png']);
+	});
+
+	it('should preserve a legitimate https source_url and images unchanged', () => {
+		const result = parseZapierOutput(
+			{
+				items: [
+					{
+						name: 'Item',
+						url: 'https://example.com/page',
+						images: ['https://example.com/a.png', 'https://example.com/b.png']
+					}
+				]
+			},
+			'structured',
+			EMPTY_MAPPING
+		);
+
+		expect(result.items[0].source_url).toBe('https://example.com/page');
+		expect(result.items[0].images).toEqual(['https://example.com/a.png', 'https://example.com/b.png']);
+	});
+});
+
 describe('deduplicateItems', () => {
 	it('should remove items whose names match existing items', () => {
 		const items = [

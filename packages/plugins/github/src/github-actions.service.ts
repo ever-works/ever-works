@@ -52,6 +52,13 @@ export class GitHubActionsService {
 		token: string,
 		baseUrl?: string
 	): Promise<void> {
+		// Security: validate secret name against GitHub's naming rules before calling API
+		if (!/^[A-Z_][A-Z0-9_]{0,254}$/.test(data.key) || data.key.startsWith('GITHUB_')) {
+			throw new Error(
+				`Invalid secret name "${data.key}": must be 1-255 characters, contain only uppercase letters, digits, and underscores, start with a letter or underscore, and must not begin with "GITHUB_".`
+			);
+		}
+
 		const octokit = this.createOctokit(token, baseUrl);
 
 		await _sodium.ready;
@@ -73,6 +80,13 @@ export class GitHubActionsService {
 		token: string,
 		baseUrl?: string
 	): Promise<void> {
+		// Security: validate variable name against GitHub's naming rules before calling API
+		if (!/^[A-Z_][A-Z0-9_]{0,254}$/.test(data.key) || data.key.startsWith('GITHUB_')) {
+			throw new Error(
+				`Invalid variable name "${data.key}": must be 1-255 characters, contain only uppercase letters, digits, and underscores, start with a letter or underscore, and must not begin with "GITHUB_".`
+			);
+		}
+
 		const octokit = this.createOctokit(token, baseUrl);
 
 		try {

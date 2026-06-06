@@ -152,7 +152,20 @@ export async function commitWithLfsCli(
 	committer: LfsCliCommitter,
 	exec: ExecImpl = defaultExec
 ): Promise<void> {
+	// Security (defense-in-depth): `cfg.branch` lands in git's operand
+	// position for both `clone --branch <branch>` and `push origin <branch>`.
+	// Commands spawn via an argv array (no shell), so classic metacharacter
+	// injection is already neutralised — but git parses options anywhere on
+	// the line, so a `-`/`--`-leading branch would be read as a flag (e.g.
+	// `--receive-pack=...`) rather than a refspec. Reject anything that is
+	// not a conservative ref name before we shell out.
+	assertSafeBranch(cfg.branch);
 	const tmpdir = await fsp.mkdtemp(nodePath.join(os.tmpdir(), 'ew-gh-storage-lfs-'));
+	// Security: resolve the real tmpdir once so each file's target path can
+	// be confined to it. `mkdtemp` can return a symlinked prefix on some
+	// platforms (e.g. macOS `/tmp` -> `/private/tmp`); resolving keeps the
+	// containment check honest.
+	const tmpdirReal = nodePath.resolve(tmpdir);
 	const run = (cwd: string | undefined, cmd: string, args: ReadonlyArray<string>) =>
 		exec(cmd, args, { cwd, signal: cfg.signal });
 	try {
@@ -160,13 +173,35 @@ export async function commitWithLfsCli(
 		await run(tmpdir, 'git', ['lfs', 'install', '--local']);
 		await run(tmpdir, 'git', ['lfs', 'track', sanitizeTrackPattern(pathPrefix)]);
 		for (const file of files) {
-			const full = nodePath.join(tmpdir, file.path);
+			// Security (defense-in-depth): `commitWithLfsCli` is exported and
+			// callable with an arbitrary `file.path`. `nodePath.join` does NOT
+			// prevent traversal (`join(tmp, '../../etc/x')` escapes `tmp`), so
+			// a crafted path would let writeFile clobber files OUTSIDE the
+			// clone. Confine the resolved target to `tmpdir`, and reject paths
+			// git would parse as a flag (leading `-`, e.g. `-A`/`-u`) before
+			// they reach `git add`. The production caller derives the path from
+			// validated `<pathPrefix>/<ownerId>/<hash><ext>` parts, so legit
+			// uploads are unaffected.
+			const full = nodePath.resolve(tmpdirReal, file.path);
+			if (full !== tmpdirReal && !full.startsWith(tmpdirReal + nodePath.sep)) {
+				throw new Error(`Refusing to write file outside the clone: ${JSON.stringify(file.path)}`);
+			}
+			assertSafeAddPath(file.path);
 			await fsp.mkdir(nodePath.dirname(full), { recursive: true });
 			await fsp.writeFile(full, file.content);
 			await run(tmpdir, 'git', ['add', file.path]);
 		}
 		// `git lfs track` writes `.gitattributes` — always stage it.
 		await run(tmpdir, 'git', ['add', '.gitattributes']);
+		// Security (defense-in-depth): name/email land in `-c user.name=<v>`
+		// / `-c user.email=<v>` argv. A newline (or NUL) embedded in the value
+		// can let `git -c` parse a SECOND config key off the next line (e.g.
+		// `core.sshCommand=` / `core.hooksPath=`), turning an identity into
+		// config-injection -> RCE. The production caller hard-codes a static
+		// committer, but the function is exported and accepts arbitrary input.
+		// Reject control characters before building the argv.
+		assertSafeCommitterField('name', committer.name);
+		assertSafeCommitterField('email', committer.email);
 		await run(tmpdir, 'git', [
 			'-c',
 			`user.name=${committer.name}`,
@@ -194,7 +229,54 @@ export async function commitWithLfsCli(
 function sanitizeTrackPattern(pathPrefix: string): string {
 	const safe = pathPrefix.replace(/(^\/+|\/+$)/g, '');
 	if (safe.length === 0) return '*';
+	// Security: reject `..` path components so a misconfigured
+	// `GITHUB_STORAGE_PATH_PREFIX` (e.g. `uploads/../.github/workflows`)
+	// can't aim the `git lfs track` glob outside the intended uploads
+	// scope (which would, e.g., mark CI workflow YAML as LFS objects).
+	if (/(^|\/)\.\.(\/|$)/.test(safe)) {
+		throw new Error(`Refusing to use unsafe LFS track path prefix: ${JSON.stringify(pathPrefix)}`);
+	}
 	return `${safe}/**`;
+}
+
+/**
+ * Conservative git ref-name allowlist. Accepts ordinary branch names
+ * (`main`, `develop`, `feature/foo`, `release-1.2.3`) but rejects any
+ * value that git could parse as an option (leading `-`/`--`), is empty,
+ * or contains characters outside `[A-Za-z0-9._/-]`. Guards both the
+ * `clone --branch` and `push origin` sinks against option injection if a
+ * future change ever sources the branch from untrusted input.
+ */
+const SAFE_BRANCH_PATTERN = /^(?!-)[A-Za-z0-9._/-]{1,255}$/;
+function assertSafeBranch(branch: string): void {
+	if (!SAFE_BRANCH_PATTERN.test(branch)) {
+		throw new Error(`Refusing to use unsafe git branch ref: ${JSON.stringify(branch)}`);
+	}
+}
+
+/**
+ * Security: guard the path handed to `git add`. Even after the on-disk
+ * containment check, the raw `file.path` is passed to git as a positional
+ * argument; git parses options anywhere on the line, so a value starting
+ * with `-` (e.g. `-A`, `-u`, `--all`) would be read as a flag rather than a
+ * pathspec. Reject leading `-` and any control characters / NUL.
+ */
+function assertSafeAddPath(p: string): void {
+	if (p.length === 0 || p.startsWith('-') || /[\0\r\n]/.test(p)) {
+		throw new Error(`Refusing to git-add unsafe path: ${JSON.stringify(p)}`);
+	}
+}
+
+/**
+ * Security: reject CR/LF/NUL in a committer identity field before it lands
+ * in a `git -c user.<field>=<value>` argument. An embedded newline can let
+ * git's config parser pick up a second key from the next line, escalating an
+ * identity into arbitrary git config (e.g. `core.sshCommand`, `core.hooksPath`).
+ */
+function assertSafeCommitterField(field: 'name' | 'email', value: string): void {
+	if (/[\0\r\n]/.test(value)) {
+		throw new Error(`Refusing to use committer ${field} containing control characters`);
+	}
 }
 
 type Runner = (cwd: string | undefined, cmd: string, args: ReadonlyArray<string>) => Promise<ExecResult>;
@@ -256,6 +338,25 @@ export interface ExecOptions {
 export type ExecImpl = (cmd: string, args: ReadonlyArray<string>, opts: ExecOptions) => Promise<ExecResult>;
 
 /**
+ * Security: the clone/push argv carries the GitHub token verbatim
+ * (`-c http.extraheader=Authorization: Bearer <token>` and the
+ * `git config --local http.extraheader <header>` persist step). Every
+ * error this runner throws joins the full argv into the message, which
+ * is then logged by the NestJS Logger / surfaced in the Trigger.dev run
+ * UI — so the live token would otherwise leak to anyone with log read
+ * access. Scrub the bearer credential before it ever lands in an Error
+ * string. The pattern matches both the `-c http.extraheader=Authorization:
+ * Bearer <token>` clone argv and the `git config --local http.extraheader
+ * Authorization: Bearer <token>` persist argv, since both render the literal
+ * `Authorization: Bearer <token>` substring once the argv is space-joined.
+ * Mirrors the credential scrubber in `packages/plugins/k8s/src/errors.ts`.
+ */
+const REDACTED = '[REDACTED]';
+function redactArgv(text: string): string {
+	return text.replace(/Authorization:\s*Bearer\s+[A-Za-z0-9._\-+/=]+/gi, `Authorization: Bearer ${REDACTED}`);
+}
+
+/**
  * Build the subprocess env from a tight allowlist. Never spread
  * `process.env` — see `Workspace/knowledge/runbooks/EVER_WORKS_CLI_SPAWNING.md`
  * (security audit C-10, 2026-05-17).
@@ -286,7 +387,8 @@ const defaultExec: ExecImpl = async (cmd, args, opts) => {
 		} catch (err) {
 			reject(
 				new Error(
-					`Failed to spawn '${cmd} ${args.join(' ')}': ${err instanceof Error ? err.message : String(err)}. ` +
+					// redactArgv: the argv may embed the GitHub bearer token.
+					`Failed to spawn '${redactArgv(`${cmd} ${args.join(' ')}`)}': ${err instanceof Error ? err.message : String(err)}. ` +
 						`Is the binary installed and on PATH?`
 				)
 			);
@@ -340,7 +442,8 @@ const defaultExec: ExecImpl = async (cmd, args, opts) => {
 			if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
 			reject(
 				new Error(
-					`Failed to spawn '${cmd} ${args.join(' ')}': ${err.message}. ` +
+					// redactArgv: the argv may embed the GitHub bearer token.
+					`Failed to spawn '${redactArgv(`${cmd} ${args.join(' ')}`)}': ${err.message}. ` +
 						`Is the binary installed and on PATH?`
 				)
 			);
@@ -348,20 +451,27 @@ const defaultExec: ExecImpl = async (cmd, args, opts) => {
 		child.on('close', (exitCode) => {
 			if (killTimer) clearTimeout(killTimer);
 			if (opts.signal) opts.signal.removeEventListener('abort', onAbort);
+			// redactArgv: the argv (and git's stderr) may embed the GitHub bearer token.
 			if (killedByAbort) {
-				reject(new Error(`'${cmd} ${args.join(' ')}' aborted via AbortSignal`));
+				reject(new Error(`'${redactArgv(`${cmd} ${args.join(' ')}`)}' aborted via AbortSignal`));
 				return;
 			}
 			if (killedByCap) {
 				reject(
-					new Error(`'${cmd} ${args.join(' ')}' exceeded ${MAX_BUFFER_SIZE}-byte output cap and was killed`)
+					new Error(
+						`'${redactArgv(`${cmd} ${args.join(' ')}`)}' exceeded ${MAX_BUFFER_SIZE}-byte output cap and was killed`
+					)
 				);
 				return;
 			}
 			if (exitCode === 0) {
 				resolve({ stdout, stderr, exitCode });
 			} else {
-				reject(new Error(`'${cmd} ${args.join(' ')}' exited with code ${exitCode}: ${stderr || stdout}`));
+				reject(
+					new Error(
+						redactArgv(`'${cmd} ${args.join(' ')}' exited with code ${exitCode}: ${stderr || stdout}`)
+					)
+				);
 			}
 		});
 	});

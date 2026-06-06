@@ -19,7 +19,8 @@
  *    actually emits + a couple of nice-to-haves (`<sup>`, `<sub>`,
  *    `<details>` blocks).
  *  - URL schemes restricted to `http:`, `https:`, `mailto:`, and
- *    `data:image/...` — `javascript:` href / src is dropped.
+ *    base64 raster `data:image/...` (no SVG) — `javascript:` href /
+ *    src is dropped.
  */
 
 const ALLOWED_TAGS = new Set([
@@ -72,8 +73,12 @@ const ALLOWED_URL_SCHEMES = new Set(['http:', 'https:', 'mailto:']);
 function isSafeUrl(value: string): boolean {
     const trimmed = value.trim();
     if (trimmed.length === 0) return false;
-    // Data URLs only allowed for images.
-    if (/^data:image\/(png|jpe?g|gif|webp|svg\+xml);/i.test(trimmed)) return true;
+    // Data URLs only allowed for raster images. Security: SVG is a
+    // scriptable document format (inline <script>, on* handlers,
+    // xlink:href="javascript:"), so `data:image/svg+xml` is rejected
+    // to block stored XSS via a malicious DOCX-embedded SVG reaching
+    // `dangerouslySetInnerHTML`. Mammoth only emits raster data URIs.
+    if (/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(trimmed)) return true;
     // Absolute or scheme-relative — verify scheme.
     if (/^[a-z][a-z0-9+\-.]*:/i.test(trimmed)) {
         try {

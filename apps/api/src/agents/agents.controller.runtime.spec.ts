@@ -273,7 +273,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             const result = await controller.assignTask(auth, agentId, { taskId });
             expect(result.runId).toBe(runId);
             expect(taskExecuteDispatcher.enqueue).toHaveBeenCalledWith(
-                expect.objectContaining({ agentId, taskId, userId: 'u1' }),
+                expect.objectContaining({ agentId, taskId, userId: 'u1', runId }),
             );
             expect(activityLog.log).toHaveBeenCalledWith(
                 expect.objectContaining({ actionType: 'agent_task_assigned' }),

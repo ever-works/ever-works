@@ -11,12 +11,14 @@ import type {
 import type { PluginSettings } from '../../settings/settings.types.js';
 
 vi.mock('../../ai/ai-operations.js', () => {
-	const MockAiOperations = vi.fn().mockImplementation(() => ({
-		createChatCompletion: vi.fn(),
-		askJson: vi.fn().mockResolvedValue({ result: { name: 'test' }, model: 'test-model', usage: undefined }),
-		listModels: vi.fn().mockResolvedValue([]),
-		testConnection: vi.fn().mockResolvedValue({ success: true })
-	}));
+	const MockAiOperations = vi.fn().mockImplementation(function () {
+		return {
+			createChatCompletion: vi.fn(),
+			askJson: vi.fn().mockResolvedValue({ result: { name: 'test' }, model: 'test-model', usage: undefined }),
+			listModels: vi.fn().mockResolvedValue([]),
+			testConnection: vi.fn().mockResolvedValue({ success: true })
+		};
+	});
 	return { AiOperations: MockAiOperations };
 });
 

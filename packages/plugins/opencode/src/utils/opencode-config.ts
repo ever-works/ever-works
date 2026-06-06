@@ -14,7 +14,20 @@ export interface OpenCodeSessionConfig {
 }
 
 function getSessionRoot(userId: string, workId: string): string {
-	return path.join(BASE_TEMP_DIR, userId, 'opencode', workId);
+	const sessionRoot = path.join(BASE_TEMP_DIR, userId, 'opencode', workId);
+	// Security (path-traversal): `userId`/`workId` are server-side entity IDs in
+	// the normal path, but `executeCodeEdit` lets them flow from an exec context
+	// (`execContext.userId`/`workId`). A value containing `../` would let
+	// `path.join` normalize the session root outside the temp sandbox — and the
+	// spawned OpenCode subprocess would then run with `cwd` inside another
+	// tenant's directory. Confirm the resolved root stays inside BASE_TEMP_DIR.
+	// Legitimate IDs contain no traversal sequences, so behavior is unchanged.
+	const baseResolved = path.resolve(BASE_TEMP_DIR);
+	const relative = path.relative(baseResolved, path.resolve(sessionRoot));
+	if (relative.startsWith('..') || path.isAbsolute(relative)) {
+		throw new Error('Invalid session path: path traversal detected');
+	}
+	return sessionRoot;
 }
 
 function buildConfig(providerConfig: AiProviderConfig, model: string) {

@@ -26,6 +26,7 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkProposalsApiService } from './work-proposals.service';
 import {
     AcceptWorkProposalDto,
+    AddWorkProposalAttachmentDto,
     BuildWorkProposalResponseDto,
     CreateWorkProposalDto,
     ListWorkProposalsQueryDto,
@@ -128,7 +129,7 @@ export class WorkProposalsController {
     @Post()
     @ApiOperation({ summary: 'Create a user-typed Idea (USER_MANUAL source)' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async createUserManual(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateWorkProposalDto,
@@ -153,6 +154,9 @@ export class WorkProposalsController {
                 : [WorkProposalStatus.PENDING];
         const proposals = await this.service.list(auth.userId, statuses, {
             missionId: query.missionId,
+            search: query.search?.trim() || undefined,
+            limit: query.limit,
+            offset: query.offset,
         });
         return proposals.map(toResponseDto);
     }
@@ -170,7 +174,7 @@ export class WorkProposalsController {
     @Post('refresh')
     @ApiOperation({ summary: 'Trigger a fresh research + proposal-generation run' })
     @HttpCode(HttpStatus.ACCEPTED)
-    @Throttle({ default: { limit: 3, ttl: 60_000 } })
+    @Throttle({ long: { limit: 3, ttl: 60_000 } })
     async refresh(@CurrentUser() auth: AuthenticatedUser): Promise<RefreshResponseDto> {
         const result = await this.service.refresh(auth.userId);
         if (result.status === 'rate-limited') {
@@ -272,7 +276,7 @@ export class WorkProposalsController {
     @Post(':id/build')
     @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent goal pipeline' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async build(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -293,7 +297,7 @@ export class WorkProposalsController {
     @Post(':id/retry')
     @ApiOperation({ summary: 'Manually retry a failed Idea build' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async retry(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -314,7 +318,7 @@ export class WorkProposalsController {
     @Post(':id/rebuild')
     @ApiOperation({ summary: 'Re-build a done Idea — produces a new Work, original is preserved' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async rebuild(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -365,11 +369,11 @@ export class WorkProposalsController {
     @Post(':id/attachments')
     @ApiOperation({ summary: 'Attach an uploaded file to an Idea' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        @Body() body: AddWorkProposalAttachmentDto,
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }

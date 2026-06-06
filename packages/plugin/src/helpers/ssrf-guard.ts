@@ -47,7 +47,22 @@ export function isSafeWebhookUrl(rawUrl: string): boolean {
 	return true;
 }
 
-const CLOUD_METADATA_HOSTNAMES = new Set(['metadata.google.internal', 'metadata.goog']);
+// Security: `isSafeWebhookUrl` is a LEXICAL first line of defense — it only
+// catches literal IPs and these named metadata aliases. The primary metadata
+// IP (169.254.169.254, used by AWS/Azure/GCP) is covered by `isPrivateIPv4`,
+// but providers also expose DNS aliases that may resolve to it. List the known
+// ones so a lexical-only caller still rejects them; `safeFetchWithDnsPin` adds
+// the DNS-resolution check for hostname-based rebinding.
+const CLOUD_METADATA_HOSTNAMES = new Set([
+	// GCP
+	'metadata.google.internal',
+	'metadata.goog',
+	// AWS
+	'instance-data',
+	'instance-data.ec2.internal',
+	// Azure
+	'metadata.azure.internal'
+]);
 
 /**
  * True for any IPv4 address that must never be reachable from server-side
@@ -88,7 +103,15 @@ export function isPrivateIPv6(ip: string): boolean {
 	const lower = ip.toLowerCase();
 	if (lower === '::1' || lower === '::') return true;
 	if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
-	if (lower.startsWith('fe80')) return true;
+	// Security: link-local is the full fe80::/10 block (fe80:: – febf::), not
+	// just the fe80 prefix. `startsWith('fe80')` missed fe81–febf, letting
+	// e.g. http://[fe82::1]/ through. Mask the first hextet with 0xffc0 and
+	// compare to 0xfe80 so the whole /10 range is blocked.
+	const firstHextet = lower.split(':', 1)[0];
+	if (/^[0-9a-f]{1,4}$/.test(firstHextet)) {
+		const group0 = parseInt(firstHextet, 16);
+		if ((group0 & 0xffc0) === 0xfe80) return true;
+	}
 	if (lower.startsWith('::ffff:')) {
 		const v4 = lower.slice('::ffff:'.length);
 		if (isIP(v4) === 4) return isPrivateIPv4(v4);

@@ -102,9 +102,11 @@ export class GitHubAppService {
         );
 
         if (data.error) {
-            throw new UnauthorizedException(
-                data.error_description || `GitHub App authorization failed: ${data.error}`,
-            );
+            // Security: do not forward GitHub's raw error/error_description to the client. Surface a
+            // fixed application-level message so verbatim upstream OAuth error text (which could
+            // confirm exact failure modes or, in future code paths, leak upstream internals) is
+            // never reflected into API responses.
+            throw new UnauthorizedException('GitHub App authorization failed');
         }
 
         if (!data.access_token) {
@@ -141,10 +143,19 @@ export class GitHubAppService {
     }
 
     async getInstallation(installationId: string): Promise<GitHubInstallationResponse> {
+        // Security: installationId reaches this sink from the @Public() /api/github-app/setup
+        // endpoint where it is only validated as @IsString(). GitHub installation ids are always
+        // numeric, so reject anything else to prevent path traversal (e.g. `../meta`) that would
+        // otherwise be appended verbatim to the GitHub API path with the privileged App JWT
+        // attached (Axios does not encode path segments). encodeURIComponent is applied as
+        // defense in depth so the value can never break out of the path segment.
+        if (!/^\d+$/.test(installationId)) {
+            throw new BadRequestException('Invalid GitHub App installation id');
+        }
         const jwt = this.getAppJwt();
         const { data } = await firstValueFrom(
             this.httpService.get<GitHubInstallationResponse>(
-                `https://api.github.com/app/installations/${installationId}`,
+                `https://api.github.com/app/installations/${encodeURIComponent(installationId)}`,
                 {
                     headers: createGitHubAppHeaders(jwt),
                 },

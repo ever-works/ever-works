@@ -82,11 +82,40 @@ describe('Agent entity', () => {
         expect(pauseAfter?.options.default).toBe(3);
     });
 
-    it('declares the composite uniqueness on (userId, scope, missionId, ideaId, workId, slug)', () => {
+    it('declares the durable composite uniqueness on (userId, scope, scopeTargetId, slug)', () => {
         const uq = indices.find((i) => i.name === 'uq_agents_user_scope_slug');
         expect(uq).toBeDefined();
         expect(uq?.unique).toBe(true);
-        expect(uq?.columns).toEqual(['userId', 'scope', 'missionId', 'ideaId', 'workId', 'slug']);
+        // `scopeTargetId` (non-null, = missionId ?? ideaId ?? workId ?? '')
+        // replaces the three nullable scope FKs so the unique index has no
+        // nullable members. SQL treats NULLs as DISTINCT inside a unique index,
+        // so the old (…, missionId, ideaId, workId, slug) form could NOT dedup
+        // same-name agents in a null-containing scope (tenant/mission/etc.) and
+        // a concurrent create burst all succeeded instead of exactly one.
+        expect(uq?.columns).toEqual(['userId', 'scope', 'scopeTargetId', 'slug']);
+    });
+
+    it('keeps scopeTargetId (non-null) in lock-step with the scope FKs', () => {
+        const col = columns.find((c) => c.propertyName === 'scopeTargetId');
+        expect(col).toBeDefined();
+        expect(col?.options.nullable).toBeFalsy();
+        expect(col?.options.default).toBe('');
+
+        // The @BeforeInsert/@BeforeUpdate hook derives it from the scope FKs.
+        const agent = new Agent();
+        agent.missionId = null;
+        agent.ideaId = null;
+        agent.workId = null;
+        agent.syncScopeTargetId();
+        expect(agent.scopeTargetId).toBe(''); // tenant scope → empty, never NULL
+
+        agent.workId = 'work-123';
+        agent.syncScopeTargetId();
+        expect(agent.scopeTargetId).toBe('work-123');
+
+        agent.missionId = 'mission-9';
+        agent.syncScopeTargetId();
+        expect(agent.scopeTargetId).toBe('mission-9'); // missionId wins the coalesce
     });
 
     it('declares the dispatcher-hot-path index on (status, nextHeartbeatAt)', () => {

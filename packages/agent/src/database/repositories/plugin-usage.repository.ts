@@ -228,16 +228,34 @@ export class PluginUsageRepository {
      * platform-admin view. Returns one row per (userId, workId) with
      * non-zero usage in the period. Sorted by spend descending so
      * the admin sees biggest spenders first.
+     *
+     * Security: pass `tenantId` to restrict results to a single tenant.
+     * Omit it only from platform-admin (IsPlatformAdminGuard) callers
+     * that intentionally need the full cross-tenant view.
      */
-    async getCrossUserSpend(periodStart: Date, periodEnd: Date): Promise<CrossUserSpendRow[]> {
-        const rows = await this.repository
+    async getCrossUserSpend(
+        periodStart: Date,
+        periodEnd: Date,
+        // Security: optional tenant scope — when provided, limits rows to
+        // that tenant so a tenant-scoped caller cannot read other tenants'
+        // user/work IDs or spend amounts (defence-in-depth on top of the
+        // IsPlatformAdminGuard that already gates the admin endpoint).
+        tenantId?: string,
+    ): Promise<CrossUserSpendRow[]> {
+        const qb = this.repository
             .createQueryBuilder('e')
             .select('e.userId', 'userId')
             .addSelect('e.workId', 'workId')
             .addSelect('SUM(e.units)', 'units')
             .addSelect('SUM(e.costCents)', 'costCents')
             .where('e.occurredAt >= :start', { start: periodStart })
-            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+
+        if (tenantId) {
+            qb.andWhere('e.tenantId = :tenantId', { tenantId });
+        }
+
+        const rows = await qb
             .groupBy('e.userId')
             .addGroupBy('e.workId')
             .orderBy('"costCents"', 'DESC')

@@ -1,4 +1,5 @@
 import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MakeWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
@@ -7,6 +8,51 @@ interface PayloadOptions {
 	request: GenerationRequest;
 	existing: ExistingItems;
 	config: Record<string, unknown>;
+}
+
+// Security (DoS): `scenario_params` is an unconstrained, tenant-controlled
+// `Record<string, unknown>` (Advanced form `type: 'json'` field) that is
+// embedded verbatim in the outbound payload and later `JSON.stringify`-d into
+// the Make.com request body. Without bounds, a malicious tenant can supply a
+// huge map or a deeply nested object and exhaust CPU/memory during
+// serialization. We cap nesting depth and total node count using an iterative,
+// early-exit traversal (no recursion, never fully walks an oversized structure)
+// so the check itself can't be turned into a DoS or blow the stack. Legitimate
+// small parameter maps are unaffected. Circular references trip the node cap and
+// are rejected. Throwing here is intentional: the pipeline call site wraps
+// payload building in try/catch and surfaces a clean error result.
+const MAX_SCENARIO_PARAMS_DEPTH = 8;
+const MAX_SCENARIO_PARAMS_NODES = 5000;
+
+function assertScenarioParamsWithinLimits(params: Record<string, unknown>): void {
+	let nodeCount = 0;
+	// Iterative depth-first walk with explicit [value, depth] frames.
+	const stack: Array<{ value: unknown; depth: number }> = [{ value: params, depth: 0 }];
+
+	while (stack.length > 0) {
+		const { value, depth } = stack.pop() as { value: unknown; depth: number };
+
+		if (depth > MAX_SCENARIO_PARAMS_DEPTH) {
+			throw new Error(
+				`Custom scenario parameters are nested too deeply (max ${MAX_SCENARIO_PARAMS_DEPTH} levels).`
+			);
+		}
+
+		if (value === null || typeof value !== 'object') {
+			continue;
+		}
+
+		const entries = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>);
+		for (const child of entries) {
+			nodeCount += 1;
+			if (nodeCount > MAX_SCENARIO_PARAMS_NODES) {
+				throw new Error(`Custom scenario parameters are too large (max ${MAX_SCENARIO_PARAMS_NODES} values).`);
+			}
+			if (child !== null && typeof child === 'object') {
+				stack.push({ value: child, depth: depth + 1 });
+			}
+		}
+	}
 }
 
 /**
@@ -42,7 +88,16 @@ export function buildWorkflowPayload(options: PayloadOptions): MakeWorkflowInput
 	}
 
 	// Strategy 2: GitHub repository reference
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: the user-supplied repo_url (plus its access token) is forwarded
+	// to the external Make.com scenario, which fetches it server-side. Without
+	// validation an attacker could point it at http://169.254.169.254/, a
+	// private/loopback host, or a non-HTTP scheme (file://) to probe internal
+	// services via the Make runner (SSRF) and exfiltrate the attached token.
+	// Gate the dataSource on the shared lexical SSRF guard (rejects non-HTTP(S)
+	// schemes and literal private/loopback/link-local/cloud-metadata IPs).
+	// Legitimate https://github.com/... URLs are unaffected; an unsafe URL fails
+	// closed by omitting dataSource so neither the probe nor the token leaks.
+	if (config.pass_repo_access && config.repo_url && isSafeWebhookUrl(config.repo_url as string)) {
 		payload.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,
@@ -54,7 +109,11 @@ export function buildWorkflowPayload(options: PayloadOptions): MakeWorkflowInput
 
 	// Custom scenario parameters
 	if (config.scenario_params && typeof config.scenario_params === 'object') {
-		payload.scenarioParams = config.scenario_params as Record<string, unknown>;
+		const scenarioParams = config.scenario_params as Record<string, unknown>;
+		// Security (DoS): bound size/depth of tenant-supplied params before they
+		// are serialized into the outbound request body. See helper above.
+		assertScenarioParamsWithinLimits(scenarioParams);
+		payload.scenarioParams = scenarioParams;
 	}
 
 	return payload;

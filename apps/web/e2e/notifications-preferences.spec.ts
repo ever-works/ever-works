@@ -83,8 +83,14 @@ test.describe('Notifications v2 — preferences', () => {
     test('muting a category appears in the preferences view, and unmuting clears it', async ({
         request,
     }) => {
-        const { headers, eventTypes } = await setup(request);
-        const category = eventTypes[0].category;
+        const { headers } = await setup(request);
+        // The mute API validates `category` against the NotificationCategory
+        // enum (ai_credits, subscription, generation, system, security, agent,
+        // task) — NOT the broader event-type taxonomy. The seeded event types
+        // carry categories like `agents` (plural) / `integrations` that are NOT
+        // mute-able enum members, so deriving the category from eventTypes[0]
+        // (which sorts to `agents`) 400s. Use a real enum value instead.
+        const category = 'generation';
 
         const muted = await request.post(`${API_BASE}/api/notifications/preferences/mute`, {
             headers,

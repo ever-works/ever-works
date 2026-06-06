@@ -104,6 +104,55 @@ export interface PluginsModuleOptions {
      * @default 30000
      */
     loadTimeout?: number;
+
+    /**
+     * EW-693 — Dynamic plugin distribution mode.
+     *
+     * - `bundled` (default): existing behaviour. All plugins in the
+     *   image; loader discovers from `pluginPaths`; no registry calls
+     *   on enable. **Bundled-mode deployments behave byte-for-byte the
+     *   same as before this option was introduced (FR-22).**
+     * - `dynamic`: only core plugins (`distribution: 'core'`) are
+     *   bundled. Distributable plugins (`distribution: 'registry'`)
+     *   are pulled from `registryUrl` / `registryGithubUrl` on first
+     *   enable and placed in `installDir` for `import()`. Boot
+     *   reconcile warms the per-replica store from the DB-recorded
+     *   installed set.
+     *
+     * Omit (or `undefined`) to use `bundled`. Wired by
+     * `apps/api/src/api.module.ts` from
+     * `config.plugins.distributionMode()`.
+     */
+    distributionMode?: 'bundled' | 'dynamic';
+
+    /**
+     * EW-693 — Primary npm-compatible registry the installer resolves
+     * packages from. Used in `dynamic` mode only. Defaults to
+     * `https://registry.npmjs.org` when wired from the api config.
+     */
+    registryUrl?: string;
+
+    /**
+     * EW-693 — Secondary registry (GitHub Packages, `@ever-works`
+     * scope). Installer falls back here when the allowlist entry's
+     * `source` is `github-packages` or the primary returns 404 for a
+     * first-party package.
+     */
+    registryGithubUrl?: string;
+
+    /**
+     * EW-693 — Bearer token for the registry. SECRET. Read lazily by
+     * the installer so a missing token only surfaces on first install,
+     * not at boot.
+     */
+    registryToken?: string;
+
+    /**
+     * EW-693 — Writable directory where dynamically-installed plugins
+     * land. Defaults to `/app/plugins`. The boot reconciler (Phase 5)
+     * refuses to start in `dynamic` mode if this directory is read-only.
+     */
+    installDir?: string;
 }
 
 /**

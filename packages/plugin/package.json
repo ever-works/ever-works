@@ -1,6 +1,6 @@
 {
 	"name": "@ever-works/plugin",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"description": "Plugin system contracts, helpers, and utilities for Ever Works platform",
 	"author": {
 		"name": "Ever Co. LTD",
@@ -116,7 +116,7 @@
 		"stopword": "^3.1.5",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3",
-		"vitest": "^3.2.1"
+		"vitest": "^4.1.0"
 	},
 	"peerDependencies": {
 		"@langchain/core": "^0.3.80",

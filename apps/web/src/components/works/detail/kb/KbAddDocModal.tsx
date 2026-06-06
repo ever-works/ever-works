@@ -93,7 +93,8 @@ export function KbAddDocModal({
     useEffect(() => {
         if (initialTags !== undefined) return;
         let cancelled = false;
-        fetch(`/api/works/${workId}/kb/tags`, { credentials: 'same-origin' })
+        // Security: encode workId to prevent URL corruption if value ever contains special chars
+        fetch(`/api/works/${encodeURIComponent(workId)}/kb/tags`, { credentials: 'same-origin' })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return (await res.json()) as KbTagDto[];

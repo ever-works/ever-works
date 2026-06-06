@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Resend } from 'resend';
 import type {
 	IEmailOutboundPlugin,
@@ -101,7 +102,10 @@ export class ResendPlugin implements IEmailOutboundPlugin {
 		// Resend verifies sending domains, not individual addresses. We
 		// emit a token + return it; the platform-side verify route uses
 		// it to flip `verified` once the operator clicks the confirmation.
-		const verificationToken = `rs-${Math.random().toString(36).slice(2)}${Date.now()}`;
+		// Security: use a CSPRNG (256-bit) instead of Math.random() — the
+		// token grants control over a tenant email address, so it must be
+		// unpredictable. The `rs-` prefix is kept for log/debug readability.
+		const verificationToken = `rs-${randomBytes(32).toString('hex')}`;
 		return {
 			address,
 			verificationToken,

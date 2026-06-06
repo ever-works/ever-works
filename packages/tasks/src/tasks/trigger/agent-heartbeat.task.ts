@@ -2,13 +2,16 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { config } from '@ever-works/agent/config';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
-import { computeNextHeartbeat } from '@ever-works/agent/agents';
+import { AgentRunService, computeNextHeartbeat } from '@ever-works/agent/agents';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
+// Security: import assertUuid to validate Trigger.dev payload fields before any DB access
+import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 
 export interface AgentHeartbeatPayload {
     agentId: string;
     userId: string;
+    runId?: string;
     /** ISO string — Date doesn't serialize cleanly across Trigger.dev. */
     scheduledFor: string;
 }
@@ -39,6 +42,9 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
     maxDuration: config.agents.getMaxRunDurationSeconds(),
     onFailure: async ({ payload, error }) => {
         if (!payload) return;
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentHeartbeat:Failure'));
@@ -53,9 +59,11 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 const next = agent ? computeNextHeartbeat(agent.heartbeatCadence) : null;
                 await agents.incrementErrorCount(payload.agentId, next);
 
-                const inFlight = await runs.findInFlightForAgent(payload.agentId);
-                if (inFlight) {
-                    await runs.markFailed(inFlight.id, message);
+                const run = payload.runId
+                    ? await runs.findById(payload.runId)
+                    : await runs.findInFlightForAgent(payload.agentId);
+                if (run && (run.status === 'queued' || run.status === 'running')) {
+                    await runs.markFailed(run.id, message);
                 }
             } finally {
                 await appContext.close();
@@ -67,6 +75,9 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
         }
     },
     run: async (payload: AgentHeartbeatPayload) => {
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('AgentHeartbeat'));
 
@@ -79,24 +90,75 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 return { status: 'skipped', reason: 'agent-not-found', agentId: payload.agentId };
             }
 
-            // Phase 6 placeholder — Phase 7's AgentRunService.execute()
-            // wires PromptAssembler + AiFacade + tools + skills. v1 just
-            // logs that the heartbeat fired so the loop is observable
-            // end-to-end before the orchestrator lands.
-            const summary = `Phase 6 placeholder heartbeat — scheduled ${payload.scheduledFor}`;
+            const runner = appContext.get(AgentRunService);
+            let run = payload.runId ? await runs.findById(payload.runId) : null;
+            if (run && run.agentId !== agent.id) {
+                return {
+                    status: 'skipped',
+                    reason: 'run-agent-mismatch',
+                    agentId: payload.agentId,
+                };
+            }
+            if (run && run.status === 'cancelled') {
+                const nextSlot = computeNextHeartbeat(agent.heartbeatCadence);
+                await agents.releaseAfterRun(agent.id, nextSlot, 'cancelled');
+                return {
+                    status: 'skipped',
+                    reason: 'run-cancelled',
+                    agentId: agent.id,
+                    runId: run.id,
+                    nextHeartbeatAt: nextSlot?.toISOString() ?? null,
+                };
+            }
+            if (run && run.status !== 'queued' && run.status !== 'running') {
+                const nextSlot = computeNextHeartbeat(agent.heartbeatCadence);
+                await agents.releaseAfterRun(agent.id, nextSlot, run.status);
+                return {
+                    status: 'skipped',
+                    reason: `run-${run.status}`,
+                    agentId: agent.id,
+                    runId: run.id,
+                    nextHeartbeatAt: nextSlot?.toISOString() ?? null,
+                };
+            }
+            if (!run) {
+                run = await runs.findInFlightForAgent(agent.id);
+            }
+            if (!run) {
+                run = await runs.createQueued({
+                    agentId: agent.id,
+                    userId: payload.userId,
+                    triggerKind: 'heartbeat',
+                });
+            }
 
-            const inFlight = await runs.findInFlightForAgent(agent.id);
-            if (inFlight) {
-                await runs.markStarted(inFlight.id, null);
-                await runs.markCompleted(inFlight.id, summary);
+            await runs.markStarted(run.id, null);
+            const result = await runner.execute({
+                runId: run.id,
+                agentId: agent.id,
+                userId: payload.userId,
+                kind: 'heartbeat',
+            });
+
+            if (result.status === 'assembled') {
+                await runs.markCompleted(
+                    run.id,
+                    `Prompt assembled for heartbeat scheduled ${payload.scheduledFor}`,
+                );
             }
 
             const nextSlot = computeNextHeartbeat(agent.heartbeatCadence);
-            await agents.releaseAfterRun(agent.id, nextSlot, 'completed');
+            const completed = result.status === 'assembled' || result.status === 'dispatched';
+            if (completed) {
+                await agents.releaseAfterRun(agent.id, nextSlot, 'completed');
+            } else {
+                await agents.incrementErrorCount(agent.id, nextSlot);
+            }
 
             return {
-                status: 'completed',
+                status: completed ? 'completed' : result.status,
                 agentId: agent.id,
+                runId: run.id,
                 nextHeartbeatAt: nextSlot?.toISOString() ?? null,
             };
         } finally {

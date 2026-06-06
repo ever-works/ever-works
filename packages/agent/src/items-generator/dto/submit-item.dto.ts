@@ -10,9 +10,33 @@ import {
     MaxLength,
     ValidateIf,
     ArrayMinSize,
+    Validate,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import type { SubmitItemDto as ISubmitItemDto } from '@ever-works/contracts/api';
+import { isSafeWebhookUrl } from '../../utils/ssrf-guard';
+
+// Security (SSRF): `@IsUrl` only enforces http(s) + a TLD, so it still accepts
+// URLs whose host is a literal private/loopback/link-local IP (e.g.
+// http://169.254.169.254/... AWS/GCP/Azure IMDS) or a cloud-metadata hostname
+// (metadata.google.internal). `source_url`, `brand_logo_url`, and `images` are
+// persisted to the work's YAML and later fetched server-side (content-extractor
+// / screenshot / image-capture facades), so reject those hosts at the DTO
+// boundary too — a lexical mirror of the guard `WorkGenerationService` already
+// applies before fetching. Public URLs are unaffected; full DNS-rebinding
+// defense still lives in the fetching plugins. Mirrors `ExtractItemDetailsDto`.
+@ValidatorConstraint({ name: 'isNotSsrfUrl', async: false })
+class IsNotSsrfUrlConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        return typeof value === 'string' && isSafeWebhookUrl(value);
+    }
+
+    defaultMessage(): string {
+        return 'URL is not allowed';
+    }
+}
 
 export class SubmitItemDto implements ISubmitItemDto {
     @ApiProperty({ description: 'Name of the item' })
@@ -28,6 +52,9 @@ export class SubmitItemDto implements ISubmitItemDto {
     @ApiProperty({ description: 'Source URL of the item', example: 'https://example.com' })
     @IsString()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    // Security (SSRF): block private/loopback/link-local IP literals and
+    // cloud-metadata hostnames that pass @IsUrl but must never be fetched.
+    @Validate(IsNotSsrfUrlConstraint)
     source_url: string;
 
     // Backward compatibility: accept single category string
@@ -82,12 +109,18 @@ export class SubmitItemDto implements ISubmitItemDto {
     @ApiPropertyOptional({ description: 'Brand logo URL', example: 'https://example.com/logo.png' })
     @IsOptional()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true })
+    // Security (SSRF): brand logo is fetched server-side for optimization/display;
+    // block private/loopback/link-local IPs and cloud-metadata hostnames.
+    @Validate(IsNotSsrfUrlConstraint)
     brand_logo_url?: string;
 
     @ApiPropertyOptional({ description: 'Image URLs for the item', type: [String] })
     @IsOptional()
     @IsArray()
     @IsUrl({ protocols: ['http', 'https'], require_tld: true }, { each: true })
+    // Security (SSRF): each image URL is fetched server-side; block private/
+    // loopback/link-local IPs and cloud-metadata hostnames per-element.
+    @Validate(IsNotSsrfUrlConstraint, { each: true })
     images?: string[];
 
     @ApiPropertyOptional({

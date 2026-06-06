@@ -35,6 +35,11 @@ import type {
 	TransferRepoResult
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
+// Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
+// (GitHub Enterprise endpoint) from being pointed at private/loopback/cloud-
+// metadata hosts. Imported from the dedicated subpath because the SSRF guard
+// pulls in node:net/dns and is intentionally not re-exported from the package root.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import { GitOperations } from '@ever-works/plugin/git';
 import { GitHubApiService } from './github-api.service.js';
 import { GitHubActionsService } from './github-actions.service.js';
@@ -75,6 +80,11 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				default: 'https://api.github.com',
 				format: 'uri',
 				'x-hidden': true,
+				// Security: this global-scope value becomes the HTTP base URL for every
+				// authenticated Octokit call, so it must only be editable by an admin
+				// (matches clientId/clientSecret). The plugin is already configurationMode
+				// 'admin-only'; the explicit field annotation makes the intent enforceable.
+				'x-adminOnly': true,
 				'x-scope': 'global'
 			},
 			readPackagesPat: {
@@ -534,7 +544,17 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 		const data = await response.json();
 
 		if (data.error) {
-			throw new Error(`GitHub OAuth error: ${data.error_description || data.error}`);
+			// Security (log-injection): `error`/`error_description` are attacker-
+			// influenceable strings from the OAuth authorization-server response.
+			// Interpolating them raw into a thrown (and likely logged) Error lets a
+			// crafted value with CR/LF forge additional log lines. Strip control
+			// characters and cap the length before surfacing the diagnostic.
+			const detail = String(data.error_description || data.error)
+				// eslint-disable-next-line no-control-regex
+				.replace(/[\x00-\x1f\x7f]+/g, ' ')
+				.trim()
+				.slice(0, 300);
+			throw new Error(`GitHub OAuth error: ${detail}`);
 		}
 
 		return {
@@ -636,10 +656,22 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 			return {};
 		}
 		const settings = await this.context.getSettings();
+		const DEFAULT_API_BASE_URL = 'https://api.github.com';
+		const configuredApiBaseUrl = (settings?.apiBaseUrl as string) || DEFAULT_API_BASE_URL;
+		// Security (SSRF): this base URL is forwarded as the HTTP origin for every
+		// Octokit call — including ones that carry an authenticated GitHub token.
+		// A misconfigured/hostile value (e.g. http://169.254.169.254/…, loopback,
+		// or a file:// scheme) would direct those credentialed requests at internal
+		// services. Lexically reject private/loopback/link-local/metadata hosts and
+		// non-http(s) schemes; legitimate public hosts — api.github.com and any
+		// GitHub Enterprise Server hostname — pass unchanged. Fall back to the
+		// documented default instead of throwing so a bad value degrades safely.
+		// (Lexical only: DNS-rebinding of a hostname is not covered here.)
+		const apiBaseUrl = isSafeWebhookUrl(configuredApiBaseUrl) ? configuredApiBaseUrl : DEFAULT_API_BASE_URL;
 		return {
 			clientId: settings?.clientId as string | undefined,
 			clientSecret: settings?.clientSecret as string | undefined,
-			apiBaseUrl: (settings?.apiBaseUrl as string) || 'https://api.github.com'
+			apiBaseUrl
 		};
 	}
 

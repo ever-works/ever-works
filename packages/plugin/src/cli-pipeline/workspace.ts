@@ -58,7 +58,11 @@ const cliItemSchema = z
 		tags: z.array(z.string().max(ITEM_TAG_MAX)).max(256).optional(),
 		images: z.array(httpUrl).max(64).optional(),
 		image: stringOrNullish.optional(),
-		brand: stringOrNullish.optional()
+		brand: stringOrNullish.optional(),
+		// M-26 schema-level slug cap: only bound length, never reject or drop
+		// (traversal is already closed at the fs.writeFile sink via slugify +
+		// confinement; strict regex would silently drop legitimate items).
+		slug: z.string().max(255).optional()
 		// Free-form metadata — accept but cap.
 	})
 	.catchall(z.unknown())
@@ -120,6 +124,16 @@ export function getWorkspacePath(baseTempDir: string, userId: string, workId: st
 
 export async function createWorkspace(baseTempDir: string, userId: string, workId: string): Promise<string> {
 	const workspaceRoot = getWorkspacePath(baseTempDir, userId, workId);
+	// Security (path-traversal confinement): verify that the constructed path
+	// stays inside baseTempDir before creating any directories. This catches
+	// any caller that passes a crafted userId/workId containing `..` sequences
+	// without relying solely on the API layer's UUID validation.
+	const resolvedBase = path.resolve(baseTempDir);
+	const resolvedRoot = path.resolve(workspaceRoot);
+	const rel = path.relative(resolvedBase, resolvedRoot);
+	if (rel.startsWith('..') || path.isAbsolute(rel) || rel === '') {
+		throw new Error('createWorkspace: workspace path escapes baseTempDir');
+	}
 	await fs.mkdir(workspaceRoot, { recursive: true });
 	const workspacePath = await fs.mkdtemp(path.join(workspaceRoot, 'run-'));
 	await fs.mkdir(path.join(workspacePath, '_meta'), { recursive: true });
@@ -135,17 +149,39 @@ export async function seedExistingItems(workspacePath: string, items: readonly I
 	const indexLines: string[] = [];
 	const itemWrites: Array<() => Promise<void>> = [];
 
+	const workspaceResolved = path.resolve(workspacePath);
+
 	for (const item of items) {
-		const baseSlug = item.slug || slugify(item.name);
+		// Security (path-traversal): `item.slug` round-trips from `readGeneratedItems`,
+		// where it passes through the schema `.catchall()` unvalidated, so a
+		// prompt-injected CLI agent can set it to `../../../etc/cron.d/x`. Run it
+		// through `slugify` (which strips `/`, `.` and other path chars) BEFORE it
+		// becomes a filename — same treatment the `name` fallback already gets.
+		// `slugify` is idempotent for legitimate slugs, so behavior is unchanged
+		// for valid input. Fall back to the name slug, then a literal, if a hostile
+		// slug reduces to empty.
+		const baseSlug = slugify(item.slug || item.name) || slugify(item.name) || 'item';
 		const slug = deduplicateSlug(baseSlug, usedSlugs);
 		usedSlugs.add(slug);
 
 		const fileName = `${slug}.json`;
+		const filePath = path.join(workspaceResolved, fileName);
+		// Security (defense-in-depth): confirm the resolved write path stays inside
+		// the workspace. `slugify` already removes traversal sequences; this assert
+		// guarantees confinement even if that ever regresses.
+		const relativeToWorkspace = path.relative(workspaceResolved, filePath);
+		if (
+			relativeToWorkspace.startsWith('..') ||
+			path.isAbsolute(relativeToWorkspace) ||
+			relativeToWorkspace.includes('/')
+		) {
+			continue;
+		}
 		const content = JSON.stringify(item, null, 2);
 		seededManifest[fileName] = createHash('sha256').update(content).digest('hex');
 		indexLines.push(JSON.stringify({ slug, name: item.name, source_url: item.source_url }));
 
-		itemWrites.push(() => fs.writeFile(path.join(workspacePath, fileName), content, 'utf-8'));
+		itemWrites.push(() => fs.writeFile(filePath, content, 'utf-8'));
 	}
 
 	await parallelBatch(itemWrites, WRITE_CONCURRENCY);
@@ -297,6 +333,14 @@ export async function cleanupWorkspace(workspacePath: string, baseTempDir?: stri
 		const nativeResolved = nativePath.resolve(workspacePath);
 		const winResolved = nativePath.win32.resolve(workspacePath);
 		if (resolved === '/' || nativeResolved === '/' || /^[A-Za-z]:[\\/]?$/.test(winResolved)) {
+			return;
+		}
+		// Security (L-32): implement the segment-count guard the JSDoc above
+		// promises but that was never coded. Every legitimate workspace path is
+		// `<baseTempDir>/<userId>/<workId>/run-XXXXX` (>= 5 segments), so refusing
+		// anything shallower than 5 segments blocks accidental `fs.rm` of `/tmp`,
+		// `/var`, etc. without affecting any real cleanup.
+		if (resolved.split('/').filter(Boolean).length < 5) {
 			return;
 		}
 		// If a baseTempDir is supplied, the workspace MUST be inside it.

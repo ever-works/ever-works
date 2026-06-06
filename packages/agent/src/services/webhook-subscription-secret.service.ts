@@ -21,8 +21,9 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
  * unset.
  *
  * Security notes:
- *  - The key MUST be 32 bytes. Hex (64 chars), base64 (44), and raw utf-8
- *    (32) are all accepted; anything else is a clear error.
+ *  - The key MUST be 64 lowercase/uppercase hex characters (= 32 bytes),
+ *    matching the sibling secret services that share PLATFORM_ENCRYPTION_KEY;
+ *    anything else is rejected (base64 / raw-utf-8 keys are NOT accepted).
  *  - The IV is random per-record so the same plaintext encrypts to a
  *    different ciphertext each call.
  *  - We never log the decrypted secret. The webhook-delivery service
@@ -38,6 +39,8 @@ const ENVELOPE_PREFIX = 'enc::v1::';
 export class WebhookSubscriptionSecretService {
     private readonly logger = new Logger(WebhookSubscriptionSecretService.name);
     private cachedKey: Buffer | null = null;
+    // Security: latch so the plaintext-passthrough warning fires once, not per-call.
+    private warnedPlaintextPassthrough = false;
 
     isEnabled(): boolean {
         return Boolean(this.tryGetKey());
@@ -57,7 +60,18 @@ export class WebhookSubscriptionSecretService {
     encrypt(value: string): string {
         const key = this.tryGetKey();
         if (!key) {
-            return value; // dev/test passthrough
+            // Security: do not pass through silently. When PLATFORM_ENCRYPTION_KEY
+            // is unset the signing secret is persisted in PLAINTEXT — anyone with DB
+            // read access (backup, replica, SQLi) can forge signed webhook bodies.
+            // Tolerated only for the documented dev/test path; loudly flagged so a
+            // misconfigured production deploy is caught instead of silently leaking.
+            if (!this.warnedPlaintextPassthrough) {
+                this.warnedPlaintextPassthrough = true;
+                this.logger.warn(
+                    'PLATFORM_ENCRYPTION_KEY is not set — webhook subscription signing secrets are being stored in PLAINTEXT at rest. Set a 64-hex-char PLATFORM_ENCRYPTION_KEY in any non-dev environment.',
+                );
+            }
+            return value; // dev/test passthrough (key absent)
         }
         const iv = randomBytes(IV_LENGTH_BYTES);
         const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -111,15 +125,16 @@ export class WebhookSubscriptionSecretService {
     }
 
     private decodeKey(raw: string): Buffer | null {
-        if (/^[0-9a-f]{64}$/i.test(raw)) {
-            return Buffer.from(raw, 'hex');
+        // Security: hex-only key material, matching the sibling secret services
+        // (PlatformSyncSecretService / WebhookSecretService) which read the SAME
+        // PLATFORM_ENCRYPTION_KEY and enforce `/^[0-9a-fA-F]+$/`. Accepting base64
+        // or raw utf-8 here (a) allowed weak human-readable keys with a far smaller
+        // brute-force keyspace, and (b) produced ciphertext the hex-only siblings
+        // could not decrypt. Require 64 hex chars (= 32 bytes); reject everything else.
+        if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+            return null;
         }
-        if (/^[A-Za-z0-9+/]{43}=?$/.test(raw)) {
-            const decoded = Buffer.from(raw, 'base64');
-            if (decoded.length === KEY_LENGTH_BYTES) return decoded;
-        }
-        const utf = Buffer.from(raw, 'utf8');
-        if (utf.length === KEY_LENGTH_BYTES) return utf;
-        return null;
+        const decoded = Buffer.from(raw, 'hex');
+        return decoded.length === KEY_LENGTH_BYTES ? decoded : null;
     }
 }

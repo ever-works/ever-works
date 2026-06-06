@@ -310,6 +310,11 @@ function sanitizePluginConfig(config: Record<string, unknown>): Record<string, u
                     .map((v) => v.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim())
                     .filter(Boolean);
             }
+            // Security: strip control characters from plain scalar string values so
+            // plugin text/textarea/url/email fields cannot smuggle null bytes or
+            // ANSI escape sequences into the backend or LLM prompt pipeline.
+        } else if (typeof value === 'string') {
+            sanitized[key] = value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
         } else {
             sanitized[key] = value;
         }

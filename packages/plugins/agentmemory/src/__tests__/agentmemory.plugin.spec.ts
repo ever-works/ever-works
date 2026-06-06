@@ -12,16 +12,18 @@ const mockContext = vi.fn();
 const mockForget = vi.fn();
 
 vi.mock('../agentmemory-client.js', () => ({
-	AgentmemoryClient: vi.fn().mockImplementation(() => ({
-		health: mockHealth,
-		sessionStart: mockSessionStart,
-		sessionEnd: mockSessionEnd,
-		observe: mockObserve,
-		remember: mockRemember,
-		smartSearch: mockSmartSearch,
-		context: mockContext,
-		forget: mockForget
-	}))
+	AgentmemoryClient: vi.fn().mockImplementation(function () {
+		return {
+			health: mockHealth,
+			sessionStart: mockSessionStart,
+			sessionEnd: mockSessionEnd,
+			observe: mockObserve,
+			remember: mockRemember,
+			smartSearch: mockSmartSearch,
+			context: mockContext,
+			forget: mockForget
+		};
+	})
 }));
 
 function createContext(): PluginContext {

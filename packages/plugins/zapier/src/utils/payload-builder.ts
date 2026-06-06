@@ -1,4 +1,5 @@
 import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { ZapierWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
@@ -19,9 +20,14 @@ interface PayloadOptions {
  *    catalog actions (Gmail, Slack, Sheets, …) see their required input fields
  *    where Zapier expects them (e.g. `{ to, subject, body }` for Gmail send).
  *
- * Collision handling: if the user's `action_params` contain a key that clashes
- * with an envelope key (e.g. `metadata`), the user's value wins via spread order.
+ * Collision handling: reserved envelope keys (`metadata`, `existingSummary`,
+ * `dataSource`, `actionParams`) are platform-owned and always win. Any matching
+ * key in the user's free-form `action_params` is dropped from the top-level
+ * flatten so it cannot forge the trusted work/tenant context (e.g. overwrite
+ * `metadata.workId`). The user's full object is still available untouched under
+ * the `actionParams` envelope key for Zaps that destructure it.
  */
+const RESERVED_ENVELOPE_KEYS = new Set(['metadata', 'existingSummary', 'dataSource', 'actionParams']);
 export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInput & Record<string, unknown> {
 	const { work, request, existing, config } = options;
 
@@ -49,7 +55,16 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 		};
 	}
 
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: the user-supplied repo_url (and the repo access token attached
+	// alongside it) is forwarded to the external Zapier action, which fetches it
+	// server-side. Without validation an attacker could set repo_url to
+	// http://169.254.169.254/, a private/loopback host, or a non-HTTP scheme to
+	// exfiltrate the GitHub access token / probe internal services via the Zapier
+	// runner (SSRF). Gate the dataSource on the shared lexical SSRF guard (rejects
+	// non-HTTP(S) schemes and literal private/loopback/link-local/cloud-metadata
+	// IPs). Legitimate https://github.com/... URLs are unaffected; an unsafe URL
+	// fails closed by omitting dataSource so the token never leaves the platform.
+	if (config.pass_repo_access && config.repo_url && isSafeWebhookUrl(config.repo_url as string)) {
 		envelope.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,
@@ -68,8 +83,17 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 		envelope.actionParams = actionParams;
 	}
 
+	// Security: flatten user-supplied action params at the top level (catalog
+	// actions like Gmail/Slack expect their fields there) but never let them
+	// shadow platform-owned envelope keys. Reserved keys are stripped from the
+	// top-level spread so action_params cannot forge metadata/dataSource/etc.
+	// (legitimate catalog fields — to, subject, body, channel… — never collide).
+	const flattenedParams = actionParams
+		? Object.fromEntries(Object.entries(actionParams).filter(([key]) => !RESERVED_ENVELOPE_KEYS.has(key)))
+		: {};
+
 	return {
-		...envelope,
-		...(actionParams ?? {})
+		...flattenedParams,
+		...envelope
 	};
 }

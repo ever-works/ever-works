@@ -197,7 +197,7 @@ export class ActivityLogController {
     // site, so its blast radius if leaked is wide. Cap per-IP throughput to
     // 60/min on top of the bearer check, mitigating spam even if a token
     // is compromised before rotation lands.
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     @HttpCode(202)
     @ApiOperation({
         summary: 'Ingest a website-sourced activity event',

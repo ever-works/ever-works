@@ -34,6 +34,55 @@ Your task:
 Be somewhat lenient in determining relatedness - minor variations, additional details, or slight scope changes should still be considered related if the core intent is similar.` as const;
 
 /**
+ * Security (prompt-injection hardening): chat-template control markers that some
+ * models interpret as out-of-band role/turn delimiters. Stripped from every
+ * untrusted value before it is interpolated into {@link PROMPT_COMPARISON_PROMPT}
+ * so injected text cannot spoof a system/user turn. Mirrors the canonical
+ * `sanitizePromptVariable` in `@ever-works/agent`'s `item-health.service.ts`
+ * and the sibling `item-extraction.step.ts`.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the literal XML-style delimiter tags
+ * that fence the two prompt slots of {@link PROMPT_COMPARISON_PROMPT}. Both the
+ * existing prompt (persisted tenant free-text in `metadata.initial_prompt`) and
+ * the new prompt (`request.prompt`) are interpolated INSIDE these fences, so a
+ * value that prints its own `</existing_prompt>` (or any sibling fence tag)
+ * could forge a boundary and have trailing imperative text parsed as
+ * authoritative instructions (e.g. forcing `areRelated:true`). Matched open or
+ * close so the boundary token can be defused wherever it appears.
+ */
+const PROMPT_FENCE_TOKEN_PATTERN = /<\/?(?:existing_prompt|new_prompt)\b/gi;
+
+/**
+ * Security (prompt-injection hardening): defuse a forged fence boundary by
+ * inserting a zero-width space right after the opening `<` of any fence tag.
+ * This keeps the text human/model-readable while breaking the literal token the
+ * boundary keys on. Mirrors `item-extraction.step.ts`'s `neutralizeFenceTokens`.
+ */
+function neutralizeFenceTokens(value: string): string {
+	return value.replace(PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+}
+
+/**
+ * Security (prompt-injection hardening): sanitize an untrusted prompt string
+ * before it is interpolated into a `<existing_prompt>` / `<new_prompt>` fence.
+ * Both inputs are single logical free-text prompts authored by a tenant, so
+ * newlines are collapsed to spaces (preventing injected fake prompt lines),
+ * chat-template control markers are stripped, forged fence tokens are
+ * neutralized, and the value is hard-truncated. Applied only at interpolation
+ * time so the identical-prompt / empty-prompt pre-checks and the fallback
+ * similarity scoring continue to see the raw values unchanged.
+ */
+function sanitizePromptForComparison(value: string, maxLength: number): string {
+	return neutralizeFenceTokens(value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '')).slice(
+		0,
+		maxLength
+	);
+}
+
+/**
  * Output schema for prompt comparison
  */
 const promptComparisonOutputSchema = z.object({
@@ -154,7 +203,14 @@ export class PromptComparisonStep extends BasePipelineStep {
 				promptComparisonOutputSchema,
 				{
 					temperature: 0.1,
-					variables: { existing_prompt: existingPrompt, new_prompt: newPrompt },
+					// Security: both prompts are tenant-controlled free text interpolated
+					// inside <existing_prompt>/<new_prompt> fences; sanitize at the
+					// interpolation site so a forged closing tag or chat-template marker
+					// cannot escape its slot and steer the comparison verdict.
+					variables: {
+						existing_prompt: sanitizePromptForComparison(existingPrompt, 8000),
+						new_prompt: sanitizePromptForComparison(newPrompt, 8000)
+					},
 					routing: {
 						complexity: 'medium',
 						taskId: 'prompt-comparison'

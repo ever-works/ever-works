@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as path from 'node:path';
 import YAML from 'yaml';
 import { z } from 'zod';
 
@@ -66,6 +67,42 @@ const defaultsSchema = z
     })
     .passthrough();
 
+// Security (path traversal): `seedPaths` comes from an
+// attacker-controllable template repo's `.works/mission.yml` and
+// the Phase 8 scaffolder copies each entry out of the template repo
+// into the new Mission repo at fork time. Reject anything that, after
+// POSIX normalization, escapes the template-repo root or looks
+// absolute/Windows so a hostile template can't read `../../../.env`
+// (or write outside the target repo). Mirrors the relative-path
+// confinement idiom in `KnowledgeBaseGitMirrorService.validateRelativeKbPath`.
+// Kept as a Zod `.refine` so the existing `errorKind: 'schema'` contract
+// and the `.min(1)`-driven empty-string rejection are preserved; legitimate
+// relative paths like `docs/strategy.md` pass unchanged.
+const INVALID_SEED_PATH_MESSAGE =
+    'kb.seedPaths entries must be relative paths within the template repo (no "..", leading "/", backslashes, or null bytes)';
+
+function isSafeSeedPath(p: string): boolean {
+    // Backslashes and null bytes are never valid in a forward-slash,
+    // repo-relative seed path — reject outright.
+    if (p.includes('\\') || p.includes('\0')) {
+        return false;
+    }
+    // Absolute POSIX paths or Windows drive-letter paths escape the root.
+    if (p.startsWith('/') || /^[A-Za-z]:/.test(p)) {
+        return false;
+    }
+    // POSIX-normalize so `a/../b`-style traversal is caught regardless of host.
+    const normalized = path.posix.normalize(p);
+    if (
+        normalized === '..' ||
+        normalized.startsWith('../') ||
+        normalized.split('/').some((seg) => seg === '..')
+    ) {
+        return false;
+    }
+    return true;
+}
+
 const kbSchema = z
     .object({
         /**
@@ -75,7 +112,10 @@ const kbSchema = z
          * root, no leading slash. Globs not supported in v1 —
          * keeps the fork step predictable.
          */
-        seedPaths: z.array(z.string().min(1).max(500)).max(200).optional(),
+        seedPaths: z
+            .array(z.string().min(1).max(500).refine(isSafeSeedPath, INVALID_SEED_PATH_MESSAGE))
+            .max(200)
+            .optional(),
     })
     .passthrough();
 

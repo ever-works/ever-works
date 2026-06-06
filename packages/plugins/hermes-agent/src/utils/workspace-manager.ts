@@ -72,7 +72,35 @@ export async function seedMetadata(workspacePath: string, metadata: Record<strin
 }
 
 export async function cleanupWorkspace(workspacePath: string): Promise<void> {
-	await fs.rm(assertWithinBaseDir(workspacePath), { recursive: true, force: true });
+	// Security: confine the workspace path LEXICALLY — do NOT realpath() it.
+	// A prompt-injected subprocess can replace its own run directory with a
+	// symlink pointing at *another* workspace under BASE_TEMP_DIR; realpath()
+	// would follow that link so the prefix check still passes, and
+	// fs.rm({ recursive }) would then delete the symlink's *target* (another
+	// run's / tenant's workspace) instead of just removing the link.
+	//
+	// The path is already built from sanitized segments by getWorkspacePath() /
+	// createWorkspace(), so a lexical containment check is sufficient. fs.rm()
+	// does not traverse INTO symlinks it meets while walking (it unlinks them),
+	// so nested prompt-injected symlinks cannot escape either.
+	const confinedPath = assertWithinBaseDir(workspacePath);
+
+	let stats;
+	try {
+		stats = await fs.lstat(confinedPath);
+	} catch {
+		// Path does not exist or is otherwise inaccessible — nothing to remove.
+		return;
+	}
+
+	if (stats.isSymbolicLink()) {
+		// The run directory itself is a symlink: unlink it WITHOUT following, so
+		// we never recurse into (and delete) whatever it points at.
+		await fs.unlink(confinedPath);
+		return;
+	}
+
+	await fs.rm(confinedPath, { recursive: true, force: true });
 }
 
 export function collectMetadataFromItems(items: readonly ItemData[]): {

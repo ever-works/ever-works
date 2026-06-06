@@ -1,4 +1,5 @@
 import { workAPI } from '@/lib/api/work';
+import { getAuthFromCookie } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -18,6 +19,15 @@ import { NextRequest, NextResponse } from 'next/server';
  *   }
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    // Security: require an authenticated session before proxying to the upstream
+    // API, matching the comparisons/generation-status route. Prevents anonymous
+    // enumeration of deploy status (state, website URL, provider) for arbitrary
+    // work IDs and avoids relying solely on upstream tenant isolation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     try {
         const response = await workAPI.get(id);
@@ -31,12 +41,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
             website: work.website ?? null,
             deployProvider: work.deployProvider ?? null,
         });
-    } catch (error) {
-        return NextResponse.json(
-            {
-                error: error instanceof Error ? error.message : 'failed_to_load_deploy_status',
-            },
-            { status: 500 },
-        );
+    } catch {
+        // Security: return a generic error rather than leaking the raw upstream
+        // error message (e.g. ApiResponseError details) to the caller.
+        return NextResponse.json({ error: 'failed_to_load_deploy_status' }, { status: 500 });
     }
 }

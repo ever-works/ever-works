@@ -1,10 +1,12 @@
 import { tasks } from '@trigger.dev/sdk';
+import type { AgentHeartbeatTrigger } from '@ever-works/agent/agents';
 import type {
     AgentChatReplyDispatcher,
     AgentChatReplyDispatchPayload,
     AgentTaskExecuteDispatcher,
     AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
+import type { AgentHeartbeatPayload } from '../tasks/trigger/agent-heartbeat.task';
 import type { AgentChatReplyPayload } from '../tasks/trigger/agent-chat-reply.task';
 import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execute.task';
 
@@ -18,6 +20,20 @@ import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execut
  * the dispatcher tokens — keeps `@trigger.dev/sdk` out of the
  * @ever-works/agent package's dependency graph.
  */
+export const agentHeartbeatTriggerAdapter: AgentHeartbeatTrigger = {
+    async enqueue(payload) {
+        const handle = await tasks.trigger<
+            typeof import('../tasks/trigger/agent-heartbeat.task').agentHeartbeatTask
+        >('agent-heartbeat', {
+            agentId: payload.agentId,
+            userId: payload.userId,
+            runId: payload.runId,
+            scheduledFor: payload.scheduledFor.toISOString(),
+        } satisfies AgentHeartbeatPayload);
+        return { runId: handle.id };
+    },
+};
+
 export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
     async enqueue(payload: AgentTaskExecuteDispatchPayload) {
         // Review-fix I10: pass `idempotencyKey` to Trigger.dev so a
@@ -34,6 +50,7 @@ export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
                 userId: payload.userId,
                 taskId: payload.taskId,
                 dedupKey: payload.dedupKey,
+                runId: payload.runId,
             } satisfies AgentTaskExecutePayload,
             { idempotencyKey: payload.dedupKey },
         );
@@ -54,6 +71,7 @@ export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
                 taskId: payload.taskId,
                 triggeringMessageId: payload.triggeringMessageId,
                 dedupKey: payload.dedupKey,
+                runId: payload.runId,
             } satisfies AgentChatReplyPayload,
             { idempotencyKey: payload.dedupKey },
         );

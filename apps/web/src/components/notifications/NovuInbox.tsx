@@ -11,8 +11,11 @@ import { Inbox } from '@novu/react';
  *
  * `subscriberId` is the current user's id. `subscriberHash` (HMAC of the
  * subscriber id, computed server-side from `NOVU_SECRET_KEY`) enables
- * Novu's secured/HMAC mode; when absent, Novu runs in non-secured mode.
- * `backendUrl` / `socketUrl` point at a self-hosted Novu when set.
+ * Novu's secured/HMAC mode. Without it Novu runs in non-secured (open)
+ * mode, where the browser-supplied `subscriberId` is trusted with no HMAC
+ * challenge — so anyone who learns another user's id can read their
+ * notification stream. `backendUrl` / `socketUrl` point at a self-hosted
+ * Novu when set.
  */
 export function NovuInbox({
     subscriberId,
@@ -22,7 +25,12 @@ export function NovuInbox({
     subscriberHash?: string;
 }) {
     const applicationIdentifier = process.env.NEXT_PUBLIC_NOVU_APP_ID;
-    if (!applicationIdentifier || !subscriberId) {
+    // Security: require secured/HMAC mode. `subscriberHash` is only present
+    // when NOVU_SECRET_KEY is configured server-side; rendering without it
+    // would put Novu in non-secured mode, letting any client subscribe with
+    // a spoofed `subscriberId` and read another user's notifications. Fail
+    // closed (no-op) instead of silently mounting an unauthenticated inbox.
+    if (!applicationIdentifier || !subscriberId || !subscriberHash) {
         return null;
     }
 

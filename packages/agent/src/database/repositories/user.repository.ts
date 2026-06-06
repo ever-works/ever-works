@@ -171,6 +171,31 @@ export class UserRepository {
     }
 
     /**
+     * Atomically consume a magic-link token: clears the token columns ONLY if
+     * the row still holds `tokenHash`, compiling to a single
+     * `UPDATE … SET magicLinkToken=NULL … WHERE id=:id AND magicLinkToken=:hash`.
+     * Returns true iff a row was updated, making magic-link redemption truly
+     * single-use under concurrency — two requests racing on the same token:
+     * the first UPDATE clears it, the second's WHERE no longer matches so it
+     * affects 0 rows and the caller rejects it. Mirrors
+     * {@link clearPasswordResetToken} for the password-reset flow.
+     */
+    async consumeMagicLinkToken(id: string, tokenHash: string): Promise<boolean> {
+        const result = await this.repository.update(
+            {
+                id,
+                magicLinkToken: tokenHash,
+            },
+            {
+                magicLinkToken: null,
+                magicLinkExpires: null,
+            },
+        );
+
+        return (result.affected || 0) > 0;
+    }
+
+    /**
      * EW-617 G2: anonymous user TTL cleanup.
      * Returns all rows where `isAnonymous=true AND anonymousExpiresAt < now`.
      * Caller (Trigger.dev nightly task) is expected to delete them; ON DELETE

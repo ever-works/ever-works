@@ -27,6 +27,12 @@ import type {
 } from '../contracts/capabilities/ai-provider.interface.js';
 import { TokenUsageTracker } from './token-usage.tracker.js';
 import { getReasoningConfig } from './reasoning.utils.js';
+// Security (SSRF): `baseURL` originates from the user-scoped `baseUrl` plugin
+// setting (ollama/lm-studio/vllm/openrouter/etc., x-scope:user) and flows here
+// via BaseAiProvider.resolveConfig. Every outbound request built from it must
+// pass the shared SSRF guard. Direct import — ssrf-guard pulls in node:net/dns
+// and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl, safeFetchWithDnsPin } from '../helpers/ssrf-guard.js';
 
 export interface AiOperationsConfig {
 	apiKey: string;
@@ -234,6 +240,10 @@ export class AiOperations {
 			throw new Error('Embedding model must be specified in options or config');
 		}
 
+		// Security (SSRF): same guard as createChatModel — OpenAIEmbeddings is
+		// constructed directly here with the user-supplied baseURL.
+		this.assertSafeBaseUrl(config.baseURL);
+
 		const embeddings = new OpenAIEmbeddings({
 			apiKey: config.apiKey,
 			model,
@@ -261,7 +271,12 @@ export class AiOperations {
 
 		const modelsUrl = `${config.baseURL.replace(/\/+$/, '')}/models`;
 
-		const response = await fetch(modelsUrl, {
+		// Security (SSRF): this fetch carries the provider Bearer key to a
+		// user-controlled baseURL. Route it through safeFetchWithDnsPin, which
+		// runs the lexical SSRF guard and re-checks the resolved IP (mitigating
+		// DNS rebinding) before issuing the request, refusing private/loopback/
+		// link-local/cloud-metadata destinations and non-http(s) schemes.
+		const response = await safeFetchWithDnsPin(modelsUrl, {
 			headers: {
 				Authorization: `Bearer ${config.apiKey}`,
 				'Content-Type': 'application/json'
@@ -390,12 +405,33 @@ export class AiOperations {
 		return { ...this.defaultConfig, ...overrides };
 	}
 
+	/**
+	 * Security (SSRF): lexically reject a user-supplied `baseURL` that targets a
+	 * private / loopback / link-local / cloud-metadata host before it is handed
+	 * to LangChain's ChatOpenAI / OpenAIEmbeddings (whose internal fetch we
+	 * cannot route through `safeFetchWithDnsPin`). Undefined `baseURL` means the
+	 * provider's hosted default endpoint is used — that is always allowed.
+	 * DNS-rebinding is only partially covered here (lexical-only); the raw
+	 * `fetch` in `listModels` uses the DNS-pinning variant instead.
+	 */
+	private assertSafeBaseUrl(baseURL?: string): void {
+		if (baseURL && !isSafeWebhookUrl(baseURL)) {
+			throw new Error('Configured baseURL is not allowed (must be a public http(s) endpoint)');
+		}
+	}
+
 	private createChatModel(
 		config: AiOperationsConfig,
 		model: string,
 		options?: ChatCompletionOptions,
 		skip?: Set<string>
 	): ChatOpenAI {
+		// Security (SSRF): validate the user-supplied baseURL before LangChain
+		// issues any LLM request (chat/stream/askJson/testConnection all build
+		// the client here), since the request body + Bearer key would otherwise
+		// be forwarded to an attacker-chosen internal address.
+		this.assertSafeBaseUrl(config.baseURL);
+
 		const modelKwargs: Record<string, unknown> = {};
 
 		if (!skip?.has('reasoning')) {

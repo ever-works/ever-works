@@ -185,7 +185,10 @@ export function WorkStatusCard({ work }: WorkStatusCardProps) {
             },
             [GenerateStatusType.ERROR]: {
                 title: t('error.title'),
-                description: generateStatus.error || t('error.description'),
+                // Security: generateStatus.error is a raw backend string that may contain
+                // internal file paths, stack traces, or DB constraint names. Always display
+                // the generic i18n fallback to avoid leaking platform internals to the user.
+                description: t('error.description'),
                 action: (
                     <div>
                         {generateStatus.warnings?.length ? (
@@ -219,7 +222,10 @@ export function WorkStatusCard({ work }: WorkStatusCardProps) {
             },
             [GenerateStatusType.CANCELLED]: {
                 title: t('cancelled.title'),
-                description: generateStatus.error || t('cancelled.description'),
+                // Security: generateStatus.error is a raw backend string that may contain
+                // internal file paths, stack traces, or DB constraint names. Always display
+                // the generic i18n fallback to avoid leaking platform internals to the user.
+                description: t('cancelled.description'),
                 action: (
                     <Button
                         href={`${ROUTES.DASHBOARD_WORK(currentWork.id)}/generator`}

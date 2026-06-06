@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Task, TaskStatus } from '../../entities/task.entity';
+import { sanitizeLikePattern } from '../utils';
 
 export interface ListTasksFilter {
     status?: TaskStatus | TaskStatus[];
@@ -73,16 +74,34 @@ export class TaskRepository {
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
 
         if (filter.search) {
-            qb.andWhere('(task.title LIKE :q OR task.slug LIKE :q OR task.description LIKE :q)', {
-                q: `%${filter.search}%`,
-            });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // search term and pair each predicate with an explicit ESCAPE
+            // clause. The value is already bound, so this is not SQLi, but
+            // unescaped wildcards otherwise let a caller bypass the filter
+            // (e.g. `%`) or force an index-defeating leading-wildcard scan.
+            // Mirrors agent.repository.ts. Escape-only (no LOWER()) preserves
+            // the existing case-sensitive matching for legitimate input.
+            qb.andWhere(
+                "(task.title LIKE :q ESCAPE '\\' OR task.slug LIKE :q ESCAPE '\\' OR task.description LIKE :q ESCAPE '\\')",
+                {
+                    q: `%${sanitizeLikePattern(filter.search)}%`,
+                },
+            );
         }
 
         // `labels` is a simple-json array; we hit it as a substring match
         // against the serialized JSON. v1 — proper jsonb indexing lands
         // when the catalog grows.
         if (filter.label) {
-            qb.andWhere('task.labels LIKE :label', { label: `%"${filter.label}"%` });
+            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
+            // label before wrapping it in the `"<label>"` JSON-token match,
+            // and add an explicit ESCAPE clause. Bound param (not SQLi), but
+            // unescaped wildcards would let `%` match every labelled task and
+            // break out of the intended quoted-token boundary. Escape-only
+            // preserves the exact match for legitimate, wildcard-free labels.
+            qb.andWhere("task.labels LIKE :label ESCAPE '\\'", {
+                label: `%"${sanitizeLikePattern(filter.label)}"%`,
+            });
         }
 
         const total = await qb.getCount();
@@ -100,6 +119,24 @@ export class TaskRepository {
 
     async updateById(id: string, data: Partial<Task>): Promise<void> {
         await this.repository.update(id, data);
+    }
+
+    /**
+     * Compare-and-swap status update: applies `data` (which advances the
+     * status) ONLY while the row is still at `expectedStatus`, in a single
+     * atomic `UPDATE … WHERE id=? AND status=?`. Returns true iff exactly one
+     * row changed — i.e. THIS caller won the race. Concurrent transitions from
+     * the same source state therefore resolve to exactly one winner
+     * (affected=1); the losers get affected=0 and a read-time conflict, instead
+     * of every racer clobbering the row (the state machine is the CAS lock).
+     */
+    async casUpdateStatus(
+        id: string,
+        expectedStatus: Task['status'],
+        data: Partial<Task>,
+    ): Promise<boolean> {
+        const result = await this.repository.update({ id, status: expectedStatus }, data);
+        return (result.affected ?? 0) === 1;
     }
 
     async deleteById(id: string): Promise<void> {
@@ -139,6 +176,12 @@ export class TaskRepository {
     /**
      * Find recurring Task templates due to spawn an instance. Used by
      * `TaskRecurrenceDispatcherService.dispatchDue` in Phase 17.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries. If a user-scoped variant is ever
+     * needed, create a separate `findDueRecurringTemplatesForUser(userId)`
+     * method rather than adding optional params here.
      */
     async findDueRecurringTemplates(limit: number, now: Date = new Date()): Promise<Task[]> {
         return this.repository
@@ -178,6 +221,15 @@ export class TaskRepository {
         return (result.affected ?? 0) > 0;
     }
 
+    /**
+     * Find recurring templates whose `nextOccurrenceAt` is stuck (not
+     * advanced) past `olderThan`. Used by the cron-based recovery path in
+     * `TaskRecurrenceDispatcherService`.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries.
+     */
     async findStuckRecurring(olderThan: Date): Promise<Task[]> {
         return this.repository.find({
             where: {

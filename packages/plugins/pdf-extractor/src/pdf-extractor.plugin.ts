@@ -139,6 +139,23 @@ export class PdfExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 				timeout,
 				maxContentLength: PDF_MAX_BYTES,
 				maxBodyLength: PDF_MAX_BYTES,
+				maxRedirects: 5,
+				// Security (SSRF): the lexical `isSafeWebhookUrl(url)` check above
+				// only vets the INITIAL url. axios/follow-redirects transparently
+				// follows up to 5 3xx hops, so a public, guard-passing
+				// `https://evil.example.com/report.pdf` can redirect to
+				// http://169.254.169.254/...index.pdf (cloud metadata) or
+				// http://127.0.0.1. Re-run isSafeWebhookUrl on every redirect
+				// target (follow-redirects populates options.href with the
+				// fully-resolved next URL before invoking this hook); throwing here
+				// aborts the request and is surfaced by the catch block below as a
+				// failed extraction. Mirrors local-content-extractor.
+				beforeRedirect: (options: Record<string, unknown>) => {
+					const next = typeof options.href === 'string' ? options.href : '';
+					if (!next || !isSafeWebhookUrl(next)) {
+						throw new Error(`Redirect blocked by SSRF guard: ${next || '<unknown target>'}`);
+					}
+				},
 				headers: {
 					'User-Agent': 'EverWorks/PDF-Extractor'
 				}
