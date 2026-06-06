@@ -44,24 +44,25 @@ the prompt and answers come back with citations.
 Every KB document has a **class**. The class drives how Agents treat
 it:
 
-| Class         | Meaning                       | How Agents use it                                                                  |
-| ------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
-| `brand`       | Brand voice, identity, tone   | Soft guidance — "write in this voice", retrieved on every relevant run             |
-| `style`       | Editorial style guide         | Grammar, banned words, tense, voice — applied as constraints                       |
-| `legal`       | Legal copy, disclaimers       | Verbatim or omitted — Agents copy exactly, never paraphrase                        |
-| `seo`         | SEO conventions, keywords     | Constraints — target keywords + structured-data patterns per page type             |
-| `glossary`    | Approved terminology          | Term substitution — Agents always use these terms, never invent synonyms           |
-| `personas`    | Audience personas             | Targeting — Agents write for these readers                                         |
-| `competitors` | Competitor list + rules       | Inclusion / exclusion — drives comparisons and the do-not-mention rule             |
-| `research`    | Background research, notes    | Retrieved by semantic similarity when relevant to the task at hand                 |
-| `transcripts` | Audio / video transcripts     | Treated as research — extracted by Whisper-class transcription, retrieved by topic |
-| `output`      | Agent-authored artifacts      | Reports, summaries, decks — Agents write here, you can promote / archive           |
-| `freeform`    | Catch-all notes               | Retrieved by similarity or explicit `@mention`                                     |
+| Class         | Meaning                     | How Agents use it                                                                  |
+| ------------- | --------------------------- | ---------------------------------------------------------------------------------- |
+| `brand`       | Brand voice, identity, tone | Soft guidance — "write in this voice", retrieved on every relevant run             |
+| `style`       | Editorial style guide       | Grammar, banned words, tense, voice — applied as constraints                       |
+| `legal`       | Legal copy, disclaimers     | Verbatim or omitted — Agents copy exactly, never paraphrase                        |
+| `seo`         | SEO conventions, keywords   | Constraints — target keywords + structured-data patterns per page type             |
+| `glossary`    | Approved terminology        | Term substitution — Agents always use these terms, never invent synonyms           |
+| `personas`    | Audience personas           | Targeting — Agents write for these readers                                         |
+| `competitors` | Competitor list + rules     | Inclusion / exclusion — drives comparisons and the do-not-mention rule             |
+| `research`    | Background research, notes  | Retrieved by semantic similarity when relevant to the task at hand                 |
+| `transcripts` | Audio / video transcripts   | Treated as research — extracted by Whisper-class transcription, retrieved by topic |
+| `output`      | Agent-authored artifacts    | Reports, summaries, decks — Agents write here, you can promote / archive           |
+| `freeform`    | Catch-all notes             | Retrieved by similarity or explicit `@mention`                                     |
 
 You don't have to use every class. A common starting setup is `brand`
-+ `style` + `glossary` + `personas` — enough for Agents to sound like
-you. Add `research` and `transcripts` once you start ingesting source
-material.
+
+- `style` + `glossary` + `personas` — enough for Agents to sound like
+  you. Add `research` and `transcripts` once you start ingesting source
+  material.
 
 ## Uploading sources
 
@@ -76,10 +77,10 @@ runs the same pipeline regardless of where the file came from:
 2. **Sniff the MIME type** from the file's magic bytes (the
    client-supplied MIME is never trusted).
 3. **Normalize media** when the file isn't text:
-   - Video → MP4 + extracted MP3 audio track.
-   - Audio → MP3.
-   - PDF / DOCX / XLSX → text via the configured content-extractor
-     plugin.
+    - Video → MP4 + extracted MP3 audio track.
+    - Audio → MP3.
+    - PDF / DOCX / XLSX → text via the configured content-extractor
+      plugin.
 4. **Transcribe audio** (MP3 from a video, or a directly-uploaded
    podcast / call recording) via the AI provider that advertises the
    `transcribe` capability — OpenAI Whisper today, Groq's Whisper-large
@@ -144,10 +145,10 @@ every change is a git commit with full history.
 A **lock** stops Agents from changing a document during scheduled
 regeneration or autonomous runs. Two modes:
 
-| Mode              | Effect                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| `full`            | All agent edits are rejected. Humans can still edit via the workbench.                                       |
-| `additions-only`  | Agents may **append** new content (typically new research notes) but cannot modify existing body or metadata. |
+| Mode             | Effect                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------- |
+| `full`           | All agent edits are rejected. Humans can still edit via the workbench.                                        |
+| `additions-only` | Agents may **append** new content (typically new research notes) but cannot modify existing body or metadata. |
 
 Lock / unlock is exposed in the workbench (the padlock icon), via the
 CLI (`ever works kb lock <workId> <idOrPath> --mode=full`), and via

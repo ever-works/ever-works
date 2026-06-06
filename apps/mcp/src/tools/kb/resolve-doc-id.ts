@@ -12,11 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * with `kb.get`, so when the caller supplies a path we first resolve it
  * to a UUID via the get endpoint and then issue the mutating call.
  */
-export async function resolveKbDocId(
-	apiClient: ApiClientService,
-	workId: string,
-	idOrPath: string
-): Promise<string> {
+export async function resolveKbDocId(apiClient: ApiClientService, workId: string, idOrPath: string): Promise<string> {
 	if (UUID_RE.test(idOrPath)) {
 		return idOrPath;
 	}

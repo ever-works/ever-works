@@ -95,9 +95,7 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
         };
         storage = {
             providerName: 'local-fs',
-            putObject: jest
-                .fn()
-                .mockResolvedValue({ key: 'kb-originals/normalized/deadbeef.mp4' }),
+            putObject: jest.fn().mockResolvedValue({ key: 'kb-originals/normalized/deadbeef.mp4' }),
             getObject: jest.fn().mockResolvedValue({
                 buffer: Buffer.from('original-bytes'),
                 mimeType: 'video/mp4',
@@ -249,9 +247,7 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
     it('rejects when the upload row is missing', async () => {
         uploadRepo.findById.mockResolvedValue(null);
 
-        await expect(service.normalizeVideo(videoPayload)).rejects.toThrow(
-            /upload .* not found/i,
-        );
+        await expect(service.normalizeVideo(videoPayload)).rejects.toThrow(/upload .* not found/i);
     });
 
     it('returns transcribeRunId: null when the transcribe dispatcher is absent', async () => {
@@ -276,4 +272,3 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
         expect(transcribeDispatcher.dispatchKbTranscribe).not.toHaveBeenCalled();
     });
 });
-

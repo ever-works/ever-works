@@ -14,10 +14,7 @@ import { toMcpError } from '../../api-client/api-error.js';
  */
 const KbGetSchema = z.object({
 	workId: z.string().uuid().describe('Work UUID.'),
-	idOrPath: z
-		.string()
-		.min(1)
-		.describe('Either the document UUID or its KB path (e.g. "brand/voice").')
+	idOrPath: z.string().min(1).describe('Either the document UUID or its KB path (e.g. "brand/voice").')
 });
 
 @Injectable()

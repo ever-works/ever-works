@@ -73,7 +73,9 @@ export const uploadCommand = new Command('upload')
 
             const absolute = path.resolve(filePath);
             if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
-                console.error(chalk.red(`Error: file not found or not a regular file: ${absolute}`));
+                console.error(
+                    chalk.red(`Error: file not found or not a regular file: ${absolute}`),
+                );
                 process.exit(1);
             }
 

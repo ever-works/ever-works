@@ -13,13 +13,6 @@ import { KbUnlockTool } from './unlock.js';
  * up each `@Tool(...)` decorator at bootstrap. Same shape as the
  * existing `PingTool` / `RegisterWorkTool` registration.
  */
-export const KB_TOOL_PROVIDERS = [
-	KbListTool,
-	KbGetTool,
-	KbCreateTool,
-	KbUpdateTool,
-	KbLockTool,
-	KbUnlockTool
-] as const;
+export const KB_TOOL_PROVIDERS = [KbListTool, KbGetTool, KbCreateTool, KbUpdateTool, KbLockTool, KbUnlockTool] as const;
 
 export { KbListTool, KbGetTool, KbCreateTool, KbUpdateTool, KbLockTool, KbUnlockTool };

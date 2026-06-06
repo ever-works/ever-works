@@ -133,9 +133,7 @@ describe('KnowledgeBaseReconcileService', () => {
                 normalizedStoragePath: 'kb-originals/normalized/known-derivative.mp3',
             },
         ]);
-        const warnSpy = jest
-            .spyOn(service['logger'], 'warn')
-            .mockImplementation(() => undefined);
+        const warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
 
         const result = await service.reconcile();
 

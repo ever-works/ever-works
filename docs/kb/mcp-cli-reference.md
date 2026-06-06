@@ -35,34 +35,34 @@ KB path (e.g. `brand/voice`).
 
 List documents for a Work.
 
-| Field    | Type                                          | Required | Notes                                          |
-| -------- | --------------------------------------------- | -------- | ---------------------------------------------- |
-| `workId` | `string` (UUID)                               | yes      | Work the documents belong to                   |
-| `class`  | `brand \| style \| legal \| seo \| ...`       | no       | Filter by class                                |
-| `status` | `active \| archived \| draft \| ...`          | no       | Filter by lifecycle status                     |
-| `tag`    | `string`                                      | no       | Filter to documents tagged with this slug      |
-| `q`      | `string`                                      | no       | Lexical search over title / description / body |
-| `limit`  | `integer 1-100`                               | no       | Page size                                      |
-| `offset` | `integer ≥0`                                  | no       | Pagination offset                              |
+| Field    | Type                                    | Required | Notes                                          |
+| -------- | --------------------------------------- | -------- | ---------------------------------------------- |
+| `workId` | `string` (UUID)                         | yes      | Work the documents belong to                   |
+| `class`  | `brand \| style \| legal \| seo \| ...` | no       | Filter by class                                |
+| `status` | `active \| archived \| draft \| ...`    | no       | Filter by lifecycle status                     |
+| `tag`    | `string`                                | no       | Filter to documents tagged with this slug      |
+| `q`      | `string`                                | no       | Lexical search over title / description / body |
+| `limit`  | `integer 1-100`                         | no       | Page size                                      |
+| `offset` | `integer ≥0`                            | no       | Pagination offset                              |
 
 **Output:**
 
 ```jsonc
 {
-  "items": [
-    {
-      "id": "uuid",
-      "path": "brand/voice",
-      "title": "Brand voice",
-      "class": "brand",
-      "status": "active",
-      "locked": true,
-      "lockMode": "full",
-      "tags": ["voice", "tone"],
-      "updatedAt": "2025-12-15T10:30:00Z"
-    }
-  ],
-  "total": 42
+	"items": [
+		{
+			"id": "uuid",
+			"path": "brand/voice",
+			"title": "Brand voice",
+			"class": "brand",
+			"status": "active",
+			"locked": true,
+			"lockMode": "full",
+			"tags": ["voice", "tone"],
+			"updatedAt": "2025-12-15T10:30:00Z"
+		}
+	],
+	"total": 42
 }
 ```
 
@@ -72,10 +72,10 @@ Annotations: `readOnlyHint: true`.
 
 Fetch one document (full Markdown body + metadata + asset summaries).
 
-| Field      | Type            | Required | Notes                                       |
-| ---------- | --------------- | -------- | ------------------------------------------- |
-| `workId`   | `string` (UUID) | yes      |                                             |
-| `idOrPath` | `string`        | yes      | Document UUID or slash-separated KB path    |
+| Field      | Type            | Required | Notes                                    |
+| ---------- | --------------- | -------- | ---------------------------------------- |
+| `workId`   | `string` (UUID) | yes      |                                          |
+| `idOrPath` | `string`        | yes      | Document UUID or slash-separated KB path |
 
 **Output:** `KbDocumentBodyDto` (id, path, title, class, status,
 locked, lockMode, description, tags, categories, body, updatedAt,
@@ -87,18 +87,18 @@ Annotations: `readOnlyHint: true`.
 
 Create a new document.
 
-| Field         | Type                                                                                        | Required | Notes                                       |
-| ------------- | ------------------------------------------------------------------------------------------- | -------- | ------------------------------------------- |
-| `workId`      | `string` (UUID)                                                                             | yes      |                                             |
-| `path`        | `string` (1-512)                                                                            | yes      | Unique per Work, slash-separated            |
-| `title`       | `string` (1-256)                                                                            | yes      |                                             |
-| `body`        | `string`                                                                                    | yes      | Markdown, may be empty                      |
-| `class`       | `brand \| style \| legal \| seo \| glossary \| personas \| competitors \| research \| ...`  | yes      | See [class list](./user-guide.md#what-lives-in-the-kb--document-classes) |
-| `description` | `string \| null`                                                                            | no       |                                             |
-| `tags`        | `string[]`                                                                                  | no       | Tag slugs                                   |
-| `categories`  | `string[]`                                                                                  | no       | Category slugs                              |
-| `language`    | `string` (BCP-47)                                                                           | no       | Defaults to `en`                            |
-| `status`      | `active \| archived \| draft \| ...`                                                        | no       | Defaults to `active`                        |
+| Field         | Type                                                                                       | Required | Notes                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------ |
+| `workId`      | `string` (UUID)                                                                            | yes      |                                                                          |
+| `path`        | `string` (1-512)                                                                           | yes      | Unique per Work, slash-separated                                         |
+| `title`       | `string` (1-256)                                                                           | yes      |                                                                          |
+| `body`        | `string`                                                                                   | yes      | Markdown, may be empty                                                   |
+| `class`       | `brand \| style \| legal \| seo \| glossary \| personas \| competitors \| research \| ...` | yes      | See [class list](./user-guide.md#what-lives-in-the-kb--document-classes) |
+| `description` | `string \| null`                                                                           | no       |                                                                          |
+| `tags`        | `string[]`                                                                                 | no       | Tag slugs                                                                |
+| `categories`  | `string[]`                                                                                 | no       | Category slugs                                                           |
+| `language`    | `string` (BCP-47)                                                                          | no       | Defaults to `en`                                                         |
+| `status`      | `active \| archived \| draft \| ...`                                                       | no       | Defaults to `active`                                                     |
 
 **Output:** the newly created `KbDocumentDto`.
 
@@ -106,23 +106,23 @@ Create a new document.
 
 Partial update. At least one patch field must be provided.
 
-| Field      | Type                                  | Required | Notes                                |
-| ---------- | ------------------------------------- | -------- | ------------------------------------ |
-| `workId`   | `string` (UUID)                       | yes      |                                      |
-| `idOrPath` | `string`                              | yes      | Document UUID or KB path             |
-| `patch`    | `object`                              | yes      | At least one of the fields below     |
+| Field      | Type            | Required | Notes                            |
+| ---------- | --------------- | -------- | -------------------------------- |
+| `workId`   | `string` (UUID) | yes      |                                  |
+| `idOrPath` | `string`        | yes      | Document UUID or KB path         |
+| `patch`    | `object`        | yes      | At least one of the fields below |
 
 `patch` shape:
 
 ```jsonc
 {
-  "title": "string?",
-  "description": "string | null?",
-  "body": "string?",
-  "tags": ["string?"],
-  "categories": ["string?"],
-  "language": "string?",
-  "status": "active | archived | draft | ..."
+	"title": "string?",
+	"description": "string | null?",
+	"body": "string?",
+	"tags": ["string?"],
+	"categories": ["string?"],
+	"language": "string?",
+	"status": "active | archived | draft | ..."
 }
 ```
 
@@ -136,11 +136,11 @@ pinned to a UUID).
 
 Lock a document so subsequent agent edits are rejected.
 
-| Field      | Type                          | Required | Notes                                              |
-| ---------- | ----------------------------- | -------- | -------------------------------------------------- |
-| `workId`   | `string` (UUID)               | yes      |                                                    |
-| `idOrPath` | `string`                      | yes      | Document UUID or KB path                           |
-| `lockMode` | `full \| additions-only`      | yes      | `full` blocks all edits; `additions-only` permits appends |
+| Field      | Type                     | Required | Notes                                                     |
+| ---------- | ------------------------ | -------- | --------------------------------------------------------- |
+| `workId`   | `string` (UUID)          | yes      |                                                           |
+| `idOrPath` | `string`                 | yes      | Document UUID or KB path                                  |
+| `lockMode` | `full \| additions-only` | yes      | `full` blocks all edits; `additions-only` permits appends |
 
 Emits a `kb-document-locked` activity-log event with actor + previous
 mode.
@@ -164,13 +164,13 @@ Every tool routes server-side errors through `toMcpError` so the MCP
 client sees a structured error with HTTP status + message. Common
 cases:
 
-| HTTP | Meaning                                                                                                |
-| ---- | ------------------------------------------------------------------------------------------------------ |
-| 401  | Missing / expired JWT, or shared API key not configured                                                |
-| 403  | User has no role on the Work                                                                           |
-| 404  | Document not found, or `idOrPath` resolved to nothing                                                  |
-| 409  | Conflict — e.g. `kb.create` with a duplicate path, or `kb.update` on a document locked `full`          |
-| 422  | Validation failure — body didn't match the schema (Zod surface)                                        |
+| HTTP | Meaning                                                                                       |
+| ---- | --------------------------------------------------------------------------------------------- |
+| 401  | Missing / expired JWT, or shared API key not configured                                       |
+| 403  | User has no role on the Work                                                                  |
+| 404  | Document not found, or `idOrPath` resolved to nothing                                         |
+| 409  | Conflict — e.g. `kb.create` with a duplicate path, or `kb.update` on a document locked `full` |
+| 422  | Validation failure — body didn't match the schema (Zod surface)                               |
 
 ## CLI — `ever works kb`
 
@@ -179,13 +179,13 @@ token store as the rest of `ever works` (`ever works auth login`).
 
 ### `ever works kb list <workId>`
 
-| Flag        | Type       | Default | Notes                                       |
-| ----------- | ---------- | ------- | ------------------------------------------- |
-| `--class`   | `string`   | —       | Filter by KB document class                 |
-| `--tag`     | `string`   | —       | Filter by tag slug                          |
-| `--q`       | `string`   | —       | Lexical + semantic blended search query     |
-| `--limit`   | `integer`  | `20`    | Max rows to return                          |
-| `--offset`  | `integer`  | `0`     | Pagination offset                           |
+| Flag       | Type      | Default | Notes                                   |
+| ---------- | --------- | ------- | --------------------------------------- |
+| `--class`  | `string`  | —       | Filter by KB document class             |
+| `--tag`    | `string`  | —       | Filter by tag slug                      |
+| `--q`      | `string`  | —       | Lexical + semantic blended search query |
+| `--limit`  | `integer` | `20`    | Max rows to return                      |
+| `--offset` | `integer` | `0`     | Pagination offset                       |
 
 Example:
 
@@ -199,9 +199,9 @@ ever works kb list 5b2f...d8e1 --q "tone of voice"
 Fetch a single document. Renders metadata + the Markdown body to
 stdout, or pass `--json` for the raw DTO (pipe to `jq` for scripting).
 
-| Flag      | Type     | Notes                                             |
-| --------- | -------- | ------------------------------------------------- |
-| `--json`  | flag     | Emit raw `KbDocumentBodyDto` instead of rendered  |
+| Flag     | Type | Notes                                            |
+| -------- | ---- | ------------------------------------------------ |
+| `--json` | flag | Emit raw `KbDocumentBodyDto` instead of rendered |
 
 Example:
 
@@ -219,10 +219,10 @@ Upload a source file. The server runs the full ingest pipeline
 (storage → MIME sniff → media normalize → transcribe / extract →
 KB document).
 
-| Flag        | Type     | Notes                                                            |
-| ----------- | -------- | ---------------------------------------------------------------- |
-| `--title`   | `string` | Override the auto-derived KB document title                      |
-| `--class`   | `string` | Target KB document class for the resulting extract               |
+| Flag      | Type     | Notes                                              |
+| --------- | -------- | -------------------------------------------------- |
+| `--title` | `string` | Override the auto-derived KB document title        |
+| `--class` | `string` | Target KB document class for the resulting extract |
 
 Example:
 
@@ -261,10 +261,10 @@ ever works kb unlock 5b2f...d8e1 legal/disclaimer
 
 ### Common exit codes
 
-| Code | Cause                                                                                  |
-| ---- | -------------------------------------------------------------------------------------- |
-| `0`  | Success                                                                                |
-| `1`  | Validation error (bad flag value, file not found, missing required field, server 4xx)  |
+| Code | Cause                                                                                 |
+| ---- | ------------------------------------------------------------------------------------- |
+| `0`  | Success                                                                               |
+| `1`  | Validation error (bad flag value, file not found, missing required field, server 4xx) |
 
 Server-side errors are pretty-printed via the shared `handleCliError`
 helper — JSON body with status code, message, and request id when the
@@ -275,15 +275,15 @@ API returns one.
 The MCP / CLI surfaces are intentionally a 1:1 mirror of the REST
 endpoints:
 
-| Operation     | REST endpoint                                                       | MCP tool      | CLI command                              |
-| ------------- | ------------------------------------------------------------------- | ------------- | ---------------------------------------- |
-| List docs     | `GET /api/works/:id/kb/documents`                                   | `kb.list`     | `ever works kb list`                     |
-| Get one doc   | `GET /api/works/:id/kb/documents/:docIdOrPath`                      | `kb.get`      | `ever works kb get`                      |
-| Create doc    | `POST /api/works/:id/kb/documents`                                  | `kb.create`   | —                                        |
-| Update doc    | `PATCH /api/works/:id/kb/documents/:docId`                          | `kb.update`   | —                                        |
-| Lock doc      | `POST /api/works/:id/kb/documents/:docId/lock`                      | `kb.lock`     | `ever works kb lock --mode <m>`          |
-| Unlock doc    | `POST /api/works/:id/kb/documents/:docId/unlock`                    | `kb.unlock`   | `ever works kb unlock`                   |
-| Upload source | `POST /api/works/:id/kb/uploads` (multipart)                        | —             | `ever works kb upload`                   |
+| Operation     | REST endpoint                                    | MCP tool    | CLI command                     |
+| ------------- | ------------------------------------------------ | ----------- | ------------------------------- |
+| List docs     | `GET /api/works/:id/kb/documents`                | `kb.list`   | `ever works kb list`            |
+| Get one doc   | `GET /api/works/:id/kb/documents/:docIdOrPath`   | `kb.get`    | `ever works kb get`             |
+| Create doc    | `POST /api/works/:id/kb/documents`               | `kb.create` | —                               |
+| Update doc    | `PATCH /api/works/:id/kb/documents/:docId`       | `kb.update` | —                               |
+| Lock doc      | `POST /api/works/:id/kb/documents/:docId/lock`   | `kb.lock`   | `ever works kb lock --mode <m>` |
+| Unlock doc    | `POST /api/works/:id/kb/documents/:docId/unlock` | `kb.unlock` | `ever works kb unlock`          |
+| Upload source | `POST /api/works/:id/kb/uploads` (multipart)     | —           | `ever works kb upload`          |
 
 The two omissions are deliberate:
 
@@ -299,6 +299,6 @@ The two omissions are deliberate:
 
 - [Knowledge Base User Guide](./user-guide.md) — concepts, classes, locks, inheritance
 - [Knowledge Base & Memory (Features)](../features/knowledge-base.md) — high-level overview
-- [MCP Server](../features/mcp-server.md) — the broader MCP surface (works.*, items.*, ...)
+- [MCP Server](../features/mcp-server.md) — the broader MCP surface (works._, items._, ...)
 - [CLI Reference](../cli/index.md) — top-level CLI doc
 - [Plugin System (End-to-End)](../architecture/plugins.md) — storage + transcription + extractor plugins back the KB

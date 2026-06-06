@@ -12,7 +12,9 @@ import { KbDocumentStatus } from '../entities/kb-types';
 const WORK_ID = '00000000-0000-0000-0000-000000000001';
 const ACTOR_USER_ID = '00000000-0000-0000-0000-000000000099';
 
-function buildDoc(overrides: Partial<WorkKnowledgeDocument> & { body?: string }): WorkKnowledgeDocument {
+function buildDoc(
+    overrides: Partial<WorkKnowledgeDocument> & { body?: string },
+): WorkKnowledgeDocument {
     const { body, metadata, ...rest } = overrides;
     const mergedMetadata =
         metadata !== undefined

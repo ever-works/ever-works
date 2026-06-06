@@ -1,10 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import {
-    API_BASE,
-    authedHeaders,
-    createWorkViaAPI,
-    registerUserViaAPI,
-} from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { seedKbSkippedUpload } from './helpers/kb-fixtures';
 
 /**
@@ -104,10 +99,9 @@ async function triggerReconcileForWork(
     token: string,
     workId: string,
 ): Promise<ReconcileSummary | null> {
-    const res = await request.post(
-        `${API_BASE}/api/works/${workId}/kb/_test/reconcile`,
-        { headers: authedHeaders(token) },
-    );
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/_test/reconcile`, {
+        headers: authedHeaders(token),
+    });
     if (res.status() === 404 || res.status() === 405) return null;
     if (!res.ok()) {
         throw new Error(`reconcile driver failed (${res.status()}): ${await res.text()}`);
@@ -210,10 +204,9 @@ test.describe('flow: KB daily reconciliation acceptance (A38/A39/A40/A41)', () =
         test.skip(!summary, 'no on-demand reconcile driver in this env');
         expect(summary!.staleUploads, 'stale upload flipped').toBeGreaterThanOrEqual(1);
 
-        const after = await request.get(
-            `${API_BASE}/api/works/${workId}/kb/uploads/${uploadId}`,
-            { headers: authedHeaders(owner.access_token) },
-        );
+        const after = await request.get(`${API_BASE}/api/works/${workId}/kb/uploads/${uploadId}`, {
+            headers: authedHeaders(owner.access_token),
+        });
         expect(after.ok()).toBeTruthy();
         const row = (await after.json()) as UploadRow;
         expect(row.extractionStatus).toBe('failed');

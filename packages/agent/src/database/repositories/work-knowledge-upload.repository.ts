@@ -132,9 +132,9 @@ export class WorkKnowledgeUploadRepository {
             workId: r.workId,
             storagePath: r.storagePath,
             normalizedStoragePath:
-                (r.metadata as Record<string, unknown> | null | undefined)?.[
+                ((r.metadata as Record<string, unknown> | null | undefined)?.[
                     'normalizedStoragePath'
-                ] as string | null | undefined ?? null,
+                ] as string | null | undefined) ?? null,
         }));
     }
 }

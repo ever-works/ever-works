@@ -1,11 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import {
-    API_BASE,
-    authedHeaders,
-    createWorkViaAPI,
-    registerUserViaAPI,
-} from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
 
 /**
@@ -92,13 +87,10 @@ async function lockDoc(
     docId: string,
     mode: string,
 ): Promise<number> {
-    const res = await request.post(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}/lock`,
-        {
-            headers: { ...authedHeaders(token), 'content-type': 'application/json' },
-            data: { mode },
-        },
-    );
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/documents/${docId}/lock`, {
+        headers: { ...authedHeaders(token), 'content-type': 'application/json' },
+        data: { mode },
+    });
     return res.status();
 }
 
@@ -109,13 +101,10 @@ async function patchDoc(
     docId: string,
     data: Record<string, unknown>,
 ): Promise<number> {
-    const res = await request.patch(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}`,
-        {
-            headers: { ...authedHeaders(token), 'content-type': 'application/json' },
-            data,
-        },
-    );
+    const res = await request.patch(`${API_BASE}/api/works/${workId}/kb/documents/${docId}`, {
+        headers: { ...authedHeaders(token), 'content-type': 'application/json' },
+        data,
+    });
     return res.status();
 }
 

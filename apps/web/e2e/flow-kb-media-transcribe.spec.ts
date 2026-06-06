@@ -84,10 +84,9 @@ async function waitForNormalized(
     const deadline = Date.now() + POLL_DEADLINE_MS;
     let last: UploadRow | null = null;
     while (Date.now() < deadline) {
-        const res = await request.get(
-            `${API_BASE}/api/works/${workId}/kb/uploads/${uploadId}`,
-            { headers: authedHeaders(token) },
-        );
+        const res = await request.get(`${API_BASE}/api/works/${workId}/kb/uploads/${uploadId}`, {
+            headers: authedHeaders(token),
+        });
         if (res.ok()) {
             last = (await res.json()) as UploadRow;
             const meta = (last.metadata ?? {}) as Record<string, unknown>;

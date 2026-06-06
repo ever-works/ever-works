@@ -72,7 +72,9 @@ export const listCommand = new Command('list')
                 const qs = query.toString();
                 const url = `/works/${encodeURIComponent(workId)}/kb/documents${qs ? `?${qs}` : ''}`;
                 const { data } = await http.get<KbDocumentListResponse>(url);
-                spinner.succeed(`Found ${data.total} KB document(s) (showing ${data.items.length})`);
+                spinner.succeed(
+                    `Found ${data.total} KB document(s) (showing ${data.items.length})`,
+                );
 
                 if (data.items.length === 0) {
                     console.log(chalk.yellow('\nNo KB documents match the supplied filters.'));

@@ -57,20 +57,20 @@ walks the configured discovery paths
 
 ```jsonc
 {
-  "name": "@ever-works/openai-plugin",
-  "version": "1.4.2",
-  "everworks": {
-    "plugin": {
-      "id": "openai",
-      "name": "OpenAI",
-      "category": "ai-provider",
-      "capabilities": ["ai-provider", "transcribe", "embedding"],
-      "defaultForCapabilities": ["ai-provider"],
-      "configurationMode": "user-required",
-      "autoEnable": true,
-      "builtIn": true
-    }
-  }
+	"name": "@ever-works/openai-plugin",
+	"version": "1.4.2",
+	"everworks": {
+		"plugin": {
+			"id": "openai",
+			"name": "OpenAI",
+			"category": "ai-provider",
+			"capabilities": ["ai-provider", "transcribe", "embedding"],
+			"defaultForCapabilities": ["ai-provider"],
+			"configurationMode": "user-required",
+			"autoEnable": true,
+			"builtIn": true
+		}
+	}
 }
 ```
 
@@ -122,11 +122,11 @@ Settings schemas are vanilla JSON Schema with three Ever-Works-specific
 extension keywords that drive the web settings UI and the env-var
 fallback resolver:
 
-| Keyword     | Effect                                                                                                                                                                                                            |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `x-widget`  | Selects the input control (`text`, `password`, `select`, `model-picker`, `toggle`, `multiline`, ...). The settings UI in `apps/web` renders the right component without the plugin shipping its own React code.   |
-| `x-secret`  | Marks the value as a secret — it is stored in the encrypted `PluginEntity.secretSettings` column, never logged, and never sent to the browser after the first round-trip.                                          |
-| `x-envVar`  | Names an environment variable the resolver should fall back to when the operator hasn't set the field in the UI. Lets a self-hosted operator wire `OPENAI_API_KEY` once and have every Work pick it up implicitly. |
+| Keyword    | Effect                                                                                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `x-widget` | Selects the input control (`text`, `password`, `select`, `model-picker`, `toggle`, `multiline`, ...). The settings UI in `apps/web` renders the right component without the plugin shipping its own React code.    |
+| `x-secret` | Marks the value as a secret — it is stored in the encrypted `PluginEntity.secretSettings` column, never logged, and never sent to the browser after the first round-trip.                                          |
+| `x-envVar` | Names an environment variable the resolver should fall back to when the operator hasn't set the field in the UI. Lets a self-hosted operator wire `OPENAI_API_KEY` once and have every Work pick it up implicitly. |
 
 The resolved settings hierarchy is **`work plugin row → user plugin row →
 system plugin row → x-envVar fallback → schema default`** — facades call
@@ -228,28 +228,32 @@ import type { ISearchPlugin, SearchOptions, SearchResponse } from '@ever-works/p
 import { settingsSchema } from './settings.schema.js';
 
 export class MyPlugin extends BasePlugin implements ISearchPlugin {
-    readonly id = 'my-plugin';
-    readonly name = 'My Plugin';
-    readonly version = '1.0.0';
-    readonly category = 'search' as const;
-    readonly capabilities = ['search'] as const;
-    readonly settingsSchema = settingsSchema;
-    readonly providerName = 'my-plugin';
+	readonly id = 'my-plugin';
+	readonly name = 'My Plugin';
+	readonly version = '1.0.0';
+	readonly category = 'search' as const;
+	readonly capabilities = ['search'] as const;
+	readonly settingsSchema = settingsSchema;
+	readonly providerName = 'my-plugin';
 
-    async search(options: SearchOptions): Promise<SearchResponse> {
-        const settings = await this.context.getResolvedSettings();
-        const apiKey = settings['apiKey'] as string;
-        const res = await this.context.http.post('https://api.example.com/search', {
-            query: options.query,
-            limit: options.limit,
-        }, { headers: { Authorization: `Bearer ${apiKey}` } });
-        return { results: res.data.items, source: this.providerName };
-    }
+	async search(options: SearchOptions): Promise<SearchResponse> {
+		const settings = await this.context.getResolvedSettings();
+		const apiKey = settings['apiKey'] as string;
+		const res = await this.context.http.post(
+			'https://api.example.com/search',
+			{
+				query: options.query,
+				limit: options.limit
+			},
+			{ headers: { Authorization: `Bearer ${apiKey}` } }
+		);
+		return { results: res.data.items, source: this.providerName };
+	}
 
-    async isAvailable(): Promise<boolean> {
-        const settings = await this.context.getResolvedSettings();
-        return Boolean(settings['apiKey']);
-    }
+	async isAvailable(): Promise<boolean> {
+		const settings = await this.context.getResolvedSettings();
+		return Boolean(settings['apiKey']);
+	}
 }
 ```
 
@@ -257,24 +261,24 @@ export class MyPlugin extends BasePlugin implements ISearchPlugin {
 
 ```typescript
 export const settingsSchema = {
-    type: 'object',
-    properties: {
-        apiKey: {
-            type: 'string',
-            title: 'API Key',
-            'x-widget': 'password',
-            'x-secret': true,
-            'x-envVar': 'MY_PLUGIN_API_KEY',
-        },
-        defaultLimit: {
-            type: 'integer',
-            default: 10,
-            minimum: 1,
-            maximum: 50,
-            'x-widget': 'number',
-        },
-    },
-    required: ['apiKey'],
+	type: 'object',
+	properties: {
+		apiKey: {
+			type: 'string',
+			title: 'API Key',
+			'x-widget': 'password',
+			'x-secret': true,
+			'x-envVar': 'MY_PLUGIN_API_KEY'
+		},
+		defaultLimit: {
+			type: 'integer',
+			default: 10,
+			minimum: 1,
+			maximum: 50,
+			'x-widget': 'number'
+		}
+	},
+	required: ['apiKey']
 } as const;
 ```
 
@@ -337,18 +341,18 @@ The shape:
 
 ```typescript
 export interface IStoragePlugin extends IPlugin {
-    readonly providerName: string;
+	readonly providerName: string;
 
-    putObject(input: StoragePutInput): Promise<StoragePutResult>;
-    getObject(key: string): Promise<StorageGetResult>;
-    deleteObject(key: string): Promise<void>;
+	putObject(input: StoragePutInput): Promise<StoragePutResult>;
+	getObject(key: string): Promise<StorageGetResult>;
+	deleteObject(key: string): Promise<void>;
 
-    // Optional capabilities
-    presignPut?(input: StoragePresignInput): Promise<StoragePresignResult>;
-    deriveKey?(ownerId: string, filename: string, workId?: string): string;
-    deleteAllByOwner?(ownerId: string): Promise<{ deleted: number }>;
+	// Optional capabilities
+	presignPut?(input: StoragePresignInput): Promise<StoragePresignResult>;
+	deriveKey?(ownerId: string, filename: string, workId?: string): string;
+	deleteAllByOwner?(ownerId: string): Promise<{ deleted: number }>;
 
-    isAvailable(): Promise<boolean>;
+	isAvailable(): Promise<boolean>;
 }
 ```
 
@@ -364,7 +368,7 @@ Required capabilities are declared in the manifest:
 The Knowledge Base is the heaviest consumer:
 
 1. The workbench (or `kb upload` CLI command, or `POST
-   /api/works/:id/kb/uploads`) hands the file to the API uploads
+/api/works/:id/kb/uploads`) hands the file to the API uploads
    service.
 2. The uploads service magic-byte-sniffs the MIME and calls
    `StorageFacade.putObject({ buffer, filename, mimeType, size, ownerId, workId })`.

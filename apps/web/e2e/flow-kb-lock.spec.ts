@@ -1,10 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import {
-    API_BASE,
-    authedHeaders,
-    createWorkViaAPI,
-    registerUserViaAPI,
-} from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
 
 /**
@@ -60,13 +55,10 @@ async function lockDoc(
     docId: string,
     mode: string,
 ): Promise<{ status: number; body: LockBody | null }> {
-    const res = await request.post(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}/lock`,
-        {
-            headers: { ...authedHeaders(token), 'content-type': 'application/json' },
-            data: { mode },
-        },
-    );
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/documents/${docId}/lock`, {
+        headers: { ...authedHeaders(token), 'content-type': 'application/json' },
+        data: { mode },
+    });
     let body: LockBody | null = null;
     try {
         body = (await res.json()) as LockBody;
@@ -82,10 +74,9 @@ async function unlockDoc(
     workId: string,
     docId: string,
 ): Promise<{ status: number; body: LockBody | null }> {
-    const res = await request.post(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}/unlock`,
-        { headers: authedHeaders(token) },
-    );
+    const res = await request.post(`${API_BASE}/api/works/${workId}/kb/documents/${docId}/unlock`, {
+        headers: authedHeaders(token),
+    });
     let body: LockBody | null = null;
     try {
         body = (await res.json()) as LockBody;
@@ -102,13 +93,10 @@ async function patchDoc(
     docId: string,
     data: Record<string, unknown>,
 ): Promise<{ status: number; body: LockBody | null }> {
-    const res = await request.patch(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}`,
-        {
-            headers: { ...authedHeaders(token), 'content-type': 'application/json' },
-            data,
-        },
-    );
+    const res = await request.patch(`${API_BASE}/api/works/${workId}/kb/documents/${docId}`, {
+        headers: { ...authedHeaders(token), 'content-type': 'application/json' },
+        data,
+    });
     let body: LockBody | null = null;
     try {
         body = (await res.json()) as LockBody;
@@ -124,10 +112,9 @@ async function getDoc(
     workId: string,
     docId: string,
 ): Promise<{ status: number; body: LockBody | null }> {
-    const res = await request.get(
-        `${API_BASE}/api/works/${workId}/kb/documents/${docId}`,
-        { headers: authedHeaders(token) },
-    );
+    const res = await request.get(`${API_BASE}/api/works/${workId}/kb/documents/${docId}`, {
+        headers: authedHeaders(token),
+    });
     return {
         status: res.status(),
         body: res.ok() ? ((await res.json()) as LockBody) : null,
@@ -195,13 +182,7 @@ test.describe('flow: KB doc lock acceptance (A30/A31/A32)', () => {
             body: seedBody,
         });
 
-        const locked = await lockDoc(
-            request,
-            owner.access_token,
-            workId,
-            documentId,
-            LOCK_CONTENT,
-        );
+        const locked = await lockDoc(request, owner.access_token, workId, documentId, LOCK_CONTENT);
         expect(locked.status, 'content lock → 200').toBe(200);
         expect(locked.body?.locked).toBe(true);
         expect(locked.body?.lockMode).toBe(LOCK_CONTENT);
@@ -275,13 +256,9 @@ test.describe('flow: KB doc lock acceptance (A30/A31/A32)', () => {
 
         // While locked, a body PATCH is rejected — this is the A30
         // invariant we depend on to prove unlock actually unlocked.
-        const beforeUnlock = await patchDoc(
-            request,
-            owner.access_token,
-            workId,
-            documentId,
-            { body: 'must not apply pre-unlock' },
-        );
+        const beforeUnlock = await patchDoc(request, owner.access_token, workId, documentId, {
+            body: 'must not apply pre-unlock',
+        });
         expect(
             LOCKED_STATUSES.includes(beforeUnlock.status as 403 | 423),
             `pre-unlock PATCH must be locked (got ${beforeUnlock.status})`,

@@ -18,10 +18,7 @@ import { KB_DOCUMENT_CLASSES, KB_DOCUMENT_STATUSES } from '@ever-works/contracts
  */
 const KbListSchema = z.object({
 	workId: z.string().uuid().describe('Work UUID. The KB document list is scoped to this Work.'),
-	class: z
-		.enum(KB_DOCUMENT_CLASSES)
-		.optional()
-		.describe('Filter by document class (e.g. "brand", "legal", "seo").'),
+	class: z.enum(KB_DOCUMENT_CLASSES).optional().describe('Filter by document class (e.g. "brand", "legal", "seo").'),
 	status: z.enum(KB_DOCUMENT_STATUSES).optional().describe('Filter by lifecycle status.'),
 	tag: z.string().optional().describe('Filter to documents tagged with this tag slug.'),
 	q: z.string().optional().describe('Lexical search across title/description/body.'),

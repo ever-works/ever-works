@@ -1,10 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import {
-    API_BASE,
-    authedHeaders,
-    createWorkViaAPI,
-    registerUserViaAPI,
-} from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { seedKbSkippedUpload } from './helpers/kb-fixtures';
 
 /**
@@ -232,8 +227,10 @@ test.describe('flow: KB upload retry acceptance (A36/A37)', () => {
                 description:
                     'KB_E2E_LIVE: a future PR adds the __TEST_FORCE_EXTRACT_FAIL__ test-only seam to drive a real failing extraction here; until then the live-only branch asserts the contract shape only.',
             });
-            expect(typeof (baseline.body?.extractionError ?? null) === 'string' ||
-                baseline.body?.extractionError === null).toBeTruthy();
+            expect(
+                typeof (baseline.body?.extractionError ?? null) === 'string' ||
+                    baseline.body?.extractionError === null,
+            ).toBeTruthy();
         } else {
             test.info().annotations.push({
                 type: 'needs-kb-e2e-live',
