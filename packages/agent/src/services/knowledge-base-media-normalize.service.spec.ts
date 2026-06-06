@@ -1,7 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { writeFile } from 'node:fs/promises';
 import { EventEmitter } from 'node:events';
-import * as childProcess from 'node:child_process';
+// We replace `child_process.spawn` with a controllable jest.fn via
+// jest.mock() rather than `jest.spyOn(childProcess, 'spawn')`. Modern
+// Node defines `spawn` as a non-configurable property on the
+// `node:child_process` module record, so spyOn — which calls
+// Object.defineProperty under the hood — throws
+// `TypeError: Cannot redefine property: spawn` on the second test in
+// the suite. jest.mock() factories run before module evaluation and
+// install a fresh module shape we fully own.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const spawnFn: jest.Mock = jest.fn();
+jest.mock('node:child_process', () => ({
+    ...jest.requireActual<typeof import('node:child_process')>('node:child_process'),
+    spawn: (...args: unknown[]) => spawnFn(...args),
+}));
 import {
     FfmpegFailedError,
     KnowledgeBaseMediaNormalizeService,
@@ -73,9 +86,9 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
     };
     let transcribeDispatcher: { dispatchKbTranscribe: jest.Mock };
     let normalizeDispatcher: { dispatchKbNormalizeMedia: jest.Mock };
-    let spawnSpy: jest.SpyInstance;
 
     beforeEach(async () => {
+        spawnFn.mockReset();
         uploadRepo = {
             findById: jest.fn(),
             updateById: jest.fn().mockResolvedValue(undefined),
@@ -112,36 +125,30 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
         service = module.get(KnowledgeBaseMediaNormalizeService);
     });
 
-    afterEach(() => {
-        spawnSpy?.mockRestore();
-    });
-
     /**
-     * Wire `child_process.spawn` to return a fake child that:
+     * Wire the mocked `child_process.spawn` (installed by jest.mock at
+     * the top of the file) to return a fake child that:
      *   1. writes some bytes to a tmp output path so the service's
      *      `readFile(outputPath)` call resolves with non-empty data
      *   2. emits the configured `close` exit code
      */
     function stubSpawn(exitCode: number | null = 0): void {
-        spawnSpy = jest
-            .spyOn(childProcess, 'spawn')
-            // The real signature is overloaded; cast keeps the test concise.
-            .mockImplementation((..._args: unknown[]): any => {
-                const child = new FakeChild();
-                const argList = _args[1] as string[];
-                const outputPath = argList[argList.length - 1];
-                // Write a small fake output so `readFile` succeeds and
-                // the sha256 + putObject pipeline runs through.
-                void writeFile(outputPath, Buffer.from('normalized-bytes')).finally(() => {
-                    if (exitCode !== 0) {
-                        child.stderr.emit('data', Buffer.from('ffmpeg exploded\n'));
-                    }
-                    // Defer close to the next tick so the listener
-                    // attached by the service is wired first.
-                    setImmediate(() => child.emit('close', exitCode));
-                });
-                return child;
+        spawnFn.mockImplementation((..._args: unknown[]) => {
+            const child = new FakeChild();
+            const argList = _args[1] as string[];
+            const outputPath = argList[argList.length - 1];
+            // Write a small fake output so `readFile` succeeds and
+            // the sha256 + putObject pipeline runs through.
+            void writeFile(outputPath, Buffer.from('normalized-bytes')).finally(() => {
+                if (exitCode !== 0) {
+                    child.stderr.emit('data', Buffer.from('ffmpeg exploded\n'));
+                }
+                // Defer close to the next tick so the listener
+                // attached by the service is wired first.
+                setImmediate(() => child.emit('close', exitCode));
             });
+            return child;
+        });
     }
 
     const videoPayload: KbNormalizeMediaPayload = {
