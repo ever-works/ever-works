@@ -1,4 +1,5 @@
 import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { ZapierWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
@@ -54,7 +55,16 @@ export function buildWorkflowPayload(options: PayloadOptions): ZapierWorkflowInp
 		};
 	}
 
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: the user-supplied repo_url (and the repo access token attached
+	// alongside it) is forwarded to the external Zapier action, which fetches it
+	// server-side. Without validation an attacker could set repo_url to
+	// http://169.254.169.254/, a private/loopback host, or a non-HTTP scheme to
+	// exfiltrate the GitHub access token / probe internal services via the Zapier
+	// runner (SSRF). Gate the dataSource on the shared lexical SSRF guard (rejects
+	// non-HTTP(S) schemes and literal private/loopback/link-local/cloud-metadata
+	// IPs). Legitimate https://github.com/... URLs are unaffected; an unsafe URL
+	// fails closed by omitting dataSource so the token never leaves the platform.
+	if (config.pass_repo_access && config.repo_url && isSafeWebhookUrl(config.repo_url as string)) {
 		envelope.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,

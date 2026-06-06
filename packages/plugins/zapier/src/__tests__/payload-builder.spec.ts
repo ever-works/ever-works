@@ -119,6 +119,69 @@ describe('buildWorkflowPayload', () => {
 		expect(payload.dataSource).toBeUndefined();
 	});
 
+	it('should NOT attach the repo access token when repo_url is an SSRF/metadata target', () => {
+		const payload = buildWorkflowPayload(
+			createOptions({
+				config: {
+					target_items: 50,
+					pass_repo_access: true,
+					repo_url: 'http://169.254.169.254/latest/meta-data/',
+					repo_access_token: 'ghp_secret_token',
+					repo_branch: 'main'
+				}
+			})
+		);
+
+		// Fail-closed: an unsafe repo_url omits dataSource entirely, so the
+		// GitHub access token can never be exfiltrated to the metadata endpoint.
+		expect(payload.dataSource).toBeUndefined();
+		expect(JSON.stringify(payload)).not.toContain('ghp_secret_token');
+	});
+
+	it.each([
+		['private/loopback host', 'http://127.0.0.1:8080/repo'],
+		['private RFC1918 host', 'http://10.0.0.5/internal'],
+		['non-HTTP scheme', 'file:///etc/passwd'],
+		['cloud-metadata hostname', 'http://metadata.google.internal/computeMetadata/v1/']
+	])('should omit dataSource (and token) for unsafe repo_url: %s', (_label, repoUrl) => {
+		const payload = buildWorkflowPayload(
+			createOptions({
+				config: {
+					target_items: 50,
+					pass_repo_access: true,
+					repo_url: repoUrl,
+					repo_access_token: 'ghp_secret_token'
+				}
+			})
+		);
+
+		expect(payload.dataSource).toBeUndefined();
+		expect(JSON.stringify(payload)).not.toContain('ghp_secret_token');
+	});
+
+	it('should still attach the repo access token for a legitimate github.com URL', () => {
+		const payload = buildWorkflowPayload(
+			createOptions({
+				config: {
+					target_items: 50,
+					pass_repo_access: true,
+					repo_url: 'https://github.com/org/repo',
+					repo_access_token: 'ghp_test123',
+					repo_branch: 'main'
+				}
+			})
+		);
+
+		// Legitimate happy path is unchanged: dataSource attached with the token.
+		expect(payload.dataSource).toEqual({
+			type: 'github-repo',
+			repoUrl: 'https://github.com/org/repo',
+			accessToken: 'ghp_test123',
+			branch: 'main',
+			path: 'items/'
+		});
+	});
+
 	it('should default repo branch to "data" when not specified', () => {
 		const payload = buildWorkflowPayload(
 			createOptions({

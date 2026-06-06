@@ -13,7 +13,12 @@ jest.mock('@ever-works/agent/database', () => ({
     UserRepository: class UserRepository {},
 }));
 
-import { NotFoundException } from '@nestjs/common';
+import {
+    ArgumentMetadata,
+    BadRequestException,
+    NotFoundException,
+    ParseUUIDPipe,
+} from '@nestjs/common';
 import { PeopleController } from './people.controler';
 import { CrmTenantService } from '../services/crm-tenant.service';
 import type { ClientService } from '../services/client.service';
@@ -24,6 +29,11 @@ const TENANT_A = 'tenant-a';
 // Controllers now pass the raw tenant id (which selects that tenant's own
 // Twenty workspace credentials), not a `/tenants/{id}` path prefix.
 const PREFIX_A = TENANT_A;
+
+// Real UUIDs: the by-id handlers are now guarded by `ParseUUIDPipe`, so the
+// route param must be a valid UUID for the happy path to reach the controller.
+const CONTACT_ID = '22222222-2222-4222-8222-222222222222';
+const FOREIGN_CONTACT_ID = '88888888-8888-4888-8888-888888888888';
 
 const authUser = (userId = 'user-1'): AuthenticatedUser =>
     ({ userId, email: 'u@x.test' }) as AuthenticatedUser;
@@ -116,22 +126,43 @@ describe('PeopleController', () => {
 
     it('PATCH /people/:id verifies ownership then forwards id + body + prefix', async () => {
         const body = { firstName: 'Ada2' };
-        client.getContact.mockResolvedValue({ id: 'p-1', firstName: 'Ada' });
-        client.updateContact.mockResolvedValue({ id: 'p-1', ...body });
-        await expect(controller.updateContact(authUser(), 'p-1', body)).resolves.toEqual({
-            id: 'p-1',
+        client.getContact.mockResolvedValue({ id: CONTACT_ID, firstName: 'Ada' });
+        client.updateContact.mockResolvedValue({ id: CONTACT_ID, ...body });
+        await expect(controller.updateContact(authUser(), CONTACT_ID, body)).resolves.toEqual({
+            id: CONTACT_ID,
             firstName: 'Ada2',
         });
-        expect(client.getContact).toHaveBeenCalledWith('p-1', PREFIX_A);
-        expect(client.updateContact).toHaveBeenCalledWith('p-1', body, PREFIX_A);
+        expect(client.getContact).toHaveBeenCalledWith(CONTACT_ID, PREFIX_A);
+        expect(client.updateContact).toHaveBeenCalledWith(CONTACT_ID, body, PREFIX_A);
     });
 
     it('DELETE /people/:id verifies ownership then forwards id + prefix', async () => {
-        client.getContact.mockResolvedValue({ id: 'p-1', firstName: 'Ada' });
+        client.getContact.mockResolvedValue({ id: CONTACT_ID, firstName: 'Ada' });
         client.deleteContact.mockResolvedValue(undefined);
-        await controller.deleteContact(authUser(), 'p-1');
-        expect(client.getContact).toHaveBeenCalledWith('p-1', PREFIX_A);
-        expect(client.deleteContact).toHaveBeenCalledWith('p-1', PREFIX_A);
+        await controller.deleteContact(authUser(), CONTACT_ID);
+        expect(client.getContact).toHaveBeenCalledWith(CONTACT_ID, PREFIX_A);
+        expect(client.deleteContact).toHaveBeenCalledWith(CONTACT_ID, PREFIX_A);
+    });
+
+    // Security (EW-717 #3): the by-id mutating handlers (`@Get/@Patch/@Delete(':id')`)
+    // are decorated with `new ParseUUIDPipe()`, so a non-UUID `:id` is rejected at the
+    // pipe layer (400) before any tenant resolution / CRM call. Pipes do not run on a
+    // direct method call in a unit test, so we exercise the exact pipe wired onto the
+    // route param here.
+    describe('id route param is UUID-validated (ParseUUIDPipe)', () => {
+        const pipe = new ParseUUIDPipe();
+        const meta: ArgumentMetadata = { type: 'param', data: 'id' };
+
+        it('rejects a malformed / injection-shaped id with a 400 BadRequestException', async () => {
+            await expect(pipe.transform('p-1', meta)).rejects.toBeInstanceOf(BadRequestException);
+            await expect(pipe.transform("p-1' OR '1'='1", meta)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        });
+
+        it('passes a legitimate UUID through unchanged', async () => {
+            await expect(pipe.transform(CONTACT_ID, meta)).resolves.toBe(CONTACT_ID);
+        });
     });
 
     describe('cross-tenant IDOR is blocked', () => {
@@ -144,18 +175,22 @@ describe('PeopleController', () => {
         });
 
         it('PATCH of a record not in the caller’s tenant 404s and never mutates', async () => {
-            client.getContact.mockRejectedValue(new NotFoundException('Contact p-9 not found'));
+            client.getContact.mockRejectedValue(
+                new NotFoundException(`Contact ${FOREIGN_CONTACT_ID} not found`),
+            );
             await expect(
-                controller.updateContact(authUser(), 'p-9', { firstName: 'pwned' }),
+                controller.updateContact(authUser(), FOREIGN_CONTACT_ID, { firstName: 'pwned' }),
             ).rejects.toBeInstanceOf(NotFoundException);
             expect(client.updateContact).not.toHaveBeenCalled();
         });
 
         it('DELETE of a record not in the caller’s tenant 404s and never deletes', async () => {
-            client.getContact.mockRejectedValue(new NotFoundException('Contact p-9 not found'));
-            await expect(controller.deleteContact(authUser(), 'p-9')).rejects.toBeInstanceOf(
-                NotFoundException,
+            client.getContact.mockRejectedValue(
+                new NotFoundException(`Contact ${FOREIGN_CONTACT_ID} not found`),
             );
+            await expect(
+                controller.deleteContact(authUser(), FOREIGN_CONTACT_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
             expect(client.deleteContact).not.toHaveBeenCalled();
         });
     });

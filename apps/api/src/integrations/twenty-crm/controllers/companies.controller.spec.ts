@@ -13,7 +13,12 @@ jest.mock('@ever-works/agent/database', () => ({
     UserRepository: class UserRepository {},
 }));
 
-import { NotFoundException } from '@nestjs/common';
+import {
+    ArgumentMetadata,
+    BadRequestException,
+    NotFoundException,
+    ParseUUIDPipe,
+} from '@nestjs/common';
 import { CompaniesController } from './companies.service';
 import { CrmTenantService } from '../services/crm-tenant.service';
 import type { ClientService } from '../services/client.service';
@@ -25,6 +30,11 @@ const TENANT_B = 'tenant-b';
 // Controllers now pass the raw tenant id (which selects that tenant's own
 // Twenty workspace credentials), not a `/tenants/{id}` path prefix.
 const PREFIX_A = TENANT_A;
+
+// Real UUIDs: the by-id handlers are now guarded by `ParseUUIDPipe`, so the
+// route param must be a valid UUID for the happy path to reach the controller.
+const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+const FOREIGN_COMPANY_ID = '99999999-9999-4999-8999-999999999999';
 
 const authUser = (userId = 'user-1'): AuthenticatedUser =>
     ({ userId, email: 'u@x.test' }) as AuthenticatedUser;
@@ -81,23 +91,44 @@ describe('CompaniesController', () => {
 
     it('PATCH /companies/:id verifies ownership then forwards id + body + prefix', async () => {
         const body = { name: 'Acme v2' };
-        client.getCompany.mockResolvedValue({ id: 'co-1', name: 'Acme' });
-        client.updateCompany.mockResolvedValue({ id: 'co-1', ...body });
-        await expect(controller.updateCompany(authUser(), 'co-1', body)).resolves.toEqual({
-            id: 'co-1',
+        client.getCompany.mockResolvedValue({ id: COMPANY_ID, name: 'Acme' });
+        client.updateCompany.mockResolvedValue({ id: COMPANY_ID, ...body });
+        await expect(controller.updateCompany(authUser(), COMPANY_ID, body)).resolves.toEqual({
+            id: COMPANY_ID,
             name: 'Acme v2',
         });
         // Ownership read is scoped to the caller's tenant before the mutation.
-        expect(client.getCompany).toHaveBeenCalledWith('co-1', PREFIX_A);
-        expect(client.updateCompany).toHaveBeenCalledWith('co-1', body, PREFIX_A);
+        expect(client.getCompany).toHaveBeenCalledWith(COMPANY_ID, PREFIX_A);
+        expect(client.updateCompany).toHaveBeenCalledWith(COMPANY_ID, body, PREFIX_A);
     });
 
     it('DELETE /companies/:id verifies ownership then forwards id + prefix', async () => {
-        client.getCompany.mockResolvedValue({ id: 'co-1', name: 'Acme' });
+        client.getCompany.mockResolvedValue({ id: COMPANY_ID, name: 'Acme' });
         client.deleteCompany.mockResolvedValue(undefined);
-        await controller.deleteCompany(authUser(), 'co-1');
-        expect(client.getCompany).toHaveBeenCalledWith('co-1', PREFIX_A);
-        expect(client.deleteCompany).toHaveBeenCalledWith('co-1', PREFIX_A);
+        await controller.deleteCompany(authUser(), COMPANY_ID);
+        expect(client.getCompany).toHaveBeenCalledWith(COMPANY_ID, PREFIX_A);
+        expect(client.deleteCompany).toHaveBeenCalledWith(COMPANY_ID, PREFIX_A);
+    });
+
+    // Security (EW-717 #3): the by-id mutating handlers (`@Get/@Patch/@Delete(':id')`)
+    // are decorated with `new ParseUUIDPipe()`, so a non-UUID `:id` is rejected at the
+    // pipe layer (400) before any tenant resolution / CRM call. Pipes do not run on a
+    // direct method call in a unit test, so we exercise the exact pipe wired onto the
+    // route param here.
+    describe('id route param is UUID-validated (ParseUUIDPipe)', () => {
+        const pipe = new ParseUUIDPipe();
+        const meta: ArgumentMetadata = { type: 'param', data: 'id' };
+
+        it('rejects a malformed / injection-shaped id with a 400 BadRequestException', async () => {
+            await expect(pipe.transform('co-1', meta)).rejects.toBeInstanceOf(BadRequestException);
+            await expect(pipe.transform("co-1' OR '1'='1", meta)).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        });
+
+        it('passes a legitimate UUID through unchanged', async () => {
+            await expect(pipe.transform(COMPANY_ID, meta)).resolves.toBe(COMPANY_ID);
+        });
     });
 
     describe('cross-tenant IDOR is blocked', () => {
@@ -112,18 +143,22 @@ describe('CompaniesController', () => {
         it('PATCH of a record not in the caller’s tenant 404s and never mutates', async () => {
             // Upstream returns 404 (record not under the caller's tenant prefix)
             // when the ownership read runs.
-            client.getCompany.mockRejectedValue(new NotFoundException('Company co-9 not found'));
+            client.getCompany.mockRejectedValue(
+                new NotFoundException(`Company ${FOREIGN_COMPANY_ID} not found`),
+            );
             await expect(
-                controller.updateCompany(authUser(), 'co-9', { name: 'pwned' }),
+                controller.updateCompany(authUser(), FOREIGN_COMPANY_ID, { name: 'pwned' }),
             ).rejects.toBeInstanceOf(NotFoundException);
             expect(client.updateCompany).not.toHaveBeenCalled();
         });
 
         it('DELETE of a record not in the caller’s tenant 404s and never deletes', async () => {
-            client.getCompany.mockRejectedValue(new NotFoundException('Company co-9 not found'));
-            await expect(controller.deleteCompany(authUser(), 'co-9')).rejects.toBeInstanceOf(
-                NotFoundException,
+            client.getCompany.mockRejectedValue(
+                new NotFoundException(`Company ${FOREIGN_COMPANY_ID} not found`),
             );
+            await expect(
+                controller.deleteCompany(authUser(), FOREIGN_COMPANY_ID),
+            ).rejects.toBeInstanceOf(NotFoundException);
             expect(client.deleteCompany).not.toHaveBeenCalled();
         });
 

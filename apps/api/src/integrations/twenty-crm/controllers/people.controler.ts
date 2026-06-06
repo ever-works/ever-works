@@ -5,6 +5,7 @@ import {
     Get,
     NotFoundException,
     Param,
+    ParseUUIDPipe,
     Patch,
     Post,
     UseGuards,
@@ -81,7 +82,9 @@ export class PeopleController {
     @Get(':id')
     async getContact(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
     ): Promise<TwentyContact> {
         const tenantId = await this.resolveTenantId(auth);
         const contact = await this.clientService.getContact(id, tenantId);
@@ -111,7 +114,9 @@ export class PeopleController {
     @Patch(':id')
     async updateContact(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Body() contact: TwentyContact,
     ) {
         const tenantId = await this.resolveTenantId(auth);
@@ -121,7 +126,12 @@ export class PeopleController {
     }
 
     @Delete(':id')
-    async deleteContact(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+    async deleteContact(
+        @CurrentUser() auth: AuthenticatedUser,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
         const tenantId = await this.resolveTenantId(auth);
         // Security: verify ownership before deleting so a foreign id 404s.
         await this.assertContactInTenant(id, tenantId);
