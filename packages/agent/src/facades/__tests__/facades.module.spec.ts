@@ -218,6 +218,13 @@ describe('FacadesModule + barrel re-exports', () => {
                     'NotificationChannelFacadeError',
                     'NotificationChannelFacadeService',
                     'NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER',
+                    // EW-724 — vector-store facade (KB embeddings; pgvector et al).
+                    // The `type` re-exports (SelectVectorStoreOpts, EmbeddingMode,
+                    // EmbeddingModeSetting) are erased and intentionally absent.
+                    'VectorStoreFacadeService',
+                    'VectorStoreNotConfiguredError',
+                    'EmbeddingModeResolver',
+                    'EmbeddingModeUnsupportedError',
                 ].sort(),
             );
         });
