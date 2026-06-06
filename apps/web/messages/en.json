@@ -3414,6 +3414,25 @@
                     "conflict": "This document was edited elsewhere. Reload to see the latest.",
                     "reload": "Reload",
                     "locked": "This document is locked.",
+                    "upload": {
+                        "dropPrompt": "Drop files here to upload",
+                        "modal": {
+                            "title": "Upload to Knowledge Base",
+                            "targetClass": "Target class",
+                            "tags": "Tags",
+                            "tagsPlaceholder": "Type a tag and press Enter",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Short summary of the file(s) you are uploading",
+                            "autoClassify": "Let the agent reclassify after extraction",
+                            "upload": "Upload",
+                            "cancel": "Cancel"
+                        },
+                        "progress": {
+                            "uploading": "Uploading",
+                            "done": "Done",
+                            "failed": "Failed"
+                        }
+                    },
                     "metadata": {
                         "title": "Metadata",
                         "class": "Class",
@@ -3442,6 +3461,18 @@
                         "historyComingSoon": "Coming in slice E",
                         "saveFailed": "Save failed",
                         "lockedBanner": "This document is locked."
+                    },
+                    "viewer": {
+                        "sizeBlocked": {
+                            "title": "Preview unavailable — file too large",
+                            "description": "This file is {size} which exceeds the inline preview cap of {cap}. Download it to view locally.",
+                            "download": "Download original"
+                        },
+                        "unsupported": {
+                            "title": "Preview unavailable for this format",
+                            "description": "No inline viewer is available for {mime}. Download the file to open it in a native application.",
+                            "download": "Download original"
+                        }
                     }
                 }
             }

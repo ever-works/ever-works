@@ -48,6 +48,13 @@ import type { KbDocumentClass, KbDocumentDto, KbDocumentStatus } from '@ever-wor
 export interface KbTreePanelProps {
     workId: string;
     currentDocPath?: string;
+    /**
+     * EW-641 slice C — opt-in refresh token. When the parent (workbench
+     * page) wants the tree to re-fetch (e.g. after a successful upload
+     * via `WorkbenchUploadCoordinator`), it bumps this value and the
+     * effect's dependency array picks up the change.
+     */
+    refreshKey?: number;
 }
 
 type Tab = 'kb' | 'originals';
@@ -70,7 +77,7 @@ const CLASS_ICONS: Record<KbDocumentClass, LucideIcon> = {
     freeform: Lightbulb,
 };
 
-export function KbTreePanel({ workId, currentDocPath }: KbTreePanelProps) {
+export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelProps) {
     const t = useTranslations('dashboard.workDetail.kb');
     const [tab, setTab] = useState<Tab>('kb');
     const [documents, setDocuments] = useState<KbDocumentDto[]>([]);
@@ -103,7 +110,7 @@ export function KbTreePanel({ workId, currentDocPath }: KbTreePanelProps) {
         return () => {
             cancelled = true;
         };
-    }, [workId]);
+    }, [workId, refreshKey]);
 
     const grouped = useMemo(() => groupByClass(documents), [documents]);
     // Pre-compute which class contains the active doc so it opens by
@@ -260,7 +267,11 @@ function KbTreeGroup({
     const Icon = CLASS_ICONS[cls] ?? FileText;
     const Chevron = open ? ChevronDown : ChevronRight;
     return (
-        <div data-testid={`kb-workbench-group-${cls}`} className="flex flex-col">
+        <div
+            data-testid={`kb-workbench-group-${cls}`}
+            data-kb-class={cls}
+            className="flex flex-col"
+        >
             <button
                 type="button"
                 onClick={() => setOpen((prev) => !prev)}
