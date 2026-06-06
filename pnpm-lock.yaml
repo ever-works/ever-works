@@ -102,7 +102,7 @@ importers:
         version: 1.2.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/throttler@6.5.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))(ioredis@5.10.1)(reflect-metadata@0.2.2)
       '@nestjs-modules/mailer':
         specifier: ^2.3.4
-        version: 2.3.4(24d5d2a3a9b7931df91f7b28badcc5e7)
+        version: 2.3.4(755c5852ba32fa99904bb30e1775fdbb)
       '@nestjs/axios':
         specifier: ^4.0.1
         version: 4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.16.0)(rxjs@7.8.2)
@@ -235,16 +235,16 @@ importers:
         version: link:../../packages/plugins/minio
       '@nestjs/cli':
         specifier: ^11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.27.3)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.27.3)
       '@nestjs/schematics':
         specifier: ^11.0.10
-        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
+        version: 11.0.10(chokidar@3.6.0)(typescript@5.9.3)
       '@nestjs/testing':
         specifier: ^11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)
       '@swc/cli':
         specifier: ^0.8.1
-        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core':
         specifier: ^1.15.24
         version: 1.15.24(@swc/helpers@0.5.21)
@@ -484,10 +484,10 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.25.12)
       '@nestjs/schematics':
         specifier: ^11.0.10
-        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
+        version: 11.0.10(chokidar@3.6.0)(typescript@5.9.3)
       '@swc/cli':
         specifier: ^0.8.1
-        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core':
         specifier: ^1.15.24
         version: 1.15.24(@swc/helpers@0.5.21)
@@ -922,13 +922,13 @@ importers:
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)
       '@nestjs/schematics':
         specifier: ^11.0.10
-        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
+        version: 11.0.10(chokidar@3.6.0)(typescript@5.9.3)
       '@nestjs/testing':
         specifier: ^11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)
       '@swc/cli':
         specifier: ^0.8.1
-        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+        version: 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core':
         specifier: ^1.15.24
         version: 1.15.24(@swc/helpers@0.5.21)
@@ -1093,7 +1093,7 @@ importers:
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21)))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)
       '@nestjs/schematics':
         specifier: ^11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
@@ -2240,6 +2240,31 @@ importers:
         version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.15)(typescript@5.9.3)(yaml@2.8.3)
       typescript:
         specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.10(@types/node@22.19.11)(esbuild@0.27.3)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
+  packages/plugins/pgvector:
+    dependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      pg:
+        specifier: ^8.13.0
+        version: 8.18.0
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.15)(typescript@5.9.3)(yaml@2.8.3)
+      typeorm:
+        specifier: 0.3.28
+        version: 0.3.28(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      typescript:
+        specifier: ^5.9.3
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
@@ -11234,10 +11259,6 @@ packages:
 
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
-    engines: {node: '>= 0.4'}
-
-  call-bind@1.0.8:
-    resolution: {integrity: sha512-oKlSFMcMwpUg2ednkhQ454wfWiU/ul3CkJe/PEHcTKuiX6RpbehUiFMXu13HalGZxfUwCQzZG747YXBn1im9ww==}
     engines: {node: '>= 0.4'}
 
   call-bind@1.0.9:
@@ -20330,6 +20351,17 @@ snapshots:
 
   '@analytics/type-utils@0.6.4': {}
 
+  '@angular-devkit/core@19.2.23(chokidar@3.6.0)':
+    dependencies:
+      ajv: 8.18.0
+      ajv-formats: 3.0.1(ajv@8.18.0)
+      jsonc-parser: 3.3.1
+      picomatch: 4.0.4
+      rxjs: 7.8.1
+      source-map: 0.7.4
+    optionalDependencies:
+      chokidar: 3.6.0
+
   '@angular-devkit/core@19.2.23(chokidar@4.0.3)':
     dependencies:
       ajv: 8.18.0
@@ -20351,6 +20383,16 @@ snapshots:
       yargs-parser: 21.1.1
     transitivePeerDependencies:
       - '@types/node'
+      - chokidar
+
+  '@angular-devkit/schematics@19.2.23(chokidar@3.6.0)':
+    dependencies:
+      '@angular-devkit/core': 19.2.23(chokidar@3.6.0)
+      jsonc-parser: 3.3.1
+      magic-string: 0.30.17
+      ora: 5.4.1
+      rxjs: 7.8.1
+    transitivePeerDependencies:
       - chokidar
 
   '@angular-devkit/schematics@19.2.23(chokidar@4.0.3)':
@@ -25009,7 +25051,7 @@ snapshots:
       reflect-metadata: 0.2.2
       tslib: 2.8.1
 
-  '@nestjs-modules/mailer@2.3.4(24d5d2a3a9b7931df91f7b28badcc5e7)':
+  '@nestjs-modules/mailer@2.3.4(755c5852ba32fa99904bb30e1775fdbb)':
     dependencies:
       '@css-inline/css-inline': 0.20.0
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -25027,7 +25069,7 @@ snapshots:
       handlebars: 4.7.9
       liquidjs: 10.27.0
       mjml: 5.0.0-beta.2(relateurl@0.2.7)(svgo@4.0.1)(terser@5.46.1)(typescript@5.9.3)
-      nunjucks: 3.2.4(chokidar@4.0.3)
+      nunjucks: 3.2.4(chokidar@3.6.0)
       preview-email: 3.1.3
       pug: 3.0.4
     transitivePeerDependencies:
@@ -25054,7 +25096,7 @@ snapshots:
       keyv: 5.6.0
       rxjs: 7.8.2
 
-  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.27.3)':
+  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.27.3)':
     dependencies:
       '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
       '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
@@ -25073,6 +25115,35 @@ snapshots:
       tsconfig-paths-webpack-plugin: 4.2.0
       typescript: 5.9.3
       webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.27.3)
+      webpack-node-externals: 3.0.0
+    optionalDependencies:
+      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
+      '@swc/core': 1.15.24(@swc/helpers@0.5.21)
+    transitivePeerDependencies:
+      - '@types/node'
+      - esbuild
+      - uglify-js
+      - webpack-cli
+
+  '@nestjs/cli@11.0.18(@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3))(@swc/core@1.15.24(@swc/helpers@0.5.21))(@types/node@22.19.11)':
+    dependencies:
+      '@angular-devkit/core': 19.2.23(chokidar@4.0.3)
+      '@angular-devkit/schematics': 19.2.23(chokidar@4.0.3)
+      '@angular-devkit/schematics-cli': 19.2.23(@types/node@22.19.11)(chokidar@4.0.3)
+      '@inquirer/prompts': 7.10.1(@types/node@22.19.11)
+      '@nestjs/schematics': 11.0.10(chokidar@4.0.3)(typescript@5.9.3)
+      ansis: 4.2.0
+      chokidar: 4.0.3
+      cli-table3: 0.6.5
+      commander: 4.1.1
+      fork-ts-checker-webpack-plugin: 9.1.0(typescript@5.9.3)(webpack@5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21)))
+      glob: 13.0.6
+      node-emoji: 1.11.0
+      ora: 5.4.1
+      tsconfig-paths: 4.2.0
+      tsconfig-paths-webpack-plugin: 4.2.0
+      typescript: 5.9.3
+      webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))
       webpack-node-externals: 3.0.0
     optionalDependencies:
       '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
@@ -25104,7 +25175,7 @@ snapshots:
       webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))
       webpack-node-externals: 3.0.0
     optionalDependencies:
-      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core': 1.15.24(@swc/helpers@0.5.21)
     transitivePeerDependencies:
       - '@types/node'
@@ -25133,7 +25204,7 @@ snapshots:
       webpack: 5.105.4(@swc/core@1.15.24(@swc/helpers@0.5.21))(esbuild@0.25.12)
       webpack-node-externals: 3.0.0
     optionalDependencies:
-      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)
+      '@swc/cli': 0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)
       '@swc/core': 1.15.24(@swc/helpers@0.5.21)
     transitivePeerDependencies:
       - '@types/node'
@@ -25235,6 +25306,17 @@ snapshots:
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)(@nestjs/websockets@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       cron: 4.4.0
+
+  '@nestjs/schematics@11.0.10(chokidar@3.6.0)(typescript@5.9.3)':
+    dependencies:
+      '@angular-devkit/core': 19.2.23(chokidar@3.6.0)
+      '@angular-devkit/schematics': 19.2.23(chokidar@3.6.0)
+      comment-json: 4.6.2
+      jsonc-parser: 3.3.1
+      pluralize: 8.0.0
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - chokidar
 
   '@nestjs/schematics@11.0.10(chokidar@4.0.3)(typescript@5.9.3)':
     dependencies:
@@ -28063,6 +28145,25 @@ snapshots:
       - supports-color
       - typescript
 
+  '@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@3.6.0)':
+    dependencies:
+      '@swc/core': 1.15.24(@swc/helpers@0.5.21)
+      '@swc/counter': 0.1.3
+      '@xhmikosr/bin-wrapper': 14.2.2
+      commander: 8.3.0
+      minimatch: 10.2.5
+      piscina: 4.9.2
+      semver: 7.7.4
+      slash: 3.0.0
+      source-map: 0.7.6
+      tinyglobby: 0.2.16
+    optionalDependencies:
+      chokidar: 3.6.0
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - react-native-b4a
+      - supports-color
+
   '@swc/cli@0.8.1(@swc/core@1.15.24(@swc/helpers@0.5.21))(chokidar@4.0.3)':
     dependencies:
       '@swc/core': 1.15.24(@swc/helpers@0.5.21)
@@ -29973,7 +30074,7 @@ snapshots:
 
   array-includes@3.1.9:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-abstract: 1.24.2
@@ -29988,7 +30089,7 @@ snapshots:
 
   array.prototype.findlast@1.2.5:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-errors: 1.3.0
@@ -29997,7 +30098,7 @@ snapshots:
 
   array.prototype.findlastindex@1.2.6:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-abstract: 1.24.2
@@ -30007,21 +30108,21 @@ snapshots:
 
   array.prototype.flat@1.3.3:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-shim-unscopables: 1.1.0
 
   array.prototype.flatmap@1.3.3:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-shim-unscopables: 1.1.0
 
   array.prototype.tosorted@1.1.4:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-errors: 1.3.0
@@ -30030,7 +30131,7 @@ snapshots:
   arraybuffer.prototype.slice@1.0.4:
     dependencies:
       array-buffer-byte-length: 1.0.2
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-errors: 1.3.0
@@ -30586,13 +30687,6 @@ snapshots:
     dependencies:
       es-errors: 1.3.0
       function-bind: 1.1.2
-
-  call-bind@1.0.8:
-    dependencies:
-      call-bind-apply-helpers: 1.0.2
-      es-define-property: 1.0.1
-      get-intrinsic: 1.3.0
-      set-function-length: 1.2.2
 
   call-bind@1.0.9:
     dependencies:
@@ -32094,7 +32188,7 @@ snapshots:
       array-buffer-byte-length: 1.0.2
       arraybuffer.prototype.slice: 1.0.4
       available-typed-arrays: 1.0.7
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       data-view-buffer: 1.0.2
       data-view-byte-length: 1.0.2
@@ -33237,7 +33331,7 @@ snapshots:
 
   function.prototype.name@1.1.8:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       functions-have-names: 1.2.3
@@ -34052,7 +34146,7 @@ snapshots:
 
   is-array-buffer@3.0.5:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       get-intrinsic: 1.3.0
 
@@ -36897,13 +36991,13 @@ snapshots:
       schema-utils: 3.3.0
       webpack: 5.105.4
 
-  nunjucks@3.2.4(chokidar@4.0.3):
+  nunjucks@3.2.4(chokidar@3.6.0):
     dependencies:
       a-sync-waterfall: 1.0.1
       asap: 2.0.6
       commander: 5.1.0
     optionalDependencies:
-      chokidar: 4.0.3
+      chokidar: 3.6.0
     optional: true
 
   nypm@0.6.5:
@@ -36930,7 +37024,7 @@ snapshots:
 
   object.assign@4.1.7:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
@@ -36939,27 +37033,27 @@ snapshots:
 
   object.entries@1.1.9:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
   object.fromentries@2.0.8:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-object-atoms: 1.1.1
 
   object.groupby@1.0.3:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
 
   object.values@1.2.1:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
@@ -39050,7 +39144,7 @@ snapshots:
 
   reflect.getprototypeof@1.0.10:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
       es-errors: 1.3.0
@@ -39067,7 +39161,7 @@ snapshots:
 
   regexp.prototype.flags@1.5.4:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-errors: 1.3.0
       get-proto: 1.0.1
@@ -39423,7 +39517,7 @@ snapshots:
 
   safe-array-concat@1.1.3:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       get-intrinsic: 1.3.0
       has-symbols: 1.1.0
@@ -40105,13 +40199,13 @@ snapshots:
 
   string.prototype.includes@2.0.1:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-abstract: 1.24.2
 
   string.prototype.matchall@4.0.12:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-abstract: 1.24.2
@@ -40132,7 +40226,7 @@ snapshots:
 
   string.prototype.trim@1.2.10:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-data-property: 1.1.4
       define-properties: 1.2.1
@@ -40142,14 +40236,14 @@ snapshots:
 
   string.prototype.trimend@1.0.9:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
   string.prototype.trimstart@1.0.8:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
@@ -40872,7 +40966,7 @@ snapshots:
 
   typed-array-byte-length@1.0.3:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       for-each: 0.3.5
       gopd: 1.2.0
       has-proto: 1.2.0
@@ -40881,7 +40975,7 @@ snapshots:
   typed-array-byte-offset@1.0.4:
     dependencies:
       available-typed-arrays: 1.0.7
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       for-each: 0.3.5
       gopd: 1.2.0
       has-proto: 1.2.0
@@ -40890,7 +40984,7 @@ snapshots:
 
   typed-array-length@1.0.7:
     dependencies:
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       for-each: 0.3.5
       gopd: 1.2.0
       is-typed-array: 1.1.15
@@ -40958,7 +41052,6 @@ snapshots:
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
-    optional: true
 
   typescript-eslint@8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3):
     dependencies:
@@ -41870,7 +41963,7 @@ snapshots:
   which-typed-array@1.1.20:
     dependencies:
       available-typed-arrays: 1.0.7
-      call-bind: 1.0.8
+      call-bind: 1.0.9
       call-bound: 1.0.4
       for-each: 0.3.5
       get-proto: 1.0.1

@@ -5,6 +5,7 @@ import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import {
     WorkKnowledgeChunk,
+    WorkKnowledgeChunkCoordinate,
     WorkKnowledgeCitation,
     WorkKnowledgeDocument,
     WorkKnowledgeTag,
@@ -15,11 +16,13 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
+import { WorkKnowledgeChunkCoordinateRepository } from '../database/repositories/work-knowledge-chunk-coordinate.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-normalize.service';
 import { KnowledgeBaseTranscribeService } from './knowledge-base-transcribe.service';
+import { KnowledgeBaseReembedService } from './knowledge-base-reembed.service';
 import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { KbAgentToolsService } from './kb-agent-tools.service';
 import { KbToolsFacadeAdapter } from './kb-tools-facade.adapter';
@@ -75,6 +78,7 @@ import { WorkOwnershipService } from './work-ownership.service';
             WorkKnowledgeTag,
             WorkKnowledgeCitation,
             WorkKnowledgeChunk,
+            WorkKnowledgeChunkCoordinate,
         ]),
     ],
     providers: [
@@ -84,11 +88,13 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
         WorkKnowledgeChunkRepository,
+        WorkKnowledgeChunkCoordinateRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,
         KnowledgeBaseTranscribeService,
+        KnowledgeBaseReembedService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
@@ -99,11 +105,13 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeTagRepository,
         WorkKnowledgeCitationRepository,
         WorkKnowledgeChunkRepository,
+        WorkKnowledgeChunkCoordinateRepository,
         KnowledgeBaseService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,
         KnowledgeBaseTranscribeService,
+        KnowledgeBaseReembedService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,

@@ -23,7 +23,12 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
+import { WorkKnowledgeChunkCoordinateRepository } from '../database/repositories/work-knowledge-chunk-coordinate.repository';
 import { AiFacadeService } from '../facades/ai.facade';
+import {
+    VectorStoreFacadeService,
+    VectorStoreNotConfiguredError,
+} from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
@@ -139,6 +144,17 @@ interface ListOptions {
 export class KnowledgeBaseService {
     private readonly logger = new Logger(KnowledgeBaseService.name);
 
+    /**
+     * EW-642 slice 2 — latch so the `VectorStoreNotConfiguredError`
+     * degradation banner is only logged once per service instance.
+     * Mirrors how `KnowledgeBaseTranscribeService` handles
+     * `TranscriptionNotConfiguredError`: degraded behaviour is the
+     * documented spec §15.5 fallback, but it MUST be visible in operator
+     * logs the first time it happens so a missed plugin installation
+     * doesn't silently flatten retrieval quality forever.
+     */
+    private vectorStoreDegradedLogged = false;
+
     constructor(
         private readonly documentRepository: WorkKnowledgeDocumentRepository,
         private readonly uploadRepository: WorkKnowledgeUploadRepository,
@@ -180,6 +196,22 @@ export class KnowledgeBaseService {
         // lexical-only ranking.
         @Optional() private readonly chunkRepository?: WorkKnowledgeChunkRepository,
         @Optional() private readonly aiFacade?: AiFacadeService,
+        // EW-642 slice 2 — VectorStoreFacadeService routes every
+        // service-level semantic operation (upsert/query/delete) through
+        // the resolved `IVectorStorePlugin` (pgvector by default, Qdrant /
+        // Pinecone / … via the registry). When absent (older module wiring
+        // or a unit test that doesn't exercise vector ops) the service
+        // gracefully degrades — semantic search falls back to lexical-only
+        // ranking, and upsert/delete are no-ops on the vector side (the
+        // coordinate row is also skipped). Mirrors the
+        // `chunkRepository` / `aiFacade` @Optional() pattern above.
+        @Optional() private readonly vectorStoreFacade?: VectorStoreFacadeService,
+        // EW-642 slice 2 — every successful upsert/delete updates the
+        // platform-owned coordinate row (RFC §7 data model split). The
+        // platform owns "what was embedded where, when, with which model";
+        // the actual chunks live inside the plugin's own store.
+        @Optional()
+        private readonly chunkCoordinateRepository?: WorkKnowledgeChunkCoordinateRepository,
         // EW-641 Phase 2/e row 37d — org-overlay fanout dispatcher.
         // Optional so isolated unit tests + deployments without
         // Trigger.dev wired still construct; when absent, org docs
@@ -825,6 +857,16 @@ export class KnowledgeBaseService {
         }
         this.assertNotLockedFull(existing);
 
+        // EW-642 slice 2 — wipe the chunk set from the resolved vector
+        // store + the coordinate row BEFORE the DB delete. Doing it
+        // before keeps the failure mode safe: a vector-store delete
+        // failure leaves the document row + chunks intact so retry
+        // sees a consistent world. (The legacy pgvector path also has
+        // an FK `onDelete: 'CASCADE'` on `work_knowledge_chunks` so
+        // the DB delete below cleans those up even if the facade route
+        // is a no-op.)
+        await this.deleteChunksByDocument({ workId, documentId: docId, userId });
+
         await this.documentRepository.delete(docId);
 
         // After the hard delete, the row is gone but the Git mirror task
@@ -987,7 +1029,7 @@ export class KnowledgeBaseService {
             distance: number;
         }>
     > {
-        if (!this.chunkRepository || !this.aiFacade) return [];
+        if (!this.aiFacade) return [];
         const trimmed = query.trim();
         if (trimmed.length === 0 || limit <= 0) return [];
 
@@ -1016,7 +1058,242 @@ export class KnowledgeBaseService {
             return [];
         }
 
+        // EW-642 slice 2 — prefer the VectorStoreFacadeService route so
+        // semantic retrieval works against whichever plugin the operator
+        // has wired in (pgvector by default; Qdrant / Pinecone when
+        // configured). Catch `VectorStoreNotConfiguredError` and degrade
+        // to lexical-only (mirrors the transcribe path's
+        // `TranscriptionNotConfiguredError` handling). The legacy
+        // `chunkRepository.findNearestByEmbedding` path stays as the
+        // fallback for unit tests / older deployments that only wire the
+        // chunk repo.
+        if (this.vectorStoreFacade) {
+            try {
+                const result = await this.vectorStoreFacade.queryChunks(
+                    {
+                        workId,
+                        queryEmbedding: [...embedding],
+                        topK: limit,
+                    },
+                    { workId, userId: 'kb-search-system' },
+                );
+                // QueryHit -> the legacy shape the row-30c RRF blend +
+                // the existing consumers expect. The blend treats the
+                // list as an ordinal ranking (kb-rrf uses array position
+                // as rank), so preserving best-first order is what
+                // matters; `distance` is kept around for diagnostics and
+                // is derived from `normalizedScore` so a higher score
+                // maps to a smaller distance — same monotonic shape
+                // pgvector's cosine distance had.
+                return result.hits.map((hit) => ({
+                    id: hit.chunk.id,
+                    workId: hit.chunk.workId,
+                    documentId: hit.chunk.documentId,
+                    chunkIndex: hit.chunk.chunkIndex,
+                    content: hit.chunk.content,
+                    distance: 1 - hit.normalizedScore,
+                }));
+            } catch (error) {
+                if (error instanceof VectorStoreNotConfiguredError) {
+                    if (!this.vectorStoreDegradedLogged) {
+                        this.vectorStoreDegradedLogged = true;
+                        this.logger.warn(
+                            `semanticSearch: no vector-store plugin configured for work=${workId}` +
+                                ` — degrading to lexical-only retrieval. Install` +
+                                ` '@ever-works/pgvector-plugin' or pin one via` +
+                                ` KB_VECTOR_STORE_PROVIDER_ID to enable semantic search.`,
+                        );
+                    }
+                    return [];
+                }
+                throw error;
+            }
+        }
+
+        // Legacy path — kept for unit tests / deployments that wire the
+        // chunk repository directly without the facade. Same return
+        // shape, same Postgres-only k-NN.
+        if (!this.chunkRepository) return [];
         return this.chunkRepository.findNearestByEmbedding(workId, embedding, limit);
+    }
+
+    // ─── CHUNK WRITE / DELETE — Phase 2 (EW-642 slice 2) ────────────────────
+
+    /**
+     * EW-642 slice 2 — write a chunk set to the resolved vector store
+     * and stamp the platform-side coordinate row.
+     *
+     * The vector-store plugin owns the chunk + embedding rows (RFC §7
+     * data model split); the platform owns ONLY the
+     * `(workId, documentId)` coordinate row recording "vector store
+     * id, chunk count, embedding model + dims, embedded-at timestamp".
+     * That split lets the re-embed sweep + workbench surface drift
+     * without scanning the plugin's backend.
+     *
+     * Both writes are best-effort idempotent — the plugin's
+     * `upsertChunks` replaces by `(workId, documentId, chunkIndex)`,
+     * the coordinate repo upserts on the composite PK.
+     *
+     * `VectorStoreNotConfiguredError` propagates so the calling
+     * embedding task can mark the run as a soft skip + Trigger.dev's
+     * retry queue picks it up once an operator wires a plugin.
+     * Catching it here would silently flatten retrieval to lexical-only
+     * forever, which is the opposite of what the embed pipeline wants.
+     */
+    async upsertChunks(input: {
+        workId: string;
+        documentId: string;
+        userId: string;
+        chunks: Array<{
+            id: string;
+            chunkIndex: number;
+            content: string;
+            tokenCount: number;
+            embedding?: number[] | null;
+            metadata?: Record<string, unknown> | null;
+            tenantId?: string | null;
+            organizationId?: string | null;
+        }>;
+        embeddingModel: string;
+        embeddingDims: number;
+    }): Promise<{ written: number; skipped: number }> {
+        if (!this.vectorStoreFacade) {
+            // Caller didn't wire the facade (older module graph). Skip
+            // the vector write + the coordinate stamp — the row-30c
+            // retrieval will lexical-only the doc until the facade is
+            // wired in. Same "no-op + log debug" shape `enqueueMirror`
+            // uses when the dispatcher is absent.
+            this.logger.debug(
+                `upsertChunks: vector-store facade not wired for work=${input.workId},` +
+                    ` doc=${input.documentId}; skipping vector write + coordinate stamp.`,
+            );
+            return { written: 0, skipped: input.chunks.length };
+        }
+
+        const plugin = await this.vectorStoreFacade.select({
+            workId: input.workId,
+            userId: input.userId,
+        });
+
+        const result = await plugin.upsertChunks({
+            workId: input.workId,
+            documentId: input.documentId,
+            chunks: input.chunks.map((c) => ({
+                id: c.id,
+                workId: input.workId,
+                documentId: input.documentId,
+                chunkIndex: c.chunkIndex,
+                content: c.content,
+                tokenCount: c.tokenCount,
+                embedding: c.embedding ?? null,
+                metadata: c.metadata ?? null,
+                tenantId: c.tenantId ?? null,
+                organizationId: c.organizationId ?? null,
+            })),
+        });
+
+        // Stamp the coordinate row after the vector write lands. If the
+        // coordinate repo isn't wired (unit tests) skip silently — the
+        // vector write itself is the source of truth for retrieval.
+        if (this.chunkCoordinateRepository) {
+            try {
+                await this.chunkCoordinateRepository.upsert({
+                    workId: input.workId,
+                    documentId: input.documentId,
+                    vectorStoreId: plugin.id,
+                    chunkCount: input.chunks.length,
+                    embeddingModel: input.embeddingModel,
+                    embeddingDims: input.embeddingDims,
+                });
+            } catch (error) {
+                // A failed coordinate stamp is recoverable via the
+                // re-embed sweep (it scans coordinates to find drift)
+                // and the actual chunks already landed in the plugin's
+                // store — so log + carry on rather than rolling back
+                // the vector write the user can't recover from.
+                this.logger.warn(
+                    `upsertChunks: coordinate stamp failed for work=${input.workId},` +
+                        ` doc=${input.documentId}: ${(error as Error).message}`,
+                );
+            }
+        }
+
+        return { written: result.written, skipped: result.skipped };
+    }
+
+    /**
+     * EW-642 slice 2 — cascade-delete chunks for one document AND the
+     * coordinate row that pointed at them.
+     *
+     * Failure mode: when the vector store rejects the delete (transient
+     * 5xx, plugin not configured) the coordinate row is left in place
+     * so the next re-embed sweep / retry picks up the drift. Throwing
+     * here would force the caller to roll its own compensation —
+     * `VectorStoreNotConfiguredError` is caught + logged once because
+     * the platform-side coordinate row is also irrelevant when no
+     * vector store has ever been wired.
+     */
+    async deleteChunksByDocument(input: {
+        workId: string;
+        documentId: string;
+        userId: string;
+    }): Promise<void> {
+        if (this.vectorStoreFacade) {
+            try {
+                await this.vectorStoreFacade.deleteByDocument(
+                    { workId: input.workId, documentId: input.documentId },
+                    { workId: input.workId, userId: input.userId },
+                );
+            } catch (error) {
+                if (error instanceof VectorStoreNotConfiguredError) {
+                    if (!this.vectorStoreDegradedLogged) {
+                        this.vectorStoreDegradedLogged = true;
+                        this.logger.warn(
+                            `deleteChunksByDocument: no vector-store plugin configured` +
+                                ` for work=${input.workId} — skipping vector delete.`,
+                        );
+                    }
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        if (this.chunkCoordinateRepository) {
+            await this.chunkCoordinateRepository.deleteByDocument(input.workId, input.documentId);
+        }
+    }
+
+    /**
+     * EW-642 slice 2 — cascade-delete every chunk owned by a Work AND
+     * the coordinate rows. Called from Work delete / tenant offboarding;
+     * the per-document path above is the hot one.
+     */
+    async deleteChunksByWork(input: { workId: string; userId: string }): Promise<void> {
+        if (this.vectorStoreFacade) {
+            try {
+                await this.vectorStoreFacade.deleteByWork(
+                    { workId: input.workId },
+                    { workId: input.workId, userId: input.userId },
+                );
+            } catch (error) {
+                if (error instanceof VectorStoreNotConfiguredError) {
+                    if (!this.vectorStoreDegradedLogged) {
+                        this.vectorStoreDegradedLogged = true;
+                        this.logger.warn(
+                            `deleteChunksByWork: no vector-store plugin configured` +
+                                ` for work=${input.workId} — skipping vector delete.`,
+                        );
+                    }
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        if (this.chunkCoordinateRepository) {
+            await this.chunkCoordinateRepository.deleteByWork(input.workId);
+        }
     }
 
     // ─── DOCUMENTS — Organization scope (inheritable: legal/style/seo) ───────

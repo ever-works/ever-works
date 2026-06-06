@@ -124,6 +124,17 @@ export enum ActivityActionType {
     // carry `{ oldPath, newPath, documentsTouched }` so the activity
     // feed can render a single-line summary without re-querying.
     KB_WIKILINK_REWRITTEN = 'kb_wikilink_rewritten',
+    // EW-642 D7 — `kb-reembed-work` Trigger.dev task lifecycle. Emitted
+    // by `KnowledgeBaseReembedService` when an operator changes the
+    // embedding model (or dims) and the platform must re-embed every
+    // `(workId, documentId)` coordinate still pinned on the old model.
+    // `details` carries `{ count, fromModel, toModel }` at start and
+    // `{ durationMs, chunksReembedded, documentsReembedded }` at the
+    // happy-path end; the failed variant adds `{ error }` with the
+    // wrapped error message so the workbench banner can surface it.
+    KB_REEMBED_STARTED = 'kb_reembed_started',
+    KB_REEMBED_COMPLETED = 'kb_reembed_completed',
+    KB_REEMBED_FAILED = 'kb_reembed_failed',
 
     // Agents / Skills / Tasks (PR #1017 specs — architecture §10).
     // Lifecycle + heartbeat + file edits + budget + skills + tasks.
