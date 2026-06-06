@@ -300,12 +300,19 @@ describe('PluginInstallerService (EW-693)', () => {
             const pluginRepo = makePluginRepo({
                 'notion-extractor': { pluginId: 'notion-extractor', installState: 'available' },
             });
-            let manifestResolve: ((v: PacoteManifest) => void) | null = null;
+            // Pre-create the deferred so `manifest()` returns the same
+            // pending promise regardless of when it's called. The test
+            // body trips the gate by resolving the deferred — order-
+            // independent vs. when install() actually awaits manifest().
+            let resolveManifest!: (v: PacoteManifest) => void;
+            const manifestPromise = new Promise<PacoteManifest>((r) => {
+                resolveManifest = r;
+            });
+            let manifestCalls = 0;
             const pacote: PacoteLike = {
                 async manifest() {
-                    return new Promise<PacoteManifest>((resolve) => {
-                        manifestResolve = resolve;
-                    });
+                    manifestCalls += 1;
+                    return manifestPromise;
                 },
                 async extract(_spec, dest) {
                     await fs.mkdir(dest, { recursive: true });
@@ -318,10 +325,13 @@ describe('PluginInstallerService (EW-693)', () => {
             const b = installer.ensurePluginAvailable('notion-extractor');
 
             // Trip the gate.
-            manifestResolve?.({ version: '1.2.0', _integrity: 'sha512-x' });
+            resolveManifest({ version: '1.2.0', _integrity: 'sha512-x' });
 
             const [ra, rb] = await Promise.all([a, b]);
             expect(ra).toBe(rb);
+            // Dedup invariant: only one install() should have reached
+            // pacote.manifest() despite the two concurrent ensure calls.
+            expect(manifestCalls).toBe(1);
         });
     });
 
