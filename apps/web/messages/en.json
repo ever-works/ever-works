@@ -3394,11 +3394,55 @@
                     "editor": {
                         "preview": "Preview",
                         "savedAt": "Saved {seconds}s ago",
-                        "saving": "Saving…"
+                        "saving": "Saving…",
+                        "placeholder": "Start writing…"
+                    },
+                    "wikilink": {
+                        "searching": "Searching documents…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Wikilink suggestions"
+                    },
+                    "mention": {
+                        "searching": "Searching…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Mention suggestions",
+                        "label": {
+                            "doc": "Doc",
+                            "agent": "Agent"
+                        }
                     },
                     "conflict": "This document was edited elsewhere. Reload to see the latest.",
                     "reload": "Reload",
-                    "locked": "This document is locked."
+                    "locked": "This document is locked.",
+                    "metadata": {
+                        "title": "Metadata",
+                        "class": "Class",
+                        "tags": {
+                            "label": "Tags",
+                            "add": "Add tag",
+                            "placeholder": "Type a tag and press Enter",
+                            "remove": "Remove tag {tag}"
+                        },
+                        "description": "Description",
+                        "descriptionPlaceholder": "Short summary of this document",
+                        "status": "Status",
+                        "statusActive": "Active",
+                        "statusArchived": "Archived",
+                        "statusDraft": "Draft",
+                        "lock": {
+                            "toggle": "Locked",
+                            "mode": "Lock mode",
+                            "modeFull": "Full lock",
+                            "modeAdditionsOnly": "Additions only"
+                        },
+                        "language": "Language",
+                        "languagePlaceholder": "BCP-47 code (e.g. en, en-US)",
+                        "source": "Source",
+                        "history": "View Git history",
+                        "historyComingSoon": "Coming in slice E",
+                        "saveFailed": "Save failed",
+                        "lockedBanner": "This document is locked."
+                    }
                 }
             }
         },

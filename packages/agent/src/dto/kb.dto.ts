@@ -113,6 +113,10 @@ export class UpdateKbDocumentDto {
     @IsOptional()
     @IsIn(KB_DOCUMENT_STATUSES as unknown as readonly string[])
     status?: KbDocumentStatus;
+
+    @IsOptional()
+    @IsIn(KB_DOCUMENT_CLASSES as unknown as readonly string[])
+    class?: KbDocumentClass;
 }
 
 export class LockKbDocumentDto {

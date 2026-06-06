@@ -166,6 +166,7 @@ export class KbController {
         return this.kb.updateDocument(workId, docId, auth.userId, {
             ...body,
             status: body.status as KbDocumentStatus | undefined,
+            class: body.class as KbDocumentClass | undefined,
         });
     }
 

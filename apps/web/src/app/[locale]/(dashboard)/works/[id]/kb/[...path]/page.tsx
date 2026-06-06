@@ -7,7 +7,8 @@ import { ApiResponseError } from '@/lib/api/server-api';
 import { WorkbenchShell } from '@/components/kb/workbench/WorkbenchShell';
 import { KbTreePanel } from '@/components/kb/workbench/KbTreePanel';
 import { KbDocumentHeader } from '@/components/kb/workbench/KbDocumentHeader';
-import { MarkdownEditor } from '@/components/kb/workbench/MarkdownEditor';
+import { TiptapEditor } from '@/components/kb/workbench/TiptapEditor';
+import { KbMetadataPanel } from '@/components/kb/workbench/KbMetadataPanel';
 
 type Params = {
     params: Promise<{ id: string; path: string[]; locale: string }>;
@@ -54,9 +55,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  * Renders the three-pane workbench shell:
  *  - Left: `KbTreePanel` with `currentDocPath` so the active row is
  *    pre-highlighted and its class group opens by default.
- *  - Center: `KbDocumentHeader` (title + chips) over `MarkdownEditor`
- *    (textarea + live preview, autosaves on debounce).
- *  - Right: empty in slice A — the AI panel lands in Phase 2.
+ *  - Center: `KbDocumentHeader` (title + chips) over `TiptapEditor`
+ *    (WYSIWYG, autosaves on debounce).
+ *  - Right: `KbMetadataPanel` — slice B side panel covering class /
+ *    tags / description / status / lock / language / source plus a
+ *    disabled "View Git history" placeholder for slice E.
  *
  * 404 semantics: any non-404 backend error bubbles to the dashboard
  * error boundary; a 404 from the doc fetch renders Next's `not-found`.
@@ -92,9 +95,10 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
             center={
                 <div className="flex h-full flex-col">
                     <KbDocumentHeader workId={id} document={doc} />
-                    <MarkdownEditor workId={id} document={doc} initialBody={doc.body} />
+                    <TiptapEditor workId={id} document={doc} initialBody={doc.body} />
                 </div>
             }
+            right={<KbMetadataPanel workId={id} document={doc} />}
         />
     );
 }
