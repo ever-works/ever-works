@@ -1,4 +1,5 @@
 import type { WorkReference, GenerationRequest, ExistingItems } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MakeWorkflowInput } from '../types.js';
 import { DEFAULT_TARGET_ITEMS } from '../types.js';
 
@@ -87,7 +88,16 @@ export function buildWorkflowPayload(options: PayloadOptions): MakeWorkflowInput
 	}
 
 	// Strategy 2: GitHub repository reference
-	if (config.pass_repo_access && config.repo_url) {
+	// Security: the user-supplied repo_url (plus its access token) is forwarded
+	// to the external Make.com scenario, which fetches it server-side. Without
+	// validation an attacker could point it at http://169.254.169.254/, a
+	// private/loopback host, or a non-HTTP scheme (file://) to probe internal
+	// services via the Make runner (SSRF) and exfiltrate the attached token.
+	// Gate the dataSource on the shared lexical SSRF guard (rejects non-HTTP(S)
+	// schemes and literal private/loopback/link-local/cloud-metadata IPs).
+	// Legitimate https://github.com/... URLs are unaffected; an unsafe URL fails
+	// closed by omitting dataSource so neither the probe nor the token leaks.
+	if (config.pass_repo_access && config.repo_url && isSafeWebhookUrl(config.repo_url as string)) {
 		payload.dataSource = {
 			type: 'github-repo',
 			repoUrl: config.repo_url as string,

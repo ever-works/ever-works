@@ -1,4 +1,5 @@
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { ZapierWorkflowOutput, ZapierOutputItem, ZapierResultShape, ZapierFieldMapping } from '../types.js';
 
 export interface ParsedResults {
@@ -181,17 +182,24 @@ function mapNativeRecord(record: Record<string, unknown>, mapping: ZapierFieldMa
 		const raw = readField(record, mapping.imageField);
 		if (Array.isArray(raw)) {
 			for (const img of raw) {
-				if (typeof img === 'string' && img.trim()) images.push(img.trim());
+				// Security (SSRF): webhook-supplied image URLs are fetched/rendered
+				// server-side, so drop any pointing at private/loopback/link-local
+				// or cloud-metadata addresses before they enter ItemData.
+				if (typeof img === 'string' && img.trim() && isSafeWebhookUrl(img.trim())) images.push(img.trim());
 			}
-		} else if (typeof raw === 'string' && raw.trim()) {
+		} else if (typeof raw === 'string' && raw.trim() && isSafeWebhookUrl(raw.trim())) {
 			images.push(raw.trim());
 		}
 	}
 
+	// Security (SSRF): the mapped source_url is later fetched server-side;
+	// null it out when it resolves to an unsafe (private/metadata) target.
+	const safeSourceUrl = (url || '').trim();
+
 	return {
 		name: (name || '').trim(),
 		description: (description || '').trim(),
-		source_url: (url || '').trim(),
+		source_url: safeSourceUrl && isSafeWebhookUrl(safeSourceUrl) ? safeSourceUrl : '',
 		markdown: content,
 		category: (category || '').trim(),
 		tags,
@@ -246,16 +254,24 @@ function parseItems(rawItems: ZapierOutputItem[]): ItemData[] {
 		if (!raw || typeof raw !== 'object') continue;
 		if (!raw.name || typeof raw.name !== 'string') continue;
 
+		// Security (SSRF): source_url is fetched server-side; drop it when it
+		// points at a private/loopback/link-local or cloud-metadata target.
+		const rawSourceUrl =
+			typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '';
+
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : '',
-			source_url:
-				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '',
+			source_url: rawSourceUrl && isSafeWebhookUrl(rawSourceUrl) ? rawSourceUrl : '',
 			markdown: typeof raw.content === 'string' ? raw.content : undefined,
 			category: typeof raw.category === 'string' ? raw.category.trim() : '',
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
-			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
+			// Security (SSRF): each image URL is fetched/rendered server-side; keep
+			// only strings that pass the lexical SSRF guard.
+			images: Array.isArray(raw.images)
+				? raw.images.filter((i): i is string => typeof i === 'string' && isSafeWebhookUrl(i))
+				: undefined
 		};
 
 		items.push(item);

@@ -5,6 +5,7 @@ import {
     Get,
     NotFoundException,
     Param,
+    ParseUUIDPipe,
     Patch,
     Post,
     UseGuards,
@@ -145,7 +146,9 @@ export class CompaniesController {
     @Get(':id')
     async getCompany(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
     ): Promise<TwentyOrganization> {
         const tenantId = await this.resolveTenantId(auth);
         // Reads use the caller-tenant's own workspace credentials: a foreign id
@@ -169,7 +172,9 @@ export class CompaniesController {
     @Patch(':id')
     async updateCompany(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Body() company: UpdateCompanyBodyDto,
     ): Promise<TwentyOrganization> {
         const tenantId = await this.resolveTenantId(auth);
@@ -180,7 +185,12 @@ export class CompaniesController {
     }
 
     @Delete(':id')
-    async deleteCompany(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+    async deleteCompany(
+        @CurrentUser() auth: AuthenticatedUser,
+        // Security: reject malformed/abusive ids at the pipe layer (400) before
+        // they are forwarded to the CRM. Mirrors `kb.controller.ts`.
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
         const tenantId = await this.resolveTenantId(auth);
         // Security: verify ownership before deleting so a foreign id 404s.
         await this.assertCompanyInTenant(id, tenantId);
