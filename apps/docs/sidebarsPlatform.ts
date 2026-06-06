@@ -29,6 +29,12 @@ const sidebars: SidebarsConfig = {
 				// git facade, plugin-tools facade) operators bind to
 				// custom adapters.
 				'architecture/agent-injection-tokens',
+				// EW-639 Phase 3 — end-to-end plugin system overview
+				// (lifecycle, AiOperations, JSON-Schema extensions,
+				// category registry, AiFacadeService selection,
+				// authoring, bundled-vs-dynamic distribution / EW-693,
+				// storage plugins + KB usage).
+				'architecture/plugins',
 				'architecture/module-system',
 				'architecture/middleware-pipeline',
 				'architecture/configuration-management',
@@ -83,6 +89,16 @@ const sidebars: SidebarsConfig = {
 			type: 'category',
 			label: 'Guides',
 			items: ['guides/founder-journey']
+		},
+		{
+			// EW-639 Phase 3 — KB user-facing docs (concepts, classes,
+			// locks, transcription, inherited org docs) + the machine
+			// access surfaces (MCP `kb.*` tools and `ever works kb`
+			// CLI subcommands). Sits between Guides and API Reference
+			// so end-user concepts come before raw REST.
+			type: 'category',
+			label: 'Knowledge Base',
+			items: ['kb/user-guide', 'kb/mcp-cli-reference']
 		},
 		{
 			type: 'category',

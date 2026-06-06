@@ -3195,7 +3195,8 @@
                     "additions-only": "Additions only"
                 },
                 "document": {
-                    "emptyBody": "This document has no body yet."
+                    "emptyBody": "This document has no body yet.",
+                    "tagsLabel": "Tags"
                 },
                 "editor": {
                     "save": "Save",

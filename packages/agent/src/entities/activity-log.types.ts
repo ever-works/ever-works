@@ -118,6 +118,12 @@ export enum ActivityActionType {
     // upload-extraction event shape; transcription is "extraction for media".
     KB_UPLOAD_TRANSCRIBED = 'kb_upload_transcribed',
     KB_UPLOAD_TRANSCRIPTION_FAILED = 'kb_upload_transcription_failed',
+    // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
+    // KB document is renamed and the rewriter sweeps the rest of the
+    // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
+    // carry `{ oldPath, newPath, documentsTouched }` so the activity
+    // feed can render a single-line summary without re-querying.
+    KB_WIKILINK_REWRITTEN = 'kb_wikilink_rewritten',
 
     // Agents / Skills / Tasks (PR #1017 specs — architecture §10).
     // Lifecycle + heartbeat + file edits + budget + skills + tasks.

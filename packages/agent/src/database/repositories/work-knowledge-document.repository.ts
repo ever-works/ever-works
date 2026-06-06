@@ -53,6 +53,49 @@ export class WorkKnowledgeDocumentRepository {
         return this.repository.findOne({ where: { workId, path } });
     }
 
+    /**
+     * EW-643 Phase 3 slice 2b — look up a Work-scope document whose
+     * `metadata[key] = value`. Used by `KnowledgeBaseTranscribeService`
+     * for idempotency on `metadata.transcribedFromUploadId` so a
+     * Trigger.dev retry never produces a duplicate transcript document.
+     *
+     * The `metadata` column is `text` (TypeORM `simple-json`), not
+     * `jsonb`, so we must cast before applying `->>` — otherwise
+     * PostgreSQL throws `operator does not exist: text ->> unknown`
+     * and the entire transcribe pipeline crashes at the idempotency
+     * check (Greptile P2 on PR #1219). The cast is cheap and runs
+     * once per query. SQLite + Postgres path-pick differs but the
+     * `simple-json` columnar comparison still works because TypeORM
+     * stringifies on read and `LIKE` matches the JSON literal —
+     * we use the Postgres-shaped query because the production DB
+     * is Postgres; the test DB uses an in-memory mock at the repo
+     * layer (no SQL is exercised).
+     */
+    async findByMetadataKey(
+        workId: string,
+        key: string,
+        value: string,
+    ): Promise<WorkKnowledgeDocument | null> {
+        return this.repository
+            .createQueryBuilder('doc')
+            .where('doc.workId = :workId', { workId })
+            .andWhere(`(doc.metadata::jsonb) ->> :key = :value`, { key, value })
+            .getOne();
+    }
+
+    /**
+     * Partial update by id. Used by `KnowledgeBaseTranscribeService`
+     * to persist `metadata.transcribedFromUploadId` + provider id +
+     * duration on the freshly-created transcript document.
+     */
+    async updateById(
+        workId: string,
+        docId: string,
+        patch: Partial<WorkKnowledgeDocument>,
+    ): Promise<void> {
+        await this.repository.update({ id: docId, workId }, patch);
+    }
+
     async findOrgById(
         organizationId: string,
         docId: string,

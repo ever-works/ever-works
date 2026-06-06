@@ -31,6 +31,7 @@ export * from './knowledge-base-git-mirror.service';
 export * from './knowledge-base-media-normalize.service';
 export * from './knowledge-base-transcribe.service';
 export * from './knowledge-base-buffer-extractor.service';
+export * from './knowledge-base-reconcile.service';
 export * from './knowledge-base.module';
 export * from './kb-chunker';
 export * from './kb-rrf';
