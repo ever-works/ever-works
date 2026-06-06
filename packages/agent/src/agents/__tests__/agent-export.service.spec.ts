@@ -222,5 +222,83 @@ describe('AgentExportService', () => {
             env.files.toolsMd = 'GH=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
             await expect(svc.importOne('u1', env)).rejects.toThrow(/Secret-like/);
         });
+
+        // Security (EW-711 #8) — scope-ownership IDOR. The scope columns are
+        // NOT FK-constrained, so without this guard any authenticated user
+        // could plant an imported Agent under another user's
+        // Mission/Idea/Work id. These tests construct the service WITH the
+        // raw Agent repository (5th ctor arg) so `assertScopeOwned` runs its
+        // live `manager.getRepository(...).count(...)` ownership check.
+        describe('scope-ownership (EW-711 #8)', () => {
+            let scopeCount: jest.Mock;
+            let svcWithRepo: AgentExportService;
+
+            const missionEnvelope = (): AgentExportEnvelope => ({
+                ...baseEnvelope(),
+                identity: { ...baseEnvelope().identity, scope: AgentScope.MISSION },
+            });
+
+            beforeEach(() => {
+                scopeCount = jest.fn();
+                // Minimal `Repository<Agent>` stand-in: only `.manager.getRepository().count`
+                // is exercised by the ownership check.
+                const agentEntityRepo = {
+                    manager: {
+                        getRepository: jest.fn().mockReturnValue({ count: scopeCount }),
+                    },
+                } as any;
+                svcWithRepo = new AgentExportService(
+                    agents,
+                    memberships,
+                    budgets,
+                    activity,
+                    agentEntityRepo,
+                );
+            });
+
+            it('404s when the target Mission is not owned by the caller', async () => {
+                scopeCount.mockResolvedValueOnce(0); // mission m1 not owned by u1
+                await expect(
+                    svcWithRepo.importOne('u1', missionEnvelope(), {
+                        overrideScope: AgentScope.MISSION,
+                        missionId: 'm1',
+                    }),
+                ).rejects.toThrow(NotFoundException);
+                // Rejected BEFORE any Agent row is created.
+                expect(agents.create).not.toHaveBeenCalled();
+                expect(scopeCount).toHaveBeenCalledWith({ where: { id: 'm1', userId: 'u1' } });
+            });
+
+            it('creates the Agent when the caller owns the target Mission', async () => {
+                scopeCount.mockResolvedValueOnce(1); // mission m1 owned by u1
+                agents.findByUserIdAndSlug.mockResolvedValue(null);
+                agents.create.mockResolvedValueOnce(
+                    makeAgent({
+                        id: 'new-a',
+                        scope: AgentScope.MISSION,
+                        missionId: 'm1',
+                        status: AgentStatus.DRAFT,
+                    }),
+                );
+                const res = await svcWithRepo.importOne('u1', missionEnvelope(), {
+                    overrideScope: AgentScope.MISSION,
+                    missionId: 'm1',
+                });
+                expect(res.conflictResolution).toBe('none');
+                expect(agents.create).toHaveBeenCalledWith(
+                    expect.objectContaining({ scope: AgentScope.MISSION, missionId: 'm1' }),
+                );
+            });
+
+            it('does not own-check TENANT-scoped imports (no target id)', async () => {
+                agents.findByUserIdAndSlug.mockResolvedValue(null);
+                agents.create.mockResolvedValueOnce(
+                    makeAgent({ id: 'new-a', status: AgentStatus.DRAFT }),
+                );
+                await svcWithRepo.importOne('u1', baseEnvelope());
+                expect(scopeCount).not.toHaveBeenCalled();
+                expect(agents.create).toHaveBeenCalled();
+            });
+        });
     });
 });
