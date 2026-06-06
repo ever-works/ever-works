@@ -15,6 +15,7 @@ import {
     HardDrive,
     Mail,
     Bell,
+    Boxes,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -41,6 +42,8 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // EW-650 / EW-663 — Notifications v2 surfaces
     'email-provider': Mail,
     'notification-channel': Bell,
+    // EW-724 — vector store backends (pgvector, Qdrant, …) for KB embeddings
+    'vector-store': Boxes,
 };
 
 /**
@@ -63,6 +66,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     storage: 'Storage',
     'email-provider': 'Email Providers',
     'notification-channel': 'Notification Channels',
+    'vector-store': 'Vector Stores',
 };
 
 // Type-safe assertion that all categories are covered
@@ -153,6 +157,7 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'deployment',
     'data-source',
     'storage',
+    'vector-store',
     'email-provider',
     'notification-channel',
     'form',

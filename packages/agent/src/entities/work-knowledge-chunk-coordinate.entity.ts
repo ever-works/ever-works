@@ -48,8 +48,20 @@ export class WorkKnowledgeChunkCoordinate {
     @Column({ type: 'int', name: 'chunk_count', default: 0 })
     chunkCount: number;
 
-    /** Wall-clock at which the chunks were last (re)embedded + written. */
-    @Column({ type: 'timestamptz', name: 'last_embedded_at' })
+    /**
+     * Wall-clock at which the chunks were last (re)embedded + written.
+     *
+     * Type is left to TypeORM's per-driver inference from the `Date`
+     * property (Postgres `timestamp`, better-sqlite3 `datetime`) rather
+     * than a hard-coded `timestamptz`: the raw `timestamptz` string is
+     * Postgres-only and the in-memory `better-sqlite3` test DB throws
+     * `DataTypeNotSupportedError` on it, which broke every module that
+     * synchronizes this entity in tests. (EW-725 follow-up — see the
+     * migration for the on-disk Postgres type; tz precision is not relied
+     * on by the re-embed sweep, which filters on model/dims, not on this
+     * instant.)
+     */
+    @Column({ name: 'last_embedded_at' })
     lastEmbeddedAt: Date;
 
     /**
