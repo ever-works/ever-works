@@ -183,10 +183,7 @@ test.describe('Public API contract — the @Public() surface as one integrated c
         // Only assert delegation when neither probe was throttled by the shared-IP
         // global tier (a 429 short-circuits before the handler, so there is no body
         // to compare — and that is the throttle behaving, not a contract break).
-        if (
-            homeRes.status() !== SHARED_IP_THROTTLE &&
-            healthRes.status() !== SHARED_IP_THROTTLE
-        ) {
+        if (homeRes.status() !== SHARED_IP_THROTTLE && healthRes.status() !== SHARED_IP_THROTTLE) {
             const home = await homeRes.json();
             const health = await healthRes.json();
             expect(health, '/api/health must delegate to / (identical body)').toEqual(home);
@@ -265,18 +262,15 @@ test.describe('Public API contract — the @Public() surface as one integrated c
             const withCookie = await get(request, path, {
                 Cookie: 'better-auth.session_token=forged-value',
             });
-            expect(
-                withCookie.status(),
-                `${path} must ignore a forged cookie (never 401)`,
-            ).not.toBe(401);
+            expect(withCookie.status(), `${path} must ignore a forged cookie (never 401)`).not.toBe(
+                401,
+            );
             if (withCookie.status() === 200) {
                 expect(
                     await withCookie.text(),
                     `${path} body must be unchanged by a forged cookie`,
                 ).toBe(anonText);
-                expect((withCookie.headers()['vary'] || '').toLowerCase()).not.toContain(
-                    'cookie',
-                );
+                expect((withCookie.headers()['vary'] || '').toLowerCase()).not.toContain('cookie');
             }
         }
     });
@@ -541,9 +535,7 @@ test.describe('Public API contract — the @Public() surface as one integrated c
                 expect((head.headers()['content-type'] || '').toLowerCase()).toContain(
                     'application/json',
                 );
-                expect((await head.text()).length, `HEAD ${path} must carry an empty body`).toBe(
-                    0,
-                );
+                expect((await head.text()).length, `HEAD ${path} must carry an empty body`).toBe(0);
             }
         }
     });

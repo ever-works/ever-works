@@ -168,7 +168,13 @@ async function buildTenant(request: APIRequestContext, label: string): Promise<B
         scope: 'tenant',
         name: `${marker} Agent`,
     });
-    const skillId = await createSkill(request, headers, user.user.id, org.tenantId, `${marker} Skill`);
+    const skillId = await createSkill(
+        request,
+        headers,
+        user.user.id,
+        org.tenantId,
+        `${marker} Skill`,
+    );
     const missionId = await createMission(request, headers, `${marker} Mission`);
 
     return {

@@ -338,10 +338,10 @@ test.describe('Comparison generator — flag, generation gating, count, contract
         // ownership gate passes they read the in-memory progress cache and get
         // 200 { generating:false } (repo-independent, never a git 5xx). Confirms
         // the 403 above is an ownership signal, not a blanket failure.
-        const ownerStatus = await request.get(
-            `${workUrl(workId)}/comparisons/generation-status`,
-            { headers: ownerHeaders, timeout: COMP_TIMEOUT },
-        );
+        const ownerStatus = await request.get(`${workUrl(workId)}/comparisons/generation-status`, {
+            headers: ownerHeaders,
+            timeout: COMP_TIMEOUT,
+        });
         expect(ownerStatus.status()).toBe(200);
         expect((await ownerStatus.json()).generating).toBe(false);
 

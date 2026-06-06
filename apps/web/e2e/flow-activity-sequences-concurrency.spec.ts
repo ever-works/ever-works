@@ -323,10 +323,9 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         const responses = await Promise.all(
             firstWave.map(async (r) => {
                 if (r.status() === 202) return r;
-                expect(
-                    r.status(),
-                    `concurrent ingest body=${await r.text().catch(() => '')}`,
-                ).toBe(429);
+                expect(r.status(), `concurrent ingest body=${await r.text().catch(() => '')}`).toBe(
+                    429,
+                );
                 return ingestAccepted(request, workId, {
                     eventId,
                     occurredAt,
@@ -394,9 +393,7 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
         // outcome by retrying that SAME event. The retry lands on the same row,
         // so the "every event present exactly once" contract holds and the 202
         // is asserted, never weakened.
-        const firstWave = await Promise.all(
-            fields.map((f) => ingest(request, workId, f)),
-        );
+        const firstWave = await Promise.all(fields.map((f) => ingest(request, workId, f)));
         const responses = await Promise.all(
             firstWave.map(async (r, i) => {
                 if (r.status() === 202) return r;
