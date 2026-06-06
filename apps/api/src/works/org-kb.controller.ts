@@ -15,6 +15,10 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@ne
 import { KnowledgeBaseService, WorkOwnershipService } from '@ever-works/agent/services';
 import { CreateKbDocumentDto, KbDocumentQueryDto } from '@ever-works/agent/dto';
 import { OrganizationMembershipService } from '../organizations/organization-membership.service';
+import {
+    OrganizationOwnershipGuard,
+    OrgAdmin,
+} from '../organizations/guards/organization-ownership.guard';
 import type { KbDocumentClass, KbDocumentStatus } from '@ever-works/agent/entities';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -79,6 +83,7 @@ export class OrgKbController {
     }
 
     @Get('organizations/:orgId/kb/documents')
+    @UseGuards(OrganizationOwnershipGuard)
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'List organization-level KB documents' })
     @ApiQuery({ name: 'class', required: false, description: 'Filter by class (legal|style|seo)' })
@@ -89,6 +94,8 @@ export class OrgKbController {
         @Query() query: KbDocumentQueryDto,
     ) {
         // Security: reject cross-tenant reads of another org's KB docs.
+        // `OrganizationOwnershipGuard` (above) already enforces this
+        // default-on; the inline call is retained as defense-in-depth.
         await this.membership.ensureMember(orgId, auth.userId);
         return this.kb.listOrgDocuments(orgId, {
             class: query.class as KbDocumentClass | undefined,
@@ -96,6 +103,8 @@ export class OrgKbController {
     }
 
     @Post('organizations/:orgId/kb/documents')
+    @UseGuards(OrganizationOwnershipGuard)
+    @OrgAdmin()
     @HttpCode(HttpStatus.CREATED)
     @ApiOperation({
         summary: 'Create an organization-level KB document',
@@ -111,8 +120,10 @@ export class OrgKbController {
     ) {
         // Security: reject cross-tenant writes (stored prompt-injection /
         // repo poisoning of another tenant's org via attacker-supplied orgId).
-        // `ensureAdmin` is the write-side seam; today it's the same
+        // `@OrgAdmin()` + `OrganizationOwnershipGuard` (above) enforce this
+        // default-on via the write-side `ensureAdmin` seam — today the same
         // tenant-ownership check as `ensureMember` (org-admin role re-deferred).
+        // The inline call is retained as defense-in-depth.
         await this.membership.ensureAdmin(orgId, auth.userId);
         return this.kb.createOrgDocument(orgId, auth.userId, {
             path: body.path,
