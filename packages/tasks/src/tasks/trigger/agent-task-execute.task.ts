@@ -84,6 +84,24 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 return { status: 'skipped', reason: 'agent-not-found' };
             }
 
+            // Security: scope the Task lookup to the payload's userId before
+            // we link/create any AgentRun row (IDOR guard). `getOne` resolves
+            // via `TaskRepository.findByIdAndUser` and throws an
+            // existence-leak-safe 404 for a foreign/non-owned `taskId`, so a
+            // forged payload that pairs an owned `agentId` with another
+            // tenant's `taskId` cannot attach a run to that task. The
+            // legitimate dispatch path (`TaskTransitionService`) always derives
+            // `taskId` from a task the `userId` owns, so this never rejects a
+            // real run. We resolve `taskRow` here (instead of after
+            // markStarted) and reuse it for prompt assembly below — null only
+            // for a foreign/missing task, in which case we skip without
+            // mutating any run state. The reason is non-leaking and does not
+            // echo the caller-supplied `taskId`.
+            const taskRow = await tasks.getOne(payload.userId, payload.taskId).catch(() => null);
+            if (!taskRow) {
+                return { status: 'skipped', reason: 'task-not-found' };
+            }
+
             // Look up the dispatcher-queued in-flight run (created when
             // TaskTransitionService fanned out the dispatch). If we
             // don't find one, create on the fly so the audit trail is
@@ -120,7 +138,8 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
 
             await runs.markStarted(run.id, null);
 
-            const taskRow = await tasks.getOne(payload.userId, payload.taskId).catch(() => null);
+            // `taskRow` was resolved above (owner-scoped) before any run
+            // mutation; it is guaranteed non-null here.
             const immediateInput = taskRow
                 ? [
                       `Task ${taskRow.slug ?? taskRow.id}: ${taskRow.title}`,

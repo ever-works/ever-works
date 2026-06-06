@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { WorkInvitationRepository } from '../database/repositories/work-invitation.repository';
 import { WorkInvitation } from '../entities/work-invitation.entity';
+import { WorkOwnershipService } from './work-ownership.service';
 import {
     ALL_INVITATION_ROLES,
     INVITATION_ROLE_OWNER_CLAIM,
@@ -64,7 +65,10 @@ const TOKEN_BYTES = 32;
  */
 @Injectable()
 export class WorkInvitationService {
-    constructor(private readonly invitations: WorkInvitationRepository) {}
+    constructor(
+        private readonly invitations: WorkInvitationRepository,
+        private readonly ownership: WorkOwnershipService,
+    ) {}
 
     async issue(input: CreateInvitationInput): Promise<IssuedInvitation> {
         this.assertRole(input.role);
@@ -111,10 +115,12 @@ export class WorkInvitationService {
         if (invitation.status !== WorkInvitationStatus.PENDING) {
             throw new BadRequestException('invitation_not_pending');
         }
-        if (invitation.invitedById !== actorUserId) {
-            // Authorization beyond inviter (e.g., owner/manager) is enforced
-            // by the caller; this is a defensive default.
-        }
+        // Defense-in-depth: only a manager (or higher) on the underlying work
+        // may revoke a pending invitation. ensureCanManageMembers throws an
+        // existence-leak-safe error for non-managers, so a foreign actor can't
+        // probe or cancel another work's invitations even if the caller forgets
+        // its own check.
+        await this.ownership.ensureCanManageMembers(invitation.workId, actorUserId);
         const ok = await this.invitations.markRevoked(invitationId);
         if (!ok) {
             throw new BadRequestException('invitation_state_changed');

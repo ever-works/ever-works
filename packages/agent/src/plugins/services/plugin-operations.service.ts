@@ -59,6 +59,7 @@ import { buildProviderModelSummaries } from '../utils/plugin-model-settings.util
 // EW-693 — install-on-enable hook (T18). Optional so bundled-mode
 // deployments don't structurally depend on the installer.
 import { PluginInstallerService } from './plugin-installer.service';
+import { WorkOwnershipService } from '../../services/work-ownership.service';
 
 @Injectable()
 export class PluginOperationsService {
@@ -82,6 +83,19 @@ export class PluginOperationsService {
         // plugins before the existing registry.get() lookup.
         @Optional()
         private readonly pluginInstaller?: PluginInstallerService,
+        // Work-scoped authorization gate. NOT decorated `@Optional()`,
+        // so NestJS resolves it as a REQUIRED dependency by token (both
+        // this service and WorkOwnershipService are providers of
+        // WorkModule) and throws at startup if it can't be provided —
+        // it never silently no-ops. The TS `?` is only to satisfy the
+        // "required param cannot follow optional param" rule introduced
+        // by the two preceding `@Optional()` params; it does not relax
+        // the DI requirement. Appended at the END so positional
+        // construction in any unit spec keeps resolving the prior
+        // params. Used to fail-closed on the work-scoped read/write
+        // paths before any repository access so a foreign workId cannot
+        // be probed or mutated.
+        private readonly workOwnershipService?: WorkOwnershipService,
     ) {}
 
     /**
@@ -729,6 +743,14 @@ export class PluginOperationsService {
      * List plugins for a work with work-specific status
      */
     async listWorkPlugins(workId: string, userId: string): Promise<WorkPluginListResponse> {
+        // Defense-in-depth: gate the work-scoped READ on viewer access
+        // before touching the registry or any repository. Throws an
+        // existence-leak-safe 404/403 for a non-member, so a foreign
+        // workId cannot be probed. The `!` keeps this a hard call (never
+        // optional-chained) so a missing dependency throws rather than
+        // silently skipping the check.
+        await this.workOwnershipService!.ensureCanView(workId, userId);
+
         const allPlugins = this.pluginRegistryService.getAll();
 
         // Filter: visible + applicable to work scope
@@ -804,6 +826,14 @@ export class PluginOperationsService {
             priority?: number;
         },
     ): Promise<WorkPluginResponse> {
+        // Defense-in-depth: gate the work-scoped WRITE on editor access
+        // before touching the registry or any repository. Throws an
+        // existence-leak-safe 404/403 for a non-editor, so a foreign
+        // workId cannot be mutated. The `!` keeps this a hard call (never
+        // optional-chained) so a missing dependency throws rather than
+        // silently skipping the check.
+        await this.workOwnershipService!.ensureCanEdit(workId, userId);
+
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
