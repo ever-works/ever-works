@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { SubscriptionPlanCode } from '@src/entities/types';
 import { WorkScheduleBillingMode, WorkScheduleCadence } from '@ever-works/contracts/api';
@@ -620,6 +620,68 @@ describe('SubscriptionService', () => {
             });
             await service.assignPlanToUser({ id: 'u1' } as any, undefined as any);
             expect(planRepository.findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.FREE);
+        });
+    });
+
+    describe('changePlanSelfService (EW-711 #23 — self-service may only set FREE)', () => {
+        it('throws BadRequestException when subscriptions are disabled', async () => {
+            process.env.SUBSCRIPTIONS_ENABLED = 'false';
+            const { service } = makeService();
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as any, SubscriptionPlanCode.FREE),
+            ).rejects.toThrow(BadRequestException);
+        });
+
+        it('throws NotFoundException when the requested plan code is not in the DB', async () => {
+            const { service } = makeService({ findByCode: jest.fn().mockResolvedValue(null) });
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as any, SubscriptionPlanCode.FREE),
+            ).rejects.toThrow(NotFoundException);
+        });
+
+        it('assigns a FREE plan (monthlyPrice 0) and persists it', async () => {
+            const user = { id: 'u1' } as any;
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue(FREE_PLAN),
+            });
+            const plan = await service.changePlanSelfService(user, SubscriptionPlanCode.FREE);
+            expect(plan).toBe(FREE_PLAN);
+            expect(userRepository.update).toHaveBeenCalledWith('u1', {
+                defaultPlanId: FREE_PLAN.id,
+            });
+            expect(user.defaultPlanId).toBe(FREE_PLAN.id);
+        });
+
+        // The escalation the fix closes: a user must NOT be able to self-assign
+        // a paid tier (monthlyPrice > 0) — that requires a billing-verified
+        // grant via the privileged `assignPlanToUser`.
+        it.each([
+            ['STANDARD', SubscriptionPlanCode.STANDARD, STANDARD_PLAN],
+            ['PREMIUM', SubscriptionPlanCode.PREMIUM, PREMIUM_PLAN],
+        ] as const)(
+            'rejects self-assigning the paid %s plan with ForbiddenException and does NOT persist',
+            async (_label, code, planFixture) => {
+                const { service, userRepository } = makeService({
+                    findByCode: jest.fn().mockResolvedValue(planFixture),
+                });
+                await expect(
+                    service.changePlanSelfService({ id: 'u1' } as any, code),
+                ).rejects.toThrow(ForbiddenException);
+                // No grant happened — the user stays on their current plan.
+                expect(userRepository.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it('still lets the PRIVILEGED assignPlanToUser grant a paid plan (billing/admin seam unchanged)', async () => {
+            const user = { id: 'u1' } as any;
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue(PREMIUM_PLAN),
+            });
+            const plan = await service.assignPlanToUser(user, SubscriptionPlanCode.PREMIUM);
+            expect(plan).toBe(PREMIUM_PLAN);
+            expect(userRepository.update).toHaveBeenCalledWith('u1', {
+                defaultPlanId: PREMIUM_PLAN.id,
+            });
         });
     });
 
