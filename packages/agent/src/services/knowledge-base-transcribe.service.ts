@@ -54,11 +54,24 @@ export class KnowledgeBaseTranscribeService {
         private readonly documents: WorkKnowledgeDocumentRepository,
         private readonly kb: KnowledgeBaseService,
         private readonly aiFacade: AiFacadeService,
-        @Inject(KB_STORAGE_PLUGIN) private readonly storage: IStoragePlugin,
+        // Optional so consumers that import KnowledgeBaseModule but never
+        // dispatch a transcribe task (e.g. internal-cli's WorkModule import
+        // chain) still construct. The API provides KB_STORAGE_PLUGIN via
+        // the @Global() KbStorageModule; if storage is missing at the call
+        // site we throw a loud runtime error rather than silently no-op.
+        @Optional()
+        @Inject(KB_STORAGE_PLUGIN)
+        private readonly storage?: IStoragePlugin,
         @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     async transcribeUpload(payload: KbTranscribePayload): Promise<KbTranscribeResult> {
+        if (!this.storage) {
+            throw new Error(
+                `kb-transcribe: KB_STORAGE_PLUGIN is not provided in this DI scope — ` +
+                    `wire KbStorageModule (or equivalent) when dispatching transcribe tasks.`,
+            );
+        }
         const upload = await this.uploads.findById(payload.workId, payload.uploadId);
         if (!upload) {
             throw new Error(

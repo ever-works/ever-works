@@ -71,7 +71,14 @@ export class KnowledgeBaseMediaNormalizeService {
 
     constructor(
         private readonly uploads: WorkKnowledgeUploadRepository,
-        @Inject(KB_STORAGE_PLUGIN) private readonly storage: IStoragePlugin,
+        // Optional so consumers that import KnowledgeBaseModule but never
+        // dispatch a normalize task (e.g. internal-cli's WorkModule import
+        // chain) still construct. The API provides KB_STORAGE_PLUGIN via
+        // the @Global() KbStorageModule; if storage is missing at the call
+        // site we throw a loud runtime error rather than silently no-op.
+        @Optional()
+        @Inject(KB_STORAGE_PLUGIN)
+        private readonly storage?: IStoragePlugin,
         @Optional()
         @Inject(KB_TRANSCRIBE_DISPATCHER)
         private readonly transcribeDispatcher?: KbTranscribeDispatcher,
@@ -97,6 +104,12 @@ export class KnowledgeBaseMediaNormalizeService {
         payload: KbNormalizeMediaPayload,
         stage: 'video' | 'audio',
     ): Promise<KbNormalizeResult> {
+        if (!this.storage) {
+            throw new Error(
+                `kb-normalize-${stage}: KB_STORAGE_PLUGIN is not provided in this DI scope — ` +
+                    `wire KbStorageModule (or equivalent) when dispatching media normalize tasks.`,
+            );
+        }
         const started = Date.now();
         const upload = await this.uploads.findById(payload.workId, payload.uploadId);
         if (!upload) {
