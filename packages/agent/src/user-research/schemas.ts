@@ -30,7 +30,12 @@ const isSafeHttpsSourceUrl = (raw: string): boolean => {
     // the shared guard, which other callers — e.g. the agent-memory localhost
     // default — intentionally allow.)
     const host = parsed.hostname.toLowerCase();
-    if (host === 'localhost' || host === 'ip6-localhost' || host === 'ip6-loopback' || host.endsWith('.localhost')) {
+    if (
+        host === 'localhost' ||
+        host === 'ip6-localhost' ||
+        host === 'ip6-loopback' ||
+        host.endsWith('.localhost')
+    ) {
         return false;
     }
     return isSafeWebhookUrl(raw);
@@ -46,13 +51,10 @@ export const inferredProfileSchema = z.object({
     sources: z
         .array(
             z.object({
-                url: z
-                    .string()
-                    .url()
-                    .refine(isSafeHttpsSourceUrl, {
-                        message:
-                            'Source url must be a public https URL (no http, private IPs, loopback, link-local, or cloud-metadata targets)',
-                    }),
+                url: z.string().url().refine(isSafeHttpsSourceUrl, {
+                    message:
+                        'Source url must be a public https URL (no http, private IPs, loopback, link-local, or cloud-metadata targets)',
+                }),
                 title: z.string(),
             }),
         )

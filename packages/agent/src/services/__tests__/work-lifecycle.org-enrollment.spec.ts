@@ -25,7 +25,11 @@ import { WorkOwnershipService } from '../work-ownership.service';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
 import { TemplateCatalogService } from '@src/template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from '../work-website-repository-state.service';
-import { EverWorksDeployQuotaService, EverWorksGitProvider, EverWorksDnsService } from '@src/ever-works-providers';
+import {
+    EverWorksDeployQuotaService,
+    EverWorksGitProvider,
+    EverWorksDnsService,
+} from '@src/ever-works-providers';
 import { ZeroFrictionFunnelService } from '../zero-friction-funnel.service';
 import type { Work } from '@src/entities/work.entity';
 import type { Organization } from '@src/entities/organization.entity';
@@ -82,15 +86,19 @@ describe('WorkLifecycleService — org-KB enrollment tenant guard (EW-711 #27)',
 
         workRepository = {
             // `updateWork` returns whatever `update` resolves; echo a work-shaped row.
-            update: jest.fn().mockImplementation(async (_id: string, data: Record<string, unknown>) => ({
-                ...work,
-                ...data,
-                getRepoOwner: () => 'acme',
-            })),
+            update: jest
+                .fn()
+                .mockImplementation(async (_id: string, data: Record<string, unknown>) => ({
+                    ...work,
+                    ...data,
+                    getRepoOwner: () => 'acme',
+                })),
         };
         organizationRepository = { findById: jest.fn() };
         ownershipService = {
-            ensureCanEdit: jest.fn().mockResolvedValue({ work, member: null, role: 'owner', isCreator: true }),
+            ensureCanEdit: jest
+                .fn()
+                .mockResolvedValue({ work, member: null, role: 'owner', isCreator: true }),
         };
 
         const module: TestingModule = await Test.createTestingModule({
@@ -154,7 +162,9 @@ describe('WorkLifecycleService — org-KB enrollment tenant guard (EW-711 #27)',
         expect(result.status).toBe('success');
         expect(organizationRepository.findById).toHaveBeenCalledWith(OWN_ORG_ID);
         expect(workRepository.update).toHaveBeenCalledTimes(1);
-        expect(workRepository.update.mock.calls[0][1]).toMatchObject({ organizationId: OWN_ORG_ID });
+        expect(workRepository.update.mock.calls[0][1]).toMatchObject({
+            organizationId: OWN_ORG_ID,
+        });
     });
 
     it('clears membership when organizationId is null WITHOUT an org lookup', async () => {

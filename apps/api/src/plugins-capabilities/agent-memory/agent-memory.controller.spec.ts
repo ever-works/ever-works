@@ -195,9 +195,9 @@ describe('AgentMemoryController', () => {
             agentMemory.listSessions.mockResolvedValueOnce([
                 { id: 'sess-foreign', metadata: { ownerUserId: 'user-2' } },
             ]);
-            await expect(
-                controller.closeSession(auth, 'sess-foreign', {}),
-            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(controller.closeSession(auth, 'sess-foreign', {})).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
             expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
             expect(agentMemory.closeSession).not.toHaveBeenCalled();
         });
@@ -271,19 +271,29 @@ describe('AgentMemoryController', () => {
             // but was saved by another user — the owner stamp must block it.
             agentMemory.searchMemory.mockResolvedValueOnce({
                 results: [
-                    { id: 'mem-foreign', content: 'x', createdAt: 'now', metadata: { ownerUserId: 'user-2' } },
+                    {
+                        id: 'mem-foreign',
+                        content: 'x',
+                        createdAt: 'now',
+                        metadata: { ownerUserId: 'user-2' },
+                    },
                 ],
             });
-            await expect(
-                controller.deleteEntry(auth, 'mem-foreign', {}),
-            ).rejects.toBeInstanceOf(ForbiddenException);
+            await expect(controller.deleteEntry(auth, 'mem-foreign', {})).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
             expect(agentMemory.deleteEntry).not.toHaveBeenCalled();
         });
 
         it('allows the caller to forget their own entry (workId omitted)', async () => {
             agentMemory.searchMemory.mockResolvedValueOnce({
                 results: [
-                    { id: 'mem-mine', content: 'x', createdAt: 'now', metadata: { ownerUserId: 'user-1' } },
+                    {
+                        id: 'mem-mine',
+                        content: 'x',
+                        createdAt: 'now',
+                        metadata: { ownerUserId: 'user-1' },
+                    },
                 ],
             });
             await controller.deleteEntry(auth, 'mem-mine', {});

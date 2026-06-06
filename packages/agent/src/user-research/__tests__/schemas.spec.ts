@@ -54,7 +54,8 @@ describe('inferredProfileSchema', () => {
 
     it('rejects non-https source URLs', () => {
         expect(
-            inferredProfileSchema.safeParse(profileWithSource('http://example.com/article')).success,
+            inferredProfileSchema.safeParse(profileWithSource('http://example.com/article'))
+                .success,
         ).toBe(false);
     });
 
