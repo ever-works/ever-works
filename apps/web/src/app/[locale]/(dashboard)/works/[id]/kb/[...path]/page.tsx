@@ -5,10 +5,12 @@ import { workAPI } from '@/lib/api';
 import { kbAPI } from '@/lib/api/kb';
 import { ApiResponseError } from '@/lib/api/server-api';
 import { WorkbenchShell } from '@/components/kb/workbench/WorkbenchShell';
-import { KbTreePanel } from '@/components/kb/workbench/KbTreePanel';
+import { WorkbenchUploadCoordinator } from '@/components/kb/workbench/WorkbenchUploadCoordinator';
 import { KbDocumentHeader } from '@/components/kb/workbench/KbDocumentHeader';
 import { TiptapEditor } from '@/components/kb/workbench/TiptapEditor';
 import { KbMetadataPanel } from '@/components/kb/workbench/KbMetadataPanel';
+import { KbDocumentViewerSwitch } from '@/components/kb/workbench/KbDocumentViewerSwitch';
+import type { KbUploadDto } from '@ever-works/contracts';
 
 type Params = {
     params: Promise<{ id: string; path: string[]; locale: string }>;
@@ -89,13 +91,54 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
         throw error;
     }
 
+    // Slice D — when the doc was derived from a binary upload (a PDF,
+    // image, etc.), fetch the upload row so we can dispatch to the
+    // matching inline viewer. `KbDocumentDto` doesn't carry the MIME
+    // type or byte size; both live on `KbUploadDto`. We swallow a
+    // 404 here (orphaned `sourceUploadId`) and fall through to the
+    // Markdown editor so the doc still loads in a degraded but
+    // usable state.
+    let upload: KbUploadDto | null = null;
+    if (doc.sourceUploadId) {
+        try {
+            upload = await kbAPI.getUpload(id, doc.sourceUploadId);
+        } catch (error) {
+            if (error instanceof ApiResponseError && error.statusCode === 404) {
+                upload = null;
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    const bareMime = (upload?.mimeType ?? '').split(';')[0].trim().toLowerCase();
+    const useInlineViewer =
+        upload !== null &&
+        bareMime.length > 0 &&
+        bareMime !== 'text/markdown' &&
+        bareMime !== 'text/plain';
+    const downloadUrl = upload ? `/api/works/${id}/kb/uploads/${upload.id}/download` : undefined;
+
     return (
         <WorkbenchShell
-            left={<KbTreePanel workId={id} currentDocPath={doc.path} />}
+            left={<WorkbenchUploadCoordinator workId={id} currentDocPath={doc.path} />}
             center={
                 <div className="flex h-full flex-col">
                     <KbDocumentHeader workId={id} document={doc} />
-                    <TiptapEditor workId={id} document={doc} initialBody={doc.body} />
+                    {useInlineViewer && upload ? (
+                        <div className="flex-1 overflow-auto p-4">
+                            <KbDocumentViewerSwitch
+                                workId={id}
+                                document={doc}
+                                mimeType={upload.mimeType}
+                                fileSize={upload.fileSize}
+                                filename={upload.originalFilename}
+                                downloadUrl={downloadUrl}
+                            />
+                        </div>
+                    ) : (
+                        <TiptapEditor workId={id} document={doc} initialBody={doc.body} />
+                    )}
                 </div>
             }
             right={<KbMetadataPanel workId={id} document={doc} />}

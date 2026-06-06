@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { workAPI } from '@/lib/api';
 import { kbAPI } from '@/lib/api/kb';
 import { WorkbenchShell } from '@/components/kb/workbench/WorkbenchShell';
-import { KbTreePanel } from '@/components/kb/workbench/KbTreePanel';
+import { WorkbenchUploadCoordinator } from '@/components/kb/workbench/WorkbenchUploadCoordinator';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.workDetail.kb');
@@ -47,7 +47,7 @@ export default async function WorkKnowledgeBasePage({ params }: Params) {
 
     return (
         <WorkbenchShell
-            left={<KbTreePanel workId={id} />}
+            left={<WorkbenchUploadCoordinator workId={id} />}
             center={
                 <div
                     data-testid="kb-workbench-empty"
