@@ -39,6 +39,7 @@ import {
 import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '../tasks';
 import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '../tasks';
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } from '../tasks';
+import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
 import type {
     CitationDto,
@@ -197,6 +198,19 @@ export class KnowledgeBaseService {
         // keep constructing — when absent, the enqueue degrades to
         // a no-op log and defers to Phase 3 reconciliation.
         @Optional() private readonly workRepository?: WorkRepository,
+        // EW-643 Phase 3 slice 2c — KB media normalize dispatcher.
+        // Triggered from `createUpload` immediately after the upload
+        // row lands for a `video/*` or `audio/*` MIME family so an
+        // ffmpeg-backed normalize job runs in the background. Optional
+        // so isolated unit tests + deployments without Trigger.dev
+        // wired keep constructing; when absent, the upload row stays
+        // in its current extraction state and slice 5's reconciliation
+        // job catches the drift. Fire-and-forget shape mirrors
+        // `enqueueMirror` / `enqueueEmbed` — a queue outage logs a
+        // warning but never bubbles up to the user-facing API write.
+        @Optional()
+        @Inject(KB_NORMALIZE_MEDIA_DISPATCHER)
+        private readonly normalizeMediaDispatcher?: KbNormalizeMediaDispatcher,
     ) {}
 
     /**
@@ -317,6 +331,53 @@ export class KnowledgeBaseService {
         } catch (error) {
             this.logger.warn(
                 `Failed to enqueue KB org-overlay fanout for ${operation} ${docPath} (org=${organizationId}): ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * EW-643 Phase 3 slice 2c — dispatch the ffmpeg-backed normalize
+     * task for one KB upload, iff the upload's reported MIME family is
+     * `video/*` or `audio/*` AND the dispatcher token is bound (i.e.
+     * Trigger.dev is wired into this deployment).
+     *
+     * Fire-and-forget: any error from the dispatcher is logged but
+     * never bubbles back to the caller. The upload row already lives
+     * in the DB; rolling the whole `createUpload` back on a queue
+     * outage would be an unrecoverable user-facing failure for a
+     * deferred-side-effect.
+     *
+     * Slice 5's reconciliation job catches uploads whose normalize
+     * dispatch silently dropped.
+     */
+    private async maybeDispatchMediaNormalize(
+        upload: WorkKnowledgeUpload,
+        mimeType: string,
+        sha256: string,
+    ): Promise<void> {
+        if (!this.normalizeMediaDispatcher) {
+            return;
+        }
+        const bare = mimeType.split(';')[0].trim().toLowerCase();
+        const mediaKind: 'video' | 'audio' | null = bare.startsWith('video/')
+            ? 'video'
+            : bare.startsWith('audio/')
+              ? 'audio'
+              : null;
+        if (!mediaKind) {
+            return;
+        }
+        try {
+            await this.normalizeMediaDispatcher.dispatchKbNormalizeMedia({
+                workId: upload.workId,
+                uploadId: upload.id,
+                mediaKind,
+                originalSha256: sha256,
+                originalMimeType: bare,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to enqueue KB media-normalize for upload ${upload.id} (work=${upload.workId}, kind=${mediaKind}): ${(error as Error).message}`,
             );
         }
     }
@@ -1320,6 +1381,16 @@ export class KnowledgeBaseService {
                 sha256,
             },
         );
+
+        // EW-643 Phase 3 slice 2c — branch on MIME family. For video/*
+        // and audio/* uploads, fire-and-forget enqueue the ffmpeg-backed
+        // normalize task (which in turn dispatches transcribe). We do
+        // NOT skip the existing extract+materialize path — the row-21b
+        // viewable stub still gets created so the media is reachable
+        // from the KB tree while the background pipeline runs. Wrapped
+        // in try/catch + logger.warn so a queue outage (Trigger.dev
+        // disabled / disposed) never rolls back the upload row.
+        await this.maybeDispatchMediaNormalize(upload, input.file.mimeType, sha256);
 
         const document = await this.extractAndMaterialize(upload, input);
         // `upload` above was returned from `uploadRepository.create` with
