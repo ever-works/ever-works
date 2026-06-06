@@ -119,6 +119,19 @@ export {
 // hosted `agentmemory` REST server on :3111)
 export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
 
+// Vector Store Facade — EW-642 RFC §6 selection chain + D4 embedding
+// mode resolver. Routes KB chunk upsert / query / delete through the
+// resolved `IVectorStorePlugin` for the (work, user) tuple.
+export {
+    VectorStoreFacadeService,
+    VectorStoreNotConfiguredError,
+    EmbeddingModeResolver,
+    EmbeddingModeUnsupportedError,
+    type SelectVectorStoreOpts,
+    type EmbeddingMode,
+    type EmbeddingModeSetting,
+} from './vector-store.facade';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {
