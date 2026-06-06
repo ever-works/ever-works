@@ -5,11 +5,22 @@ import {
     type FeedResponse,
     type GetActivityFeedParams,
 } from '@/lib/api/works/activity-feed';
+import { getAuthFromCookie } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { ROUTES } from '@/lib/constants';
 
 export async function getActivityFeed(
     workId: string,
     params?: GetActivityFeedParams,
 ): Promise<{ success: true; data: FeedResponse } | { success: false; error: string }> {
+    // Security: defense-in-depth auth guard at the web tier — server actions are
+    // reachable as POST endpoints via the Next-Action header so UI gating is not
+    // a security boundary. Matches the pattern in conversations.ts / budgets.ts.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const data = await activityFeedAPI.get(workId, params);
         return { success: true, data };

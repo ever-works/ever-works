@@ -30,6 +30,47 @@ interface ReleaseResponse {
 /** Socket idle timeout (ms). Resets on activity, so it's safe for large downloads on slow links. */
 const FETCH_SOCKET_IDLE_TIMEOUT_MS = 60_000;
 
+// Security: cap the in-memory download size so a compromised CDN / MITM serving an
+// unbounded (or chunked-infinite) response cannot OOM the API process. 500 MB is far
+// above any real OpenCode archive (tens of MB) yet bounds heap growth in fetchBuffer.
+const FETCH_MAX_BYTES = 500 * 1024 * 1024;
+
+// Security: the binary archive + checksum are downloaded over the network and then
+// extracted/chmod'd/executed as a native subprocess. Restrict every fetch (the GitHub
+// API release JSON, the archive, and the .sha256) to https on GitHub-controlled hosts so
+// a spoofed redirect / poisoned browser_download_url cannot point us at an internal
+// metadata endpoint (SSRF, e.g. 169.254.169.254) or an attacker-hosted artifact.
+const ALLOWED_DOWNLOAD_HOSTS: ReadonlySet<string> = new Set([
+	'api.github.com',
+	'github.com',
+	'objects.githubusercontent.com',
+	'release-assets.githubusercontent.com',
+	'codeload.github.com'
+]);
+
+// Security: the OpenCode CLI `version` is operator/tenant-supplied plugin settings
+// (settings.version) and is interpolated into both the GitHub release URL and the cached
+// binary's on-disk path (getBinaryPath -> path.join). Restrict it to a semver-like token
+// (optional leading `v`, optional pre-release/build suffix) so values such as
+// `../../etc/cron.d` cannot traverse out of the cache dir or inject into the URL.
+const VERSION_PATTERN = /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u;
+
+function assertAllowedDownloadUrl(url: string): URL {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		throw new Error(`Invalid OpenCode download URL: ${url}`);
+	}
+	if (parsed.protocol !== 'https:') {
+		throw new Error(`Refusing non-https OpenCode download URL: ${url}`);
+	}
+	if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname)) {
+		throw new Error(`Refusing OpenCode download from disallowed host: ${parsed.hostname}`);
+	}
+	return parsed;
+}
+
 function fetchBuffer(url: string, maxRedirects = 5, signal?: AbortSignal): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		if (maxRedirects <= 0) {
@@ -41,7 +82,18 @@ function fetchBuffer(url: string, maxRedirects = 5, signal?: AbortSignal): Promi
 			return;
 		}
 
-		const client = url.startsWith('https://') ? https : http;
+		// Security: enforce https + GitHub host allowlist on every hop. Because redirects are
+		// followed by recursing into fetchBuffer, validating here also gates redirect targets,
+		// blocking SSRF/open-redirect to internal or metadata IPs and downgrade-to-http MITM.
+		let parsed: URL;
+		try {
+			parsed = assertAllowedDownloadUrl(url);
+		} catch (err) {
+			reject(err instanceof Error ? err : new Error(String(err)));
+			return;
+		}
+
+		const client = parsed.protocol === 'https:' ? https : http;
 		const req = client.get(
 			url,
 			{
@@ -52,7 +104,17 @@ function fetchBuffer(url: string, maxRedirects = 5, signal?: AbortSignal): Promi
 			(res) => {
 				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
 					res.resume(); // drain so the socket is released before following the redirect
-					fetchBuffer(res.headers.location, maxRedirects - 1, signal).then(resolve, reject);
+					// Security: resolve relative redirects against the current URL so the allowlist
+					// check in the recursive call sees an absolute URL (a bare path would otherwise
+					// throw as "invalid"); the recursive assertAllowedDownloadUrl still re-validates it.
+					let redirectUrl: string;
+					try {
+						redirectUrl = new URL(res.headers.location, url).toString();
+					} catch {
+						reject(new Error(`Invalid redirect location while fetching ${url}`));
+						return;
+					}
+					fetchBuffer(redirectUrl, maxRedirects - 1, signal).then(resolve, reject);
 					return;
 				}
 
@@ -62,8 +124,18 @@ function fetchBuffer(url: string, maxRedirects = 5, signal?: AbortSignal): Promi
 					return;
 				}
 
+				// Security: bound accumulated bytes to prevent unbounded heap growth (DoS/OOM)
+				// from a malicious/compromised server streaming an arbitrarily large response.
 				const chunks: Buffer[] = [];
-				res.on('data', (chunk: Buffer) => chunks.push(chunk));
+				let total = 0;
+				res.on('data', (chunk: Buffer) => {
+					total += chunk.length;
+					if (total > FETCH_MAX_BYTES) {
+						req.destroy(new Error(`Response exceeded ${FETCH_MAX_BYTES} bytes fetching ${url}`));
+						return;
+					}
+					chunks.push(chunk);
+				});
 				res.on('end', () => resolve(Buffer.concat(chunks)));
 				res.on('error', reject);
 			}
@@ -115,14 +187,36 @@ async function verifySha256(filePath: string, checksum: string): Promise<boolean
 	return createHash('sha256').update(file).digest('hex') === checksum;
 }
 
+// Security: reject any archive entry whose resolved destination escapes the extraction
+// directory (zip-slip / tar path traversal). The archive is downloaded over the network,
+// so a compromised release could embed `../../etc/cron.d/evil` to write outside tempDir.
+function isPathWithin(outputDir: string, entryName: string): boolean {
+	const root = path.resolve(outputDir);
+	const resolved = path.resolve(root, entryName);
+	return resolved === root || resolved.startsWith(root + path.sep);
+}
+
 async function unzipArchive(archivePath: string, outputDir: string): Promise<void> {
-	await extractZip(archivePath, { dir: outputDir });
+	const root = path.resolve(outputDir);
+	await extractZip(archivePath, {
+		dir: outputDir,
+		// Security: defense-in-depth zip-slip guard (does not rely solely on extract-zip's
+		// internal confinement, which could regress on a downgrade).
+		onEntry: (entry) => {
+			if (!isPathWithin(root, entry.fileName)) {
+				throw new Error(`Refusing to extract path-traversing zip entry: ${entry.fileName}`);
+			}
+		}
+	});
 }
 
 async function extractTarGzArchive(archivePath: string, outputDir: string): Promise<void> {
+	const root = path.resolve(outputDir);
 	await tar.x({
 		file: archivePath,
-		cwd: outputDir
+		cwd: outputDir,
+		// Security: tar zip-slip guard — drop any entry that resolves outside outputDir.
+		filter: (entryPath: string) => isPathWithin(root, entryPath)
 	});
 }
 
@@ -165,6 +259,13 @@ export async function ensureBinary(
 	logger?: Logger,
 	signal?: AbortSignal
 ): Promise<string> {
+	// Security: validate the operator/tenant-supplied version before it is interpolated into
+	// the GitHub release URL and the on-disk cache path. Rejects path-traversal / injection
+	// payloads (e.g. `../../etc/cron.d`) while accepting normal semver tags like `v1.0.223`.
+	if (!VERSION_PATTERN.test(version)) {
+		throw new Error(`Invalid OpenCode CLI version: ${version}`);
+	}
+
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
 
@@ -199,14 +300,20 @@ export async function ensureBinary(
 		const archiveBuffer = await fetchBuffer(archiveAsset.browser_download_url, 5, signal);
 		await fs.writeFile(archivePath, archiveBuffer);
 
+		// Security: fail closed when no checksum is available. Previously this logged a warning
+		// and installed/executed the downloaded native binary with no integrity check, so a
+		// MITM / compromised release that omits the digest and .sha256 asset could ship a
+		// trojaned binary that is then chmod'd and run as a subprocess. Refuse to proceed.
 		const checksum = await resolveChecksum(release.assets, archiveName, signal);
-		if (checksum) {
-			const valid = await verifySha256(archivePath, checksum);
-			if (!valid) {
-				throw new Error(`Checksum mismatch for OpenCode ${release.tag_name} (${archiveName})`);
-			}
-		} else {
-			logger?.warn(`No checksum asset found for ${archiveName}; proceeding without checksum verification.`);
+		if (!checksum) {
+			throw new Error(
+				`No checksum (digest or .sha256 asset) found for OpenCode ${release.tag_name} (${archiveName}); ` +
+					`refusing to install an unverified binary.`
+			);
+		}
+		const valid = await verifySha256(archivePath, checksum);
+		if (!valid) {
+			throw new Error(`Checksum mismatch for OpenCode ${release.tag_name} (${archiveName})`);
 		}
 
 		await extractArchive(archivePath, tempDir);

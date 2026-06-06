@@ -8,12 +8,14 @@ const mockGetWorkflowStatus = vi.fn();
 const mockExecuteWorkflow = vi.fn();
 
 vi.mock('simstudio-ts-sdk', () => ({
-	SimStudioClient: vi.fn().mockImplementation(() => ({
-		validateWorkflow: mockValidateWorkflow,
-		getWorkflowStatus: mockGetWorkflowStatus,
-		executeWorkflow: mockExecuteWorkflow,
-		getRateLimitInfo: vi.fn().mockReturnValue(null)
-	})),
+	SimStudioClient: vi.fn().mockImplementation(function () {
+		return {
+			validateWorkflow: mockValidateWorkflow,
+			getWorkflowStatus: mockGetWorkflowStatus,
+			executeWorkflow: mockExecuteWorkflow,
+			getRateLimitInfo: vi.fn().mockReturnValue(null)
+		};
+	}),
 	SimStudioError: class SimStudioError extends Error {
 		code?: string;
 		status?: number;

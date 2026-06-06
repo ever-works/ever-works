@@ -95,7 +95,10 @@ test.describe('Skills — API contract', () => {
             data: { ownerType: 'tenant', title: 'S', description: 'd', instructionsMd: '# S' },
         });
         expect(noOwnerId.status()).toBe(400);
-        expect((await noOwnerId.json()).message).toMatch(/ownerId is required/i);
+        // ownerId is a required @IsUUID() field: omitting it fails class-validator,
+        // surfaced via the global ValidationPipe's default message array.
+        const noOwnerIdMsg = [].concat((await noOwnerId.json()).message).join(' ');
+        expect(noOwnerIdMsg).toMatch(/ownerId must be a UUID/i);
 
         const badType = await request.post(`${API_BASE}/api/skills`, {
             headers,
@@ -108,7 +111,10 @@ test.describe('Skills — API contract', () => {
             },
         });
         expect(badType.status()).toBe(400);
-        expect((await badType.json()).message).toMatch(/invalid ownerType/i);
+        // 'user' is not in SKILL_OWNER_TYPES (tenant/mission/idea/work/agent) — the
+        // @IsEnum guard rejects it with the default "must be one of …" message.
+        const badTypeMsg = [].concat((await badType.json()).message).join(' ');
+        expect(badTypeMsg).toMatch(/ownerType must be one of the following values/i);
     });
 
     test('PATCH /api/skills/:id updates body and recomputes contentHash', async ({ request }) => {

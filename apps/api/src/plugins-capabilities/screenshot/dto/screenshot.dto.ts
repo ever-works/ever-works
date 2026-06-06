@@ -8,12 +8,36 @@ import {
     IsIn,
     IsString,
     IsUUID,
+    Validate,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
+
+// Security (SSRF): `@IsUrl` with no options accepts URLs whose host is a
+// literal private/loopback/link-local IP (e.g. http://169.254.169.254 AWS
+// IMDS) or a cloud-metadata hostname. The validated URL is forwarded to
+// third-party screenshot providers; if those providers follow private-address
+// URLs they can leak cloud credentials. Block at the DTO boundary with the
+// same lexical guard used by WebhooksService / WorkGenerationService.
+@ValidatorConstraint({ name: 'isNotSsrfUrl', async: false })
+class IsNotSsrfUrlConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        return typeof value === 'string' && isSafeWebhookUrl(value);
+    }
+
+    defaultMessage(): string {
+        return 'URL is not allowed';
+    }
+}
 
 export class CaptureScreenshotDto {
     @ApiProperty({ description: 'URL of the page to capture', example: 'https://example.com' })
-    @IsUrl()
+    // Security: restrict to HTTPS, require a TLD, and block private/loopback/
+    // link-local addresses and cloud-metadata hostnames via the SSRF guard.
+    @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: true })
+    @Validate(IsNotSsrfUrlConstraint)
     url: string;
 
     @ApiPropertyOptional({

@@ -56,6 +56,10 @@ import {
     removeActiveCapability,
 } from '../utils/active-capabilities.util';
 import { buildProviderModelSummaries } from '../utils/plugin-model-settings.utils';
+// EW-693 — install-on-enable hook (T18). Optional so bundled-mode
+// deployments don't structurally depend on the installer.
+import { PluginInstallerService } from './plugin-installer.service';
+import { WorkOwnershipService } from '../../services/work-ownership.service';
 
 @Injectable()
 export class PluginOperationsService {
@@ -74,7 +78,49 @@ export class PluginOperationsService {
         private readonly aiFacade: AiFacadeService,
         @Optional()
         private readonly eventEmitter?: EventEmitter2,
+        // EW-693 — optional install-on-enable hook. Inert in bundled
+        // mode; in dynamic mode it lazily installs distributable
+        // plugins before the existing registry.get() lookup.
+        @Optional()
+        private readonly pluginInstaller?: PluginInstallerService,
+        // Work-scoped authorization gate. NOT decorated `@Optional()`,
+        // so NestJS resolves it as a REQUIRED dependency by token (both
+        // this service and WorkOwnershipService are providers of
+        // WorkModule) and throws at startup if it can't be provided —
+        // it never silently no-ops. The TS `?` is only to satisfy the
+        // "required param cannot follow optional param" rule introduced
+        // by the two preceding `@Optional()` params; it does not relax
+        // the DI requirement. Appended at the END so positional
+        // construction in any unit spec keeps resolving the prior
+        // params. Used to fail-closed on the work-scoped read/write
+        // paths before any repository access so a foreign workId cannot
+        // be probed or mutated.
+        private readonly workOwnershipService?: WorkOwnershipService,
     ) {}
+
+    /**
+     * EW-693 / T18 — Lazy install-on-enable.
+     *
+     * Called at the top of every enable path. In bundled mode this is
+     * a no-op (the installer is undefined or returns immediately). In
+     * dynamic mode, if the plugin isn't already registered, this calls
+     * `installer.ensurePluginAvailable(pluginId)` so the package is
+     * downloaded + verified + placed under the install dir's
+     * `node_modules/`, then prompts a re-discover via the loader (the
+     * existing path scan picks up the new symlink). If install fails,
+     * the original NotFoundException-with-context is thrown so the
+     * caller surfaces the registry/install error.
+     *
+     * Failure here MUST NOT register a half-loaded plugin (FR-14).
+     * `ensurePluginAvailable` writes installState='error' on its own;
+     * this method only forwards the error.
+     */
+    private async ensurePluginInstalledOrThrow(pluginId: string): Promise<void> {
+        if (!this.pluginInstaller) return;
+        if (this.pluginInstaller.getDistributionMode() !== 'dynamic') return;
+        if (this.pluginRegistryService.get(pluginId)) return;
+        await this.pluginInstaller.ensurePluginAvailable(pluginId);
+    }
 
     // ============================================
     // Plugin List Operations
@@ -395,6 +441,12 @@ export class PluginOperationsService {
         secretSettings?: Record<string, unknown>,
         autoEnableForWorks?: boolean,
     ): Promise<UserPluginResponse> {
+        // EW-693 / T18 — install-on-enable for dynamic-mode plugins.
+        // No-op in bundled mode; in dynamic mode this fetches +
+        // verifies + places the plugin under installDir/node_modules
+        // before the registry lookup below runs.
+        await this.ensurePluginInstalledOrThrow(pluginId);
+
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);
@@ -691,6 +743,14 @@ export class PluginOperationsService {
      * List plugins for a work with work-specific status
      */
     async listWorkPlugins(workId: string, userId: string): Promise<WorkPluginListResponse> {
+        // Defense-in-depth: gate the work-scoped READ on viewer access
+        // before touching the registry or any repository. Throws an
+        // existence-leak-safe 404/403 for a non-member, so a foreign
+        // workId cannot be probed. The `!` keeps this a hard call (never
+        // optional-chained) so a missing dependency throws rather than
+        // silently skipping the check.
+        await this.workOwnershipService!.ensureCanView(workId, userId);
+
         const allPlugins = this.pluginRegistryService.getAll();
 
         // Filter: visible + applicable to work scope
@@ -766,6 +826,14 @@ export class PluginOperationsService {
             priority?: number;
         },
     ): Promise<WorkPluginResponse> {
+        // Defense-in-depth: gate the work-scoped WRITE on editor access
+        // before touching the registry or any repository. Throws an
+        // existence-leak-safe 404/403 for a non-editor, so a foreign
+        // workId cannot be mutated. The `!` keeps this a hard call (never
+        // optional-chained) so a missing dependency throws rather than
+        // silently skipping the check.
+        await this.workOwnershipService!.ensureCanEdit(workId, userId);
+
         const registered = this.pluginRegistryService.get(pluginId);
         if (!registered) {
             throw new NotFoundException(`Plugin "${pluginId}" not found`);

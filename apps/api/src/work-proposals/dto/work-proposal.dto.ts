@@ -4,10 +4,14 @@ import {
     IsArray,
     IsBoolean,
     IsEnum,
+    IsInt,
     IsOptional,
     IsString,
     IsUUID,
+    Matches,
+    Max,
     MaxLength,
+    Min,
     MinLength,
 } from 'class-validator';
 import { WorkProposalSource, WorkProposalStatus } from '@ever-works/agent/user-research';
@@ -45,6 +49,40 @@ export class ListWorkProposalsQueryDto {
     @IsOptional()
     @IsUUID()
     missionId?: string;
+
+    @ApiProperty({
+        required: false,
+        maxLength: 500,
+        description: 'Case-insensitive search across title and description.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    search?: string;
+
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: 101,
+        description: 'Maximum rows to return.',
+    })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null ? value : Number(value)))
+    @IsInt()
+    @Min(1)
+    @Max(101)
+    limit?: number;
+
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        description: 'Number of rows to skip.',
+    })
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined || value === null ? value : Number(value)))
+    @IsInt()
+    @Min(0)
+    offset?: number;
 }
 
 export class AcceptWorkProposalDto {
@@ -81,6 +119,16 @@ export class CreateWorkProposalDto {
     @IsString()
     @MaxLength(120)
     title?: string;
+}
+
+export class AddWorkProposalAttachmentDto {
+    @ApiProperty({
+        description: 'Upload id returned by POST /api/uploads/file.',
+        pattern: '^[0-9a-fA-F]{64}$',
+    })
+    @IsString()
+    @Matches(/^[0-9a-f]{64}$/i)
+    uploadId: string;
 }
 
 // `BuildWorkProposalResponseDto` is declared AFTER

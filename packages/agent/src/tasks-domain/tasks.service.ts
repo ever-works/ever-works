@@ -6,7 +6,10 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { Repository } from 'typeorm';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
+import { Mission } from '../entities/mission.entity';
 import { TaskRepository, type ListTasksFilter } from '../database/repositories/task.repository';
 import {
     TaskAssigneeRepository,
@@ -24,6 +27,9 @@ import { assertNoSecrets } from '../utils/secret-scan';
 import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { TaskNotificationService } from './task-notification.service';
+import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 
 export interface CreateTaskInput {
     title: string;
@@ -70,6 +76,12 @@ export class TasksService {
         @Optional() private readonly agents?: AgentRepository,
         // Review-fix I13: in-app notification emit on assign.
         @Optional() private readonly notifications?: TaskNotificationService,
+        @Optional() private readonly workUploads?: WorkKnowledgeUploadRepository,
+        @Optional() private readonly works?: WorkRepository,
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missions?: Repository<Mission>,
+        @Optional() private readonly ideas?: WorkProposalRepository,
     ) {}
 
     /**
@@ -113,6 +125,7 @@ export class TasksService {
 
     async create(userId: string, input: CreateTaskInput): Promise<Task> {
         this.assertScopeExclusivity(input);
+        await this.assertScopeReachable(userId, input);
         this.assertTitle(input.title);
         if (input.description) assertNoSecrets(input.description, 'task.description');
 
@@ -126,6 +139,14 @@ export class TasksService {
             if (!parent) {
                 throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
             }
+            this.assertParentScopeMatches(
+                {
+                    missionId: input.missionId ?? null,
+                    ideaId: input.ideaId ?? null,
+                    workId: input.workId ?? null,
+                },
+                parent,
+            );
             // Walk parent chain to detect pre-existing cyclic data.
             // PASS-4 fix: 64-hop cap now THROWS on overflow instead
             // of silent pass — a chain deeper than 64 is either
@@ -205,6 +226,11 @@ export class TasksService {
             if (input.parentTaskId === null) {
                 patch.parentTaskId = null;
             } else {
+                const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
+                if (!parent) {
+                    throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
+                }
+                this.assertParentScopeMatches(task, parent);
                 const isCycle = await this.tasks.wouldCreateCycle(id, input.parentTaskId);
                 if (isCycle) {
                     throw new ConflictException(
@@ -363,7 +389,10 @@ export class TasksService {
 
     async removeAssignee(userId: string, taskId: string, assigneeId: string) {
         await this.getOne(userId, taskId);
-        await this.assignees.remove(assigneeId);
+        const removed = await this.assignees.removeForTask(taskId, assigneeId);
+        if (!removed) {
+            throw new NotFoundException(`Assignee ${assigneeId} not found.`);
+        }
         await this.logActivity({
             userId,
             taskId,
@@ -432,7 +461,10 @@ export class TasksService {
 
     async removeBlocker(userId: string, taskId: string, blockId: string) {
         await this.getOne(userId, taskId);
-        await this.blocks.remove(blockId);
+        const removed = await this.blocks.removeForTask(taskId, blockId);
+        if (!removed) {
+            throw new NotFoundException(`Blocker ${blockId} not found.`);
+        }
         // Review-fix I1 (second-pass NEW-bug corrected): removing a
         // block row may unblock the DEPENDENT task (`taskId` itself).
         // The previous call used `autoUnblockResolvedTasks(taskId)`,
@@ -476,12 +508,35 @@ export class TasksService {
      * the upload row lives in the existing KB upload service.
      */
     async addAttachment(userId: string, taskId: string, uploadId: string) {
-        await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId);
         if (!uploadId) throw new BadRequestException('uploadId is required.');
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }
-        return this.attachments.add(taskId, uploadId);
+        if (!task.workId) {
+            throw new BadRequestException(
+                'Task attachments require a Work-scoped task so upload ownership can be verified.',
+            );
+        }
+        if (!this.workUploads) {
+            throw new BadRequestException('Work upload repository not wired in this context.');
+        }
+        const upload = await this.workUploads.findById(task.workId, uploadId);
+        if (!upload) {
+            throw new BadRequestException(`Upload ${uploadId} not found for this Task's Work.`);
+        }
+        try {
+            return await this.attachments.add(taskId, uploadId);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (/unique|duplicate|UNIQUE/i.test(message)) {
+                const existing = (await this.attachments.findByTaskId(taskId)).find(
+                    (a) => a.uploadId === uploadId,
+                );
+                if (existing) return existing;
+            }
+            throw err;
+        }
     }
 
     async removeAttachment(userId: string, taskId: string, attachmentId: string) {
@@ -489,7 +544,10 @@ export class TasksService {
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }
-        await this.attachments.remove(attachmentId);
+        const removed = await this.attachments.removeForTask(taskId, attachmentId);
+        if (!removed) {
+            throw new NotFoundException(`Attachment ${attachmentId} not found.`);
+        }
         return { deleted: true } as const;
     }
 
@@ -511,6 +569,59 @@ export class TasksService {
                 'Task must be scoped to exactly zero or one of missionId / ideaId / workId.',
             );
         }
+    }
+
+    private async assertScopeReachable(userId: string, input: CreateTaskInput): Promise<void> {
+        if (input.workId) {
+            if (!this.works) {
+                throw new BadRequestException('Work repository not wired in this context.');
+            }
+            const work = await this.works.findById(input.workId);
+            if (!work || work.userId !== userId) {
+                throw new BadRequestException(`Work ${input.workId} not found.`);
+            }
+        }
+        if (input.missionId) {
+            if (!this.missions) {
+                throw new BadRequestException('Mission repository not wired in this context.');
+            }
+            const mission = await this.missions.findOne({
+                where: { id: input.missionId, userId },
+                select: ['id', 'userId'],
+            });
+            if (!mission) {
+                throw new BadRequestException(`Mission ${input.missionId} not found.`);
+            }
+        }
+        if (input.ideaId) {
+            if (!this.ideas) {
+                throw new BadRequestException('Idea repository not wired in this context.');
+            }
+            const idea = await this.ideas.findByIdForUser(input.ideaId, userId);
+            if (!idea) {
+                throw new BadRequestException(`Idea ${input.ideaId} not found.`);
+            }
+        }
+    }
+
+    private assertParentScopeMatches(
+        child: Pick<Task, 'missionId' | 'ideaId' | 'workId'>,
+        parent: Pick<Task, 'missionId' | 'ideaId' | 'workId'>,
+    ): void {
+        const childScope = this.scopeKey(child);
+        const parentScope = this.scopeKey(parent);
+        if (childScope !== parentScope) {
+            throw new BadRequestException(
+                `Parent Task scope (${parentScope}) must match child Task scope (${childScope}).`,
+            );
+        }
+    }
+
+    private scopeKey(scope: Pick<Task, 'missionId' | 'ideaId' | 'workId'>): string {
+        if (scope.workId) return `work:${scope.workId}`;
+        if (scope.missionId) return `mission:${scope.missionId}`;
+        if (scope.ideaId) return `idea:${scope.ideaId}`;
+        return 'unscoped';
     }
 
     private diffFor(before: Task, after: Task): Record<string, unknown> {

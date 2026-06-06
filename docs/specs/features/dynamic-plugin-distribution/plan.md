@@ -6,8 +6,8 @@
 **Feature ID**: `dynamic-plugin-distribution`
 **Spec**: `./spec.md`
 **Tasks**: `./tasks.md`
-**Status**: `Draft`
-**Last updated**: 2026-05-28
+**Status**: `Implemented`
+**Last updated**: 2026-06-03
 
 ---
 

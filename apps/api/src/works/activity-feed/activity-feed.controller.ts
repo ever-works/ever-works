@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
@@ -28,7 +28,8 @@ export class ActivityFeedController {
     })
     async getActivityFeed(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        // Security: reject non-UUID values at the HTTP layer before they reach the ORM or error messages
+        @Param('id', ParseUUIDPipe) id: string,
         @Query() query: FeedQueryDto,
     ): Promise<FeedResponse> {
         // Throws ForbiddenException / NotFoundException if the user lacks access.

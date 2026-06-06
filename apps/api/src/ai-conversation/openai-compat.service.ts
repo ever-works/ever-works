@@ -438,14 +438,55 @@ export class OpenAiCompatService {
      * Extract an actionable error message while stripping sensitive data.
      * Keeps: status codes, model names, "invalid key", "rate limit", "not found" etc.
      * Strips: URLs, API keys, tokens, stack traces.
+     *
+     * Security: pattern set mirrors packages/agent/src/utils/secret-scan.ts so that
+     * upstream-provider errors containing AWS, GitHub, GitLab, Slack, Stripe, etc.
+     * credentials are redacted before the message reaches the API caller.
      */
     private sanitizeErrorMessage(error: unknown): string {
         if (!(error instanceof Error)) return 'Something went wrong. Please try again.';
 
         let msg = error.message;
 
-        // Strip anything that looks like a key/token (long alphanumeric strings)
-        msg = msg.replace(/\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/gi, '[redacted]');
+        // Security: redact all known secret patterns (mirrors secret-scan.ts PATTERNS).
+        // Apply each pattern with a fresh regex instance to reset lastIndex.
+        const SECRET_PATTERNS: ReadonlyArray<RegExp> = [
+            // Generic: sk-…/key-…/token-…/Bearer … (covers OpenAI, Anthropic sk-ant-…, etc.)
+            /\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/gi,
+            // AWS access-key id
+            /\bAKIA[A-Z0-9]{16}\b/g,
+            // GitHub classic PAT
+            /\bghp_[A-Za-z0-9]{36,}\b/g,
+            // GitHub OAuth token
+            /\bgho_[A-Za-z0-9]{36,}\b/g,
+            // GitHub App installation token
+            /\bghs_[A-Za-z0-9]{36,}\b/g,
+            // GitHub fine-grained PAT (default since 2022)
+            /\bgithub_pat_[A-Za-z0-9_]{30,}\b/g,
+            // GitLab PAT
+            /\bglpat-[A-Za-z0-9_-]{20,}\b/g,
+            // Slack bot / user tokens
+            /\bxox[bp]-[A-Za-z0-9-]{10,}\b/g,
+            // Generic PAT prefix
+            /\bpat_[A-Za-z0-9]{30,}\b/g,
+            // PEM private-key block header
+            /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----/g,
+            // Google API key (AIza…)
+            /\bAIza[0-9A-Za-z_-]{35}\b/g,
+            // Stripe secret / restricted keys (sk_live_, rk_live_, *_test_)
+            /\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}\b/g,
+            // npm automation / publish token
+            /\bnpm_[A-Za-z0-9]{36,}\b/g,
+            // HuggingFace token
+            /\bhf_[A-Za-z0-9]{30,}\b/g,
+            // JWT (three base64url segments)
+            /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g,
+            // Twilio API key SID (SK + 32 hex chars)
+            /\bSK[0-9a-fA-F]{32}\b/g,
+        ];
+        for (const re of SECRET_PATTERNS) {
+            msg = msg.replace(new RegExp(re.source, re.flags), '[redacted]');
+        }
 
         // Truncate to reasonable length
         if (msg.length > 300) {

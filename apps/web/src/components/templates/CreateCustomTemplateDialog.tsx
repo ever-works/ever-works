@@ -415,7 +415,12 @@ export function CreateCustomTemplateDialog({
                                     {t(`status.${customization.status}`)}
                                 </span>
                                 {failed && customization.errorMessage && (
-                                    <p className="mt-2 text-xs">{customization.errorMessage}</p>
+                                    // Security: errorMessage is attacker-controlled agent output; truncate to prevent
+                                    // large payloads and guard against future rich-text renderer upgrades.
+                                    // React renders this as a plain text node (no dangerouslySetInnerHTML).
+                                    <p className="mt-2 text-xs">
+                                        {customization.errorMessage.slice(0, 500)}
+                                    </p>
                                 )}
                                 {sessionRunSucceeded && (
                                     <p className="mt-2 text-xs">{t('successHelp')}</p>
@@ -472,7 +477,10 @@ function CustomizationStatusPanel({
         <StatusBox failed={failed} succeeded={succeeded} running={running}>
             <span className="font-medium">{t(`status.${customization.status}`)}</span>
             {failed && customization.errorMessage && (
-                <p className="mt-2 text-xs">{customization.errorMessage}</p>
+                // Security: errorMessage is attacker-controlled agent output; truncate to prevent
+                // large payloads and guard against future rich-text renderer upgrades.
+                // React renders this as a plain text node (no dangerouslySetInnerHTML).
+                <p className="mt-2 text-xs">{customization.errorMessage.slice(0, 500)}</p>
             )}
             {succeeded && <p className="mt-2 text-xs">{t('successHelp')}</p>}
         </StatusBox>

@@ -10,12 +10,38 @@ import {
     MaxLength,
     Min,
     MinLength,
+    Validate,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import {
     ALL_INVITATION_ROLES,
     INVITATION_ROLE_OWNER_CLAIM,
     type InvitationRole,
 } from '@ever-works/agent/entities';
+
+// Security: cap the total serialised size of the `metadata` field to prevent
+// large-payload DoS where an authenticated manager-role user floods the
+// invitations table with multi-megabyte JSON blobs.
+const METADATA_BYTE_CAP = 8 * 1024; // 8 KiB
+
+@ValidatorConstraint({ name: 'invitationMetadataByteCap', async: false })
+class MetadataByteCapConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (value === undefined || value === null) return true;
+        if (typeof value !== 'object') return false;
+        try {
+            const serialized = JSON.stringify(value);
+            return Buffer.byteLength(serialized, 'utf8') <= METADATA_BYTE_CAP;
+        } catch {
+            return false;
+        }
+    }
+
+    defaultMessage(): string {
+        return `metadata must serialise to <= ${METADATA_BYTE_CAP} bytes`;
+    }
+}
 
 export class CreateInvitationDto {
     @ApiPropertyOptional({
@@ -53,6 +79,7 @@ export class CreateInvitationDto {
     })
     @IsOptional()
     @IsObject()
+    @Validate(MetadataByteCapConstraint) // Security: reject oversized metadata objects
     metadata?: Record<string, unknown>;
 
     @ApiPropertyOptional({

@@ -10,6 +10,8 @@ import { WorkModule } from '@ever-works/agent/services';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 import { UsersModule } from '../users/users.module';
 import { OrganizationService } from './organization.service';
+import { OrganizationMembershipService } from './organization-membership.service';
+import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
 import { WorkRegisteredListener } from './work-registered.listener';
 
@@ -43,11 +45,28 @@ import { WorkRegisteredListener } from './work-registered.listener';
         WorkRepository,
         TenantBootstrapService,
         OrganizationService,
+        // Reusable tenant-ownership guard for raw
+        // `/api/organizations/:orgId/...` routes (extracted from
+        // OrgKbController's inline assertOrgAccess). Exported so other
+        // feature modules with `:orgId` routes (e.g. WorksModule's
+        // OrgKbController) share one audited implementation.
+        OrganizationMembershipService,
+        // EW-711 (security-audit C2) — fail-closed `CanActivate` wrapper over
+        // OrganizationMembershipService so raw `:orgId` routes are authorized
+        // declaratively/by-default (closes the "a future route forgets the
+        // inline call" gap). Exported for feature modules with `:orgId` routes
+        // (e.g. WorksModule's OrgKbController).
+        OrganizationOwnershipGuard,
         // EW-665 (Phase 13) — turns a Company Work's `→ registered`
         // transition (the `work.status.changed` event) into an Org.
         WorkRegisteredListener,
     ],
     controllers: [OrganizationsController],
-    exports: [OrganizationService, TenantBootstrapService],
+    exports: [
+        OrganizationService,
+        OrganizationMembershipService,
+        OrganizationOwnershipGuard,
+        TenantBootstrapService,
+    ],
 })
 export class OrganizationsModule {}

@@ -11,6 +11,52 @@ import { PROMPT_KEYS } from '../../prompt-keys.js';
 
 type ExtractedItems = z.infer<typeof extractedItemsSchema>;
 
+/**
+ * Security (prompt-injection hardening): chat-template control markers that some
+ * models interpret as out-of-band role/turn delimiters. Stripped from the
+ * serialized item data before it is interpolated into the `<items>` block so
+ * injected text inside an item's name/description/source_url cannot spoof a
+ * system/user turn. Mirrors the canonical `sanitizeJsonForPrompt` in
+ * `category-processing.step.ts` and `prompt.utils.ts`'s `neutralizeCustomPrompt`.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the literal XML-style delimiter tags
+ * that fence the sections of {@link DEDUPLICATOR_PROMPT}. The untrusted item
+ * array (whose name/description/source_url originate from imported data repos,
+ * scraped web content, or AI generation) is interpolated INSIDE the `<items>`
+ * fence as serialized JSON, so a value that prints its own `</items>` (or any
+ * sibling fence tag) could forge a boundary and have trailing imperative text
+ * parsed as authoritative instructions. Matched (open or close) so the boundary
+ * token can be defused wherever it appears.
+ */
+const PROMPT_FENCE_TOKEN_PATTERN = /<\/?(?:rules|examples|items|task)\b/gi;
+
+/**
+ * Security (prompt-injection hardening): defuse a forged fence boundary by
+ * inserting a zero-width space right after the opening `<` of any fence tag.
+ * This keeps the text human/model-readable while breaking the literal token the
+ * boundary keys on. Mirrors `category-processing.step.ts`'s `neutralizeFenceTokens`.
+ */
+function neutralizeFenceTokens(value: string): string {
+	return value.replace(PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+}
+
+/**
+ * Security (prompt-injection hardening): serialize untrusted item data and
+ * neutralize prompt-injection vectors before it is interpolated into the fenced
+ * `<items>` block. `JSON.stringify` already escapes real newlines (`\n` becomes
+ * the two-character sequence `\n`), so the JSON structure stays intact and
+ * legitimate data round-trips unchanged; we additionally strip chat-template
+ * control markers and defuse forged fence tokens that would otherwise appear
+ * verbatim inside string values and be read by the model as out-of-band
+ * delimiters. Mirrors `category-processing.step.ts`'s `sanitizeJsonForPrompt`.
+ */
+function sanitizeJsonForPrompt(value: unknown): string {
+	return neutralizeFenceTokens(JSON.stringify(value).replace(CHAT_TEMPLATE_MARKER_PATTERN, ''));
+}
+
 export class AiDeduplicator {
 	private readonly CHUNK_DELAY_MS = 500;
 	private readonly GROUP_DELAY_MS = 1000;
@@ -67,7 +113,11 @@ export class AiDeduplicator {
 					temperature: 0,
 					variables: {
 						task: description,
-						items: JSON.stringify(items.map((item) => ({ ...item })))
+						// Security (prompt-injection hardening): item name/description/
+						// source_url derive from imported data repos, scraped web content, or
+						// AI generation; the serialized JSON is neutralized against fence/
+						// role-marker forgery before it enters the <items> block.
+						items: sanitizeJsonForPrompt(items.map((item) => ({ ...item })))
 					},
 					routing: { complexity: 'medium', taskId: 'ai-deduplication' }
 				},

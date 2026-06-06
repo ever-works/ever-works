@@ -5,6 +5,7 @@ export * from './kb-backfill-skeleton.task';
 export * from './kb-embed-document.task';
 export * from './kb-mirror-document.task';
 export * from './kb-org-overlay-fanout.task';
+export * from './kb-reconcile.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 export * from './agent-heartbeat-dispatcher.task';
@@ -18,3 +19,5 @@ export * from './work-import.task';
 export * from './work-onboarding.task';
 export * from './work-schedule-dispatcher.task';
 export * from './webhook-delivery.task';
+// EW-693 — long-running plugin execution (Phase 7 / T27).
+export * from './run-plugin-operation.task';

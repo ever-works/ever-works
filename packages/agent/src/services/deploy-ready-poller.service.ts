@@ -110,6 +110,20 @@ export class DeployReadyPollerService {
 
         for (const work of pendingWorks) {
             try {
+                // Security (SSRF): the slug is validated as DNS-safe on creation
+                // (DTO `@Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)`) but is re-read
+                // from the DB here with no guarantee it still matches (direct DB
+                // writes, migration gaps, legacy rows). Re-validate before
+                // interpolating it into the probe/website URL so a malformed slug
+                // (e.g. containing `@`, `/`, `#`, `?`, null bytes, or empty) can't
+                // redirect the fetch to an attacker-controlled or internal host.
+                // Mirrors `CloudflareDnsProvider.assertSlug`. Routed through the
+                // existing catch → counted as `failed` and logged.
+                if (!this.isValidSlug(work.slug)) {
+                    throw new Error(
+                        `refusing to probe work with malformed slug: ${JSON.stringify(work.slug)}`,
+                    );
+                }
                 const url = `https://${work.slug}.${domain}/api/healthz`;
                 const ok = await this.probeUrl(httpFetch, url, timeoutMs);
                 if (!ok) {
@@ -144,6 +158,14 @@ export class DeployReadyPollerService {
         }
 
         return summary;
+    }
+
+    // Security (SSRF): canonical DNS-safe slug shape shared across the
+    // codebase (Work DTO `@Matches`, CloudflareDnsProvider.assertSlug).
+    // Re-checked here because the slug is read back from the DB and cannot
+    // be trusted to still satisfy the creation-time constraint.
+    private isValidSlug(slug: string): boolean {
+        return typeof slug === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
     }
 
     private async probeUrl(

@@ -1,4 +1,31 @@
 import type { ComparisonPair, ComparisonResearch } from './types';
+import { sanitizePrompt } from '../../utils/sanitize.util';
+
+// Security: extracted page bodies and search snippets are HOSTILE external
+// content. The writer (comparison-writer.ts) fences this string inside a
+// `<web_research untrusted="true">…</web_research>` block and tells the model
+// to treat it as data, never instructions. That fence is only effective if the
+// untrusted content cannot forge the closing tag (`</web_research>`) to break
+// out into the trusted prompt, or re-open the block. Neutralize the fence
+// delimiters at the source (here, where research.content is assembled) plus the
+// chat-template / instruction tokens that spoof role/turn boundaries, and strip
+// control chars. Legitimate article text is unaffected — real pages don't
+// contain these literal tokens.
+function sanitizeExtractedContent(text: string): string {
+    return sanitizePrompt(
+        text
+            // Break the writer's `<web_research>` / `</web_research>` fence
+            // tokens so embedded copies can't close or re-open the untrusted
+            // block. The visible text is preserved (angle brackets encoded).
+            .replace(/<(\/?)\s*web_research\b/gi, '&lt;$1web_research')
+            // Strip instruction / chat-template delimiters (mirrors
+            // sanitizeCustomPrompt in comparison-writer.ts).
+            .replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, ''),
+        // Per-source bodies are already trimmed to ~2000 chars below; keep a
+        // generous cap so this only strips abusive tokens, never legit content.
+        8000,
+    );
+}
 
 function buildSourceTitle(url: string, snippet?: string): string {
     const cleanedSnippet = snippet?.trim();
@@ -126,14 +153,21 @@ export async function researchPair(
             if (content) {
                 // Limit each extraction to ~2000 chars to control token cost
                 const trimmed = content.length > 2000 ? content.slice(0, 2000) + '...' : content;
-                contentParts.push(`Source: ${result.url}\n${trimmed}`);
+                // Security: neutralize prompt-injection / fence-breakout tokens.
+                contentParts.push(`Source: ${result.url}\n${sanitizeExtractedContent(trimmed)}`);
             } else if (result.snippet) {
-                contentParts.push(`Source: ${result.url}\n${result.snippet}`);
+                // Security: neutralize prompt-injection / fence-breakout tokens.
+                contentParts.push(
+                    `Source: ${result.url}\n${sanitizeExtractedContent(result.snippet)}`,
+                );
             }
         } catch {
             // Extraction failed for this URL, still keep the snippet
             if (result.snippet) {
-                contentParts.push(`Source: ${result.url}\n${result.snippet}`);
+                // Security: neutralize prompt-injection / fence-breakout tokens.
+                contentParts.push(
+                    `Source: ${result.url}\n${sanitizeExtractedContent(result.snippet)}`,
+                );
             }
         }
     }

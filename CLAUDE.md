@@ -174,6 +174,27 @@ The `AiFacadeService` in `packages/agent/src/facades/` consumes AI provider plug
 
 Conventional commits enforced by commitlint: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 
+### Documentation layout — no stray docs in the repo root
+
+**Do NOT create working/progress/plan/summary/tracker markdown files in the
+monorepo root.** The root is reserved for a small, fixed set of standard files:
+`README.md`, `CLAUDE.md`, `AGENTS.md`, `AUGMENT.md`, `LICENSES.md` (plus
+tool-config dotfiles). Everything else goes under `docs/`:
+
+- **Internal working docs** (implementation plans, progress logs, hand-off
+  summaries, coverage trackers, review notes, checklists — e.g. `*-PLAN.md`,
+  `*-PROGRESS.md`, `*-SUMMARY.md`, `*-TRACKER.md`): put them in
+  **`docs/internal/`** (see [`docs/internal/README.md`](docs/internal/README.md)).
+- **Feature-scoped specs/plans/tasks**: under `docs/specs/<feature>/`.
+- **User-facing documentation**: under the relevant `docs/<area>/` folder and,
+  if it should appear on the published site, add it to
+  `apps/docs/sidebarsPlatform.ts` (the sidebar is manual — files not listed
+  there render only as orphan pages, which is how internal docs stay off the
+  nav).
+
+If you find a stray doc in the root, move it into `docs/` (most likely
+`docs/internal/`) rather than leaving it there.
+
 ## Key Dependencies
 
 | Concern            | Package                                        | Version          |

@@ -9,20 +9,72 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    ParseEnumPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiParam, ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
 import { CurrentUser, AuthSessionGuard } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { NotificationPreferencesService } from './notification-preferences.service';
+import { NotificationCategory } from '@ever-works/agent/entities';
 
-interface QuietHoursBody {
+// Security: DTO class (not interface) so class-validator decorators are enforced
+// by the global ValidationPipe. Valid IANA time zones computed once at startup.
+// `Intl.supportedValuesOf` is available on the Node 22 runtime but not in the
+// project's TS lib typings; cast to access it without widening the lib target.
+// `Intl.supportedValuesOf('timeZone')` returns the canonical IANA zone list
+// but OMITS the universally-valid `UTC` / `GMT` aliases (V8 quirk), so add
+// them explicitly — rejecting `UTC` is a correctness bug, not hardening. Both
+// construct cleanly in `Intl.DateTimeFormat`, so there is no RangeError risk.
+const VALID_TIMEZONES = new Set<string>([
+    ...(Intl as typeof Intl & { supportedValuesOf(key: string): string[] }).supportedValuesOf(
+        'timeZone',
+    ),
+    'UTC',
+    'GMT',
+]);
+
+// Security: HH:mm (optionally with :ss) — rejects arbitrary strings stored as
+// quiet-hours times. Seconds are optional because callers commonly send the
+// full `HH:mm:ss` TIME form; both are accepted and stored verbatim.
+const HH_MM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+const NOTIFICATION_CATEGORY_VALUES = Object.values(NotificationCategory);
+
+class QuietHoursBody {
+    // Security: must match HH:mm to prevent arbitrary strings in DB
+    @IsOptional()
+    @IsString()
+    @Matches(HH_MM_PATTERN, { message: 'quietHoursStart must be in HH:mm format' })
     quietHoursStart?: string | null;
+
+    // Security: must match HH:mm to prevent arbitrary strings in DB
+    @IsOptional()
+    @IsString()
+    @Matches(HH_MM_PATTERN, { message: 'quietHoursEnd must be in HH:mm format' })
     quietHoursEnd?: string | null;
+
+    // Security: must be a valid IANA timezone to prevent RangeError in Intl.DateTimeFormat downstream
+    @IsOptional()
+    @IsString()
+    @IsIn([...VALID_TIMEZONES], { message: 'timezone must be a valid IANA timezone identifier' })
     timezone?: string | null;
 }
 
-interface MuteBody {
-    category: string;
+class MuteBody {
+    // Security: restrict category to the known NotificationCategory enum values.
+    // Keep Swagger on a plain values array; reflecting the enum object here can
+    // trigger a circular schema error on enum keys such as AI_CREDITS.
+    @ApiProperty({
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to mute.',
+    })
+    @IsEnum(NotificationCategory, {
+        message: `category must be one of: ${NOTIFICATION_CATEGORY_VALUES.join(', ')}`,
+    })
+    category: NotificationCategory;
+
+    @IsOptional()
+    @IsString()
     mutedUntil?: string | null;
 }
 
@@ -82,6 +134,7 @@ export class NotificationPreferencesController {
     @ApiOperation({ summary: 'Mute a category until a given time (or indefinitely)' })
     async muteCategory(@CurrentUser() auth: AuthenticatedUser, @Body() body: MuteBody) {
         const mutedUntil = body.mutedUntil ? new Date(body.mutedUntil) : null;
+        // Security: body.category is now validated as NotificationCategory by class-validator
         const mute = await this.service.muteCategory(auth.userId, body.category, mutedUntil);
         return { mute };
     }
@@ -89,9 +142,18 @@ export class NotificationPreferencesController {
     @Delete('preferences/mute/:category')
     @HttpCode(HttpStatus.NO_CONTENT)
     @ApiOperation({ summary: 'Unmute a category' })
+    // Keep Swagger on a plain values array for the same reason as MuteBody.
+    // Runtime validation is still enforced by the ParseEnumPipe below.
+    @ApiParam({
+        name: 'category',
+        type: String,
+        enum: NOTIFICATION_CATEGORY_VALUES,
+        description: 'Notification category to unmute.',
+    })
     async unmuteCategory(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('category') category: string,
+        // Security: ParseEnumPipe rejects path params not in NotificationCategory
+        @Param('category', new ParseEnumPipe(NotificationCategory)) category: NotificationCategory,
     ) {
         await this.service.unmuteCategory(auth.userId, category);
     }

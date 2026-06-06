@@ -8,5 +8,7 @@
         "declarationMap": true,
         "incremental": false
     },
-    "include": ["src/**/*.ts"]
+    "include": ["src/**/*.ts"],
+    "// exclude": "Declaration build emits the package's public .d.ts surface only — test files are never part of it. Excluding them also prevents a cross-package spec import (e.g. a `*.spec.ts` reaching into another package's `src/**/__tests__/fakes`) from dragging foreign source under this package's rootDir and breaking the emit with TS6059.",
+    "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/**/__tests__/**"]
 }

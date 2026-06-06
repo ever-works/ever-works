@@ -5,8 +5,12 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
-import { AgentScheduleDispatcherService } from '@ever-works/agent/agents';
-import { TaskRecurrenceDispatcherService } from '@ever-works/agent/tasks-domain';
+import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import {
+    TaskChatService,
+    TaskRecurrenceDispatcherService,
+    TasksService,
+} from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
@@ -70,6 +74,12 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             inject: [TriggerInternalApiClient],
         },
         {
+            provide: AgentRunService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentRunService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
             provide: AgentRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AgentRepository'),
@@ -87,6 +97,18 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: TaskRecurrenceDispatcherService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'TaskRecurrenceDispatcherService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: TasksService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TasksService'),
+            inject: [TriggerInternalApiClient],
+        },
+        {
+            provide: TaskChatService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskChatService'),
             inject: [TriggerInternalApiClient],
         },
         // Notifications v2 (EW-663) — the notification-channel-delivery
@@ -107,9 +129,12 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         DeployReadyPollerService,
         MissionTickService,
         AgentScheduleDispatcherService,
+        AgentRunService,
         AgentRepository,
         AgentRunRepository,
         TaskRecurrenceDispatcherService,
+        TasksService,
+        TaskChatService,
         NotificationChannelFacadeService,
     ],
 })

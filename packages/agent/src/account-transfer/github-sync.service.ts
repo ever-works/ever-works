@@ -7,6 +7,7 @@ import { UserRepository } from '../database/repositories/user.repository';
 import { UserSyncConfigRepository } from './repositories/user-sync-config.repository';
 import { AccountExportService } from './account-export.service';
 import { AccountImportService } from './account-import.service';
+import { redactSecrets } from '../utils/secret-scan';
 import type {
     SyncStatus,
     ConfigureSyncDto,
@@ -19,6 +20,13 @@ import type {
 
 const SYNC_REPO_NAME = 'ever-works-config';
 const PROVIDER_ID = 'github';
+
+// Security (path-traversal hardening): slugs are used verbatim as directory
+// names under the cloned sync repo. `path.basename` alone is platform-dependent
+// (POSIX leaves `..\\x` untouched, Windows strips it) and lets through reserved
+// names like `.`/`..`, so we additionally require a strict allowlist matching
+// the `slugifyText` output charset ([A-Za-z0-9_-]) before any path is built.
+const SAFE_SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 @Injectable()
 export class GitHubSyncService {
@@ -214,7 +222,8 @@ export class GitHubSyncService {
             await this.syncConfigRepository.updateLastPush(userId);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
@@ -260,7 +269,8 @@ export class GitHubSyncService {
             return this.importService.previewImport(userId, payload);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
@@ -306,13 +316,80 @@ export class GitHubSyncService {
             return result;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.syncConfigRepository.updateError(userId, message);
+            // Security (info-leak): sanitize before persisting/echoing.
+            await this.syncConfigRepository.updateError(userId, this.sanitizeSyncError(message));
             throw error;
         }
     }
 
     async removeSyncConfig(userId: string): Promise<void> {
         await this.syncConfigRepository.delete(userId);
+    }
+
+    /**
+     * Security helper: resolve a slug to a directory under `baseDir`, rejecting
+     * anything that is not a strict `[A-Za-z0-9_-]+` token or that would escape
+     * `baseDir` once resolved. Returns the safe absolute path, or `null` when
+     * the slug must be skipped. Mirrors the path-confinement check used by
+     * `KnowledgeBaseGitMirrorService.resolveInsideKbRoot`.
+     */
+    private safeSlugDir(baseDir: string, slug: string): string | null {
+        const safeName = path.basename(slug);
+        // Reject empty results and anything outside the slug allowlist before
+        // building a path — defends against platform-dependent `basename`
+        // behaviour and OS-reserved names (`.`, `..`, etc.).
+        if (!safeName || safeName !== slug || !SAFE_SLUG_PATTERN.test(safeName)) {
+            return null;
+        }
+        // Build the path in the same `path.join` form the original code used so
+        // the return value is identical for legitimate slugs. Resolve BOTH sides
+        // only for the containment check — correct even when `baseDir` is not an
+        // absolute, normalized path (otherwise path.resolve would prepend the cwd
+        // drive to the child but not to the bare root, rejecting valid slugs).
+        const dirPath = path.join(baseDir, safeName);
+        const resolvedRoot = path.resolve(baseDir);
+        const resolvedChild = path.resolve(baseDir, safeName);
+        if (resolvedChild !== resolvedRoot && !resolvedChild.startsWith(resolvedRoot + path.sep)) {
+            return null;
+        }
+        return dirPath;
+    }
+
+    /**
+     * Security (secrets — defence-in-depth): the agent/skill/task bodies
+     * are about to be durably written into a user-pointed GitHub repo's
+     * git history. Agent file bodies are already hard-rejected for
+     * secrets upstream (`AgentExportService.exportOne` → `assertNoSecrets`),
+     * but the skill `instructionsMd` and task `description` + chat `body`
+     * reach this serializer un-scanned. Redact (not hard-reject) so a body
+     * that acquired a credential never lands in the remote repo, while a
+     * single bad body never blocks the sync of everything else. Returns a
+     * shallow clone with redacted fields so the source payload is never
+     * mutated. No-op for clean (legitimate) bodies.
+     */
+    private redactBodyForRepo<T extends Record<string, any>>(
+        row: T,
+        bodyFields: Array<keyof T>,
+    ): T {
+        let clone: T | null = null;
+        let total = 0;
+        for (const field of bodyFields) {
+            const value = row[field];
+            if (typeof value !== 'string' || value.length === 0) continue;
+            const { cleaned, redactions } = redactSecrets(value);
+            if (redactions > 0) {
+                if (!clone) clone = { ...row };
+                (clone as Record<string, unknown>)[field as string] = cleaned;
+                total += redactions;
+            }
+        }
+        if (clone && total > 0) {
+            this.logger.warn(
+                `Redacted ${total} secret-like value(s) from a synced body before push`,
+            );
+            return clone;
+        }
+        return row;
     }
 
     private writeExportFiles(dir: string, payload: AccountExportPayload): void {
@@ -346,12 +423,11 @@ export class GitHubSyncService {
         fs.mkdirSync(worksDir, { recursive: true });
 
         for (const work of payload.data.works) {
-            const safeName = path.basename(work.slug);
-            if (safeName !== work.slug) {
+            const dirPath = this.safeSlugDir(worksDir, work.slug);
+            if (!dirPath) {
                 this.logger.warn(`Skipping work with invalid slug: ${work.slug}`);
                 continue;
             }
-            const dirPath = path.join(worksDir, safeName);
             fs.mkdirSync(dirPath, { recursive: true });
 
             const {
@@ -413,36 +489,57 @@ export class GitHubSyncService {
             const agentsDir = path.join(dir, 'agents');
             fs.mkdirSync(agentsDir, { recursive: true });
             for (const agent of agents) {
-                const safeName = path.basename(agent.identity.slug);
-                if (safeName !== agent.identity.slug) {
+                const safeDir = this.safeSlugDir(agentsDir, agent.identity.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping agent with invalid slug: ${agent.identity.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(agentsDir, `${safeName}.json`), agent);
+                this.writeJsonFile(`${safeDir}.json`, agent);
             }
         }
         if (skills.length > 0) {
             const skillsDir = path.join(dir, 'skills');
             fs.mkdirSync(skillsDir, { recursive: true });
             for (const skill of skills) {
-                const safeName = path.basename(skill.slug);
-                if (safeName !== skill.slug) {
+                const safeDir = this.safeSlugDir(skillsDir, skill.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping skill with invalid slug: ${skill.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(skillsDir, `${safeName}.json`), skill);
+                // Security: scrub secrets from the skill body before it lands
+                // in the remote repo (the skill-write path scans on save, but
+                // this sync serializer otherwise bypasses that hygiene).
+                const safeSkill = this.redactBodyForRepo(skill, ['instructionsMd', 'description']);
+                this.writeJsonFile(`${safeDir}.json`, safeSkill);
             }
         }
         if (tasks.length > 0) {
             const tasksDir = path.join(dir, 'tasks');
             fs.mkdirSync(tasksDir, { recursive: true });
             for (const task of tasks) {
-                const safeName = path.basename(task.slug);
-                if (safeName !== task.slug) {
+                const safeDir = this.safeSlugDir(tasksDir, task.slug);
+                if (!safeDir) {
                     this.logger.warn(`Skipping task with invalid slug: ${task.slug}`);
                     continue;
                 }
-                this.writeJsonFile(path.join(tasksDir, `${safeName}.json`), task);
+                // Security: scrub secrets from the task description AND every
+                // chat-message body before writing to the remote repo. Task
+                // descriptions/chat are redact-on-save (not hard-reject), so a
+                // body could legitimately have carried a secret pre-scan; this
+                // mirrors that posture on the sync-out path.
+                let safeTask = this.redactBodyForRepo(task, ['description']);
+                if (Array.isArray(safeTask.chat) && safeTask.chat.length > 0) {
+                    let chatChanged = false;
+                    const safeChat = safeTask.chat.map((m) => {
+                        const redacted = this.redactBodyForRepo(m, ['body']);
+                        if (redacted !== m) chatChanged = true;
+                        return redacted;
+                    });
+                    if (chatChanged) {
+                        safeTask = { ...safeTask, chat: safeChat };
+                    }
+                }
+                this.writeJsonFile(`${safeDir}.json`, safeTask);
             }
         }
     }
@@ -556,7 +653,16 @@ export class GitHubSyncService {
             const rows: any[] = [];
             const names = fs
                 .readdirSync(dirPath, { withFileTypes: true })
-                .filter((d) => d.isFile() && d.name.endsWith('.json'))
+                // Security (symlink escape / path traversal): the directory
+                // lives inside an attacker-controllable cloned sync repo. A
+                // malicious repo can ship a symlink (e.g. `evil.json ->
+                // /etc/passwd`) that `fs.readFileSync` would follow off-tree
+                // and surface its contents in logs/parse errors. `Dirent`
+                // uses lstat semantics, so a symlink reports `isFile()`
+                // false today — but reject it EXPLICITLY (same posture as
+                // WebsiteUpdateService.copyRepositoryFiles) so the guard can
+                // never regress if the filter above is relaxed.
+                .filter((d) => !d.isSymbolicLink?.() && d.isFile() && d.name.endsWith('.json'))
                 .map((d) => d.name)
                 .sort();
             for (const name of names) {
@@ -583,6 +689,21 @@ export class GitHubSyncService {
         if (!fs.existsSync(filePath)) return null;
         const content = fs.readFileSync(filePath, 'utf-8');
         return JSON.parse(content);
+    }
+
+    /**
+     * Security (info-leak): the raw git/provider error message is stored in
+     * `lastSyncError` and reflected back to the client by `getSyncStatus`.
+     * isomorphic-git / GitHub error strings can embed absolute filesystem
+     * paths, internal hostnames, or token fragments. Redact secret-like
+     * spans (reusing the shared scanner) and cap the length before it is
+     * persisted/returned. Behaviour for the happy path is unchanged — this
+     * only touches the error-reporting string.
+     */
+    private sanitizeSyncError(message: string): string {
+        const { cleaned } = redactSecrets(message || '');
+        const MAX = 500;
+        return cleaned.length > MAX ? `${cleaned.slice(0, MAX)}…` : cleaned;
     }
 
     private async hasGitHubOAuth(userId: string): Promise<boolean> {

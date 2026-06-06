@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import Mailgun from 'mailgun.js';
 import formData from 'form-data';
 import type {
@@ -170,7 +170,10 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 		// Mailgun verifies sending domains, not individual addresses. We
 		// emit a token; the platform-side verify route flips `verified`
 		// once the operator clicks the confirmation.
-		const verificationToken = `mg-${Math.random().toString(36).slice(2)}${Date.now()}`;
+		// Security: use a CSPRNG (256-bit) instead of Math.random() + Date.now()
+		// — the token grants control over a tenant email address, so it must be
+		// unpredictable. The `mg-` prefix is kept for log/debug readability.
+		const verificationToken = `mg-${randomBytes(32).toString('hex')}`;
 		return {
 			address,
 			verificationToken,

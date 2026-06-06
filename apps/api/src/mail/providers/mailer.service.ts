@@ -70,10 +70,23 @@ export class MailerService {
 
     private async readHtmlTemplate(data: SendMailOptions) {
         if (data.template) {
-            const content = await fs.readFile(
-                path.join(process.cwd(), 'src/templates', `${data.template}.hbs`),
-                { encoding: 'utf8' },
-            );
+            // Security: prevent path traversal via a user-supplied template name.
+            // Restrict to a safe charset (no `/`, `\`, `.` or `..` segments) so a
+            // value like `../../config/constants` can never escape the templates
+            // directory and read arbitrary `.hbs`-suffixed files from the tree.
+            if (!/^[a-z0-9-]+$/i.test(data.template)) {
+                throw new Error(`Invalid template name: ${JSON.stringify(data.template)}`);
+            }
+
+            const templatesDir = path.resolve(process.cwd(), 'src/templates');
+            const templatePath = path.resolve(templatesDir, `${data.template}.hbs`);
+            // Security: defence-in-depth — ensure the resolved path stays inside
+            // the templates directory before reading it.
+            if (!templatePath.startsWith(templatesDir + path.sep)) {
+                throw new Error(`Invalid template name: ${JSON.stringify(data.template)}`);
+            }
+
+            const content = await fs.readFile(templatePath, { encoding: 'utf8' });
 
             const template = Handlebars.compile(content);
             const result = template(data.context || {});

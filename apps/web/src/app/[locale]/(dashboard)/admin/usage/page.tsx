@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { adminUsageAPI, type AdminUsageResponse } from '@/lib/api/budgets';
+import { authAPI } from '@/lib/api';
 
 export const metadata: Metadata = {
     title: 'Platform usage',
@@ -26,6 +27,16 @@ function formatCents(cents: number, currency = 'usd'): string {
  */
 export default async function AdminUsagePage() {
     const t = await getTranslations('dashboard.adminUsage');
+
+    // Security: defense-in-depth — verify the caller holds the platform-admin
+    // flag before issuing the admin API call. The backend's IsPlatformAdminGuard
+    // is the authoritative check; this is a redundant frontend layer so that a
+    // future misconfiguration of the backend guard does not silently expose data.
+    const profile = await authAPI.getProfile().catch(() => null);
+    if (!profile?.isPlatformAdmin) {
+        notFound();
+    }
+
     let data: AdminUsageResponse;
     try {
         data = await adminUsageAPI.list();

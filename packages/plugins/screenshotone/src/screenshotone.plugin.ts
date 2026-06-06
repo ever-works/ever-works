@@ -16,6 +16,12 @@ import type {
 
 import * as screenshotone from 'screenshotone-api-sdk';
 
+// Security (SSRF): shared lexical guard rejecting non-HTTP(S) schemes and
+// literal private/loopback/link-local/cloud-metadata IPs. Imported directly
+// from the helper subpath because the plugin barrel intentionally does not
+// re-export it (it pulls in node:net / node:dns).
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+
 /**
  * ScreenshotOne plugin settings interface
  */
@@ -166,6 +172,19 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 		const startTime = Date.now();
 		const settings = this.mergeSettings(options.settings);
 
+		// Security (SSRF): `options.url` is attacker-controllable (work source
+		// URLs, LLM-generated item URLs) and is forwarded to the ScreenshotOne
+		// backend to render. Block non-HTTP(S) schemes and literal
+		// private/loopback/link-local/cloud-metadata targets (e.g.
+		// http://169.254.169.254/...) before building TakeOptions. Legitimate
+		// https item URLs are unaffected.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				error: `URL host is not safe to capture (SSRF guard blocked: ${options.url})`
+			};
+		}
+
 		try {
 			const client = this.createClient(settings);
 			const takeOptions = this.buildTakeOptions(options, settings);
@@ -206,6 +225,17 @@ export class ScreenshotOnePlugin implements IPlugin, IScreenshotPlugin {
 	 */
 	async getScreenshotUrl(options: ScreenshotOptions): Promise<string | null> {
 		const settings = this.mergeSettings(options.settings);
+
+		// Security (SSRF): same guard as capture() — `options.url` is
+		// attacker-controllable and ends up in the generated ScreenshotOne
+		// take URL. Refuse non-HTTP(S) schemes and private/loopback/link-local/
+		// cloud-metadata targets; return null (the existing failure shape).
+		if (!isSafeWebhookUrl(options.url)) {
+			this.context?.logger.error(
+				`ScreenshotOne URL generation blocked by SSRF guard for unsafe URL: ${options.url}`
+			);
+			return null;
+		}
 
 		try {
 			const client = this.createClient(settings);

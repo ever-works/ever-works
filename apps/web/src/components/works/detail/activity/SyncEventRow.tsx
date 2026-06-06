@@ -79,12 +79,20 @@ export function SyncEventRow({ event }: SyncEventRowProps) {
                 )}
                 {event.kind === 'skipped' && (
                     <div className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {/* Security: event.reason originates from external git repo content (branch names, commit
+                            messages, stderr output) and is attacker-controlled. React JSX string-child escaping
+                            is active here, so no XSS risk in this path. Do NOT pass this value to
+                            dangerouslySetInnerHTML, a markdown renderer, or an HTML template without sanitization. */}
                         Reason: <code>{event.reason}</code>
                     </div>
                 )}
                 {event.kind === 'failed' && (
                     <details className="mt-1">
                         <summary className="cursor-pointer text-xs text-destructive">
+                            {/* Security: event.errorClass and event.errorTail come from external git repo sync
+                                stderr/exceptions and are fully attacker-controlled. React JSX string-child
+                                escaping is active here — safe as-is. Do NOT switch to dangerouslySetInnerHTML
+                                (e.g., for ANSI colour codes) without first sanitizing against XSS payloads. */}
                             <code>{event.errorClass}</code>
                         </summary>
                         <pre className="mt-1 text-xs whitespace-pre-wrap break-words text-text-secondary dark:text-text-secondary-dark">

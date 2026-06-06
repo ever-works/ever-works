@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { tasksAPI, type Task } from '@/lib/api/tasks';
+import { tasksAPI } from '@/lib/api/tasks';
 import { TasksScopedSection } from '@/components/tasks/TasksScopedSection';
 
 export const metadata: Metadata = { title: 'Tasks' };
@@ -17,12 +17,10 @@ export const metadata: Metadata = { title: 'Tasks' };
  */
 export default async function WorkTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const result = await tasksAPI
-        .list({ workId: id, limit: 100 })
-        .catch(() => ({ data: [] as Task[], meta: { total: 0, limit: 100, offset: 0 } }));
+    const result = await tasksAPI.list({ workId: id, limit: 100 });
     return (
         <div className="p-6 max-w-screen-2xl mx-auto">
-            <TasksScopedSection tasks={result.data} scopeLabel="Work" />
+            <TasksScopedSection tasks={result.data} scopeLabel="Work" scopeId={id} />
         </div>
     );
 }

@@ -19,12 +19,34 @@ import { MailerService } from './providers/mailer.service';
                     port: config.mail.smtpPort(),
                     secure: config.mail.smtpSecure(),
                     ignoreTLS: config.mail.smtpIgnoreTLS(),
-                    auth: {
-                        user: config.mail.smtpUser(),
-                        pass: config.mail.smtpPassword(),
-                    },
+                    // Only send SMTP AUTH when credentials are actually
+                    // configured. A local relay (MailHog/Mailpit, used by e2e)
+                    // accepts unauthenticated mail; passing
+                    // `auth: { user: undefined, pass: undefined }` makes
+                    // nodemailer attempt PLAIN auth with no credentials and
+                    // abort the connection with `Missing credentials for
+                    // "PLAIN"`, so every outbound message silently fails and the
+                    // email-flow e2e specs can't read the sent mail. Ternary
+                    // (not `&&`) keeps the spread typed as an object.
+                    ...(config.mail.smtpUser() && config.mail.smtpPassword()
+                        ? {
+                              auth: {
+                                  user: config.mail.smtpUser(),
+                                  pass: config.mail.smtpPassword(),
+                              },
+                          }
+                        : {}),
+                    // Security: verify the SMTP relay's TLS certificate by
+                    // default so outbound mail (password-reset, magic-link and
+                    // account-deletion tokens) can't be intercepted via a
+                    // MITM presenting an invalid cert. Verification stays ON
+                    // unless an operator explicitly opts out with
+                    // `SMTP_REJECT_UNAUTHORIZED=false` (e.g. a local
+                    // MailHog/Mailpit relay with a self-signed cert). The e2e
+                    // stack short-circuits TLS via `SMTP_IGNORE_TLS=true`, so
+                    // this default does not affect it.
                     tls: {
-                        rejectUnauthorized: false,
+                        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
                     },
                 },
                 defaults: {

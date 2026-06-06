@@ -168,5 +168,112 @@ export const config = {
          */
         zeroFrictionOnboarding: () =>
             (process.env.FEATURE_ZERO_FRICTION_ONBOARDING ?? 'true').toLowerCase() !== 'false',
+
+        /**
+         * EW-693 — opt-in switch for the dynamic plugin distribution
+         * feature surface (catalog endpoint, install/uninstall API,
+         * admin allowlist). Independent of `config.plugins.distributionMode`
+         * so an operator can pre-deploy the runtime in `bundled` mode
+         * and flip this on later. Default `false`; in `bundled` mode
+         * the new surfaces simply 501 / return empty until enabled.
+         */
+        dynamicPlugins: () =>
+            (process.env.FEATURE_DYNAMIC_PLUGINS ?? 'false').toLowerCase() === 'true',
+    },
+
+    /**
+     * EW-693 — Dynamic plugin distribution. The default mode is
+     * `bundled` everywhere (SaaS and self-host alike). Switching to
+     * `dynamic` requires explicit env config and a writable
+     * `PLUGIN_INSTALL_DIR`. Wire is read by `apps/api/src/api.module.ts`
+     * → `AgentPluginsModule.forRootAsync` (see Phase 4 / T15).
+     */
+    plugins: {
+        /**
+         * `bundled` (default) → existing behaviour: every plugin
+         * shipped in the image, discovered at boot, no registry calls.
+         * `dynamic` → only core plugins bundled; distributable plugins
+         * pulled from the configured registry on first enable
+         * (per-replica installs, no shared RWX volume needed).
+         *
+         * Anything other than `dynamic` (incl. empty, missing,
+         * `'BUNDLED'`, typos) coerces to `bundled` — fail-safe.
+         */
+        distributionMode: (): 'bundled' | 'dynamic' => {
+            const raw = (process.env.PLUGIN_DISTRIBUTION_MODE ?? '').toLowerCase();
+            return raw === 'dynamic' ? 'dynamic' : 'bundled';
+        },
+
+        /**
+         * Primary registry the installer resolves packages from.
+         * Defaults to public npm. Self-hosters mirror the catalog to
+         * their own registry and point this at it. The installer pins
+         * exact versions + integrity (FR-10), so HTTPS-only is
+         * recommended but not enforced here (the installer will refuse
+         * on a TLS error from the resolver).
+         */
+        registryUrl: (): string => process.env.PLUGIN_REGISTRY_URL || 'https://registry.npmjs.org',
+
+        /**
+         * Secondary registry for GitHub Packages (`@ever-works` scope).
+         * The installer falls back to this when an allowlist entry's
+         * `source` is `github-packages` or when the primary registry
+         * returns 404 for a first-party package. Default mirrors the
+         * publish workflow target.
+         */
+        registryGithubUrl: (): string =>
+            process.env.PLUGIN_REGISTRY_GITHUB_URL || 'https://npm.pkg.github.com',
+
+        /**
+         * Bearer token for the registry. SECRET — never log this value.
+         * Empty when unset (public npm packages don't need auth; GitHub
+         * Packages does, but in CI the workflow injects GITHUB_TOKEN
+         * directly). The installer reads it lazily so missing-token
+         * errors surface on first install, not at boot.
+         */
+        registryToken: (): string | undefined => process.env.PLUGIN_REGISTRY_TOKEN || undefined,
+
+        /**
+         * Writable directory where dynamically-installed plugins are
+         * placed so Node can `import()` them. Defaults to `/app/plugins`
+         * (matches the Docker image WORKDIR convention). In `bundled`
+         * mode this is the same directory already used by the loader
+         * for built-in plugins; in `dynamic` mode it MUST be writable
+         * — the boot reconciler (Phase 5 / T19) refuses to start when
+         * the directory is read-only.
+         */
+        installDir: (): string => process.env.PLUGIN_INSTALL_DIR || '/app/plugins',
+
+        /**
+         * Fail-fast at boot: when `dynamic` mode is selected, at least
+         * `PLUGIN_REGISTRY_URL` must be non-empty. Default-resolution
+         * always returns a value (public npm), so this guard only
+         * fires when the operator has explicitly cleared it — usually
+         * indicating an internal-mirror setup is in flight but not
+         * configured yet. Better loud at boot than a confusing 502
+         * on first install.
+         *
+         * Called from `apps/api/src/api.module.ts`'s
+         * `AgentPluginsModule.forRootAsync` factory before the module
+         * spins up.
+         */
+        validate: (): void => {
+            const mode = config.plugins.distributionMode();
+            if (mode !== 'dynamic') return;
+            const primary = (process.env.PLUGIN_REGISTRY_URL ?? '').trim();
+            const github = (process.env.PLUGIN_REGISTRY_GITHUB_URL ?? '').trim();
+            // Default-fallback (public npm) keeps `registryUrl()` non-empty.
+            // The guard is on the RAW env: if the operator explicitly cleared
+            // PLUGIN_REGISTRY_URL, we expect them to set the GitHub fallback
+            // (or another registry URL) explicitly. Neither set → fail.
+            if (primary === '' && github === '') {
+                throw new Error(
+                    'PLUGIN_DISTRIBUTION_MODE=dynamic requires at least one of ' +
+                        'PLUGIN_REGISTRY_URL or PLUGIN_REGISTRY_GITHUB_URL to be set. ' +
+                        'Set PLUGIN_REGISTRY_URL=https://registry.npmjs.org (or your mirror) ' +
+                        'and re-deploy. Bundled-mode deployments are unaffected.',
+                );
+            }
+        },
     },
 };

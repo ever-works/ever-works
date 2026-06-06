@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RequestMagicLinkDto {
@@ -15,7 +15,10 @@ export class RequestMagicLinkDto {
         description:
             'Optional callback URL to embed the token into. Must resolve to an allow-listed host (see ALLOWED_CALLBACK_HOSTS). Falls back to the platform default when omitted.',
     })
-    @IsString()
+    // Security: enforce http/https URL shape at the DTO layer so malformed strings
+    // and non-http(s) schemes (e.g. javascript:) are rejected before reaching the
+    // downstream validateCallbackUrl() host-allowlist check in AuthService.
+    @IsUrl({ protocols: ['http', 'https'], require_tld: true })
     @IsOptional()
     magicLinkCallbackUrl?: string;
 }

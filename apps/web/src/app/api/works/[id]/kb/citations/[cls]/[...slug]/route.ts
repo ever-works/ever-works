@@ -35,17 +35,34 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     const { id, cls, slug } = await params;
 
     // Defensive: empty class or empty slug → nothing meaningful to resolve.
-    const slugJoined = (slug ?? []).filter((seg) => seg && seg.length > 0).join('/');
-    if (!cls || cls.length === 0 || slugJoined.length === 0) {
+    // Security: drop `.`/`..` path components from the catch-all slug before
+    // joining so a citation like `<cls>/../other` can't carry dot-dot
+    // traversal segments into the upstream document path. `encodeURIComponent`
+    // below already neutralises the immediate vector (the `/` is percent-
+    // encoded), but stripping the segments keeps a normalising upstream from
+    // re-resolving them. No legitimate stored KB slug segment is literally
+    // `.` or `..`, so this is behaviour-preserving for real citations.
+    const slugJoined = (slug ?? [])
+        .filter((seg) => seg && seg.length > 0 && seg !== '.' && seg !== '..')
+        .join('/');
+    // Security: reject a class that is itself a bare `.`/`..` traversal token.
+    if (!cls || cls.length === 0 || cls === '.' || cls === '..' || slugJoined.length === 0) {
         return NextResponse.json({ document: null }, { status: 200 });
     }
 
     const token = await getAuthAccessCookie();
+    // Security: this citation-resolution proxy rewrites upstream 404s into a
+    // `{ document: null }` 200 for the popover, so without a local gate an
+    // anonymous caller could differentiate request shapes against a protected
+    // endpoint. Require the auth cookie up front (every legitimate caller is a
+    // signed-in user) — the upstream API stays the authoritative tenant/owner
+    // check; this just stops unauthenticated probes before the fetch.
+    if (!token) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     const headers = new Headers();
     headers.set('Accept', 'application/json');
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
+    headers.set('Authorization', `Bearer ${token}`);
 
     // Try canonical `.md` first, then bare `<cls>/<slug>` (row 35b parity).
     const hasExtension = /\.[A-Za-z0-9]+$/.test(slugJoined);

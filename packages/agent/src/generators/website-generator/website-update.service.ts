@@ -383,6 +383,22 @@ export class WebsiteUpdateService {
                 continue; // Skip .git work
             }
 
+            // Security (symlink escape / path traversal): a malicious template
+            // repository (custom templates accept any GitHub URL) can contain a
+            // symlink such as `secret -> ../../../../etc/passwd`. `Dirent.isDirectory()`
+            // uses lstat semantics and returns false for symlinks, so they would
+            // otherwise fall through to `fs.copyFile`, which follows the link by
+            // default and copies the host file's CONTENT into the user's website
+            // repo (then committed/pushed to GitHub — host-secret exfiltration).
+            // Skip symlinks entirely; a freshly cloned website template never
+            // relies on intra-repo symlinks for its generated output.
+            if (entry.isSymbolicLink?.()) {
+                this.logger.warn(
+                    `Skipping symbolic link '${entry.name}' in template repository (symlink escape prevention)`,
+                );
+                continue;
+            }
+
             const sourcePath = path.join(sourceDir, entry.name);
             const targetPath = path.join(targetDir, entry.name);
 

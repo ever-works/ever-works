@@ -39,7 +39,7 @@
 		"@types/node": "^22.0.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",
-		"vitest": "^3.0.0"
+		"vitest": "^4.1.0"
 	},
 	"everworks": {
 		"plugin": {
@@ -70,7 +70,13 @@
 					"secret": true,
 					"description": "Urlbox API secret for signed render links (optional - can be set via admin/user settings)"
 				}
-			]
+			],
+			"distribution": "registry"
 		}
+	},
+	"private": false,
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

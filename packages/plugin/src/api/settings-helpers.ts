@@ -1,5 +1,12 @@
 import type { PluginSettingsSchema, PluginSettingsSchemaProperty, SettingScopeApi } from './api-response.types.js';
 
+// Security: Named sentinel constant for the UI mask placeholder so callers
+// and server-side code can import and reuse the same pattern rather than
+// embedding a magic bullet-character literal in multiple places.  A UI or
+// server change that picks a different mask character only needs to update
+// this one export.
+export const SETTINGS_MASK_SENTINEL = '••••'; // four U+2022 BULLET chars
+
 /**
  * Split settings into regular and secret buckets based on schema.
  * Populates schema defaults for visible-in-scope fields with no saved value.
@@ -136,16 +143,20 @@ export function validateRequiredSettings(
  * Three independent transformations:
  *
  * 1. **Drop masked-secret placeholders.** Fields the UI rendered with a
- *    `••••` mask (U+2022 BULLET) come back from a form submit as that
- *    same mask string. Sending that to the API would replace the real
- *    secret with `••••••••`, destroying the credential. The guard
- *    matches `value.includes('••••')` rather than an exact mask string
- *    so a partial mask (e.g. user typed extra chars and then hit save)
- *    still gets dropped. **Trade-off**: any user-typed string that
- *    contains four-in-a-row `•` bullets is silently discarded. Don't
- *    use four-bullet sequences as legitimate values in any settings
- *    field, and don't change the UI mask character without updating
- *    this guard.
+ *    `••••` mask (U+2022 BULLET, see {@link SETTINGS_MASK_SENTINEL}) come
+ *    back from a form submit as that same mask string. Sending that to the
+ *    API would replace the real secret with `••••••••`, destroying the
+ *    credential. The guard matches `value.includes(SETTINGS_MASK_SENTINEL)`
+ *    rather than an exact mask string so a partial mask (e.g. user typed
+ *    extra chars and then hit save) still gets dropped. **Trade-off**: any
+ *    user-typed string that contains four-in-a-row `•` bullets is silently
+ *    discarded. Don't use four-bullet sequences as legitimate values in any
+ *    settings field, and don't change the UI mask character without updating
+ *    {@link SETTINGS_MASK_SENTINEL}.
+ *    **Note**: this is a client-side UX helper. The server-side plugin
+ *    settings endpoint MUST also reject/strip values that contain the
+ *    sentinel; otherwise a caller bypassing the browser UI can overwrite a
+ *    stored secret with the mask placeholder.
  * 2. **`undefined` → `null`**, always. JSON.stringify drops `undefined`
  *    properties; normalising to `null` keeps the field present in the
  *    request body so the server can distinguish "explicitly cleared"
@@ -162,8 +173,10 @@ export function sanitizeSettingsForSave(
 ): Record<string, unknown> {
 	const result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(settings)) {
-		// Never send masked placeholders back to the API
-		if (typeof value === 'string' && value.includes('••••')) {
+		// Security: Never send masked placeholders back to the API.
+		// Uses the shared SETTINGS_MASK_SENTINEL constant so that if the
+		// mask character ever changes, only one place needs updating.
+		if (typeof value === 'string' && value.includes(SETTINGS_MASK_SENTINEL)) {
 			continue;
 		}
 		if (value === undefined) {

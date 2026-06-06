@@ -17,6 +17,14 @@ export type OnboardingStatus =
     | 'failed'
     | 'rejected';
 
+// Security: constrain failureDetail to prevent raw Error objects (containing
+// stack traces and internal paths) from being serialized into the database
+// and subsequently returned to callers via status-poll endpoints.
+export interface OnboardingFailureDetail {
+    message: string;
+    code?: string;
+}
+
 @Entity({ name: 'onboarding_requests' })
 @Index(['githubIdentityHash', 'repoUrlCanonical'], { unique: true })
 @Index(['repoUrlCanonical'])
@@ -50,8 +58,10 @@ export class OnboardingRequest {
     @Column({ type: 'varchar', length: 128, nullable: true })
     failureCode: string | null;
 
+    // Security: typed to OnboardingFailureDetail (not `unknown`) so callers
+    // cannot pass raw Error objects with stack traces or internal path names.
     @Column({ type: 'simple-json', nullable: true })
-    failureDetail: unknown;
+    failureDetail: OnboardingFailureDetail | null;
 
     @Column({ type: 'varchar', length: 64, nullable: true })
     idempotencyKey: string | null;

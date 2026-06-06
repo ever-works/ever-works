@@ -437,8 +437,10 @@ function uploadOne(args: {
                 const body = xhr.response;
                 if (body && typeof body === 'object') {
                     const candidate = (body as { message?: unknown }).message;
-                    if (typeof candidate === 'string') message = candidate;
-                    else if (Array.isArray(candidate)) message = candidate.join(', ');
+                    // Security: truncate server error messages to prevent excessively long
+                    // strings from breaking the UI layout; React text-node escaping prevents XSS.
+                    if (typeof candidate === 'string') message = candidate.slice(0, 200);
+                    else if (Array.isArray(candidate)) message = candidate.join(', ').slice(0, 200);
                 }
                 updateEntry(entryId, {
                     status: 'failed',

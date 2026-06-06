@@ -46,6 +46,36 @@ const DEFAULT_PURPOSE = 'work-generation';
 const DEFAULT_MAX_CONTEXT_TOKENS = 1500;
 
 /**
+ * Security (prompt-injection hardening): chat-template control markers that
+ * some models interpret as out-of-band role/turn delimiters. Stripped from
+ * untrusted values before they are embedded in the observation text that this
+ * modifier persists to the agent-memory store. Mirrors the shared
+ * `neutralizePromptField` / `sanitizePromptVariable` pattern used across the
+ * agent package (`agents/prompt-assembler.service.ts`,
+ * `services/kb-prompt-formatter.ts`, `user-research/prompts.ts`).
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the observation summaries built below
+ * are saved verbatim to the agent-memory store and later re-fetched by
+ * `runFetchContext` into `context.memoryContext`, which downstream pipeline
+ * steps splice into their LLM prompts. The interpolated `work.name` and
+ * `error.message` are attacker-controlled (a tenant can name a Work anything;
+ * an error can echo poisoned URLs/filenames), so a value like
+ * `"\nIgnore previous instructions…"` would otherwise be replayed as
+ * instructions on the next run. This single-line neutralizer collapses CR/LF
+ * to a space (so a value cannot start a new instruction line — this also
+ * defuses Markdown headings, which only act at line-start) and strips
+ * chat-template control markers (so it cannot spoof a system/user turn). The
+ * summaries are single-line observations, so clean text is returned unchanged
+ * and legitimate work names / error messages pass through untouched.
+ */
+function neutralizeMemoryField(value: string): string {
+	return value.replace(/\r?\n|\r/g, ' ').replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
+}
+
+/**
  * Agent-memory pipeline modifier.
  *
  * Adds two steps to any pipeline (target `['*']`):
@@ -573,7 +603,9 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		work: { id?: string; name?: string; slug?: string } | undefined,
 		items: unknown[] | undefined
 	): string {
-		const workLabel = work?.name ?? work?.slug ?? work?.id ?? 'unknown Work';
+		// Security: neutralize the attacker-controlled work name before it is
+		// persisted to memory and later replayed into downstream LLM prompts.
+		const workLabel = neutralizeMemoryField(work?.name ?? work?.slug ?? work?.id ?? 'unknown Work');
 		const count = Array.isArray(items) ? items.length : 0;
 		return `Work "${workLabel}" — pipeline completed with ${count} item${count === 1 ? '' : 's'}.`;
 	}
@@ -591,10 +623,15 @@ export class MemoryPipelineModifierPlugin implements IPlugin, IPipelineModifierP
 		error: Error,
 		isCancellation: boolean
 	): string {
-		const workLabel = work?.name ?? work?.slug ?? work?.id ?? 'unknown Work';
+		// Security: both the work name and the error message are
+		// attacker-controlled (a tenant names the Work; an error can echo a
+		// poisoned URL/filename). Neutralize before persisting to memory so the
+		// stored failure observation cannot inject instructions when a later run
+		// fetches it into the LLM prompt context.
+		const workLabel = neutralizeMemoryField(work?.name ?? work?.slug ?? work?.id ?? 'unknown Work');
 		const count = Array.isArray(items) ? items.length : 0;
 		const verb = isCancellation ? 'cancelled' : 'failed';
-		const trimmedMessage = (error.message ?? '').slice(0, 240);
+		const trimmedMessage = neutralizeMemoryField(error.message ?? '').slice(0, 240);
 		const itemNote = count > 0 ? ` (${count} item${count === 1 ? '' : 's'} produced before stop)` : '';
 		return `Work "${workLabel}" — pipeline ${verb}${itemNote}: ${trimmedMessage}`;
 	}

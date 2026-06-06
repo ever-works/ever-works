@@ -19,11 +19,15 @@ vi.mock('bash-tool', () => ({
 }));
 
 vi.mock('just-bash', () => ({
-	Bash: vi.fn().mockImplementation(() => ({})),
-	ReadWriteFs: vi.fn().mockImplementation(() => ({
-		readFile: mockSandboxReadFile,
-		writeFile: mockSandboxWriteFile
-	}))
+	Bash: vi.fn().mockImplementation(function () {
+		return {};
+	}),
+	ReadWriteFs: vi.fn().mockImplementation(function () {
+		return {
+			readFile: mockSandboxReadFile,
+			writeFile: mockSandboxWriteFile
+		};
+	})
 }));
 
 vi.mock('ai', () => ({

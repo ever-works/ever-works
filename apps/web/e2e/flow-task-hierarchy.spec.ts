@@ -81,7 +81,18 @@ function uniqueSuffix(): string {
     return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Create a Task via the live API, asserting the 201 + entity shape. */
+/**
+ * Create a Task via the live API, asserting the 201 + entity shape.
+ *
+ * HARDENING (workers=4): POST /api/tasks is @Throttle({ default: 60/60s }) and
+ * the ThrottlerGuard tracks per-IP — every parallel worker shares 127.0.0.1, so
+ * sibling specs creating tasks concurrently can exhaust the shared window and
+ * make a create transiently return 429 ThrottlerException (verified live: bursts
+ * trip 429 with a Retry-After[-short] header once the per-IP budget is spent).
+ * That is a parallelism collision, not a contract change — so we RETRY on 429,
+ * honouring the throttle window, and only assert the 201 contract after the
+ * window has drained. The 201 + shape assertions are never weakened.
+ */
 async function createTask(
     request: APIRequestContext,
     token: string,
@@ -94,10 +105,27 @@ async function createTask(
         parentTaskId?: string;
     },
 ): Promise<Task> {
-    const res = await request.post(`${API_BASE}/api/tasks`, {
+    const maxAttempts = 8;
+    let res = await request.post(`${API_BASE}/api/tasks`, {
         headers: authedHeaders(token),
         data: body,
     });
+    for (let attempt = 1; res.status() === 429 && attempt < maxAttempts; attempt++) {
+        // The guard sets Retry-After (seconds); fall back to a capped linear
+        // backoff that still outlasts a full 60s window across the attempts.
+        const headers = res.headers();
+        const retryAfterRaw = headers['retry-after'] ?? headers['retry-after-short'];
+        const retryAfterSec = Number(retryAfterRaw);
+        const waitMs =
+            Number.isFinite(retryAfterSec) && retryAfterSec > 0
+                ? Math.min(retryAfterSec * 1000 + 500, 12_000)
+                : Math.min(2_000 * attempt, 12_000);
+        await new Promise((r) => setTimeout(r, waitMs));
+        res = await request.post(`${API_BASE}/api/tasks`, {
+            headers: authedHeaders(token),
+            data: body,
+        });
+    }
     expect(res.status(), `createTask body=${await res.text().catch(() => '')}`).toBe(201);
     const task = (await res.json()) as Task;
     expect(task.id, 'created task has an id').toBeTruthy();
@@ -246,7 +274,9 @@ test.describe('Task hierarchy — subtasks, filters/pagination, search', () => {
     test('subtask filtering by label/priority/status + pagination meta windows', async ({
         request,
     }) => {
-        test.setTimeout(120_000);
+        // Generous budget: this flow does ~30 creates + a transition, each of
+        // which may retry past per-IP throttle 429s under workers=4 contention.
+        test.setTimeout(240_000);
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const sfx = uniqueSuffix();
@@ -357,10 +387,25 @@ test.describe('Task hierarchy — subtasks, filters/pagination, search', () => {
         expect(beforeBacklog.meta.total, 'all subtasks begin in backlog').toBe(subtaskSpecs.length);
 
         const moved = subtasks[0];
-        const transitionRes = await request.post(`${API_BASE}/api/tasks/${moved.id}/transition`, {
+        // /transition is also @Throttle({ default: 60/60s }) per-IP; retry past a
+        // transient 429 from sibling-worker contention before asserting the 200.
+        let transitionRes = await request.post(`${API_BASE}/api/tasks/${moved.id}/transition`, {
             headers: authedHeaders(token),
             data: { to: 'todo' },
         });
+        for (let attempt = 1; transitionRes.status() === 429 && attempt < 8; attempt++) {
+            const h = transitionRes.headers();
+            const ra = Number(h['retry-after'] ?? h['retry-after-short']);
+            const waitMs =
+                Number.isFinite(ra) && ra > 0
+                    ? Math.min(ra * 1000 + 500, 12_000)
+                    : Math.min(2_000 * attempt, 12_000);
+            await new Promise((r) => setTimeout(r, waitMs));
+            transitionRes = await request.post(`${API_BASE}/api/tasks/${moved.id}/transition`, {
+                headers: authedHeaders(token),
+                data: { to: 'todo' },
+            });
+        }
         expect(transitionRes.status(), 'transition backlog -> todo is legal (200)').toBe(200);
         const movedBody = (await transitionRes.json()) as Task;
         expect(movedBody.status, 'transitioned task is now todo').toBe('todo');

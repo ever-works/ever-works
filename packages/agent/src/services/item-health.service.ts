@@ -427,7 +427,9 @@ export class ItemHealthService {
             baseReachabilityStatus,
             pageContent,
         );
-        const httpSummary = this.buildHttpSummary(health);
+        // Security: sanitize the HTTP summary (derived from health.message/status) before
+        // it enters the LLM prompt, matching the treatment of the other prompt variables.
+        const httpSummary = this.sanitizePromptVariable(this.buildHttpSummary(health), 300);
 
         try {
             const { result } = await this.aiFacade.askJson(
@@ -437,7 +439,10 @@ export class ItemHealthService {
                     variables: {
                         itemName: this.sanitizePromptVariable(item.name, 200),
                         itemDescription: this.sanitizePromptVariable(item.description || '', 500),
-                        candidateUrl: item.source_url,
+                        // Security: source_url comes from externally controlled repo YAML; sanitize
+                        // it (strip newlines/injection tokens) like the sibling prompt variables to
+                        // prevent prompt injection via crafted source URLs.
+                        candidateUrl: this.sanitizePromptVariable(item.source_url, 500),
                         httpSummary,
                         pageContent: this.sanitizePromptVariable(pageContent, 2000),
                     },

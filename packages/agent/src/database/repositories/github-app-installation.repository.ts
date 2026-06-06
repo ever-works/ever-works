@@ -44,11 +44,29 @@ export class GitHubAppInstallationRepository {
         });
     }
 
+    /**
+     * Security: returns EVERY installation across ALL tenants.
+     * Must only be called from platform-admin–gated code paths (e.g. an
+     * IsPlatformAdminGuard-protected controller). NEVER wire this to a
+     * tenant-scoped route — use `listByTenantId` instead.
+     */
     async listAll(): Promise<GitHubAppInstallation[]> {
         return this.repository.find({
             order: {
                 createdAt: 'DESC',
             },
+        });
+    }
+
+    /**
+     * Security: tenant-scoped enumeration — safe for use in tenant routes.
+     * Always prefer this over `listAll()` when the caller has a tenantId.
+     */
+    async listByTenantId(tenantId: string): Promise<GitHubAppInstallation[]> {
+        // Security: filters to a single tenant to prevent cross-tenant data exposure
+        return this.repository.find({
+            where: { tenantId, deletedAt: IsNull() },
+            order: { createdAt: 'DESC' },
         });
     }
 

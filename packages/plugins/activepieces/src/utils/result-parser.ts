@@ -1,4 +1,7 @@
 import type { ItemData, Category, Tag, Brand } from '@ever-works/plugin';
+// Security: direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { ActivepiecesFlowOutput, ActivepiecesOutputItem } from '../types.js';
 
 export interface ParsedResults {
@@ -100,6 +103,21 @@ function tryParse(str: string): unknown {
 	}
 }
 
+/**
+ * Security: validates that a URL from untrusted Activepieces flow output uses
+ * only http: or https: and passes the lexical SSRF guard. Rejects javascript:,
+ * file:, data:, and private/metadata IP destinations to prevent XSS and SSRF
+ * when URLs are later passed to screenshot facades or rendered in the UI.
+ * Returns the original URL string if safe, or an empty string if rejected.
+ */
+function sanitizeItemUrl(rawUrl: unknown): string {
+	if (typeof rawUrl !== 'string' || rawUrl.trim() === '') return '';
+	const trimmed = rawUrl.trim();
+	// Security: isSafeWebhookUrl enforces http:/https: scheme and blocks private
+	// IPs, loopback, link-local, and cloud-metadata hostnames (e.g. 169.254.169.254).
+	return isSafeWebhookUrl(trimmed) ? trimmed : '';
+}
+
 function parseItems(rawItems: ActivepiecesOutputItem[]): ItemData[] {
 	const items: ItemData[] = [];
 
@@ -107,16 +125,24 @@ function parseItems(rawItems: ActivepiecesOutputItem[]): ItemData[] {
 		if (!raw || typeof raw !== 'object') continue;
 		if (!raw.name || typeof raw.name !== 'string') continue;
 
+		// Security: validate source_url and images URLs from untrusted flow output to
+		// prevent javascript:, file:, data: schemes and SSRF via http: to internal hosts.
+		const rawSourceUrl =
+			typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '';
 		const item: ItemData = {
 			name: raw.name.trim(),
 			description: typeof raw.description === 'string' ? raw.description.trim() : '',
-			source_url:
-				typeof raw.url === 'string' ? raw.url : typeof raw.source_url === 'string' ? raw.source_url : '',
+			source_url: sanitizeItemUrl(rawSourceUrl),
 			markdown: typeof raw.content === 'string' ? raw.content : undefined,
 			category: typeof raw.category === 'string' ? raw.category.trim() : '',
 			tags: Array.isArray(raw.tags) ? raw.tags.filter((t): t is string => typeof t === 'string') : [],
 			brand: typeof raw.brand === 'string' ? raw.brand.trim() : undefined,
-			images: Array.isArray(raw.images) ? raw.images.filter((i): i is string => typeof i === 'string') : undefined
+			images: Array.isArray(raw.images)
+				? raw.images
+						.filter((i): i is string => typeof i === 'string')
+						.map((i) => sanitizeItemUrl(i))
+						.filter((i) => i !== '')
+				: undefined
 		};
 
 		items.push(item);

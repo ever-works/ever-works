@@ -68,11 +68,21 @@ export class EverWorksK8sDeployProvider {
      */
     resolveIngressHost(work: EverWorksProviderWorkRef, templateOverride?: string): string {
         const template = templateOverride ?? config.everWorks.deploy.getIngressHostTemplate();
-        const userPart = (work.userSlug ?? '').trim() || work.userId.slice(0, 8);
+        // Security: DNS-label-sanitise every user-controlled substitution before it
+        // lands in the ingress host. `work.slug`/`work.userSlug` are user-controlled
+        // (create-Work API); a value like `foo.bar` or `../admin` would otherwise
+        // inject extra subdomain levels or a malformed host into the Ingress spec.
+        // Mirrors CloudflareDnsProvider.assertSlug()'s DNS-label expectation while
+        // reusing the same normaliser used for the namespace name.
+        const slugPart = sanitiseDnsLabel(work.slug);
+        const userPart =
+            sanitiseDnsLabel((work.userSlug ?? '').trim()) ||
+            sanitiseDnsLabel(work.userId.slice(0, 8));
+        const workIdPart = sanitiseDnsLabel(work.id);
         return template
-            .replace(/\{slug\}/g, work.slug)
+            .replace(/\{slug\}/g, slugPart)
             .replace(/\{user\}/g, userPart)
-            .replace(/\{workId\}/g, work.id);
+            .replace(/\{workId\}/g, workIdPart);
     }
 
     /**

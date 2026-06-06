@@ -22,6 +22,28 @@ export interface BranchSyncSummary {
     results: BranchSyncResult[];
 }
 
+// Security: `template.syncBranches` / `template.betaBranch` originate from the
+// operator-managed `templates` DB row (persisted as a `simple-json` text column
+// and deserialized without re-validation). They flow unvalidated into git ref
+// operations here — `cloneOrPull({ branch })`, `renameBranch`, and as
+// branch-mapping keys/targets. A ref that begins with `-` or smuggles a git
+// protocol switch (e.g. `--upload-pack=...`) is a known argument-/protocol-
+// injection vector for any downstream git invocation. Restrict refs to the
+// conservative character set real branch names use and forbid a leading dash or
+// slash so a malicious/corrupt catalog row cannot inject an option. Legitimate
+// branches (`main`, `stage`, `develop`, `feature/x`, configured beta branches)
+// are unaffected.
+const SAFE_GIT_BRANCH_NAME = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
+
+function isSafeGitBranchName(name: unknown): name is string {
+    return (
+        typeof name === 'string' &&
+        name.length > 0 &&
+        name.length <= 255 &&
+        SAFE_GIT_BRANCH_NAME.test(name)
+    );
+}
+
 /**
  * Pulls upstream template branches into each Work's own website repo so
  * the operator's customisations stay rebased against the latest template
@@ -66,10 +88,22 @@ export class BranchSyncService {
         const websiteRepo = work.getWebsiteRepo();
         const template = await this.websiteTemplateResolver.resolveForWork(work);
 
-        const branchMapping =
-            work.websiteTemplateUseBeta && template.betaBranch
-                ? { [template.betaBranch]: 'main' }
-                : undefined;
+        // Security: validate the DB-sourced beta branch before it becomes a
+        // git ref / mapping key. An unsafe value is dropped (no beta mapping),
+        // matching the "no beta branch configured" path rather than feeding a
+        // malformed ref into cloneOrPull.
+        const useBetaBranch =
+            work.websiteTemplateUseBeta &&
+            template.betaBranch &&
+            isSafeGitBranchName(template.betaBranch);
+        if (work.websiteTemplateUseBeta && template.betaBranch && !useBetaBranch) {
+            this.logger.warn(
+                `Ignoring beta branch with unsafe name for ${websiteOwner}/${websiteRepo}`,
+            );
+        }
+        const branchMapping = useBetaBranch
+            ? { [template.betaBranch as string]: 'main' }
+            : undefined;
 
         this.logger.log(
             `Syncing all branches from template to ${websiteOwner}/${websiteRepo}` +
@@ -141,8 +175,26 @@ export class BranchSyncService {
 
         // Build sync operations
         const syncOperations: Array<{ branchName: string; targetBranch: string }> = [];
+        // Security: branches rejected by ref-name validation are reported as
+        // errors (not silently dropped) so the summary's `errors` count — which
+        // gates the caller's "did the deploy refresh succeed" check — reflects
+        // the rejection rather than reporting a clean success.
+        const rejectedResults: BranchSyncResult[] = [];
 
         for (const branchName of branchesToSync) {
+            // Security: never feed an unsafe ref name into git operations.
+            if (!isSafeGitBranchName(branchName)) {
+                this.logger.warn(
+                    `Skipping branch with unsafe name in template.syncBranches for ${targetOwner}/${targetRepo}`,
+                );
+                rejectedResults.push({
+                    branch: String(branchName),
+                    status: 'error',
+                    message: 'Branch name rejected: contains unsafe characters',
+                });
+                continue;
+            }
+
             // Skip if this branch would be overwritten by a mapped branch
             if (mappedTargets.includes(branchName) && !branchMapping[branchName]) {
                 this.logger.log(`Skipping '${branchName}' - will be overwritten by mapped branch`);
@@ -153,14 +205,27 @@ export class BranchSyncService {
 
             // If mapped, also sync to the mapped target
             const mappedTarget = branchMapping[branchName];
-            if (mappedTarget && mappedTarget !== branchName) {
+            // Security: the mapped target also becomes a git ref (renameBranch);
+            // reject an unsafe mapping target instead of syncing to it.
+            if (mappedTarget && mappedTarget !== branchName && !isSafeGitBranchName(mappedTarget)) {
+                this.logger.warn(
+                    `Skipping unsafe branch-mapping target for '${branchName}' in ${targetOwner}/${targetRepo}`,
+                );
+                rejectedResults.push({
+                    branch: branchName,
+                    status: 'error',
+                    message: 'Branch mapping target rejected: contains unsafe characters',
+                });
+            } else if (mappedTarget && mappedTarget !== branchName) {
                 syncOperations.push({ branchName, targetBranch: mappedTarget });
                 this.logger.log(`Branch '${branchName}' will also sync to '${mappedTarget}'`);
             }
         }
 
-        // Sync with controlled parallelism
-        const results: BranchSyncResult[] = [];
+        // Sync with controlled parallelism.
+        // Security: seed with any ref-name rejections so they're counted in the
+        // summary's `errors` total alongside genuine sync failures.
+        const results: BranchSyncResult[] = [...rejectedResults];
 
         for (let i = 0; i < syncOperations.length; i += this.MAX_CONCURRENT_SYNCS) {
             const batch = syncOperations.slice(i, i + this.MAX_CONCURRENT_SYNCS);

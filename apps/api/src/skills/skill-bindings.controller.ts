@@ -20,7 +20,7 @@ export class SkillBindingsController {
     @Delete(':id')
     @ApiOperation({ summary: 'Remove one Skill binding by id.' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async remove(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

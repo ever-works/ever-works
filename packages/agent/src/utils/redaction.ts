@@ -33,7 +33,28 @@ export const REDACTED_BODY_FIELDS: ReadonlyArray<string> = [
     'secret',
     'apiKey',
     'agentPayment',
+    // Security: added missing sensitive field names (webhookSecret, privateKey, clientSecret,
+    // signingKey, encryptedSettings, webhookToken, installationToken) so that plugin settings
+    // payloads containing these fields are redacted if captured by a future log interceptor.
+    'webhookSecret',
+    'privateKey',
+    'clientSecret',
+    'signingKey',
+    'encryptedSettings',
+    'webhookToken',
+    'installationToken',
 ];
+
+/**
+ * Blanket patterns for field names that should always be redacted regardless of whether
+ * their exact name appears in {@link REDACTED_BODY_FIELDS}. A field name is considered
+ * sensitive if it contains any of these substrings (case-insensitive). This acts as a
+ * defence-in-depth catch-all for future field names we haven't enumerated yet.
+ *
+ * Security: added to ensure any field whose name contains 'secret', 'key', 'token', or
+ * 'password' is redacted even if not explicitly listed in REDACTED_BODY_FIELDS.
+ */
+const REDACTED_BODY_PATTERNS: ReadonlyArray<string> = ['secret', 'key', 'token', 'password'];
 
 export function redactHeaders(
     headers: Record<string, string | string[] | undefined> | undefined,
@@ -70,7 +91,12 @@ export function redactBody(body: unknown): unknown {
     const out: Record<string, unknown> = {};
     const lower = new Set(REDACTED_BODY_FIELDS.map((f) => f.toLowerCase()));
     for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
-        if (lower.has(k.toLowerCase())) {
+        const kLower = k.toLowerCase();
+        // Security: also redact any field whose name contains a sensitive pattern substring,
+        // acting as a catch-all for field names not yet enumerated in REDACTED_BODY_FIELDS.
+        const isSensitive =
+            lower.has(kLower) || REDACTED_BODY_PATTERNS.some((pattern) => kLower.includes(pattern));
+        if (isSensitive) {
             out[k] = REDACTED;
         } else if (v && typeof v === 'object') {
             out[k] = redactBody(v);

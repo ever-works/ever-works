@@ -26,6 +26,14 @@ export class NotificationChannelFacadeError extends FacadeError {
     }
 }
 
+/**
+ * Security: upper bound on the channel-send error message we log, persist to
+ * the delivery_log, and return to callers. Channel plugins can fold an
+ * attacker-controlled webhook error-response body into the thrown message, so
+ * we truncate to keep stored/returned content bounded.
+ */
+const MAX_DELIVERY_ERROR_MESSAGE_LENGTH = 500;
+
 export interface NotificationChannelFanoutInput {
     readonly text: string;
     readonly rich?: ChannelRichPayload;
@@ -228,6 +236,18 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         payload: NotificationChannelFanoutInput,
         options: FacadeOptions,
     ): Promise<NotificationChannelFanoutResult> {
+        // Security: require a caller userId so the channel lookup in sendOne
+        // stays owner-scoped (findByIdForUser). Without this, a caller that
+        // omits userId falls through to the unscoped findById and could deliver
+        // to a leaked/guessed channel UUID owned by another user (IDOR). All
+        // legitimate callers already pass userId (FacadeOptions.userId is a
+        // required field), so this only rejects malformed/abusive calls.
+        if (!options.userId) {
+            throw new NotificationChannelFacadeError(
+                'sendDirect requires userId in options',
+                'sendDirect',
+            );
+        }
         return this.sendOne(channelId, payload, options, payload.eventType ?? undefined);
     }
 
@@ -266,6 +286,19 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         options: FacadeOptions,
         eventType?: string,
     ): Promise<NotificationChannelFanoutResult> {
+        // Security: this primitive is invoked by the Trigger.dev delivery task
+        // with options deserialized from the enqueued payload. Require a userId
+        // so the channel lookup in sendOne stays owner-scoped (findByIdForUser):
+        // a payload that omits userId would otherwise fall through to the
+        // unscoped findById and deliver to any channel by UUID (IDOR). The
+        // producer (send()) always stamps userId onto the dispatched options,
+        // so this only rejects a crafted/corrupted payload.
+        if (!options.userId) {
+            throw new NotificationChannelFacadeError(
+                'deliverToChannelOrThrow requires userId in options',
+                'deliverToChannelOrThrow',
+            );
+        }
         const result = await this.sendOne(channelId, payload, options, eventType);
         if (result.status === 'failed') {
             throw new NotificationChannelFacadeError(
@@ -357,7 +390,17 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
                 providerMessageId: result.providerMessageId,
             };
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err);
+            // Security: a channel plugin's send() can wrap an attacker-controlled
+            // HTTP error-response body (e.g. a hostile webhook endpoint) into the
+            // thrown message. Cap its length before it is logged, persisted to the
+            // delivery_log row, and returned in the fanout result to limit
+            // log/store bloat and the exfiltration surface. Legitimate errors are
+            // short, so this is behavior-preserving for normal failures.
+            const rawErrorMessage = err instanceof Error ? err.message : String(err);
+            const errorMessage =
+                rawErrorMessage.length > MAX_DELIVERY_ERROR_MESSAGE_LENGTH
+                    ? `${rawErrorMessage.slice(0, MAX_DELIVERY_ERROR_MESSAGE_LENGTH)}… [truncated]`
+                    : rawErrorMessage;
             this.logger.warn(`channel ${channelId} send failed: ${errorMessage}`);
             await this.logDelivery(
                 channelId,

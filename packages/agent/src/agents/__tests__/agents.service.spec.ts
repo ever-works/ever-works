@@ -225,6 +225,74 @@ describe('AgentsService', () => {
         });
     });
 
+    describe('heartbeat cadence updates', () => {
+        it('rejects invalid cadence on create', async () => {
+            agents.findByUserIdAndSlug.mockResolvedValueOnce(null);
+
+            await expect(
+                svc.create('u1', {
+                    scope: AgentScope.TENANT,
+                    name: 'CEO',
+                    heartbeatCadence: 'not a cron',
+                }),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.create).not.toHaveBeenCalled();
+        });
+
+        it('rejects invalid cadence on update', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(
+                makeAgent({ status: AgentStatus.ACTIVE, heartbeatCadence: null }),
+            );
+
+            await expect(
+                svc.update('u1', 'a1', { heartbeatCadence: '60 * * * *' }),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.updateById).not.toHaveBeenCalled();
+        });
+
+        it('reschedules an active Agent when cadence changes from manual to cron', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(
+                makeAgent({ status: AgentStatus.ACTIVE, heartbeatCadence: null }),
+            );
+            agents.findById.mockResolvedValueOnce(
+                makeAgent({ status: AgentStatus.ACTIVE, heartbeatCadence: '*/15 * * * *' }),
+            );
+
+            await svc.update('u1', 'a1', { heartbeatCadence: '*/15 * * * *' });
+
+            expect(agents.updateById).toHaveBeenCalledWith(
+                'a1',
+                expect.objectContaining({
+                    heartbeatCadence: '*/15 * * * *',
+                    nextHeartbeatAt: expect.any(Date),
+                }),
+            );
+        });
+
+        it('clears nextHeartbeatAt when an active Agent is switched to manual', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(
+                makeAgent({
+                    status: AgentStatus.ACTIVE,
+                    heartbeatCadence: '*/15 * * * *',
+                    nextHeartbeatAt: new Date('2026-01-01T00:15:00Z'),
+                }),
+            );
+            agents.findById.mockResolvedValueOnce(
+                makeAgent({ status: AgentStatus.ACTIVE, heartbeatCadence: null }),
+            );
+
+            await svc.update('u1', 'a1', { heartbeatCadence: null });
+
+            expect(agents.updateById).toHaveBeenCalledWith(
+                'a1',
+                expect.objectContaining({
+                    heartbeatCadence: null,
+                    nextHeartbeatAt: null,
+                }),
+            );
+        });
+    });
+
     describe('status transitions', () => {
         it('allows draft → active', async () => {
             agents.findByIdAndUser.mockResolvedValueOnce(makeAgent({ status: AgentStatus.DRAFT }));

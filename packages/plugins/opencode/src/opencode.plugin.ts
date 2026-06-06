@@ -652,16 +652,35 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 		};
 	}
 
+	// Security (prompt-injection hardening): `systemPrompt`/`userPrompt` ultimately
+	// embed user-controlled values (work.name/description, request.prompt/name on
+	// the pipeline path; `request.prompt` passed verbatim on the code-edit path at
+	// `executeCodeEdit`). Those fields can carry hostile text from a malicious
+	// tenant or scraped external content. `buildCombinedPrompt` frames them inside
+	// `<system_instructions>`/`<user_request>` fences sent as a single CLI arg to
+	// OpenCode (which has webfetch/websearch tools), so a crafted value that forges
+	// one of those boundary tokens could break out of the user section and inject
+	// operator-level instructions. Defuse the two fence boundaries this method owns
+	// — mirroring the house `neutralizeWorkField` pattern in
+	// `@ever-works/plugin`'s `cli-pipeline/prompts.ts` — by inserting a zero-width
+	// space after the opening `<` of any forged fence token. Benign content (which
+	// never contains these literal tokens) passes through byte-for-byte unchanged.
+	private static readonly PROMPT_FENCE_TOKEN_PATTERN = /<\/?(?:system_instructions|user_request)\b/gi;
+
+	private neutralizePromptFences(value: string): string {
+		return value.replace(OpenCodePlugin.PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+	}
+
 	private buildCombinedPrompt(systemPrompt: string, userPrompt: string): string {
 		return [
 			'You must follow the system instructions below exactly.',
 			'',
 			'<system_instructions>',
-			systemPrompt,
+			this.neutralizePromptFences(systemPrompt),
 			'</system_instructions>',
 			'',
 			'<user_request>',
-			userPrompt,
+			this.neutralizePromptFences(userPrompt),
 			'</user_request>'
 		].join('\n');
 	}

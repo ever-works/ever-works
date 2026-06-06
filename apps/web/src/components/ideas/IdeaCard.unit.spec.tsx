@@ -18,6 +18,10 @@ vi.mock('@/i18n/navigation', () => ({
     ),
 }));
 
+vi.mock('sonner', () => ({
+    toast: { error: vi.fn() },
+}));
+
 const dismissProposalMock = vi.fn();
 vi.mock('@/app/actions/dashboard/work-proposals', () => ({
     dismissProposalAction: (...args: unknown[]) => dismissProposalMock(...args),
@@ -135,6 +139,15 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         render(<IdeaCard proposal={minimalProposal} />);
         fireEvent.click(screen.getByText('actions.accept'));
         expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
+    });
+
+    it('uses onQueueBuild for pending Ideas when provided', () => {
+        routerPushMock.mockClear();
+        const onQueueBuild = vi.fn();
+        render(<IdeaCard proposal={minimalProposal} onQueueBuild={onQueueBuild} />);
+        fireEvent.click(screen.getByText('actions.accept'));
+        expect(onQueueBuild).toHaveBeenCalledWith('prop-1');
+        expect(routerPushMock).not.toHaveBeenCalled();
     });
 
     it('calls dismissProposalAction + onDismissed when the X is clicked', async () => {

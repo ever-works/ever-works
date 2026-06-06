@@ -73,9 +73,12 @@ export function buildAgentTaskTools(args: {
     agent: Agent;
     tasksService: TasksService;
     chatService: TaskChatService;
-    // Review-fix C9: membership-check helpers. Optional so unit tests
-    // that don't need the gate can omit them; production wiring in
-    // the API-side module always binds all three.
+    // Review-fix C9: membership-check helpers. Typed optional for
+    // ergonomic construction, but Security (fail-closed): if any of the
+    // three is unbound the commentOnTask membership gate DENIES every
+    // call (see agentIsOnTask). Production wiring in the API-side module
+    // must bind all three; unit tests that exercise commentOnTask must
+    // supply them too (omitting them now denies rather than allows).
     assignees?: TaskAssigneeRepository;
     reviewers?: TaskReviewerRepository;
     approvers?: TaskApproverRepository;
@@ -126,11 +129,19 @@ export function buildAgentTaskTools(args: {
     }
 
     // Helper for C9: returns true iff the Agent is on the Task as
-    // assignee / reviewer / approver. When the repos aren't bound
-    // (unit-test mode), default to allowing the call — the test
-    // already chose not to enforce the gate.
+    // assignee / reviewer / approver.
+    //
+    // Security (fail-closed authz): the membership gate is the SOLE
+    // enforcement point for "Agent must be a member" — downstream
+    // TaskChatService.post only checks task OWNERSHIP (findByIdAndUser),
+    // not membership. If any of the three membership repos is unbound
+    // the gate cannot be evaluated completely, so we DENY rather than
+    // silently allow. A misconfigured / partially-wired DI graph
+    // therefore fails closed instead of turning the gate into a no-op.
+    // (Previously this returned `true` when all three repos were absent,
+    // which let any caller that omitted the repos bypass the check.)
     async function agentIsOnTask(taskId: string): Promise<boolean> {
-        if (!args.assignees && !args.reviewers && !args.approvers) return true;
+        if (!args.assignees || !args.reviewers || !args.approvers) return false;
         const checks = await Promise.all([
             args.assignees?.findByTaskId(taskId).catch(() => []),
             args.reviewers?.findByTaskId(taskId).catch(() => []),

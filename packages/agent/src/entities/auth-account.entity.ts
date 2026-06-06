@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
 import { PortableDateColumn } from './_types';
 
 @Entity({ name: 'account' })
@@ -17,9 +18,16 @@ export class AuthAccount {
     @Column({ type: 'varchar' })
     providerId: string;
 
+    // Security: secret. @Exclude() keeps OAuth tokens / credential hash out of
+    // any class-transformer serialization (instanceToPlain / ClassSerializerInterceptor)
+    // so an accidental endpoint or log that serializes the raw entity cannot leak
+    // them. Server-side consumers read these via direct property access, which
+    // @Exclude() does not affect, so OAuth/git flows are unchanged.
+    @Exclude()
     @Column({ type: 'text', nullable: true })
     accessToken?: string | null;
 
+    @Exclude()
     @Column({ type: 'text', nullable: true })
     refreshToken?: string | null;
 
@@ -38,12 +46,18 @@ export class AuthAccount {
     @PortableDateColumn({ nullable: true })
     refreshTokenExpiresAt?: Date | null;
 
+    // Security: secret (granted OAuth scopes can reveal token power). @Exclude().
+    @Exclude()
     @Column({ type: 'text', nullable: true })
     scope?: string | null;
 
+    // Security: secret. @Exclude() — see accessToken note above.
+    @Exclude()
     @Column({ type: 'text', nullable: true })
     idToken?: string | null;
 
+    // Security: credential password hash. @Exclude() — see accessToken note above.
+    @Exclude()
     @Column({ type: 'text', nullable: true })
     password?: string | null;
 

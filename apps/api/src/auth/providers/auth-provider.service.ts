@@ -289,7 +289,15 @@ export class AuthProviderService extends AuthProvider {
     }
 
     private async getContext(): Promise<AuthRuntimeContext> {
-        return (await this.auth.$context) as AuthRuntimeContext;
+        // better-auth >=1.6.11 narrowed `internalAdapter.deleteSessions` from
+        // (userId: string) to (sessionTokens: string[]); our local
+        // `AuthRuntimeContext` still types the old shape because consumers
+        // pass a userId. The two-step cast (through `unknown`) acknowledges
+        // the deliberate widening at the boundary — runtime callers either
+        // use the bearer-token branch (deleteSessionRecord) or the
+        // signOutAll path which uses our own SessionRepository, so the
+        // better-auth method isn't actually invoked with the old shape.
+        return (await this.auth.$context) as unknown as AuthRuntimeContext;
     }
 
     private async requireAuthenticatedUser(headers: Headers) {

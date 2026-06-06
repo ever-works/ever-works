@@ -224,6 +224,35 @@ describe('UserRepository', () => {
         });
     });
 
+    describe('consumeMagicLinkToken', () => {
+        it('clears token + expiry on (id, tokenHash) match and returns true on hit', async () => {
+            repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
+
+            await expect(service.consumeMagicLinkToken('u1', 'hash-abc')).resolves.toBe(true);
+
+            // Conditional UPDATE keyed on the hash — this is what makes redemption
+            // atomically single-use (a racing request affects 0 rows).
+            expect(repository.update).toHaveBeenCalledWith(
+                { id: 'u1', magicLinkToken: 'hash-abc' },
+                { magicLinkToken: null, magicLinkExpires: null },
+            );
+        });
+
+        it('returns false when no row was affected (token already consumed / lost the race)', async () => {
+            repository.update.mockResolvedValueOnce({ affected: 0, raw: {}, generatedMaps: [] });
+            await expect(service.consumeMagicLinkToken('u1', 'hash-abc')).resolves.toBe(false);
+        });
+
+        it('coerces undefined affected to 0 (returns false)', async () => {
+            repository.update.mockResolvedValueOnce({
+                affected: undefined,
+                raw: {},
+                generatedMaps: [],
+            });
+            await expect(service.consumeMagicLinkToken('u1', 'hash-abc')).resolves.toBe(false);
+        });
+    });
+
     describe('createOrGetLocalUser', () => {
         beforeEach(() => {
             delete process.env.GH_OWNER;

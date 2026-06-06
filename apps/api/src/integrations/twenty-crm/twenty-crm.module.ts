@@ -7,6 +7,11 @@ import { CrmTenantService } from './services/crm-tenant.service';
 import { ClientService } from './services/client.service';
 import { CompaniesController } from './controllers/companies.service';
 import { AuthModule } from '@src/auth';
+// Security (cross-tenant IDOR fix): CompaniesController constructor-injects
+// UserRepository to resolve the caller's real Tenant id. AuthModule provides
+// UserRepository but does NOT export it, so we import DatabaseModule (which
+// provides + exports it) — mirrors how WorksModule wires OrgKbController.
+import { DatabaseModule } from '@ever-works/agent/database';
 
 /**
  * Twenty CRM integration module
@@ -25,6 +30,7 @@ export class TwentyCrmModule {
                 }),
                 ConfigModule,
                 AuthModule,
+                DatabaseModule,
             ],
             providers: [
                 CrmConfigService,
@@ -55,6 +61,7 @@ export class TwentyCrmModule {
                 }),
                 ConfigModule,
                 AuthModule,
+                DatabaseModule,
             ],
             providers: [
                 CrmConfigService,

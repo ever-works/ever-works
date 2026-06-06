@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import {
     tasksAPI,
     type Task,
@@ -8,6 +9,8 @@ import {
     type TaskPriority,
     type TaskStatus,
 } from '@/lib/api/tasks';
+import { getAuthFromCookie } from '@/lib/auth';
+import { ROUTES } from '@/lib/constants';
 
 export async function createTaskAction(input: {
     title: string;
@@ -19,6 +22,10 @@ export async function createTaskAction(input: {
     workId?: string | null;
     parentTaskId?: string | null;
 }): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const task = await tasksAPI.create(input);
     revalidatePath('/tasks');
     return task;
@@ -33,6 +40,10 @@ export async function updateTaskAction(
         >
     >,
 ): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const task = await tasksAPI.update(id, patch);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -40,6 +51,10 @@ export async function updateTaskAction(
 }
 
 export async function deleteTaskAction(id: string): Promise<{ deleted: true }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const res = await tasksAPI.remove(id);
     revalidatePath('/tasks');
     return res;
@@ -50,6 +65,10 @@ export async function transitionTaskAction(
     to: TaskStatus,
     force = false,
 ): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const task = await tasksAPI.transition(id, to, force);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -57,6 +76,10 @@ export async function transitionTaskAction(
 }
 
 export async function postTaskChatAction(taskId: string, body: string): Promise<TaskChatMessage> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const message = await tasksAPI.postChat(taskId, body);
     revalidatePath(`/tasks/${taskId}`);
     return message;
@@ -66,6 +89,10 @@ export async function editTaskChatAction(
     messageId: string,
     body: string,
 ): Promise<TaskChatMessage> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     return tasksAPI.editChat(messageId, body);
 }
 
@@ -84,6 +111,10 @@ export async function setTaskRecurringAction(
         recurrenceMaxOccurrences?: number;
     },
 ): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const task = await tasksAPI.setRecurring(id, input);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -97,6 +128,10 @@ export async function setTaskRecurringAction(
  * independent rows.
  */
 export async function clearTaskRecurringAction(id: string): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const task = await tasksAPI.clearRecurring(id);
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
@@ -110,12 +145,20 @@ export async function clearTaskRecurringAction(id: string): Promise<Task> {
 // Task via the existing `POST /api/tasks/:id/attachments` endpoint.
 
 export async function attachUploadAction(taskId: string, uploadId: string) {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const row = await tasksAPI.addAttachment(taskId, uploadId);
     revalidatePath(`/tasks/${taskId}`);
     return row;
 }
 
 export async function detachAttachmentAction(taskId: string, attachmentId: string) {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
     const res = await tasksAPI.removeAttachment(taskId, attachmentId);
     revalidatePath(`/tasks/${taskId}`);
     return res;

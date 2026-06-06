@@ -23,6 +23,7 @@
 	},
 	"dependencies": {
 		"@apidevtools/swagger-parser": "^12.1.0",
+		"@ever-works/contracts": "workspace:*",
 		"@modelcontextprotocol/sdk": "^1.27.1",
 		"@nestjs/common": "^11.1.18",
 		"@nestjs/core": "^11.1.18",
@@ -42,7 +43,7 @@
 		"tsup": "^8.5.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "8.53.1",
-		"vitest": "^3.2.1"
+		"vitest": "^4.1.0"
 	},
 	"engines": {
 		"node": ">=22.0.0"

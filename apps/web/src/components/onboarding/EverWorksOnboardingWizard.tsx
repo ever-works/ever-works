@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { sanitizePrompt } from '@/lib/utils/sanitize';
 import { useMounted } from '@/lib/hooks/use-mounted';
 import { useOnboardingFlow, type WizardStep } from './useOnboardingFlow';
 import { WizardFooter } from './WizardFooter';
@@ -136,7 +137,15 @@ export function EverWorksOnboardingWizard({
         const url = new URL(window.location.href);
         const fromQuery = url.searchParams.get('prompt');
         const fromHash = readHashParam(url.hash, 'prompt');
-        const raw = (fromQuery || fromHash || '').trim();
+        // Security: the prompt is read verbatim from an attacker-controllable
+        // URL (`?prompt=…` / `#prompt=…`) before it is stored in wizard state,
+        // serialised to the onboarding-state endpoint on every render, and
+        // rendered into the DOM. Bound + sanitise it at ingestion with the
+        // shared sanitiser (strips control chars, caps at the same 5000-char
+        // limit the contract + QuickCreateWorkDto already enforce, preserves
+        // newline formatting). Legitimate hand-off prompts are unaffected; a
+        // malicious multi-megabyte / control-char payload is neutralised.
+        const raw = sanitizePrompt(fromQuery || fromHash || '', 5000);
         if (!raw) return;
 
         promptHydratedRef.current = true;

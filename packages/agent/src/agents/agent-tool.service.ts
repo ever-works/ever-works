@@ -36,6 +36,12 @@ import {
     type AgentNotifyChannelFacade,
     type AgentNotifyChannelResult,
 } from './agent-notify-channel-facade';
+// Security: lexical SSRF guard reused by the model-controlled URL tools
+// (screenshot / extractContent). Blocks non-HTTP(S) schemes, literal
+// private/loopback/link-local IPs, and cloud-metadata hostnames before
+// the URL reaches a (possibly self-hosted) fetcher facade. Same helper
+// used by the plugin HTTP client + WebhookDeliveryService.
+import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 /**
  * Tool descriptor — stable shape across every Agent tool. The
@@ -734,6 +740,25 @@ export class AgentToolService {
                         error: 'messageAgent is not supported by the configured email adapter.',
                     };
                 }
+                // Security: enforce same-owner scope on the LLM-controlled
+                // targetAgentId before routing. Without this, a malicious /
+                // prompt-injected agent could enumerate another tenant's agent
+                // ids and inject a message into the victim agent's inbound
+                // conversation thread (cross-tenant message injection). The
+                // adapter resolves targetAgentId purely by id, so the boundary
+                // must be enforced here. `findByIdAndUser` is always present on
+                // the real AgentRepository; the typeof gate keeps mock-only
+                // unit harnesses (no repository method) working without
+                // weakening the production check.
+                if (typeof this.agents.findByIdAndUser === 'function') {
+                    const target = await this.agents.findByIdAndUser(
+                        args.targetAgentId,
+                        agent.userId,
+                    );
+                    if (!target) {
+                        return { error: 'Target agent not found or not accessible.' };
+                    }
+                }
                 try {
                     return await this.emailFacade.messageAgent({
                         userId: agent.userId,
@@ -824,6 +849,16 @@ export class AgentToolService {
                 if (!args?.url || args.url.trim().length === 0) {
                     return { error: 'url is required.' };
                 }
+                // Security: SSRF guard. The url is model-controlled (and can be
+                // steered by prompt-injected fetched content). The active
+                // screenshot plugin may fetch it server-side, so reject
+                // non-HTTP(S) schemes + private/loopback/link-local/metadata
+                // targets before dispatch. Public URLs are unaffected.
+                if (!isSafeWebhookUrl(args.url)) {
+                    return {
+                        error: 'url is not allowed: must be an http(s) URL to a public host (private, loopback, link-local, and cloud-metadata addresses are blocked).',
+                    };
+                }
                 try {
                     return await this.pluginTools!.screenshot({
                         userId: agent.userId,
@@ -864,6 +899,18 @@ export class AgentToolService {
             invoke: async (args) => {
                 if (!args?.url || args.url.trim().length === 0) {
                     return { error: 'url is required.' };
+                }
+                // Security: SSRF guard. extractContent fetches the model-
+                // controlled url server-side (the default content-extractor is
+                // a self-hosted fetcher), so an injected instruction could
+                // point it at cloud-metadata / internal services or use it to
+                // exfiltrate context to an attacker host. Reject non-HTTP(S)
+                // schemes + private/loopback/link-local/metadata targets before
+                // dispatch; public URLs are unaffected.
+                if (!isSafeWebhookUrl(args.url)) {
+                    return {
+                        error: 'url is not allowed: must be an http(s) URL to a public host (private, loopback, link-local, and cloud-metadata addresses are blocked).',
+                    };
                 }
                 try {
                     return await this.pluginTools!.extractContent({

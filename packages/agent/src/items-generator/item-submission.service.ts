@@ -306,9 +306,18 @@ export class ItemSubmissionService {
         user: User,
         removeItemDto: RemoveItemDto,
     ): Promise<RemoveItemResponseDto> {
-        this.logger.debug(
-            `Removing item for work: ${work.slug}, item slug: ${removeItemDto.item_slug}`,
-        );
+        // Security (path traversal): `item_slug` is attacker-controlled and is
+        // only validated as `@IsString()` at the DTO boundary, so a value such
+        // as `../../../../tmp/evil` would escape the cloned data repo when it
+        // reaches `DataRepository.getItemPath` (`path.join(dataDir, slug)`,
+        // which performs no confinement) — driving `fs.rm` / `fs.access` at an
+        // arbitrary host path. Normalise it to a single safe slug segment up
+        // front, exactly as `submitItem` already does before writing files
+        // (see line ~184). `slugifyText` strips `.`, `/` and `\\`, so traversal
+        // sequences cannot survive, while legitimate (already-slugified) slugs
+        // are idempotent and resolve to the same directory as before.
+        const itemSlug = slugifyText(removeItemDto.item_slug);
+        this.logger.debug(`Removing item for work: ${work.slug}, item slug: ${itemSlug}`);
 
         try {
             // Use work owner's credentials (they set up the repos)
@@ -336,27 +345,27 @@ export class ItemSubmissionService {
             const data = await DataRepository.create(dest);
 
             // Check if item exists
-            const itemExists = await data.itemExists(removeItemDto.item_slug);
+            const itemExists = await data.itemExists(itemSlug);
             if (!itemExists) {
                 return {
                     status: 'error',
                     slug: work.slug,
                     item_name: 'Unknown',
-                    item_slug: removeItemDto.item_slug,
-                    message: `Item with slug '${removeItemDto.item_slug}' not found`,
+                    item_slug: itemSlug,
+                    message: `Item with slug '${itemSlug}' not found`,
                 };
             }
 
             // Get item details before removal for response
-            const itemData = await data.getItem(removeItemDto.item_slug);
+            const itemData = await data.getItem(itemSlug);
 
             if (!itemData) {
                 return {
                     status: 'error',
                     slug: work.slug,
                     item_name: 'Unknown',
-                    item_slug: removeItemDto.item_slug,
-                    message: `Failed to retrieve item details for '${removeItemDto.item_slug}'`,
+                    item_slug: itemSlug,
+                    message: `Failed to retrieve item details for '${itemSlug}'`,
                 };
             }
 
@@ -369,7 +378,7 @@ export class ItemSubmissionService {
                 branchName = await this.gitFacade.switchBranch(
                     provider,
                     dest,
-                    `remove-${removeItemDto.item_slug}-${Date.now()}`,
+                    `remove-${itemSlug}-${Date.now()}`,
                     true,
                 );
                 this.logger.log(`Created and switched to new branch: ${branchName}`);
@@ -381,14 +390,14 @@ export class ItemSubmissionService {
             }
 
             // Remove the item
-            const removed = await data.removeItem(removeItemDto.item_slug);
+            const removed = await data.removeItem(itemSlug);
             if (!removed) {
                 return {
                     status: 'error',
                     slug: work.slug,
                     item_name: itemData.name,
-                    item_slug: removeItemDto.item_slug,
-                    message: `Failed to remove item '${removeItemDto.item_slug}'`,
+                    item_slug: itemSlug,
+                    message: `Failed to remove item '${itemSlug}'`,
                 };
             }
 
@@ -413,7 +422,7 @@ export class ItemSubmissionService {
                 const prTitle = `Remove ${itemData.name} - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;
                 const prBody =
                     `Remove item: ${itemData.name}\n\n` +
-                    `**Item Slug:** ${removeItemDto.item_slug}\n` +
+                    `**Item Slug:** ${itemSlug}\n` +
                     `**Source URL:** ${itemData.source_url}\n` +
                     `**Category:** ${itemData.category}\n` +
                     (removeItemDto.reason ? `**Reason:** ${removeItemDto.reason}\n` : '') +
@@ -439,7 +448,7 @@ export class ItemSubmissionService {
                     status: 'success',
                     slug: work.slug,
                     item_name: itemData.name,
-                    item_slug: removeItemDto.item_slug,
+                    item_slug: itemSlug,
                     message: `Item "${itemData.name}" removal has been submitted for review. PR #${pr.number} created.`,
                     pr_number: pr.number,
                     pr_url: pr.url,
@@ -453,7 +462,7 @@ export class ItemSubmissionService {
                 status: 'success',
                 slug: work.slug,
                 item_name: itemData.name,
-                item_slug: removeItemDto.item_slug,
+                item_slug: itemSlug,
                 message: `Item "${itemData.name}" removed successfully.`,
             };
         } catch (error) {
@@ -462,7 +471,7 @@ export class ItemSubmissionService {
                 status: 'error',
                 slug: work.slug,
                 item_name: 'Unknown',
-                item_slug: removeItemDto.item_slug,
+                item_slug: itemSlug,
                 message: error.message,
             };
         }
@@ -473,9 +482,19 @@ export class ItemSubmissionService {
         user: User,
         updateItemDto: UpdateItemDto,
     ): Promise<SubmitItemResponseDto> {
-        this.logger.debug(
-            `Updating item metadata for work: ${work.slug}, item slug: ${updateItemDto.item_slug}`,
-        );
+        // Security (path traversal): `item_slug` is attacker-controlled and is
+        // only validated as `@IsString()` at the DTO boundary, so a value such
+        // as `../../../../tmp/evil` would escape the cloned data repo when it
+        // reaches `DataRepository.getItemPath` (`path.join(dataDir, slug)`,
+        // which performs no confinement) — turning `getItem` into an arbitrary
+        // `*.yml`/`*.yaml` read oracle and `writeItemMarkdown` into an
+        // out-of-tree `.md` write. Normalise it to a single safe slug segment
+        // up front, exactly as `submitItem` already does before writing files
+        // (see line ~184). `slugifyText` strips `.`, `/` and `\\`, so traversal
+        // sequences cannot survive, while legitimate (already-slugified) slugs
+        // are idempotent and resolve to the same directory as before.
+        const itemSlug = slugifyText(updateItemDto.item_slug);
+        this.logger.debug(`Updating item metadata for work: ${work.slug}, item slug: ${itemSlug}`);
 
         try {
             // Use work owner's credentials (they set up the repos)
@@ -501,14 +520,14 @@ export class ItemSubmissionService {
 
             const data = await DataRepository.create(dest);
 
-            const existingItem = await data.getItem(updateItemDto.item_slug).catch(() => null);
+            const existingItem = await data.getItem(itemSlug).catch(() => null);
             if (!existingItem) {
                 return {
                     status: 'error',
                     slug: work.slug,
                     item_name: 'Unknown',
-                    item_slug: updateItemDto.item_slug,
-                    message: `Item with slug '${updateItemDto.item_slug}' not found`,
+                    item_slug: itemSlug,
+                    message: `Item with slug '${itemSlug}' not found`,
                 };
             }
 
@@ -521,7 +540,7 @@ export class ItemSubmissionService {
                 branchName = await this.gitFacade.switchBranch(
                     provider,
                     dest,
-                    `update-${updateItemDto.item_slug}-${Date.now()}`,
+                    `update-${itemSlug}-${Date.now()}`,
                     true,
                 );
                 this.logger.log(`Created and switched to new branch: ${branchName}`);
@@ -575,15 +594,15 @@ export class ItemSubmissionService {
                 itemUpdates.markdown = updateItemDto.markdown;
             }
 
-            const updatedItem = await data.updateItemMetadata(updateItemDto.item_slug, itemUpdates);
+            const updatedItem = await data.updateItemMetadata(itemSlug, itemUpdates);
 
             if (!updatedItem) {
                 return {
                     status: 'error',
                     slug: work.slug,
                     item_name: 'Unknown',
-                    item_slug: updateItemDto.item_slug,
-                    message: `Failed to update item '${updateItemDto.item_slug}'`,
+                    item_slug: itemSlug,
+                    message: `Failed to update item '${itemSlug}'`,
                 };
             }
 
@@ -626,7 +645,7 @@ export class ItemSubmissionService {
                       : 'Update item metadata';
                 const prBody =
                     `${prBodyKind}: ${updatedItem.name}\n\n` +
-                    `**Item Slug:** ${updateItemDto.item_slug}\n` +
+                    `**Item Slug:** ${itemSlug}\n` +
                     `**Featured:** ${String(!!updatedItem.featured)}\n` +
                     `**Order:** ${updatedItem.order ?? 'n/a'}\n` +
                     `**Source URL:** ${updatedItem.source_url}\n` +
@@ -653,7 +672,7 @@ export class ItemSubmissionService {
                     status: 'success',
                     slug: work.slug,
                     item_name: updatedItem.name,
-                    item_slug: updateItemDto.item_slug,
+                    item_slug: itemSlug,
                     message: markdownChanged
                         ? `Item "${updatedItem.name}" content update submitted. PR #${pr.number} created.`
                         : sourceUrlChanged
@@ -671,7 +690,7 @@ export class ItemSubmissionService {
                 status: 'success',
                 slug: work.slug,
                 item_name: updatedItem.name,
-                item_slug: updateItemDto.item_slug,
+                item_slug: itemSlug,
                 message: markdownChanged
                     ? `Item "${updatedItem.name}" content updated.`
                     : sourceUrlChanged
@@ -684,7 +703,7 @@ export class ItemSubmissionService {
                 status: 'error',
                 slug: work.slug,
                 item_name: 'Unknown',
-                item_slug: updateItemDto.item_slug,
+                item_slug: itemSlug,
                 message: error.message,
             };
         }

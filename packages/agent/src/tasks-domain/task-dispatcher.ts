@@ -16,6 +16,7 @@ export interface AgentTaskExecuteDispatchPayload {
     userId: string;
     taskId: string;
     dedupKey: string;
+    runId?: string;
 }
 
 export interface AgentChatReplyDispatchPayload {
@@ -24,6 +25,7 @@ export interface AgentChatReplyDispatchPayload {
     taskId: string;
     triggeringMessageId: string;
     dedupKey: string;
+    runId?: string;
 }
 
 export interface AgentTaskExecuteDispatcher {

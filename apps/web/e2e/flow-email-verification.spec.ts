@@ -4,6 +4,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, makeTestUser } from './hel
 import {
     isMailhogAvailable,
     waitForMessageTo,
+    listMessages,
     extractLinkFromBody,
     type MailhogMessage,
 } from './helpers/mailhog';
@@ -76,6 +77,48 @@ function extractVerificationToken(message: MailhogMessage): string | null {
     }
     const bare = VERIFY_TOKEN_RE.exec(message.Content.Body);
     return bare?.[0] ?? null;
+}
+
+/**
+ * Find the verification token that is CURRENTLY live for `email`.
+ *
+ * `sendVerificationEmail` rotates the stored token on every call: the DB
+ * column only ever holds sha256(latest token), so a token captured from an
+ * EARLIER mail (e.g. the one fired during registration) is invalidated the
+ * moment a resend is issued. This e2e exercises two resends before the
+ * round-trip, so we can't reuse the registration-time token — we must read
+ * back the freshest mail and confirm against the API which candidate the DB
+ * still recognises. Polls every verification mail addressed to `email` and
+ * returns the first whose token the `validate-email-token` oracle reports as
+ * `valid:true` (which is, by construction, the live one). Returns null when
+ * MailHog is unreachable or no live token surfaces within the timeout.
+ */
+async function findLiveVerificationToken(
+    request: APIRequestContext,
+    email: string,
+    timeoutMs = 12_000,
+): Promise<string | null> {
+    if (!(await isMailhogAvailable(request))) return null;
+    const emailLower = email.toLowerCase();
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const messages = await listMessages(request, 200);
+        const mine = messages.filter((m) =>
+            m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === emailLower),
+        );
+        for (const mail of mine) {
+            const candidate = extractVerificationToken(mail);
+            if (!candidate) continue;
+            const res = await request.get(
+                `${API_BASE}/api/auth/validate-email-token?token=${candidate}`,
+            );
+            if (res.status() === 200 && (await res.json()).valid === true) {
+                return candidate;
+            }
+        }
+        await new Promise((r) => setTimeout(r, 300));
+    }
+    return null;
 }
 
 /**
@@ -271,10 +314,17 @@ test.describe('Email verification round-trip — verify + resend', () => {
         // STEP 6 — the REAL round-trip, only possible when MailHog handed
         // us the raw token. validate (valid:true) → verify (issues a fresh
         // session) → profile flips verified → replay rejected (single-use).
-        if (seed.token) {
+        //
+        // IMPORTANT: the STEP-2 resends ROTATE the stored token — every
+        // `sendVerificationEmail` overwrites emailVerificationToken with
+        // sha256(new token), so the registration-time `seed.token` is no
+        // longer the live one here. Re-read the freshest mail and use the
+        // token the API still recognises (the post-resend live token).
+        const liveToken = await findLiveVerificationToken(request, seed.email);
+        if (liveToken) {
             // 6a — validate the live token: valid:true, echoes the bound email.
             const liveValidate = await request.get(
-                `${API_BASE}/api/auth/validate-email-token?token=${seed.token}`,
+                `${API_BASE}/api/auth/validate-email-token?token=${liveToken}`,
             );
             expect(liveValidate.status()).toBe(200);
             const liveValidateBody = await liveValidate.json();
@@ -283,7 +333,7 @@ test.describe('Email verification round-trip — verify + resend', () => {
 
             // 6b — verify-email consumes the token and ISSUES A NEW SESSION.
             const verifyRes = await request.post(`${API_BASE}/api/auth/verify-email`, {
-                data: { token: seed.token },
+                data: { token: liveToken },
             });
             expect(verifyRes.status(), 'verify-email succeeds → 200 + session').toBe(200);
             const verified = await verifyRes.json();
@@ -310,7 +360,7 @@ test.describe('Email verification round-trip — verify + resend', () => {
             // 6d — token is single-use: the cleared column means a replay
             // is now an unknown token → 400 Invalid.
             const replay = await request.post(`${API_BASE}/api/auth/verify-email`, {
-                data: { token: seed.token },
+                data: { token: liveToken },
             });
             expect(replay.status(), 'consumed token cannot be replayed').toBe(400);
             expect((await replay.json()).message).toBe('Invalid verification token');
@@ -318,15 +368,16 @@ test.describe('Email verification round-trip — verify + resend', () => {
             // 6e — and the live-token validate oracle now reports the
             // consumed token as no-longer-valid.
             const postValidate = await request.get(
-                `${API_BASE}/api/auth/validate-email-token?token=${seed.token}`,
+                `${API_BASE}/api/auth/validate-email-token?token=${liveToken}`,
             );
             expect(postValidate.status()).toBe(200);
             expect((await postValidate.json()).valid).toBe(false);
         } else {
-            // No MailHog → the round-trip's PRECONDITION (a real token)
-            // can't be met. We still asserted the entire bad-token /
-            // resend / DTO contract above, so the flow is meaningful; the
-            // verify-success branch is simply unreachable on this host.
+            // No live token surfaced → the round-trip's PRECONDITION (a real
+            // token the DB still recognises) can't be met (MailHog absent, or
+            // SMTP delivery unavailable in this env). We still asserted the
+            // entire bad-token / resend / DTO contract above, so the flow is
+            // meaningful; the verify-success branch is simply unreachable here.
             // Re-confirm the user remains unverified (no token consumed).
             const stillUnverified = await request.get(`${API_BASE}/api/auth/profile/fresh`, {
                 headers: authedHeaders(access_token),

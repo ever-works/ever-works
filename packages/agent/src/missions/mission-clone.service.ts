@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
-import { Mission, MissionStatus } from '../entities/mission.entity';
+import { Mission, MissionGuardrailsOverride, MissionStatus } from '../entities/mission.entity';
 import {
     WorkProposal,
     WorkProposalSource,
     WorkProposalStatus,
 } from '../entities/work-proposal.entity';
+import { parseCron } from './cron-matcher';
 import { toMissionDto, type MissionDto } from './types';
 
 /**
@@ -83,6 +84,35 @@ export class MissionCloneService {
         private readonly proposals: Repository<WorkProposal>,
     ) {}
 
+    /**
+     * Security: strip any keys that are not part of the canonical
+     * `WorkAgentGuardrails` schema before persisting the override on a
+     * cloned Mission.  This prevents unknown/injected keys from a
+     * maliciously crafted template from propagating to new Missions.
+     * Mirrors the `pickGuardrailOverride` allowlist in WorkAgentService.
+     */
+    private sanitizeGuardrailsOverride(
+        raw: MissionGuardrailsOverride | null | undefined,
+    ): MissionGuardrailsOverride | null {
+        if (!raw) return null;
+        const allowed: Array<keyof MissionGuardrailsOverride> = [
+            'maxWorksPerRun',
+            'maxItemsPerWork',
+            'maxBudgetCentsPerRun',
+            'requireApprovalBeforeCreate',
+            'requireApprovalBeforeDelete',
+            'requireApprovalAboveBudgetCents',
+            'dryRunByDefault',
+        ];
+        const result: MissionGuardrailsOverride = {};
+        for (const key of allowed) {
+            if (raw[key] !== undefined) {
+                (result as Record<string, unknown>)[key] = raw[key];
+            }
+        }
+        return Object.keys(result).length > 0 ? result : null;
+    }
+
     async cloneForUser(
         userId: string,
         sourceMissionId: string,
@@ -114,6 +144,24 @@ export class MissionCloneService {
                 200,
             );
 
+            // Security: re-validate the schedule cron expression before
+            // copying it to the cloned Mission.  A stored expression that has
+            // since become invalid (e.g. injected via a malicious template)
+            // must not silently propagate; we nullify it and log a warning so
+            // the user can reconfigure rather than having a Mission that
+            // silently fails every tick.
+            let clonedSchedule: string | null = null;
+            if (source.schedule) {
+                try {
+                    parseCron(source.schedule);
+                    clonedSchedule = source.schedule;
+                } catch {
+                    this.logger.warn(
+                        `Cloning Mission ${source.id}: schedule "${source.schedule}" failed re-validation; nullified on clone.`,
+                    );
+                }
+            }
+
             const newMission = await tx.save(
                 tx.create(Mission, {
                     userId,
@@ -121,10 +169,12 @@ export class MissionCloneService {
                     description: source.description,
                     type: source.type,
                     status: MissionStatus.ACTIVE,
-                    schedule: source.schedule ?? null,
+                    // Security: re-validated above — invalid expressions are nullified.
+                    schedule: clonedSchedule,
                     autoBuildWorks: source.autoBuildWorks,
                     outstandingIdeasCap: source.outstandingIdeasCap ?? null,
-                    guardrailsOverride: source.guardrailsOverride ?? null,
+                    // Security: strip unknown keys before propagating to the clone.
+                    guardrailsOverride: this.sanitizeGuardrailsOverride(source.guardrailsOverride),
                     missionTemplateRepo: source.missionTemplateRepo ?? null,
                     // Clone gets its own repo at scaffold time
                     // (Phase 8 PR X) — until then NULL.

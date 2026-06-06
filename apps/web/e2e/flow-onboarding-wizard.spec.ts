@@ -411,17 +411,26 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         // Open the Help drawer. The "?" global shortcut fires onOpenHelp; it is
         // ignored while focus is in an input, so blur first. Retry-to-open to
         // ride out the dev-mode hydration race.
-        const helpTitle = page.getByRole('heading', { name: 'Help & Resources' });
-        await expect(async () => {
-            await page.locator('body').click({ position: { x: 5, y: 5 } });
-            await page.keyboard.press('?');
-            await expect(helpTitle).toBeVisible({ timeout: 3_000 });
-        }).toPass({ timeout: 30_000 });
-
+        //
         // The onboarding entry is always rendered in the drawer and shows
         // "Open onboarding (x/N)" (i18n: dashboard.header.help.onboarding.action).
+        // CI is slower (shared shard, 2 retries, next-dev cold compile) and the
+        // Headless UI drawer transitions in over ~300ms, so the drawer title can
+        // flash visible a beat before the onboarding <section> settles — and a
+        // stray retry body-click on the backdrop can re-close a half-open drawer.
+        // Assert "drawer open AND onboarding button visible" as ONE atomically
+        // retried condition, and only press "?" when the drawer isn't already
+        // open so the body-click never closes it out from under us.
+        const helpTitle = page.getByRole('heading', { name: 'Help & Resources' });
         const openOnboarding = page.getByRole('button', { name: /Open onboarding \(\d+\/\d+\)/ });
-        await expect(openOnboarding).toBeVisible({ timeout: 10_000 });
+        await expect(async () => {
+            if (!(await helpTitle.isVisible().catch(() => false))) {
+                await page.locator('body').click({ position: { x: 5, y: 5 } });
+                await page.keyboard.press('?');
+                await expect(helpTitle).toBeVisible({ timeout: 3_000 });
+            }
+            await expect(openOnboarding).toBeVisible({ timeout: 3_000 });
+        }).toPass({ timeout: 45_000 });
 
         // The N in the label must equal the API-derived step count for the
         // seeded user's persisted state — UI and server agree on the flow size.
@@ -439,32 +448,45 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
 
         // Click it → the drawer closes and the wizard Dialog opens (manual
         // open path; independent of dismissed/works state). Assert the wizard's
-        // own stable chrome appears: the "Setup" badge, the heading, and the
-        // first step ("Welcome to Ever Works").
+        // own stable chrome appears: the SideNav "Setup" badge heading and the
+        // numbered step buttons — these render regardless of which step the
+        // wizard restores to from the user's persisted `lastStep`.
         await openOnboarding.click();
 
         await expect(page.getByText('Get started with Ever Works')).toBeVisible({
             timeout: 15_000,
         });
-        await expect(page.getByRole('heading', { name: 'Welcome to Ever Works' })).toBeVisible({
-            timeout: 15_000,
-        });
         // The wizard SideNav lists every derived step as a numbered button.
         // For the seeded user we cannot assume defaults, but the base
         // navigation labels are always present.
-        await expect(page.getByRole('button', { name: 'Welcome' })).toBeVisible({
+        const welcomeNav = page.getByRole('button', { name: 'Welcome' });
+        await expect(welcomeNav).toBeVisible({
             timeout: 10_000,
         });
         await expect(page.getByRole('button', { name: 'Your AI choice' })).toBeVisible({
             timeout: 10_000,
         });
-        await expect(page.getByRole('button', { name: 'Create your first work' })).toBeVisible({
+        await expect(
+            page.getByRole('button', { name: 'Create your first work' }).first(),
+        ).toBeVisible({
             timeout: 10_000,
         });
         // And the wizard footer's "Close wizard" affordance.
         await expect(page.getByRole('button', { name: 'Close wizard' })).toBeVisible({
             timeout: 10_000,
         });
+        // The wizard restores to the user's persisted `lastStep` (probe shows
+        // the seeded user can be at step 1 = "ai-choice", mutated by sibling
+        // onboarding specs under parallelism), so the welcome step body is NOT
+        // guaranteed to be the open step. Jump to step 0 via the "Welcome"
+        // SideNav button (flow.jumpTo(0)) so the WelcomeStep body renders, then
+        // assert its heading. Retry-to-open rides out the dev hydration race.
+        await expect(async () => {
+            await welcomeNav.click();
+            await expect(page.getByRole('heading', { name: 'Welcome to Ever Works' })).toBeVisible({
+                timeout: 3_000,
+            });
+        }).toPass({ timeout: 15_000 });
     });
 });
 

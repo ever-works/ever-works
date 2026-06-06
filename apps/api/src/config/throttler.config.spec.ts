@@ -1,4 +1,6 @@
 import type { ThrottlerOptions } from '@nestjs/throttler';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { throttlerConfig } from './throttler.config';
 
 // `ThrottlerModuleOptions` is a union (array OR object-with-throttlers). The
@@ -61,4 +63,32 @@ describe('throttlerConfig', () => {
         expect(c.storage).toBeUndefined();
         expect(c.ignoreUserAgents).toBeUndefined();
     });
+
+    it('does not use inert default-keyed @Throttle decorators with named tiers', () => {
+        const srcRoot = join(__dirname, '..');
+        const inertThrottlePattern = '@Throttle({ ' + 'default:';
+        const offenders = collectTypeScriptFiles(srcRoot).filter((file) =>
+            readFileSync(file, 'utf8').includes(inertThrottlePattern),
+        );
+
+        expect(offenders).toEqual([]);
+    });
 });
+
+function collectTypeScriptFiles(dir: string): string[] {
+    if (!existsSync(dir)) return [];
+
+    const files: string[] = [];
+    for (const entry of readdirSync(dir)) {
+        const path = join(dir, entry);
+        const stat = statSync(path);
+        if (stat.isDirectory()) {
+            files.push(...collectTypeScriptFiles(path));
+            continue;
+        }
+        if (path.endsWith('.ts') && !path.endsWith('.d.ts')) {
+            files.push(path);
+        }
+    }
+    return files;
+}

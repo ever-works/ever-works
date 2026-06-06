@@ -13,6 +13,8 @@ import {
     splitSettingsBySecret,
 } from '@ever-works/plugin/api';
 import type { UserPluginResponse, SettingScopeApi } from '@ever-works/plugin/api';
+// EW-693 / T36 — dynamic distribution subcommands (catalog/install/uninstall/install-status).
+import { buildDynamicSubcommands } from './dynamic.command';
 
 export const pluginsCommand = new Command('plugins')
     .description('Manage plugins')
@@ -398,4 +400,14 @@ function formatCategory(category: string): string {
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
+}
+
+// EW-693 / T36 — register dynamic-mode subcommands AFTER the existing
+// `plugins` command is fully wired so the help output groups them
+// alongside the legacy interactive flow. The subcommands are
+// no-ops in bundled mode at runtime (the API surface gracefully
+// returns 404 / empty catalog), so registering them unconditionally
+// is safe regardless of deployment mode.
+for (const sub of buildDynamicSubcommands()) {
+    pluginsCommand.addCommand(sub);
 }

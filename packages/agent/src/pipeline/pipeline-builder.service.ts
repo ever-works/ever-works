@@ -242,7 +242,18 @@ export class PipelineBuilderService {
             // Check targetPipelines
             const targets =
                 registered.plugin.targetPipelines ?? registered.manifest.targetPipelines;
-            if (!targets?.includes(pipelineId) && !targets?.includes('*')) continue;
+            // Security: only honor the `'*'` wildcard target for first-party
+            // (built-in) modifiers. A built-in flag is stamped by the host at
+            // registration and cannot be forged by plugin code, whereas both
+            // `plugin.targetPipelines` and `manifest.targetPipelines` are
+            // attacker-controlled. This stops an untrusted, tenant-enabled
+            // modifier from silently attaching itself to EVERY pipeline (a
+            // pipeline it never declared interest in) via `['*']`. Third-party
+            // modifiers must name each pipeline they target explicitly.
+            const wildcardAllowed = registered.builtIn;
+            const targetsThisPipeline =
+                targets?.includes(pipelineId) || (wildcardAllowed && targets?.includes('*'));
+            if (!targetsThisPipeline) continue;
 
             // PR #1087 — KB option B. If the modifier implements
             // `canSkipAtBuildTime`, resolve its settings and let it

@@ -16,6 +16,12 @@ import type {
 	ContentExtractionResult,
 	ConnectionValidationResult
 } from '@ever-works/plugin';
+// Security (SSRF): isSafeWebhookUrl rejects non-http(s) schemes and http(s) URLs
+// whose host is private/loopback/link-local/cloud-metadata, before any caller-
+// supplied URL is forwarded to the Linkup /fetch proxy (which fetches it
+// server-side). Imported directly because the ssrf-guard is intentionally not
+// re-exported from the helpers barrel (it pulls in node:net/node:dns).
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const LINKUP_API_BASE = 'https://api.linkup.so/v1';
 
@@ -98,7 +104,9 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			});
 
 			if (!response.ok) {
-				throw new Error(`Linkup search failed with status ${response.status}: ${await response.text()}`);
+				// Security (info-leak): surface only the HTTP status line, not the raw
+				// upstream Linkup response body (may carry internal API error detail).
+				throw new Error(`Linkup search failed with status ${response.status}: ${response.statusText}`);
 			}
 
 			const data = (await response.json()) as LinkupSearchResponse;
@@ -153,8 +161,12 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			});
 
 			if (!response.ok) {
-				const text = await response.text();
-				return { success: false, message: `Linkup connection failed (${response.status}): ${text}` };
+				// Security (info-leak): report only the HTTP status line, not the raw
+				// upstream Linkup response body (may carry internal API error detail).
+				return {
+					success: false,
+					message: `Linkup connection failed (${response.status}): ${response.statusText}`
+				};
 			}
 
 			return { success: true, message: 'Linkup connection verified.' };
@@ -178,6 +190,22 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 		const apiKey = this.getApiKey(options.settings);
 		const startTime = Date.now();
 
+		// Security (SSRF): `options.url` is caller-supplied and forwarded verbatim to
+		// the Linkup /fetch endpoint, which fetches it server-side and returns the
+		// body to us. `canExtract()` is advisory and `extractBatch()` calls this
+		// method directly, so enforce the gate HERE. Reject non-http(s) schemes
+		// (file://, ftp://, …) and internal/loopback/link-local/metadata hosts before
+		// making the request. Returns the method's existing failed-result shape;
+		// legitimate public http(s) URLs are unaffected.
+		if (!isSafeWebhookUrl(options.url)) {
+			return {
+				success: false,
+				url: options.url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${options.url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
 		try {
 			const response = await fetch(`${LINKUP_API_BASE}/fetch`, {
 				method: 'POST',
@@ -194,10 +222,13 @@ export class LinkupSearchPlugin implements IPlugin, ISearchPlugin, IContentExtra
 			});
 
 			if (!response.ok) {
+				// Security (info-leak): do not reflect the raw upstream Linkup response
+				// body to the caller — it can carry internal API error detail. Surface
+				// only the HTTP status line.
 				return {
 					success: false,
 					url: options.url,
-					error: `Linkup fetch failed with status ${response.status}: ${await response.text()}`,
+					error: `Linkup fetch failed with status ${response.status}: ${response.statusText}`,
 					duration: Date.now() - startTime
 				};
 			}

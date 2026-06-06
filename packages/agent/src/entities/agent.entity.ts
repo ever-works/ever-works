@@ -1,4 +1,6 @@
 import {
+    BeforeInsert,
+    BeforeUpdate,
     Column,
     CreateDateColumn,
     Entity,
@@ -147,7 +149,16 @@ export enum AgentIdleBehavior {
  * avoid forward-import cycles; FK constraints are added by the migration.
  */
 @Entity({ name: 'agents' })
-@Index('uq_agents_user_scope_slug', ['userId', 'scope', 'missionId', 'ideaId', 'workId', 'slug'], {
+// Durable per-scope slug uniqueness. The scope's target is normalized into the
+// NON-NULL `scopeTargetId` column (see below) so this index has no nullable
+// members — SQL treats NULLs as DISTINCT inside a unique index, so the previous
+// `(userId, scope, missionId, ideaId, workId, slug)` form could NOT dedup
+// same-name agents in any null-containing scope (tenant has all three FKs null;
+// mission has idea/work null; etc.), letting a concurrent same-name create
+// burst ALL succeed instead of exactly one. With `scopeTargetId` non-null the
+// DB enforces the slug CAS on both Postgres and sqlite, and the lost racers get
+// the named 409 via `isUniqueConstraintError` in agents.service.create.
+@Index('uq_agents_user_scope_slug', ['userId', 'scope', 'scopeTargetId', 'slug'], {
     unique: true,
 })
 @Index('idx_agents_user_status', ['userId', 'status'])
@@ -180,6 +191,18 @@ export class Agent {
     /** FK to `works.id` when `scope = 'work'`. */
     @Column('uuid', { nullable: true })
     workId?: string | null;
+
+    /**
+     * NON-NULL normalization of the scope's target id, used solely by the
+     * `uq_agents_user_scope_slug` unique index so it carries no nullable
+     * members (NULLs are DISTINCT in a unique index and would defeat the
+     * dedup). Holds `missionId ?? ideaId ?? workId` for scoped agents, or the
+     * empty string for tenant-scope. Kept in lock-step with the FKs by
+     * `syncScopeTargetId()` (@BeforeInsert/@BeforeUpdate) — never set it by
+     * hand.
+     */
+    @Column({ type: 'varchar', length: 36, default: '' })
+    scopeTargetId: string;
 
     @Column({ type: 'varchar', length: 120 })
     name: string;
@@ -326,4 +349,16 @@ export class Agent {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    /**
+     * Keep `scopeTargetId` in lock-step with the scope FKs on every persist so
+     * the durable `uq_agents_user_scope_slug` unique index has a non-null key.
+     * Runs on `repository.save()` (the only persistence path AgentRepository
+     * uses) for every create site — service, export, and tool-driven creates.
+     */
+    @BeforeInsert()
+    @BeforeUpdate()
+    syncScopeTargetId(): void {
+        this.scopeTargetId = this.missionId ?? this.ideaId ?? this.workId ?? '';
+    }
 }

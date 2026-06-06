@@ -6,6 +6,7 @@ import {
 	normalizeReferenceUrl,
 	shouldSkipReferenceUrl
 } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 
@@ -48,6 +49,20 @@ export class ContentRetrievalStep extends BasePipelineStep {
 
 		// Filter out already processed URLs, including durable reference history from previous runs.
 		const urlsToProcess = allUrls.filter((url) => {
+			// Security (SSRF, H): `source_urls` come straight from the user's pipeline
+			// config and `extractedUrls` from attacker-influenceable search results;
+			// both are handed to `contentExtractorFacade.extractContent` below, which
+			// fetches the URL server-side. Reject non-HTTP(S) schemes (e.g. `file://`)
+			// and hosts that are loopback, link-local (169.254.x.x / cloud IMDS),
+			// RFC-1918 private, or a known cloud-metadata hostname BEFORE extraction,
+			// using the same lexical guard the sibling source-validation step applies.
+			// (This is lexical only; DNS-rebinding hardening must live in the extractor
+			// facade where the actual fetch is issued.)
+			if (!isSafeWebhookUrl(url)) {
+				logger.warn(`[${work.slug}] Skipping unsafe/blocked source URL: ${url}`);
+				return false;
+			}
+
 			const normalizedUrl = normalizeReferenceUrl(url);
 			if (processedSourceUrls.has(url) || processedSourceUrls.has(normalizedUrl)) {
 				return false;

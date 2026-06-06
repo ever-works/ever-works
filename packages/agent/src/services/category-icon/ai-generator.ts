@@ -42,6 +42,29 @@ const CATEGORY_DESCRIPTION_TEMPLATE = (description: string): string =>
 
 const MARKDOWN_FENCE_RE = /^```(?:svg|xml|html)?\s*\n?|\n?```\s*$/g;
 
+// Security (prompt-injection hardening): chat-template control markers that
+// some models interpret as out-of-band role/turn delimiters. Stripped from
+// the untrusted category name/description so their text cannot spoof a
+// system/user turn. Mirrors the shared `sanitizePromptVariable` used by
+// item-health.service and the standard-pipeline prompt utils.
+const CHAT_TEMPLATE_MARKER_RE = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security: neutralize untrusted taxonomy text (category name/description,
+ * which can originate from imported directory data or an AI classifier fed
+ * poisoned content) before it is interpolated into the icon-generation
+ * prompt. Collapses newlines to spaces and removes chat-template markers so
+ * the value cannot break out of its slot and inject instructions. Behavior
+ * is unchanged for ordinary category names; only injection constructs are
+ * stripped. The SVG sanitizer remains the authoritative output-layer control.
+ */
+function sanitizePromptVariable(value: string, maxLength: number): string {
+    return value
+        .replace(/\r?\n|\r/g, ' ')
+        .replace(CHAT_TEMPLATE_MARKER_RE, '')
+        .slice(0, maxLength);
+}
+
 export interface CategoryIconGenerateOptions {
     /** Category name (free-form, e.g. "Time Tracking", "Open-Source"). */
     readonly name: string;
@@ -80,9 +103,20 @@ export async function generateCategoryIconSvg(
 ): Promise<CategoryIconGenerateResult> {
     const { name, description, facadeOptions, logger } = options;
 
-    const prompt = ICON_SYSTEM_PROMPT.replace('{category_name}', name).replace(
+    // Security (prompt-injection hardening): the category name/description are
+    // untrusted (user-created or AI-classified taxonomy that can carry imported,
+    // attacker-influenced text). Strip newlines + chat-template control markers
+    // before interpolation. Function replacers are used so `$`-sequences in the
+    // sanitized values (e.g. `$&`, `$'`) are inserted literally and cannot pull
+    // in surrounding prompt text via String.replace's special replacement rules.
+    const safeName = sanitizePromptVariable(name, 200);
+    const descriptionBlock = description
+        ? CATEGORY_DESCRIPTION_TEMPLATE(sanitizePromptVariable(description, 500))
+        : '';
+
+    const prompt = ICON_SYSTEM_PROMPT.replace('{category_name}', () => safeName).replace(
         '{category_description_block}',
-        description ? CATEGORY_DESCRIPTION_TEMPLATE(description) : '',
+        () => descriptionBlock,
     );
 
     let raw: string;

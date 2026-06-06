@@ -6,6 +6,14 @@ import {
     type ActivityLogEntry,
     type ActivitySummaryResponse,
 } from '@/lib/api/activity-log';
+// Security: defense-in-depth authn guard for these server actions, mirroring the
+// pattern in actions/api-keys.ts. serverFetch only attaches the bearer token when
+// an auth cookie is present, so without this an unauthenticated invocation would
+// reach the API with no Authorization header. The API remains the real authz
+// boundary; this closes the web-layer gap and matches house style.
+import { getAuthFromCookie } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { ROUTES } from '@/lib/constants';
 
 export async function getActivityLog(params?: GetActivityLogParams): Promise<{
     success: boolean;
@@ -13,6 +21,12 @@ export async function getActivityLog(params?: GetActivityLogParams): Promise<{
     total: number;
     error?: string;
 }> {
+    // Security: require an authenticated session before hitting the API.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const response = await activityLogAPI.getAll(params);
         return {
@@ -35,6 +49,12 @@ export async function getRunningActivityCount(): Promise<{
     success: boolean;
     count: number;
 }> {
+    // Security: require an authenticated session before hitting the API.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const response = await activityLogAPI.getRunningCount();
         return { success: true, count: response.count };
@@ -48,6 +68,12 @@ export async function getActivitySummary(): Promise<{
     success: boolean;
     counts: ActivitySummaryResponse['counts'];
 }> {
+    // Security: require an authenticated session before hitting the API.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const response = await activityLogAPI.getSummary();
         return { success: true, counts: response.counts };
@@ -71,6 +97,12 @@ export async function getActivityById(id: string): Promise<{
     activity?: ActivityLogEntry;
     error?: string;
 }> {
+    // Security: require an authenticated session before hitting the API.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const response = await activityLogAPI.getById(id);
         return {

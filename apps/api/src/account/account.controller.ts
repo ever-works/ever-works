@@ -19,6 +19,70 @@ import {
 } from '@ever-works/agent/account-transfer';
 import type { AccountExportPayload, ConflictResolution } from '@ever-works/agent/account-transfer';
 
+// Security (DoS): the import bodies are typed as plain (erased) TS
+// interfaces, so the global ValidationPipe — which only enforces
+// constraints on class-validator-decorated classes — applies no
+// size/shape limits to them. The AccountImportService then iterates the
+// top-level `works`/`userPlugins` arrays and each work's nested arrays
+// (items/categories/tags/collections/comparisons) with no bound. A single
+// authenticated request carrying e.g. a `works` array of millions of
+// elements (or a work with millions of items) can exhaust memory. These
+// caps reject only abusively large payloads before they reach the
+// service; the limits are far above any realistic export (an account
+// exporting hundreds of works, each a directory site with tens of
+// thousands of items, stays well under them), so every legitimate import
+// is unchanged. (A full class-validator DTO tree mirroring the shared
+// `AccountExportPayload` contract + a body-parser byte cap are the
+// complementary defenses and are tracked separately.)
+const MAX_IMPORT_WORKS = 5000;
+const MAX_IMPORT_USER_PLUGINS = 5000;
+const MAX_IMPORT_ITEMS_PER_WORK = 100000;
+const MAX_IMPORT_NESTED_PER_WORK = 50000;
+
+function assertImportPayloadBounds(payload: AccountExportPayload | undefined | null): void {
+    const data = payload?.data;
+    if (!data || typeof data !== 'object') {
+        return;
+    }
+    if (Array.isArray(data.works) && data.works.length > MAX_IMPORT_WORKS) {
+        throw new BadRequestException(
+            `Import payload too large: works exceeds ${MAX_IMPORT_WORKS}`,
+        );
+    }
+    if (Array.isArray(data.userPlugins) && data.userPlugins.length > MAX_IMPORT_USER_PLUGINS) {
+        throw new BadRequestException(
+            `Import payload too large: userPlugins exceeds ${MAX_IMPORT_USER_PLUGINS}`,
+        );
+    }
+    if (Array.isArray(data.works)) {
+        for (const work of data.works) {
+            if (!work || typeof work !== 'object') {
+                continue;
+            }
+            if (Array.isArray(work.items) && work.items.length > MAX_IMPORT_ITEMS_PER_WORK) {
+                throw new BadRequestException(
+                    `Import payload too large: a work's items exceeds ${MAX_IMPORT_ITEMS_PER_WORK}`,
+                );
+            }
+            for (const nested of [
+                work.categories,
+                work.tags,
+                work.collections,
+                work.comparisons,
+                work.members,
+                work.customDomains,
+                work.workPlugins,
+            ]) {
+                if (Array.isArray(nested) && nested.length > MAX_IMPORT_NESTED_PER_WORK) {
+                    throw new BadRequestException(
+                        `Import payload too large: a work's nested array exceeds ${MAX_IMPORT_NESTED_PER_WORK}`,
+                    );
+                }
+            }
+        }
+    }
+}
+
 @Controller('api/account')
 export class AccountController {
     constructor(
@@ -67,6 +131,9 @@ export class AccountController {
         if (!payload || typeof payload !== 'object' || Object.keys(payload).length === 0) {
             throw new BadRequestException('Request body is empty');
         }
+        // Security (DoS): bound the untrusted arrays before the service
+        // iterates them unguarded.
+        assertImportPayloadBounds(payload);
         return this.importService.previewImport(auth.userId, payload);
     }
 
@@ -76,6 +143,9 @@ export class AccountController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: { payload: AccountExportPayload; resolutions: ConflictResolution[] },
     ) {
+        // Security (DoS): bound the untrusted arrays before the service
+        // iterates them unguarded (mirrors the preview guard).
+        assertImportPayloadBounds(body?.payload);
         return this.importService.applyImport(auth.userId, body.payload, body.resolutions || []);
     }
 

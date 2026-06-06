@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { act, render, waitFor } from '@testing-library/react';
 
 // Mock next-intl translations — t(key) just returns the key so we can
@@ -45,11 +45,14 @@ vi.mock('@/components/ui/select', () => ({
 import { GithubOwnerWidget, GithubRepoWidget } from './GithubRepoWidgets';
 
 describe('GithubOwnerWidget (EW-644)', () => {
-    let onChange: ReturnType<typeof vi.fn>;
+    // Vitest 4 narrowed `Mock` to `Mock<Procedure | Constructable>`, so a bare
+    // `vi.fn()` no longer satisfies a concrete `(next: string) => void` slot.
+    // Pin the signature explicitly via the `Mock<…>` generic.
+    let onChange: Mock<(next: string) => void>;
 
     beforeEach(() => {
         getGitProviderOrganizations.mockReset();
-        onChange = vi.fn();
+        onChange = vi.fn<(next: string) => void>();
     });
 
     afterEach(() => {
@@ -114,16 +117,22 @@ describe('GithubOwnerWidget (EW-644)', () => {
 });
 
 describe('GithubRepoWidget (EW-644)', () => {
-    let onChange: ReturnType<typeof vi.fn>;
+    // Same Vitest-4 `Mock<…>` pinning as the owner-widget suite. The widget's
+    // `siblings` prop has concrete `get(name): unknown` / `set(name, value): void`
+    // signatures, which a bare `vi.fn()` can no longer satisfy.
+    let onChange: Mock<(next: string) => void>;
     let siblings: {
-        get: ReturnType<typeof vi.fn>;
-        set: ReturnType<typeof vi.fn>;
+        get: Mock<(name: string) => unknown>;
+        set: Mock<(name: string, value: unknown) => void>;
     };
 
     beforeEach(() => {
         getUserRepositories.mockReset();
-        onChange = vi.fn();
-        siblings = { get: vi.fn(), set: vi.fn() };
+        onChange = vi.fn<(next: string) => void>();
+        siblings = {
+            get: vi.fn<(name: string) => unknown>(),
+            set: vi.fn<(name: string, value: unknown) => void>(),
+        };
     });
 
     afterEach(() => {
@@ -179,7 +188,10 @@ describe('GithubRepoWidget (EW-644)', () => {
 
         // Now flip the sibling 'owner' under the same component instance.
         // We swap the siblings ref's `get` to return a different owner.
-        const siblings2 = { get: vi.fn().mockReturnValue('umbrella'), set: vi.fn() };
+        const siblings2 = {
+            get: vi.fn<(name: string) => unknown>().mockReturnValue('umbrella'),
+            set: vi.fn<(name: string, value: unknown) => void>(),
+        };
         await act(async () => {
             rerender(<GithubRepoWidget value="storage" onChange={onChange} siblings={siblings2} />);
         });

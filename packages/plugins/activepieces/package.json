@@ -8,7 +8,7 @@
 		"url": "https://ever.co"
 	},
 	"license": "AGPL-3.0",
-	"private": true,
+	"private": false,
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
@@ -40,7 +40,7 @@
 		"@types/node": "^22.0.0",
 		"tsup": "^8.0.0",
 		"typescript": "^5.9.3",
-		"vitest": "^3.2.1"
+		"vitest": "^4.1.0"
 	},
 	"everworks": {
 		"plugin": {
@@ -62,7 +62,12 @@
 			"visibility": "public",
 			"selectableProviderCategories": [
 				"screenshot"
-			]
+			],
+			"distribution": "registry"
 		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

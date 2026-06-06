@@ -139,5 +139,34 @@ describe('PostmarkPlugin', () => {
 		it('accepts when no secret configured', () => {
 			expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
 		});
+
+		it('warns the operator when accepting an unsigned inbound webhook (no secret configured)', () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+			try {
+				expect(() => plugin.verifyWebhookSignature(Buffer.from(''), {}, { settings: {} })).not.toThrow();
+				expect(warnSpy).toHaveBeenCalledTimes(1);
+				expect(warnSpy.mock.calls[0][0]).toMatch(/WITHOUT signature verification/);
+			} finally {
+				warnSpy.mockRestore();
+			}
+		});
+
+		it('does NOT warn when a secret IS configured (verification path is exercised)', () => {
+			const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+			try {
+				// Mismatch still throws; the point is that the unsigned-accept
+				// warning is NOT emitted on the verifying path.
+				expect(() =>
+					plugin.verifyWebhookSignature(
+						Buffer.from(''),
+						{ authorization: 'Basic xxx' },
+						{ settings: { inboundWebhookSecret: 'super-secret' } }
+					)
+				).toThrow(/signature mismatch/);
+				expect(warnSpy).not.toHaveBeenCalled();
+			} finally {
+				warnSpy.mockRestore();
+			}
+		});
 	});
 });

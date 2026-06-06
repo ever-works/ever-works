@@ -124,6 +124,9 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         everWorksDns as never,
         funnel as never,
         eventEmitter as never,
+        // organizationRepository (EW-711 #27) — appended last; unused by the
+        // createWork defaults path under test, so a bare stub suffices.
+        {} as never,
     );
 
     return {

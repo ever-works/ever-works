@@ -5,8 +5,8 @@
 
 **Feature ID**: `dynamic-plugin-distribution`
 **Plan**: `./plan.md`
-**Status**: `Draft`
-**Last updated**: 2026-05-28
+**Status**: `Done`
+**Last updated**: 2026-06-03
 
 ---
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationChannelRepository } from '@ever-works/agent/database';
 import type { NotificationChannel } from '@ever-works/agent/entities';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
@@ -14,6 +14,12 @@ export interface UpdateChannelInput {
     readonly targetConfig?: Record<string, unknown>;
     readonly disabled?: boolean;
 }
+
+// Security: hard cap on the number of channels a single user can own.
+// Prevents a legitimate but malicious user from bloating the
+// notification_channels table without bound (unlimited INSERT DoS).
+// 50 channels per user is well above any real use-case.
+const MAX_CHANNELS_PER_USER = 50;
 
 /**
  * EW-663 / EW-673 — Notification channel CRUD + test-send wiring.
@@ -31,6 +37,16 @@ export class NotificationChannelsService {
     }
 
     async create(userId: string, input: CreateChannelInput): Promise<NotificationChannel> {
+        // Security: enforce per-user channel count cap before persisting.
+        // findActiveByUser only returns non-deleted rows; counting those
+        // is sufficient to prevent table-bloat DoS by a single authenticated
+        // user creating thousands of channel rows in a tight loop.
+        const existing = await this.channels.findActiveByUser(userId);
+        if (existing.length >= MAX_CHANNELS_PER_USER) {
+            throw new BadRequestException(
+                `Maximum of ${MAX_CHANNELS_PER_USER} notification channels per user`,
+            );
+        }
         return this.channels.save({
             userId,
             pluginId: input.pluginId,

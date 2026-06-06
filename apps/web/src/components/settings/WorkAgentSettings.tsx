@@ -64,6 +64,9 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
+    // Security: cap goal instruction length client-side to prevent oversized
+    // payloads from reaching the server action and inflating LLM token budgets.
+    const MAX_INSTRUCTION_LENGTH = 10_000;
     const [instruction, setInstruction] = useState('');
     const [dryRun, setDryRun] = useState(preferences.guardrails.dryRunByDefault);
 
@@ -650,8 +653,13 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             onChange={(event) => setInstruction(event.target.value)}
                             rows={4}
                             placeholder={t('queue.placeholder')}
+                            maxLength={MAX_INSTRUCTION_LENGTH}
                             className="w-full rounded-lg border border-border dark:border-border-dark bg-background dark:bg-background-dark px-3 py-2 text-sm text-text dark:text-text-dark outline-none focus:ring-2 focus:ring-primary/25"
                         />
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark text-right">
+                            {instruction.length.toLocaleString()} /{' '}
+                            {MAX_INSTRUCTION_LENGTH.toLocaleString()}
+                        </p>
                         <div className="flex flex-col gap-3 @3xl/main:flex-row @3xl/main:items-center @3xl/main:justify-between">
                             <ToggleRow
                                 label={t('fields.dryRunThisGoal')}
@@ -665,7 +673,8 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                                 disabled={
                                     isQueueing ||
                                     !localPreferences.enabled ||
-                                    instruction.trim().length < 10
+                                    instruction.trim().length < 10 ||
+                                    instruction.length > MAX_INSTRUCTION_LENGTH
                                 }
                             >
                                 <Play className="w-3.5 h-3.5" />

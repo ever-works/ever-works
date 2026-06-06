@@ -271,7 +271,11 @@ export class GitOperations implements IGitOperations {
 		const url = this.getCloneUrl(owner, repo);
 		const auth = this.getAuth(token);
 
-		const uniqueName = `${repo}-${branch}-${Date.now()}`;
+		// Security: slugify the attacker-controlled repo/branch before using them in a
+		// filesystem path. Without this, a branch name containing `../` sequences would
+		// escape baseDir via path.join normalization (path traversal). The numeric
+		// Date.now() suffix preserves directory uniqueness for legitimate inputs.
+		const uniqueName = `${slugifyText(`${repo}-${branch}`)}-${Date.now()}`;
 		const dir = path.join(this.baseDir, uniqueName);
 
 		await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => {});

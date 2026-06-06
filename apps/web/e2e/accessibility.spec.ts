@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { isThrottleKeyCorsNoise } from './helpers/console-noise';
 
 /**
  * Lightweight a11y smoke tests on key public pages.
@@ -103,7 +104,12 @@ test.describe('Accessibility — no console errors on key pages', () => {
         test(`${url} renders without console.error`, async ({ page }) => {
             const errors: string[] = [];
             page.on('console', (msg) => {
-                if (msg.type() === 'error') errors.push(msg.text());
+                // Drop the harness's own `x-e2e-throttle-key` CORS preflight
+                // rejection — a test-env-only artifact (see
+                // helpers/console-noise.ts), never seen by a real user.
+                if (msg.type() === 'error' && !isThrottleKeyCorsNoise(msg.text())) {
+                    errors.push(msg.text());
+                }
             });
             page.on('pageerror', (err) => errors.push(err.message));
 

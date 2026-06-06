@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { MailService } from '@sendgrid/mail';
 import type { MailDataRequired } from '@sendgrid/mail';
 import type {
@@ -109,7 +110,10 @@ export class SendGridPlugin implements IEmailOutboundPlugin {
 		// SendGrid verifies sender identities / domains, not arbitrary
 		// addresses. We emit a token; the platform-side verify route flips
 		// `verified` once the operator clicks the confirmation.
-		const verificationToken = `sg-${Math.random().toString(36).slice(2)}${Date.now()}`;
+		// Security: use a CSPRNG (256-bit) instead of Math.random() — the
+		// token grants control over a tenant email address, so it must be
+		// unpredictable. The `sg-` prefix is kept for log/debug readability.
+		const verificationToken = `sg-${randomBytes(32).toString('hex')}`;
 		return {
 			address,
 			verificationToken,

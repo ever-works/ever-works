@@ -149,6 +149,66 @@ describe('MarkdownRepository', () => {
             });
             // Note: explicitly NOT recursive — files only.
         });
+
+        // EW-717 #1 — path-traversal guard. A caller-supplied slug must be a
+        // single safe `[A-Za-z0-9_-]+` segment; anything that could escape the
+        // `details/` dir must throw BEFORE any fs write/delete.
+        describe('slug confinement (path traversal)', () => {
+            it.each([
+                '../../evil',
+                '../escape',
+                'a/b',
+                '..',
+                '.',
+                '',
+                'foo/../../bar',
+                'sub/child',
+            ])('writeDetails rejects hostile slug %p without writing', async (slug) => {
+                await expect(new MarkdownRepository(dir).writeDetails(slug, 'x')).rejects.toThrow(
+                    /Invalid slug/,
+                );
+                expect(fsMock.writeFile).not.toHaveBeenCalled();
+            });
+
+            it.each([
+                '../../evil',
+                '../escape',
+                'a/b',
+                '..',
+                '.',
+                '',
+                'foo/../../bar',
+                'sub/child',
+            ])('removeDetails rejects hostile slug %p without removing', async (slug) => {
+                await expect(new MarkdownRepository(dir).removeDetails(slug)).rejects.toThrow(
+                    /Invalid slug/,
+                );
+                expect(fsMock.rm).not.toHaveBeenCalled();
+            });
+
+            it('does not bump the write counter when a hostile slug is rejected', async () => {
+                const repo = new MarkdownRepository(dir);
+                await expect(repo.writeDetails('../../evil', 'x')).rejects.toThrow(/Invalid slug/);
+                await expect(repo.removeDetails('../../evil')).rejects.toThrow(/Invalid slug/);
+                expect(repo.getWriteCount()).toBe(0);
+            });
+
+            it('still writes a legitimate slug unchanged under details/', async () => {
+                await new MarkdownRepository(dir).writeDetails('my-item', '# ok');
+                expect(fsMock.writeFile).toHaveBeenCalledWith(
+                    path.join(detailsDir, 'my-item.md'),
+                    '# ok',
+                    'utf-8',
+                );
+            });
+
+            it('still removes a legitimate slug unchanged under details/', async () => {
+                await new MarkdownRepository(dir).removeDetails('my-item');
+                expect(fsMock.rm).toHaveBeenCalledWith(path.join(detailsDir, 'my-item.md'), {
+                    force: true,
+                });
+            });
+        });
     });
 
     describe('writeLicense', () => {

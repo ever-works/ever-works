@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import {
     BadRequestException,
     ConflictException,
@@ -150,8 +150,10 @@ export class OnboardingService {
             }),
         );
 
+        // Security: strip newline characters from ghLogin to prevent log injection into newline-sensitive log aggregators.
+        const safeLogin = ghLogin.replace(/[\r\n]/g, '_');
         this.logger.log(
-            `onboarding.validated id=${persisted.id} repo=${coords.canonicalUrl} login=${ghLogin}`,
+            `onboarding.validated id=${persisted.id} repo=${coords.canonicalUrl} login=${safeLogin}`,
         );
 
         // T9b: account upsert. Best-effort — if it fails, the row stays in
@@ -226,7 +228,10 @@ export class OnboardingService {
         }
 
         const { githubIdentityHash } = await this.resolveGitHubIdentity(proofToken);
-        if (githubIdentityHash !== row.githubIdentityHash) {
+        // Security: use constant-time comparison to prevent timing side-channel on hash prefix brute-force.
+        const a = Buffer.from(githubIdentityHash);
+        const b = Buffer.from(row.githubIdentityHash);
+        if (a.length !== b.length || !timingSafeEqual(a, b)) {
             throw new ForbiddenException({
                 statusCode: 403,
                 code: 'gh_repo_access_denied',

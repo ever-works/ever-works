@@ -371,4 +371,101 @@ export const config = {
             return Number.isFinite(raw) && raw > 0 ? raw : 1800;
         },
     },
+
+    /**
+     * EW-643 Phase 3 — Knowledge Base operator knobs.
+     *
+     * Default-on for normalize so an upload of a `.mov` doesn't silently
+     * produce an unplayable workbench viewer entry. Operators flip
+     * `KB_MEDIA_NORMALIZE=false` to bypass the ffmpeg lane entirely
+     * (the KB ingest path then dispatches kb-transcribe directly).
+     *
+     * The pinned provider env is consumed by `AiFacadeService.transcribe`
+     * — see the JSDoc on `IAiProviderPlugin.transcribe` for the
+     * selection chain. Without a pin, the facade falls back to the
+     * first AI provider plugin whose transcribe is defined.
+     */
+    kb: {
+        /** Master switch for the ffmpeg normalize stage. Default `true`. */
+        isMediaNormalizeEnabled(): boolean {
+            const v = process.env.KB_MEDIA_NORMALIZE;
+            if (v === undefined || v === '') return true;
+            return v.toLowerCase() === 'true' || v === '1';
+        },
+        /** Path to the ffmpeg binary. Default `ffmpeg` (resolves via $PATH). */
+        getFfmpegBin(): string {
+            return process.env.KB_FFMPEG_BIN || 'ffmpeg';
+        },
+        /** Video codec. libx264 is the broadest browser-compatible default. */
+        getVideoOutputCodec(): string {
+            return process.env.KB_VIDEO_OUTPUT_CODEC || 'libx264';
+        },
+        /** Video output container/extension. `mp4` is the spec §14.3 default. */
+        getVideoOutputExt(): string {
+            return process.env.KB_VIDEO_OUTPUT_EXT || 'mp4';
+        },
+        /** Audio codec. libmp3lame keeps Whisper-friendly file sizes. */
+        getAudioOutputCodec(): string {
+            return process.env.KB_AUDIO_OUTPUT_CODEC || 'libmp3lame';
+        },
+        /** Audio output container/extension. `mp3` is the spec §14.3 default. */
+        getAudioOutputExt(): string {
+            return process.env.KB_AUDIO_OUTPUT_EXT || 'mp3';
+        },
+        /**
+         * Operator-pinned transcription provider plugin id. When set,
+         * `AiFacadeService.transcribe` ONLY tries this provider — no
+         * silent fallback. Leave unset to let the facade auto-resolve
+         * to the first available provider whose `transcribe` is
+         * defined.
+         */
+        getTranscriptionProviderId(): string | undefined {
+            const v = process.env.KB_TRANSCRIPTION_PROVIDER_ID;
+            return v && v.length > 0 ? v : undefined;
+        },
+        /** KbDocumentClass for materialized transcripts. `research` per spec §14.3. */
+        getTranscriptionTargetClass(): string {
+            return process.env.KB_TRANSCRIPTION_TARGET_CLASS || 'research';
+        },
+        /** BCP-47 language hint forwarded to the transcribe call. Unset = auto-detect. */
+        getTranscriptionLanguage(): string | undefined {
+            const v = process.env.KB_TRANSCRIPTION_LANGUAGE;
+            return v && v.length > 0 ? v : undefined;
+        },
+        /**
+         * EW-643 Phase 3 slice 4a — how long an upload may sit in
+         * `extractionStatus='running'` before the daily reconcile sweep
+         * declares it stale and force-marks it `failed`. Default 24h —
+         * comfortably longer than the `kb-transcribe` task's 30-minute
+         * `maxDuration`, so a slow-but-legitimate retry isn't mistaken
+         * for a dead row.
+         */
+        getReconcileStaleAfterMs(): number {
+            const raw = parseInt(process.env.KB_RECONCILE_STALE_AFTER_MS || '', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 24 * 60 * 60 * 1000;
+        },
+        /**
+         * EW-642 — operator-pinned vector-store provider plugin id.
+         * When set, `VectorStoreFacadeService` ONLY tries this provider
+         * — no silent fallback. Leave unset to let the facade resolve
+         * via per-Work pin → scope-active → first-available chain.
+         * Mirrors the `KB_TRANSCRIPTION_PROVIDER_ID` knob shape.
+         */
+        getVectorStoreProviderId(): string | undefined {
+            const v = process.env.KB_VECTOR_STORE_PROVIDER_ID;
+            return v && v.length > 0 ? v : undefined;
+        },
+        /**
+         * EW-642 — embedding routing mode. `'pgvector'` keeps the
+         * legacy `WorkKnowledgeChunkRepository` SQL path; `'external'`
+         * forces the facade-routed `IVectorStorePlugin` path; `'auto'`
+         * (default) lets the facade pick based on whether a non-pgvector
+         * vector-store plugin is registered. Free-form string so the
+         * future "hybrid" / "shadow-write" modes don't need a contract
+         * bump.
+         */
+        getEmbeddingMode(): 'pgvector' | 'external' | 'auto' | string {
+            return process.env.KB_EMBEDDING_MODE || 'auto';
+        },
+    },
 };

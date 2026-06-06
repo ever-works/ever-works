@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { StepExecutionContext, MutableItemData, FacadeOptions } from '@ever-works/plugin';
-import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
+import { isSafeWebhookUrl, safeFetchWithDnsPin } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext, StandardPipelineMetrics } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { appendCustomPrompt } from '../utils/prompt.utils.js';
@@ -46,6 +46,31 @@ Prefer official sources in this order:
 4. Package manager pages (npm, PyPI, etc.)
 5. Avoid: blog posts, news articles, tutorials, unless they are the only authoritative source
 ` as const;
+
+/**
+ * Security (prompt-injection hardening): the candidate page content and item
+ * metadata fed into {@link URL_VALIDATION_PROMPT} originate from untrusted,
+ * attacker-influenceable sources (fetched web pages, AI-extracted item fields).
+ * Collapse newlines so injected text cannot fake new prompt lines, strip the
+ * chat-template control markers some models treat as out-of-band role/turn
+ * delimiters, and hard-truncate. Mirrors the canonical `sanitizePromptVariable`
+ * in `@ever-works/agent`'s `item-health.service.ts`, which sanitizes the exact
+ * same variables on the equivalent URL-authority prompt.
+ */
+function sanitizePromptVariable(value: string, maxLength: number): string {
+	return value
+		.replace(/\r?\n|\r/g, ' ')
+		.replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '')
+		.slice(0, maxLength);
+}
+
+/**
+ * Maximum number of HTTP redirect hops {@link SourceValidationStep} will follow
+ * during URL liveness probing. Each hop is independently re-validated through
+ * the DNS-pinned SSRF guard, so a 30x chain cannot be used to reach an internal
+ * address; the cap also bounds redirect loops.
+ */
+const MAX_VALIDATION_REDIRECTS = 5;
 
 /**
  * Source Validation Step
@@ -199,34 +224,76 @@ export class SourceValidationStep extends BasePipelineStep {
 				return undefined;
 			}
 
-			// Use fetch for basic URL validation instead of axios
+			// Security (SSRF / DNS-rebinding + redirect bypass, H-11 / M-23):
+			// `isSafeWebhookUrl` above is LEXICAL ONLY — a hostname that passes
+			// it can still resolve to 127.0.0.1 / 169.254.169.254 at connect
+			// time, and a plain `fetch` follows 30x redirects to internal hosts
+			// without re-checking. Probe through `safeFetchWithDnsPin` (resolves
+			// DNS and rejects any private/loopback/link-local/metadata address
+			// before connecting) and disable automatic redirect following
+			// (`redirect: 'manual'`), instead chasing each hop manually so every
+			// redirect target is re-run through the same DNS-pinned guard.
+			const probeWithRedirects = async (method: 'HEAD' | 'GET', timeoutMs: number): Promise<boolean> => {
+				// One shared deadline for the whole redirect chain, mirroring the
+				// single-signal-per-attempt semantics of the original probe.
+				const signal = AbortSignal.timeout(timeoutMs);
+				const headers: Record<string, string> = {
+					Accept: 'text/html',
+					'User-Agent':
+						'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+				};
+				if (method === 'GET') {
+					headers.Range = 'bytes=0-1024';
+				}
+
+				let nextUrl = urlToValidate;
+				for (let hop = 0; hop <= MAX_VALIDATION_REDIRECTS; hop++) {
+					const response = await safeFetchWithDnsPin(nextUrl, {
+						method,
+						headers,
+						redirect: 'manual',
+						signal
+					});
+
+					// In Node (undici) `redirect: 'manual'` surfaces the 3xx
+					// response with a readable Location header (unlike the opaque
+					// browser response), so we can re-validate and follow it.
+					if (response.status >= 300 && response.status < 400) {
+						const location = response.headers.get('location');
+						if (!location) {
+							return false;
+						}
+						let resolved: string;
+						try {
+							resolved = new URL(location, nextUrl).toString();
+						} catch {
+							return false;
+						}
+						// Re-run the lexical guard on the hop before the DNS-pinned
+						// fetch re-checks it; bail on non-HTTP(S) / metadata targets.
+						if (!isSafeWebhookUrl(resolved)) {
+							return false;
+						}
+						nextUrl = resolved;
+						continue;
+					}
+
+					return response.ok;
+				}
+				// Exceeded the redirect budget.
+				return false;
+			};
+
+			// HEAD first; only fall back to GET when HEAD throws (network error,
+			// timeout, or an SSRF-blocked redirect) — preserving the original
+			// control flow where a non-ok HEAD does NOT trigger the GET fallback.
 			try {
-				const response = await fetch(urlToValidate, {
-					method: 'HEAD',
-					headers: {
-						Accept: 'text/html',
-						'User-Agent':
-							'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
-					},
-					signal: AbortSignal.timeout(5000)
-				});
-				if (response.ok) {
+				if (await probeWithRedirects('HEAD', 5000)) {
 					return urlToValidate;
 				}
 			} catch {
-				// Try GET as fallback
 				try {
-					const response = await fetch(urlToValidate, {
-						method: 'GET',
-						headers: {
-							Accept: 'text/html',
-							Range: 'bytes=0-1024',
-							'User-Agent':
-								'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
-						},
-						signal: AbortSignal.timeout(8000)
-					});
-					if (response.ok) {
+					if (await probeWithRedirects('GET', 8000)) {
 						return urlToValidate;
 					}
 				} catch {
@@ -367,10 +434,17 @@ export class SourceValidationStep extends BasePipelineStep {
 				{
 					temperature: 0.1,
 					variables: {
-						itemName,
-						itemDescription,
+						// Security (prompt-injection hardening): itemName/itemDescription are
+						// AI-extracted from untrusted content and pageContent is fetched from
+						// an attacker-controllable web page. Sanitize each before it enters the
+						// URL-authority prompt so embedded "SYSTEM:"/[INST]/<|im_start|> text
+						// cannot coerce the model into rating a typosquat as the official
+						// source. candidateUrl is already URL- and SSRF-validated upstream.
+						// Mirrors item-health.service.ts's sanitizePromptVariable limits.
+						itemName: sanitizePromptVariable(itemName, 200),
+						itemDescription: sanitizePromptVariable(itemDescription, 500),
 						candidateUrl,
-						pageContent: partialContent
+						pageContent: sanitizePromptVariable(partialContent, 2000)
 					},
 					routing: {
 						complexity: 'simple',

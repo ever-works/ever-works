@@ -714,8 +714,17 @@ export class TemplateCatalogService implements OnModuleInit {
                         id: canonicalId,
                         kind: 'website',
                         sourceType: 'built_in',
-                        name: this.humanizeRepositoryName(repository.name),
-                        description: repository.description || null,
+                        // Security: cap the humanized name so an over-long org repo
+                        // name can't overflow UI / hit column-truncation surprises.
+                        name: this.humanizeRepositoryName(repository.name).slice(0, 120),
+                        // Security: the GitHub repo `description` is third-party
+                        // metadata (any catalog-org admin / compromised account can
+                        // set it) that we persist and return to every user in the
+                        // templates list. Strip HTML tags + control chars and cap
+                        // length so a payload like `<img src=x onerror=...>` can't
+                        // become stored XSS in a client that renders descriptions as
+                        // HTML/markdown. Plain-text descriptions are unchanged.
+                        description: this.sanitizeDiscoveredDescription(repository.description),
                         framework: inferFrameworkFromRepository(repository.name),
                         repositoryUrl: repository.url,
                         repositoryOwner: repository.owner,
@@ -932,6 +941,31 @@ export class TemplateCatalogService implements OnModuleInit {
             .filter(Boolean)
             .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
             .join(' ');
+    }
+
+    // Security: discovered GitHub repo descriptions are attacker-influenceable
+    // (set by any catalog-org admin or via a compromised account) yet get
+    // persisted and surfaced in the templates list to every user. Strip HTML
+    // tags and control characters and cap the length before storage so a
+    // payload such as `<img src=x onerror=...>` cannot reach a client that
+    // renders the field as HTML/markdown. Legitimate plain-text descriptions
+    // (no markup) are returned unchanged.
+    private sanitizeDiscoveredDescription(value: string | null | undefined): string | null {
+        if (!value) {
+            return null;
+        }
+        const stripped = value
+            // Drop anything that looks like an HTML/XML tag.
+            .replace(/<[^>]*>/g, '')
+            // Remove stray angle brackets left by malformed/partial tags.
+            .replace(/[<>]/g, '')
+            // eslint-disable-next-line no-control-regex
+            .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+/g, ' ')
+            .trim();
+        if (!stripped) {
+            return null;
+        }
+        return stripped.length > 500 ? stripped.slice(0, 500) : stripped;
     }
 
     private isStandardTemplateRepository(repo: string): boolean {

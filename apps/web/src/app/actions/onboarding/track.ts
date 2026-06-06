@@ -26,7 +26,9 @@ export async function trackOnboardingEvent(
     try {
         await onboardingAPI.track(event, properties);
     } catch (cause) {
+        // Security: strip newlines/CRs from the event name to prevent log injection
+        const safeEvent = event.replace(/[\r\n]/g, '_');
         // eslint-disable-next-line no-console -- intentional: telemetry is best-effort
-        console.warn(`trackOnboardingEvent(${event}) failed: ${(cause as Error).message}`);
+        console.warn(`trackOnboardingEvent(${safeEvent}) failed: ${(cause as Error).message}`);
     }
 }

@@ -572,7 +572,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		) as typeof DEFAULT_PARENT_SYSTEM_PROMPT;
 		const systemPrompt = substituteVariables(sysTemplate, buildParentSystemPromptVariables(promptOptions));
 
-		this.context?.logger.log('[System Prompt] ' + systemPrompt);
+		// Security: the system prompt embeds tenant-supplied work.name/work.description/
+		// request.prompt and may carry business-sensitive or personal data. Log at debug
+		// (not info) so it stays out of default-level, cross-tenant log aggregation.
+		this.context?.logger.debug('[System Prompt] ' + systemPrompt);
 
 		const userTemplate = (
 			promptFacade
@@ -581,7 +584,10 @@ export class AgentPipelinePlugin implements IPlugin, IPipelinePlugin<AgentPipeli
 		) as typeof DEFAULT_PARENT_USER_PROMPT;
 		const userPrompt = substituteVariables(userTemplate, buildParentUserPromptVariables(promptOptions));
 
-		this.context?.logger.log('[User Prompt] ' + userPrompt);
+		// Security: the user prompt embeds tenant-supplied work.name/work.description/
+		// request.prompt and may carry business-sensitive or personal data. Log at debug
+		// (not info) so it stays out of default-level, cross-tenant log aggregation.
+		this.context?.logger.debug('[User Prompt] ' + userPrompt);
 
 		const settings = await resolveSettings(this.context, facadeOptions.userId, work.id);
 		const maxSteps = (settings.maxSteps as number) || DEFAULT_MAX_STEPS;

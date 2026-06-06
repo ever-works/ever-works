@@ -21,6 +21,25 @@ interface PluginCardProps {
     plugin: UserPlugin;
 }
 
+// Security: `plugin.homepage` comes from an attacker-controllable plugin manifest
+// (unconstrained `homepage?: string`; dynamic plugins can be installed at runtime).
+// A `javascript:`/`data:`/`vbscript:` URI in an `<a href>` executes in the page
+// origin on click — `rel="noopener noreferrer"` does NOT block it. Enforce an
+// http(s)-only scheme allow-list before rendering. Mirrors the file-local
+// `safeExternalUrl` pattern in ChatToolResult.tsx / FeedRow.tsx.
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 export function PluginCard({ plugin }: PluginCardProps) {
     const t = useTranslations('dashboard.plugins');
 
@@ -44,6 +63,9 @@ export function PluginCard({ plugin }: PluginCardProps) {
     const visibleCaps = plugin.capabilities.filter(
         (cap) => cap !== plugin.category && !HIDDEN_CAPABILITIES.has(cap),
     );
+
+    // Security: scheme allow-list the manifest-supplied homepage (see safeExternalUrl).
+    const homepageUrl = safeExternalUrl(plugin.homepage);
 
     return (
         <>
@@ -113,9 +135,9 @@ export function PluginCard({ plugin }: PluginCardProps) {
                         {t('settings')}
                     </Link>
 
-                    {plugin.homepage && (
+                    {homepageUrl && (
                         <a
-                            href={plugin.homepage}
+                            href={homepageUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark flex items-center gap-1"

@@ -16,13 +16,18 @@ import { TasksList } from './TasksList';
 export function TasksScopedSection({
     tasks,
     scopeLabel,
+    scopeId,
 }: {
     tasks: Task[];
     scopeLabel: 'Work' | 'Mission' | 'Idea';
+    scopeId: string;
 }) {
     const doneCount = tasks.filter((t) => t.status === 'done').length;
     const openCount = tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length;
     const progressPct = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
+    const scopeParam =
+        scopeLabel === 'Work' ? 'workId' : scopeLabel === 'Mission' ? 'missionId' : 'ideaId';
+    const newTaskHref = `${ROUTES.DASHBOARD_TASK_NEW}?${scopeParam}=${encodeURIComponent(scopeId)}`;
 
     return (
         <div className="space-y-5">
@@ -57,7 +62,7 @@ export function TasksScopedSection({
                 </div>
 
                 <Link
-                    href={ROUTES.DASHBOARD_TASK_NEW}
+                    href={newTaskHref}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap shrink-0"
                 >
                     <Plus className="w-3.5 h-3.5" />

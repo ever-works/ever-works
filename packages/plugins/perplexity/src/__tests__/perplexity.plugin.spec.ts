@@ -3,7 +3,9 @@ import type { PluginContext, SearchOptions } from '@ever-works/plugin';
 
 const { searchCreateMock, PerplexityCtorMock } = vi.hoisted(() => {
 	const create = vi.fn();
-	const ctor = vi.fn().mockImplementation(() => ({ search: { create } }));
+	const ctor = vi.fn().mockImplementation(function () {
+		return { search: { create } };
+	});
 	return { searchCreateMock: create, PerplexityCtorMock: ctor };
 });
 

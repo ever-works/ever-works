@@ -2,6 +2,14 @@
 
 import { membersAPI, WorkMember, AssignableMemberRole } from '@/lib/api';
 import { revalidatePath } from 'next/cache';
+// Security: server actions are reachable as POST endpoints via the
+// `Next-Action` header, so every exported action must independently verify
+// authentication at the Next.js layer before proxying to backend
+// membership-mutation endpoints — UI gating alone is not a security boundary.
+// Mirrors works.ts / work-proposals.ts / items.ts.
+import { getAuthFromCookie } from '@/lib/auth';
+import { ROUTES } from '@/lib/constants';
+import { redirect } from 'next/navigation';
 
 interface ActionResult {
     status: 'success' | 'error';
@@ -14,6 +22,12 @@ export async function inviteMember(
     email: string,
     role: AssignableMemberRole,
 ): Promise<ActionResult> {
+    // Security: independently verify authentication before any membership mutation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const result = await membersAPI.invite(workId, { email, role });
 
@@ -36,6 +50,12 @@ export async function updateMemberRole(
     memberId: string,
     role: AssignableMemberRole,
 ): Promise<ActionResult> {
+    // Security: independently verify authentication before any membership mutation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const result = await membersAPI.updateRole(workId, memberId, { role });
 
@@ -54,6 +74,12 @@ export async function updateMemberRole(
 }
 
 export async function removeMember(workId: string, memberId: string): Promise<ActionResult> {
+    // Security: independently verify authentication before any membership mutation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const result = await membersAPI.remove(workId, memberId);
 
@@ -72,6 +98,12 @@ export async function removeMember(workId: string, memberId: string): Promise<Ac
 }
 
 export async function leaveWork(workId: string): Promise<ActionResult> {
+    // Security: independently verify authentication before any membership mutation.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
     try {
         const result = await membersAPI.leave(workId);
 

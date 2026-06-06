@@ -41,7 +41,7 @@
 		"@types/node": "^22.0.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",
-		"vitest": "^3.0.0"
+		"vitest": "^4.1.0"
 	},
 	"everworks": {
 		"plugin": {
@@ -61,6 +61,7 @@
 			},
 			"license": "AGPL-3.0",
 			"systemPlugin": false,
+			"distribution": "registry",
 			"builtIn": false,
 			"envVars": [
 				{
@@ -95,5 +96,10 @@
 				}
 			]
 		}
+	},
+	"private": false,
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
 	}
 }

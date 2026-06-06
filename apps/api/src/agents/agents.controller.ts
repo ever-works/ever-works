@@ -135,7 +135,7 @@ export class AgentsController {
     @Post()
     @ApiOperation({ summary: 'Create a new Agent' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async create(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateAgentDto,
@@ -177,7 +177,7 @@ export class AgentsController {
     @Patch(':id')
     @ApiOperation({ summary: 'Update Agent fields (partial)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async update(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -208,7 +208,7 @@ export class AgentsController {
         summary: 'Archive Agent (soft-delete). Pass ?hard=true to permanently delete + cascade.',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -223,7 +223,7 @@ export class AgentsController {
     @Post(':id/pause')
     @ApiOperation({ summary: 'Pause an active Agent (ACTIVE → PAUSED)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async pause(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -234,7 +234,7 @@ export class AgentsController {
     @Post(':id/resume')
     @ApiOperation({ summary: 'Resume a paused/errored Agent (→ ACTIVE)' })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async resume(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -268,7 +268,7 @@ export class AgentsController {
     // PASS-4 review fix: plan §7.1 documents 60/min for PUT /:id/files/:name
     // ("UI typing autosave" rationale). Tick-42 I11 mis-read the spec and
     // tightened to 30; reverting to match the plan + docs/api/agents.md.
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async writeFile(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -304,7 +304,7 @@ export class AgentsController {
             'Export one Agent as a JSON envelope (identity, files, runtime, avatar, skill bindings, budget).',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async exportOne(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -318,7 +318,7 @@ export class AgentsController {
             'Import an Agent envelope. Conflict mode: skip | overwrite | rename (default rename — appends -2, -3, etc.).',
     })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async importOne(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: AgentExportEnvelope,
@@ -353,7 +353,7 @@ export class AgentsController {
             'Manually trigger an agent-heartbeat run NOW, bypassing the heartbeatCadence schedule.',
     })
     @HttpCode(HttpStatus.ACCEPTED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async runNow(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -441,7 +441,7 @@ export class AgentsController {
         summary: 'Cancel a queued / running AgentRun. No-op for already-terminal runs.',
     })
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async cancelRun(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -551,7 +551,7 @@ export class AgentsController {
             'Assign a Task to this Agent — pre-creates an AgentRun for the (taskId, agentId) pair and enqueues `agent-task-execute`.',
     })
     @HttpCode(HttpStatus.ACCEPTED)
-    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async assignTask(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -586,6 +586,7 @@ export class AgentsController {
                 userId: auth.userId,
                 taskId: body.taskId,
                 dedupKey: `${body.taskId}:${id}:assigned:${run.id}`,
+                runId: run.id,
             });
         } catch (err) {
             // FU-2 review fix (codex P1): without this rollback, the
@@ -652,7 +653,7 @@ export class AgentsController {
     @Post(':id/attachments')
     @ApiOperation({ summary: 'Attach an uploaded file to an Agent' })
     @HttpCode(HttpStatus.CREATED)
-    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

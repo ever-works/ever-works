@@ -1,5 +1,6 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import path from 'node:path';
 import type { CodeEditFileChange } from '../contracts/capabilities/code-edit-plugin.interface.js';
 
 const execAsync = promisify(exec);
@@ -23,20 +24,44 @@ export async function computeWorkspaceFileChanges(workspaceDir: string): Promise
 			cwd: workspaceDir,
 			maxBuffer: 10 * 1024 * 1024
 		});
-		return parsePorcelain(stdout);
+		return parsePorcelain(stdout, workspaceDir);
 	} catch {
 		return [];
 	}
 }
 
-function parsePorcelain(output: string): CodeEditFileChange[] {
+/**
+ * Confirm a porcelain-reported path stays inside the workspace.
+ *
+ * Git porcelain paths are relative to the repo root (`workspaceDir`), but the
+ * working tree may be an attacker-controlled cloned repo. A crafted rename
+ * record (`old -> new`) whose `new` component contains `../` sequences — or an
+ * absolute path — would otherwise yield a `CodeEditFileChange.path` that
+ * escapes the workspace and could mislead downstream consumers (PR diff
+ * rendering, file display) into touching files outside it. Mirrors the
+ * confinement guard used in `cli-pipeline/workspace.ts`.
+ */
+function isInsideWorkspace(workspaceDir: string, relPath: string): boolean {
+	if (!relPath || path.isAbsolute(relPath)) return false;
+	const workspaceResolved = path.resolve(workspaceDir);
+	const resolved = path.resolve(workspaceResolved, relPath);
+	const relative = path.relative(workspaceResolved, resolved);
+	return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function parsePorcelain(output: string, workspaceDir: string): CodeEditFileChange[] {
 	const changes: CodeEditFileChange[] = [];
 	for (const line of output.split('\n')) {
 		if (!line.trim()) continue;
 		const code = line.slice(0, 2);
 		const rest = line.slice(3);
-		const path = rest.includes(' -> ') ? rest.split(' -> ')[1] : rest;
-		changes.push({ path, status: mapStatus(code) });
+		const filePath = rest.includes(' -> ') ? rest.split(' -> ')[1] : rest;
+		// Security (path-traversal): skip any path that escapes the workspace
+		// (e.g. a hostile rename record `app.ts -> ../../etc/passwd` in a cloned
+		// attacker repo). Legitimate in-tree changes resolve inside `workspaceDir`
+		// and are unaffected.
+		if (!isInsideWorkspace(workspaceDir, filePath)) continue;
+		changes.push({ path: filePath, status: mapStatus(code) });
 	}
 	return changes;
 }

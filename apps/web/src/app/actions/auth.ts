@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
-import { ROUTES, withAppUrl } from '@/lib/constants';
+import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
@@ -10,6 +10,41 @@ import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
 import { OAuthProvider } from '@/lib/api/enums';
+
+// Security: `isValidRedirectUrl` only validates URL *syntax* — it accepts any
+// absolute http(s) URL regardless of host, which is an open redirect: an
+// attacker-supplied `?redirect=https://evil.com` query param would otherwise be
+// used as the post-login / post-magic-link redirect target (phishing). Restrict
+// absolute redirects to hosts in the server-side allowlist (relative paths are
+// already constrained by `isValidRedirectUrl`). Host matching mirrors
+// `isRelativeOrAllowedRedirectHost` in lib/auth/redirect.ts and
+// `isRedirectAllowedWithSession` in lib/utils/url.ts (exact match + leading
+// `*.` wildcard).
+function isRelativeOrAllowedRedirectHost(redirectUrl: string): boolean {
+    if (redirectUrl.startsWith('/')) {
+        return true;
+    }
+
+    try {
+        const hostname = new URL(redirectUrl).hostname.toLowerCase();
+
+        return ALLOWED_REDIRECT_URLS.some((allowed) => {
+            const cleanAllowed = allowed
+                .replace(/^https?:\/\//, '')
+                .toLowerCase()
+                .trim();
+
+            if (cleanAllowed.startsWith('*.')) {
+                const domain = cleanAllowed.slice(2);
+                return hostname !== domain && hostname.endsWith('.' + domain);
+            }
+
+            return hostname === cleanAllowed;
+        });
+    } catch {
+        return false;
+    }
+}
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -53,7 +88,14 @@ export async function login(identifier: string, password: string, redirectUrl: s
         };
     }
 
-    if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+    // Security: require BOTH a syntactically valid URL AND a relative path or
+    // allowlisted host before honoring the query-param redirect target, closing
+    // the open redirect (an absolute `?redirect=https://evil.com` is rejected).
+    if (
+        redirectUrl &&
+        isValidRedirectUrl(redirectUrl) &&
+        isRelativeOrAllowedRedirectHost(redirectUrl)
+    ) {
         href = redirectUrl;
     } else if (authResponse) {
         // Check if we have a redirect URL in a cookie
@@ -112,12 +154,12 @@ export async function register(username: string, email: string, password: string
         const errorT = await getTranslations('api.errors');
         let message = errorT('registerFailed');
 
-        if (error instanceof Error) {
-            if (error.message.includes('exists')) {
-                message = t('email.emailAlreadyRegistered');
-            } else if (!error.message.includes('Bad Request')) {
-                message = error.message;
-            }
+        // Security: only map the known "already exists" case to a friendly
+        // message; never forward the raw upstream `error.message` to the client
+        // (it can leak DB/infra detail). All other errors fall through to the
+        // generic `registerFailed` message assigned above.
+        if (error instanceof Error && error.message.includes('exists')) {
+            message = t('email.emailAlreadyRegistered');
         }
 
         return {
@@ -180,9 +222,11 @@ export async function connectProvider(providerId: OAuthProvider) {
         console.error(error);
         const t = await getTranslations('api.errors');
 
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
         return {
             success: false,
-            error: error instanceof Error ? error.message : t('providerConnectFailed'),
+            error: t('providerConnectFailed'),
         };
     }
 }
@@ -219,9 +263,11 @@ export async function forgotPassword(email: string) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
 
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
         return {
             success: false,
-            error: error instanceof Error ? error.message : errorT('forgotPasswordFailed'),
+            error: errorT('forgotPasswordFailed'),
         };
     }
 }
@@ -257,9 +303,11 @@ export async function resetPassword(token: string, newPassword: string) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
 
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
         return {
             success: false,
-            error: error instanceof Error ? error.message : errorT('resetPasswordFailed'),
+            error: errorT('resetPasswordFailed'),
         };
     }
 
@@ -298,7 +346,7 @@ export async function issueMagicLink(email: string) {
     try {
         await authAPI.requestMagicLink({
             email: validation.data,
-            magicLinkCallbackUrl: withAppUrl('/login/magic-link'),
+            magicLinkCallbackUrl: withAppUrl(ROUTES.AUTH_MAGIC_LINK),
         });
 
         return { success: true };
@@ -306,9 +354,11 @@ export async function issueMagicLink(email: string) {
         console.error(error);
         const errorT = await getTranslations('api.errors');
 
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
         return {
             success: false,
-            error: error instanceof Error ? error.message : errorT('magicLinkFailed'),
+            error: errorT('magicLinkFailed'),
         };
     }
 }
@@ -341,13 +391,22 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
         console.error(error);
         const errorT = await getTranslations('api.errors');
 
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
         return {
             success: false,
-            error: error instanceof Error ? error.message : errorT('magicLinkInvalid'),
+            error: errorT('magicLinkInvalid'),
         };
     }
 
-    if (redirectUrl && isValidRedirectUrl(redirectUrl)) {
+    // Security: require BOTH a syntactically valid URL AND a relative path or
+    // allowlisted host before honoring the query-param redirect target, closing
+    // the open redirect (an absolute `?redirect=https://evil.com` is rejected).
+    if (
+        redirectUrl &&
+        isValidRedirectUrl(redirectUrl) &&
+        isRelativeOrAllowedRedirectHost(redirectUrl)
+    ) {
         href = redirectUrl;
     } else if (authResponse) {
         href = await getRedirectUrl(authResponse, href);

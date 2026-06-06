@@ -121,14 +121,24 @@ export class TemplateRepository {
         catalogOwner: string,
         updatedSince: Date,
     ): Promise<boolean> {
+        // Security: `catalogOwner` is embedded into a LIKE pattern bind value. Even
+        // though it travels as a parameter (no raw SQL injection), unescaped LIKE
+        // metacharacters (`%`, `_`, `\`) would let a tainted/misconfigured owner value
+        // match unintended metadata rows and silently suppress the discovery-freshness
+        // gate. Escape them and pin the escape char so only an exact owner string
+        // matches. For normal org names (no metacharacters) the pattern is unchanged.
+        const escapedOwner = catalogOwner
+            .replace(/\\/g, '\\\\')
+            .replace(/%/g, '\\%')
+            .replace(/_/g, '\\_');
         return this.repository.exists({
             where: {
                 kind,
                 sourceType: 'built_in',
                 isActive: true,
                 updatedAt: MoreThanOrEqual(updatedSince),
-                metadata: Raw((alias) => `${alias} LIKE :ownerMarker`, {
-                    ownerMarker: `%"discoveredFromOrganization":"${catalogOwner}"%`,
+                metadata: Raw((alias) => `${alias} LIKE :ownerMarker ESCAPE '\\'`, {
+                    ownerMarker: `%"discoveredFromOrganization":"${escapedOwner}"%`,
                 }),
             },
         });

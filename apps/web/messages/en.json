@@ -748,9 +748,56 @@
         "skillsPage": {
             "title": "Skills",
             "subtitle": "Reusable, versioned instructions Agents can pull into a run when relevant.",
+            "tabs": {
+                "label": "Skill sections",
+                "installed": "Installed",
+                "available": "Available",
+                "custom": "Custom"
+            },
+            "search": {
+                "label": "Search skills",
+                "placeholder": "Search skills by title, slug, or description",
+                "submit": "Search",
+                "clear": "Clear"
+            },
+            "errors": {
+                "installed": "Installed skills could not be loaded. Try refreshing the page.",
+                "catalog": "The skills catalog could not be loaded. Installed and custom skills are still available."
+            },
             "empty": {
                 "title": "No Skills yet.",
-                "subtitle": "Skills ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+                "subtitle": "Install one from the catalog or create a custom Skill for your workspace."
+            },
+            "catalog": {
+                "emptyTitle": "No catalog Skills available.",
+                "emptySubtitle": "Enable a skills-provider plugin or adjust the search.",
+                "install": "Install",
+                "installing": "Installing...",
+                "installed": "Installed",
+                "installFailed": "Install failed"
+            },
+            "custom": {
+                "summary": "{count, plural, =0 {No hand-authored Skills yet.} =1 {1 hand-authored Skill.} other {# hand-authored Skills.}}",
+                "new": "New Skill",
+                "formTitle": "New custom Skill",
+                "title": "Title",
+                "titlePlaceholder": "e.g. Code review checklist",
+                "description": "Description (optional)",
+                "descriptionPlaceholder": "One-liner. Body goes on the detail page.",
+                "create": "Create",
+                "creating": "Creating...",
+                "cancel": "Cancel",
+                "titleRequired": "Title is required.",
+                "createFailed": "Failed to create Skill"
+            },
+            "card": {
+                "fromCatalog": "from catalog"
+            },
+            "pagination": {
+                "showing": "Showing {start}-{end} of {total}",
+                "emptyPage": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
             },
             "list": {
                 "newSkill": "+ New Skill",
@@ -3148,7 +3195,8 @@
                     "additions-only": "Additions only"
                 },
                 "document": {
-                    "emptyBody": "This document has no body yet."
+                    "emptyBody": "This document has no body yet.",
+                    "tagsLabel": "Tags"
                 },
                 "editor": {
                     "save": "Save",

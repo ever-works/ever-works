@@ -103,8 +103,15 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 		}
 
 		// Search across all scopes
-		const result = await this.apiService.lookupDeploymentAcrossScopes(projectName, token, (project) =>
-			project.name.includes(projectName)
+		// Security: require an exact project-name match instead of a substring match. The
+		// Vercel `search` query already performs prefix filtering server-side, so a loose
+		// `includes` could match a different project (e.g. searching `my-site` matching
+		// `my-site-v2`), letting a strategically named project hijack another work's
+		// deployment lookup. Exact equality mirrors the primary check in `lookupProject`.
+		const result = await this.apiService.lookupDeploymentAcrossScopes(
+			projectName,
+			token,
+			(project) => project.name === projectName
 		);
 		return {
 			found: result.found,

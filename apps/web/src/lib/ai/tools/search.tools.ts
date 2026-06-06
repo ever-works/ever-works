@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { tool } from 'ai';
 import { ROUTES } from '@/lib/constants';
 import { searchAPI } from '@/lib/api/plugins-capabilities/search';
+import { sanitizeText } from '@/lib/utils';
 
 export const webSearch = tool({
     description: [
@@ -35,11 +36,19 @@ export const webSearch = tool({
 
             return {
                 success: true,
+                // Security: search results come from untrusted external pages (SEO-poisoned
+                // titles/URLs) and flow straight back into the agent tool loop — where a
+                // subagent also holds getUserInfo. Sanitize the attacker-controllable string
+                // fields (strip control chars, collapse newlines that enable instruction-format
+                // breakouts, truncate) so injected text can't masquerade as instructions.
+                // Legitimate titles/URLs/dates are well within these limits and pass through.
                 results: response.results.map((r) => ({
-                    title: r.title,
-                    url: r.url,
+                    title: sanitizeText(r.title, { maxLength: 300 }),
+                    url: sanitizeText(r.url, { maxLength: 2048 }),
                     score: r.score,
-                    publishedDate: r.publishedDate,
+                    publishedDate: r.publishedDate
+                        ? sanitizeText(r.publishedDate, { maxLength: 64 })
+                        : r.publishedDate,
                 })),
                 resultCount: response.results.length,
             };

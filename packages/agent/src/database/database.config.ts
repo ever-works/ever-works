@@ -45,6 +45,7 @@ import {
     WorkKnowledgeTag,
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
+    WorkKnowledgeChunkCoordinate,
     Mission,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
@@ -191,6 +192,7 @@ export const ENTITIES = [
     WorkKnowledgeTag,
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
+    WorkKnowledgeChunkCoordinate,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

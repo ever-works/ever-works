@@ -40,7 +40,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
 
     beforeEach(() => {
         tasks = {
-            updateById: jest.fn().mockResolvedValue(undefined),
+            casUpdateStatus: jest.fn().mockResolvedValue(true),
             findById: jest.fn(),
         };
         blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
@@ -78,6 +78,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         const firstCall = dispatcher.enqueue.mock.calls[0][0];
         expect(firstCall.taskId).toBe('t1');
         expect(firstCall.dedupKey).toMatch(/t1:agent-[ab]:1/);
+        expect(firstCall.runId).toBe('r1');
     });
 
     it('pre-creates a queued AgentRun row before enqueuing the Trigger.dev run', async () => {
@@ -97,6 +98,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
                 taskId: 't1',
             }),
         );
+        expect(dispatcher.enqueue).toHaveBeenCalledWith(expect.objectContaining({ runId: 'r1' }));
     });
 
     it('dedupKey bumps with recurrenceOccurredCount + 1 on recurring instances', async () => {

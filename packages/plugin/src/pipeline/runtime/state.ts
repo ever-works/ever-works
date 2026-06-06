@@ -169,7 +169,26 @@ export async function resolveScopedSettings(
 		}
 
 		return merged;
-	} catch {
+	} catch (err) {
+		// Security: re-throw authorization/authentication errors so cross-tenant
+		// access violations are not silently swallowed and masked as empty settings.
+		const isAuthError =
+			err instanceof Error &&
+			(/unauthorized|forbidden|access denied/i.test(err.message) ||
+				('status' in err && (err as { status: unknown }).status === 401) ||
+				('status' in err && (err as { status: unknown }).status === 403) ||
+				('statusCode' in err && (err as { statusCode: unknown }).statusCode === 401) ||
+				('statusCode' in err && (err as { statusCode: unknown }).statusCode === 403));
+
+		if (isAuthError) {
+			throw err;
+		}
+
+		// Log all other errors at warn level so infrastructure failures are observable.
+		context.logger?.warn(
+			`resolveScopedSettings: failed to load settings for user=${userId} work=${workId}: ${err instanceof Error ? err.message : String(err)}`
+		);
+
 		return {};
 	}
 }

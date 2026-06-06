@@ -32,7 +32,28 @@ import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 // Cron fixed at every minute per spec §7 ("Dispatcher cron"). Made
 // overridable via env so soak tests can dial it down without redeploying.
-const cronExpression = process.env.DATA_SYNC_DISPATCHER_CRON ?? '*/1 * * * *';
+const DEFAULT_DISPATCHER_CRON = '*/1 * * * *';
+
+// Security: the cron is operator-controlled via env, but a compromised
+// deploy pipeline / misconfigured ConfigMap could inject a malformed or
+// 6-field expression that silently breaks schedule registration or fires
+// far more often than intended. Validate against a standard 5-field cron
+// shape and fall back to the safe default on any mismatch rather than
+// passing an unvetted string straight to Trigger.dev. Falling back (vs
+// throwing) keeps the schedule registered, which the rest of this module
+// already relies on. Legitimate values ("*/1 * * * *", "*/5 * * * *",
+// etc.) pass unchanged.
+const CRON_FIELD = '(?:\\*|\\*/\\d+|\\d+(?:-\\d+)?(?:/\\d+)?(?:,\\d+(?:-\\d+)?(?:/\\d+)?)*)';
+const FIVE_FIELD_CRON = new RegExp(`^${CRON_FIELD}(?:\\s+${CRON_FIELD}){4}$`);
+
+const resolveDispatcherCron = (): string => {
+    const raw = process.env.DATA_SYNC_DISPATCHER_CRON;
+    if (raw === undefined) return DEFAULT_DISPATCHER_CRON;
+    const trimmed = raw.trim();
+    return FIVE_FIELD_CRON.test(trimmed) ? trimmed : DEFAULT_DISPATCHER_CRON;
+};
+
+const cronExpression = resolveDispatcherCron();
 
 interface DataSyncDispatcher {
     dispatchDue: (limit?: number) => Promise<{

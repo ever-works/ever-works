@@ -4,7 +4,9 @@ import type { PluginContext, SearchOptions, ContentExtractionOptions } from '@ev
 const { searchMock, getContentsMock, ExaCtorMock } = vi.hoisted(() => {
 	const search = vi.fn();
 	const getContents = vi.fn();
-	const ctor = vi.fn().mockImplementation(() => ({ search, getContents }));
+	const ctor = vi.fn().mockImplementation(function () {
+		return { search, getContents };
+	});
 	return { searchMock: search, getContentsMock: getContents, ExaCtorMock: ctor };
 });
 

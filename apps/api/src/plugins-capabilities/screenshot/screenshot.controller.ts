@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { NoProviderError, ScreenshotFacadeService } from '@ever-works/agent/facades';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { PluginRegistryService, PluginSettingsService } from '@ever-works/agent/plugins';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import type { RegisteredPlugin } from '@ever-works/agent/plugins';
@@ -18,7 +19,26 @@ export class ScreenshotController {
         private readonly screenshotFacade: ScreenshotFacadeService,
         private readonly pluginRegistry: PluginRegistryService,
         private readonly pluginSettings: PluginSettingsService,
+        private readonly ownershipService: WorkOwnershipService,
     ) {}
+
+    /**
+     * Security (EW-711 #30): cross-work IDOR. When the caller supplies a
+     * `workId`, the work-scoped provider resolution below reads that work's
+     * enabled providers + settings (including secrets via
+     * `includeSecrets: true`) and spends its credits on capture. Nothing
+     * here verified the caller may access the target work, so any
+     * authenticated user could read another work's providers/secrets and
+     * burn its credits by passing a foreign `workId`. Gate on view-access
+     * to the work first (same `WorkOwnershipService.ensureCanView` seam
+     * OrgKbController uses). `ensureCanView` passes for the creator and any
+     * work member, so legitimate same-owner / same-tenant callers keep
+     * working. No `workId` ⇒ purely personal scope, no work to authorize.
+     */
+    private async ensureWorkAccess(userId: string, workId?: string): Promise<void> {
+        if (!workId) return;
+        await this.ownershipService.ensureCanView(workId, userId);
+    }
 
     private hasAllRequiredSettings(
         schema: JsonSchema | undefined,
@@ -61,6 +81,9 @@ export class ScreenshotController {
     }
 
     private async listProviders(userId: string, workId?: string) {
+        // Security (EW-711 #30): authorize the target work before reading
+        // its scoped providers/settings (incl. secrets) below.
+        await this.ensureWorkAccess(userId, workId);
         const enabledPlugins = await this.pluginRegistry.getEnabledPluginsScoped(
             PLUGIN_CAPABILITIES.SCREENSHOT,
             workId,

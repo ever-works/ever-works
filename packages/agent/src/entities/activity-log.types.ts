@@ -20,6 +20,10 @@ export enum ActivityActionType {
     PLUGIN_ENABLED = 'plugin_enabled',
     PLUGIN_DISABLED = 'plugin_disabled',
     PLUGIN_CONFIGURED = 'plugin_configured',
+    // EW-693 — dynamic plugin distribution install lifecycle.
+    PLUGIN_INSTALLED = 'plugin_installed',
+    PLUGIN_INSTALL_FAILED = 'plugin_install_failed',
+    PLUGIN_UNINSTALLED = 'plugin_uninstalled',
 
     // Templates
     TEMPLATE_ADDED = 'template_added',
@@ -91,6 +95,46 @@ export enum ActivityActionType {
     KB_DOCUMENT_CREATED = 'kb_document_created',
     KB_DOCUMENT_UPDATED = 'kb_document_updated',
     KB_DOCUMENT_DELETED = 'kb_document_deleted',
+    // EW-643 Phase 3 — lock semantics + reconciliation. Spec §19.1 + §9.6.
+    // LOCKED/UNLOCKED fire on POST /lock and /unlock; RESTORED fires on
+    // restore-from-history; LOCK_VIOLATION fires from the daily Git ↔ DB
+    // reconcile job when a locked document was mutated by a direct Git
+    // push (workbench surfaces this as a banner with accept/revert).
+    KB_DOCUMENT_LOCKED = 'kb_document_locked',
+    KB_DOCUMENT_UNLOCKED = 'kb_document_unlocked',
+    KB_DOCUMENT_RESTORED = 'kb_document_restored',
+    KB_DOCUMENT_LOCK_VIOLATION = 'kb_document_lock_violation',
+    // Reconciliation sweep terminal outcomes. `details` carries `{ scanned,
+    // driftCount, violationCount, orphanCount }`. Orphan tombstoning +
+    // 7-day grace land alongside (KB_UPLOAD_TOMBSTONED on first detection,
+    // KB_UPLOAD_REVIVED when re-uploaded within the grace window).
+    KB_RECONCILE_COMPLETED = 'kb_reconcile_completed',
+    KB_UPLOAD_TOMBSTONED = 'kb_upload_tombstoned',
+    KB_UPLOAD_REVIVED = 'kb_upload_revived',
+    // Context-budget truncation in KbPromptFormatter. Emitted with
+    // `{ requestedTokens, budgetTokens, droppedClasses }` for budget tuning.
+    KB_CONTEXT_TRUNCATED = 'kb_context_truncated',
+    // Transcription pipeline (EW-643 — Whisper / Anthropic). Mirrors the
+    // upload-extraction event shape; transcription is "extraction for media".
+    KB_UPLOAD_TRANSCRIBED = 'kb_upload_transcribed',
+    KB_UPLOAD_TRANSCRIPTION_FAILED = 'kb_upload_transcription_failed',
+    // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
+    // KB document is renamed and the rewriter sweeps the rest of the
+    // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
+    // carry `{ oldPath, newPath, documentsTouched }` so the activity
+    // feed can render a single-line summary without re-querying.
+    KB_WIKILINK_REWRITTEN = 'kb_wikilink_rewritten',
+    // EW-642 D7 — `kb-reembed-work` Trigger.dev task lifecycle. Emitted
+    // by `KnowledgeBaseReembedService` when an operator changes the
+    // embedding model (or dims) and the platform must re-embed every
+    // `(workId, documentId)` coordinate still pinned on the old model.
+    // `details` carries `{ count, fromModel, toModel }` at start and
+    // `{ durationMs, chunksReembedded, documentsReembedded }` at the
+    // happy-path end; the failed variant adds `{ error }` with the
+    // wrapped error message so the workbench banner can surface it.
+    KB_REEMBED_STARTED = 'kb_reembed_started',
+    KB_REEMBED_COMPLETED = 'kb_reembed_completed',
+    KB_REEMBED_FAILED = 'kb_reembed_failed',
 
     // Agents / Skills / Tasks (PR #1017 specs — architecture §10).
     // Lifecycle + heartbeat + file edits + budget + skills + tasks.

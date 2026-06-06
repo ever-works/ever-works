@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NovuChannelPlugin } from './novu-channel-plugin.js';
 
 describe('NovuChannelPlugin', () => {
@@ -7,6 +7,13 @@ describe('NovuChannelPlugin', () => {
 
 	beforeEach(() => {
 		plugin = new NovuChannelPlugin();
+	});
+
+	afterEach(() => {
+		// vitest 4: spies installed via vi.spyOn(global, 'fetch') persist
+		// across tests (their call history + queued implementations leak),
+		// so restore them between tests to keep each case isolated.
+		vi.restoreAllMocks();
 	});
 
 	it('declares notification-channel + notification-channel-novu (workflow shape)', () => {

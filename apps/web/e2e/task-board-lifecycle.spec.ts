@@ -179,8 +179,17 @@ test.describe('Task status lifecycle — state machine (API)', () => {
             data: { to: 'frozen' },
         });
         expect(res.status()).toBe(400);
-        // PROBED wording: "Invalid target status: frozen".
-        expect((await res.json()).message).toMatch(/invalid target status/i);
+        // The TransitionTaskDto pins `to` with `@IsEnum(TaskStatus)`, so the
+        // global ValidationPipe rejects an out-of-enum value BEFORE the
+        // controller's manual guard runs. class-validator returns `message`
+        // as a string ARRAY ("to must be one of the following values: …"),
+        // so normalize to a single string before matching the enum complaint.
+        const body = await res.json();
+        const message = Array.isArray(body.message) ? body.message.join(' ') : String(body.message);
+        expect(message).toMatch(/to must be one of the following values/i);
+        // The rejected value's allowed enum is enumerated in the message.
+        expect(message).toContain('backlog');
+        expect(message).toContain('done');
     });
 });
 

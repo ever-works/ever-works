@@ -30,9 +30,14 @@ type Params = {
  * Joins the Next.js catch-all `path` segments into the slash-separated
  * doc path the API uses. Each segment is already URL-decoded by Next,
  * so we just rejoin and let the API resolve the canonical row.
+ *
+ * Security: reject empty, `.`, and `..` segments to prevent path-traversal
+ * payloads reaching the KB API (defense-in-depth — backend should also
+ * validate, but the web layer provides an explicit first-line guard).
  */
 function joinPath(segments: string[]): string {
-    return segments.filter((s) => s.length > 0).join('/');
+    // Security: filter out traversal segments before joining
+    return segments.filter((s) => s.length > 0 && s !== '.' && s !== '..').join('/');
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {

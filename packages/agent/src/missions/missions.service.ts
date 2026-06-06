@@ -6,7 +6,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     Mission,
     MissionStatus,
@@ -18,11 +18,39 @@ import { MissionAttachmentRepository } from '../database/repositories/attachment
 import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
+// Security: lexical SSRF predicate (blocks non-HTTP(S) schemes, literal
+// private/loopback/link-local IPs, and cloud-metadata hostnames). Reused to
+// validate full-URL forms of `missionTemplateRepo` so a malicious value can
+// never be persisted for the Phase 8 scaffolder to clone/fetch.
+import { isSafeWebhookUrl } from '../utils';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
 // (Codex + Greptile P1 on PR #1044).
 const SHA256_RE = /^[0-9a-f]{64}$/i;
+
+// Security: `missionTemplateRepo` is documented as a GitHub-style `owner/repo`
+// slug (e.g. `ever-works/p2p-marketplace-mission-template`) and is consumed by
+// the Phase 8 scaffolder to clone/fetch a template repo. Accept ONLY the
+// documented slug shape: 2+ path segments of [A-Za-z0-9._-] joined by single
+// `/`, no leading/trailing slash. This intentionally rejects every SSRF /
+// scheme-injection vector (`file://`, `git://`, `http://`, `ssh://`,
+// credentials with `@`, whitespace, backslashes) because they all contain
+// characters or `://` outside this set. Full HTTPS git URLs are handled
+// separately via `isSafeWebhookUrl` so legitimate `https://github.com/...`
+// inputs still pass while private-IP / non-TLS hosts are blocked.
+const TEMPLATE_REPO_SLUG_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
+
+// `missionTemplateRepo` ALSO doubles as the template SELECTOR for the seeded
+// catalog: the product's mission-create flow stores the chosen catalog id
+// (e.g. `starter-business` — see `NewPageClient` + `MISSION_TEMPLATES`)
+// directly in this column, and a scaffolder resolves it via
+// `findMissionTemplateConfig()` rather than cloning the raw string. A bare
+// single-segment slug (`[A-Za-z0-9._-]+`, no `/`) therefore must be accepted
+// too. It is SSRF-safe by construction: with no `:`, `/`, `@`, whitespace or
+// backslash it cannot encode a scheme, host, port or credential — the exact
+// vectors the URL branch below guards against.
+const TEMPLATE_REPO_BARE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
 
 /**
  * Input shape for `MissionsService.create`. Mirrors the writable
@@ -62,6 +90,13 @@ export interface UpdateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: MissionGuardrailsOverride | null;
     missionTemplateRepo?: string | null;
+}
+
+export interface ListMissionsFilter {
+    status?: MissionStatus;
+    search?: string;
+    limit?: number;
+    offset?: number;
 }
 
 /**
@@ -142,10 +177,23 @@ export class MissionsService {
      * PR H adds filter + pagination; PR R (Phase 6 frontend) drives
      * the design for which controls land where.
      */
-    async listForUser(userId: string): Promise<MissionDto[]> {
+    async listForUser(userId: string, filter: ListMissionsFilter = {}): Promise<MissionDto[]> {
+        const baseWhere: FindOptionsWhere<Mission> = {
+            userId,
+            ...(filter.status ? { status: filter.status } : {}),
+        };
+        const search = filter.search?.trim();
+        const where: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[] = search
+            ? [
+                  { ...baseWhere, title: ILike(`%${search}%`) },
+                  { ...baseWhere, description: ILike(`%${search}%`) },
+              ]
+            : baseWhere;
         const rows = await this.missions.find({
-            where: { userId },
+            where,
             order: { updatedAt: 'DESC' },
+            take: filter.limit,
+            skip: filter.offset,
         });
         return rows.map(toMissionDto);
     }
@@ -201,7 +249,8 @@ export class MissionsService {
                 autoBuildWorks: input.autoBuildWorks ?? false,
                 outstandingIdeasCap: input.outstandingIdeasCap ?? null,
                 guardrailsOverride: input.guardrailsOverride ?? null,
-                missionTemplateRepo: input.missionTemplateRepo ?? null,
+                // Security: validate/normalize before persisting (SSRF defense-in-depth).
+                missionTemplateRepo: this.normalizeTemplateRepo(input.missionTemplateRepo),
                 missionRepo: null, // Phase 8 PR X scaffolder sets this.
                 sourceMissionId: null, // Mission Clone (PR HH) sets this.
             }),
@@ -248,7 +297,8 @@ export class MissionsService {
         if (input.guardrailsOverride !== undefined)
             existing.guardrailsOverride = input.guardrailsOverride;
         if (input.missionTemplateRepo !== undefined)
-            existing.missionTemplateRepo = input.missionTemplateRepo;
+            // Security: validate/normalize before persisting (SSRF defense-in-depth).
+            existing.missionTemplateRepo = this.normalizeTemplateRepo(input.missionTemplateRepo);
 
         const saved = await this.missions.save(existing);
         return toMissionDto(saved);
@@ -482,6 +532,54 @@ export class MissionsService {
                 'Mission.type=one-shot must NOT have a `schedule` set; pass null or omit.',
             );
         }
+    }
+
+    /**
+     * Security (SSRF defense-in-depth): validate `missionTemplateRepo` on
+     * write so a hostile value never reaches the Phase 8 scaffolder that
+     * clones/fetches it. `null`/empty clears the field (unchanged behavior).
+     * A non-empty value MUST be either the documented `owner/repo` slug or a
+     * well-formed HTTPS git URL that passes the lexical SSRF guard — anything
+     * with a `file://`/`git://`/`http://`/`ssh://` scheme, an embedded
+     * credential, a private/loopback/metadata host, whitespace, or a backslash
+     * is rejected. Legitimate inputs (`owner/repo`, `https://github.com/...`)
+     * are unaffected.
+     */
+    private normalizeTemplateRepo(value: string | null | undefined): string | null {
+        if (value === undefined || value === null) return null;
+        const trimmed = value.trim();
+        if (trimmed.length === 0) return null;
+        if (trimmed.length > 200) {
+            throw new BadRequestException('Mission.missionTemplateRepo is too long (max 200).');
+        }
+        // Accept the documented GitHub-style `owner/repo` shorthand outright.
+        if (TEMPLATE_REPO_SLUG_RE.test(trimmed)) return trimmed;
+        // Accept a bare catalog-id selector (`starter-business`, etc.). Safe:
+        // a single `[A-Za-z0-9._-]+` segment cannot carry an SSRF payload.
+        if (TEMPLATE_REPO_BARE_SLUG_RE.test(trimmed)) return trimmed;
+        // Otherwise the only other acceptable shape is a full HTTPS git URL on
+        // a public host. Reuse the shared lexical SSRF guard, but additionally
+        // require TLS (`isSafeWebhookUrl` allows http:) and reject embedded
+        // credentials so `https://user:pass@host` / `https://169.254.169.254`
+        // style payloads can't slip through.
+        let parsed: URL | null = null;
+        try {
+            parsed = new URL(trimmed);
+        } catch {
+            parsed = null;
+        }
+        if (
+            parsed &&
+            parsed.protocol === 'https:' &&
+            !parsed.username &&
+            !parsed.password &&
+            isSafeWebhookUrl(trimmed)
+        ) {
+            return trimmed;
+        }
+        throw new BadRequestException(
+            'Mission.missionTemplateRepo must be a GitHub-style "owner/repo" slug or an HTTPS git URL on a public host.',
+        );
     }
 
     private normalizeSchedule(type: MissionType, schedule: string | null): string | null {

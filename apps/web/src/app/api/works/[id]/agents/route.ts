@@ -52,12 +52,14 @@ export async function GET(request: NextRequest, _ctx: RouteContext) {
     const limit = limitRaw && /^\d+$/.test(limitRaw) ? Math.min(Number(limitRaw), 50) : 10;
 
     const token = await getAuthAccessCookie();
+    // Security: require authentication before forwarding to upstream plugin catalogue.
+    if (!token) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const headers = new Headers();
     headers.set('Accept', 'application/json');
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
+    headers.set('Authorization', `Bearer ${token}`);
 
     const upstream = await fetch(`${API_URL}/plugins?category=pipeline`, {
         method: 'GET',

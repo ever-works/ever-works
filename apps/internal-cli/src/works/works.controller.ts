@@ -32,8 +32,11 @@ import {
 } from '@ever-works/agent/services';
 import { UpdateWebsiteRepositoryResponseDto } from '@ever-works/agent/generators';
 
+// Security: removed DEPLOY_TOKEN from the deploy DTO so credentials are never
+// declared as / accepted via the request body. The deploy endpoint is deprecated
+// (throws NotFoundException); secrets must travel via Authorization headers, not
+// the body, to avoid leaking into request/error logs if the handler is reinstated.
 interface DeployDto {
-    DEPLOY_TOKEN?: string;
     teamScope?: string;
 }
 

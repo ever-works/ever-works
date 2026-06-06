@@ -40,6 +40,29 @@ interface DeployFormProps {
     websiteTemplates?: WebsiteTemplateOption[];
 }
 
+/**
+ * Security: `work.website` is a server-serialized value originating from the
+ * deployment plugin response. A malicious/buggy plugin (or API) could store a
+ * `javascript:`/`data:` URL there; rendered straight into `<a href>` it becomes
+ * a clickable XSS payload (`rel="noopener noreferrer"` + `target="_blank"` do
+ * NOT block this). Returns `undefined` for anything that isn't http/https
+ * (including non-string values, which throw in `new URL` and hit the catch);
+ * the JSX omits the link in that case. Mirrors `safeExternalUrl` in
+ * DeployProgressPanel.tsx / ComparisonDetailClient.tsx / ItemCard.tsx.
+ */
+function safeExternalUrl(raw: string | undefined | null): string | undefined {
+    if (!raw) return undefined;
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+            return undefined;
+        }
+        return parsed.toString();
+    } catch {
+        return undefined;
+    }
+}
+
 export function DeployForm({
     work,
     isDeploying,
@@ -162,6 +185,10 @@ export function DeployForm({
         runDeploy(teamScope);
     };
 
+    // Security: only expose the deployed-website link for http(s) URLs; rejects
+    // javascript:/data: payloads (and non-string values) from the stored value.
+    const safeWebsite = safeExternalUrl(work.website);
+
     return (
         <div className="space-y-6">
             <DeployConfigDialog
@@ -209,14 +236,16 @@ export function DeployForm({
                                     </p>
                                 )}
 
-                                <a
-                                    href={work.website}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-primary dark:text-primary-dark hover:underline break-all"
-                                >
-                                    {work.website}
-                                </a>
+                                {safeWebsite && (
+                                    <a
+                                        href={safeWebsite}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary dark:text-primary-dark hover:underline break-all"
+                                    >
+                                        {safeWebsite}
+                                    </a>
+                                )}
                             </div>
                         )}
 

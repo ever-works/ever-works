@@ -55,7 +55,12 @@ export function HistoryExpandedDetail({
                                 className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400"
                             >
                                 <span className="mt-0.5 shrink-0">&#x2022;</span>
-                                <span>{warning}</span>
+                                {/* Security: cap agent-produced warning length as defense-in-depth; React text interpolation already escapes HTML */}
+                                <span>
+                                    {typeof warning === 'string' && warning.length > 500
+                                        ? `${warning.slice(0, 500)}…`
+                                        : warning}
+                                </span>
                             </li>
                         ))}
                     </ul>

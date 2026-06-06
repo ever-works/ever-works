@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
@@ -27,9 +28,10 @@ import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
 interface IdeaCardProps {
     proposal: WorkProposal;
     onDismissed?: (id: string) => void;
+    onQueueBuild?: (id: string) => void;
 }
 
-export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
+export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps) {
     const t = useTranslations('dashboard.proposals');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -52,6 +54,10 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
             router.push(ROUTES.DASHBOARD_WORK(proposal.acceptedWorkId));
             return;
         }
+        if (onQueueBuild && (proposal.status === 'pending' || proposal.status === 'failed')) {
+            onQueueBuild(proposal.id);
+            return;
+        }
         router.push(`/works/new?proposal=${proposal.id}`);
     };
 
@@ -61,7 +67,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 await dismissProposalAction(proposal.id);
                 onDismissed?.(proposal.id);
             } catch {
-                // Caller refresh on next list; silent failure is fine here.
+                toast.error('Could not dismiss Idea.');
             }
         });
     };
@@ -86,7 +92,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 aria-label={t('actions.dismissAria')}
                 className="absolute top-3 right-3 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
             >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
             </button>
 
             <div className="flex items-center gap-3 mb-2 pr-6 min-w-0">
@@ -125,7 +131,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
 
             {proposal.reasoning && (
                 <p className="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4">
-                    "{proposal.reasoning}"
+                    &quot;{proposal.reasoning}&quot;
                 </p>
             )}
 
@@ -146,7 +152,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                     className="mb-4 rounded-md border border-danger/30 bg-danger/5 dark:bg-danger/10 p-2 text-xs text-danger"
                 >
                     <div className="flex items-start gap-1.5">
-                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" />
                         <div className="min-w-0 flex-1">
                             {proposal.failureKind && (
                                 <div className="font-medium">
@@ -180,13 +186,13 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                 >
                     {isDone ? (
                         <>
-                            <CheckCircle2 className="w-4 h-4" />
+                            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                             {t('actions.viewWork')}
                         </>
                     ) : (
                         <>
                             {t('actions.accept')}
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-4 h-4" aria-hidden="true" />
                         </>
                     )}
                 </button>
@@ -199,7 +205,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                     className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md border border-border dark:border-border-dark px-2.5 py-2 text-xs font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
                     title="Create a new Idea-scoped Agent"
                 >
-                    <Bot className="w-3.5 h-3.5" />
+                    <Bot className="w-3.5 h-3.5" aria-hidden="true" />
                 </Link>
             </div>
         </div>

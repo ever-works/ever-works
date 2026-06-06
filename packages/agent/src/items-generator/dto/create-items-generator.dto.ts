@@ -69,9 +69,17 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
 
     @ApiPropertyOptional({
         description: 'Optional AI model override used for generation',
+        maxLength: 200,
     })
     @IsOptional()
     @IsString()
+    // Security: bound length and strip control chars/newlines so an
+    // attacker can't supply an unbounded or multi-line model identifier.
+    // Legitimate identifiers (e.g. "openai/gpt-4.1") are single-line tokens
+    // and pass through unchanged. Allowlisting against enabled AI providers
+    // remains a service-layer concern.
+    @MaxLength(200)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 200) : value))
     model?: string;
 
     @ApiPropertyOptional({
@@ -121,9 +129,15 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
 export class UpdateItemsGeneratorDto implements IUpdateItemsGeneratorDto {
     @ApiPropertyOptional({
         description: 'Optional AI model override used for generation',
+        maxLength: 200,
     })
     @IsOptional()
     @IsString()
+    // Security: bound length and strip control chars/newlines (see
+    // CreateItemsGeneratorDto.model). Legitimate single-line identifiers
+    // pass through unchanged; provider allowlisting stays service-layer.
+    @MaxLength(200)
+    @Transform(({ value }) => (typeof value === 'string' ? sanitizeName(value, 200) : value))
     model?: string;
 
     @ApiPropertyOptional({

@@ -27,8 +27,11 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
 
     if (!upstream.ok) {
         const detail = await upstream.text().catch(() => '');
+        // Security: suppress raw upstream error body for 5xx responses to avoid leaking stack traces,
+        // internal service names, or DB error messages; only forward sanitized detail for 4xx.
+        const safeDetail = upstream.status >= 500 ? undefined : detail;
         return NextResponse.json(
-            { error: 'Item export failed', detail },
+            { error: 'Item export failed', detail: safeDetail },
             { status: upstream.status || 500 },
         );
     }

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
-import { getAuthFromCookie } from './lib/auth';
+import { getAuthFromRequest } from './lib/auth';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
@@ -52,11 +52,24 @@ const STATIC_SECURITY_HEADERS: Record<string, string> = {
     'Strict-Transport-Security': 'max-age=15552000; includeSubDomains',
 };
 
+// Security: a CSP source-expression is a scheme/host/port (optionally with a
+// leading `*.` subdomain wildcard and a path), e.g. `https://api.tenant.io`.
+// `NEXT_PUBLIC_EXTRA_CONNECT_SRC` is operator-supplied but is NOT a secret and
+// gets interpolated raw into the `connect-src` directive, so a malformed/abusive
+// entry containing CSP delimiters (whitespace, `;`, quotes) could smuggle extra
+// directives or `'unsafe-inline'`/`*` into the policy. Accept only well-formed
+// host sources and drop anything else; legitimate hostnames pass unchanged.
+const SAFE_CSP_HOST_SOURCE =
+    /^(?:https?|wss?):\/\/(?:\*\.)?[a-zA-Z0-9.-]+(?::\d{1,5})?(?:\/[^\s'";,*]*)?$/;
+
 function buildCsp(): string {
     const extraConnect = (process.env.NEXT_PUBLIC_EXTRA_CONNECT_SRC || '')
         .split(',')
         .map((s) => s.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        // Security: reject directive-injection payloads (whitespace/quotes/`;`/
+        // bare `*`) — keep only valid scheme+host[:port] connect-src sources.
+        .filter((s) => SAFE_CSP_HOST_SOURCE.test(s));
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.ever.works';
     let apiHost: string;
     try {
@@ -175,8 +188,12 @@ export default async function proxy(req: NextRequest) {
     }
 
     // 5) Auth gate — unauthenticated users go to /login (no locale prefix).
-    const auth = await getAuthFromCookie().catch(() => null);
-    if (!auth) {
+    // Keep this check local to the cookie. Calling `/auth/profile` here makes
+    // every page navigation consume API rate-limit budget, and a transient
+    // 429/5xx would otherwise look like "not authenticated" and clear a valid
+    // session cookie.
+    const auth = await getAuthFromRequest();
+    if (!auth.isAuthenticated || auth.isExpired) {
         const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
         const response = NextResponse.redirect(loginUrl);
 

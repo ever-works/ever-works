@@ -8,6 +8,14 @@ export function isValidRedirectUrl(url: string | undefined): boolean {
     url = url.trim();
 
     if (url.startsWith('/')) {
+        // Security: reject protocol-relative ("//evil.com") and backslash-obfuscated
+        // ("/\evil.com") targets. Browsers resolve these against the current scheme
+        // (and some normalize "\" to "/") and navigate to an external host, enabling
+        // open redirect. A safe relative path has a single leading slash followed by a
+        // non-slash, non-backslash character (or is just "/").
+        if (url.startsWith('//') || url.startsWith('/\\')) {
+            return false;
+        }
         // Basic validation for relative URLs
         const relativeUrlRegex = /^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/;
         return relativeUrlRegex.test(url);

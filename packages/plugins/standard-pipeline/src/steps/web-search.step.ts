@@ -6,6 +6,7 @@ import {
 	normalizeReferenceUrl,
 	shouldSkipReferenceUrl
 } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 import type { MutableGenerationContext } from '../context/index.js';
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { sanitizeErrorForUser } from '../utils/error.utils.js';
@@ -174,6 +175,23 @@ export class WebSearchStep extends BasePipelineStep {
 					continue;
 				}
 
+				// Security (SSRF, H): `source_url` comes from the search provider's
+				// (e.g. Tavily) response, which is attacker-influenceable — a crafted
+				// indexed page or prompt-injected query can surface URLs pointing at
+				// `file://`, loopback, link-local (169.254.x.x / cloud IMDS), RFC-1918
+				// private hosts, or a cloud-metadata hostname. They are handed to
+				// `contentExtractorFacade.extractContent` below, which fetches the URL
+				// server-side, so reject unsafe schemes/hosts BEFORE extraction using
+				// the same lexical guard the sibling content-retrieval / source-validation
+				// steps apply. (Lexical only; DNS-rebinding hardening lives in the
+				// extractor facade where the actual fetch is issued.)
+				if (!isSafeWebhookUrl(source_url)) {
+					logger.warn(
+						`[${slug}] Skipping unsafe/blocked search result URL for query "${result.query}": ${source_url}`
+					);
+					continue;
+				}
+
 				// Skip already processed URLs
 				const normalizedUrl = normalizeReferenceUrl(source_url);
 				const referenceDecision = shouldSkipReferenceUrl(source_url, context.existing?.references, {
@@ -302,6 +320,19 @@ export class WebSearchStep extends BasePipelineStep {
 
 		// Filter out already processed URLs
 		const urlsToProcess = dedupedUrls.filter((url) => {
+			// Security (SSRF, H): these URLs originate from `context.extractedUrls`,
+			// which are derived from attacker-influenceable search results / prompt
+			// content and fetched server-side by `contentExtractorFacade.extractContent`
+			// below. Reject non-HTTP(S) schemes (e.g. `file://`) and loopback,
+			// link-local (169.254.x.x / cloud IMDS), RFC-1918 private, or known
+			// cloud-metadata hosts BEFORE extraction, matching the sibling
+			// content-retrieval step. (Lexical only; DNS-rebinding hardening lives in
+			// the extractor facade where the actual fetch is issued.)
+			if (!isSafeWebhookUrl(url)) {
+				logger.warn(`[${slug}] Skipping unsafe/blocked URL: ${url}`);
+				return false;
+			}
+
 			const normalizedUrl = normalizeReferenceUrl(url);
 			if (processedSourceUrls.has(url) || processedSourceUrls.has(normalizedUrl)) {
 				return false;

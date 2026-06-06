@@ -18,7 +18,8 @@ import { REPOSITORY_PROVIDERS } from './_repository-inventory';
             useFactory: (configService: ConfigService) => {
                 const config = configService.get('database');
                 const logger = new Logger('DatabaseModule');
-                logger.debug(`Using ${config.type} database: ${config.database}`);
+                // Security: omit config.database (absolute filesystem path) to avoid leaking DB location in logs
+                logger.debug(`Using ${config.type} database`);
                 return config;
             },
             inject: [ConfigService],

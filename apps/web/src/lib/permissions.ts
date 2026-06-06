@@ -1,5 +1,11 @@
 import { WorkMemberRole } from './api/enums';
 
+// Security: These helpers are CLIENT-SIDE UI hints only. They control which
+// buttons/pages are rendered in the browser but must NOT be treated as the
+// sole access-control mechanism. Every destructive or privileged action
+// (delete, deploy, manage members, etc.) MUST be independently enforced by
+// server-side guards (e.g. WorkMemberGuard / role checks) in the NestJS API.
+
 /**
  * Role hierarchy values for comparison.
  * Higher number = more permissions.

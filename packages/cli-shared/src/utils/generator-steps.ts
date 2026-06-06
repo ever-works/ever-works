@@ -82,20 +82,42 @@ export interface GenerateStatusFields {
 	itemsProcessed?: number;
 }
 
+// Security: Strip ANSI/VT escape sequences from server-controlled strings before
+// displaying them in a terminal. A malicious API response (e.g., from a poisoned
+// pipeline step fed by hostile external content) could otherwise inject OSC/CSI
+// sequences that overwrite the terminal title, paste buffer, or — on some
+// emulators — silently execute commands.
+//
+// Pattern covers:
+//   CSI sequences  – \x1b[ … <final byte 0x40–0x7E>
+//   OSC sequences  – \x1b] … \x07  (BEL-terminated)
+//   OSC sequences  – \x1b] … \x1b\ (ST-terminated)
+//   Single-char Fe – \x1b<char 0x40–0x5F> (e.g. \x1bM  reverse-index)
+//   C1 controls    – \x80–\x9F (8-bit equivalents)
+const ANSI_STRIP_RE =
+	// eslint-disable-next-line no-control-regex
+	/\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[A-Z]|[\x80-\x9f]/g;
+
+function stripAnsiSequences(value: string): string {
+	return value.replace(ANSI_STRIP_RE, '');
+}
+
 /**
  * Get human-readable step text from dynamic pipeline status.
  * Uses `stepName` when available, falls back to enum lookup.
  */
 export function getDynamicStepText(status: GenerateStatusFields): string {
 	if (status.stepName) {
-		return status.stepName;
+		// Security: sanitize server-controlled step name before terminal output
+		return stripAnsiSequences(status.stepName);
 	}
 	if (status.step) {
 		// Try enum lookup (for legacy standard-pipeline steps)
 		const enumText = getStepText(status.step as ItemsGeneratorStep);
 		// If enum lookup fails ('Processing' fallback), use the raw step value
 		if (enumText !== 'Processing') return enumText;
-		return status.step;
+		// Security: sanitize raw step value before terminal output
+		return stripAnsiSequences(status.step);
 	}
 	return 'Processing';
 }

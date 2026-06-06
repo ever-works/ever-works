@@ -149,6 +149,22 @@ export class AgentmemoryPlugin implements IPlugin, IAgentMemoryPlugin {
 						errors: [{ path: 'baseUrl', message: '`baseUrl` must be http:// or https://' }]
 					};
 				}
+				// Security (SSRF): reject a tenant-supplied baseUrl that targets the
+				// cloud Instance Metadata Service / a link-local address at config
+				// time. The localhost default and private-LAN hosts are intentionally
+				// still permitted (this plugin talks to a self-hosted server); only
+				// the never-legitimate IMDS/metadata surface is blocked here.
+				if (isCloudMetadataHost(baseUrl)) {
+					return {
+						valid: false,
+						errors: [
+							{
+								path: 'baseUrl',
+								message: '`baseUrl` must not target a cloud metadata / link-local address'
+							}
+						]
+					};
+				}
 			} catch {
 				return {
 					valid: false,
@@ -359,6 +375,17 @@ export class AgentmemoryPlugin implements IPlugin, IAgentMemoryPlugin {
 	}
 
 	private buildClient(settings: AgentmemorySettings): AgentmemoryClient {
+		// Security (SSRF): defense-in-depth choke point. Every plugin operation
+		// (openSession / saveMemory / searchMemory / buildContext / deleteEntry /
+		// closeSession / validateConnection) funnels through here, and most of
+		// them never call `validateSettings`. Reject a resolved baseUrl that
+		// targets the cloud metadata service before any request is issued so a
+		// hostile tenant can't read IMDS credentials back through the response.
+		if (settings.baseUrl && isCloudMetadataHost(settings.baseUrl)) {
+			throw new Error(
+				'agentmemory baseUrl is not allowed to target a cloud metadata / link-local address (SSRF guard blocked the destination host).'
+			);
+		}
 		return new AgentmemoryClient({
 			baseUrl: settings.baseUrl,
 			apiKey: settings.apiKey,
@@ -410,6 +437,45 @@ function envOf(name: string): string | undefined {
 	const value = process.env[name];
 	return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
+
+// Security (SSRF — cloud-metadata exfiltration): `baseUrl` is a user/work-scoped
+// tenant setting that is used verbatim to construct every outbound request and
+// whose response/error body is reflected back through `validateConnection`.
+// A hostile tenant can therefore point it at the cloud Instance Metadata
+// Service (IMDS) and read back IAM credentials. We deliberately do NOT reuse
+// the broad `isSafeWebhookUrl` guard here because this plugin's whole purpose
+// is to talk to a self-hosted memory server — the documented default is
+// `http://localhost:3111` and operators legitimately run it on loopback or a
+// private LAN address, both of which `isSafeWebhookUrl` would reject. Blocking
+// the link-local IMDS range + metadata hostnames is the maximal set that has
+// ZERO impact on any legitimate agentmemory deployment (no one runs the server
+// on 169.254.x.x or metadata.google.internal). A stricter tenant-baseUrl
+// policy that also blocks RFC1918 is a multi-tenant deployment decision — see
+// the audit DEFER note. Returns true when the host must never be reached.
+function isCloudMetadataHost(rawUrl: string): boolean {
+	let url: URL;
+	try {
+		url = new URL(rawUrl);
+	} catch {
+		// Malformed URLs are rejected elsewhere (validateSettings); treat as
+		// not-a-metadata-host so we don't change behaviour for that path.
+		return false;
+	}
+	let host = url.hostname.toLowerCase();
+	// Node keeps the brackets around literal IPv6 hosts.
+	if (host.startsWith('[') && host.endsWith(']')) {
+		host = host.slice(1, -1);
+	}
+	if (CLOUD_METADATA_HOSTNAMES.has(host)) return true;
+	// IPv4 link-local 169.254.0.0/16 (covers AWS/GCP/Azure/OpenStack IMDS
+	// 169.254.169.254 and any other link-local target).
+	if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+	// IPv6 IMDS (AWS) and IPv4-mapped form of the link-local IMDS address.
+	if (host === 'fd00:ec2::254' || host === '::ffff:169.254.169.254') return true;
+	return false;
+}
+
+const CLOUD_METADATA_HOSTNAMES = new Set(['metadata.google.internal', 'metadata.goog']);
 
 function safeStringify(value: unknown): string {
 	try {

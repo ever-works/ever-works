@@ -1,5 +1,9 @@
 import type { FormFieldDefinition, FormFieldGroup, ValidationResult } from '@ever-works/plugin';
 import { DEFAULT_TARGET_ITEMS } from './types.js';
+// Direct import (NOT via `@ever-works/plugin/helpers`): the SSRF guard pulls in
+// `node:net` / `node:dns` and is intentionally excluded from the helpers barrel.
+// Mirrors the import in utils/make-client.ts.
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const REPO_ACCESS_CONDITION = { field: 'pass_repo_access', operator: 'eq' as const, value: true };
 const SCENARIO_MODE_CONDITION = { field: 'execution_mode', operator: 'eq' as const, value: 'scenario' };
@@ -174,6 +178,24 @@ export function validateFormInput(values: Record<string, unknown>): ValidationRe
 				errors: [{ path: 'webhook_url', message: 'Webhook URL is required in webhook mode' }]
 			};
 		}
+		// Security (SSRF): webhook_url is tenant-controlled and is later POSTed to
+		// server-side via fetch (utils/make-client.ts invokeWebhook). Reject
+		// literal private/loopback/link-local/cloud-metadata hosts and non-HTTP(S)
+		// schemes here so a malicious config fails fast with a clean validation
+		// error instead of reaching the runtime SSRF guard. The make-client guard
+		// remains the authoritative defense; this is defense-in-depth.
+		if (!isSafeWebhookUrl(values.webhook_url.trim())) {
+			return {
+				valid: false,
+				errors: [
+					{
+						path: 'webhook_url',
+						message:
+							'Webhook URL must be a public https URL. Private, loopback, link-local, and cloud-metadata hosts are not allowed.'
+					}
+				]
+			};
+		}
 	}
 
 	if (values.pass_repo_access) {
@@ -181,6 +203,26 @@ export function validateFormInput(values: Record<string, unknown>): ValidationRe
 			return {
 				valid: false,
 				errors: [{ path: 'repo_url', message: 'Repository URL is required when repository access is enabled' }]
+			};
+		}
+		// Security (SSRF): repo_url is tenant-controlled and is forwarded (with its
+		// access token) to the Make.com scenario as dataSource.repoUrl, where the
+		// scenario is expected to clone/fetch it. Reject literal private/loopback/
+		// link-local/cloud-metadata hosts and non-HTTP(S) schemes so an attacker
+		// can't point the automation at an internal endpoint (e.g.
+		// http://169.254.169.254/). Public git hosts (github.com, gitlab.com, and
+		// self-hosted git on public DNS) are unaffected; we intentionally do not
+		// impose a fixed host allowlist so legitimate self-hosted repos still work.
+		if (!isSafeWebhookUrl(values.repo_url.trim())) {
+			return {
+				valid: false,
+				errors: [
+					{
+						path: 'repo_url',
+						message:
+							'Repository URL must be a public https URL. Private, loopback, link-local, and cloud-metadata hosts are not allowed.'
+					}
+				]
 			};
 		}
 		if (

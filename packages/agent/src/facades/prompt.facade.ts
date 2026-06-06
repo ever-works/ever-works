@@ -3,6 +3,7 @@ import type { IPromptFacade, FacadeOptions, IPromptProviderPlugin } from '@ever-
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { sanitizePrompt } from '../utils/sanitize.util';
 
 /**
  * Normalize Langfuse-style `{{var}}` placeholders to `{var}` so they
@@ -59,7 +60,14 @@ export class PromptFacadeService implements IPromptFacade {
             this.logger.debug(
                 `Resolved prompt "${key}" from provider (version: ${result.version ?? 'unknown'})`,
             );
-            return normalizeTemplate(result.template);
+            // Security (prompt-injection): the template comes from an external,
+            // mutable prompt store (e.g. Langfuse) and is injected verbatim into
+            // LLM system/user prompts. Treat it as untrusted data — strip control
+            // characters (which could smuggle hidden directives or break logs/UI)
+            // and bound the length so an oversized injected blob cannot flood the
+            // model context. Newlines/whitespace are preserved so legitimate
+            // multi-line prompt formatting is unchanged.
+            return normalizeTemplate(sanitizePrompt(result.template));
         } catch (error) {
             this.logger.warn(
                 `Failed to resolve prompt "${key}" from provider: ${error instanceof Error ? error.message : String(error)}`,

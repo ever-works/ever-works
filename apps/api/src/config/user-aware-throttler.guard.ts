@@ -1,0 +1,102 @@
+import { ExecutionContext, Injectable } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
+
+type ThrottledRequest = Record<string, unknown> & {
+    user?: {
+        userId?: unknown;
+        id?: unknown;
+        sub?: unknown;
+    };
+    url?: unknown;
+    originalUrl?: unknown;
+    ip?: unknown;
+    ips?: unknown;
+    headers?: Record<string, unknown>;
+    socket?: {
+        remoteAddress?: unknown;
+    };
+};
+
+@Injectable()
+export class UserAwareThrottlerGuard extends ThrottlerGuard {
+    /**
+     * Test/CI escape hatch for the AUTH endpoints only. The e2e suite drives
+     * every spec from a single CI IP and must register / log in / mint many
+     * accounts, so the per-IP auth throttles (register 5/min, login 10/min,
+     * anonymous 5/h, …) would 429 its bulk setup. When `E2E_DISABLE_AUTH_THROTTLE`
+     * is set AND we are not in production, skip throttling for `/api/auth/*`
+     * routes. NON-auth throttling (ingest / notification / global tiers) stays
+     * fully active so those rate-limit specs keep their coverage, and this is
+     * HARD-gated off in production so it can never weaken a real deployment.
+     */
+    async canActivate(context: ExecutionContext): Promise<boolean> {
+        if (
+            process.env.E2E_DISABLE_AUTH_THROTTLE === 'true' &&
+            process.env.NODE_ENV !== 'production'
+        ) {
+            const req = context.switchToHttp().getRequest<ThrottledRequest>();
+            const rawUrl =
+                (typeof req.originalUrl === 'string' && req.originalUrl) ||
+                (typeof req.url === 'string' && req.url) ||
+                '';
+            const path = rawUrl.split('?')[0];
+            // Incidental per-IP throttles that the single CI IP trips
+            // cumulatively across the suite (none asserted as a 429 by any
+            // rate-limit spec):
+            //   - `/api/auth/*`                     — register/login/etc.
+            //   - `/api/claim/*`                    — tokenised invitation claim (10/min)
+            //   - `/api/organizations/check-slug`   — public slug-availability (30/60s)
+            // Skipping these keeps the bulk-setup paths green. NON-auth
+            // throttling (ingest / notification / global) stays active so the
+            // dedicated rate-limit specs keep coverage, and this whole branch is
+            // hard-gated off in production.
+            if (
+                path.startsWith('/api/auth/') ||
+                path.startsWith('/api/claim/') ||
+                path === '/api/organizations/check-slug'
+            ) {
+                return true;
+            }
+        }
+        return super.canActivate(context);
+    }
+
+    protected getTracker(req: ThrottledRequest): Promise<string> {
+        const userId = firstString(req.user?.userId, req.user?.id, req.user?.sub);
+        if (userId) {
+            return Promise.resolve(`user:${userId}`);
+        }
+
+        // E2E per-worker bucketing (non-prod only). The suite runs every shard's
+        // Playwright workers from ONE machine IP, so platform-bearer endpoints
+        // that throttle per-IP (e.g. activity-log ingest) get saturated by
+        // CROSS-worker load — one worker's legitimate seed bounces 429 because
+        // siblings filled the shared bucket. When Playwright stamps a stable
+        // per-worker `x-e2e-throttle-key`, bucket by that instead so each worker
+        // is isolated, WHILE a single worker's intentional burst still trips its
+        // own bucket (the ingest rate-limit specs keep their 429 coverage).
+        // Hard-gated off in production, where no client sends this header.
+        if (process.env.NODE_ENV !== 'production') {
+            const e2eKey = firstString(req.headers?.['x-e2e-throttle-key']);
+            if (e2eKey) {
+                return Promise.resolve(`e2e:${e2eKey}`);
+            }
+        }
+
+        const proxiedIp =
+            Array.isArray(req.ips) && typeof req.ips[0] === 'string' ? req.ips[0] : null;
+        const ip = firstString(req.ip, proxiedIp, req.socket?.remoteAddress);
+
+        return Promise.resolve(`ip:${ip || 'unknown'}`);
+    }
+}
+
+function firstString(...values: unknown[]): string | null {
+    for (const value of values) {
+        if (typeof value !== 'string') continue;
+        const trimmed = value.trim();
+        if (trimmed.length > 0) return trimmed;
+    }
+
+    return null;
+}

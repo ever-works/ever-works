@@ -41,6 +41,16 @@ export default defineConfig({
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         locale: 'en',
+        // Per-worker throttle bucket: the whole shard runs from one machine IP,
+        // so platform-bearer per-IP throttles (activity-log ingest, etc.) get
+        // saturated by CROSS-worker load. A stable per-worker key lets the API's
+        // UserAwareThrottlerGuard isolate each worker (non-prod only), while a
+        // single worker's intentional burst still trips its own bucket. Stamped
+        // on every request the suite makes (config is loaded per worker process,
+        // so TEST_WORKER_INDEX resolves to this worker's index).
+        extraHTTPHeaders: {
+            'x-e2e-throttle-key': `w${process.env.TEST_WORKER_INDEX ?? '0'}`,
+        },
     },
 
     projects: [

@@ -11,7 +11,14 @@ import { TaskAttachment } from '../entities/task-attachment.entity';
 import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
+import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
+import { Work } from '../entities/work.entity';
+import { Mission } from '../entities/mission.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import {
     TaskAssigneeRepository,
     TaskReviewerRepository,
@@ -54,6 +61,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
             TaskWatcher,
             TaskKbMention,
             UserTaskCounter,
+            WorkKnowledgeUpload,
+            Work,
+            Mission,
+            WorkProposal,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume
@@ -77,6 +88,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskWatcherRepository,
         TaskKbMentionRepository,
         UserTaskCounterRepository,
+        WorkKnowledgeUploadRepository,
+        WorkRepository,
+        WorkProposalRepository,
         TaskTransitionService,
         TasksService,
         TaskChatService,
@@ -95,6 +109,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskWatcherRepository,
         TaskKbMentionRepository,
         UserTaskCounterRepository,
+        WorkKnowledgeUploadRepository,
+        WorkRepository,
+        WorkProposalRepository,
         TaskTransitionService,
         TasksService,
         TaskChatService,

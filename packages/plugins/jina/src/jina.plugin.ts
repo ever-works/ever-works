@@ -15,6 +15,7 @@ import type {
 	ContentExtractionResult,
 	ConnectionValidationResult
 } from '@ever-works/plugin';
+import { isSafeWebhookUrl } from '@ever-works/plugin/helpers/ssrf-guard';
 
 const JINA_READER_URL = 'https://r.jina.ai/';
 const JINA_SEARCH_URL = 'https://s.jina.ai/';
@@ -206,6 +207,22 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 		const { url, settings } = options;
 		const apiKey = settings?.apiKey as string;
 
+		// Security (SSRF): the caller-supplied `url` is forwarded verbatim to the
+		// Jina Reader API (r.jina.ai), which fetches it server-side and returns the
+		// response body to us. Without a pre-check, a hostile tenant could target
+		// internal/loopback/link-local hosts or cloud-metadata IPs (e.g.
+		// http://169.254.169.254/...) and exfiltrate the response. Apply the same
+		// lexical SSRF guard the default local-content-extractor uses before making
+		// the request. Returns a failed result (the method's existing error shape).
+		if (!isSafeWebhookUrl(url)) {
+			return {
+				success: false,
+				url,
+				error: `URL host is not safe to fetch (SSRF guard blocked: ${url})`,
+				duration: Date.now() - startTime
+			};
+		}
+
 		try {
 			const headers: Record<string, string> = {
 				Accept: 'application/json',
@@ -306,12 +323,12 @@ export class JinaReaderPlugin implements IPlugin, ISearchPlugin, IContentExtract
 	}
 
 	async canExtract(url: string): Promise<boolean> {
-		try {
-			const parsed = new URL(url);
-			return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-		} catch {
-			return false;
-		}
+		// Security (SSRF): reject http(s) URLs that resolve to private, loopback,
+		// link-local, or cloud-metadata hosts so the facade never selects this
+		// provider for an internal target. `isSafeWebhookUrl` already enforces the
+		// http/https-only check the previous protocol guard did, while adding the
+		// private-IP/metadata denylist. Public URLs are unaffected.
+		return isSafeWebhookUrl(url);
 	}
 
 	getSupportedFormats(): readonly ('text' | 'html' | 'markdown')[] {

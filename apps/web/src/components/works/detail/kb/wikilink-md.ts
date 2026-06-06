@@ -59,6 +59,20 @@ function basename(path: string): string {
     return last.replace(/\.md$/i, '');
 }
 
+// Security: the wikilink label comes from untrusted KB bodies (imported
+// Git repos / LLM output) and is interpolated into CommonMark link text
+// (`[<label>](<href>)`). The WIKILINK_RE label group only excludes `]`,
+// `\n` and `|`, so a label may contain `[ ] ( ) \` — the structural
+// characters that let an attacker close the link early and inject an
+// arbitrary second link/image (e.g. a phishing `https://` anchor or an
+// `![](url)` outbound-request image) from the operator's authenticated
+// session. Backslash-escape those characters so the label always renders
+// as literal text. Legitimate labels never contain them meaningfully, so
+// this is behaviour-preserving for real KB content.
+function escapeMarkdownLabel(label: string): string {
+    return label.replace(/([\\[\]()])/g, '\\$1');
+}
+
 /**
  * Rewrites `[[Label|path]]` and `[[path]]` wikilinks in `source` to
  * standard Markdown links pointing at `/works/<workId>/kb/<path>`.
@@ -105,6 +119,10 @@ export function rewriteWikilinks(source: string, workId: string): string {
                 ? rawLabelOrPath.trim() || basename(path)
                 : basename(path);
         const href = `/works/${encodeURIComponent(workId)}/kb/${path}`;
-        return `[${label}](${href})`;
+        // Security: escape Markdown-structural chars in the label so a
+        // hostile label cannot break out of the link text (see
+        // escapeMarkdownLabel). The href is already constrained by
+        // isSafePath + encodeURIComponent on workId.
+        return `[${escapeMarkdownLabel(label)}](${href})`;
     });
 }

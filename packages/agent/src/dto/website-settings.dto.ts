@@ -7,6 +7,8 @@ import {
     ValidateNested,
     IsIn,
     IsInt,
+    IsUrl,
+    Matches,
     Min,
     Max,
     MaxLength,
@@ -21,8 +23,16 @@ export class CustomMenuItemDto {
     @MaxLength(50)
     label: string;
 
+    // Security: navigation hrefs are rendered as <a href> in the deployed
+    // public directory site. Restrict to a relative path (single leading "/",
+    // not protocol-relative "//") or an absolute http(s) URL so stored
+    // `javascript:`/`data:`/`vbscript:` and `//evil.com` open-redirect schemes
+    // are rejected. Legitimate menu links (relative paths, https URLs) pass.
     @IsString()
     @MaxLength(200)
+    @Matches(/^(?:\/(?!\/)\S*|https?:\/\/\S+)$/, {
+        message: 'path must be a relative path (starting with /) or an http(s):// URL',
+    })
     path: string;
 
     @IsOptional()
@@ -143,8 +153,13 @@ export class UpdateWebsiteSettingsDto {
     @MaxLength(100)
     company_name?: string;
 
+    // Security: company_website is persisted to the work config and rendered
+    // as an <a href> link in the Work Overview tab and the generated site.
+    // Require a well-formed http(s) URL so stored `javascript:`/`data:` and
+    // other dangerous schemes can never reach an href. Real company URLs pass.
     @IsOptional()
     @IsString()
+    @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
     @MaxLength(200)
     company_website?: string;
 
