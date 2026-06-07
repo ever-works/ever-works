@@ -34,7 +34,7 @@ export class APIController {
             timestamp: new Date().toISOString(),
         });
 
-        return { status: 'success', message: 'API is up and running' };
+        return this.status();
     }
 
     @Public()
@@ -43,9 +43,20 @@ export class APIController {
     @ApiOperation({ summary: 'Health check', description: 'Check API health status' })
     @ApiResponse({ status: 200, description: 'API is healthy' })
     healthCheck() {
-        // Health check endpoints are filtered from Sentry and PostHog
-        // to avoid noise in monitoring
-        return this.home();
+        // Health-check / probe endpoints are deliberately NOT tracked in PostHog —
+        // k8s liveness/readiness probes + uptime monitors hit this every few seconds,
+        // which would flood analytics with machine noise (and bill per event). Note we
+        // return the status payload DIRECTLY rather than delegating to home(): home()
+        // fires the `api_home_visit` event, so calling it here previously made every
+        // probe masquerade as a home visit. The PostHogInterceptor also skips this path.
+        return this.status();
+    }
+
+    // Shared, side-effect-free status payload. Kept separate from home() so the health
+    // probe can reuse the response shape without emitting the `api_home_visit` analytics
+    // event that home() fires for genuine `/` visits.
+    private status() {
+        return { status: 'success', message: 'API is up and running' };
     }
 
     /**

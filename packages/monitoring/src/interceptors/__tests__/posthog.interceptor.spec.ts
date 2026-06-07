@@ -99,6 +99,43 @@ describe('PostHogInterceptor', () => {
         expect(apiRequestCall![0].properties.ip).toBe('10.0.0.1');
     });
 
+    it.each(['/api/health', '/api/health/live', '/api/health/ready', '/api/health/'])(
+        'does NOT capture any event for health/probe path %s',
+        async (originalUrl) => {
+            initPostHog({ apiKey: 'k' });
+            const req = {
+                method: 'GET',
+                originalUrl,
+                headers: { 'user-agent': 'kube-probe' },
+                body: undefined,
+            };
+            const next: CallHandler = { handle: () => of({ ok: true }) };
+
+            // The request still flows through untouched...
+            await expect(
+                lastValueFrom(interceptor.intercept(buildExecCtx(req), next)),
+            ).resolves.toEqual({ ok: true });
+            // ...but nothing is sent to PostHog.
+            expect(captureMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it('still captures for non-probe paths that merely start with "health"', async () => {
+        initPostHog({ apiKey: 'k' });
+        const req = {
+            method: 'GET',
+            originalUrl: '/api/healthcheck-foo',
+            headers: {},
+            body: undefined,
+        };
+        const next: CallHandler = { handle: () => of({}) };
+        await lastValueFrom(interceptor.intercept(buildExecCtx(req), next));
+
+        // Exemption is narrow (exact `/api/health` or `/api/health/` prefix), so this
+        // unrelated route is still tracked.
+        expect(captureMock).toHaveBeenCalled();
+    });
+
     it('replaces numeric IDs with :id and lowercases the named-event slug', async () => {
         initPostHog({ apiKey: 'k' });
         const req = {
