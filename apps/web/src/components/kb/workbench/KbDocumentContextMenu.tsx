@@ -177,7 +177,7 @@ export function KbDocumentContextMenu({
                 router.refresh();
                 return { ok: true as const, data: result.data };
             }
-            setError(result.error ?? tMenu('locked.disabled.tooltip'));
+            setError(result.error ?? tMenu('lockedDisabledTooltip'));
             return { ok: false as const, error: result.error ?? null };
         },
         [workId, document.id, onPatched, router, tMenu],
@@ -344,14 +344,14 @@ export function KbDocumentContextMenu({
                         rename: tMenu('rename'),
                         duplicate: tMenu('duplicate'),
                         lock: tMenu('lock'),
-                        lockFull: tMenu('lock.full'),
-                        lockAdditionsOnly: tMenu('lock.additionsOnly'),
+                        lockFull: tMenu('lockFull'),
+                        lockAdditionsOnly: tMenu('lockAdditionsOnly'),
                         unlock: tMenu('unlock'),
                         archive: tMenu('archive'),
                         delete: tMenu('delete'),
                         copyPath: tMenu('copyPath'),
                         copyWikilink: tMenu('copyWikilink'),
-                        lockedTooltip: tMenu('locked.disabled.tooltip'),
+                        lockedTooltip: tMenu('lockedDisabledTooltip'),
                     }}
                     onClose={closeMenu}
                     onRename={() => {
@@ -387,11 +387,11 @@ export function KbDocumentContextMenu({
                     pending={pending}
                     error={error}
                     labels={{
-                        title: tMenu('delete.confirmTitle'),
-                        instruction: tMenu('delete.confirmInstruction'),
-                        inputLabel: tMenu('delete.confirmInput'),
-                        cancel: tMenu('delete.cancel'),
-                        confirm: tMenu('delete.confirm'),
+                        title: tMenu('deleteConfirmTitle'),
+                        instruction: tMenu('deleteConfirmInstruction'),
+                        inputLabel: tMenu('deleteConfirmInput'),
+                        cancel: tMenu('deleteCancel'),
+                        confirm: tMenu('deleteConfirm'),
                     }}
                     onCancel={() => setDeleteOpen(false)}
                     onConfirm={onDelete}
@@ -728,7 +728,7 @@ function InlineRenameDialog({
                         disabled={pending}
                         className="rounded-md px-3 py-1.5 text-sm hover:bg-surface-hover dark:hover:bg-surface-hover-dark"
                     >
-                        {t('delete.cancel')}
+                        {t('deleteCancel')}
                     </button>
                     <button
                         type="submit"
