@@ -386,33 +386,29 @@ spec:
           volumeMounts:
             - name: git-repos
               mountPath: /tmp/ever-works-repos
-            # EW-693 / T30 — Writable runtime plugin store. Default
-            # PLUGIN_INSTALL_DIR is `/app/plugins`, set in
-            # apps/api/src/config/constants.ts. emptyDir is per-pod
-            # ephemeral, which is exactly what FR-13 expects: each
-            # replica's installer lazily installs distributable plugins
-            # on first use, and boot warmup pre-installs the DB-recorded
-            # set. NO shared RWX volume is required.
+            # NOTE (incident 2026-06-07): do NOT mount any volume at
+            # `/app/plugins` while running in `PLUGIN_DISTRIBUTION_MODE=bundled`.
+            # The bundled image BAKES all ~66 plugins into `/app/plugins`
+            # (Dockerfile `.deploy/docker/api/Dockerfile` →
+            # `COPY --from=installer /app/deploy/plugins ./plugins`). An
+            # `emptyDir` here shadows them, so `PluginLoaderService`
+            # discovers 0 plugins, the registry stays empty, and every
+            # AI / search / deploy capability (incl. the chat assistant)
+            # fails with `<capability> provider not found`. That is exactly
+            # the outage this volume previously caused.
             #
-            # For deployments that want to avoid cold-start install
-            # cost, swap `emptyDir` for a `persistentVolumeClaim` with
-            # `ReadWriteOnce` (the API's StatefulSet semantics tolerate
-            # per-pod PVCs). A shared `ReadWriteMany` PVC is supported
-            # but NOT required.
-            - name: plugin-install-dir
-              mountPath: /app/plugins
+            # The EW-693 dynamic installer's writable store
+            # (`PLUGIN_INSTALL_DIR`, default `/app/plugins`) is only needed
+            # when `PLUGIN_DISTRIBUTION_MODE=dynamic`. When dynamic mode is
+            # adopted here, point `PLUGIN_INSTALL_DIR` at a SEPARATE path
+            # (e.g. `/app/plugins-runtime`) and mount the writable volume
+            # THERE so it never shadows the baked core plugins — do not
+            # re-add a mount at `/app/plugins`.
 
       volumes:
         - name: git-repos
           emptyDir:
             sizeLimit: 5Gi
-        # EW-693 / T30 — see volumeMounts above. 2Gi covers ~40
-        # distributable plugins at typical sizes (notion-extractor ≈
-        # 18 MB, screenshot plugins ≈ 5 MB, AI providers ≈ 1-5 MB);
-        # tighten or bump after observability confirms real usage.
-        - name: plugin-install-dir
-          emptyDir:
-            sizeLimit: 2Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
