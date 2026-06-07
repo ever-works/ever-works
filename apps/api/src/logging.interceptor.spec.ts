@@ -79,13 +79,14 @@ describe('LoggingInterceptor', () => {
 
         it('logs the incoming request line synchronously before subscribing', async () => {
             const next: CallHandler = { handle: () => of('payload') };
-            const ctx = buildContext({ method: 'GET', originalUrl: '/api/health' });
+            const ctx = buildContext({ method: 'GET', originalUrl: '/api/works' });
 
             const result$ = interceptor.intercept(ctx, next);
 
             // Incoming-Request line fires synchronously inside `intercept`
-            // before any subscription happens.
-            expect(logSpy).toHaveBeenCalledWith('Incoming Request: GET /api/health');
+            // before any subscription happens. (Uses a non-health path — health
+            // probes are deliberately NOT logged; see the suppression block below.)
+            expect(logSpy).toHaveBeenCalledWith('Incoming Request: GET /api/works');
 
             await lastValueFrom(result$);
         });
@@ -217,6 +218,57 @@ describe('LoggingInterceptor', () => {
             await expect(lastValueFrom(interceptor.intercept(ctx, next))).rejects.toBe(err);
 
             expect(errorSpy).toHaveBeenCalledWith('Error Response: GET /api/x 500 - 250ms');
+        });
+    });
+
+    describe('health/probe suppression (debug-on)', () => {
+        beforeEach(() => {
+            process.env.HTTP_DEBUG = 'true';
+        });
+
+        it.each([
+            '/api/health',
+            '/api/health/live',
+            '/api/health/ready',
+            '/api/health/',
+            '/api/health?x=1',
+        ])('logs NOTHING for a successful health/probe request to %s', async (originalUrl) => {
+            const next: CallHandler = { handle: () => of('ok') };
+            const ctx = buildContext({ method: 'GET', originalUrl });
+
+            await expect(lastValueFrom(interceptor.intercept(ctx, next))).resolves.toBe('ok');
+
+            expect(logSpy).not.toHaveBeenCalled();
+            expect(errorSpy).not.toHaveBeenCalled();
+        });
+
+        it('STILL logs an error raised inside a health endpoint (failing readiness probe)', async () => {
+            const err = { response: { statusCode: 503 }, message: 'db down' };
+            const next: CallHandler = { handle: () => throwError(() => err) };
+            const ctx = buildContext({ method: 'GET', originalUrl: '/api/health/ready' });
+
+            await expect(lastValueFrom(interceptor.intercept(ctx, next))).rejects.toBe(err);
+
+            // No incoming/outgoing noise...
+            expect(logSpy).not.toHaveBeenCalled();
+            // ...but the error IS logged — that's the signal we want to keep.
+            const errorCall = errorSpy.mock.calls.find((c) =>
+                String(c[0]).startsWith('Error Response'),
+            );
+            expect(errorCall).toBeDefined();
+            expect(errorCall![0]).toMatch(/^Error Response: GET \/api\/health\/ready 503 - \d+ms$/);
+        });
+
+        it('still logs normally for a non-probe path that merely starts with "health"', async () => {
+            const next: CallHandler = { handle: () => of('ok') };
+            const ctx = buildContext({ method: 'GET', originalUrl: '/api/healthcheck-foo' });
+
+            await lastValueFrom(interceptor.intercept(ctx, next));
+
+            expect(logSpy).toHaveBeenCalledWith('Incoming Request: GET /api/healthcheck-foo');
+            expect(
+                logSpy.mock.calls.some((c) => String(c[0]).startsWith('Outgoing Response')),
+            ).toBe(true);
         });
     });
 });
