@@ -160,7 +160,7 @@ export function KbGitHistoryModal({
                     ) : (
                         <PlaceholderBody
                             title={t('placeholder')}
-                            description={t('placeholder.description')}
+                            description={t('placeholderDescription')}
                         />
                     )}
                 </div>
