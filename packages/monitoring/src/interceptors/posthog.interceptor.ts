@@ -15,6 +15,17 @@ export class PostHogInterceptor implements NestInterceptor {
         // ?api_key=) that must not be persisted in third-party analytics.
         const endpointPath = this.getEndpointPath(originalUrl);
 
+        // Do NOT record analytics for health-check / probe endpoints. k8s liveness +
+        // readiness probes (plus uptime monitors / load balancers) hit these every few
+        // seconds on every replica, around the clock. Each probe would otherwise emit an
+        // `api_request` event plus a per-endpoint `api_get_api_health` event — pure
+        // machine noise that bills per event and tells us nothing about real product
+        // usage. Covers `/api/health`, `/api/health/live`, `/api/health/ready`
+        // (see APIController + HealthController).
+        if (this.isHealthProbePath(endpointPath)) {
+            return next.handle();
+        }
+
         const startTime = Date.now();
 
         return next.handle().pipe(
@@ -60,6 +71,16 @@ export class PostHogInterceptor implements NestInterceptor {
     private getEndpointPath(url: string): string {
         if (!url) return url;
         return url.split('?')[0].split('#')[0];
+    }
+
+    // Health-check / probe endpoints we never want in analytics. Matches the base
+    // `/api/health` liveness route plus the `/api/health/live` + `/api/health/ready`
+    // probes underneath it. Kept narrow (exact match or `/api/health/` prefix) so an
+    // unrelated future route like `/api/healthcheck-foo` would NOT be silently dropped.
+    private isHealthProbePath(path: string): boolean {
+        if (!path) return false;
+        const normalized = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+        return normalized === '/api/health' || normalized.startsWith('/api/health/');
     }
 
     private getEndpointName(url: string): string {

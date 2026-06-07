@@ -176,27 +176,28 @@ describe('APIController', () => {
     });
 
     describe('healthCheck', () => {
-        it('delegates to home() and returns the same envelope', () => {
-            const homeSpy = jest.spyOn(controller, 'home');
-
+        it('returns the same success envelope as home()', () => {
             const result = controller.healthCheck();
 
-            expect(homeSpy).toHaveBeenCalledTimes(1);
             expect(result).toEqual({ status: 'success', message: 'API is up and running' });
         });
 
-        it('emits an analytics track event (delegates through home())', () => {
+        it('does NOT emit any analytics event — probe traffic must not reach PostHog', () => {
+            // Health/probe endpoints (k8s liveness/readiness + uptime monitors) hit
+            // this every few seconds; tracking them floods PostHog with machine noise
+            // and bills per event. healthCheck() therefore returns the status payload
+            // directly instead of delegating to home() (which fires api_home_visit).
             controller.healthCheck();
 
-            // Health check still goes through the same code path, so analytics
-            // fires. Sentry/PostHog noise filtering happens at the
-            // monitoring-package level, not in this controller.
-            expect(analytics.track).toHaveBeenCalledTimes(1);
-            expect(analytics.track).toHaveBeenCalledWith(
-                'anonymous',
-                'api_home_visit',
-                expect.objectContaining({ endpoint: '/' }),
-            );
+            expect(analytics.track).not.toHaveBeenCalled();
+        });
+
+        it('does not delegate to home() (which would emit api_home_visit)', () => {
+            const homeSpy = jest.spyOn(controller, 'home');
+
+            controller.healthCheck();
+
+            expect(homeSpy).not.toHaveBeenCalled();
         });
     });
 });
