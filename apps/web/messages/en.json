@@ -3379,6 +3379,141 @@
                     "errorFallback": "Could not delete. Please try again.",
                     "errorBusy": "Deleting…",
                     "errorPartial": "Deleted {ok}, failed {failed}."
+                },
+                "workbench": {
+                    "title": "Knowledge Base workbench",
+                    "metaTitle": "Knowledge Base workbench",
+                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "tab": {
+                        "kb": "KB",
+                        "originals": "Originals"
+                    },
+                    "originals": {
+                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                    },
+                    "editor": {
+                        "preview": "Preview",
+                        "savedAt": "Saved {seconds}s ago",
+                        "saving": "Saving…",
+                        "placeholder": "Start writing…"
+                    },
+                    "wikilink": {
+                        "searching": "Searching documents…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Wikilink suggestions"
+                    },
+                    "mention": {
+                        "searching": "Searching…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Mention suggestions",
+                        "label": {
+                            "doc": "Doc",
+                            "agent": "Agent"
+                        }
+                    },
+                    "conflict": "This document was edited elsewhere. Reload to see the latest.",
+                    "reload": "Reload",
+                    "locked": "This document is locked.",
+                    "upload": {
+                        "dropPrompt": "Drop files here to upload",
+                        "modal": {
+                            "title": "Upload to Knowledge Base",
+                            "targetClass": "Target class",
+                            "tags": "Tags",
+                            "tagsPlaceholder": "Type a tag and press Enter",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Short summary of the file(s) you are uploading",
+                            "autoClassify": "Let the agent reclassify after extraction",
+                            "upload": "Upload",
+                            "cancel": "Cancel"
+                        },
+                        "progress": {
+                            "uploading": "Uploading",
+                            "done": "Done",
+                            "failed": "Failed"
+                        }
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "class": "Class",
+                        "tags": {
+                            "label": "Tags",
+                            "add": "Add tag",
+                            "placeholder": "Type a tag and press Enter",
+                            "remove": "Remove tag {tag}"
+                        },
+                        "description": "Description",
+                        "descriptionPlaceholder": "Short summary of this document",
+                        "status": "Status",
+                        "statusActive": "Active",
+                        "statusArchived": "Archived",
+                        "statusDraft": "Draft",
+                        "lock": {
+                            "toggle": "Locked",
+                            "mode": "Lock mode",
+                            "modeFull": "Full lock",
+                            "modeAdditionsOnly": "Additions only"
+                        },
+                        "language": "Language",
+                        "languagePlaceholder": "BCP-47 code (e.g. en, en-US)",
+                        "source": "Source",
+                        "history": "View Git history",
+                        "historyComingSoon": "Coming in slice E",
+                        "saveFailed": "Save failed",
+                        "lockedBanner": "This document is locked."
+                    },
+                    "viewer": {
+                        "sizeBlocked": {
+                            "title": "Preview unavailable — file too large",
+                            "description": "This file is {size} which exceeds the inline preview cap of {cap}. Download it to view locally.",
+                            "download": "Download original"
+                        },
+                        "unsupported": {
+                            "title": "Preview unavailable for this format",
+                            "description": "No inline viewer is available for {mime}. Download the file to open it in a native application.",
+                            "download": "Download original"
+                        }
+                    },
+                    "contextMenu": {
+                        "rename": "Rename",
+                        "duplicate": "Duplicate",
+                        "lock": "Lock",
+                        "lock.full": "Full lock",
+                        "lock.additionsOnly": "Additions-only lock",
+                        "unlock": "Unlock",
+                        "archive": "Archive",
+                        "delete": "Delete",
+                        "copyPath": "Copy path",
+                        "copyWikilink": "Copy wikilink",
+                        "locked.disabled.tooltip": "Unlock the document to perform this action.",
+                        "delete.confirmTitle": "Delete document?",
+                        "delete.confirmInstruction": "Type \"{name}\" to confirm. This cannot be undone.",
+                        "delete.confirmInput": "Document name",
+                        "delete.cancel": "Cancel",
+                        "delete.confirm": "Delete"
+                    },
+                    "search": {
+                        "placeholder": "Search Knowledge Base documents…",
+                        "empty": "Type to search KB documents.",
+                        "noResults": "No documents matched your search.",
+                        "searching": "Searching…",
+                        "filter": {
+                            "class": "Class",
+                            "tags": "Tags",
+                            "status": "Status",
+                            "locked": "Locked only",
+                            "language": "Language"
+                        }
+                    },
+                    "history": {
+                        "title": "Document Git history",
+                        "placeholder": "No commits yet for this document.",
+                        "placeholder.description": "The Git-mirror background job will populate this list after the next edit lands. If this persists, the backend endpoint may still be rolling out — track follow-up at EW-732.",
+                        "restore": "Restore",
+                        "restored": "Restored",
+                        "failed": "Restore failed",
+                        "close": "Close"
+                    }
                 }
             }
         },
