@@ -101,6 +101,7 @@ interface UpdateDocumentInput {
     categories?: string[];
     language?: string;
     status?: KbDocumentStatus;
+    class?: KbDocumentClass;
 }
 
 interface ListOptions {
@@ -811,6 +812,7 @@ export class KnowledgeBaseService {
         if (input.categories !== undefined) patch.categories = input.categories;
         if (input.language !== undefined) patch.language = input.language;
         if (input.status !== undefined) patch.status = input.status;
+        if (input.class !== undefined) patch.kbDocumentClass = input.class;
 
         if (input.body !== undefined) {
             patch.wordCount = this.countWords(input.body);

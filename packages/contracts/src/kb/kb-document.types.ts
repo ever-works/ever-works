@@ -67,6 +67,11 @@ export interface CreateKbDocumentInput {
 
 /**
  * Partial update.
+ *
+ * The class field is settable from the metadata side panel — operators
+ * can move a doc between brand/legal/seo/etc when the initial
+ * classification was wrong. The lock pair (`locked`, `lockMode`) lives
+ * on `POST /lock` + `POST /unlock` endpoints, not this PATCH.
  */
 export interface UpdateKbDocumentInput {
 	title?: string;
@@ -76,6 +81,7 @@ export interface UpdateKbDocumentInput {
 	categories?: string[];
 	language?: string;
 	status?: KbDocumentStatus;
+	class?: KbDocumentClass;
 }
 
 /**
