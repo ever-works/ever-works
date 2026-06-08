@@ -504,7 +504,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
         // dev` (documented gotcha) — tolerate the local-dev not-found surface
         // so the dispatcher proof still runs in CI.
         const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
-        await expect(xlsxViewer.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(xlsxViewer.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if ((await xlsxViewer.count()) > 0) {
             // 28-byte CSV is well under the gate + viewer caps → inline grid.
             await expect(xlsxViewer).toHaveAttribute('data-mode', 'inline');

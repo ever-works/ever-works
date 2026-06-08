@@ -211,11 +211,18 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(select).toBeVisible({ timeout: 60_000 });
         await select.selectOption('archived');
 
-        // Allow the action + revalidation cycle.
-        await page.waitForTimeout(800);
-        await page.reload({ waitUntil: 'domcontentloaded' });
-
-        const chip = page.getByTestId('kb-workbench-status-chip');
-        await expect(chip).toHaveAttribute('data-kb-status', 'archived', { timeout: 30_000 });
+        // The centre status chip is server-rendered from the doc DTO, so it
+        // only reflects the new status after the mutation PERSISTS and the
+        // page re-fetches. A fixed wait raced the PATCH under cold compile
+        // (the reload re-fetched the stale 'active' row). Retry reload +
+        // assert until the server state catches up.
+        await expect(async () => {
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await expect(page.getByTestId('kb-workbench-status-chip')).toHaveAttribute(
+                'data-kb-status',
+                'archived',
+                { timeout: 10_000 },
+            );
+        }).toPass({ timeout: 60_000 });
     });
 });
