@@ -158,6 +158,25 @@ export function validateFormInput(values: Record<string, unknown>): ValidationRe
 				errors: [{ path: 'repo_url', message: 'Repository URL is required when repository access is enabled' }]
 			};
 		}
+		// Security (SSRF / supply-chain): the repo URL is forwarded (with the access token) to the
+		// Activepieces flow, so reject anything that is not an https://github.com/... URL at validation
+		// time. Mirrors assertSafeGithubRepoUrl in utils/payload-builder.ts (the runtime guard).
+		let parsedRepoUrl: URL | null = null;
+		try {
+			parsedRepoUrl = new URL(values.repo_url.trim());
+		} catch {
+			parsedRepoUrl = null;
+		}
+		if (
+			!parsedRepoUrl ||
+			parsedRepoUrl.protocol !== 'https:' ||
+			parsedRepoUrl.hostname.toLowerCase() !== 'github.com'
+		) {
+			return {
+				valid: false,
+				errors: [{ path: 'repo_url', message: 'Repository URL must be an https://github.com/... URL' }]
+			};
+		}
 		if (
 			!values.repo_access_token ||
 			typeof values.repo_access_token !== 'string' ||

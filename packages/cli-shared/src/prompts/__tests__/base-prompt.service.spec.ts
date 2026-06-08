@@ -73,6 +73,21 @@ describe('BasePromptService — validateUrl', () => {
 	it('rejects empty string', () => {
 		expect(svc.exposeValidateUrl('')).not.toBe(true);
 	});
+
+	it('rejects non-http(s) schemes (file:, javascript:, data:, ftp:)', () => {
+		// Security (SSRF/LFI): these are syntactically valid URLs that the old
+		// guard accepted because it only checked `new URL(...)` did not throw.
+		for (const dangerous of [
+			'file:///etc/passwd',
+			'javascript:alert(1)',
+			'data:text/html,<script>alert(1)</script>',
+			'ftp://example.com/resource'
+		]) {
+			const r = svc.exposeValidateUrl(dangerous);
+			expect(typeof r).toBe('string');
+			expect(r as string).toMatch(/http and https/);
+		}
+	});
 });
 
 describe('BasePromptService — validateEmail', () => {

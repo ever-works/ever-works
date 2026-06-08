@@ -26,4 +26,18 @@ export async function register() {
                 'key, and the OAuth callback handler now fails closed if the secret is too short.',
         );
     }
+
+    // ALLOWED_REDIRECT_URLS: in production this env var has no safe default.
+    // `lib/constants.ts` falls back to `localhost,127.0.0.1` when it is unset,
+    // which means `addSessionTokenToUrl` silently refuses to attach session
+    // tokens to any real (non-loopback) production redirect target. Warn (not
+    // throw) at boot so the misconfiguration is loud in the logs without
+    // breaking deploys that intentionally rely on loopback-only redirects.
+    if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_REDIRECT_URLS) {
+        console.warn(
+            '[security] ALLOWED_REDIRECT_URLS is not set — defaulting to localhost,127.0.0.1. ' +
+                'Set this to your production domain(s) or session tokens will not be appended to ' +
+                'any absolute redirect URL.',
+        );
+    }
 }

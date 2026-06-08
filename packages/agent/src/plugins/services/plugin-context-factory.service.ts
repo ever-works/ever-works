@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER, Cache } from '@nestjs/cache-manager';
-// Security: lexical SSRF guard for the plugin HTTP client (blocks literal
-// private/loopback/link-local IPs and cloud-metadata hostnames before fetch).
-import { isSafeWebhookUrl } from '../../utils/ssrf-guard';
+// Security: DNS-pinned SSRF guard for the plugin HTTP client. safeFetchWithDnsPin
+// runs the lexical check (blocks literal private/loopback/link-local IPs and
+// cloud-metadata hostnames) AND resolves the hostname to refuse any private IP
+// before the socket connect, mitigating DNS-rebinding. Mirrors the guard used by
+// WebhookDeliveryService. Throws SsrfBlockedError on any refusal.
+import { safeFetchWithDnsPin, SsrfBlockedError } from '../../utils/ssrf-guard';
 import type {
     PluginContext,
     PluginLogger,
@@ -339,27 +342,35 @@ export class PluginContextFactoryService {
             // request. The plugin HTTP client runs inside the API process and
             // shares its network namespace, so a malicious/compromised plugin
             // could otherwise reach cloud-metadata endpoints (169.254.169.254),
-            // loopback, or RFC1918 internal hosts. isSafeWebhookUrl is the same
-            // lexical guard used by WebhookDeliveryService; it blocks literal
-            // private/loopback/link-local IPs, metadata hostnames, and
-            // non-HTTP(S) schemes without a DNS lookup (so legitimate external
-            // calls to public hosts are unaffected).
-            if (!isSafeWebhookUrl(url)) {
-                this.logger.warn(
-                    `Plugin "${pluginId}" attempted a blocked ${method} request to a disallowed URL`,
-                );
-                throw new Error('Request blocked: target URL is not permitted');
+            // loopback, or RFC1918 internal hosts. safeFetchWithDnsPin is the
+            // same DNS-pinned guard used by WebhookDeliveryService: it runs the
+            // lexical check internally (blocking literal private/loopback/
+            // link-local IPs, metadata hostnames, and non-HTTP(S) schemes) AND
+            // resolves the hostname to refuse any private IP before connecting,
+            // mitigating DNS-rebinding. Legitimate external calls to public
+            // hosts are unaffected. On any refusal it throws SsrfBlockedError,
+            // which we re-map to the existing generic plugin-facing error so the
+            // error surface seen by plugins is unchanged.
+            let response: Response;
+            try {
+                response = await safeFetchWithDnsPin(url, {
+                    method,
+                    headers: {
+                        ...(body ? { 'Content-Type': 'application/json' } : {}),
+                        ...options?.headers,
+                    },
+                    body: body ? JSON.stringify(body) : undefined,
+                    signal: options?.timeout ? AbortSignal.timeout(options.timeout) : undefined,
+                });
+            } catch (err) {
+                if (err instanceof SsrfBlockedError) {
+                    this.logger.warn(
+                        `Plugin "${pluginId}" attempted a blocked ${method} request to a disallowed URL (${err.code})`,
+                    );
+                    throw new Error('Request blocked: target URL is not permitted');
+                }
+                throw err;
             }
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    ...(body ? { 'Content-Type': 'application/json' } : {}),
-                    ...options?.headers,
-                },
-                body: body ? JSON.stringify(body) : undefined,
-                signal: options?.timeout ? AbortSignal.timeout(options.timeout) : undefined,
-            });
 
             let data: T;
             try {
