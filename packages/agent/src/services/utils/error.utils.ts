@@ -1,4 +1,22 @@
 import { BadRequestException, HttpException, Logger } from '@nestjs/common';
+import { redactSecrets } from '../../utils/secret-scan';
+
+// Security: upstream API / git error strings flow back to authenticated users
+// via `normalizeGeneratorError`. They can carry credentials embedded in URLs
+// (`https://user:token@host/…`) or raw secret tokens lifted from a cause chain.
+// Redact both BEFORE the string is returned so no caller can leak them.
+//
+// 1. Userinfo in any `scheme://user:pass@host` URL → `scheme://***:***@host`.
+//    The pattern matches a URL scheme, then a userinfo segment of the form
+//    `user:pass@`, and replaces ONLY the user:pass with `***:***`.
+const URL_CREDENTIAL_RE = /([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi;
+
+function redactCredentials(message: string): string {
+    // Strip credentials embedded in URLs first, then run the shared secret
+    // scrubber to catch standalone tokens (ghp_…, sk-…, Bearer …, JWTs, etc.).
+    const urlRedacted = message.replace(URL_CREDENTIAL_RE, '$1***:***@');
+    return redactSecrets(urlRedacted).cleaned;
+}
 
 function getErrorMessage(error: unknown): string {
     if (typeof error === 'object' && error !== null) {
@@ -84,5 +102,9 @@ export function normalizeGeneratorError(error: any): string {
         return 'Please reconnect your Git account to continue.';
     }
 
-    return detailedMessage || message;
+    // Security: only the raw upstream string falls through here (the canned
+    // classification messages above carry no untrusted content). Redact
+    // credentials-in-URLs and secret tokens before returning. Which message
+    // wins is unchanged — only the chosen string is sanitised.
+    return redactCredentials(detailedMessage || message);
 }

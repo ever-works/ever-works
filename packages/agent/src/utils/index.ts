@@ -11,3 +11,4 @@ export * from './github-app.utils';
 export * from './generation-cancellation.utils';
 export * from './ssrf-guard';
 export * from './redaction';
+export * from './secret-scan';

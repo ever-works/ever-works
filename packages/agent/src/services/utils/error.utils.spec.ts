@@ -32,4 +32,37 @@ describe('normalizeGeneratorError', () => {
             'Please reconnect your Git account to continue.',
         );
     });
+
+    it('redacts credentials embedded in a URL in the returned detailed message', () => {
+        const error = new Error('Failed to clone repository') as Error & { cause?: Error };
+        error.cause = new Error('fatal: unable to access https://u:secret@host/x.git');
+
+        const result = normalizeGeneratorError(error);
+
+        // The userinfo (user:pass) is replaced with ***:*** and the raw token is gone.
+        expect(result).toContain('https://***:***@host/x.git');
+        expect(result).not.toContain('secret');
+        expect(result).not.toContain('u:secret');
+        // The non-credential parts of the message are preserved.
+        expect(result).toContain('Failed to clone repository');
+        expect(result).toContain('fatal: unable to access');
+    });
+
+    it('redacts a standalone GitHub token in the returned message', () => {
+        const token = `ghp_${'A'.repeat(36)}`;
+        const error = new Error(`git push rejected using token ${token}`);
+
+        const result = normalizeGeneratorError(error);
+
+        expect(result).not.toContain(token);
+        expect(result).toContain('git push rejected using token');
+    });
+
+    it('returns a clean message unchanged', () => {
+        const error = new Error('Something unexpected happened while building the page');
+
+        expect(normalizeGeneratorError(error)).toBe(
+            'Something unexpected happened while building the page',
+        );
+    });
 });

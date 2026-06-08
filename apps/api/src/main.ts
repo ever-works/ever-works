@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { configDotenv } from 'dotenv';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { apiReference } from '@scalar/nestjs-api-reference';
 import { ApiModule } from './api.module';
 import { buildOpenApiConfig } from './openapi/openapi-document.config';
@@ -12,6 +13,7 @@ import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
 import { config as appConfig } from './config/constants';
+import { resolveTrustProxyHops } from './config/trust-proxy';
 
 async function bootstrap() {
     // Load environment variables from .env file
@@ -30,13 +32,23 @@ async function bootstrap() {
     initSentry();
     initPostHog();
 
-    const app = await NestFactory.create(ApiModule);
+    const app = await NestFactory.create<NestExpressApplication>(ApiModule);
 
     // Forward every NestJS Logger emit (log/warn/error/debug/verbose) to
     // PostHog Logs as a `$log` event while still writing to stdout. The
     // PostHogLoggerService fails open — without POSTHOG_API_KEY it degrades
     // to the default NestJS console logger (no PostHog traffic, no errors).
     app.useLogger(new PostHogLoggerService());
+
+    // EW-719: the API sits behind an nginx ingress. Without an explicit
+    // `trust proxy`, Express treats the ingress socket address as `req.ip` for
+    // every request, which collapses the per-IP rate limiter
+    // (UserAwareThrottlerGuard.getTracker) into a single pod-wide bucket.
+    // Trust the configured number of proxy hops (TRUST_PROXY_HOPS, default 1 for
+    // the standard nginx → pod topology) so Express resolves the real client IP
+    // from X-Forwarded-For. The hop count is sanitised (garbage → default,
+    // negatives → 0) so an operator typo can't widen trust to a spoofable header.
+    app.set('trust proxy', resolveTrustProxyHops(process.env));
 
     const captureRawBody = (
         req: IncomingMessage & { rawBody?: string },

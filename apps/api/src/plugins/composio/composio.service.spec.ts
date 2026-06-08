@@ -1,3 +1,16 @@
+// EW-719 (open-redirect): pin the platform web-app host + the extra
+// allow-listed callback host BEFORE the service is constructed, since
+// `parseAllowedCallbackHosts()` reads them in the constructor. `app.ever.works`
+// is the host the existing "forwards callbackUrl" test uses as a legit
+// platform-origin callback, so it must be allow-listed.
+const ORIGINAL_ENV = { ...process.env };
+beforeAll(() => {
+    process.env.WEB_URL = 'https://app.ever.works';
+});
+afterAll(() => {
+    process.env = ORIGINAL_ENV;
+});
+
 import { Test, TestingModule } from '@nestjs/testing';
 import {
     BadGatewayException,
@@ -226,6 +239,62 @@ describe('ComposioService', () => {
             });
             expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith('user-1', 'ac_xyz', {
                 callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback',
+            });
+        });
+
+        // EW-719 (open-redirect): a callbackUrl on a non-allow-listed host must
+        // NOT reach the SDK — Composio would otherwise redirect the victim's
+        // browser to the attacker origin after the OAuth dance.
+        it('drops a callbackUrl on a non-allow-listed (attacker) host', async () => {
+            const sdk = buildSdkStub();
+            (sdk.connectedAccounts.initiate as jest.Mock).mockResolvedValue({
+                redirectUrl: 'https://composio.example/oauth',
+            });
+            injectSdk(service, sdk);
+
+            await service.initiateConnection('user-1', {
+                toolkitSlug: 'GMAIL',
+                authConfigId: 'ac_xyz',
+                callbackUrl: 'https://attacker.example/steal',
+            });
+            // Falls back to omitting callbackUrl (SDK uses platform default) —
+            // the attacker host is never forwarded.
+            expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith('user-1', 'ac_xyz', {});
+        });
+
+        // EW-719: fail CLOSED on a non-http(s) scheme even if a host string is
+        // present (e.g. a smuggled javascript:/data: URL).
+        it('drops a callbackUrl with a non-http(s) scheme', async () => {
+            const sdk = buildSdkStub();
+            (sdk.connectedAccounts.initiate as jest.Mock).mockResolvedValue({
+                redirectUrl: 'https://composio.example/oauth',
+            });
+            injectSdk(service, sdk);
+
+            await service.initiateConnection('user-1', {
+                toolkitSlug: 'GMAIL',
+                authConfigId: 'ac_xyz',
+                callbackUrl: 'javascript:alert(1)//app.ever.works',
+            });
+            expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith('user-1', 'ac_xyz', {});
+        });
+
+        // EW-719: the legit happy path — a callbackUrl on the platform web-app
+        // origin (config.webAppUrl() host) is allow-listed and forwarded.
+        it('forwards a callbackUrl on the platform web-app origin', async () => {
+            const sdk = buildSdkStub();
+            (sdk.connectedAccounts.initiate as jest.Mock).mockResolvedValue({
+                redirectUrl: 'https://composio.example/oauth',
+            });
+            injectSdk(service, sdk);
+
+            await service.initiateConnection('user-1', {
+                toolkitSlug: 'GMAIL',
+                authConfigId: 'ac_xyz',
+                callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback?foo=bar',
+            });
+            expect(sdk.connectedAccounts.initiate).toHaveBeenCalledWith('user-1', 'ac_xyz', {
+                callbackUrl: 'https://app.ever.works/settings/plugins/composio/callback?foo=bar',
             });
         });
 

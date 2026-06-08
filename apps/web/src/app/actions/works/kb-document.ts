@@ -3,6 +3,11 @@
 import { revalidatePath } from 'next/cache';
 import { kbAPI } from '@/lib/api/kb';
 import type { ActionResult } from '@/app/actions/plugins';
+// Security (EW-718): route every caught error through the co-located pure
+// mapper so raw backend strings (internal paths, DB detail, upstream provider
+// messages) are never forwarded to the browser. The mapper lives in its own
+// module because a `'use server'` file may only export async server actions.
+import { toSafeActionError } from './kb-document-error';
 import type {
     KbDocumentBodyDto,
     KbDocumentClass,
@@ -38,7 +43,7 @@ export async function updateKbDocumentAction(args: {
         console.error('[kb-editor] failed to update KB document:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to save document',
+            error: toSafeActionError(error, 'Failed to save document'),
         };
     }
 }
@@ -108,7 +113,7 @@ export async function createKbDocumentAction(args: {
         console.error('[kb-add-doc] failed to create KB document:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to create document',
+            error: toSafeActionError(error, 'Failed to create document'),
         };
     }
 }
@@ -152,7 +157,7 @@ export async function deleteKbDocumentAction(args: {
         console.error('[kb-delete] failed to delete KB document:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to delete document',
+            error: toSafeActionError(error, 'Failed to delete document'),
         };
     }
 }
@@ -235,7 +240,7 @@ export async function overrideInheritedKbDocumentAction(args: {
         console.error('[kb-inherited] failed to override inherited doc:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to override inherited document',
+            error: toSafeActionError(error, 'Failed to override inherited document'),
         };
     }
 }

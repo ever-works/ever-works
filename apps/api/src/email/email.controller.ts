@@ -15,6 +15,7 @@ import {
     UseGuards,
     HttpCode,
     HttpStatus,
+    Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -74,6 +75,8 @@ type WebhookRequest = {
 @ApiTags('Email')
 @Controller('api/email')
 export class EmailController {
+    private readonly logger = new Logger(EmailController.name);
+
     constructor(
         private readonly emailService: EmailService,
         private readonly emailFacade: EmailFacadeService,
@@ -320,13 +323,20 @@ export class EmailController {
             });
         }
 
-        return {
-            received: true,
-            providerMessageId: message.providerMessageId,
-            handled: dispatch?.handled ?? false,
-            agentId: dispatch?.agentId,
-            mode: dispatch?.mode,
-        };
+        // Security (EW-718): the webhook caller is an unauthenticated provider,
+        // so the public ack MUST NOT leak internal routing metadata
+        // (providerMessageId, the resolved agentId, dispatch mode, handled
+        // flag). Keep that detail server-side for diagnostics and return a
+        // minimal non-leaking acknowledgement.
+        this.logger.debug(
+            `inbound webhook processed for plugin ${pluginId}: ` +
+                `providerMessageId=${message.providerMessageId} ` +
+                `handled=${dispatch?.handled ?? false} ` +
+                `agentId=${dispatch?.agentId ?? 'none'} ` +
+                `mode=${dispatch?.mode ?? 'none'}`,
+        );
+
+        return { received: true };
     }
 
     @Public()
