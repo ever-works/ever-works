@@ -22,6 +22,7 @@ import type {
     CustomCapabilityDefinition,
     PluginServices,
     HttpResponse,
+    JsonSchema,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from './plugin-registry.service';
 import { PluginSettingsService } from './plugin-settings.service';
@@ -96,7 +97,7 @@ export class PluginContextFactoryService {
             cache: this.createCache(pluginId),
             http: this.createHttpClient(pluginId),
             env: this.createEnvironment(),
-            envVars: this.createEnvVars(),
+            envVars: this.createEnvVars(pluginId),
             services: this.createServices(scopeOptions),
 
             getSettings: async (
@@ -441,27 +442,112 @@ export class PluginContextFactoryService {
     }
 
     /**
-     * Create an EnvironmentVariables accessor
+     * Create an EnvironmentVariables accessor scoped to a single plugin.
+     *
+     * Security: the plugin host runs inside the API process and shares its
+     * `process.env`, which holds DATABASE_URL, AUTH_SECRET, TRIGGER_* secrets,
+     * and every OTHER plugin's API key. The old accessor proxied
+     * `process.env[anyKey]` straight through, so any plugin could read all of
+     * them. Instead we build the env from an allowlist (mirroring the
+     * from-scratch `buildSubprocessEnv` philosophy used by the CLI plugins):
+     * the only keys a plugin may read are the env-var names it DECLARES via the
+     * `x-envVar` JSON-Schema extension on its own settings schema, plus a tiny
+     * fixed set of non-sensitive platform vars. Every accessor FAILS CLOSED for
+     * any key outside that set (undefined / false / throws), so a
+     * compromised/prompt-injected plugin cannot exfiltrate co-tenant secrets.
      */
-    private createEnvVars(): EnvironmentVariables {
+    private createEnvVars(pluginId: string): EnvironmentVariables {
+        const allowedKeys = this.resolveAllowedEnvKeys(pluginId);
+
+        const read = (key: string): string | undefined => {
+            if (!allowedKeys.has(key)) {
+                this.logger.warn(
+                    `Plugin "${pluginId}" attempted to read environment variable "${key}" it did not declare via x-envVar`,
+                );
+                return undefined;
+            }
+            return process.env[key];
+        };
+
         return {
             get: (key: string): string | undefined => {
-                return process.env[key];
+                return read(key);
             },
             getOrDefault: (key: string, defaultValue: string): string => {
-                return process.env[key] ?? defaultValue;
+                return read(key) ?? defaultValue;
             },
             has: (key: string): boolean => {
+                if (!allowedKeys.has(key)) {
+                    return false;
+                }
                 return key in process.env;
             },
             getRequired: (key: string): string => {
-                const value = process.env[key];
+                const value = read(key);
                 if (value === undefined) {
                     throw new Error(`Required environment variable "${key}" is not set`);
                 }
                 return value;
             },
         };
+    }
+
+    /**
+     * Non-sensitive platform env vars every plugin may read regardless of its
+     * declared schema. Keep this list tiny and free of secrets — anything added
+     * here is exposed to ALL plugins.
+     */
+    private static readonly PLATFORM_ENV_ALLOWLIST: readonly string[] = ['NODE_ENV'];
+
+    /**
+     * Resolve the set of env-var names a plugin is allowed to read: the
+     * `x-envVar` names declared on its settings schema properties (collected
+     * recursively so `allOf`/`anyOf`/`oneOf`-composed schemas still work) plus
+     * the fixed platform allowlist. Returns a fail-closed set — unknown plugins
+     * get only the platform vars.
+     */
+    private resolveAllowedEnvKeys(pluginId: string): ReadonlySet<string> {
+        const allowed = new Set<string>(PluginContextFactoryService.PLATFORM_ENV_ALLOWLIST);
+
+        const registered = this.registry.get(pluginId);
+        const schema = registered?.plugin?.settingsSchema;
+        if (schema) {
+            this.collectEnvVarNames(schema, allowed);
+        }
+
+        return allowed;
+    }
+
+    /**
+     * Walk a settings schema and add every declared `x-envVar` name to `out`.
+     * Recurses into `properties` and the JSON-Schema composition keywords so a
+     * plugin that declares its credentials under `anyOf`/`allOf`/`oneOf` (e.g.
+     * the zapier plugin) still resolves its env-var names correctly.
+     */
+    private collectEnvVarNames(schema: JsonSchema, out: Set<string>): void {
+        if (!schema || typeof schema !== 'object') {
+            return;
+        }
+
+        const envVar = schema['x-envVar'];
+        if (typeof envVar === 'string' && envVar.length > 0) {
+            out.add(envVar);
+        }
+
+        if (schema.properties) {
+            for (const child of Object.values(schema.properties)) {
+                this.collectEnvVarNames(child, out);
+            }
+        }
+
+        for (const keyword of ['allOf', 'anyOf', 'oneOf'] as const) {
+            const branches = schema[keyword];
+            if (Array.isArray(branches)) {
+                for (const branch of branches) {
+                    this.collectEnvVarNames(branch, out);
+                }
+            }
+        }
     }
 
     /**

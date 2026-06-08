@@ -490,12 +490,6 @@ export class PluginOperationsService {
             if (settings) {
                 userPlugin.settings = { ...userPlugin.settings, ...settings };
             }
-            if (secretSettings) {
-                userPlugin.secretSettings = {
-                    ...userPlugin.secretSettings,
-                    ...secretSettings,
-                };
-            }
         } else {
             // Create new user plugin record
             userPlugin = this.userPluginRepository.create({
@@ -505,12 +499,38 @@ export class PluginOperationsService {
                 enabled: true,
                 autoEnableForWorks: autoEnableForWorks ?? false,
                 settings: settings || {},
-                secretSettings: secretSettings || {},
+                secretSettings: {},
                 metadata: {},
             });
         }
 
+        // Persist the entity-level fields (enabled / autoEnableForWorks /
+        // non-secret settings). Secrets are intentionally NOT written onto
+        // the entity here — they go through the encrypting write path below
+        // so they are never stored in plaintext at rest.
         await this.userPluginRepository.save(userPlugin);
+
+        // D3 / C-08 — route enable-time secrets through the
+        // PluginSettingsService encrypting write path so they are encrypted
+        // at rest exactly like every other secret write (updateUserSettings →
+        // encryptSecrets). Previously this method wrote `secretSettings`
+        // DIRECTLY onto the user-plugin entity, bypassing C-08 envelope
+        // encryption entirely. The base record is saved first (above) so
+        // updateUserSettings finds the existing row and merges + encrypts the
+        // secret bag onto it. The schema's `x-secret` markers route each key
+        // into the encrypted `secretSettings` column.
+        if (secretSettings && Object.keys(secretSettings).length > 0) {
+            await this.settingsService.updateUserSettings(pluginId, userId, secretSettings);
+            // Reflect the just-written secrets in the in-memory entity used to
+            // build the response. The response masks x-secret fields, so the
+            // plaintext view here is only used to produce the masked output;
+            // the persisted column holds the encrypted envelope.
+            userPlugin.secretSettings = {
+                ...userPlugin.secretSettings,
+                ...secretSettings,
+            };
+        }
+
         this.logger.log(`Plugin "${pluginId}" enabled for user "${userId}"`);
 
         return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {

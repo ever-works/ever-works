@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { AgentExportService, type AgentExportEnvelope } from '../agent-export.service';
 import {
+    AGENT_PERMISSIONS_DEFAULT,
     AgentAvatarMode,
     AgentIdleBehavior,
     AgentScope,
@@ -221,6 +222,68 @@ describe('AgentExportService', () => {
             const env = baseEnvelope();
             env.files.toolsMd = 'GH=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
             await expect(svc.importOne('u1', env)).rejects.toThrow(/Secret-like/);
+        });
+
+        // Security (D9) — clamp imported permissions to least-privilege.
+        // The envelope is attacker-editable, so an import must NEVER carry
+        // its `runtime.permissions` into the created/overwritten Agent;
+        // every imported Agent starts at the all-false frozen default and
+        // the owner must explicitly re-grant.
+        describe('permission clamp (D9)', () => {
+            const elevatedEnvelope = (): AgentExportEnvelope => {
+                const env = baseEnvelope();
+                env.runtime.permissions = {
+                    canCreateAgents: true,
+                    canAssignTasks: true,
+                    canEditSkills: true,
+                    canEditAgentFiles: true,
+                    canSpend: true,
+                    canCommitToRepo: true,
+                    canOpenPullRequests: true,
+                    canCallExternalTools: true,
+                };
+                return env;
+            };
+
+            it('does NOT honour elevated envelope permissions on create — clamps to AGENT_PERMISSIONS_DEFAULT', async () => {
+                agents.findByUserIdAndSlug.mockResolvedValue(null);
+                agents.create.mockResolvedValueOnce(
+                    makeAgent({ id: 'new-a', status: AgentStatus.DRAFT }),
+                );
+                await svc.importOne('u1', elevatedEnvelope());
+
+                const createArg = agents.create.mock.calls[0][0];
+                expect(createArg.permissions).toEqual(AGENT_PERMISSIONS_DEFAULT);
+                // Every flag is false — no privilege escalation across import.
+                expect(Object.values(createArg.permissions).every((v) => v === false)).toBe(true);
+            });
+
+            it('clamps permissions on the overwrite path too', async () => {
+                const existing = makeAgent({ id: 'existing-ceo' });
+                agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
+                agents.findById.mockResolvedValueOnce(existing);
+                await svc.importOne('u1', elevatedEnvelope(), { onConflict: 'overwrite' });
+
+                expect(agents.updateById).toHaveBeenCalledWith(
+                    'existing-ceo',
+                    expect.objectContaining({ permissions: AGENT_PERMISSIONS_DEFAULT }),
+                );
+                const patch = agents.updateById.mock.calls[0][1];
+                expect(Object.values(patch.permissions).every((v) => v === false)).toBe(true);
+            });
+
+            it('legit import (default permissions) still creates a draft Agent unchanged', async () => {
+                // baseEnvelope already carries the all-false default set.
+                agents.findByUserIdAndSlug.mockResolvedValue(null);
+                agents.create.mockResolvedValueOnce(
+                    makeAgent({ id: 'new-a', status: AgentStatus.DRAFT }),
+                );
+                const res = await svc.importOne('u1', baseEnvelope());
+                expect(res.conflictResolution).toBe('none');
+                const createArg = agents.create.mock.calls[0][0];
+                expect(createArg.permissions).toEqual(AGENT_PERMISSIONS_DEFAULT);
+                expect(createArg.status).toBe(AgentStatus.DRAFT);
+            });
         });
 
         // Security (EW-711 #8) — scope-ownership IDOR. The scope columns are

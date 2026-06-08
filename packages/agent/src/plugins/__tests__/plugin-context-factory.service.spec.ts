@@ -420,8 +420,27 @@ describe('PluginContextFactoryService', () => {
     });
 
     describe('EnvironmentVariables', () => {
+        // The plugin must DECLARE the env var it reads via the `x-envVar`
+        // JSON-Schema extension; `TEST_VAR` is declared on the mock plugin's
+        // settings schema below so the legitimate happy path keeps working.
+        const createPluginDeclaringEnvVar = (envVarName: string): RegisteredPlugin => {
+            const registered = createRegisteredPlugin();
+            (registered.plugin as any).settingsSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: {
+                        type: 'string',
+                        'x-secret': true,
+                        'x-envVar': envVarName,
+                    },
+                },
+            };
+            return registered;
+        };
+
         beforeEach(() => {
             process.env.TEST_VAR = 'test-value';
+            jest.spyOn(registry, 'get').mockReturnValue(createPluginDeclaringEnvVar('TEST_VAR'));
         });
 
         afterEach(() => {
@@ -456,6 +475,101 @@ describe('PluginContextFactoryService', () => {
             expect(() => context.envVars.getRequired('NON_EXISTENT')).toThrow(
                 'Required environment variable "NON_EXISTENT" is not set',
             );
+        });
+
+        describe('allowlist (security)', () => {
+            const SECRET_ENV_KEYS = ['DATABASE_URL', 'AUTH_SECRET', 'AWS_SECRET_KEY'];
+
+            beforeEach(() => {
+                process.env.DATABASE_URL = 'postgres://secret';
+                process.env.AUTH_SECRET = 'super-secret';
+                process.env.AWS_SECRET_KEY = 'aws-secret';
+                // A different plugin's declared key, which THIS plugin must not read.
+                process.env.OTHER_PLUGIN_API_KEY = 'other-key';
+            });
+
+            afterEach(() => {
+                for (const key of [...SECRET_ENV_KEYS, 'OTHER_PLUGIN_API_KEY']) {
+                    delete process.env[key];
+                }
+            });
+
+            it('blocks reading undeclared platform secrets via every accessor', () => {
+                const context = service.createContext('test-plugin');
+
+                for (const key of SECRET_ENV_KEYS) {
+                    expect(context.envVars.get(key)).toBeUndefined();
+                    expect(context.envVars.getOrDefault(key, 'fallback')).toBe('fallback');
+                    expect(context.envVars.has(key)).toBe(false);
+                    expect(() => context.envVars.getRequired(key)).toThrow(
+                        `Required environment variable "${key}" is not set`,
+                    );
+                }
+            });
+
+            it("blocks reading another plugin's declared env var", () => {
+                // This plugin declares only TEST_VAR; OTHER_PLUGIN_API_KEY belongs
+                // to a different plugin and must not be reachable.
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('OTHER_PLUGIN_API_KEY')).toBeUndefined();
+                expect(context.envVars.has('OTHER_PLUGIN_API_KEY')).toBe(false);
+            });
+
+            it('allows reading a key the plugin declared via x-envVar', () => {
+                process.env.FOO_KEY = 'foo-value';
+                jest.spyOn(registry, 'get').mockReturnValue(createPluginDeclaringEnvVar('FOO_KEY'));
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('FOO_KEY')).toBe('foo-value');
+                expect(context.envVars.has('FOO_KEY')).toBe(true);
+                expect(context.envVars.getRequired('FOO_KEY')).toBe('foo-value');
+                // ...but still cannot reach unrelated secrets.
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                delete process.env.FOO_KEY;
+            });
+
+            it('collects x-envVar names declared under anyOf/allOf/oneOf branches', () => {
+                process.env.COMPOSED_KEY = 'composed-value';
+                const registered = createRegisteredPlugin();
+                (registered.plugin as any).settingsSchema = {
+                    type: 'object',
+                    anyOf: [
+                        {
+                            properties: {
+                                token: {
+                                    type: 'string',
+                                    'x-envVar': 'COMPOSED_KEY',
+                                },
+                            },
+                        },
+                    ],
+                };
+                jest.spyOn(registry, 'get').mockReturnValue(registered);
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('COMPOSED_KEY')).toBe('composed-value');
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                delete process.env.COMPOSED_KEY;
+            });
+
+            it('allows the fixed non-sensitive platform env (NODE_ENV)', () => {
+                const previous = process.env.NODE_ENV;
+                process.env.NODE_ENV = 'test';
+                // A plugin declaring no env vars at all.
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin());
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('NODE_ENV')).toBe('test');
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                process.env.NODE_ENV = previous;
+            });
         });
     });
 
