@@ -215,13 +215,13 @@ test.describe('Screenshot capability contract — facade, scoping & gating', () 
             expect(res.status, `${op}: missing url → 400`).toBe(400);
         }
 
-        // In CONTRAST, a non-UUID workId in the QUERY string of check-availability
-        // is NOT validated (no IsUUID pipe on the query param) — it resolves to an
-        // empty, available:false result rather than a 400.
+        // In CONTRAST, check-availability scoped to a workId the caller cannot
+        // access is REJECTED before any provider/secret read. EW-711 #30 added
+        // `ensureCanView(workId, userId)` to the capability-listing path, so an
+        // unknown/unowned work (here a non-existent `not-a-uuid`) resolves to a
+        // 404 not-found rather than leaking an empty availability envelope.
         const q = await checkAvailability(request, token, 'not-a-uuid');
-        expect(q.status, 'check-availability tolerates a non-uuid query workId').toBe(200);
-        expect(q.body.available, 'unknown work scope → unavailable').toBe(false);
-        expect(q.body.providers, 'unknown work scope → no providers').toEqual([]);
+        expect(q.status, 'check-availability rejects an unknown/unauthorized work scope').toBe(404);
     });
 
     test('Flow 2: user-scoped enable does NOT leak into a work scope; ProviderOption shape', async ({
@@ -336,7 +336,7 @@ test.describe('Screenshot capability contract — facade, scoping & gating', () 
         ).toBe(403);
     });
 
-    test('Flow 4: cross-user — capability listing is visible but the SECRET KEYS never leak', async ({
+    test('Flow 4: cross-user — work access is DENIED (403), so no listing and no SECRET KEY leak', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -367,40 +367,34 @@ test.describe('Screenshot capability contract — facade, scoping & gating', () 
         const attacker = await registerUserViaAPI(request);
         const aToken = attacker.access_token;
 
-        // The capability LISTING is not ownership-gated: the attacker's
-        // check-availability for the victim's workId reports the provider as
-        // configured:true (the `configured` flag is derived from the env-var
-        // fallback, not from a resolved per-user secret).
+        // EW-711 #30 — cross-user work access is denied at the capability
+        // listing path (`ensureCanView`), which fronts check-availability,
+        // get-url AND capture. The attacker cannot read the victim's
+        // screenshot availability AT ALL: the call is rejected with 403
+        // BEFORE any provider/secret resolution, so the listing — and any
+        // secret behind it — never crosses the user boundary.
         const aAvail = await checkAvailability(request, aToken, work.id);
-        expect(aAvail.status, 'attacker availability call is authorised').toBe(200);
-        expect(
-            aAvail.body.providers.map((p) => p.id),
-            'listing surfaces the provider cross-user',
-        ).toContain('screenshotone');
+        expect(aAvail.status, 'attacker cross-user availability is forbidden').toBe(403);
 
-        // BUT the SECRETS never cross the user boundary: a get-url scoped to the
-        // victim's work CANNOT be signed (the attacker has no resolvable key) →
-        // 400 "Failed to generate screenshot URL", with NO imageUrl leaked.
+        // The same ownership guard fronts get-url, so a victim-scoped sign
+        // from the attacker is rejected before reaching the provider — NO
+        // signed URL (and therefore no key) is ever produced.
         const aUrl = await postScreenshot(request, aToken, 'get-url', {
             url: 'https://evil.example',
             workId: work.id,
         });
-        expect(aUrl.status, 'attacker get-url is rejected (no signing key)').toBe(400);
-        expect(aUrl.body.status, 'error envelope').toBe('error');
+        expect(aUrl.status, 'attacker get-url is forbidden cross-user').toBe(403);
         expect(
             String(aUrl.body.imageUrl ?? ''),
             'NO signed URL (and therefore no key) is leaked to the attacker',
         ).toBe('');
-        expect(messageText(aUrl.body)).toMatch(/failed to generate screenshot url/i);
 
-        // Likewise capture cannot reach the provider — it truthfully reports the
-        // access key is not configured FOR THIS USER (the owner's key is invisible).
+        // Likewise capture is denied cross-user before it can reach the provider.
         const aCapture = await postScreenshot(request, aToken, 'capture', {
             url: 'https://evil.example',
             workId: work.id,
         });
-        expect(aCapture.status, 'attacker capture is rejected').toBe(400);
-        expect(messageText(aCapture.body)).toMatch(/access key not configured|not configured/i);
+        expect(aCapture.status, 'attacker capture is forbidden cross-user').toBe(403);
 
         // Sanity: the OWNER, by contrast, CAN sign for the same work.
         const oUrl = await postScreenshot(request, ownerToken, 'get-url', {
