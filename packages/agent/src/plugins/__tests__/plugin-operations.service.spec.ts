@@ -159,6 +159,9 @@ describe('PluginOperationsService', () => {
                     useValue: {
                         resolveSettings: jest.fn().mockResolvedValue({}),
                         getResolvedSettings: jest.fn().mockResolvedValue({}),
+                        // D3 / C-08 — encrypting write path that enable-time
+                        // secrets must be routed through.
+                        updateUserSettings: jest.fn().mockResolvedValue(undefined),
                     },
                 },
                 {
@@ -976,7 +979,7 @@ describe('PluginOperationsService', () => {
             );
         });
 
-        it('should save secret settings on enablePluginForUser', async () => {
+        it('should route enable-time secret settings through the encrypting write path (D3 / C-08)', async () => {
             const registered = createRegisteredPlugin();
             jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
             jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
@@ -984,16 +987,60 @@ describe('PluginOperationsService', () => {
                 pluginId: 'test-plugin',
             } as any);
             jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+            const updateUserSettingsSpy = jest.spyOn(settingsService, 'updateUserSettings');
+
+            // Snapshot secretSettings AT save-time (deep copy) — the entity is
+            // passed by reference, so a post-save in-memory mutation (used only
+            // to build the masked response) must not contaminate this evidence.
+            const secretSnapshotsAtSave: Array<Record<string, unknown>> = [];
+            jest.spyOn(userPluginRepository, 'save').mockImplementation((entity: any) => {
+                secretSnapshotsAtSave.push(JSON.parse(JSON.stringify(entity.secretSettings ?? {})));
+                return entity;
+            });
 
             await service.enablePluginForUser('test-plugin', 'user-1', undefined, {
                 secretField: 'my-secret',
             });
 
+            // LEGIT path: the secret is persisted, but ONLY through the
+            // PluginSettingsService.updateUserSettings encrypting path
+            // (which runs encryptSecrets() at rest).
+            expect(updateUserSettingsSpy).toHaveBeenCalledWith('test-plugin', 'user-1', {
+                secretField: 'my-secret',
+            });
+
+            // BLOCKED path: the raw plaintext secret must NEVER be written
+            // directly onto the user-plugin entity that is saved to the DB —
+            // doing so would bypass C-08 envelope encryption entirely.
+            expect(secretSnapshotsAtSave.length).toBeGreaterThan(0);
+            for (const snapshot of secretSnapshotsAtSave) {
+                expect(snapshot).not.toEqual(expect.objectContaining({ secretField: 'my-secret' }));
+            }
+        });
+
+        it('should NOT invoke the encrypting write path when no secrets are supplied on enable', async () => {
+            const registered = createRegisteredPlugin();
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(registered);
+            jest.spyOn(pluginRepository, 'findOne').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+            } as any);
+            jest.spyOn(userPluginRepository, 'findOne').mockResolvedValue(null);
+            const updateUserSettingsSpy = jest.spyOn(settingsService, 'updateUserSettings');
+
+            // Enable with only non-secret settings — the legit happy path
+            // must still persist normally without touching the secret path.
+            const result = await service.enablePluginForUser('test-plugin', 'user-1', {
+                normalSetting: 'plain-value',
+            });
+
+            expect(result.enabled).toBe(true);
             expect(userPluginRepository.save).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    secretSettings: { secretField: 'my-secret' },
+                    settings: { normalSetting: 'plain-value' },
                 }),
             );
+            expect(updateUserSettingsSpy).not.toHaveBeenCalled();
         });
 
         it('should save secret settings on updateWorkPluginSettings', async () => {

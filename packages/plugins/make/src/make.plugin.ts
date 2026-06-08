@@ -179,6 +179,15 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 					message: 'Make.com API base URL is not allowed (must be a public HTTPS host).'
 				};
 			}
+			// Security (credential leak / abuse): on top of the SSRF check, restrict
+			// the host to the make.com domain so a tenant cannot point the baseUrl
+			// at an arbitrary public host while carrying their Make API token.
+			if (!isMakeHost(baseUrl)) {
+				return {
+					success: false,
+					message: 'Make.com API base URL must be an HTTPS make.com host (e.g. https://us2.make.com/api/v2).'
+				};
+			}
 			const client = new MakeClient({
 				apiKey,
 				baseUrl,
@@ -580,6 +589,12 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		if (!isSafeWebhookUrl(baseUrl)) {
 			throw new Error('Make.com API base URL is not allowed (must be a public HTTPS host).');
 		}
+		// Security (credential leak / abuse): on top of the SSRF check, restrict the
+		// host to the make.com domain so a tenant cannot point the baseUrl at an
+		// arbitrary public host while carrying their Make API token. Fails closed.
+		if (!isMakeHost(baseUrl)) {
+			throw new Error('Make.com API base URL must be an HTTPS make.com host (e.g. https://us2.make.com/api/v2).');
+		}
 
 		return {
 			apiKey,
@@ -708,6 +723,26 @@ export class MakePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvider
 		}
 		return flat;
 	}
+}
+
+/**
+ * Security (host allowlist): returns true only when `url` parses as an HTTPS URL
+ * whose hostname is exactly `make.com` or a sub-domain ending in `.make.com`
+ * (Make uses regional/zone hosts like `us2.make.com`, `eu1.make.com`, and
+ * webhook hosts like `hook.us2.make.com`). Applied ON TOP of `isSafeWebhookUrl`
+ * so a tenant cannot point the baseUrl at an arbitrary public host while
+ * carrying their Make API token. Fails closed on any parse error.
+ */
+function isMakeHost(url: string): boolean {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return false;
+	}
+	if (parsed.protocol !== 'https:') return false;
+	const host = parsed.hostname.toLowerCase();
+	return host === 'make.com' || host.endsWith('.make.com');
 }
 
 /**

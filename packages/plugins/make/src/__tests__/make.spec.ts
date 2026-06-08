@@ -622,6 +622,87 @@ describe('MakePlugin', () => {
 		});
 	});
 
+	describe('baseUrl make.com host allowlist (SSRF / credential-leak hardening)', () => {
+		beforeEach(async () => {
+			await plugin.onLoad(createMockContext());
+		});
+
+		// ── settings-check path: validateConnection ──────────────────────
+		it('rejects a non-make.com host that still passes the SSRF check', async () => {
+			// https://evil.com is a public HTTPS host (passes isSafeWebhookUrl) but
+			// is NOT a make.com host — it must be rejected and no REST call issued.
+			const result = await plugin.validateConnection({
+				apiKey: 'valid-key',
+				baseUrl: 'https://evil.com/api/v2'
+			});
+
+			expect(result.success).toBe(false);
+			expect(result.message).toMatch(/make\.com host/i);
+			// The authenticated whoAmI/scenario call (which carries the token) must
+			// never have been attempted.
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('accepts a regional make.com host (eu1.make.com)', async () => {
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { user: { id: 1 } } }));
+
+			const result = await plugin.validateConnection({
+				apiKey: 'valid-key',
+				baseUrl: 'https://eu1.make.com/api/v2'
+			});
+
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('Connected to Make.com');
+		});
+
+		it('accepts the default make.com base URL', async () => {
+			fetchMock.mockResolvedValueOnce(mockResponse({ body: { user: { id: 1 } } }));
+
+			const result = await plugin.validateConnection({
+				apiKey: 'valid-key',
+				baseUrl: 'https://us2.make.com/api/v2'
+			});
+
+			expect(result.success).toBe(true);
+			expect(result.message).toContain('Connected to Make.com');
+		});
+
+		// ── request-path guard: execute → resolveMakeSettings ────────────
+		// The execute() path resolves settings via context.getSettings('user'|'work'),
+		// so override that to inject a tenant-controlled baseUrl.
+		it('fails the pipeline when the configured baseUrl is not a make.com host', async () => {
+			const ctx = createMockContext();
+			(ctx.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+				apiKey: 'test-api-key',
+				baseUrl: 'https://evil.com/api/v2'
+			});
+			await plugin.onLoad(ctx);
+
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
+
+			expect(result.success).toBe(false);
+			const errorMessage = result.error instanceof Error ? result.error.message : String(result.error);
+			expect(errorMessage).toMatch(/make\.com host/i);
+			// No authenticated REST call should have been made for the rejected host.
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('runs the pipeline normally for a make.com baseUrl', async () => {
+			const ctx = createMockContext();
+			(ctx.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+				apiKey: 'test-api-key',
+				baseUrl: 'https://eu1.make.com/api/v2'
+			});
+			await plugin.onLoad(ctx);
+			mockSuccessfulScenarioRun(fetchMock);
+
+			const result = await plugin.execute(createWork(), createRequest(), createExisting());
+
+			expect(result.success).toBe(true);
+			expect(result.outputs.items.length).toBeGreaterThan(0);
+		});
+	});
+
 	describe('getManifest', () => {
 		it('should return a valid manifest', () => {
 			const manifest = plugin.getManifest();
