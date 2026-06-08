@@ -112,6 +112,9 @@ export class OpenAiPlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
+				// Security (D4): a SaaS provider API endpoint is admin-controlled — a
+				// non-admin user must not repoint it (defense-in-depth atop the SSRF guard).
+				'x-adminOnly': true,
 				description: 'OpenAI API endpoint',
 				default: 'https://api.openai.com/v1',
 				'x-hidden': true
