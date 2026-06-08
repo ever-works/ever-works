@@ -66,16 +66,25 @@ import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
  *   drives orgId from work.organizationId, so an unpaired Work (organizationId
  *   null) resolves to org-scope [] and the inherited section unmounts.
  *
- * UI selectors verified against real source (KbTreePanel.tsx / KbTreeDocRow.tsx /
- * KbShell.tsx / KbDocumentView):
- *   - kb-shell (data-work-id)
- *   - kb-tree / kb-tree-count
- *   - kb-tree-inherited  ("Inherited from organization" section; mounts iff >=1 org-scoped doc)
- *   - kb-tree-inherited-<class>-<slug>  (data-source="inherited", data-doc-path, data-doc-class)
- *   - kb-tree-item (data-doc-path)      Work-owned row
- *   - kb-tree-group-<class>             per-class Work-owned group
- *   - kb-editor (data-inherited="true" on inherited detail view)
- *   - kb-inherited-banner / kb-inherited-banner-icon (🔒) / kb-inherited-override-cta
+ * UI MIGRATION (EW-641 workbench) — the legacy KB UI this spec targeted
+ * (KbShell / KbTreePanel / KbTreeDocRow / KbDocumentView with an "Inherited
+ * from organization" tree section) has been replaced by the workbench
+ * (apps/web/src/components/kb/workbench/*). The workbench tree
+ * (`KbTreePanel.tsx`) does NOT yet render an inherited section — that
+ * affordance is deferred to EW-641 slices C/E — so the inherited-TREE UI
+ * selectors this spec relied on (`kb-tree-inherited*`,
+ * `kb-inherited-banner*`, the `data-inherited` detail-view stamp) have no
+ * workbench equivalent. Tests whose CORE assertion is the inherited tree
+ * (flows 1, 2, 6) are `test.skip(...)`'d with that reason; the rest keep
+ * their full API coverage and migrate to the workbench selectors:
+ *   - kb-shell                          → kb-workbench-shell
+ *   - kb-tree                           → kb-workbench-tree (data-work-id)
+ *   - kb-tree-group-<class>             → kb-workbench-group-<class> (+ toggle
+ *                                          kb-workbench-group-toggle-<class>)
+ *   - kb-tree-item (data-doc-path)      → kb-workbench-row-<docId> (data-doc-path)
+ *   - kb-editor                         → kb-workbench-editor (data-doc-id)
+ *   - kb-editor-body / kb-document-body → kb-tiptap-editor-body (contenteditable)
+ *   - kb-tree-inherited*                → (no workbench equivalent yet — slices C/E)
  *
  * ───────────────────────────────────────────────────────────────────────
  * NOTES / GOTCHAS honoured:
@@ -203,6 +212,19 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
         page,
         request,
     }) => {
+        // The core of this test is the inherited TREE UI re-mounting the
+        // org-scoped row after an override DELETE restores inheritance
+        // (`kb-tree-inherited` / `kb-tree-inherited-legal-privacy`). The new
+        // workbench tree (`KbTreePanel`) has NO inherited section yet — that
+        // affordance is deferred to EW-641 slices C/E — so the UI assertions
+        // that are the point of this test cannot pass against the current
+        // workbench. The pure-API restore-inheritance contract is fully
+        // covered by `re-override after restore` (test 3) below, so we skip
+        // the whole test rather than half-migrate it.
+        test.skip(
+            true,
+            'workbench inherited-tree UI deferred to EW-641 slices C/E — re-enable when built',
+        );
         // First KB-page hit triggers Next dev-mode compilation; budget like the
         // other authenticated KB specs.
         test.setTimeout(KB_PAGE_TIMEOUT);
@@ -306,6 +328,19 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
         page,
         request,
     }) => {
+        // The point of this test is the UI proving that the two never-overridden
+        // classes stay in the inherited TREE section while the overridden one
+        // leaves it (`kb-tree-inherited-style-voice` / `-seo-meta` remain,
+        // `kb-tree-inherited-legal-privacy` goes away). The new workbench tree
+        // has no inherited section yet (deferred to EW-641 slices C/E), so the
+        // class-isolation-in-the-merge-map invariant that this UI visualises is
+        // not observable through the current workbench. The API-level partial
+        // override isolation is still exercised by the other deep flows, so we
+        // skip the whole test rather than drop its UI coverage.
+        test.skip(
+            true,
+            'workbench inherited-tree UI deferred to EW-641 slices C/E — re-enable when built',
+        );
         test.setTimeout(KB_PAGE_TIMEOUT);
 
         const token = await seededToken(request);
@@ -544,45 +579,55 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
         expect(missingRes.status(), 'missing org path 404s').toBe(404);
 
         // UI BEST-EFFORT (gated on API truth above): the merged set masks the
-        // inherited row (override workId !== null) so the tree shows a Work-owned
-        // row. The detail route renders in CI but can 404 to the catch-all
-        // LOCALLY, so we assert only the stable tree page + tolerate the detail
-        // view with .or().
+        // inherited row (override workId !== null) so the workbench tree shows a
+        // Work-owned row at this path. The new workbench tree (`KbTreePanel`)
+        // has NO inherited section yet (deferred to EW-641 slices C/E), so we no
+        // longer assert the absence of an inherited row — instead we confirm the
+        // Work-owned override row is present (its presence at this path IS the
+        // "override masks inheritance" signal the user sees). Rows are
+        // `kb-workbench-row-<docId>` and carry `data-doc-path`; we locate by the
+        // stable path attribute. The detail route renders in CI but can 404 to
+        // the catch-all LOCALLY, so we assert only the stable tree page first,
+        // then best-effort the detail view.
         await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        await expect(page.getByTestId('kb-tree')).toBeVisible({ timeout: 30_000 });
-        // Overridden → not in inherited section; Work-owned row present.
-        await expect(page.getByTestId('kb-tree-inherited-legal-privacy')).toHaveCount(0, {
-            timeout: 15_000,
-        });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+        // Overridden → the Work now OWNS a row at this path. The legal group is
+        // expanded by default on the index page only when it holds the active
+        // doc, so click the legal group toggle to reveal its rows, then assert
+        // the Work-owned row at legal/privacy.md.
+        const legalToggle = page.getByTestId('kb-workbench-group-toggle-legal');
+        await expect(legalToggle).toBeVisible({ timeout: 15_000 });
+        if ((await legalToggle.getAttribute('aria-expanded')) !== 'true') {
+            await legalToggle.click();
+        }
         const workOwnedRow = page.locator(
-            '[data-testid="kb-tree-item"][data-doc-path="legal/privacy.md"]',
+            '[data-testid^="kb-workbench-row-"][data-doc-path="legal/privacy.md"]',
         );
         await expect(workOwnedRow).toBeVisible({ timeout: 15_000 });
 
         // ── Detail-view nav: the Work-owned row deep-links to the editable
-        // (non-inherited) detail route. The detail route mounts `KbEditor`
-        // (a heavy 'use client' Tiptap surface) for Work-owned docs; its
-        // server-rendered `<section data-testid="kb-editor">` shell can paint
-        // before Tiptap hydrates, and under next-dev + shard load the editable
-        // surface (`kb-editor-body`, rendered by `EditorContent`) does NOT
-        // always mount within a single timeout. We HARDEN by retrying the
-        // route with a RELOAD on every miss (which re-kicks hydration) over a
-        // generous budget, then assert the inheritance CONTRACT on whichever
-        // real surface actually mounted — the LIVE editor first, else the
-        // equivalent read-only document body the same route renders — so the
-        // "Work-owned doc is NOT inherited" contract is asserted end-to-end
-        // rather than hard-failing on a dev-only paint gap.
+        // detail route. The detail route mounts `TiptapEditor` (a heavy
+        // 'use client' contenteditable surface) for Work-owned markdown docs;
+        // its server-rendered `<div data-testid="kb-workbench-editor">` shell
+        // can paint before Tiptap hydrates, and under next-dev + shard load the
+        // editable surface (`kb-tiptap-editor-body`, rendered by
+        // `EditorContent`) does NOT always mount within a single timeout. We
+        // HARDEN by retrying the route with a RELOAD on every miss (which
+        // re-kicks hydration) over a generous budget, then assert the override
+        // CONTRACT on whichever real surface actually mounted — so the
+        // "Work-owned override resolves on the detail route" contract is asserted
+        // end-to-end rather than hard-failing on a dev-only paint gap.
         const detailUrl = `/en/works/${workId}/kb/legal/privacy.md`;
-        const editor = page.getByTestId('kb-editor');
+        const editor = page.getByTestId('kb-workbench-editor');
         // The editable Tiptap surface is the true "live editor hydrated" signal
-        // (the `<section>` shell alone server-renders before hydration). The
-        // read-only fallback the same route can render exposes `kb-document-body`
-        // instead — either one proves the detail route resolved the doc.
-        const liveEditorSurface = page.getByTestId('kb-editor-body');
-        const readOnlyBody = page.getByTestId('kb-document-body');
+        // (the editor shell alone server-renders before hydration). When the
+        // editor isn't ready yet, `TiptapEditor` renders the SAME
+        // `kb-tiptap-editor-body` testid on a placeholder node, so either way
+        // its presence proves the detail route resolved this Work-owned doc.
+        const liveEditorSurface = page.getByTestId('kb-tiptap-editor-body');
 
-        type DetailSurface = 'live-editor' | 'read-only' | 'none';
+        type DetailSurface = 'live-editor' | 'none';
         let surface: DetailSurface = 'none';
         // The retry RELOADS the route each pass to re-kick hydration. We swallow
         // the eventual timeout (rather than let it fail the test) so that when
@@ -593,10 +638,11 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
             // Assert the root editor shell first (server-rendered, fast) so a
             // stuck pass surfaces as a retry rather than a silent miss.
             await page.goto(detailUrl, { waitUntil: 'domcontentloaded' });
-            await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 30_000 });
+            await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 30_000 });
             await expect(editor).toBeVisible({ timeout: 20_000 });
 
-            // Prefer the LIVE editor when its editable surface actually hydrates.
+            // Confirm the editor body surface mounts (live editor or its
+            // placeholder — both expose `kb-tiptap-editor-body`).
             if (
                 await liveEditorSurface
                     .waitFor({ state: 'visible', timeout: 15_000 })
@@ -606,19 +652,8 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
                 surface = 'live-editor';
                 return;
             }
-            // Otherwise accept the read-only document body the same route renders
-            // (full-render fallback) — still the real KB detail surface.
-            if (
-                await readOnlyBody
-                    .waitFor({ state: 'visible', timeout: 5_000 })
-                    .then(() => true)
-                    .catch(() => false)
-            ) {
-                surface = 'read-only';
-                return;
-            }
-            // Neither inner surface mounted this pass — fail so `toPass` reloads.
-            throw new Error('KB detail editor/body surface did not mount yet; reloading');
+            // The inner surface didn't mount this pass — fail so `toPass` reloads.
+            throw new Error('KB detail editor body surface did not mount yet; reloading');
         })
             .toPass({ timeout: 90_000, intervals: [1_000, 2_000, 5_000] })
             .catch(() => {
@@ -627,12 +662,29 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
             });
 
         if (surface !== 'none') {
-            // The detail route resolved the Work-owned doc on a real surface →
-            // assert the inheritance CONTRACT directly in the DOM: a Work-owned
-            // detail view is NEVER inherited (no `data-inherited="true"`, which
-            // only `KbDocumentView isInherited` stamps), and the URL is the doc.
-            await expect(editor).not.toHaveAttribute('data-inherited', 'true');
+            // The detail route resolved the Work-owned doc on a real editor
+            // surface → assert the override CONTRACT directly in the DOM. The
+            // editor shell stamps `data-doc-id` from the resolved document, and
+            // because the override masks the org row the route can ONLY resolve
+            // the Work's own override here — so `data-doc-id === override.id` is
+            // the "override masks inheritance" proof end-to-end. The URL is the
+            // doc path. (Both hold whether or not Tiptap finished hydrating, so
+            // they are the load-bearing assertions.)
+            await expect(editor).toHaveAttribute('data-doc-id', override.id);
             await expect(page).toHaveURL(/\/kb\/legal\/privacy\.md$/, { timeout: 15_000 });
+            // BEST-EFFORT body check: when Tiptap actually hydrated (not just the
+            // server-rendered placeholder), the rendered markdown carries the
+            // WORK-OWNED body, never the ORG body. Tolerate the placeholder case
+            // (dev-only hydration gap) since `data-doc-id` already proves which
+            // row resolved.
+            const renderedWorkBody = await liveEditorSurface
+                .filter({ hasText: 'WORK-OWNED body' })
+                .first()
+                .isVisible()
+                .catch(() => false);
+            if (renderedWorkBody) {
+                await expect(liveEditorSurface).not.toContainText('ORG-OWNED body');
+            }
         } else {
             // DEGRADE: the live route never painted a usable surface under load
             // (dev-only hydration/catch-all gap). Re-assert the SAME contract
@@ -661,7 +713,7 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
             test.info().annotations.push({
                 type: 'note',
                 description:
-                    'KB detail route did not paint a usable editor/body surface under next-dev load; the Work-owned (non-inherited) override contract was re-asserted end-to-end via the KB API.',
+                    'KB workbench detail route did not paint a usable editor surface under next-dev load; the Work-owned (override-masks-inheritance) contract was re-asserted end-to-end via the KB API.',
             });
         }
     });
@@ -752,6 +804,20 @@ test.describe('Knowledge Base — inherited override lifecycle (deep, #1192)', (
         page,
         request,
     }) => {
+        // The whole assertion of this test is the inherited TREE section
+        // mounting when paired, unmounting on unpair, and re-mounting on re-pair
+        // (`kb-tree-inherited`, `kb-tree-inherited-legal-privacy`,
+        // `kb-tree-inherited-style-voice`). The new workbench tree
+        // (`KbTreePanel`) has no inherited section yet — deferred to EW-641
+        // slices C/E — so the pair-toggle visibility journey cannot be observed
+        // through the current workbench. The pure-API pair/unpair contract is
+        // still exercised inline below for documentation, but with no inherited
+        // tree to assert against there is nothing UI-observable to keep, so we
+        // skip the whole test rather than half-migrate it.
+        test.skip(
+            true,
+            'workbench inherited-tree UI deferred to EW-641 slices C/E — re-enable when built',
+        );
         test.setTimeout(KB_PAGE_TIMEOUT);
 
         const token = await seededToken(request);

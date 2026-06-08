@@ -203,13 +203,38 @@ test.describe('Flow — KB document lifecycle', () => {
         expect(listed!.source).toBe('imported');
         expect(listed!.sourceUploadId).toBe(uploaded.upload.id);
 
-        // 4. The new doc renders in the real KB tree UI. router.refresh()
-        //    inside the upload zone re-fetches the server tree, but here we
-        //    seeded via API, so navigate fresh and assert the tree leaf.
+        // 4. The new doc renders in the real KB workbench tree UI. The
+        //    workbench shell (`kb-workbench-shell`) hosts the left tree
+        //    (`kb-workbench-tree`), which client-fetches the same
+        //    `/api/works/:id/kb/documents` list we asserted above. Class
+        //    groups are COLLAPSED by default, so we expand the `freeform`
+        //    group (the upload's targetClass) to reveal the doc row. The row
+        //    testid is keyed by document id (`kb-workbench-row-<id>`) and also
+        //    carries `data-doc-path`.
         await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        const treeItem = page.locator(`[data-testid="kb-tree-item"][data-doc-path="${docPath}"]`);
-        await expect(treeItem).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+
+        const freeformToggle = page.getByTestId('kb-workbench-group-toggle-freeform');
+        await expect(freeformToggle).toBeVisible({ timeout: 30_000 });
+        await freeformToggle.click();
+
+        const treeRow = page.getByTestId(`kb-workbench-row-${docId}`);
+        await expect(treeRow).toBeVisible({ timeout: 30_000 });
+        // The row links to the canonical `<class>/<slug>.md` doc path.
+        await expect(treeRow).toHaveAttribute('data-doc-path', docPath);
+
+        // 4b. Navigate into the document via the tree row → the detail route
+        //     renders the Tiptap editor (markdown text MIME → WYSIWYG, not an
+        //     inline binary viewer). Assert the rendered BODY contains the
+        //     heading text (Tiptap renders markdown to HTML, so we assert on
+        //     the visible TEXT — never the raw markdown string).
+        await treeRow.click();
+        await page.waitForURL(new RegExp(`/works/${workId}/kb/`), { timeout: 30_000 });
+        await expect(page.getByTestId('kb-tiptap-editor-body')).toContainText(
+            `KB Lifecycle ${runId}`,
+            { timeout: 60_000 },
+        );
 
         // 5. Fetch the document BODY via both id and `<class>/<slug>.md` path —
         //    both resolve to the same KbDocumentBodyDto with the markdown body.

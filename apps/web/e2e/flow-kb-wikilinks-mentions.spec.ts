@@ -71,18 +71,26 @@ import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helper
  *    until an indexing/consumer pass runs, which the sqlite e2e driver
  *    does not perform). Assert the array shape + endpoint scoping
  *    (missing docId → 404), never a non-empty backlink list.
- *  - WIKILINK RENDER: a FULLY-LOCKED text doc renders read-only via
- *    `KbDocumentView`, which runs `rewriteWikilinks(body, workId)` →
- *    `[Label](/works/<workId>/kb/<class>/<slug>.md)`. The anchor is
- *    materialised by client-side `react-markdown` after hydration, so
- *    it is observable in the browser `page` (not in the raw curl HTML).
- *    Non-locked text docs mount the Tiptap `KbEditor` instead
- *    (`data-testid="kb-editor-body"`), where `[[` is the wikilink
- *    trigger and `@` the mention trigger.
- *  - `rewriteWikilinks` SECURITY: rejects URL-scheme targets
- *    (`javascript:`, `https://`), absolute paths, `..` traversal, and
- *    whitespace targets — leaving the raw `[[…]]` text un-rewritten so
- *    no unsafe href is synthesised.
+ *  - WIKILINK RENDER (legacy KB UI): a FULLY-LOCKED text doc used to
+ *    render read-only via `KbDocumentView`, which ran
+ *    `rewriteWikilinks(body, workId)` →
+ *    `[Label](/works/<workId>/kb/<class>/<slug>.md)`, the anchor
+ *    materialised by client-side `react-markdown`. The EW-641 WORKBENCH
+ *    replaced that viewer: the route now ALWAYS mounts the Tiptap WYSIWYG
+ *    editor (`kb-tiptap-editor-body`, a contenteditable) for Markdown docs
+ *    — locked OR not — round-tripping Markdown via `tiptap-markdown` and
+ *    never running `rewriteWikilinks`. `[[` is still the wikilink trigger
+ *    (popover `kb-workbench-wikilink-popover`) and `@` the mention trigger
+ *    (popover `kb-workbench-mention-popover`). Because the workbench has no
+ *    read-only `rewriteWikilinks` render surface, the authored-time
+ *    wikilink-ANCHOR-render assertions are skipped here (their API-level
+ *    RESOLUTION coverage is preserved); see the `test.skip` notes below.
+ *  - `rewriteWikilinks` SECURITY (legacy KB UI): rejected URL-scheme
+ *    targets (`javascript:`, `https://`), absolute paths, `..` traversal,
+ *    and whitespace targets — leaving the raw `[[…]]` text un-rewritten so
+ *    no unsafe href was synthesised. This is a client-render-time property
+ *    of the legacy `wikilink-md.ts` rewriter the workbench editor does not
+ *    invoke, so the XSS-guard UI assertions are skipped (no API equivalent).
  *
  * Cross-spec isolation: API-only orchestration runs on FRESH
  * register-a-throwaway-user tokens minted here (unique emails). The
@@ -264,10 +272,12 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
             body: `See [[The Target|${goodTargetPath}]] and a [[${brokenTargetPath}]] broken link.`,
         });
 
-        // Lock the linker FULLY so the route renders the read-only
-        // `KbDocumentView`, which runs `rewriteWikilinks` → real anchors.
-        // (Non-locked text docs mount the Tiptap editor instead, where the
-        // body is editable rather than markdown-rendered.)
+        // Lock the linker FULLY. In the OLD KB UI this flipped the route to a
+        // read-only `KbDocumentView` that ran `rewriteWikilinks` → real
+        // anchors. Lock is still a real, asserted state transition (200), and
+        // its lock badge is surfaced by the workbench header
+        // (`kb-workbench-lock-badge`), but the workbench no longer renders a
+        // read-only markdown viewer for locked text docs (see skip note below).
         const lockRes = await page.request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${linker.id}/lock`,
             { headers: authedHeaders(access_token), data: { mode: 'full' } },
@@ -275,8 +285,8 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         expect(lockRes.status(), 'lock full → 200').toBe(200);
 
         // AUTHORITATIVE resolution behind the anchors (env-INDEPENDENT — the
-        // real "broken wikilink is a real end state" proof, asserted FIRST so
-        // it runs even where the dev-route quirk below suppresses the UI):
+        // real "broken wikilink is a real end state" proof). This is the
+        // load-bearing wikilink-resolution coverage and is PRESERVED in full:
         // the GOOD target resolves to a real KbDocumentBodyDto (200), the
         // BROKEN one 404s with the not-found contract.
         const goodResolve = await page.request.get(
@@ -294,55 +304,23 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         const brokenJson = (await brokenResolve.json()) as { statusCode: number; message: string };
         expect(brokenJson.statusCode).toBe(404);
 
-        // Navigate to the locked linker doc. The route 307s /en/works → /works
-        // (locale-prefix strip); land on either form.
-        await page.goto(`/en/works/${workId}/kb/${linkerPath}`, {
-            waitUntil: 'domcontentloaded',
-        });
-
-        // DEVIATION (turbopack `next dev`): the nested `/works/[id]/kb/[...path]`
-        // catch-all is shadowed by the localized `[locale]` catch-all and
-        // renders the built-in "Page not found" page LOCALLY (HTTP 200, no
-        // `kb-document-body`), while it renders the real read-only viewer in
-        // CI. Wait for the render to SETTLE on either surface, then assert the
-        // wikilink-rewrite contract only where the viewer actually mounted.
-        const body = page.getByTestId('kb-document-body');
-        const notFound = page.getByRole('heading', { name: 'Page not found' });
-        await expect(body.or(notFound).first()).toBeVisible({ timeout: 60_000 });
-
-        if ((await body.count()) > 0) {
-            // `rewriteWikilinks` lifts each safe `[[Label|class/slug.md]]` into
-            // a CommonMark link `[Label](/works/<workId>/kb/<class>/<slug>.md)`,
-            // which react-markdown materialises as an `<a>` after hydration.
-            // The visible anchor TEXT is the wikilink label — that is the
-            // stable, security-independent contract of the rewrite.
-            //
-            // NOTE: `MarkdownPreview` renders every anchor through its
-            // `SafeAnchor` hardening (apps/web/.../items/MarkdownPreview.tsx),
-            // which collapses any href that is not `http(s):` to `#` as a
-            // defence-in-depth XSS guard. Our in-app KB target is a *relative*
-            // path, so the rendered `href` is `#`, not the literal
-            // `/works/.../kb/...` string. We therefore assert the rewrite via
-            // the anchor's label + the fact that the wikilink became a real
-            // `<a>` (no leftover `[[…]]` bracket text), NOT via the href.
-            const goodAnchor = body.getByRole('link', { name: 'The Target', exact: true });
-            await expect(goodAnchor).toBeVisible({ timeout: 30_000 });
-
-            // The BROKEN wikilink ALSO rewrites to an in-app anchor (the
-            // rewriter is path-shape based, not existence based) — the
-            // brokenness only shows when the target route 404s (asserted
-            // above against the API). Its label is the basename.
-            const brokenAnchor = body.getByRole('link', { name: `missing-${runId}`, exact: true });
-            await expect(brokenAnchor).toBeVisible({ timeout: 30_000 });
-
-            // Both safe wikilinks were lifted out of their `[[…]]` syntax —
-            // no raw wikilink bracket text survives in the rendered body.
-            await expect(body).not.toContainText('[[');
-        } else {
-            // Local dev-route shadow: the KB viewer route resolved to the
-            // localized not-found page rather than crashing or redirecting.
-            await expect(notFound).toBeVisible();
-        }
+        // WORKBENCH MIGRATION — the UI half of this test (locking a doc so the
+        // route renders the read-only `KbDocumentView`, whose client-side
+        // `react-markdown` runs `rewriteWikilinks(body, workId)` to materialise
+        // `[[Label|class/slug.md]]` into in-app `<a>` anchors) targets the OLD
+        // KB UI that the workbench replaced. The new route ALWAYS mounts the
+        // Tiptap WYSIWYG editor for Markdown docs (locked or not) — it does a
+        // `tiptap-markdown` round-trip and never runs `rewriteWikilinks`, so
+        // there is no `kb-document-body` read-only surface and no
+        // react-markdown anchor rendering to assert against. The authored-time
+        // wikilink-rewrite render contract has no equivalent UI in the
+        // workbench yet. The API-level wikilink RESOLUTION coverage above
+        // (good → 200, broken → 404) — the substantive end-to-end proof — has
+        // already run; only the dead-UI anchor-render assertions are skipped.
+        test.skip(
+            true,
+            'workbench renders locked Markdown docs via the Tiptap editor (tiptap-markdown round-trip), not the read-only KbDocumentView/rewriteWikilinks react-markdown viewer — authored-time wikilink-anchor rendering UI not built in the workbench (EW-641); API-level wikilink resolution asserted above',
+        );
     });
 
     test('`kb:{class}/{slug}` citation resolves to the doc body; bare slug + missing slug do not', async ({
@@ -604,10 +582,20 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         }
 
         // 3. The EDITOR surface that hosts the `[[` (wikilink) and `@`
-        //    (mention) triggers mounts for a non-locked text doc. Seed one,
-        //    navigate, and assert the Tiptap body is present + editable —
-        //    this is where an author types `[[` / `@` to invoke the pickers
+        //    (mention) triggers mounts for a text doc. Seed one, navigate, and
+        //    assert the workbench Tiptap body is present — this is where an
+        //    author types `[[` / `@` to invoke the workbench pickers
+        //    (`kb-workbench-wikilink-popover` / `kb-workbench-mention-popover`)
         //    whose data sources we validated above.
+        //
+        //    WORKBENCH MIGRATION: the old `KbEditor` (`kb-editor-body` +
+        //    explicit `kb-editor-save` button + `kb-editor-status`) was
+        //    replaced by `TiptapEditor` — a contenteditable
+        //    (`kb-tiptap-editor-body`) with NO save button (autosave on an
+        //    800ms debounce) and a `kb-workbench-status` pill. We assert the
+        //    contenteditable mounted with the seeded body text + the autosave
+        //    status indicator, which together prove the live editor (the
+        //    `[[`/`@` trigger host) rendered rather than a read-only viewer.
         const editable = await createDoc(page.request, access_token, workId, {
             path: `freeform/scratch-${runId}.md`,
             title: `Scratch ${runId}`,
@@ -624,21 +612,27 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
         // not found" page LOCALLY (HTTP 200, no editor), while it mounts the
         // real Tiptap editor in CI. Settle on either surface, then assert the
         // editor contract only where the editor actually mounted.
-        const editorBody = page.getByTestId('kb-editor-body');
+        const editorBody = page.getByTestId('kb-tiptap-editor-body');
         const notFound = page.getByRole('heading', { name: 'Page not found' });
         await expect(editorBody.or(notFound).first()).toBeVisible({ timeout: 60_000 });
 
         if ((await editorBody.count()) > 0) {
-            // The save affordance (proves the live Tiptap editor mounted, not
-            // the read-only viewer). Tolerate dev hydration: poll for it.
+            // The Tiptap contenteditable renders the seeded Markdown as text
+            // (the `# Scratch …` heading becomes visible body text), proving
+            // the live WYSIWYG editor mounted rather than a read-only viewer.
+            await expect(editorBody.first()).toContainText(`Scratch ${runId}`, {
+                timeout: 30_000,
+            });
+            // The autosave status pill (`kb-workbench-status`) is the
+            // workbench replacement for the old explicit save button — its
+            // presence proves the autosave-backed editor is live. It may be
+            // `sr-only` when idle, so assert on presence (count), not
+            // visibility. Tolerate dev hydration: poll for it.
             await expect
-                .poll(
-                    async () =>
-                        (await page.getByTestId('kb-editor-save').count()) > 0 ||
-                        (await page.getByTestId('kb-editor-status').count()) > 0,
-                    { timeout: 30_000 },
-                )
-                .toBeTruthy();
+                .poll(async () => page.getByTestId('kb-workbench-status').count(), {
+                    timeout: 30_000,
+                })
+                .toBeGreaterThan(0);
         } else {
             // Local dev-route shadow: the editor route resolved to the
             // localized not-found page rather than crashing or redirecting.
@@ -682,66 +676,33 @@ test.describe('Flow — KB wikilinks, mentions & citations', () => {
             body: unsafeBody,
         });
 
-        // Lock FULLY → the read-only `KbDocumentView` runs `rewriteWikilinks`
-        // and renders the result via client-side react-markdown.
+        // Lock FULLY. In the OLD KB UI this flipped the route to the read-only
+        // `KbDocumentView`, which ran `rewriteWikilinks` and rendered the
+        // result via client-side react-markdown. Lock is still a real, asserted
+        // state transition (200).
         const lockRes = await page.request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/lock`,
             { headers: authedHeaders(access_token), data: { mode: 'full' } },
         );
         expect(lockRes.status(), 'lock full → 200').toBe(200);
 
-        await page.goto(`/en/works/${workId}/kb/freeform/safety-${runId}.md`, {
-            waitUntil: 'domcontentloaded',
-        });
-        // DEVIATION (turbopack `next dev`): the nested `kb/[...path]` route is
-        // shadowed by the localized catch-all and renders the built-in "Page
-        // not found" page LOCALLY (HTTP 200, no `kb-document-body`), while it
-        // renders the read-only viewer in CI. Settle on either surface, then
-        // assert the XSS-guard contract only where the viewer actually mounted.
-        const body = page.getByTestId('kb-document-body');
-        const notFound = page.getByRole('heading', { name: 'Page not found' });
-        await expect(body.or(notFound).first()).toBeVisible({ timeout: 60_000 });
-
-        if ((await body.count()) > 0) {
-            // The SAFE wikilink IS lifted into an in-app anchor by
-            // `rewriteWikilinks` (label "Ok"). `MarkdownPreview.SafeAnchor`
-            // then collapses its *relative* href to `#` as a defence-in-depth
-            // XSS guard (only `http(s):` hrefs survive), so we identify the
-            // wikilink anchor by its LABEL, not its href.
-            const safeAnchor = body.getByRole('link', { name: 'Ok', exact: true });
-            await expect(safeAnchor).toBeVisible({ timeout: 30_000 });
-
-            // No `javascript:` href is EVER synthesised — the real XSS vector.
-            // The unsafe wikilink stays literal text; `react-markdown` +
-            // `remark-gfm` never autolink a `javascript:` scheme, and
-            // `SafeAnchor` would neutralise it to `#` even if one appeared.
-            await expect(body.locator('a[href^="javascript:"]')).toHaveCount(0);
-            // The unsafe targets survive as raw `[[…]]` bracket text (the
-            // rewriter refused them via `isSafePath`), rather than being
-            // emitted as a mangled-but-unsafe in-app anchor.
-            await expect(body).toContainText('[[evil|javascript:alert(1)]]');
-            await expect(body).toContainText('[[abs|/etc/passwd]]');
-            await expect(body).toContainText(`[[trav|../secrets-${runId}.md]]`);
-
-            // The crux: exactly ONE wikilink-rewritten anchor exists in the
-            // body — the single safe target, whose label "Ok" is NOT a URL.
-            // The four unsafe wikilinks produced ZERO synthesised anchors
-            // (absolute path, `..` traversal, and the two URL schemes were all
-            // refused by `isSafePath`). remark-gfm DOES autolink the bare
-            // `https://evil.example/x` left inside the un-rewritten bracket
-            // text, but that is a plain-markdown autolink (its visible text IS
-            // the raw URL) — not a synthesised KB route. So every anchor that
-            // is NOT a bare-URL autolink must be the lone safe wikilink.
-            const anchors = body.locator('a');
-            const labels = await anchors.allInnerTexts();
-            const wikilinkAnchorLabels = labels
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0 && !/^https?:\/\//i.test(s));
-            expect(wikilinkAnchorLabels).toEqual(['Ok']);
-        } else {
-            // Local dev-route shadow: the KB viewer route resolved to the
-            // localized not-found page rather than crashing or redirecting.
-            await expect(notFound).toBeVisible();
-        }
+        // WORKBENCH MIGRATION — the entire assertion body of this test is the
+        // `rewriteWikilinks` defence-in-depth XSS guard, observed through the
+        // OLD read-only `KbDocumentView` + `MarkdownPreview.SafeAnchor`
+        // react-markdown render path. The workbench replaced that viewer with
+        // the Tiptap WYSIWYG editor (`tiptap-markdown` round-trip) for ALL
+        // Markdown docs, locked or not — it never runs `rewriteWikilinks` and
+        // exposes no `kb-document-body` read-only surface. The wikilink-rewrite
+        // safety filter (`isSafePath`) is a property of the legacy
+        // `wikilink-md.ts` rewriter that the workbench editor does not invoke,
+        // so this UI-level XSS contract has no equivalent surface in the new
+        // workbench yet. The doc + unsafe-target fixtures and the lock
+        // transition above still exercise the setup path; only the dead-UI
+        // anchor-render assertions are skipped (no API-level equivalent exists
+        // for this purely client-render-time rewrite behaviour).
+        test.skip(
+            true,
+            'workbench renders locked Markdown docs via the Tiptap editor (tiptap-markdown round-trip), not the read-only KbDocumentView/MarkdownPreview react-markdown viewer — the rewriteWikilinks XSS guard (isSafePath) is a legacy client-render-time behaviour with no workbench surface (EW-641)',
+        );
     });
 });

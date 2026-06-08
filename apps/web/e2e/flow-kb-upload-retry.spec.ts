@@ -23,13 +23,13 @@ import { seedKbSkippedUpload } from './helpers/kb-fixtures';
  *     because today it would fail until the header is wired.
  *
  *   - A37 needs a path that actually surfaces an `extractionError`
- *     value. The CI sqlite env has no in-process buffer-extractor
- *     failure injector, so the only ways to populate the column are
- *     (a) the reconcile sweep flipping a stale row, which requires
- *     external schedulers, or (b) a real failing extractor (PDF/audio).
- *     We assert the GET CONTRACT — the upload row exposes the field
- *     and it's null/undefined in the happy path — and gate the
- *     populated-value branch behind `KB_E2E_LIVE`.
+ *     value. An octet-stream upload has no extractor route, so the
+ *     service's SKIPPED branch already populates `extractionError` with
+ *     the "No extractor route for <mime> yet (…)" message — we assert
+ *     that exact non-null contract in CI. Driving a FAILED-status
+ *     extraction (corrupt PDF/audio, or the reconcile sweep flipping a
+ *     stale row) still needs external infra, so that branch stays gated
+ *     behind `KB_E2E_LIVE`.
  *
  * Realistic test data: each scenario fabricates a fresh user and a
  * fresh Work via the existing helpers. Bodies are run-id stamped so
@@ -183,9 +183,12 @@ test.describe('flow: KB upload retry acceptance (A36/A37)', () => {
         });
 
         // Seed an upload via the SKIPPED branch (octet-stream has no
-        // extractor route). This populates the upload row with a stable
-        // `extractionError: null` baseline that the GET shape must
-        // expose so the UI can surface the column.
+        // extractor route). The service's "no extractor route" branch
+        // (knowledge-base.service.ts) marks the row `skipped` AND
+        // populates `extractionError` with the documented
+        // "No extractor route for <mime> yet (…)" message — so the GET
+        // shape surfaces a real, non-null extractionError that the UI
+        // can render for the skipped binary.
         const opaque = Buffer.from(`A37 opaque payload ${id}`, 'utf8');
         const { uploadId, extractionStatus } = await seedKbSkippedUpload(
             request,
@@ -199,43 +202,47 @@ test.describe('flow: KB upload retry acceptance (A36/A37)', () => {
         expect(baseline.status).toBe(200);
         expect(baseline.body, 'upload row is fetchable').not.toBeNull();
         // CONTRACT: the GET response shape exposes the `extractionError`
-        // field (null for the skipped branch). The UI binds to this
-        // exact field name (kb-upload.types.ts).
+        // field. The UI binds to this exact field name (kb-upload.types.ts).
         expect(
             Object.prototype.hasOwnProperty.call(baseline.body ?? {}, 'extractionError'),
             'upload GET exposes extractionError field',
         ).toBeTruthy();
-        expect(baseline.body?.extractionError ?? null).toBeNull();
+        // The octet-stream upload has no extractor route, so the service
+        // surfaces a non-null extractionError describing that. This is the
+        // real API contract (knowledge-base.service.ts populates
+        // `No extractor route for application/octet-stream yet (...)`).
+        expect(
+            baseline.body?.extractionError ?? null,
+            'skipped octet-stream upload surfaces a non-null extractionError',
+        ).not.toBeNull();
+        expect(baseline.body?.extractionError ?? '').toMatch(/no extractor route/i);
 
         if (KB_E2E_LIVE) {
-            // STRICT: drive a path that populates `extractionError`. In a
-            // live env this means uploading a corrupt PDF or invoking the
-            // reconcile sweep against a stale row. Both depend on the
-            // KB_E2E_LIVE infra (ffmpeg / Trigger.dev cron / S3 backend),
-            // so we skip in CI sqlite and pin the populated-value branch
-            // behind the flag.
+            // STRICT: drive a FAILED-status extraction (distinct from the
+            // SKIPPED branch above, which already surfaces a non-null
+            // extractionError). A real `extractionStatus='failed'` row
+            // means uploading a corrupt PDF or invoking the reconcile
+            // sweep against a stale row. Both depend on the KB_E2E_LIVE
+            // infra (ffmpeg / Trigger.dev cron / S3 backend), so we skip in
+            // CI sqlite and pin the failed-status branch behind the flag.
             //
-            // The minimal contract we can pin here without those deps:
-            // the upload row already supports being PATCHed by the
-            // reconcile service to surface the documented message. If
-            // the env exposes a test-only hook (`__TEST_FORCE_EXTRACT_FAIL__`,
-            // mentioned in the row 23 plan), exercise it here. We TODO
-            // the strict driver and assert the shape only — keeping CI
-            // green while documenting the gate.
+            // If the env exposes a test-only hook
+            // (`__TEST_FORCE_EXTRACT_FAIL__`, mentioned in the row 23 plan),
+            // exercise it here. We TODO the strict driver and assert the
+            // shape only — keeping CI green while documenting the gate.
             test.info().annotations.push({
                 type: 'kb-e2e-live-todo',
                 description:
-                    'KB_E2E_LIVE: a future PR adds the __TEST_FORCE_EXTRACT_FAIL__ test-only seam to drive a real failing extraction here; until then the live-only branch asserts the contract shape only.',
+                    'KB_E2E_LIVE: a future PR adds the __TEST_FORCE_EXTRACT_FAIL__ test-only seam to drive a real failing (FAILED-status) extraction here; until then the live-only branch asserts the contract shape only.',
             });
-            expect(
-                typeof (baseline.body?.extractionError ?? null) === 'string' ||
-                    baseline.body?.extractionError === null,
-            ).toBeTruthy();
+            // extractionError is always a string on the skipped row; live
+            // infra would additionally flip the status to 'failed'.
+            expect(typeof (baseline.body?.extractionError ?? '')).toBe('string');
         } else {
             test.info().annotations.push({
                 type: 'needs-kb-e2e-live',
                 description:
-                    'A37 populated extractionError branch needs ffmpeg/Whisper/external storage to drive a real failing extraction. The GET shape contract above runs unconditionally so the UI binding is still pinned.',
+                    'A37 FAILED-status extractionError branch needs ffmpeg/Whisper/external storage to drive a real failing extraction. The SKIPPED-branch non-null extractionError contract above already runs unconditionally so the UI binding is pinned in CI.',
             });
         }
     });

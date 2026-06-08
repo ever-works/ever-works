@@ -6,27 +6,40 @@ import { seedKbBinaryDoc } from './helpers/kb-fixtures';
 /**
  * EW-641 Phase 1B/d row 21c — A14 acceptance e2e (viewer size caps).
  *
- * Drives the per-MIME viewer dispatcher (row 21b) end-to-end:
+ * Drives the per-MIME viewer dispatcher end-to-end through the new
+ * KB "workbench" UI (`KbDocumentViewerSwitch`), which REUSES the same
+ * `Kb{Pdf,Xlsx,…}Viewer` components (and their `kb-pdf-viewer` /
+ * `kb-xlsx-viewer` testids) as the old detail page, but now wraps each
+ * one in an OUTER `SizeThresholdGate` (`kb-workbench-size-gate` /
+ * `kb-workbench-size-blocked`). That gives TWO tiers of size caps:
  *
- *  A14.1 — PDF under the 30 MiB inline cap: seed a tiny valid PDF byte
- *    stub via the public upload endpoint, navigate to the per-doc
- *    editor route, assert that `KbPdfViewer` mounts in `data-mode="inline"`
- *    (the lazy-loaded iframe canvas — we only check the dispatcher's
- *    outer-container state, not the PDF.js render, so this stays fast
- *    and stable on CI).
+ *   - the workbench gate (`SizeThresholdGate`): PDF 50 MiB, XLSX 15 MiB
+ *     — short-circuits to a download banner BEFORE the viewer mounts.
+ *   - the viewer's own inline cap: PDF 30 MiB, XLSX 5 MiB — decides
+ *     `data-mode="inline"` vs `data-mode="download"` once mounted.
  *
- *  A14.2 — XLSX over the 5 MiB inline cap: seed a 6 MiB zero-filled
- *    buffer (passes the upload endpoint's 200 MiB cap, fails the
- *    KbXlsxViewer's 5 MiB viewer-side threshold), navigate, assert
- *    that `KbXlsxViewer` mounts in `data-mode="download"` AND the
- *    `kb-xlsx-download-fallback` card is visible.
+ *  A14.1 — PDF under BOTH caps (a few-KB valid PDF < 30 MiB < 50 MiB):
+ *    seed via the public upload endpoint, navigate to the per-doc
+ *    workbench route, assert the workbench gate passed through and that
+ *    `KbPdfViewer` mounts in `data-mode="inline"` (we only check the
+ *    dispatcher's outer-container state, not the PDF.js render, so this
+ *    stays fast and stable on CI).
  *
- * The viewer dispatcher lives in
+ *  A14.2 — XLSX in the band between the two caps (~6 MiB > 5 MiB viewer
+ *    cap, but < 15 MiB workbench-gate cap): the workbench gate PASSES
+ *    THROUGH (6 < 15) so the viewer mounts, then the viewer's own 5 MiB
+ *    threshold flips it to `data-mode="download"` and renders the
+ *    `kb-xlsx-download-fallback` card. We assert the gate did NOT block
+ *    AND the viewer-side download fallback is visible.
+ *
+ * The viewer dispatcher is mounted by the workbench route
  * `apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/[...path]/page.tsx`
- * — it fetches the source upload row when `doc.sourceUploadId` is set,
- * runs `pickKbViewer(upload.mimeType)`, and dispatches to the matching
- * `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer`. URL points at the
- * row-21a download proxy (`/api/works/:id/kb/uploads/:uploadId/download`).
+ * — it fetches the source upload row when `doc.sourceUploadId` is set
+ * and forwards `mimeType` / `fileSize` / `downloadUrl` to
+ * `KbDocumentViewerSwitch`, which branches on the bare MIME to the
+ * matching `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer`. The download
+ * URL points at the row-21a proxy
+ * (`/api/works/:id/kb/uploads/:uploadId/download`).
  *
  * Lives in `apps/web/e2e/` so the existing `e2e.yml` workflow picks it
  * up on push to develop / stage / main. Authenticated by the shared
@@ -148,17 +161,22 @@ test.describe('Knowledge Base — A14 viewer size caps', () => {
         });
         // The server stores every extracted upload at `${class}/${slug}.md`
         // (knowledge-base.service.ts ≈ line 1496); the original `.pdf`
-        // extension is dropped during extraction. The viewer dispatcher
+        // extension is dropped during extraction. `KbDocumentViewerSwitch`
         // then picks `KbPdfViewer` from `upload.mimeType`, NOT from the
         // document path, so any matching slug+class is fine here.
         expect(docPath).toMatch(/^freeform\/kb-a14-pdf-.*\.md$/);
 
         await page.goto(`/en/works/${workId}/kb/${docPath}`, { waitUntil: 'domcontentloaded' });
 
+        // The workbench wraps the viewer in `SizeThresholdGate`. A few-KB
+        // PDF is well under the gate's 50 MiB PDF cap, so the gate renders
+        // in pass-through mode and never shows its own size-blocked banner.
+        await expect(page.locator('[data-testid="kb-workbench-size-blocked"]')).toHaveCount(0);
+
         const pdfViewer = page.locator('[data-testid="kb-pdf-viewer"]');
         await expect(pdfViewer).toBeVisible({ timeout: 60_000 });
         await expect(pdfViewer).toHaveAttribute('data-mode', 'inline');
-        // Confirm the download fallback did NOT render — the viewer's
+        // Confirm the viewer's own download fallback did NOT render — the
         // inline branch chose KbPdfViewerCanvas (next/dynamic), not the
         // download-fallback card.
         await expect(page.locator('[data-testid="kb-pdf-download-fallback"]')).toHaveCount(0);
@@ -187,6 +205,12 @@ test.describe('Knowledge Base — A14 viewer size caps', () => {
         // viewer dispatcher then decides on `fileSize` AFTER the row
         // exists, so a slightly oversized real workbook is the cleanest
         // way to drive the > 5 MiB download-fallback branch.
+        //
+        // 6 MiB is deliberately chosen to sit in the band BETWEEN the two
+        // workbench caps: above the viewer's 5 MiB inline cap (so the
+        // viewer flips to download mode) but below the `SizeThresholdGate`
+        // 15 MiB XLSX cap (so the outer gate passes through and the viewer
+        // actually mounts rather than the gate's own size-blocked banner).
         const xlsxBuffer = await makeOversizeXlsx(6 * 1024 * 1024);
         const { path: docPath } = await seedKbBinaryDoc(request, access_token, workId, {
             filename: `kb-a14-xlsx-${runId}.xlsx`,
@@ -198,6 +222,13 @@ test.describe('Knowledge Base — A14 viewer size caps', () => {
         expect(docPath).toMatch(/^freeform\/kb-a14-xlsx-.*\.md$/);
 
         await page.goto(`/en/works/${workId}/kb/${docPath}`, { waitUntil: 'domcontentloaded' });
+
+        // The outer workbench `SizeThresholdGate` must PASS THROUGH here
+        // (6 MiB < its 15 MiB XLSX cap), so it renders the viewer rather
+        // than its own `kb-workbench-size-blocked` banner. If this count
+        // were non-zero the workbench gate would have pre-empted the
+        // viewer-side fallback we actually want to exercise.
+        await expect(page.locator('[data-testid="kb-workbench-size-blocked"]')).toHaveCount(0);
 
         const xlsxViewer = page.locator('[data-testid="kb-xlsx-viewer"]');
         await expect(xlsxViewer).toBeVisible({ timeout: 60_000 });
