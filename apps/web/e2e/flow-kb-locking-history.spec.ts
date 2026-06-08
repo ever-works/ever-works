@@ -441,14 +441,14 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
             // In CI (route renders) the header lock badge must report the full
             // lock mode. The editor still mounts (workbench never swaps to a
             // read-only view) — the lock is enforced server-side.
-            await expect(
-                lockBadge,
-                'full-locked doc shows the header lock badge',
-            ).toBeVisible({ timeout: 30_000 });
-            await expect(
-                lockBadge,
-                'full-locked doc badge reports lockMode=full',
-            ).toHaveAttribute('data-kb-lock-mode', LOCK_FULL, { timeout: 15_000 });
+            await expect(lockBadge, 'full-locked doc shows the header lock badge').toBeVisible({
+                timeout: 30_000,
+            });
+            await expect(lockBadge, 'full-locked doc badge reports lockMode=full').toHaveAttribute(
+                'data-kb-lock-mode',
+                LOCK_FULL,
+                { timeout: 15_000 },
+            );
             // The workbench still renders the editor surface for a locked doc.
             await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 15_000 });
         } else {
@@ -465,10 +465,9 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         expect(downgrade.status, 're-lock additions-only → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
         if (!localCatchAll) {
-            await expect(
-                lockBadge,
-                'additions-only doc still shows the lock badge',
-            ).toBeVisible({ timeout: 60_000 });
+            await expect(lockBadge, 'additions-only doc still shows the lock badge').toBeVisible({
+                timeout: 60_000,
+            });
             await expect(
                 lockBadge,
                 'badge flips to lockMode=additions-only after the downgrade',
@@ -1106,14 +1105,14 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         await page.reload({ waitUntil: 'domcontentloaded' });
 
         const lockBadge = page.getByTestId('kb-workbench-lock-badge');
-        await expect(
-            lockBadge,
-            'a full-locked doc surfaces the header lock badge',
-        ).toBeVisible({ timeout: 60_000 });
-        await expect(
-            lockBadge,
-            'the lock badge reports lockMode=full',
-        ).toHaveAttribute('data-kb-lock-mode', LOCK_FULL, { timeout: 15_000 });
+        await expect(lockBadge, 'a full-locked doc surfaces the header lock badge').toBeVisible({
+            timeout: 60_000,
+        });
+        await expect(lockBadge, 'the lock badge reports lockMode=full').toHaveAttribute(
+            'data-kb-lock-mode',
+            LOCK_FULL,
+            { timeout: 15_000 },
+        );
         // The workbench still renders the editor surface for the locked doc.
         await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 15_000 });
 

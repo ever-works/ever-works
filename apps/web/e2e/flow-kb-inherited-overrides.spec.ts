@@ -209,9 +209,12 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         ]);
 
         // 8. And the Work-owned list now carries the override at that path.
-        const docsRes = await request.get(`${API_BASE}/api/works/${workId}/kb/documents?limit=200`, {
-            headers: authedHeaders(token),
-        });
+        const docsRes = await request.get(
+            `${API_BASE}/api/works/${workId}/kb/documents?limit=200`,
+            {
+                headers: authedHeaders(token),
+            },
+        );
         expect(docsRes.ok()).toBeTruthy();
         const docsBody = (await docsRes.json()) as { items: InheritableDoc[]; total: number };
         const ownedPaths = docsBody.items.map((d) => d.path);
@@ -355,9 +358,12 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         ).toBe(0);
 
         // And the Work-owned list now carries both overrides.
-        const docsRes = await request.get(`${API_BASE}/api/works/${workId}/kb/documents?limit=200`, {
-            headers: authedHeaders(token),
-        });
+        const docsRes = await request.get(
+            `${API_BASE}/api/works/${workId}/kb/documents?limit=200`,
+            {
+                headers: authedHeaders(token),
+            },
+        );
         expect(docsRes.ok()).toBeTruthy();
         const docsBody = (await docsRes.json()) as { items: InheritableDoc[]; total: number };
         const ownedPaths = docsBody.items.map((d) => d.path);
