@@ -91,6 +91,23 @@ describe('sanitizeResponse', () => {
 		});
 	});
 
+	it('strips sensitive fields regardless of key casing', () => {
+		const input = {
+			id: 'u1',
+			email: 'test@example.com',
+			// Uppercased / PascalCased variants that case-sensitive matching
+			// would have leaked through unredacted.
+			PASSWORD: 'hunter2',
+			AccessToken: 'ghp_xxxx',
+			ApiKey: 'sk-abc123',
+			Refresh_Token: 'rt_xxxx',
+			JWT: 'eyJhbGci',
+			Salt: 'random-salt'
+		};
+		const result = sanitizeResponse(input);
+		expect(result).toEqual({ id: 'u1', email: 'test@example.com' });
+	});
+
 	it('preserves non-sensitive fields', () => {
 		const input = {
 			id: '123',

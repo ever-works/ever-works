@@ -16,6 +16,13 @@ export class TriggerInternalApiClient {
             throw new Error('TRIGGER_INTERNAL_API_URL is not configured');
         }
 
+        // The x-trigger-secret header and decrypted plugin-secret payloads transit this
+        // connection. In production, refuse plaintext HTTP so they can't leak on the wire.
+        // Non-production (local dev / in-cluster http://api) keeps working unchanged.
+        if (process.env.NODE_ENV === 'production' && !this.baseUrl.startsWith('https://')) {
+            throw new Error('TRIGGER_INTERNAL_API_URL must use HTTPS');
+        }
+
         if (!this.secret) {
             throw new Error('TRIGGER_INTERNAL_SECRET is not configured');
         }

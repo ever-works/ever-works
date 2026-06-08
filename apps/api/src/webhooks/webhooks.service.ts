@@ -181,6 +181,16 @@ export class WebhooksService {
                     `url ${parsed.hostname} resolves to a private / loopback / link-local address`,
                 );
             }
+            // HMAC-signed webhook payloads must not traverse plaintext http
+            // in non-local envs (the signature/secret would be exposed on the
+            // wire). Local dev/test still allows http above so tunnels work.
+            // Checked after the SSRF guard so private/loopback hosts keep their
+            // existing 403 surface regardless of scheme.
+            if (parsed.protocol !== 'https:') {
+                throw new BadRequestException(
+                    'webhook url must use https in non-local environments',
+                );
+            }
         }
     }
 }

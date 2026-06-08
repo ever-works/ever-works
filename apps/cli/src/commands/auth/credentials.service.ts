@@ -35,6 +35,10 @@ export class CredentialsService {
     static async save(credentials: Credentials): Promise<void> {
         await this.ensureCredentialsDir();
         await fs.writeJson(CREDENTIALS_FILE, credentials, { spaces: 2 });
+        // Security: restrict the credentials file to owner read/write (0o600) so
+        // the stored bearer token is not world-readable. POSIX mode is a no-op on
+        // Windows. The containing dir is hardened to 0o700 separately.
+        await fs.chmod(CREDENTIALS_FILE, 0o600);
     }
 
     static async get(): Promise<Credentials | null> {

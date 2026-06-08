@@ -111,6 +111,37 @@ describe('WebhooksService', () => {
             ).resolves.toBeDefined();
         });
 
+        it('rejects plaintext http in non-local envs (HMAC exposure)', async () => {
+            // A public, non-private https host so the SSRF guard passes and we
+            // isolate the https-only protocol check.
+            process.env.NODE_ENV = 'production';
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).rejects.toThrow(BadRequestException);
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).rejects.toThrow(/https/);
+        });
+
+        it('accepts https in non-local envs', async () => {
+            process.env.NODE_ENV = 'production';
+            // Encryption-at-rest is mandatory in prod before a secret can be
+            // minted; supply a valid 32-byte (hex) key so the https path
+            // reaches a successful create instead of the secret-service guard.
+            process.env.PLATFORM_ENCRYPTION_KEY = 'a'.repeat(64);
+            service = new WebhooksService(repo as any, new WebhookSecretService());
+            await expect(
+                service.create(ACCOUNT, { url: 'https://hooks.example.com/ingest' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('still accepts http in local dev (tunnels)', async () => {
+            process.env.NODE_ENV = 'development';
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).resolves.toBeDefined();
+        });
+
         it('enforces per-account cap (25)', async () => {
             const rows = Array.from({ length: 25 }, (_, i) => ({ id: `wh-${i}` }));
             repo.listActiveForAccount.mockResolvedValueOnce(rows as any);

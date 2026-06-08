@@ -28,6 +28,14 @@ async function bootstrap() {
     // `const config` for Swagger.
     appConfig.auth.secret();
 
+    // #21: fail fast on a missing PLATFORM_ENCRYPTION_KEY in non-local
+    // environments. It is the master key used to encrypt operator-supplied
+    // secrets at rest; without this check a misconfigured prod/staging deploy
+    // boots clean and the gap only surfaces deep inside a request (plaintext
+    // secrets or an opaque encrypt/decrypt failure). Local dev/test runs are
+    // exempt (see the validator in config/constants.ts).
+    appConfig.platformEncryptionKey();
+
     // Initialize Sentry and PostHog
     initSentry();
     initPostHog();
