@@ -20,6 +20,7 @@ import {
     ONBOARDING_WORK_CREATOR,
     OnboardingRequestRepository,
     WorksManifestService,
+    isSafeWebhookUrl,
     type OnboardingAccountUpsert,
     type OnboardingGitProvider,
     type OnboardingWorkCreator,
@@ -88,6 +89,25 @@ export class OnboardingService {
      *   - Webhook + state-marker fan-out on terminal status (T10, T11, T21).
      */
     async handle(ctx: OnboardingContext): Promise<RegisterWorkResponse> {
+        // Security (SSRF): the DTO only enforces an http(s) shape on
+        // webhookUrl. The persisted URL is later fetched server-side on
+        // terminal status, so a private / loopback / link-local / metadata
+        // target must be refused before it is stored. Mirror
+        // WebhooksService.assertValidUrl()'s env-gate: allow local targets in
+        // dev/test so a developer can point at a local tunnel, but enforce in
+        // every other (staging/prod) env that shares internal network access.
+        if (ctx.body.webhookUrl) {
+            const env = process.env.NODE_ENV;
+            const isLocalEnv =
+                env === 'development' || env === 'test' || env === undefined || env === '';
+            if (!isLocalEnv && !isSafeWebhookUrl(ctx.body.webhookUrl)) {
+                this.fail({
+                    code: 'validation_error',
+                    message: 'webhookUrl resolves to a private/loopback/link-local address',
+                });
+            }
+        }
+
         const coords = parseRepoCoords(ctx.body.repo);
         if (!coords) {
             this.fail({ code: 'validation_error', message: 'invalid repo URL' });

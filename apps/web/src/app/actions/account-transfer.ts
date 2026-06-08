@@ -7,24 +7,9 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
 import { serverFetch } from '@/lib/api/server-api';
-
-/**
- * M-08: defense-in-depth shape validation for Server Action args. The API
- * tier has its own DTO check, but a malformed shape at this boundary
- * (oversized payload, wrong type) should fail fast in the web tier rather
- * than be proxied verbatim and trigger an opaque 400/500 from the API.
- *
- * The schemas are deliberately permissive on the deep shape (the export
- * payload is large and varied) but enforce length / count caps that bound
- * memory + RPC body size before the upstream call.
- */
-const accountExportPayloadSchema = z
-    .object({
-        // Top-level fields the API tier requires
-        version: z.union([z.string().max(64), z.number()]).optional(),
-        user: z.unknown().optional(),
-    })
-    .catchall(z.unknown());
+// M-08 / EW-717: nested-array count caps for the import payload live in a pure
+// module so they can be unit-tested without importing this `'use server'` file.
+import { accountExportPayloadSchema } from './account-transfer-schemas';
 
 const conflictResolutionSchema = z.unknown(); // ConflictResolution shape is server-owned; cap by array length below.
 

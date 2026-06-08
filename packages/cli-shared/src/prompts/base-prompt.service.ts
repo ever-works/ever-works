@@ -229,7 +229,13 @@ export abstract class BasePromptService {
 	 */
 	protected validateUrl(url: string): string | boolean {
 		try {
-			new URL(url);
+			const parsed = new URL(url);
+			// Security: restrict to http(s) so non-fetchable/dangerous schemes
+			// (file:, javascript:, data:, ftp:, etc.) cannot pass validation and
+			// be stored as work config or handed to downstream fetch/agent code (SSRF/LFI).
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+				return 'Only http and https URLs are allowed (e.g., https://example.com)';
+			}
 			return true;
 		} catch {
 			return 'Please enter a valid URL (e.g., https://example.com)';
