@@ -89,6 +89,11 @@ export class ConfigService {
             const cleanConfig = this.removeUndefinedValues(config);
 
             await fs.writeJson(this.configPath, cleanConfig, { spaces: 2 });
+
+            // Security: the config file may hold secrets (GIT_TOKEN, PLUGIN_*_API_KEY,
+            // DEPLOY_TOKEN). Restrict it to owner read/write so it is not
+            // world-readable. POSIX-only; a no-op on Windows.
+            await fs.chmod(this.configPath, 0o600);
         } catch (error) {
             throw new Error(`Failed to save configuration: ${error.message}`);
         }

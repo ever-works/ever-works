@@ -3,12 +3,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('fs-extra', () => {
     const ensureDir = vi.fn().mockResolvedValue(undefined);
     const writeJson = vi.fn().mockResolvedValue(undefined);
+    const chmod = vi.fn().mockResolvedValue(undefined);
     const readJson = vi.fn();
     const pathExists = vi.fn();
     return {
-        default: { ensureDir, writeJson, readJson, pathExists },
+        default: { ensureDir, writeJson, chmod, readJson, pathExists },
         ensureDir,
         writeJson,
+        chmod,
         readJson,
         pathExists,
     };
@@ -30,6 +32,7 @@ describe('ConfigService', () => {
         // next. Re-seed the fs-extra mocks' default implementations each test.
         m(fs.ensureDir).mockResolvedValue(undefined as never);
         m(fs.writeJson).mockResolvedValue(undefined as never);
+        m(fs.chmod).mockResolvedValue(undefined as never);
         m(fs.readJson).mockReset();
         m(fs.pathExists).mockReset();
         service = new ConfigService();
@@ -101,6 +104,22 @@ describe('ConfigService', () => {
             expect(writeCall[0]).toBe(service.getConfigPath());
             expect(writeCall[1]).toEqual({ GIT_TOKEN: 'tok' });
             expect(writeCall[2]).toEqual({ spaces: 2 });
+        });
+
+        it('restricts the config file to owner read/write (chmod 0o600) after writing', async () => {
+            const order: string[] = [];
+            m(fs.writeJson).mockImplementation(async () => {
+                order.push('writeJson');
+            });
+            m(fs.chmod).mockImplementation(async () => {
+                order.push('chmod');
+            });
+
+            await service.saveConfig({ GIT_TOKEN: 'tok' });
+
+            expect(fs.chmod).toHaveBeenCalledWith(service.getConfigPath(), 0o600);
+            // chmod must run AFTER the file is written, never before.
+            expect(order).toEqual(['writeJson', 'chmod']);
         });
 
         it('strips undefined / null / empty-string values before writing', async () => {

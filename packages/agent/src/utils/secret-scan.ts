@@ -91,16 +91,30 @@ const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
 ];
 
 /**
+ * Security: defeat encoding / zero-width / homoglyph evasion. A token
+ * split by a zero-width space (e.g. `sk-abcdef…`) or built from
+ * compatibility/full-width homoglyphs slips past the word-boundary
+ * anchored patterns above. NFKC folds compatibility homoglyphs to their
+ * canonical form and the strip removes the invisible joiners scanners
+ * are blind to. Applied to the WORKING COPY used for pattern matching
+ * only; the patterns themselves are unchanged.
+ */
+function normalizeForScan(s: string): string {
+    return s.normalize('NFKC').replace(/[\u200B\u200C\u200D\u00AD\uFEFF\u2060]/g, '');
+}
+
+/**
  * Scan `body` for secret patterns. Returns all matches across all
  * patterns; empty array means "clean".
  */
 export function scanForSecrets(body: string): SecretMatch[] {
     if (!body) return [];
+    const scanBody = normalizeForScan(body);
     const out: SecretMatch[] = [];
     for (const { name, re } of PATTERNS) {
         const r = new RegExp(re.source, re.flags); // fresh state per call
         let m: RegExpExecArray | null;
-        while ((m = r.exec(body)) !== null) {
+        while ((m = r.exec(scanBody)) !== null) {
             out.push({
                 pattern: name,
                 matched: truncateForDisplay(m[0]),
@@ -139,6 +153,25 @@ export function assertNoSecrets(body: string, fieldHint = 'body'): void {
  */
 export function redactSecrets(body: string): { cleaned: string; redactions: number } {
     if (!body) return { cleaned: body, redactions: 0 };
+    // redactSecrets runs on generated/synced CONTENT (data-generator,
+    // markdown-generator, github-sync), not just logs, so it MUST NOT mutate
+    // legitimate non-secret text — NFKC folding / zero-width stripping would
+    // corrupt valid emoji ZWJ sequences, full-width CJK, and ligatures.
+    // So: redact the RAW body first (byte-for-byte preserving). Only when the
+    // normalized copy catches STRICTLY MORE secrets — i.e. a genuine
+    // zero-width / homoglyph EVASION is present — fall back to the normalized
+    // redaction (acceptable for that already-suspicious input, and never
+    // reached for evasion-free content).
+    const raw = redactWith(body);
+    const normalized = normalizeForScan(body);
+    if (normalized !== body) {
+        const norm = redactWith(normalized);
+        if (norm.redactions > raw.redactions) return norm;
+    }
+    return raw;
+}
+
+function redactWith(body: string): { cleaned: string; redactions: number } {
     let cleaned = body;
     let count = 0;
     for (const { re } of PATTERNS) {

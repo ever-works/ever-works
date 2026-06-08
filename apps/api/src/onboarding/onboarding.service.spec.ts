@@ -433,6 +433,33 @@ spec:
             expect(result.status).toBe('queued');
         });
 
+        it('rejects a plaintext http:// webhookUrl in a non-local env even when the host is public (HMAC exposure)', async () => {
+            // The host is public, so isSafeWebhookUrl() returns true and the
+            // SSRF guard above lets it through. Only the https-only crypto
+            // guard rejects it — this test fails without that guard.
+            process.env.NODE_ENV = 'production';
+            const repo = fakeRepository();
+            const { service } = createService({ repo });
+
+            await expect(
+                service.handle({
+                    body: {
+                        ...validBody,
+                        webhookUrl: 'http://my-agent.example.com/webhooks/ever-works',
+                    } as any,
+                    githubToken: 'token-aaaa',
+                }),
+            ).rejects.toMatchObject({
+                response: {
+                    code: 'validation_error',
+                    message: 'webhookUrl must use https in non-local environments',
+                },
+            });
+
+            // Rejected before any persistence / GitHub work.
+            expect(repo.save).not.toHaveBeenCalled();
+        });
+
         it('allows a public webhookUrl in a non-local env (production)', async () => {
             process.env.NODE_ENV = 'production';
             const repo = fakeRepository();

@@ -660,23 +660,44 @@ export class PluginOperationsService {
             await this.validateSettingsOrThrow(cleanedSettings, schema, 'user', registered.plugin);
         }
 
-        // Strip masked placeholders then merge settings, clearing null keys
+        // Strip masked placeholders then merge settings, clearing null keys.
+        // Non-secret settings are written directly onto the entity. Secrets are
+        // intentionally NOT written onto the entity here — they are routed
+        // through the PluginSettingsService encrypting write path below so they
+        // are never persisted in plaintext at rest.
         if (settings) {
             const clean = this.stripMaskedValues(settings);
             userPlugin.settings = this.stripNullValues({ ...userPlugin.settings, ...clean });
         }
+        let cleanSecretSettings: Record<string, unknown> | undefined;
         if (secretSettings) {
-            const clean = this.stripMaskedValues(secretSettings);
-            userPlugin.secretSettings = this.stripNullValues({
-                ...userPlugin.secretSettings,
-                ...clean,
-            });
+            cleanSecretSettings = this.stripMaskedValues(secretSettings);
         }
         if (metadata) {
             userPlugin.metadata = { ...userPlugin.metadata, ...metadata };
         }
 
+        // Persist the entity-level fields (non-secret settings / metadata).
+        // The base record is saved first so the encrypting write path below
+        // finds the existing row and merges + encrypts the secret bag onto it.
         await this.userPluginRepository.save(userPlugin);
+
+        // D3 / C-08 — route secret settings through the PluginSettingsService
+        // encrypting write path (updateUserSettings → encryptSecrets) so they
+        // are encrypted at rest exactly like every other secret write.
+        // Previously this method wrote `secretSettings` DIRECTLY onto the
+        // user-plugin entity, bypassing C-08 envelope encryption entirely.
+        if (cleanSecretSettings && Object.keys(cleanSecretSettings).length > 0) {
+            await this.settingsService.updateUserSettings(pluginId, userId, cleanSecretSettings);
+            // Reflect the just-written secrets in the in-memory entity used to
+            // build the response. The response masks x-secret fields, so the
+            // plaintext view here is only used to produce the masked output;
+            // the persisted column holds the encrypted envelope.
+            userPlugin.secretSettings = this.stripNullValues({
+                ...userPlugin.secretSettings,
+                ...cleanSecretSettings,
+            });
+        }
         this.logger.log(`Plugin "${pluginId}" settings updated for user "${userId}"`);
 
         return this.toUserPluginResponseWithResolvedSettings(registered, userPlugin, userId, {
@@ -1091,13 +1112,13 @@ export class PluginOperationsService {
             });
         }
 
+        // Secrets are intentionally NOT written onto the entity here — they are
+        // routed through the PluginSettingsService encrypting write path below
+        // so they are never persisted in plaintext at rest.
+        let cleanSecretSettings: Record<string, unknown> | undefined;
         if (secretSettings) {
             const clean = this.stripMaskedValues(secretSettings);
-            // Update secretSettings
-            workPlugin.secretSettings = this.stripNullValues({
-                ...workPlugin.secretSettings,
-                ...clean,
-            });
+            cleanSecretSettings = clean;
 
             // Cleanup: also remove secret fields from settings if they exist there
             // (handles migration case where secret fields were stored in wrong field)
@@ -1112,7 +1133,27 @@ export class PluginOperationsService {
             workPlugin.metadata = { ...workPlugin.metadata, ...metadata };
         }
 
+        // Persist the entity-level fields (non-secret settings / metadata).
+        // The base record is saved first so the encrypting write path below
+        // finds the existing row and merges + encrypts the secret bag onto it.
         await this.workPluginRepository.save(workPlugin);
+
+        // D3 / C-08 — route secret settings through the PluginSettingsService
+        // encrypting write path (updateWorkSettings → encryptSecrets) so they
+        // are encrypted at rest exactly like every other secret write.
+        // Previously this method wrote `secretSettings` DIRECTLY onto the
+        // work-plugin entity, bypassing C-08 envelope encryption entirely.
+        if (cleanSecretSettings && Object.keys(cleanSecretSettings).length > 0) {
+            await this.settingsService.updateWorkSettings(pluginId, workId, cleanSecretSettings);
+            // Reflect the just-written secrets in the in-memory entity used to
+            // build the response. The response masks x-secret fields, so the
+            // plaintext view here is only used to produce the masked output;
+            // the persisted column holds the encrypted envelope.
+            workPlugin.secretSettings = this.stripNullValues({
+                ...workPlugin.secretSettings,
+                ...cleanSecretSettings,
+            });
+        }
         this.logger.log(`Plugin "${pluginId}" settings updated for work "${workId}"`);
 
         if (hasActiveCapability(workPlugin, 'pipeline') && settings?.model !== undefined) {

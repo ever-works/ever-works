@@ -106,6 +106,18 @@ export class OnboardingService {
                     message: 'webhookUrl resolves to a private/loopback/link-local address',
                 });
             }
+            // Security (crypto/HMAC exposure): the register-work DTO accepts an
+            // http(s) shape, so a plaintext http:// webhook would be fetched
+            // server-side and the request-signing HMAC sent in the clear. The
+            // DTO regex intentionally still allows http:// so a developer can
+            // point at a local tunnel in dev/test — enforce https only in
+            // non-local (staging/prod) envs, mirroring the isLocalEnv gate above.
+            if (!isLocalEnv && !ctx.body.webhookUrl.startsWith('https://')) {
+                this.fail({
+                    code: 'validation_error',
+                    message: 'webhookUrl must use https in non-local environments',
+                });
+            }
         }
 
         const coords = parseRepoCoords(ctx.body.repo);

@@ -44,9 +44,10 @@ describe('buildSubprocessEnv (C-10)', () => {
 		expect(env.PATH).toBe('/usr/local/bin:/usr/bin');
 	});
 
-	it('forwards Anthropic / Claude Code-prefixed vars (allow-list by prefix)', () => {
+	it('forwards the explicitly named Anthropic / Claude Code vars (exact-name allow-list)', () => {
 		process.env.ANTHROPIC_BASE_URL = 'https://proxy.local';
 		process.env.ANTHROPIC_API_KEY = 'sk-from-env';
+		process.env.ANTHROPIC_AUTH_TOKEN = 'anthropic-auth-token';
 		process.env.CLAUDE_CODE_CONFIG_DIR = '/tmp/cfg';
 		process.env.CLAUDE_CODE_OAUTH_TOKEN = 'oauth-token';
 		// Negative case: a var that just contains "ANTHROPIC" but doesn't START with the prefix
@@ -57,9 +58,32 @@ describe('buildSubprocessEnv (C-10)', () => {
 
 		expect(env.ANTHROPIC_BASE_URL).toBe('https://proxy.local');
 		expect(env.ANTHROPIC_API_KEY).toBe('sk-from-env');
+		expect(env.ANTHROPIC_AUTH_TOKEN).toBe('anthropic-auth-token');
 		expect(env.CLAUDE_CODE_CONFIG_DIR).toBe('/tmp/cfg');
 		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('oauth-token');
 		expect(env.MY_ANTHROPIC_HELPER).toBeUndefined();
+	});
+
+	it('drops arbitrary ANTHROPIC_*/CLAUDE_CODE_*-prefixed vars not on the allow-list', () => {
+		// Regression guard: the env was previously built by matching any key that
+		// merely STARTED WITH `ANTHROPIC_` or `CLAUDE_CODE_`, which silently
+		// forwarded any future/custom var with those prefixes into the model's
+		// subprocess. Only the exact-name allow-list may pass through.
+		process.env.ANTHROPIC_API_KEY = 'sk-from-env';
+		process.env.ANTHROPIC_CUSTOM_VAR = 'should-be-dropped';
+		process.env.ANTHROPIC_SECRET_PROXY_TOKEN = 'leak-me';
+		process.env.CLAUDE_CODE_INTERNAL_DEBUG = 'leak-me-too';
+
+		const env = buildSubprocessEnv();
+
+		// Allow-listed var still forwarded.
+		expect(env.ANTHROPIC_API_KEY).toBe('sk-from-env');
+		// Arbitrary prefixed vars are NOT forwarded.
+		expect(env.ANTHROPIC_CUSTOM_VAR).toBeUndefined();
+		expect(env.ANTHROPIC_SECRET_PROXY_TOKEN).toBeUndefined();
+		expect(env.CLAUDE_CODE_INTERNAL_DEBUG).toBeUndefined();
+		expect(Object.values(env)).not.toContain('leak-me');
+		expect(Object.values(env)).not.toContain('leak-me-too');
 	});
 
 	it('forwards proxy / TLS / CA cert vars from host (corporate network plumbing)', () => {

@@ -4,13 +4,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('fs-extra', () => {
     const ensureDir = vi.fn().mockResolvedValue(undefined);
     const writeJson = vi.fn().mockResolvedValue(undefined);
+    const chmod = vi.fn().mockResolvedValue(undefined);
     const readJson = vi.fn();
     const pathExists = vi.fn();
     const remove = vi.fn().mockResolvedValue(undefined);
     return {
-        default: { ensureDir, writeJson, readJson, pathExists, remove },
+        default: { ensureDir, writeJson, chmod, readJson, pathExists, remove },
         ensureDir,
         writeJson,
+        chmod,
         readJson,
         pathExists,
         remove,
@@ -67,7 +69,7 @@ describe('CredentialsService', () => {
     });
 
     describe('save', () => {
-        it('ensures the credentials dir exists then writes JSON with 2-space indent', async () => {
+        it('ensures the credentials dir exists then writes JSON with 2-space indent then hardens file mode', async () => {
             const order: string[] = [];
             (fs.ensureDir as ReturnType<typeof vi.fn>).mockImplementation(async () => {
                 order.push('ensureDir');
@@ -75,14 +77,31 @@ describe('CredentialsService', () => {
             (fs.writeJson as ReturnType<typeof vi.fn>).mockImplementation(async () => {
                 order.push('writeJson');
             });
+            (fs.chmod as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+                order.push('chmod');
+            });
 
             const creds: Credentials = { token: validToken(), apiUrl: 'http://x' };
             await CredentialsService.save(creds);
 
-            expect(order).toEqual(['ensureDir', 'writeJson']);
+            // chmod must run AFTER the file is written, otherwise the token is
+            // briefly world-readable (or chmod targets a non-existent file).
+            expect(order).toEqual(['ensureDir', 'writeJson', 'chmod']);
             const writeCall = (fs.writeJson as ReturnType<typeof vi.fn>).mock.calls[0];
             expect(writeCall[1]).toBe(creds);
             expect(writeCall[2]).toEqual({ spaces: 2 });
+        });
+
+        it('restricts the credentials file to owner-only (0o600) so the JWT is not world-readable', async () => {
+            const creds: Credentials = { token: validToken(), apiUrl: 'http://x' };
+            await CredentialsService.save(creds);
+
+            expect(fs.chmod).toHaveBeenCalledTimes(1);
+            const chmodCall = (fs.chmod as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+            // mode must be exactly 0o600 (owner read/write, no group/other access)
+            expect(chmodCall[1]).toBe(0o600);
+            // and it must target the same credentials file that was written
+            expect(chmodCall[0]).toBe(CredentialsService.credentialsPath);
         });
     });
 

@@ -123,6 +123,59 @@ describe('config/constants', () => {
         });
     });
 
+    // #21: PLATFORM_ENCRYPTION_KEY must be present in non-local environments.
+    // The validator is exempt for local runs (NODE_ENV development/test/unset)
+    // so contributors don't need to provision a key just to boot. NODE_ENV is
+    // restored after each case because the suite-level beforeEach does not.
+    describe('config.platformEncryptionKey (#21)', () => {
+        const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+        afterEach(() => {
+            if (ORIGINAL_NODE_ENV === undefined) {
+                delete process.env.NODE_ENV;
+            } else {
+                process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+            }
+        });
+
+        it('throws in a non-local environment (e.g. production) when the key is missing', () => {
+            process.env.NODE_ENV = 'production';
+            delete process.env.PLATFORM_ENCRYPTION_KEY;
+            expect(() => config.platformEncryptionKey()).toThrow(
+                /PLATFORM_ENCRYPTION_KEY .* required in non-local environments/,
+            );
+        });
+
+        it('throws in staging (any non-local NODE_ENV) when the key is missing', () => {
+            process.env.NODE_ENV = 'staging';
+            delete process.env.PLATFORM_ENCRYPTION_KEY;
+            expect(() => config.platformEncryptionKey()).toThrow(/PLATFORM_ENCRYPTION_KEY/);
+        });
+
+        it('returns the key when set in a non-local environment', () => {
+            process.env.NODE_ENV = 'production';
+            process.env.PLATFORM_ENCRYPTION_KEY = 'k'.repeat(48);
+            expect(config.platformEncryptionKey()).toBe('k'.repeat(48));
+        });
+
+        it.each(['development', 'test', ''])(
+            'does NOT throw when NODE_ENV is local (%j) even with no key',
+            (env) => {
+                process.env.NODE_ENV = env;
+                delete process.env.PLATFORM_ENCRYPTION_KEY;
+                expect(() => config.platformEncryptionKey()).not.toThrow();
+                expect(config.platformEncryptionKey()).toBeUndefined();
+            },
+        );
+
+        it('does NOT throw when NODE_ENV is unset (undefined) even with no key', () => {
+            delete process.env.NODE_ENV;
+            delete process.env.PLATFORM_ENCRYPTION_KEY;
+            expect(() => config.platformEncryptionKey()).not.toThrow();
+            expect(config.platformEncryptionKey()).toBeUndefined();
+        });
+    });
+
     describe('config.branding', () => {
         it('falls back to defaults', () => {
             expect(config.branding.appName()).toBe('Ever Works');
@@ -245,6 +298,27 @@ describe('config/constants', () => {
             expect(config.mail.smtpHost()).toBe('mail.example.com');
             expect(config.mail.smtpUser()).toBe('user');
             expect(config.mail.smtpPassword()).toBe('pass');
+        });
+
+        // #31: TLS cert verification for outbound mail must default to ON
+        // (secure). mail.module.ts reads this accessor so the only opt-out is
+        // the explicit `SMTP_REJECT_UNAUTHORIZED=false` escape hatch.
+        describe('smtpRejectUnauthorized', () => {
+            it('defaults to true (verification ON) when SMTP_REJECT_UNAUTHORIZED is unset', () => {
+                expect(config.mail.smtpRejectUnauthorized()).toBe(true);
+            });
+
+            it('is false ONLY for the exact string "false"', () => {
+                process.env.SMTP_REJECT_UNAUTHORIZED = 'false';
+                expect(config.mail.smtpRejectUnauthorized()).toBe(false);
+            });
+
+            it('stays true for any other value (case/typo do not disable verification)', () => {
+                for (const v of ['true', 'FALSE', 'False', '0', 'no', '', 'yes']) {
+                    process.env.SMTP_REJECT_UNAUTHORIZED = v;
+                    expect(config.mail.smtpRejectUnauthorized()).toBe(true);
+                }
+            });
         });
     });
 

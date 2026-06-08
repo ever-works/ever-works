@@ -99,4 +99,56 @@ describe('secret-scan', () => {
             expect(cleaned).toBe('clean prose');
         });
     });
+
+    // EW-716 #17: defeat encoding / zero-width / homoglyph evasion via NFKC
+    // normalization on the DETECTION copy, while keeping redaction output
+    // content-preserving for legitimate (non-evasive) Unicode.
+    describe('encoding/zero-width/homoglyph evasion (NFKC normalization)', () => {
+        const ZWSP = '​';
+        const evasiveToken = `sk-${ZWSP}abcdefghij1234567890`;
+
+        it('detects a zero-width-split token that evaded the raw-regex scan', () => {
+            // The raw body (with the zero-width char) does NOT match directly —
+            // proving the normalize guard is load-bearing.
+            const rawMatch = /\b(sk-|key-|token-|Bearer\s+)[A-Za-z0-9_-]{10,}\b/.test(evasiveToken);
+            expect(rawMatch).toBe(false);
+
+            const hits = scanForSecrets(evasiveToken);
+            expect(hits.length).toBeGreaterThan(0);
+            expect(containsSecret(evasiveToken)).toBe(true);
+        });
+
+        it('detects a soft-hyphen-split token (U+00AD)', () => {
+            const SHY = '­';
+            const body = `please use ghp_${SHY}ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ab now`;
+            expect(containsSecret(body)).toBe(true);
+        });
+
+        it('redacts a zero-width-split token but preserves surrounding content', () => {
+            const { cleaned, redactions } = redactSecrets(`prefix ${evasiveToken} suffix`);
+            expect(redactions).toBeGreaterThan(0);
+            expect(cleaned).toContain('[redacted secret]');
+            expect(cleaned).not.toContain('abcdefghij1234567890');
+            expect(cleaned).not.toContain(ZWSP);
+            expect(cleaned).toContain('prefix ');
+            expect(cleaned).toContain(' suffix');
+        });
+
+        it('leaves legitimate prose byte-for-byte unchanged (no false positive)', () => {
+            const prose = 'Write tokens to disk. See the key-takeaways doc and sketch-board notes.';
+            expect(scanForSecrets(prose)).toHaveLength(0);
+            const { cleaned, redactions } = redactSecrets(prose);
+            expect(redactions).toBe(0);
+            expect(cleaned).toBe(prose);
+        });
+
+        it('does NOT corrupt legitimate Unicode content (emoji ZWJ, full-width) when there is no secret', () => {
+            // redactSecrets runs on generated CONTENT — it must round-trip valid
+            // ZWJ emoji sequences and full-width CJK unchanged, never NFKC-fold them.
+            const family = 'Team \u{1F468}‍\u{1F469}‍\u{1F467} shipped ＡＢＣ today.';
+            const { cleaned, redactions } = redactSecrets(family);
+            expect(redactions).toBe(0);
+            expect(cleaned).toBe(family);
+        });
+    });
 });

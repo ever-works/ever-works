@@ -96,6 +96,40 @@ describe('TriggerInternalApiClient', () => {
         });
     });
 
+    describe('constructor — HTTPS enforcement', () => {
+        const originalNodeEnv = process.env.NODE_ENV;
+
+        afterEach(() => {
+            process.env.NODE_ENV = originalNodeEnv;
+        });
+
+        it('throws in production when the base URL is plaintext http://', () => {
+            process.env.NODE_ENV = 'production';
+            triggerConfig.getInternalBaseUrl.mockReturnValue('http://api:3100');
+            triggerConfig.getInternalSecret.mockReturnValue('s');
+
+            expect(() => new TriggerInternalApiClient()).toThrow(
+                'TRIGGER_INTERNAL_API_URL must use HTTPS',
+            );
+        });
+
+        it('allows https:// in production', () => {
+            process.env.NODE_ENV = 'production';
+            triggerConfig.getInternalBaseUrl.mockReturnValue('https://api.internal:3100');
+            triggerConfig.getInternalSecret.mockReturnValue('s');
+
+            expect(() => new TriggerInternalApiClient()).not.toThrow();
+        });
+
+        it('still allows plaintext http:// outside production (local dev / in-cluster)', () => {
+            process.env.NODE_ENV = 'development';
+            triggerConfig.getInternalBaseUrl.mockReturnValue('http://api:3100');
+            triggerConfig.getInternalSecret.mockReturnValue('s');
+
+            expect(() => new TriggerInternalApiClient()).not.toThrow();
+        });
+    });
+
     describe('URL composition', () => {
         it('strips a trailing slash on the base URL and a leading slash on the path', async () => {
             triggerConfig.getInternalBaseUrl.mockReturnValue('https://api.example.com/');

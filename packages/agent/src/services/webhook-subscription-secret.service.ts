@@ -65,6 +65,11 @@ export class WebhookSubscriptionSecretService {
             // read access (backup, replica, SQLi) can forge signed webhook bodies.
             // Tolerated only for the documented dev/test path; loudly flagged so a
             // misconfigured production deploy is caught instead of silently leaking.
+            if (process.env.NODE_ENV === 'production') {
+                throw new Error(
+                    'PLATFORM_ENCRYPTION_KEY must be set in production — refusing to store webhook subscription signing secret in plaintext',
+                );
+            }
             if (!this.warnedPlaintextPassthrough) {
                 this.warnedPlaintextPassthrough = true;
                 this.logger.warn(
