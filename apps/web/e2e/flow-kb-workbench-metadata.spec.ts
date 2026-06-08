@@ -211,18 +211,14 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(select).toBeVisible({ timeout: 60_000 });
         await select.selectOption('archived');
 
-        // The centre status chip is server-rendered from the doc DTO, so it
-        // only reflects the new status after the mutation PERSISTS and the
-        // page re-fetches. A fixed wait raced the PATCH under cold compile
-        // (the reload re-fetched the stale 'active' row). Retry reload +
-        // assert until the server state catches up.
-        await expect(async () => {
-            await page.reload({ waitUntil: 'domcontentloaded' });
-            await expect(page.getByTestId('kb-workbench-status-chip')).toHaveAttribute(
-                'data-kb-status',
-                'archived',
-                { timeout: 10_000 },
-            );
-        }).toPass({ timeout: 60_000 });
+        // The status change is a SERVER ACTION (updateKbDocumentAction) that
+        // PATCHes the doc and revalidatePath()'s the detail route, so the
+        // server-rendered centre status chip updates IN PLACE. Do NOT reload:
+        // navigating mid-action aborts the in-flight PATCH, which left the row
+        // stuck on 'active'. Assert the revalidated chip directly, with a
+        // budget generous enough for the action + route revalidation under
+        // Next.js dev-mode cold compile in CI.
+        const chip = page.getByTestId('kb-workbench-status-chip');
+        await expect(chip).toHaveAttribute('data-kb-status', 'archived', { timeout: 45_000 });
     });
 });
