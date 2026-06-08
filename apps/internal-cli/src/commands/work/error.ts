@@ -1,4 +1,5 @@
 import { COMMAND } from '../../config';
+import { redactSecrets } from '@ever-works/agent/utils';
 import chalk from 'chalk';
 
 export function handleCliError(error: any, messageHeader: string = 'An error occurred') {
@@ -19,7 +20,10 @@ export function handleCliError(error: any, messageHeader: string = 'An error occ
     if (process.env.DEBUG_CLI === 'true') {
         console.error(error);
     }
-    console.error(chalk.red(`\n✗ ${messageHeader}:`), String(message));
+    // Security (EW-718): upstream API error messages can echo back secret-bearing
+    // input (tokens, keys, Bearer headers). Redact before printing to the console.
+    const safeMessage = redactSecrets(String(message)).cleaned;
+    console.error(chalk.red(`\n✗ ${messageHeader}:`), safeMessage);
 
     if (error.message?.includes('Owner is required')) {
         console.log(

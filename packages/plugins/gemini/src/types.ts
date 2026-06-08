@@ -45,9 +45,18 @@ export const BASE_TEMP_DIR = path.join(os.tmpdir(), 'gemini-generator').replace(
 export const GEMINI_NPM_PACKAGE = '@google/gemini-cli';
 
 /**
- * Default CLI version to install
+ * Default CLI version to install.
+ *
+ * Security (EW-720): pinned to an exact semver rather than the `latest`
+ * dist-tag so a new session does not auto-fetch and execute an unreviewed
+ * Gemini CLI release (supply-chain substitution risk). This mirrors the
+ * exact-version defaults of the sibling CLI plugins (codex/opencode/claude-code).
+ *
+ * The value is the version `@google/gemini-cli@latest` resolved to at pin time
+ * (2026-06-08). The `'latest'` sentinel remains an explicit opt-in via plugin
+ * settings and is still treated specially by the binary-manager.
  */
-export const DEFAULT_CLI_VERSION = 'latest';
+export const DEFAULT_CLI_VERSION = '0.45.2';
 
 /**
  * Default Gemini model
