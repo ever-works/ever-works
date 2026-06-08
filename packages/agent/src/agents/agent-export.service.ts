@@ -33,6 +33,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { createHash } from 'crypto';
 import { slugifyText } from '../utils/text.utils';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 import type { AgentDto } from './types';
 import { toAgentDto } from './types';
 
@@ -363,6 +364,11 @@ export class AgentExportService {
                     );
                 }
                 assertNoSecrets(body, `import-envelope:${name}`);
+                // D11: reject imported instruction bodies that carry
+                // chat-template control tokens (<|im_start|>, [INST], …) — a
+                // shared/catalog Agent could otherwise inject a forged system
+                // turn into the importer's runtime context.
+                assertNoInjectionTokens(body, `import-envelope:${name}`);
             }
         }
 

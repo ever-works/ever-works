@@ -75,6 +75,9 @@ export class AnthropicPlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
+				// Security (D4): a SaaS provider API endpoint is admin-controlled — a
+				// non-admin user must not repoint it (defense-in-depth atop the SSRF guard).
+				'x-adminOnly': true,
 				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://api.anthropic.com/v1/',
 				'x-hidden': true

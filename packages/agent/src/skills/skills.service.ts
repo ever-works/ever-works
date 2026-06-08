@@ -20,6 +20,7 @@ import type { SkillBinding, SkillBindingTargetType } from '../entities/skill-bin
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 import { slugifyText } from '../utils/text.utils';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -342,6 +343,12 @@ function assertBody(body: string, fieldHint: string): void {
         throw new BadRequestException(`${fieldHint} exceeds max 64 KB.`);
     }
     assertNoSecrets(body, fieldHint);
+    // D11: reject chat-template control tokens (<|im_start|>, [INST], …) in
+    // any Skill body — they can hijack the agent's system prompt when the
+    // Skill is injected, and are never legitimate in a markdown body. Matters
+    // most for `installFromCatalog` (cross-user import) but is safe on every
+    // write since no human-authored body contains model control sequences.
+    assertNoInjectionTokens(body, fieldHint);
 }
 
 function hashBody(body: string): string {

@@ -81,7 +81,10 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_repo_access',
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
-			description: 'Grant the Make.com scenario read access to the work data repository',
+			description:
+				'⚠️ Forwards your repository access token to Make.com (a third-party service) so its ' +
+				'scenario can read the data repository. The token leaves Ever Works. Only enable for ' +
+				'repos you trust Make.com with, and use a short-lived, read-only token.',
 			defaultValue: false,
 			group: 'data'
 		},

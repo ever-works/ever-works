@@ -43,7 +43,10 @@ export function getFormFields(): FormFieldDefinition[] {
 			name: 'pass_repo_access',
 			type: 'boolean',
 			label: 'Pass Data Repository Access',
-			description: 'Grant the SIM workflow read access to the work data repository',
+			description:
+				'⚠️ Forwards your repository access token to Sim.ai (a third-party service) so its ' +
+				'workflow can read the data repository. The token leaves Ever Works. Only enable for ' +
+				'repos you trust Sim.ai with, and use a short-lived, read-only token.',
 			defaultValue: false,
 			group: 'data'
 		},
