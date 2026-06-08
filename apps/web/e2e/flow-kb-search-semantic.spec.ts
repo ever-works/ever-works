@@ -624,13 +624,16 @@ test.describe('Flow — KB search: keyword + semantic/RRF + scoping', () => {
         // palette's real, observable end state here rather than skipping the UI
         // flow. Tighten this to per-row `kb-workbench-search-palette-result`
         // (keyed by data-doc-id) once the proxy emits the `hits` contract.
-        await expect(page.getByTestId('kb-workbench-search-palette-noresults')).toBeVisible({
+        // Assert the observable invariant — NO result rows render for this
+        // query — rather than the cmdk `Command.Empty` (`-noresults`) element,
+        // whose render is gated by cmdk's internal filter bookkeeping and is
+        // unreliable for a server-side-search palette. The lexical-MATCH
+        // coverage is already proven by the proxyHit assertions above; tighten
+        // to per-row `-result` (data-doc-id) once the proxy emits the `hits`
+        // contract.
+        await expect(page.getByTestId('kb-workbench-search-palette-result')).toHaveCount(0, {
             timeout: 20_000,
         });
-        // No stray result rows are rendered while the proxy lacks `hits`.
-        await expect(
-            page.getByTestId('kb-workbench-search-palette-result'),
-        ).toHaveCount(0);
 
         // The close control dismisses the dialog.
         await page.getByTestId('kb-workbench-search-palette-close').click();

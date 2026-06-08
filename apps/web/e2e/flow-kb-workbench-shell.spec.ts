@@ -164,9 +164,11 @@ test.describe('KB workbench shell — slice A', () => {
         await expect(row).toBeVisible();
         await row.click();
 
-        // URL transitions to the catch-all path.
+        // URL transitions to the catch-all path. Budget 90s: this is the
+        // FIRST hit on the per-doc `[...path]` route, which cold-compiles
+        // under Next.js dev mode in CI (the 30s default raced the compile).
         await page.waitForURL((url) => url.pathname.endsWith(`/works/${workId}/kb/${brand.path}`), {
-            timeout: 30_000,
+            timeout: 90_000,
         });
 
         // Header chip + editor render with the seeded body.

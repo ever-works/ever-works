@@ -176,7 +176,11 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await page.goto(`/en/works/${workId}/kb/${doc.path}`, { waitUntil: 'domcontentloaded' });
         const toggle = page.getByTestId('kb-workbench-metadata-lock-toggle');
         await expect(toggle).toBeVisible({ timeout: 60_000 });
-        await toggle.check();
+        // Use click() not check(): the lock checkbox is controlled — its
+        // `checked` only flips after the lock mutation round-trips, so
+        // check()'s synchronous post-click state assertion races and fails.
+        // The lock badge appearing below is the real, settled assertion.
+        await toggle.click();
 
         const badge = page.getByTestId('kb-workbench-lock-badge');
         await expect(badge).toBeVisible({ timeout: 30_000 });
