@@ -252,7 +252,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
             // local 404 path degrades cleanly instead of hard-failing.
             const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
             await expect(
-                viewer.or(notFound),
+                viewer.or(notFound).first(),
                 `kb-${c.kind}-viewer mounts (or local-dev 404) for ${c.path}`,
             ).toBeVisible({ timeout: 60_000 });
             if ((await viewer.count()) === 0) continue;
@@ -325,7 +325,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
         // local `next dev` (documented gotcha) — tolerate the local-dev
         // not-found surface so the over-cap block proof still runs in CI.
         const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
-        await expect(blocked.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(blocked.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if ((await blocked.count()) > 0) {
             // The gate blocked BEFORE the viewer mounted — no image viewer
             // (and definitely no inline <img>) is on the page.
@@ -657,7 +657,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
         // local `next dev` (documented gotcha) — tolerate the local-dev
         // not-found surface so the inline-<img> proof still runs in CI.
         const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
-        await expect(viewer.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(viewer.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if ((await viewer.count()) > 0) {
             await expect(viewer).toHaveAttribute('data-mode', 'inline');
             // data-size-bytes reflects the tiny PNG's real fileSize (well under 10 MiB).
