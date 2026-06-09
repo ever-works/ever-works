@@ -241,6 +241,21 @@ describe('WorksController — advanced-prompts + import endpoints', () => {
                 { ok: true },
             );
         });
+
+        // Abuse-rate hardening (security): the PUT advanced-prompts route must
+        // carry a @Throttle guard. @Throttle stores its config as reflection
+        // metadata on the handler function under THROTTLER:<key><name>; assert
+        // the `long` bucket is 20 req / 60s. This FAILS if the decorator is
+        // absent and PASSES once it is applied.
+        it('rate-limits the PUT handler with @Throttle({ long: 20 / 60s })', () => {
+            const handler = WorksController.prototype.updateAdvancedPrompts;
+
+            const limit = Reflect.getMetadata('THROTTLER:LIMITlong', handler);
+            const ttl = Reflect.getMetadata('THROTTLER:TTLlong', handler);
+
+            expect(limit).toBe(20);
+            expect(ttl).toBe(60_000);
+        });
     });
 
     // -----------------------------------------------------------------------

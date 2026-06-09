@@ -37,6 +37,27 @@ export function resolveSandboxPath(cwd: string, rawPath: string): string {
 	return resolved;
 }
 
+/**
+ * Prompt-injection defense-in-depth (EW-714): worker-LLM file content is later
+ * read back into prompts, so reject unbounded payloads and chat-template control
+ * tokens before persisting. Inlined here (zero-dep) rather than importing
+ * `scanForInjection` from `@ever-works/agent`, which is not — and should not
+ * become — a dependency of this plugin; the pattern mirrors
+ * `CHAT_TEMPLATE_MARKER_PATTERN` in the agent core's `content-policy`.
+ */
+const MAX_FILE_CONTENT_BYTES = 2 * 1024 * 1024; // 2 MB
+const CONTROL_TOKEN_PATTERN = /\[\/?INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>|<\|endoftext\|>/i;
+
+function checkWritableContent(content: string): string | null {
+	if (Buffer.byteLength(content, 'utf8') > MAX_FILE_CONTENT_BYTES) {
+		return `File content exceeds the ${MAX_FILE_CONTENT_BYTES}-byte limit.`;
+	}
+	if (CONTROL_TOKEN_PATTERN.test(content)) {
+		return 'File content contains disallowed chat-template control tokens.';
+	}
+	return null;
+}
+
 export interface CreateFileToolOptions {
 	/** Called after a file is successfully created. Receives the resolved path and content. */
 	onCreated?: (path: string, content: string) => Promise<void>;
@@ -73,6 +94,11 @@ export function createCreateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 				};
 			} catch {
 				// File doesn't exist — proceed
+			}
+
+			const contentError = checkWritableContent(content);
+			if (contentError) {
+				return { success: false, error: contentError };
 			}
 
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
@@ -125,6 +151,10 @@ export function createUpdateFileTool(sandbox: WrappedSandbox, cwd: string, optio
 					success: false,
 					error: `File "${path}" does not exist. Use the createFile tool to create new files.`
 				};
+			}
+			const contentError = checkWritableContent(content);
+			if (contentError) {
+				return { success: false, error: contentError };
 			}
 			await sandbox.writeFiles([{ path: resolvedPath, content }]);
 			try {
