@@ -9,13 +9,20 @@ jest.mock('@ever-works/agent/activity-log', () => ({
 jest.mock('@ever-works/agent/generators', () => ({
     MarkdownGeneratorService: class MarkdownGeneratorService {},
 }));
-// WorkRepository class shell for the controller's new ownership-check
-// dependency. The spec replaces this with a jest.Mocked instance in
-// beforeEach so the controller can call findById without touching a
-// real database.
+// `WorkRepository` is no longer a controller dependency — the per-Work
+// access gate now delegates to `WorkOwnershipService`. The class shell
+// stays only because `DataSyncService` (imported transitively as the DI
+// token) reaches into `@ever-works/agent/database` at module scope.
 jest.mock('@ever-works/agent/database', () => ({
-    WorkRepository: class WorkRepository {
-        findById = jest.fn();
+    WorkRepository: class WorkRepository {},
+}));
+// `WorkOwnershipService` shell for the controller's access-check
+// dependency. The spec replaces this with a jest mock instance in
+// beforeEach so the controller can call `ensureCanEdit` without touching
+// a real database or membership table.
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class WorkOwnershipService {
+        ensureCanEdit = jest.fn();
     },
 }));
 jest.mock('@ever-works/agent/config', () => ({
@@ -31,7 +38,7 @@ jest.mock('@ever-works/agent/config', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { WorkRepository } from '@ever-works/agent/database';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { DataSyncController } from './data-sync.controller';
 import { DataSyncService } from './data-sync.service';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -61,7 +68,7 @@ const stubUser: AuthenticatedUser = { userId: 'user-42' } as unknown as Authenti
 describe('DataSyncController (EW-628 Phase 6)', () => {
     let controller: DataSyncController;
     let dataSyncService: jest.Mocked<DataSyncService>;
-    let workRepository: jest.Mocked<WorkRepository>;
+    let ownershipService: jest.Mocked<WorkOwnershipService>;
 
     beforeEach(async () => {
         dataSyncService = {
@@ -69,18 +76,21 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
             isLocked: jest.fn(),
         } as unknown as jest.Mocked<DataSyncService>;
 
-        // Default: every Work belongs to the stub caller so the new
-        // ownership gate doesn't trip in tests that don't care about
-        // it. Tests that DO care override the mock explicitly.
-        workRepository = {
-            findById: jest.fn().mockResolvedValue({ id: 'work-stub', userId: stubUser.userId }),
-        } as unknown as jest.Mocked<WorkRepository>;
+        // Default: the stub caller passes the edit-access gate so tests
+        // that don't care about authz don't trip it. Tests that DO care
+        // override the mock to reject (stranger probe). `ensureCanEdit`
+        // resolves with a WorkAccessResult in the real service; the
+        // controller ignores the return value, so a bare resolve is
+        // enough here.
+        ownershipService = {
+            ensureCanEdit: jest.fn().mockResolvedValue({ isCreator: true }),
+        } as unknown as jest.Mocked<WorkOwnershipService>;
 
         const module: TestingModule = await Test.createTestingModule({
             controllers: [DataSyncController],
             providers: [
                 { provide: DataSyncService, useValue: dataSyncService },
-                { provide: WorkRepository, useValue: workRepository },
+                { provide: WorkOwnershipService, useValue: ownershipService },
             ],
         }).compile();
 
@@ -110,6 +120,49 @@ describe('DataSyncController (EW-628 Phase 6)', () => {
                 '  Whitespace-And-Caps  ',
                 'manual',
             );
+        });
+    });
+
+    describe('forceSync — access gate (WorkOwnershipService)', () => {
+        it('gates on ensureCanEdit(workId, callerId) before delegating', async () => {
+            dataSyncService.runDataSync.mockResolvedValue({
+                status: 'success',
+                stats: { filesChanged: 0, durationMs: 1 },
+            });
+
+            await controller.forceSync(stubUser, 'work-gate');
+
+            expect(ownershipService.ensureCanEdit).toHaveBeenCalledTimes(1);
+            expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith(
+                'work-gate',
+                stubUser.userId,
+            );
+        });
+
+        it('rejects a caller without edit access and never reaches runDataSync', async () => {
+            // ensureCanEdit throws ForbiddenException (403) for a member
+            // below EDITOR / a non-member, and NotFoundException (404)
+            // for a missing Work. Either way the controller must not
+            // delegate, so a stranger never learns the Work exists.
+            const forbidden = new (require('@nestjs/common').ForbiddenException)(
+                'You do not have permission to access this work',
+            );
+            ownershipService.ensureCanEdit.mockRejectedValueOnce(forbidden);
+
+            await expect(controller.forceSync(stubUser, 'work-stranger')).rejects.toBe(forbidden);
+            expect(dataSyncService.runDataSync).not.toHaveBeenCalled();
+        });
+
+        it('propagates the 404 contract when the Work does not exist', async () => {
+            const notFound = new (require('@nestjs/common').NotFoundException)(
+                "Work with id 'missing' not found",
+            );
+            ownershipService.ensureCanEdit.mockRejectedValueOnce(notFound);
+
+            await expect(controller.forceSync(stubUser, 'missing')).rejects.toMatchObject({
+                status: 404,
+            });
+            expect(dataSyncService.runDataSync).not.toHaveBeenCalled();
         });
     });
 

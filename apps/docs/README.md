@@ -52,13 +52,12 @@ To add or edit a documentation page:
 
 ## Environment Variables
 
-| Variable                              | Required | Description                   |
-| ------------------------------------- | -------- | ----------------------------- |
-| `ALGOLIA_APP_ID`                      | No       | Algolia search app ID         |
-| `ALGOLIA_API_KEY`                     | No       | Algolia search API key        |
-| `ALGOLIA_INDEX_NAME`                  | No       | Algolia index name            |
-| `NEXT_PUBLIC_SENTRY_DNS`              | No       | Sentry DSN for error tracking |
-| `EVER_WORKS_WEBSITE_TEMPLATE_API_URL` | No       | API URL custom field          |
+| Variable                 | Required | Description                   |
+| ------------------------ | -------- | ----------------------------- |
+| `ALGOLIA_APP_ID`         | No       | Algolia search app ID         |
+| `ALGOLIA_API_KEY`        | No       | Algolia search API key        |
+| `ALGOLIA_INDEX_NAME`     | No       | Algolia index name            |
+| `NEXT_PUBLIC_SENTRY_DNS` | No       | Sentry DSN for error tracking |
 
 When Algolia env vars are unset, search falls back to `@easyops-cn/docusaurus-search-local`.
 

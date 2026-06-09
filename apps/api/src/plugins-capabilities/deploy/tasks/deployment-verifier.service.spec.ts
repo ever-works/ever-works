@@ -309,6 +309,49 @@ describe('DeploymentVerifierService', () => {
             expect((failedEvent as any).payload.error).toBe('weird-string-error');
         });
 
+        it('caps an oversized error message at 500 chars (497 + "...") before persisting + emitting', async () => {
+            const longMessage = 'x'.repeat(2000);
+            deployFacade.lookupExistingDeployment.mockRejectedValueOnce(new Error(longMessage));
+            pluginRegistry.get.mockReturnValueOnce({ plugin: {} } as any);
+
+            await service.startVerification(
+                buildWork({ id: 'work-long' }) as any,
+                'user-1',
+                'team',
+                'dep-1',
+            );
+            await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+            // Persisted lastError on the deployment row is capped.
+            expect(deploymentRepository.markTerminal).toHaveBeenCalledWith(
+                'dep-1',
+                'ERROR',
+                expect.objectContaining({ lastError: 'x'.repeat(497) + '...' }),
+            );
+
+            // Emitted event carries the same capped message.
+            const failedEvent = eventEmitter.emit.mock.calls.find(
+                (c) => c[0] === DeploymentFailedEvent.EVENT_NAME,
+            )![1];
+            const cappedError = (failedEvent as any).payload.error as string;
+            expect(cappedError).toHaveLength(500);
+            expect(cappedError.endsWith('...')).toBe(true);
+        });
+
+        it('leaves an error message at/under 500 chars untouched (helper is a no-op)', async () => {
+            const exact = 'y'.repeat(500);
+            deployFacade.lookupExistingDeployment.mockRejectedValueOnce(new Error(exact));
+            pluginRegistry.get.mockReturnValueOnce({ plugin: {} } as any);
+
+            await service.startVerification(buildWork() as any, 'user-1');
+            await jest.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+
+            const failedEvent = eventEmitter.emit.mock.calls.find(
+                (c) => c[0] === DeploymentFailedEvent.EVENT_NAME,
+            )![1];
+            expect((failedEvent as any).payload.error).toBe(exact);
+        });
+
         it('skips overlapping ticks while the previous lookup is still in-flight', async () => {
             // Make the lookup hang so a second tick can fire while the first
             // is still resolving. Capture the resolver to release later.

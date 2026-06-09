@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { detectPlatform, getBinaryPath } from './platform.js';
-import { CLAUDE_CODE_DIST_URL, DEFAULT_CLI_VERSION } from '../types.js';
+import { BASE_TEMP_DIR, CLAUDE_CODE_DIST_URL, DEFAULT_CLI_VERSION } from '../types.js';
 
 interface Logger {
 	log(message: string, ...args: unknown[]): void;
@@ -80,8 +80,24 @@ async function verifyChecksum(filePath: string, expectedSha256: string): Promise
  * @returns Path to the executable binary
  */
 export async function ensureBinary(version: string = DEFAULT_CLI_VERSION, logger?: Logger): Promise<string> {
+	// Guard against path-traversal / URL injection via an attacker-controlled version
+	// string (e.g. settings.version). Only an exact X.Y.Z semver is allowed; legit
+	// callers always pass a real version. This value is interpolated into both the
+	// cache path and the download URL below.
+	const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+	if (!SEMVER_RE.test(version)) {
+		throw new Error(`Invalid version string: "${version}". Must be X.Y.Z semver.`);
+	}
+
 	const platform = await detectPlatform();
 	const binaryPath = getBinaryPath(version, platform.platformString);
+
+	// Defense-in-depth: ensure the resolved cache path stays inside the expected
+	// base temp directory. Pure string containment check (no fs / realpath) so the
+	// mocked getBinaryPath in tests is unaffected.
+	if (!binaryPath.startsWith(BASE_TEMP_DIR + '/')) {
+		throw new Error(`Binary path ${binaryPath} escapes the expected cache directory`);
+	}
 
 	// Check if binary already exists and is executable
 	try {

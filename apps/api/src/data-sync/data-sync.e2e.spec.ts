@@ -39,6 +39,9 @@ jest.mock('@ever-works/agent/generators', () => ({
 jest.mock('@ever-works/agent/database', () => ({
     WorkRepository: class WorkRepository {},
 }));
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class WorkOwnershipService {},
+}));
 jest.mock('@ever-works/agent/config', () => ({
     config: {
         subscriptions: {
@@ -61,7 +64,9 @@ import { ActivityActionType, CacheEntry, GenerateStatusType } from '@ever-works/
 import { CACHE_MANAGER, DistributedTaskLockService } from '@ever-works/agent/cache';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { WorkRepository } from '@ever-works/agent/database';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DataSyncController } from './data-sync.controller';
 import { DataSyncDispatcherService } from './data-sync-dispatcher.service';
 import { DataSyncService } from './data-sync.service';
@@ -145,6 +150,31 @@ describe('EW-628 data-sync e2e — orchestration across G3 + G7 + controller', (
             }),
         };
 
+        // Mirror the real `WorkOwnershipService.ensureCanEdit` contract
+        // against the in-memory `workStore`: 404 when the Work is
+        // missing, 403 when the caller is neither creator nor an
+        // EDITOR-or-higher member, otherwise resolve. The seeded Works
+        // belong to `user-1`, so the force-sync ACs pass the gate as the
+        // creator; a stranger probe would 403 exactly like production.
+        const ownershipService = {
+            ensureCanEdit: jest.fn().mockImplementation(async (id: string, userId: string) => {
+                const work = workStore.get(id);
+                if (!work) {
+                    throw new NotFoundException({
+                        status: 'error',
+                        message: `Work with id '${id}' not found`,
+                    });
+                }
+                if (work.userId !== userId) {
+                    throw new ForbiddenException({
+                        status: 'error',
+                        message: 'You do not have permission to access this work',
+                    });
+                }
+                return { work, member: null, role: 'owner', isCreator: true };
+            }),
+        };
+
         const module: TestingModule = await Test.createTestingModule({
             controllers: [DataSyncController],
             providers: [
@@ -158,6 +188,7 @@ describe('EW-628 data-sync e2e — orchestration across G3 + G7 + controller', (
                 { provide: CACHE_MANAGER, useValue: cacheManager },
                 { provide: ActivityLogService, useValue: activityLogService },
                 { provide: WorkRepository, useValue: workRepository },
+                { provide: WorkOwnershipService, useValue: ownershipService },
                 { provide: MarkdownGeneratorService, useValue: markdownGenerator },
             ],
         }).compile();
@@ -170,9 +201,10 @@ describe('EW-628 data-sync e2e — orchestration across G3 + G7 + controller', (
         const work = {
             id,
             // Both shapes — the legacy `user` relation and the
-            // canonical `userId` foreign key. The data-sync controller
-            // now reads `work.userId` for the ownership gate, but the
-            // dispatcher / G7 code reads `work.user`. Keep both populated
+            // canonical `userId` foreign key. The data-sync controller's
+            // access gate (via `WorkOwnershipService.ensureCanEdit`)
+            // keys off `work.userId`, but the dispatcher / G7 code reads
+            // `work.user`. Keep both populated
             // in the in-memory stub so each consumer sees what it
             // expects.
             user: { id: 'user-1' },
@@ -338,6 +370,19 @@ describe('EW-628 data-sync e2e — orchestration across G3 + G7 + controller', (
                 errorClass: 'main-repo-push-rejected',
             });
             expect((result as { errorTail?: string }).errorTail).toMatch(/non-fast-forward/);
+        });
+
+        it('rejects a stranger (403) and never runs the sync (no leak that the Work exists)', async () => {
+            // The Work belongs to user-1; a different caller has no
+            // edit access, so `ensureCanEdit` throws 403 and the render
+            // never fires.
+            seedWork('w-private');
+            const stranger = { userId: 'intruder-9' } as unknown as AuthenticatedUser;
+
+            await expect(controller.forceSync(stranger, 'w-private')).rejects.toMatchObject({
+                status: 403,
+            });
+            expect(markdownGenerator.syncFromDataRepo).not.toHaveBeenCalled();
         });
     });
 });

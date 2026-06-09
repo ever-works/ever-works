@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, resolve, isAbsolute } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { syncTaxonomyFromFile } from './taxonomy-sync.js';
 
@@ -99,6 +99,17 @@ async function handleFileChange(
 	logger: Logger
 ): Promise<void> {
 	const filePath = join(workspacePath, filename);
+	// Security (path-traversal): `filename` comes from the OS `fs.watch` callback and,
+	// on platforms that surface relative paths, a workspace file named `../outside.json`
+	// (created by the spawned Gemini subprocess via prompt injection) would survive the
+	// `.json`/`_meta` filters above and resolve `filePath` outside `workspacePath` —
+	// causing taxonomy reads/writes against arbitrary host paths. Confine to the
+	// workspace; legitimate items are flat `.json` files in the root, so behavior is
+	// unchanged for them. Silently skip out-of-bounds names (matches this fn's semantics).
+	const rel = relative(resolve(workspacePath), resolve(filePath));
+	if (rel.startsWith('..') || isAbsolute(rel)) {
+		return;
+	}
 	try {
 		const content = await readFn(filePath);
 		await syncTaxonomyFromFile(readFn, writeFn, filePath, content);

@@ -296,7 +296,7 @@ export class ItemSubmissionService {
                 status: 'error',
                 slug: work.slug,
                 item_name: submitItemDto.name,
-                message: error.message,
+                message: error instanceof Error ? error.message : 'An unexpected error occurred',
             };
         }
     }
@@ -472,7 +472,7 @@ export class ItemSubmissionService {
                 slug: work.slug,
                 item_name: 'Unknown',
                 item_slug: itemSlug,
-                message: error.message,
+                message: error instanceof Error ? error.message : 'An unexpected error occurred',
             };
         }
     }
@@ -704,7 +704,7 @@ export class ItemSubmissionService {
                 slug: work.slug,
                 item_name: 'Unknown',
                 item_slug: itemSlug,
-                message: error.message,
+                message: error instanceof Error ? error.message : 'An unexpected error occurred',
             };
         }
     }

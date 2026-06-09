@@ -5,6 +5,7 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { MarkdownGeneratorModule } from '@ever-works/agent/generators';
+import { WorkModule } from '@ever-works/agent/services';
 import { DataSyncController } from './data-sync.controller';
 import { DataSyncDispatcherService } from './data-sync-dispatcher.service';
 import { DataSyncService } from './data-sync.service';
@@ -30,6 +31,9 @@ import { DataSyncService } from './data-sync.service';
  * - pull in `MarkdownGeneratorModule` for `MarkdownGeneratorService`
  *   (Phase 2 `syncFromDataRepo` entry that does the actual render +
  *   push to the main repo),
+ * - pull in `WorkModule` for `WorkOwnershipService` (the controller's
+ *   per-Work edit-access gate on `POST /api/works/:id/sync` — admits the
+ *   creator plus EDITOR/MANAGER/OWNER members, not just the creator),
  * - expose `DataSyncService` to other API modules so the Phase 4
  *   dispatcher and Phase 5 webhook handler can converge on it.
  *
@@ -43,6 +47,7 @@ import { DataSyncService } from './data-sync.service';
         DatabaseModule,
         ActivityLogModule,
         MarkdownGeneratorModule,
+        WorkModule,
     ],
     controllers: [DataSyncController],
     providers: [DataSyncService, DataSyncDispatcherService, DistributedTaskLockService],

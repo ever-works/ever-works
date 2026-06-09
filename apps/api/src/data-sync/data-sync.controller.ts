@@ -1,6 +1,5 @@
 import {
     Controller,
-    ForbiddenException,
     HttpCode,
     HttpException,
     HttpStatus,
@@ -11,7 +10,7 @@ import {
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
-import { WorkRepository } from '@ever-works/agent/database';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { DataSyncService } from './data-sync.service';
 import type { DataSyncOutcome } from './data-sync.types';
 
@@ -44,7 +43,7 @@ import type { DataSyncOutcome } from './data-sync.types';
 export class DataSyncController {
     constructor(
         private readonly dataSyncService: DataSyncService,
-        private readonly workRepository: WorkRepository,
+        private readonly ownershipService: WorkOwnershipService,
     ) {}
 
     @Post('api/works/:id/sync')
@@ -60,22 +59,21 @@ export class DataSyncController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
     ): Promise<ForceSyncResponse> {
-        // Per-Work ownership / access check. The service docstring
-        // promises this check lives "alongside the gate body" inside
-        // `runDataSync`, but the gate body is still stubbed — so a
-        // stranger probing this endpoint would otherwise get a 2xx
-        // `enqueued` envelope and reveal that the Work exists. Gate at
-        // the controller until the service-level check lands.
-        const work = await this.workRepository.findById(id);
-        if (!work) {
-            throw new NotFoundException({ status: 'error', message: 'Work not found' });
-        }
-        if (work.userId !== auth.userId) {
-            throw new ForbiddenException({
-                status: 'error',
-                message: 'You do not have permission to sync this work',
-            });
-        }
+        // Per-Work access check. The service docstring promises this
+        // check lives "alongside the gate body" inside `runDataSync`,
+        // but the gate body is still stubbed — so a stranger probing
+        // this endpoint would otherwise get a 2xx `enqueued` envelope
+        // and reveal that the Work exists. Gate at the controller until
+        // the service-level check lands.
+        //
+        // Delegated to `WorkOwnershipService` so the guard honours the
+        // shared Work access model: the creator AND any work-member with
+        // EDITOR-or-higher role (EDITOR / MANAGER / OWNER) may force a
+        // sync — not just the creator. `ensureCanEdit` throws
+        // `NotFoundException` (404) when the Work doesn't exist and
+        // `ForbiddenException` (403) when the caller lacks edit access,
+        // preserving the existing 404-vs-403 contract.
+        await this.ownershipService.ensureCanEdit(id, auth.userId);
         // The service still throws plain `Error: not yet implemented` for
         // some code paths (and the per-Work ownership check is still
         // marked TODO inside `runDataSync`). Convert anything that isn't
