@@ -70,7 +70,9 @@ export function executeCodex(options: ExecuteOptions): {
 		if (options.outputLastMessagePath) {
 			args.push('--output-last-message', options.outputLastMessagePath);
 		}
-		args.push(options.prompt);
+		// Security: terminate option parsing with `--` so a prompt that begins
+		// with `-` is treated as a positional argument, not a CLI flag.
+		args.push('--', options.prompt);
 
 		const env = buildSubprocessEnv(options.env);
 

@@ -25,6 +25,19 @@ const isTerminalState = (state: DeploymentReadyState): state is DeploymentTermin
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
 
+const MAX_DEPLOYMENT_ERROR_LENGTH = 500;
+
+/**
+ * Cap the length of an error message before it is persisted on the
+ * WorkDeployment row and emitted in deployment events. Provider error
+ * strings can be arbitrarily large (e.g. a full HTML body or stack
+ * trace), which bloats stored rows and event payloads. Short messages
+ * (the common case) pass through unchanged.
+ */
+function sanitizeErrorMessage(msg: string): string {
+    return msg.length > MAX_DEPLOYMENT_ERROR_LENGTH ? msg.slice(0, 497) + '...' : msg;
+}
+
 function resolveDeployProviderId(providerId: string): string {
     return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
         ? KUBERNETES_DEPLOY_PROVIDER_ID
@@ -203,7 +216,10 @@ export class DeploymentVerifierService {
                 }
             } catch (error) {
                 this.logger.error(`Failed to get deployment for work ${work.id}:`, error);
-                cleanup('ERROR', error instanceof Error ? error.message : String(error));
+                cleanup(
+                    'ERROR',
+                    sanitizeErrorMessage(error instanceof Error ? error.message : String(error)),
+                );
             } finally {
                 inVerification = false;
             }

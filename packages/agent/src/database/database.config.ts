@@ -297,7 +297,14 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
         let database: string;
 
         if (config.database.getPath()) {
-            database = config.database.getPath();
+            const rawPath = config.database.getPath();
+            // Defensive normalization: collapse any relative traversal
+            // (e.g. `../../etc/...`) in DATABASE_PATH down to an absolute
+            // path. SQLite's special pseudo-paths (`:memory:`,
+            // `:custom-shared`, …) are NOT filesystem paths, so they are
+            // passed through untouched. Absolute file paths are unaffected
+            // (path.resolve is an identity op for already-absolute inputs).
+            database = rawPath.startsWith(':') ? rawPath : path.resolve(rawPath);
         } else if (appType === 'cli') {
             const dbDir = path.join(os.homedir(), '.ever-works');
             database = path.join(dbDir, 'ever-works.db');

@@ -3,7 +3,9 @@ import { UserSyncConfigRepository } from './user-sync-config.repository';
 /**
  * Pins the per-user-singleton semantics of the `user_sync_configs` table.
  * The `userId` column is unique (see entity), so `findByUser` is the only
- * lookup mode and `upsert` is structured as find→update-or-create.
+ * lookup mode and `upsert` is a single atomic DB-level INSERT … ON CONFLICT
+ * (conflictPaths: ['userId']) followed by a re-fetch — this closes the TOCTOU
+ * race that the prior find→update-or-create flow exposed.
  *
  * The repository also owns the "lastSyncError ↔ success" lifecycle: a
  * successful push or pull MUST clear the prior error string so the UI
@@ -16,6 +18,7 @@ describe('UserSyncConfigRepository', () => {
             update: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
+            upsert: jest.fn(),
             delete: jest.fn(),
             ...overrides,
         };
@@ -50,69 +53,73 @@ describe('UserSyncConfigRepository', () => {
     });
 
     describe('upsert', () => {
-        it('UPDATEs by userId and re-fetches when an existing row is found', async () => {
-            const existing = { id: 'sc-1', userId: 'user-1', repoOwner: 'old' };
+        it('issues a single atomic upsert keyed on userId (conflictPaths) — no find→update-or-create race', async () => {
             const updated = { id: 'sc-1', userId: 'user-1', repoOwner: 'new' };
-            const findOne = jest
-                .fn()
-                .mockResolvedValueOnce(existing) // initial findByUser
-                .mockResolvedValueOnce(updated); // re-fetch after update
-            const { repo, typeormRepo } = makeService({
-                findOne,
-                update: jest.fn().mockResolvedValue({ affected: 1 }),
-            });
+            // findOne is ONLY the post-upsert re-fetch now (no pre-read), so the
+            // window between "does a row exist?" and "write it" is gone.
+            const findOne = jest.fn().mockResolvedValue(updated);
+            const upsert = jest.fn().mockResolvedValue({ identifiers: [{ id: 'sc-1' }] });
+            const { repo, typeormRepo } = makeService({ findOne, upsert });
 
             const result = await repo.upsert('user-1', { repoOwner: 'new' });
 
-            expect(typeormRepo.update).toHaveBeenCalledWith(
-                { userId: 'user-1' },
-                { repoOwner: 'new' },
+            // Atomic DB-level upsert with the unique userId as the conflict target.
+            expect(typeormRepo.upsert).toHaveBeenCalledWith(
+                { userId: 'user-1', repoOwner: 'new' },
+                { conflictPaths: ['userId'] },
             );
+            // No TOCTOU pre-read / branch: the legacy update/create/save path is gone.
+            expect(typeormRepo.update).not.toHaveBeenCalled();
             expect(typeormRepo.create).not.toHaveBeenCalled();
             expect(typeormRepo.save).not.toHaveBeenCalled();
-            expect(findOne).toHaveBeenCalledTimes(2);
+            // The single findOne is the re-fetch that returns the durable row.
+            expect(findOne).toHaveBeenCalledTimes(1);
+            expect(findOne).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
             expect(result).toBe(updated);
         });
 
-        it('CREATEs a new row when no existing row found, merging userId into the partial', async () => {
-            const built = { userId: 'user-2', repoOwner: 'me', repoName: 'cfg' };
-            const saved = { id: 'sc-2', ...built };
-            const { repo, typeormRepo } = makeService({
-                findOne: jest.fn().mockResolvedValue(null),
-                create: jest.fn().mockReturnValue(built),
-                save: jest.fn().mockResolvedValue(saved),
-            });
+        it('merges userId into the partial and re-fetches the row whether or not it pre-existed', async () => {
+            const saved = { id: 'sc-2', userId: 'user-2', repoOwner: 'me', repoName: 'cfg' };
+            const findOne = jest.fn().mockResolvedValue(saved);
+            const upsert = jest.fn().mockResolvedValue({ identifiers: [{ id: 'sc-2' }] });
+            const { repo, typeormRepo } = makeService({ findOne, upsert });
 
             const result = await repo.upsert('user-2', { repoOwner: 'me', repoName: 'cfg' });
 
-            // userId is forced into the create payload so callers can't override it
-            expect(typeormRepo.create).toHaveBeenCalledWith({
-                userId: 'user-2',
-                repoOwner: 'me',
-                repoName: 'cfg',
-            });
-            expect(typeormRepo.save).toHaveBeenCalledWith(built);
+            // userId is merged into the upsert payload; one path handles both
+            // insert and update, so create/save are never reached.
+            expect(typeormRepo.upsert).toHaveBeenCalledWith(
+                { userId: 'user-2', repoOwner: 'me', repoName: 'cfg' },
+                { conflictPaths: ['userId'] },
+            );
+            expect(typeormRepo.create).not.toHaveBeenCalled();
+            expect(typeormRepo.save).not.toHaveBeenCalled();
             expect(typeormRepo.update).not.toHaveBeenCalled();
             expect(result).toBe(saved);
         });
 
-        it('merges userId LAST so caller-provided `userId` in the partial is overridden by the userId arg', async () => {
-            // The `{ userId, ...data }` spread order means a partial that smuggles
-            // a different userId still gets the function-arg userId at the front,
-            // which is then OVERWRITTEN by the spread. Pin this — flipping the
-            // spread order would silently let a caller create rows for other users.
-            const created = jest.fn().mockReturnValue({});
-            const { repo } = makeService({
-                findOne: jest.fn().mockResolvedValue(null),
-                create: created,
-                save: jest.fn().mockResolvedValue({}),
+        it('merges userId FIRST so caller-provided `userId` in the partial overrides the userId arg', async () => {
+            // The `{ userId, ...data }` spread order is preserved by the atomic
+            // rewrite: a partial that smuggles a different userId still has that
+            // value win via the spread. Pin this — flipping the spread order would
+            // change which user's row is targeted. The protection against smuggling
+            // lives in the calling layer, not here.
+            const upsert = jest.fn().mockResolvedValue({ identifiers: [{}] });
+            const { repo, typeormRepo } = makeService({
+                findOne: jest.fn().mockResolvedValue({}),
+                upsert,
             });
 
             await repo.upsert('user-A', { userId: 'user-B' } as any);
 
             // The smuggled value DOES override — this is the documented behaviour.
-            // The protection lives in the calling layer, not here.
-            expect(created).toHaveBeenCalledWith({ userId: 'user-B' });
+            expect(typeormRepo.upsert).toHaveBeenCalledWith(
+                { userId: 'user-B' },
+                { conflictPaths: ['userId'] },
+            );
+            // And the re-fetch uses the ARG userId, not the smuggled one — so a
+            // caller smuggling user-B still only gets back user-A's row.
+            expect(typeormRepo.findOne).toHaveBeenCalledWith({ where: { userId: 'user-A' } });
         });
     });
 

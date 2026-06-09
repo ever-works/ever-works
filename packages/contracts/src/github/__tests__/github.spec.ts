@@ -30,10 +30,14 @@ describe('parseGitHubRepositoryUrl', () => {
 		expect(r?.repo).toBe('ever-works');
 	});
 
-	it('accepts http:// in addition to https://', () => {
-		const r = parseGitHubRepositoryUrl('http://github.com/foo/bar');
-		expect(r?.owner).toBe('foo');
-		expect(r?.repo).toBe('bar');
+	it('rejects http:// (only https supported)', () => {
+		expect(parseGitHubRepositoryUrl('http://github.com/foo/bar')).toBeNull();
+	});
+
+	it('returns null when owner or repo contains characters outside [a-z0-9._-]', () => {
+		expect(parseGitHubRepositoryUrl('https://github.com/foo%2F..%2Fbar/baz')).toBeNull();
+		expect(parseGitHubRepositoryUrl('https://github.com/foo~bar/baz')).toBeNull();
+		expect(parseGitHubRepositoryUrl('https://github.com/foo/ba z')).toBeNull();
 	});
 
 	it('accepts mixed-case hostname', () => {

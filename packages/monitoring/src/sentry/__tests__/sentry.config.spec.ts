@@ -105,6 +105,31 @@ describe('sentry.config', () => {
             expect(kept).toEqual({ request: { url: 'https://api.example/works' } });
         });
 
+        it('beforeSend uses path-anchored /auth matching (not substring includes)', () => {
+            const cfg = createSentryConfig();
+            // /authentication is a DIFFERENT path and must NOT be scrubbed.
+            const authn = { request: { url: 'https://api.example/authentication/status' } };
+            expect(cfg.beforeSend(authn)).toBe(authn);
+            // A path that merely contains "/auth" in a query string is NOT auth traffic.
+            const query = { request: { url: 'https://api.example/works?next=/auth/login' } };
+            expect(cfg.beforeSend(query)).toBe(query);
+            // A real /auth path is still scrubbed.
+            expect(cfg.beforeSend({ request: { url: 'https://api.example/auth' } })).toBeNull();
+            // Non-URL / malformed strings fall back to substring matching.
+            expect(cfg.beforeSend({ request: { url: 'not a url /auth/x' } })).toBeNull();
+            const malformedKept = { request: { url: 'not a url at all' } };
+            expect(cfg.beforeSend(malformedKept)).toBe(malformedKept);
+        });
+
+        it('beforeSendTransaction uses path-anchored /auth matching (not substring includes)', () => {
+            const cfg = createSentryConfig();
+            const authn = { request: { url: 'https://api.example/authentication/status' } };
+            expect(cfg.beforeSendTransaction(authn)).toBe(authn);
+            expect(
+                cfg.beforeSendTransaction({ request: { url: 'https://api.example/auth/refresh' } }),
+            ).toBeNull();
+        });
+
         it('beforeSend tolerates events without a request.url', () => {
             const cfg = createSentryConfig();
             const ev = { level: 'error' };

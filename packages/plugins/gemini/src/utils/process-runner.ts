@@ -52,6 +52,11 @@ export function executeGemini(options: ExecuteOptions): {
 			args.push('--model', options.model);
 		}
 
+		// Do NOT forward host GCP credentials (GOOGLE_APPLICATION_CREDENTIALS,
+		// GOOGLE_API_USE_CLIENT_CERTIFICATE) into the Gemini CLI subprocess.
+		// The CLI authenticates via the scoped GEMINI_API_KEY supplied in
+		// options.env; leaking ambient host creds would let an untrusted
+		// generation run act as the host's GCP identity.
 		const passthroughEnvKeys = [
 			'HTTP_PROXY',
 			'HTTPS_PROXY',
@@ -59,9 +64,7 @@ export function executeGemini(options: ExecuteOptions): {
 			'NO_PROXY',
 			'SSL_CERT_FILE',
 			'SSL_CERT_DIR',
-			'NODE_EXTRA_CA_CERTS',
-			'GOOGLE_APPLICATION_CREDENTIALS',
-			'GOOGLE_API_USE_CLIENT_CERTIFICATE'
+			'NODE_EXTRA_CA_CERTS'
 		] as const;
 
 		const env: Record<string, string> = {

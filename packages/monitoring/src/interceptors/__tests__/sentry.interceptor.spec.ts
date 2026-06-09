@@ -108,6 +108,60 @@ describe('SentryInterceptor', () => {
         expect(ctx.body.other).toBe('ok');
     });
 
+    it('recursively redacts sensitive fields in nested objects (keeps non-sensitive)', async () => {
+        const req = {
+            method: 'POST',
+            originalUrl: '/auth/login',
+            headers: {},
+            body: {
+                name: 'kept',
+                user: { name: 'alice', password: 'pw', apiKey: 'k', access_token: 'a' },
+                meta: { nested: { refreshToken: 'r', keepMe: 'yes' } },
+            },
+        };
+        const next: CallHandler = { handle: () => of({}) };
+        await lastValueFrom(interceptor.intercept(buildExecCtx(req), next));
+
+        const ctx = sentryMock.setContext.mock.calls[0][1];
+        expect(ctx.body.name).toBe('kept');
+        expect(ctx.body.user.name).toBe('alice');
+        expect(ctx.body.user.password).toBeUndefined();
+        expect(ctx.body.user.apiKey).toBeUndefined();
+        expect(ctx.body.user.access_token).toBeUndefined();
+        expect(ctx.body.meta.nested.refreshToken).toBeUndefined();
+        expect(ctx.body.meta.nested.keepMe).toBe('yes');
+    });
+
+    it('redacts sensitive fields inside array bodies', async () => {
+        const req = {
+            method: 'POST',
+            originalUrl: '/auth/bulk',
+            headers: {},
+            body: [
+                { email: 'a@b.com', password: 'pw1' },
+                { email: 'c@d.com', token: 't2', name: 'keep' },
+            ],
+        };
+        const next: CallHandler = { handle: () => of({}) };
+        await lastValueFrom(interceptor.intercept(buildExecCtx(req), next));
+
+        const ctx = sentryMock.setContext.mock.calls[0][1];
+        expect(Array.isArray(ctx.body)).toBe(true);
+        expect(ctx.body[0].password).toBeUndefined();
+        expect(ctx.body[0].email).toBe('a@b.com');
+        expect(ctx.body[1].token).toBeUndefined();
+        expect(ctx.body[1].name).toBe('keep');
+    });
+
+    it('returns non-object bodies (string/number) unchanged without throwing', async () => {
+        const req = { method: 'POST', originalUrl: '/raw', headers: {}, body: 'plain-string-body' };
+        const next: CallHandler = { handle: () => of({}) };
+        await lastValueFrom(interceptor.intercept(buildExecCtx(req), next));
+
+        const ctx = sentryMock.setContext.mock.calls[0][1];
+        expect(ctx.body).toBe('plain-string-body');
+    });
+
     it('handles missing body without throwing', async () => {
         const req = { method: 'GET', originalUrl: '/x', headers: {}, body: undefined };
         const next: CallHandler = { handle: () => of({}) };

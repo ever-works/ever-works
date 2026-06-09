@@ -616,10 +616,12 @@ export class CodexPlugin
 				executionAuth.mode === 'api-key'
 					? executionAuth.env
 					: {
-							CODEX_HOME: await materializeDeviceAuthHome(
-								executionAuth.authJson,
-								path.join(workspacePath, '_meta', 'device-auth')
-							)
+							// Security: materialize the device-auth CODEX_HOME (which writes the
+							// user's auth.json secret) into an isolated os.tmpdir() directory rather
+							// than under workspacePath/_meta — the workspace is the Codex CWD and is
+							// readable by the (prompt-injectable) agent, so persisting credentials
+							// there would expose them. The temp dir is cleaned up in the finally block.
+							CODEX_HOME: await materializeDeviceAuthHome(executionAuth.authJson)
 						};
 			this.completeStep('prepare-context', prepareStartedAt, onLogEntry);
 
@@ -827,6 +829,13 @@ export class CodexPlugin
 			}
 			return this.handleError(err, startTime);
 		} finally {
+			// Security: device-auth mode materializes the user's auth.json into an isolated
+			// os.tmpdir() CODEX_HOME (see prepare-context). Always remove it after the run so the
+			// credential does not linger on disk outside the (now-cleaned) workspace.
+			const codexHome = executionAuthEnv?.CODEX_HOME;
+			if (codexHome) {
+				await cleanupDeviceAuthHome(codexHome);
+			}
 			if (this.abortController === abortController) {
 				this.abortController = null;
 				this.killProcess = null;
@@ -1396,6 +1405,18 @@ export class CodexPlugin
 		}
 
 		const cliVersion = (settings.version as string) || DEFAULT_CLI_VERSION;
+		// Security: cliVersion flows into ensureBinary -> a GitHub release tag/download URL
+		// (`rust-v${version}`). Reject anything that is not a bare semver so a settings-injected
+		// value cannot be used to point the download at an attacker-controlled tag/path.
+		if (!/^\d+\.\d+\.\d+$/.test(cliVersion)) {
+			return {
+				success: false,
+				summary: 'Invalid Codex CLI version',
+				filesChanged: [],
+				duration: Date.now() - startTime,
+				error: 'Invalid version'
+			};
+		}
 		this.codexCommandPath = await ensureBinary(cliVersion, this.context?.logger);
 
 		const model = request.model ?? (settings.model as string | undefined) ?? DEFAULT_MODEL;
