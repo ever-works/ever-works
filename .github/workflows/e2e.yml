@@ -272,6 +272,16 @@ jobs:
           # b709f9cb) but several specs assert paid-tier transitions
           # that only fire when the module is on.
           SUBSCRIPTIONS_ENABLED: 'true'
+          # E2E-only escape hatch (hard-gated off in production — ignored
+          # unless NODE_ENV !== 'production'). Without a real billing
+          # integration wired in, the only path to a PAID plan is the
+          # privileged `assignPlanToUser` seam, which has no HTTP route. The
+          # self-service `POST /api/subscriptions/plan` endpoint is FREE-only
+          # in prod (EW-711 #23 free→paid escalation guard). Flipping this on
+          # lets the tier-gating / billing-grace / plan-tiers / org-billing
+          # specs drive a user onto STANDARD/PREMIUM so they exercise the
+          # downstream cadence gating they actually test. Prod stays strict.
+          SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID: 'true'
           # Magic-link passwordless auth (1f). Flip on so /api/auth/providers
           # advertises it, the magic-link issuance + redemption endpoints
           # exercise their real branches, and the e2e magic-link.spec.ts

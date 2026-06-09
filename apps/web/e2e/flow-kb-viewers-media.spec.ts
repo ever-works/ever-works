@@ -7,25 +7,27 @@ import { seedKbBinaryDoc, seedKbSkippedUpload } from './helpers/kb-fixtures';
  * EW-641 Phase 1B/d rows 9-12 + 21b — KB media viewers: complex,
  * multi-step, cross-feature END-TO-END integration flows.
  *
- * Drives the full per-MIME viewer dispatcher (`pickKbViewer`, row 21b)
- * end-to-end: upload binary bytes → server creates a viewable STUB
+ * Drives the full per-MIME viewer dispatcher end-to-end against the NEW
+ * workbench UI: upload binary bytes → server creates a viewable STUB
  * `WorkKnowledgeDocument` (`maybeCreateViewableUploadStub`, row 21b)
  * with `sourceUploadId` → the detail page
  * (`apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/[...path]/page.tsx`)
- * fetches the upload row, runs `pickKbViewer(upload.mimeType)`, and
- * mounts the matching `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer`. The
- * viewer's `url` prop points at the row-21a download proxy
- * (`GET /api/works/:id/kb/uploads/:uploadId/download`).
+ * fetches the upload row and hands the doc + MIME/size to
+ * `KbDocumentViewerSwitch`, which wraps the matching
+ * `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer` in an OUTER
+ * `SizeThresholdGate` (per-MIME operator caps in
+ * `KB_WORKBENCH_SIZE_THRESHOLDS`). The viewer's `url` prop points at the
+ * row-21a download proxy (`GET /api/works/:id/kb/uploads/:uploadId/download`).
  *
  * GAP vs. existing coverage:
  *  - `kb-viewer-size-cap.spec.ts` (A14) covers ONLY PDF-inline + XLSX-over-cap.
  *  - `media-mime-sniffing.spec.ts` covers content-type-lie REJECTION on upload.
  * Neither covers: the full dispatcher TYPE MATRIX (image/video/audio/docx
- * all in one work), the IMAGE >10 MiB download-fallback path, the
- * UNSUPPORTED-type (octet-stream) "no viewable doc" branch, CSV falling
- * through to the text editor (NOT a binary viewer), the download-proxy
- * streaming contract per viewer, or inline image `<img>` render. This file
- * fills exactly those.
+ * all in one work), the IMAGE >10 MiB workbench size-gate BLOCK path, the
+ * UNSUPPORTED-type (octet-stream) "no viewable doc" branch, CSV being
+ * dispatched to the xlsx grid viewer (the workbench groups text/csv with
+ * the spreadsheet MIMEs), or the download-proxy streaming contract per
+ * viewer. This file fills exactly those.
  *
  * Verified live (sqlite in-memory env — same driver CI uses) before
  * assertions were written:
@@ -42,17 +44,24 @@ import { seedKbBinaryDoc, seedKbSkippedUpload } from './helpers/kb-fixtures';
  *      'skipped' — opaque types are NOT stubbed (no viewer), so there is no
  *      navigable KB doc. `seedKbSkippedUpload` returns ONLY the upload id.
  *  - text/csv → 201, extractionStatus 'succeeded', doc HAS a body +
- *      sourceUploadId, BUT `pickKbViewer('text/csv') === 'text'` so the
- *      detail page mounts `KbEditor`, never a `kb-*-viewer`.
+ *      sourceUploadId. In the workbench, `KbDocumentViewerSwitch` groups
+ *      text/csv WITH the spreadsheet MIMEs and mounts `KbXlsxViewer`
+ *      (`kb-xlsx-viewer`) — exceljs loads a flat CSV as a single-sheet
+ *      workbook. (The old detail page fell through to the editor instead.)
  *  - GET /api/works/:id/kb/uploads/:uploadId/download → 200,
  *      `content-type: <stored mime>`, `x-content-type-options: nosniff`,
  *      `content-disposition: inline; filename="<original>"`.
  *
- * Per-viewer inline size caps (viewer-side, NOT the 200 MiB upload cap):
- *      PDF/DOCX 30 MiB, XLSX 5 MiB, IMAGE 10 MiB, AUDIO 50 MiB, VIDEO 100 MiB.
- * The page passes the upload's REAL `fileSize` (no test seam), so over-cap
- * flows must upload genuinely oversized bytes — image (>10 MiB) is the only
- * cap small enough to exercise without multi-100-MiB allocations.
+ * Two tiers of size caps apply. The workbench `SizeThresholdGate` (OUTER)
+ * uses `KB_WORKBENCH_SIZE_THRESHOLDS`: PDF/PPTX 50 MiB, DOCX 25 MiB, XLSX
+ * 15 MiB, image/* 10 MiB, video/* 500 MiB, audio/* 100 MiB. When this cap is
+ * exceeded the gate renders `kb-workbench-size-blocked` and the inner viewer
+ * never mounts. Each viewer ALSO keeps its own inline cap (PDF/DOCX 30 MiB,
+ * XLSX 5 MiB, image 10 MiB, audio 50 MiB, video 100 MiB) for the under-gate
+ * case. The page passes the upload's REAL `fileSize` (no test seam), so the
+ * over-cap flow uploads genuinely oversized bytes — image (>10 MiB) is the
+ * only cap small enough to exercise without multi-100-MiB allocations, and at
+ * 11 MiB it trips the WORKBENCH gate (10 MiB) first.
  *
  * Filename uses the safe `flow-` prefix (not matched by the no-auth
  * `testIgnore` regex in playwright.config.ts). The UI context is the SEEDED
@@ -65,7 +74,14 @@ const PDF_MIME = 'application/pdf';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-const KB_IMAGE_INLINE_MAX_BYTES = 10 * 1024 * 1024;
+/**
+ * Workbench `image/*` size-gate threshold (mirrors
+ * `KB_WORKBENCH_SIZE_THRESHOLDS['image/*']` in `SizeThresholdGate.tsx`). The
+ * workbench dispatcher wraps every viewer in an OUTER `SizeThresholdGate`, so
+ * an image whose `fileSize` clears THIS cap is blocked by the gate (rendering
+ * `kb-workbench-size-blocked`) before `KbImageViewer` mounts.
+ */
+const KB_IMAGE_WORKBENCH_MAX_BYTES = 10 * 1024 * 1024;
 
 /** Minimal valid PNG byte header + a tiny IDAT — enough for an image upload. */
 const TINY_PNG = Buffer.from(
@@ -154,11 +170,13 @@ test.describe('Flow — KB media viewers + size caps', () => {
      * FLOW 1 — Viewer dispatcher TYPE MATRIX.
      *
      * Seed PDF + XLSX + DOCX + image + video + audio uploads on ONE work,
-     * navigate to each doc's detail route, and assert that
-     * `pickKbViewer(upload.mimeType)` mounted EXACTLY the matching
+     * navigate to each doc's detail route, and assert that the workbench
+     * `KbDocumentViewerSwitch` mounted EXACTLY the matching
      * `Kb{Pdf,Xlsx,Docx,Image,Video,Audio}Viewer` (each viewer roots a
-     * `data-testid="kb-<kind>-viewer"` section). This is the end-to-end
-     * dispatcher proof the existing A14 spec never does in aggregate.
+     * `data-testid="kb-<kind>-viewer"` section, wrapped in a pass-through
+     * `SizeThresholdGate` because every fixture is under its MIME's cap).
+     * This is the end-to-end dispatcher proof the existing A14 spec never
+     * does in aggregate.
      */
     test('dispatcher mounts the correct viewer per upload MIME (pdf/xlsx/docx/image/video/audio)', async ({
         page,
@@ -234,7 +252,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
             // local 404 path degrades cleanly instead of hard-failing.
             const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
             await expect(
-                viewer.or(notFound),
+                viewer.or(notFound).first(),
                 `kb-${c.kind}-viewer mounts (or local-dev 404) for ${c.path}`,
             ).toBeVisible({ timeout: 60_000 });
             if ((await viewer.count()) === 0) continue;
@@ -255,17 +273,21 @@ test.describe('Flow — KB media viewers + size caps', () => {
     });
 
     /**
-     * FLOW 2 — IMAGE over the 10 MiB inline cap → download fallback.
+     * FLOW 2 — IMAGE over the 10 MiB cap → workbench size-gate block.
      *
      * Uploads a genuinely oversized (~11 MiB) image so the real
-     * `upload.fileSize` clears `KB_IMAGE_INLINE_MAX_BYTES` (the page passes
-     * the live fileSize — there is no test seam). Asserts the image viewer
-     * mounts in `data-mode="download"`, the shared `MediaSizeFallback` card
-     * + download link render, and the link href points at the row-21a proxy.
-     * Complements the existing XLSX-over-cap test with the IMAGE branch
-     * (different cap, different fallback component path).
+     * `upload.fileSize` clears the workbench `image/*` threshold (10 MiB in
+     * `KB_WORKBENCH_SIZE_THRESHOLDS`; the page passes the live fileSize —
+     * there is no test seam). In the workbench, `KbDocumentViewerSwitch`
+     * wraps every viewer in an OUTER `SizeThresholdGate`; when the size
+     * exceeds the per-MIME cap the gate short-circuits and renders the
+     * `kb-workbench-size-blocked` download card BEFORE `KbImageViewer` ever
+     * mounts. So the over-cap proof now asserts the gate's blocked banner +
+     * download anchor (pointing at the row-21a proxy) and that NO
+     * `kb-image-viewer` (and no inline `<img>`) was rendered. Complements the
+     * existing XLSX-over-cap test with the IMAGE cap + the new gate path.
      */
-    test('image over 10 MiB renders the download fallback (not inline <img>)', async ({
+    test('image over 10 MiB renders the workbench size-gate block (not inline <img>)', async ({
         page,
         request,
         baseURL,
@@ -279,13 +301,13 @@ test.describe('Flow — KB media viewers + size caps', () => {
         expect(workId).toBeTruthy();
 
         // 11 MiB of incompressible bytes behind a PNG header. Only fileSize
-        // drives the inline-vs-download decision, so the body need not decode.
+        // drives the gate decision, so the body need not actually decode.
         const { randomBytes } = await import('node:crypto');
         const oversized = Buffer.concat([
             Buffer.from('89504e470d0a1a0a', 'hex'),
             randomBytes(11 * 1024 * 1024),
         ]);
-        expect(oversized.length).toBeGreaterThan(KB_IMAGE_INLINE_MAX_BYTES);
+        expect(oversized.length).toBeGreaterThan(KB_IMAGE_WORKBENCH_MAX_BYTES);
 
         const seeded = await seedKbBinaryDoc(request, token, workId, {
             filename: `over-img-${id}.png`,
@@ -298,24 +320,25 @@ test.describe('Flow — KB media viewers + size caps', () => {
             waitUntil: 'domcontentloaded',
         });
 
-        const viewer = page.locator('[data-testid="kb-image-viewer"]');
-        // KB doc catch-all route mounts the viewer in CI but can 404 under
+        const blocked = page.locator('[data-testid="kb-workbench-size-blocked"]');
+        // KB doc catch-all route mounts the gate in CI but can 404 under
         // local `next dev` (documented gotcha) — tolerate the local-dev
-        // not-found surface so the over-cap fallback proof still runs in CI.
+        // not-found surface so the over-cap block proof still runs in CI.
         const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
-        await expect(viewer.or(notFound)).toBeVisible({ timeout: 60_000 });
-        if ((await viewer.count()) > 0) {
-            await expect(viewer).toHaveAttribute('data-mode', 'download');
-            // The inline <img> must NOT have rendered.
+        await expect(blocked.or(notFound).first()).toBeVisible({ timeout: 60_000 });
+        if ((await blocked.count()) > 0) {
+            // The gate blocked BEFORE the viewer mounted — no image viewer
+            // (and definitely no inline <img>) is on the page.
+            await expect(page.locator('[data-testid="kb-image-viewer"]')).toHaveCount(0);
             await expect(page.locator('[data-testid="kb-image-element"]')).toHaveCount(0);
 
-            const fallback = page.locator('[data-testid="kb-image-download-fallback"]');
-            await expect(fallback).toBeVisible({ timeout: 10_000 });
-            // The shared MediaSizeFallback stamps human size + cap labels.
-            await expect(fallback).toHaveAttribute('data-size-label', /MB$/);
-            await expect(fallback).toHaveAttribute('data-cap-label', '10 MB');
+            // The blocked card stamps human size + cap labels off the live
+            // fileSize and the resolved `image/*` threshold (10 MiB).
+            await expect(blocked).toHaveAttribute('data-size-label', /MB$/);
+            await expect(blocked).toHaveAttribute('data-cap-label', '10 MB');
+            await expect(blocked).toHaveAttribute('data-mime-type', /^image\/png/);
 
-            const link = page.locator('[data-testid="kb-image-download-link"]');
+            const link = page.locator('[data-testid="kb-workbench-size-blocked-download"]');
             await expect(link).toBeVisible();
             await expect(link).toHaveAttribute(
                 'href',
@@ -412,16 +435,22 @@ test.describe('Flow — KB media viewers + size caps', () => {
     });
 
     /**
-     * FLOW 4 — CSV routes to the TEXT editor, not a binary viewer.
+     * FLOW 4 — CSV is extracted server-side AND dispatched to the XLSX grid.
      *
-     * `pickKbViewer('text/csv')` is intentionally `'text'` (the XLSX viewer's
-     * exceljs parser rejects plain CSV), so the server extracts the CSV into a
-     * markdown body and the detail page renders `KbEditor` — NEVER a
-     * `kb-*-viewer`. Asserts the doc was created WITH a body + sourceUploadId
-     * (extraction succeeded) yet the UI mounts no media viewer. This is the
-     * "dispatcher fall-through" branch the type-matrix flow can't show.
+     * Server side: a `text/csv` upload still extracts into a Markdown body
+     * (extraction SUCCEEDS, the doc carries a body + `sourceUploadId`) — the
+     * API contract is unchanged. UI side, the workbench dispatcher
+     * (`KbDocumentViewerSwitch`) groups `text/csv` (and `text/tab-separated-
+     * values`) WITH the spreadsheet MIMEs and mounts `KbXlsxViewer` — exceljs
+     * accepts a flat CSV as a single-sheet workbook. (This differs from the
+     * old detail page, where `pickKbViewer('text/csv') === 'text'` fell
+     * through to the editor.) So this flow now asserts: extraction succeeded
+     * at the API layer, the workbench mounts the `kb-xlsx-viewer` for the CSV
+     * MIME, and NO OTHER media viewer (pdf/docx/image/video/audio) leaks.
+     * The 28-byte fixture is far under both the workbench `XLSX` gate (15 MiB)
+     * and the viewer's own 5 MiB inline cap, so the viewer renders inline.
      */
-    test('CSV upload extracts to text and renders in the editor, not a media viewer', async ({
+    test('CSV upload extracts to text and dispatches to the xlsx grid viewer', async ({
         page,
         request,
         baseURL,
@@ -468,28 +497,26 @@ test.describe('Flow — KB media viewers + size caps', () => {
         await page.goto(`${origin}/en/works/${workId}/kb/${doc.path}`, {
             waitUntil: 'domcontentloaded',
         });
-        // No media viewer of ANY kind mounts for a CSV doc.
-        for (const kind of ['pdf', 'xlsx', 'docx', 'image', 'video', 'audio']) {
-            await expect(
-                page.locator(`[data-testid="kb-${kind}-viewer"]`),
-                `csv must not mount kb-${kind}-viewer`,
-            ).toHaveCount(0);
+
+        const xlsxViewer = page.locator('[data-testid="kb-xlsx-viewer"]');
+        // The workbench dispatches text/csv to the xlsx grid viewer. The KB
+        // doc catch-all route mounts it in CI but can 404 under local `next
+        // dev` (documented gotcha) — tolerate the local-dev not-found surface
+        // so the dispatcher proof still runs in CI.
+        const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
+        await expect(xlsxViewer.or(notFound).first()).toBeVisible({ timeout: 60_000 });
+        if ((await xlsxViewer.count()) > 0) {
+            // 28-byte CSV is well under the gate + viewer caps → inline grid.
+            await expect(xlsxViewer).toHaveAttribute('data-mode', 'inline');
+            // The dispatcher chose the xlsx viewer EXCLUSIVELY — no other
+            // media viewer leaks onto the CSV page.
+            for (const kind of ['pdf', 'docx', 'image', 'video', 'audio']) {
+                await expect(
+                    page.locator(`[data-testid="kb-${kind}-viewer"]`),
+                    `csv must not mount kb-${kind}-viewer`,
+                ).toHaveCount(0);
+            }
         }
-        // The text editor surface (Tiptap/KbEditor) renders the extracted body.
-        // next-dev local vs CI divergence → match the rendered CSV content OR a
-        // textbox/editor region, whichever the build exposes. The KB doc
-        // catch-all route mounts the editor in CI but can 404 under local
-        // `next dev` (documented gotcha), so the not-found copy is the final
-        // tolerated fallback. Trailing `.first()` collapses the union to a
-        // single element so `toBeVisible` stays strict-mode safe.
-        const editorSignal = page
-            .getByText('alice')
-            .first()
-            .or(page.getByRole('textbox').first())
-            .or(page.locator('.ProseMirror').first())
-            .or(page.getByText(/not found|404|doesn.?t exist|page you/i).first())
-            .first();
-        await expect(editorSignal).toBeVisible({ timeout: 45_000 });
     });
 
     /**
@@ -630,7 +657,7 @@ test.describe('Flow — KB media viewers + size caps', () => {
         // local `next dev` (documented gotcha) — tolerate the local-dev
         // not-found surface so the inline-<img> proof still runs in CI.
         const notFound = page.getByText(/not found|404|doesn.?t exist|page you/i).first();
-        await expect(viewer.or(notFound)).toBeVisible({ timeout: 60_000 });
+        await expect(viewer.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if ((await viewer.count()) > 0) {
             await expect(viewer).toHaveAttribute('data-mode', 'inline');
             // data-size-bytes reflects the tiny PNG's real fileSize (well under 10 MiB).
