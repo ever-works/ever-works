@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { WorkAdvancedPromptsRepository } from '@src/database/repositories/work-advanced-prompts.repository';
 import { WorkOwnershipService } from './work-ownership.service';
 import {
@@ -48,6 +48,8 @@ import { WorkAdvancedPrompts } from '@src/entities/work-advanced-prompts.entity'
  */
 @Injectable()
 export class WorkAdvancedPromptsService {
+    private readonly logger = new Logger(WorkAdvancedPromptsService.name);
+
     constructor(
         private readonly repository: WorkAdvancedPromptsRepository,
         private readonly ownershipService: WorkOwnershipService,
@@ -97,7 +99,33 @@ export class WorkAdvancedPromptsService {
      * Used by ItemsGeneratorService to load prompts during generation.
      */
     async getPromptsForGeneration(workId: string): Promise<WorkAdvancedPrompts | null> {
-        return this.repository.findByWorkId(workId);
+        const prompts = await this.repository.findByWorkId(workId);
+
+        // Attribution audit log: record WHICH advanced-prompt fields are loaded
+        // into the generation pipeline (field names only — never the prompt text,
+        // which is editor-controlled, untrusted, and a prompt-injection surface).
+        const ADVANCED_PROMPT_FIELDS = [
+            'relevanceAssessment',
+            'itemGeneration',
+            'itemExtraction',
+            'searchQuery',
+            'categorization',
+            'deduplication',
+            'sourceValidation',
+        ] as const;
+        const activeFields = prompts
+            ? ADVANCED_PROMPT_FIELDS.filter((field) => {
+                  const value = prompts[field];
+                  return typeof value === 'string' && value.length > 0;
+              })
+            : [];
+        this.logger.log({
+            message: 'advanced-prompts loaded for generation',
+            workId,
+            activeFields,
+        });
+
+        return prompts;
     }
 
     /**

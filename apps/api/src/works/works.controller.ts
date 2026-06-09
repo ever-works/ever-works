@@ -1723,6 +1723,11 @@ export class WorksController {
 
     @Put('works/:id/advanced-prompts')
     @HttpCode(HttpStatus.OK)
+    // Abuse-rate hardening: advanced prompts are persisted per-Work and feed
+    // into AI generation. Content-injection is already mitigated at the
+    // DTO/service layer; this caps write spam at the same per-IP envelope used
+    // by the other mutation routes in this controller.
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
     async updateAdvancedPrompts(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,

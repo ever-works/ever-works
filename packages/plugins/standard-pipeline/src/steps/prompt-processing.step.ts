@@ -5,6 +5,50 @@ import type { MutableGenerationContext, StandardPipelineMetrics } from '../conte
 import { BasePipelineStep } from '../base-pipeline-step.js';
 import { PROMPT_KEYS } from '../prompt-keys.js';
 
+/**
+ * Security (prompt-injection hardening): chat-template control markers that some
+ * models interpret as out-of-band role/turn delimiters. Stripped from the
+ * untrusted `user_prompt` value before it is interpolated into
+ * {@link PROMPT_PROCESSING_PROMPT} so injected text cannot spoof a system/user
+ * turn. Mirrors the sibling `content-filtering.step.ts` /
+ * `domain-detection.step.ts` and the canonical `sanitizePromptVariable` in
+ * `@ever-works/agent`'s `item-health.service.ts`.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN = /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): the literal XML-style delimiter tag
+ * that fences the untrusted user prompt inside {@link PROMPT_PROCESSING_PROMPT}.
+ * The value is interpolated INSIDE this fence, so a value that prints its own
+ * `</prompt>` could forge the boundary and have trailing imperative text parsed
+ * as authoritative instructions. Matched (open or close) so the boundary token
+ * can be defused wherever it appears.
+ */
+const PROMPT_FENCE_TOKEN_PATTERN = /<\/?prompt\b/gi;
+
+/**
+ * Security (prompt-injection hardening): defuse a forged fence boundary by
+ * inserting a zero-width space right after the opening `<` of any fence tag.
+ * This keeps the text human/model-readable while breaking the literal token the
+ * boundary keys on. Mirrors `prompt.utils.ts`'s `neutralizeCustomPrompt` and
+ * `content-filtering.step.ts`'s `neutralizeFenceTokens`.
+ */
+function neutralizeFenceTokens(value: string): string {
+	return value.replace(PROMPT_FENCE_TOKEN_PATTERN, (token) => `${token[0]}​${token.slice(1)}`);
+}
+
+/**
+ * Security (prompt-injection hardening): sanitize the raw user prompt before it
+ * is interpolated into the `<prompt untrusted="true">` block. Newlines are
+ * PRESERVED because legitimate prompts are multi-line — only forged fence tokens
+ * and chat-template control markers are neutralized. This is value-level only:
+ * the original `prompt` is still used for URL extraction, fallback, and the
+ * returned `rewrittenPrompt`, so no extraction/return behavior changes.
+ */
+function sanitizeUserPrompt(value: string): string {
+	return neutralizeFenceTokens(value.replace(CHAT_TEMPLATE_MARKER_PATTERN, ''));
+}
+
 const PROMPT_PROCESSING_PROMPT = `
 # Prompt Extraction and Rewriting Task
 
@@ -78,7 +122,7 @@ Combine separated instructions into a single, coherent task description.
 
 ## Input Format
 
-<prompt>
+<prompt untrusted="true">
 {user_prompt}
 </prompt>
 
@@ -257,7 +301,10 @@ export class PromptProcessingStep extends BasePipelineStep {
 				promptProcessingOutputSchema,
 				{
 					temperature: 0,
-					variables: { user_prompt: prompt },
+					// Security: sanitize the untrusted user prompt before LLM
+					// interpolation. Value-level only — `prompt` itself is unchanged
+					// for URL extraction / fallback / returned rewrittenPrompt.
+					variables: { user_prompt: sanitizeUserPrompt(prompt) },
 					routing: {
 						complexity: 'simple',
 						taskId: 'prompt-processing'
