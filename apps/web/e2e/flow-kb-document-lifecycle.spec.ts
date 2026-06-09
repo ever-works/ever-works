@@ -230,7 +230,9 @@ test.describe('Flow — KB document lifecycle', () => {
         //     heading text (Tiptap renders markdown to HTML, so we assert on
         //     the visible TEXT — never the raw markdown string).
         await treeRow.click();
-        await page.waitForURL(new RegExp(`/works/${workId}/kb/`), { timeout: 30_000 });
+        // 90s: first hit on the per-doc [...path] route cold-compiles under
+        // Next dev in CI (the 30s default raced the compile).
+        await page.waitForURL(new RegExp(`/works/${workId}/kb/`), { timeout: 90_000 });
         await expect(page.getByTestId('kb-tiptap-editor-body')).toContainText(
             `KB Lifecycle ${runId}`,
             { timeout: 60_000 },
