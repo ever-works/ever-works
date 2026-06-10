@@ -38,8 +38,10 @@ import { createAgentViaAPI } from './helpers/agents-tasks';
  *       row in place (resolution:"overwritten", finalSlug==originalSlug).
  *   - The clone ALWAYS lands in status DRAFT regardless of the source's status
  *       (export carries no status; import forces `AgentStatus.DRAFT`).
- *   - Clone copies files (soulMd etc.) + permissions + avatar(icon) + runtime
- *       knobs. `canOpenPullRequests` implies `canCommitToRepo` on import.
+ *   - Clone copies files (soulMd etc.) + avatar(icon) + runtime knobs. The
+ *       envelope's permissions are EXPORTED but NOT honored on import — D9
+ *       (#1258) clamps the clone to the least-privilege all-false matrix
+ *       because envelopes are attacker-controllable.
  *   - Cross-tenant IMAGE avatar with imageUploadId:null degrades to INITIALS on
  *       import (no dangling upload reference). Verified live.
  *   - Envelope guards: version!==1 → 400 "Unsupported envelope version"; missing
@@ -221,15 +223,16 @@ test.describe('Agent template catalog — public, environment-adaptive', () => {
     });
 });
 
-test.describe('Clone an Agent — export → import copies files/permissions/avatar', () => {
+test.describe('Clone an Agent — export → import copies files/avatar; permissions clamp to least-privilege', () => {
     /**
      * The canonical "clone" path. Build a richly-configured source Agent (icon
      * avatar, granted permissions, custom runtime knobs, two inline definition
      * files), export the envelope, import it back, and assert the resulting clone
-     * is a faithful DRAFT copy with a uniquely-renamed slug — proving files +
-     * permissions + avatar + runtime knobs all round-trip.
+     * is a DRAFT copy with a uniquely-renamed slug — files + avatar + runtime
+     * knobs round-trip, while permissions are deliberately CLAMPED to the
+     * all-false default (D9, #1258: envelopes are attacker-controllable).
      */
-    test('full clone faithfully copies files, permissions, avatar and runtime knobs into a DRAFT', async ({
+    test('full clone copies files, avatar and runtime knobs into a DRAFT; permissions clamp to least-privilege', async ({
         request,
     }) => {
         const { token } = await freshToken(request);
@@ -305,9 +308,15 @@ test.describe('Clone an Agent — export → import copies files/permissions/ava
         expect(clone.pauseAfterFailures).toBe(7);
         expect(clone.avatarMode).toBe('icon');
         expect(clone.avatarIcon).toBe('bot');
-        expect(clone.permissions.canSpend).toBe(true);
-        expect(clone.permissions.canCommitToRepo).toBe(true);
-        expect(clone.permissions.canEditSkills).toBe(true);
+        // Security (D9, #1258 agent-export hardening): the envelope's
+        // runtime.permissions is attacker-controllable, so import deliberately
+        // does NOT honor it — the clone is clamped to the least-privilege
+        // default (all-false) matrix even though the export envelope carries
+        // the source's grants (asserted above). The owner re-grants via the
+        // permissions UI.
+        expect(clone.permissions.canSpend).toBe(false);
+        expect(clone.permissions.canCommitToRepo).toBe(false);
+        expect(clone.permissions.canEditSkills).toBe(false);
         expect(clone.hasInlineFiles).toBe(true);
 
         // The clone's files endpoint serves the copied bodies.
