@@ -886,7 +886,14 @@ export class PluginSettingsService {
         const filtered: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(settings)) {
             const propSchema = schema.properties[key] as JsonSchema | undefined;
-            if (propSchema?.['x-envVar']) {
+            // A field marked `x-envVar` is operator-provided via that environment
+            // variable. But when it is ALSO `x-secret` it is user-providable
+            // (BYOK): the env var is only the operator's fallback default, so a
+            // user-supplied value must be kept — both for validation (it satisfies
+            // the required check) and for persistence (stored encrypted at rest).
+            // Only PURE operator-config env-var fields (no `x-secret`, e.g.
+            // admin-only baseUrls per D4) are rejected from per-user/work writes.
+            if (propSchema?.['x-envVar'] && !propSchema?.['x-secret']) {
                 this.logger.warn(
                     `Rejecting x-envVar field "${key}" - must be set via environment variable`,
                 );

@@ -114,10 +114,23 @@ export class SettingsSchemaValidatorService {
             const fieldScope = (propSchema['x-scope'] as SettingsScope) || 'global';
             if (!this.isScopeApplicable(fieldScope, scope)) continue;
 
-            // Check if the field is present and not empty
+            // Check if the field is present and not empty. A required field is
+            // also satisfied when a value WILL be available at runtime without the
+            // caller supplying it on this request: an operator-provided env var
+            // (`x-envVar`) that is actually set, or a schema `default`. This stops
+            // a partial write (e.g. enabling a plugin with only its BYOK secret)
+            // from spuriously failing on env-backed / defaulted required fields
+            // like `defaultModel`.
             const value = settings[requiredField];
-            if (value === undefined || value === null || value === '') {
-                missingFields.push(requiredField);
+            const isEmpty = value === undefined || value === null || value === '';
+            if (isEmpty) {
+                const envVar = propSchema['x-envVar'] as string | undefined;
+                const satisfiedByEnv = !!envVar && !!process.env[envVar];
+                const def = propSchema['default'];
+                const satisfiedByDefault = def !== undefined && def !== null && def !== '';
+                if (!satisfiedByEnv && !satisfiedByDefault) {
+                    missingFields.push(requiredField);
+                }
             }
         }
 
@@ -211,9 +224,25 @@ export class SettingsSchemaValidatorService {
             if (this.isScopeApplicable(propScope, scope)) {
                 filteredProperties[key] = propSchema;
 
-                // Include in required if it was originally required
+                // Include in required if it was originally required — UNLESS the
+                // field will be satisfied at runtime without the caller supplying
+                // it on this write: it carries a schema `default`, or it is
+                // operator-provided via an env var (`x-envVar`) that is currently
+                // set. validateRequiredFields() is the authoritative, env/default-
+                // aware gate for required-ness and runs first in validate(), so
+                // re-enforcing those here — with ajv's useDefaults disabled — would
+                // wrongly reject a valid partial write (e.g. enabling a plugin with
+                // only its BYOK secret while `defaultModel` rides its schema
+                // default). An env-backed field whose env var is UNSET stays
+                // required here, matching validateRequiredFields().
                 if (schema.required?.includes(key)) {
-                    filteredRequired.push(key);
+                    const def = propSchema['default'];
+                    const hasDefault = def !== undefined && def !== null && def !== '';
+                    const envVar = propSchema['x-envVar'] as string | undefined;
+                    const envSatisfied = !!envVar && !!process.env[envVar];
+                    if (!hasDefault && !envSatisfied) {
+                        filteredRequired.push(key);
+                    }
                 }
             }
         }

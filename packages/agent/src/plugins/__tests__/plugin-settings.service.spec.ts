@@ -1396,15 +1396,18 @@ describe('PluginSettingsService', () => {
 
                 await service.updateAdminSettings('test-plugin', {
                     clientId: 'should-be-filtered',
-                    clientSecret: 'should-also-be-filtered',
+                    clientSecret: 'kept-because-x-secret',
                     normalSetting: 'should-be-saved',
                 });
 
-                // x-envVar fields should NOT be saved
+                // Pure operator-config x-envVar fields (clientId) are NOT saved,
+                // but an x-envVar field that is ALSO x-secret (clientSecret) is a
+                // user/admin-providable BYOK value: it is kept and persisted into
+                // the encrypted secret bag (3rd arg), not dropped.
                 expect(pluginRepository.updateSettings).toHaveBeenCalledWith(
                     'test-plugin',
                     { normalSetting: 'should-be-saved' },
-                    {},
+                    expect.objectContaining({ clientSecret: expect.any(String) }),
                 );
             });
 
@@ -1503,6 +1506,70 @@ describe('PluginSettingsService', () => {
                 });
             });
 
+            // Regression (plugin-enable 500): enabling an AI plugin by supplying
+            // ONLY its BYOK secret must succeed — the secret is kept+encrypted, and
+            // a required field that rides a schema default (e.g. openrouter's
+            // `defaultModel`) must not trip required/ajv validation. This is the
+            // exact shape that 500'd once secret writes were routed through the
+            // validating updateUserSettings path.
+            it('enables a plugin with only its BYOK secret while a defaulted required field rides its default', async () => {
+                const schema = {
+                    type: 'object',
+                    required: ['apiKey', 'defaultModel'],
+                    properties: {
+                        apiKey: {
+                            type: 'string',
+                            'x-scope': 'user',
+                            'x-secret': true,
+                            'x-envVar': 'PLUGIN_T_API_KEY',
+                        },
+                        defaultModel: {
+                            type: 'string',
+                            'x-scope': 'global',
+                            'x-envVar': 'PLUGIN_T_MODEL',
+                            default: 'openai/gpt-5-mini',
+                        },
+                    },
+                } as unknown as JsonSchema;
+                const plugin = createMockPlugin(schema);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+                const prevKey = process.env.PLUGIN_T_API_KEY;
+                const prevModel = process.env.PLUGIN_T_MODEL;
+                delete process.env.PLUGIN_T_API_KEY; // BYOK, not operator-provided
+                delete process.env.PLUGIN_T_MODEL; // defaultModel must ride its schema default
+                try {
+                    // Must NOT throw "Invalid settings: Missing required fields..."
+                    await service.updateUserSettings('test-plugin', 'user-1', {
+                        apiKey: 'sk-byok',
+                    });
+
+                    // The user's key is kept and persisted into the encrypted secret
+                    // bag — not silently dropped as a stray x-envVar field.
+                    expect(userPluginRepository.create).toHaveBeenCalledWith(
+                        expect.objectContaining({
+                            userId: 'user-1',
+                            pluginId: 'test-plugin',
+                            secretSettings: expect.objectContaining({
+                                apiKey: expect.any(String),
+                            }),
+                        }),
+                    );
+                } finally {
+                    if (prevKey === undefined) delete process.env.PLUGIN_T_API_KEY;
+                    else process.env.PLUGIN_T_API_KEY = prevKey;
+                    if (prevModel === undefined) delete process.env.PLUGIN_T_MODEL;
+                    else process.env.PLUGIN_T_MODEL = prevModel;
+                }
+            });
+
             it('should filter x-envVar fields when updating existing user settings', async () => {
                 const schema = createSchemaWithEnvVars();
                 const plugin = createMockPlugin(schema);
@@ -1581,15 +1648,18 @@ describe('PluginSettingsService', () => {
                 } as any);
 
                 await service.updateWorkSettings('test-plugin', 'dir-1', {
-                    clientSecret: 'should-be-filtered',
+                    clientSecret: 'kept-because-x-secret',
                     normalSetting: 'new-value',
                 });
 
+                // clientSecret is x-secret (BYOK) so it is kept and persisted into
+                // the encrypted secret bag (4th arg) rather than dropped; only pure
+                // operator-config x-envVar fields are filtered.
                 expect(workPluginRepository.updateSettings).toHaveBeenCalledWith(
                     'dir-1',
                     'test-plugin',
                     { normalSetting: 'new-value' },
-                    {},
+                    expect.objectContaining({ clientSecret: expect.any(String) }),
                 );
             });
         });
