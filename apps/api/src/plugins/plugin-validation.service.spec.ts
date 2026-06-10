@@ -246,6 +246,73 @@ describe('PluginValidationService', () => {
                 modelResults: undefined,
             });
         });
+
+        // Regression: lazy-plugin stubs over-report every optional method as a
+        // function (the proxy forwards unknown property reads), so capability
+        // probes must run against the MATERIALIZED plugin, not the stub.
+        it('probes the materialized plugin, not the lazy stub: no hooks on the real plugin → null', async () => {
+            const realPlugin = { id: 'plug-1', name: 'Plug 1', capabilities: ['ai-provider'] };
+            const lazyStub = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                // Mimic the proxy: these LOOK present on the stub but the real
+                // plugin has neither. The fixed code must never consult them.
+                validateConnection: jest.fn().mockResolvedValue(undefined),
+                isAvailable: jest.fn().mockResolvedValue(undefined),
+                __materialize: jest.fn().mockResolvedValue(realPlugin),
+            };
+            pluginRegistry.get.mockReturnValue({ state: 'loaded', plugin: lazyStub });
+
+            const result = await service.tryValidateConnection('plug-1', 'u-1');
+
+            expect(result).toBeNull();
+            expect(lazyStub.__materialize).toHaveBeenCalled();
+            expect(lazyStub.validateConnection).not.toHaveBeenCalled();
+            expect(lazyStub.isAvailable).not.toHaveBeenCalled();
+        });
+
+        it('uses the materialized plugin’s real validateConnection when present', async () => {
+            const validateConnection = jest
+                .fn()
+                .mockResolvedValue({ success: true, message: 'ok' });
+            const realPlugin = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                validateConnection,
+            };
+            const lazyStub = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                __materialize: jest.fn().mockResolvedValue(realPlugin),
+            };
+            pluginRegistry.get.mockReturnValue({ state: 'loaded', plugin: lazyStub });
+            pluginSettings.getSettings.mockResolvedValue({ apiKey: 'k' });
+
+            const result = await service.tryValidateConnection('plug-1', 'u-1');
+
+            expect(result).toEqual({ success: true, message: 'ok' });
+            expect(validateConnection).toHaveBeenCalledWith({ apiKey: 'k' });
+        });
+
+        it('returns null and warns when the lazy plugin fails to materialize', async () => {
+            const warn = jest.spyOn(service['logger'], 'warn').mockImplementation();
+            const lazyStub = {
+                id: 'plug-1',
+                name: 'Plug 1',
+                capabilities: ['ai-provider'],
+                __materialize: jest.fn().mockRejectedValue(new Error('import failed')),
+            };
+            pluginRegistry.get.mockReturnValue({ state: 'loaded', plugin: lazyStub });
+
+            const result = await service.tryValidateConnection('plug-1', 'u-1');
+
+            expect(result).toBeNull();
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain('Failed to materialize');
+        });
     });
 
     describe('validateUserPluginConnection (throwing alias)', () => {
@@ -363,6 +430,29 @@ describe('PluginValidationService', () => {
             const result = await service.validateUserPluginConnection('plug-1', 'u-1');
 
             expect(result).toEqual({ success: true, message: 'Plain settings saved.' });
+        });
+
+        // Regression: the throwing endpoint 500'd for lazy plugins whose real
+        // instance lacks validateConnection — the stub's wrapper "existed",
+        // resolved undefined, and `.success` threw. With truthful probing the
+        // endpoint falls through to the generic saved message instead.
+        it('lazy stub materializing to a plugin without hooks returns "settings saved" (no 500)', async () => {
+            const realPlugin = { id: 'plug-1', name: 'Vercel', capabilities: ['deployment'] };
+            const lazyStub = {
+                id: 'plug-1',
+                name: 'Vercel',
+                capabilities: ['deployment'],
+                validateConnection: jest.fn().mockResolvedValue(undefined),
+                isAvailable: jest.fn(),
+                __materialize: jest.fn().mockResolvedValue(realPlugin),
+            };
+            pluginRegistry.get.mockReturnValue({ state: 'loaded', plugin: lazyStub });
+            pluginSettings.getSettings.mockResolvedValue({});
+
+            const result = await service.validateUserPluginConnection('plug-1', 'u-1');
+
+            expect(result).toEqual({ success: true, message: 'Vercel settings saved.' });
+            expect(lazyStub.validateConnection).not.toHaveBeenCalled();
         });
     });
 });

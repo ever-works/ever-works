@@ -1551,11 +1551,17 @@ export class PluginOperationsService {
         if (typeof validateConnection === 'function') {
             try {
                 const result = await validateConnection.call(registered.plugin, settings);
-                return {
-                    connected: result.success,
-                    scope: 'user',
-                    message: result.message,
-                };
+                // A lazy-plugin proxy reports validateConnection as present even
+                // when the materialized plugin doesn't implement it, and the call
+                // then resolves to `undefined`. Fall through to the isAvailable
+                // probe in that case instead of reporting a bogus status.
+                if (result) {
+                    return {
+                        connected: result.success,
+                        scope: 'user',
+                        message: result.message,
+                    };
+                }
             } catch (error) {
                 this.logger.warn(
                     `Failed to validate onboarding connection for plugin "${registered.plugin.id}": ${error}`,

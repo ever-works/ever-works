@@ -1570,6 +1570,32 @@ describe('PluginSettingsService', () => {
                 }
             });
 
+            // Regression: a lazy-plugin proxy exposes validateSettings as a
+            // forwarding wrapper even when the real plugin has no such hook —
+            // the call then resolves to undefined. That must read as "no custom
+            // validation", not crash on `.valid` (the TypeError 500 that broke
+            // every plugin-enable e2e flow for lazy plugins, e.g. vercel).
+            it('treats an undefined result from plugin.validateSettings as no custom validation', async () => {
+                const plugin = createMockPlugin();
+                (plugin as unknown as Record<string, unknown>).validateSettings = jest
+                    .fn()
+                    .mockResolvedValue(undefined);
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin(plugin));
+                jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                    id: '1',
+                    pluginId: 'test-plugin',
+                    settings: {},
+                    secretSettings: {},
+                } as any);
+                jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+                // Must not throw the `Cannot read properties of undefined
+                // (reading 'valid')` TypeError.
+                await service.updateUserSettings('test-plugin', 'user-1', { enabled: true });
+
+                expect(userPluginRepository.create).toHaveBeenCalled();
+            });
+
             it('should filter x-envVar fields when updating existing user settings', async () => {
                 const schema = createSchemaWithEnvVars();
                 const plugin = createMockPlugin(schema);

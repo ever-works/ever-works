@@ -452,10 +452,16 @@ export class PluginSettingsService {
         }
 
         if (this.settingsValidator) {
+            // honorRuntimeFallbacks: this is the enable/persistence path — a
+            // partial write (e.g. enabling a plugin with only its BYOK secret)
+            // must not fail on required fields that ride a schema default or a
+            // set operator env var. The explicit settings-PATCH endpoints keep
+            // the strict default via validateSettingsOrThrow.
             const schemaValidation = this.settingsValidator.validate(
                 filteredValidationSettings,
                 schema,
                 scope as ValidatorSettingsScope,
+                { honorRuntimeFallbacks: true },
             );
             if (!schemaValidation.valid) {
                 throw new Error(`Invalid settings: ${schemaValidation.errors.join(', ')}`);
@@ -466,7 +472,14 @@ export class PluginSettingsService {
             const pluginValidation = await registered.plugin.validateSettings(
                 filteredValidationSettings,
             );
-            if (!pluginValidation.valid) {
+            // Under lazy plugin loading the proxy exposes optional lifecycle
+            // methods (validateSettings is optional) as a forwarding wrapper
+            // even when the real plugin doesn't implement them; calling it then
+            // resolves to `undefined`. Treat a missing/undefined result as "no
+            // custom validation" instead of dereferencing `.valid` — that threw
+            // `Cannot read properties of undefined (reading 'valid')` → HTTP 500
+            // on plugin enable for every lazy plugin without the hook.
+            if (pluginValidation && !pluginValidation.valid) {
                 throw new Error(
                     `Invalid settings: ${
                         pluginValidation.errors?.map((error) => error.message).join(', ') ??
