@@ -206,6 +206,99 @@ describe('SettingsSchemaValidatorService', () => {
             expect(result.valid).toBe(true);
         });
 
+        // Regression: enabling a plugin with only its BYOK secret must not fail
+        // on env-backed / defaulted required fields (the plugin-enable 500 that
+        // surfaced after secret writes were routed through the validating path).
+        // The leniency is OPT-IN via honorRuntimeFallbacks — the strict default
+        // is the settings-PATCH contract e2e asserts (a PATCH missing
+        // defaultModel is rejected even though the schema has a default).
+        it('honorRuntimeFallbacks treats a required field with a schema default as satisfied (e.g. defaultModel)', () => {
+            const schema = {
+                type: 'object',
+                required: ['apiKey', 'defaultModel'],
+                properties: {
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                    defaultModel: {
+                        type: 'string',
+                        'x-scope': 'global',
+                        default: 'openai/gpt-5-mini',
+                    },
+                },
+            } as unknown as JsonSchema;
+            // Strict default (PATCH contract): defaultModel is still required.
+            expect(service.validateRequiredFields({ apiKey: 'sk-x' }, schema, 'user').valid).toBe(
+                false,
+            );
+            // Enable path: defaultModel is satisfied by its schema default.
+            const lenient = service.validateRequiredFields({ apiKey: 'sk-x' }, schema, 'user', {
+                honorRuntimeFallbacks: true,
+            });
+            expect(lenient.valid).toBe(true);
+        });
+
+        it('full validate() with honorRuntimeFallbacks accepts a partial write whose missing required field has a default', () => {
+            // This is the ACTUAL path validateAndSeparateSettings takes on plugin
+            // enable: validate() = validateRequiredFields THEN the ajv pass. The
+            // ajv pass must not re-reject the defaulted field that the required
+            // check already treated as satisfied.
+            const schema = {
+                type: 'object',
+                required: ['apiKey', 'defaultModel'],
+                properties: {
+                    apiKey: { type: 'string', 'x-scope': 'user' },
+                    defaultModel: {
+                        type: 'string',
+                        'x-scope': 'global',
+                        default: 'openai/gpt-5-mini',
+                    },
+                },
+            } as unknown as JsonSchema;
+            expect(
+                service.validate({ apiKey: 'sk-x' }, schema, 'user', {
+                    honorRuntimeFallbacks: true,
+                }).valid,
+            ).toBe(true);
+            // Strict default still rejects — the ajv stage keeps the field
+            // required when no options are passed.
+            expect(service.validate({ apiKey: 'sk-x' }, schema, 'user').valid).toBe(false);
+        });
+
+        it('honorRuntimeFallbacks treats an env-backed required field as satisfied only when its env var is set', () => {
+            const schema = {
+                type: 'object',
+                required: ['apiKey'],
+                properties: {
+                    apiKey: {
+                        type: 'string',
+                        'x-scope': 'user',
+                        'x-secret': true,
+                        'x-envVar': 'TEST_VALIDATOR_API_KEY',
+                    },
+                },
+            } as unknown as JsonSchema;
+            const lenient = { honorRuntimeFallbacks: true };
+            const prev = process.env.TEST_VALIDATOR_API_KEY;
+            try {
+                delete process.env.TEST_VALIDATOR_API_KEY;
+                // Neither supplied nor env-set → genuinely missing.
+                expect(service.validateRequiredFields({}, schema, 'user', lenient).valid).toBe(
+                    false,
+                );
+                // Operator provides it via the env var → satisfied without a
+                // request value on the enable path...
+                process.env.TEST_VALIDATOR_API_KEY = 'operator-key';
+                expect(service.validateRequiredFields({}, schema, 'user', lenient).valid).toBe(
+                    true,
+                );
+                // ...but the strict PATCH contract still demands it (x-envVar
+                // settings-vs-availability divergence asserted by e2e).
+                expect(service.validateRequiredFields({}, schema, 'user').valid).toBe(false);
+            } finally {
+                if (prev === undefined) delete process.env.TEST_VALIDATOR_API_KEY;
+                else process.env.TEST_VALIDATOR_API_KEY = prev;
+            }
+        });
+
         it('should require user-scoped fields when validating at user scope', () => {
             const schema: JsonSchema = {
                 type: 'object',

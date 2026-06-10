@@ -19,6 +19,25 @@ export interface SettingsValidationResult {
 export type SettingsScope = 'global' | 'user' | 'work';
 
 /**
+ * Options for settings validation.
+ */
+export interface SettingsValidationOptions {
+    /**
+     * When true, a required field also counts as satisfied when a value WILL
+     * be available at runtime without the caller supplying it on this request:
+     * an operator-provided env var (`x-envVar`) that is actually set, or a
+     * schema `default`. The plugin-ENABLE/persistence path opts in so that
+     * enabling a plugin with only its BYOK secret doesn't spuriously fail on
+     * env-backed / defaulted required fields like `defaultModel`.
+     *
+     * Defaults to false — the strict contract the explicit settings-PATCH
+     * endpoints expose (and e2e specs assert): a PATCH must name every
+     * required field regardless of env/default fallbacks.
+     */
+    honorRuntimeFallbacks?: boolean;
+}
+
+/**
  * Service for validating plugin settings against their JSON Schema definitions.
  * Uses Ajv for schema validation and supports scope-based filtering.
  */
@@ -60,6 +79,7 @@ export class SettingsSchemaValidatorService {
         settings: Record<string, unknown>,
         schema: JsonSchema | undefined,
         scope: SettingsScope,
+        options?: SettingsValidationOptions,
     ): SettingsValidationResult {
         if (!schema) {
             // No schema means all settings are valid
@@ -67,7 +87,7 @@ export class SettingsSchemaValidatorService {
         }
 
         // Filter schema to only include properties for this scope
-        const scopedSchema = this.filterSchemaByScope(schema, scope);
+        const scopedSchema = this.filterSchemaByScope(schema, scope, options);
 
         // Build the filtered settings object
         const scopedSettings = this.filterSettingsByScope(settings, schema, scope);
@@ -98,6 +118,7 @@ export class SettingsSchemaValidatorService {
         settings: Record<string, unknown>,
         schema: JsonSchema | undefined,
         scope: SettingsScope,
+        options?: SettingsValidationOptions,
     ): SettingsValidationResult {
         if (!schema?.properties) return { valid: true, errors: [] };
         if (!schema.required?.length && !schema['x-requiredGroups']?.length) {
@@ -114,9 +135,15 @@ export class SettingsSchemaValidatorService {
             const fieldScope = (propSchema['x-scope'] as SettingsScope) || 'global';
             if (!this.isScopeApplicable(fieldScope, scope)) continue;
 
-            // Check if the field is present and not empty
+            // Check if the field is present and not empty. With
+            // honorRuntimeFallbacks (the enable/persistence path), a required
+            // field is also satisfied when a value WILL be available at runtime
+            // without the caller supplying it on this request — see
+            // SettingsValidationOptions. The strict default keeps the explicit
+            // settings-PATCH contract: every required field must be named.
             const value = settings[requiredField];
-            if (value === undefined || value === null || value === '') {
+            const isEmpty = value === undefined || value === null || value === '';
+            if (isEmpty && !this.isRuntimeSatisfied(propSchema, options)) {
                 missingFields.push(requiredField);
             }
         }
@@ -148,15 +175,36 @@ export class SettingsSchemaValidatorService {
         settings: Record<string, unknown>,
         schema: JsonSchema | undefined,
         scope: SettingsScope,
+        options?: SettingsValidationOptions,
     ): SettingsValidationResult {
         // First validate required fields
-        const requiredResult = this.validateRequiredFields(settings, schema, scope);
+        const requiredResult = this.validateRequiredFields(settings, schema, scope, options);
         if (!requiredResult.valid) {
             return requiredResult;
         }
 
         // Then validate schema
-        return this.validateSettings(settings, schema, scope);
+        return this.validateSettings(settings, schema, scope, options);
+    }
+
+    /**
+     * Whether an (empty-on-this-request) required field will be satisfied at
+     * runtime anyway — by a set operator env var or a schema default. Only
+     * consulted when the caller opted into honorRuntimeFallbacks.
+     */
+    private isRuntimeSatisfied(
+        propSchema: JsonSchema,
+        options?: SettingsValidationOptions,
+    ): boolean {
+        if (!options?.honorRuntimeFallbacks) {
+            return false;
+        }
+        const envVar = propSchema['x-envVar'] as string | undefined;
+        if (envVar && process.env[envVar]) {
+            return true;
+        }
+        const def = propSchema['default'];
+        return def !== undefined && def !== null && def !== '';
     }
 
     clearCache(): void {
@@ -196,7 +244,11 @@ export class SettingsSchemaValidatorService {
         return errors;
     }
 
-    private filterSchemaByScope(schema: JsonSchema, scope: SettingsScope): JsonSchema {
+    private filterSchemaByScope(
+        schema: JsonSchema,
+        scope: SettingsScope,
+        options?: SettingsValidationOptions,
+    ): JsonSchema {
         if (!schema.properties) {
             return schema;
         }
@@ -211,9 +263,19 @@ export class SettingsSchemaValidatorService {
             if (this.isScopeApplicable(propScope, scope)) {
                 filteredProperties[key] = propSchema;
 
-                // Include in required if it was originally required
+                // Include in required if it was originally required — UNLESS the
+                // caller opted into honorRuntimeFallbacks and the field will be
+                // satisfied at runtime anyway (schema `default`, or a SET
+                // `x-envVar`). validateRequiredFields() is the authoritative
+                // required-ness gate and runs first in validate(); re-enforcing
+                // runtime-satisfied fields here — with ajv's useDefaults
+                // disabled — would wrongly reject the enable path's valid
+                // partial write (e.g. only a BYOK secret while `defaultModel`
+                // rides its schema default).
                 if (schema.required?.includes(key)) {
-                    filteredRequired.push(key);
+                    if (!this.isRuntimeSatisfied(propSchema, options)) {
+                        filteredRequired.push(key);
+                    }
                 }
             }
         }
