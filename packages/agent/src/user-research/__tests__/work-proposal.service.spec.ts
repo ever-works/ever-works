@@ -43,7 +43,13 @@ function makeService(
             },
         }),
     };
-    const works = { findByUser: jest.fn().mockResolvedValue([]) };
+    const works = {
+        findByUser: jest.fn().mockResolvedValue([]),
+        // Owns work 'w1'; the IDOR guard in acceptInternal reads this.
+        findById: jest.fn(async (id: string) =>
+            id === 'w1' ? { id: 'w1', userId: 'u1' } : { id, userId: 'other-user' },
+        ),
+    };
     const registry = {
         getReady: jest.fn().mockReturnValue([{ plugin: { id: 'github' } }]),
         getEnabledPluginsScoped: jest.fn().mockResolvedValue([
@@ -79,6 +85,12 @@ function makeService(
         bulkInsert: jest.fn(async (items) =>
             items.map((item: object, index: number) => ({ ...item, id: `p${index}` })),
         ),
+        // acceptInternal path: proposal 'p1' exists for 'u1'; markAccepted
+        // succeeds. The IDOR guard sits between these two.
+        findByIdForUser: jest.fn(async (id: string) =>
+            id === 'p1' ? { id: 'p1', userId: 'u1', status: 'pending' } : null,
+        ),
+        markAccepted: jest.fn().mockResolvedValue(true),
     };
     const titler = { generateTitle: jest.fn().mockResolvedValue('Manual idea') };
 
@@ -91,7 +103,7 @@ function makeService(
         titler as never,
     );
 
-    return { service, aiFacade, repo };
+    return { service, aiFacade, repo, works };
 }
 
 describe('WorkProposalService proposal limits and dedupe', () => {
@@ -155,5 +167,47 @@ describe('WorkProposalService proposal limits and dedupe', () => {
         expect(repo.bulkInsert).toHaveBeenCalledWith([
             expect.objectContaining({ title: 'AI Agent Frameworks' }),
         ]);
+    });
+});
+
+describe('WorkProposalService.acceptInternal — workId ownership (IDOR guard)', () => {
+    it('accepts when the supplied Work belongs to the caller', async () => {
+        const { service, repo, works } = makeService();
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+        expect(ok).toBe(true);
+        expect(works.findById).toHaveBeenCalledWith('w1');
+        expect(repo.markAccepted).toHaveBeenCalledWith('p1', 'u1', 'w1', ['pending']);
+    });
+
+    it('refuses (false, no write) when the supplied Work belongs to ANOTHER user', async () => {
+        const { service, repo } = makeService();
+
+        // 'w-foreign' resolves to { userId: 'other-user' } in the works mock.
+        const ok = await service.acceptInternal('u1', 'p1', 'w-foreign');
+
+        expect(ok).toBe(false);
+        expect(repo.markAccepted).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the supplied Work does not exist', async () => {
+        const { service, repo, works } = makeService();
+        works.findById.mockResolvedValueOnce(null);
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w-missing');
+
+        expect(ok).toBe(false);
+        expect(repo.markAccepted).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the proposal is not the caller’s (guard order: proposal first)', async () => {
+        const { service, repo, works } = makeService();
+
+        const ok = await service.acceptInternal('u1', 'p-foreign', 'w1');
+
+        expect(ok).toBe(false);
+        expect(works.findById).not.toHaveBeenCalled();
+        expect(repo.markAccepted).not.toHaveBeenCalled();
     });
 });
