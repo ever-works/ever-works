@@ -85,16 +85,36 @@ export async function deleteAgentHardAction(
     return res;
 }
 
+/**
+ * Discriminated result for the instruction-file autosave. EXPECTED
+ * failures (parallel-edit etag conflict, validation rejects) are
+ * returned as DATA, not thrown: Next.js redacts Server Action error
+ * messages in production builds, so the editor's old
+ * `/etag/i.test(err.message)` classification silently degraded every
+ * conflict to the generic "Save failed" banner under `next start`
+ * (it only ever worked in dev, where messages leak through). The
+ * etag detection now happens HERE — server-side, where the API's
+ * real message is still intact.
+ */
+export type WriteAgentFileResult =
+    | { ok: true; newHash: string }
+    | { ok: false; conflict: boolean; message: string };
+
 export async function writeAgentFileAction(
     id: string,
     name: AgentFileName,
     body: string,
     expectedHash?: string,
-): Promise<{ newHash: string }> {
+): Promise<WriteAgentFileResult> {
     await ensureAuth();
-    const res = await agentsAPI.writeFile(id, name, body, expectedHash);
-    revalidatePath(`/agents/${id}/instructions`);
-    return res;
+    try {
+        const res = await agentsAPI.writeFile(id, name, body, expectedHash);
+        revalidatePath(`/agents/${id}/instructions`);
+        return { ok: true, newHash: res.newHash };
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { ok: false, conflict: /etag/i.test(message), message };
+    }
 }
 
 export async function exportAgentAction(id: string): Promise<AgentExportEnvelope> {

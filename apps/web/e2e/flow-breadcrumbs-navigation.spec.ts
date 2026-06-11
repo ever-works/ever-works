@@ -63,6 +63,14 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
 
 const NAV_TIMEOUT = 20_000;
 const RENDER_TIMEOUT = 25_000;
+// First render after a navigation under prebuilt-web/prod `next start` (the CI
+// change under validation) can land well after domcontentloaded: the RSC
+// payload streams in and the client router commits a beat later, and under
+// shard load that beat stretched past 25s (run 27374977059 failed this file
+// with a toBeVisible timeout; the same waits also flaked under next-dev cold
+// compiles). 60s gives the first post-nav paint headroom while staying inside
+// the 90s test budget.
+const FIRST_RENDER_TIMEOUT = 60_000;
 
 const NOT_FOUND_TITLE = 'Page not found';
 const BACK_HOME_LABEL = 'Back to Dashboard';
@@ -129,7 +137,12 @@ function notFoundHeading(page: Page) {
 async function entityRendered(page: Page, name: string): Promise<boolean> {
     const title = workTitleHeading(page, name);
     const notFound = notFoundHeading(page);
-    await expect(title.or(notFound)).toBeVisible({ timeout: RENDER_TIMEOUT });
+    // This helper is ALWAYS the first assertion after a navigation, so it is
+    // the load-complete signal for the destination page — give it the
+    // first-render budget (prebuilt-web/prod next start, run 27374977059).
+    // .or() of two locators + trailing .first() keeps strict mode happy when
+    // both branches momentarily resolve.
+    await expect(title.or(notFound).first()).toBeVisible({ timeout: FIRST_RENDER_TIMEOUT });
     return title.isVisible().catch(() => false);
 }
 
@@ -176,16 +189,25 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
             .locator(`a[href$="/works/${work.id}/settings/budgets-usage"]`)
             .first();
         const membersLink = page.locator(`a[href$="/works/${work.id}/settings/members"]`).first();
-        const navVisible = await settingsNav
-            .isVisible({ timeout: RENDER_TIMEOUT })
-            .catch(() => false);
-        const budgetsVisible = await budgetsLink.isVisible({ timeout: 5_000 }).catch(() => false);
         // The whole /works/{id}/settings shell may itself 404 locally; if so the
         // entity <h1> is gone — branch truthfully rather than hard-failing.
+        // Load-complete signal FIRST (the URL was awaited above; this is the
+        // concrete element): under prebuilt-web/prod next start the settings
+        // shell paints a beat after the URL commits, and locator.isVisible()
+        // does NOT wait (its timeout option is ignored), so probing visibility
+        // before this await read stale falses (run 27374977059 flake mode).
         const settingsRendered = await entityRendered(page, work.name);
         if (!settingsRendered) {
             test.skip(true, '/works/{id}/settings fell through to the local catch-all');
         }
+        // Awaited, event-based form of the same OR contract (replaces the
+        // immediate isVisible probes); trailing .first() for strict mode.
+        await expect(
+            settingsNav.or(budgetsLink).first(),
+            'no level-2 settings trail (sub-tab nav nor budgets link) found',
+        ).toBeVisible({ timeout: FIRST_RENDER_TIMEOUT });
+        const navVisible = await settingsNav.isVisible().catch(() => false);
+        const budgetsVisible = await budgetsLink.isVisible().catch(() => false);
         expect(
             navVisible || budgetsVisible,
             'no level-2 settings trail (sub-tab nav nor budgets link) found',
@@ -203,12 +225,25 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
             const leaf404 = notFoundHeading(page);
             // EITHER the budgets page renders under the work <h1> (CI) OR the
             // nested route 404s to the catch-all (local). Both are valid.
-            await expect(leafTitle.or(leaf404)).toBeVisible({ timeout: RENDER_TIMEOUT });
+            // First render after a navigation → first-render budget + trailing
+            // .first() on the .or() chain (strict mode; prebuilt-web/prod
+            // next start, run 27374977059).
+            await expect(leafTitle.or(leaf404).first()).toBeVisible({
+                timeout: FIRST_RENDER_TIMEOUT,
+            });
         }
         // At minimum, the members sibling crumb must also be discoverable so the
-        // trail is provably more than a single leaf.
+        // trail is provably more than a single leaf. waitFor is the event-based
+        // probe (isVisible's timeout option is a no-op); navVisible — captured
+        // on the settings page BEFORE the budgets descent — is the intentional
+        // fallback for the local branch where the budgets leaf 404s and the
+        // sub-tab row is gone.
+        const membersVisible = await membersLink
+            .waitFor({ state: 'visible', timeout: 3_000 })
+            .then(() => true)
+            .catch(() => false);
         expect(
-            (await membersLink.isVisible({ timeout: 3_000 }).catch(() => false)) || navVisible,
+            membersVisible || navVisible,
             'settings trail exposed neither a members crumb nor the sub-tab nav',
         ).toBe(true);
     });
@@ -243,8 +278,11 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         );
 
         // Same entity, shallower crumb: the title is unchanged (it tracks the
-        // entity, not the route segment).
-        await expect(workTitleHeading(page, work.name)).toBeVisible({ timeout: RENDER_TIMEOUT });
+        // entity, not the route segment). First render after the click-nav →
+        // first-render budget (prebuilt-web/prod next start, run 27374977059).
+        await expect(workTitleHeading(page, work.name)).toBeVisible({
+            timeout: FIRST_RENDER_TIMEOUT,
+        });
         await expect(page).not.toHaveURL(/\/items(\/)?$/);
     });
 
@@ -278,14 +316,19 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         await page.goto(`${origin}/works/${a.id}`, { waitUntil: 'domcontentloaded' });
         const titleA = page.getByRole('heading', { level: 1, name: nameA }).first();
         const nf = notFoundHeading(page);
-        await expect(titleA.or(nf)).toBeVisible({ timeout: RENDER_TIMEOUT });
+        // First render after goto → first-render budget; trailing .first() on
+        // the .or() chain for strict mode (prebuilt-web/prod next start,
+        // run 27374977059).
+        await expect(titleA.or(nf).first()).toBeVisible({ timeout: FIRST_RENDER_TIMEOUT });
         const sawA = await titleA.isVisible().catch(() => false);
         // The other work's name must NEVER leak onto this page regardless of branch.
         await expect(page.getByText(nameB, { exact: true })).toHaveCount(0);
 
         await page.goto(`${origin}/works/${b.id}`, { waitUntil: 'domcontentloaded' });
         const titleB = page.getByRole('heading', { level: 1, name: nameB }).first();
-        await expect(titleB.or(notFoundHeading(page))).toBeVisible({ timeout: RENDER_TIMEOUT });
+        await expect(titleB.or(notFoundHeading(page)).first()).toBeVisible({
+            timeout: FIRST_RENDER_TIMEOUT,
+        });
         const sawB = await titleB.isVisible().catch(() => false);
         await expect(page.getByText(nameA, { exact: true })).toHaveCount(0);
 
@@ -304,8 +347,9 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         const bogus = `/works/__no_such_work_${Date.now().toString(36)}__/settings/budgets-usage/ghost`;
         await page.goto(`${origin}${bogus}`, { waitUntil: 'domcontentloaded' });
 
-        // The not-found contract: 404 hero heading.
-        await expect(notFoundHeading(page)).toBeVisible({ timeout: RENDER_TIMEOUT });
+        // The not-found contract: 404 hero heading. First render after goto →
+        // first-render budget (prebuilt-web/prod next start, run 27374977059).
+        await expect(notFoundHeading(page)).toBeVisible({ timeout: FIRST_RENDER_TIMEOUT });
 
         // Both recovery affordances are present. "Back to Dashboard" is a real
         // <Link href="/"> (ROUTES.DASHBOARD); "Go Back" is a router.back() button.
@@ -324,7 +368,11 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         await page.waitForURL((url) => !/ghost|__no_such_work/.test(url.pathname), {
             timeout: NAV_TIMEOUT,
         });
-        await expect(notFoundHeading(page)).toHaveCount(0);
+        // The 404 hero detaches once the destination commits — but under
+        // prebuilt-web/prod next start the old tree can linger a beat past the
+        // URL change (run 27374977059), so give the auto-retrying count matcher
+        // the render budget instead of the 5s expect default.
+        await expect(notFoundHeading(page)).toHaveCount(0, { timeout: RENDER_TIMEOUT });
     });
 
     test('keyboard: the work-tab crumb row is focusable and Enter activates a crumb', async ({
@@ -352,15 +400,38 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
             .locator(`a[aria-label="Items"], a[href$="/works/${work.id}/items"]`)
             .first();
         await expect(itemsCrumb).toBeVisible({ timeout: RENDER_TIMEOUT });
-        await itemsCrumb.focus();
-        const isFocused = await itemsCrumb
-            .evaluate((el) => el === document.activeElement)
-            .catch(() => false);
-        expect(isFocused, 'Items crumb did not accept keyboard focus').toBe(true);
+        // Retried focus probe: under prebuilt-web/prod next start (the CI
+        // change validated by run 27374977059) React hydration can swap the
+        // server-rendered anchor right AFTER .focus() lands, reverting
+        // activeElement to <body> — the one-shot read here was this test's
+        // chronic flake mode. Same contract (the crumb must hold keyboard
+        // focus), asserted as an awaited poll that re-issues focus until the
+        // node holds it, instead of a single unawaited snapshot.
+        await expect
+            .poll(
+                async () => {
+                    await itemsCrumb.focus().catch(() => undefined);
+                    return await itemsCrumb
+                        .evaluate((el) => el === document.activeElement)
+                        .catch(() => false);
+                },
+                {
+                    message: 'Items crumb did not accept keyboard focus',
+                    timeout: RENDER_TIMEOUT,
+                },
+            )
+            .toBe(true);
 
         await page.keyboard.press('Enter');
         await page.waitForURL(/\/works\/[^/]+\/items(\/)?$/, { timeout: NAV_TIMEOUT });
         await expect(page).toHaveURL(/\/items(\/)?$/);
+        // Load-complete signal before the keyboard probe: the URL committing
+        // does not mean the destination tree finished rendering — under
+        // prebuilt-web/prod next start (run 27374977059) pressing Tab against a
+        // half-committed tree made the focus probes read a stale activeElement.
+        // entityRendered awaits the work <h1> OR the local catch-all heading,
+        // so it is environment-adaptive (the branch result is irrelevant here).
+        await entityRendered(page, work.name);
 
         // Tab from the now-focused crumb must move focus to ANOTHER focusable
         // element (the crumb row is part of a normal tab order, not a focus trap).
@@ -395,18 +466,29 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         // /settings/data, /settings/api-keys all present).
         const securityCrumb = page.locator('a[href$="/settings/security"]').first();
         const dataCrumb = page.locator('a[href$="/settings/data"]').first();
-        const railVisible =
-            (await securityCrumb.isVisible({ timeout: RENDER_TIMEOUT }).catch(() => false)) ||
-            (await dataCrumb.isVisible({ timeout: 5_000 }).catch(() => false));
+        // Load-complete signal: WAIT for the rail before branching. The old
+        // probe used locator.isVisible({ timeout }), but isVisible does NOT
+        // wait — its timeout option is ignored and it returns immediately, so
+        // under prebuilt-web/prod next start (run 27374977059) it read false
+        // before the first post-goto paint and the test died downstream.
+        // waitFor (event-based) keeps the original skip semantics for builds
+        // where the settings shell genuinely never renders; .or() chain gets a
+        // trailing .first() for strict mode.
+        const railVisible = await securityCrumb
+            .or(dataCrumb)
+            .first()
+            .waitFor({ state: 'visible', timeout: FIRST_RENDER_TIMEOUT })
+            .then(() => true)
+            .catch(() => false);
         test.skip(
             !railVisible,
             '/settings side-nav rail not rendered (settings shell unavailable)',
         );
 
-        // Deep-navigate to a sibling settings leaf via its crumb.
-        const target = (await dataCrumb.isVisible({ timeout: 2_000 }).catch(() => false))
-            ? dataCrumb
-            : securityCrumb;
+        // Deep-navigate to a sibling settings leaf via its crumb. The rail is
+        // visible at this point (awaited above), so an immediate probe picks
+        // the branch without racing the render.
+        const target = (await dataCrumb.isVisible().catch(() => false)) ? dataCrumb : securityCrumb;
         const targetHref = await target.getAttribute('href');
         // The crumb tail we expect the URL to reflect AFTER following the link.
         // Compute it BEFORE the click so we can wait on the SPECIFIC destination
@@ -438,7 +520,12 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         // closing the trail (mirror of breadcrumbs-deep.spec's "link back to
         // /settings" but asserted as part of a full descend+ascend walk).
         const settingsRoot = page.locator('a[href$="/settings"]').first();
-        const rootReachable = await settingsRoot.isVisible({ timeout: 5_000 }).catch(() => false);
+        // Event-based wait (isVisible's timeout option is a no-op); the
+        // railVisible fallback below keeps the original contract intact.
+        const rootReachable = await settingsRoot
+            .waitFor({ state: 'visible', timeout: 5_000 })
+            .then(() => true)
+            .catch(() => false);
         // On builds where the root isn't a discrete crumb, the rail siblings still
         // constitute an up-navigation path — accept either.
         expect(
