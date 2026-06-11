@@ -213,7 +213,9 @@ export class SkillsService {
 
     async listBindings(userId: string, skillId: string): Promise<SkillBinding[]> {
         await this.getOne(userId, skillId);
-        return this.bindings.findBySkillId(skillId);
+        // Security: forward userId so the repository scopes the lookup to the
+        // owner in the WHERE clause (defense-in-depth vs. cross-user IDOR).
+        return this.bindings.findBySkillId(skillId, userId);
     }
 
     async createBinding(userId: string, input: CreateBindingInput): Promise<SkillBinding> {
@@ -245,7 +247,10 @@ export class SkillsService {
     async removeBinding(userId: string, bindingId: string): Promise<{ deleted: true }> {
         const binding = await this.bindings.findByIdAndUser(bindingId, userId);
         if (!binding) throw new NotFoundException(`Skill binding ${bindingId} not found.`);
-        await this.bindings.deleteById(bindingId);
+        // Security: ownership-scoped delete — userId is enforced in the WHERE
+        // clause so a TOCTOU gap after the guard above cannot delete another
+        // user's binding (cross-user IDOR).
+        await this.bindings.deleteByIdAndUser(bindingId, userId);
         return { deleted: true };
     }
 

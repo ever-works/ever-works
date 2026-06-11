@@ -395,12 +395,9 @@ describe('OAuthService', () => {
 
         it('exchanges code, fetches user, upserts account with plugin: prefix and connectionSource=plugin', async () => {
             const before = Date.now();
-            const result = await service.handleOAuthCallback(
-                'user-1',
-                'github',
-                'code-abc',
-                'state-xyz',
-            );
+            // EW-722 #20: no `state` arg — CSRF state verification moved to
+            // the controller (OAuthStateService) before this method runs.
+            const result = await service.handleOAuthCallback('user-1', 'github', 'code-abc');
             const after = Date.now();
 
             expect(oauthFacade.exchangeCodeForToken).toHaveBeenCalledWith(
@@ -463,7 +460,7 @@ describe('OAuthService', () => {
                 scope: undefined,
             });
 
-            await service.handleOAuthCallback('user-1', 'github', 'code', undefined);
+            await service.handleOAuthCallback('user-1', 'github', 'code');
 
             const arg = authAccountRepository.upsertProviderAccount.mock.calls[0][0];
             expect(arg.accessTokenExpiresAt).toBeUndefined();
@@ -547,11 +544,11 @@ describe('OAuthService', () => {
         });
 
         it('stores the read-packages token and its GitHub owner login in plugin settings', async () => {
+            // EW-722 #20: no `state` arg — verified at the controller.
             const result = await service.handleReadPackagesOAuthCallback(
                 'user-1',
                 'github',
                 'code-abc',
-                'state-xyz',
             );
 
             expect(oauthFacade.exchangeCodeForToken).toHaveBeenCalledWith(
@@ -579,7 +576,6 @@ describe('OAuthService', () => {
                 'user-1',
                 'github',
                 'code-abc',
-                'state-xyz',
             );
 
             expect(pluginSettingsService.updateUserSettings).toHaveBeenCalledWith(

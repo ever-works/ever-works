@@ -171,7 +171,12 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 		// Security (header injection): reject control chars in the idempotency key
 		// before it is used as a header value or cache key.
 		const messageRef = assertSafeMessageRef(payload.messageRef);
-		const cached = this.idempotencyCache.get(messageRef);
+		// Security (tenant isolation): scope the idempotency cache key by the
+		// channel binding — a bare messageRef would let one tenant's send
+		// short-circuit (and return the cached ChannelSendResult of) another
+		// tenant's send that happened to reuse the same ref.
+		const cacheKey = `${options.channelId ?? ''}:${messageRef}`;
+		const cached = this.idempotencyCache.get(cacheKey);
 		if (cached) return cached;
 
 		const { apiKey, workflowId, subscriberId } = getTarget(payload.target ?? {});
@@ -206,7 +211,7 @@ export class NovuChannelPlugin implements INotificationChannelPlugin {
 			providerMessageId: data.data.transactionId,
 			deliveredAt: new Date()
 		};
-		this.idempotencyCache.set(messageRef, result);
+		this.idempotencyCache.set(cacheKey, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

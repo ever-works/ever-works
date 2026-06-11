@@ -67,4 +67,22 @@ describe('ResendPlugin', () => {
 		await plugin.sendEmail(input, { userId: 'u' });
 		expect(sendMock).toHaveBeenCalledTimes(1);
 	});
+
+	it('does NOT serve a cached result across different userIds (tenant isolation)', async () => {
+		// Security: the local idempotency cache key is scoped by
+		// options.userId/workId — the same messageRef from two different users
+		// must trigger two real sends, never leak user A's cached result to B.
+		sendMock.mockResolvedValue({ data: { id: 'rs-scoped' }, error: null });
+
+		const input = {
+			from: 'a@example.com',
+			to: ['b@example.com'],
+			subject: 'hi',
+			bodyText: 'hi',
+			messageRef: 'ref-shared'
+		};
+		await plugin.sendEmail(input, { userId: 'user-a' });
+		await plugin.sendEmail(input, { userId: 'user-b' });
+		expect(sendMock).toHaveBeenCalledTimes(2);
+	});
 });

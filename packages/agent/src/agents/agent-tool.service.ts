@@ -1,11 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { Agent, AgentPermissions } from '../entities/agent.entity';
-import {
-    AgentAvatarMode,
-    AgentScope,
-    AgentStatus,
-    AGENT_PERMISSIONS_DEFAULT,
-} from '../entities/agent.entity';
+import type { Agent } from '../entities/agent.entity';
+import { AgentScope, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentFileService } from './agent-file.service';
 import { AgentsService } from './agents.service';
@@ -108,6 +103,14 @@ export class AgentToolService {
 
     constructor(
         private readonly agents: AgentRepository,
+        // Review-fix I6 + EW-721 #10: createSubAgent MUST route through
+        // AgentsService so scope-ownership validation + slug-uniqueness +
+        // avatar-field validation + permission refinement all run.
+        // REQUIRED (no @Optional()) — the old optional injection left a
+        // raw-repository fallback path that silently bypassed all of
+        // those checks whenever DI omitted the service. A misconfigured
+        // module now fails at boot instead of degrading security.
+        private readonly agentsService: AgentsService,
         @Optional() private readonly skills?: SkillRepository,
         @Optional() private readonly bindings?: SkillBindingRepository,
         @Optional() private readonly files?: AgentFileService,
@@ -129,12 +132,6 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_NOTIFY_CHANNEL_FACADE)
         private readonly notifyChannelFacade?: AgentNotifyChannelFacade,
-        // Review-fix I6: route createSubAgent through AgentsService so
-        // scope-ownership validation + slug-uniqueness + avatar-field
-        // validation + permission refinement all run, instead of the
-        // raw repository.create that bypassed everything. Optional()
-        // keeps unit tests that mock only AgentRepository working.
-        @Optional() private readonly agentsService?: AgentsService,
     ) {}
 
     /**
@@ -345,70 +342,35 @@ export class AgentToolService {
             invoke: async (args) => {
                 if (!args?.name) return { error: 'name is required' };
                 try {
-                    // Review-fix I6: route through AgentsService.create()
-                    // when available so the model gets a structured
-                    // ConflictException instead of a raw DB unique-
-                    // constraint violation. Falls back to repo.create
-                    // only when the service isn't bound (unit-test mode).
-                    if (this.agentsService) {
-                        const dto = await this.agentsService.create(actor.userId, {
-                            scope: actor.scope,
-                            missionId:
-                                actor.scope === AgentScope.MISSION
-                                    ? (actor.missionId ?? undefined)
-                                    : null,
-                            ideaId:
-                                actor.scope === AgentScope.IDEA
-                                    ? (actor.ideaId ?? undefined)
-                                    : null,
-                            workId:
-                                actor.scope === AgentScope.WORK
-                                    ? (actor.workId ?? undefined)
-                                    : null,
-                            name: args.name,
-                            title: args.title ?? null,
-                            capabilities: args.capabilities ?? null,
-                            aiProviderId: actor.aiProviderId ?? null,
-                            modelId: actor.modelId ?? null,
-                            maxSkillContextTokens: 4000,
-                            // Spec security §6 — sub-Agent always DRAFT,
-                            // permissions all-false (use the shared default
-                            // constant so future flag additions stay in sync).
-                            permissions: { ...AGENT_PERMISSIONS_DEFAULT },
-                        });
-                        return { id: dto.id, slug: dto.slug };
-                    }
-                    // Fallback repository path (unit-test mode only).
-                    // Sub-Agent inherits actor's scope verbatim — Mission-
-                    // scoped Agent creates Mission-scoped sub-Agent on the
-                    // same Mission. Permissions stay all-false per spec.
-                    const created = await this.agents.create({
-                        userId: actor.userId,
+                    // Review-fix I6 + EW-721 #10: ALWAYS route through
+                    // AgentsService.create() — scope-ownership validation,
+                    // slug-uniqueness (structured ConflictException instead
+                    // of a raw DB unique-constraint violation), avatar-field
+                    // validation and permission refinement all run there.
+                    // The old raw-repository fallback bypassed every one of
+                    // those checks and was removed.
+                    const dto = await this.agentsService.create(actor.userId, {
                         scope: actor.scope,
-                        missionId: actor.scope === AgentScope.MISSION ? actor.missionId : null,
-                        ideaId: actor.scope === AgentScope.IDEA ? actor.ideaId : null,
-                        workId: actor.scope === AgentScope.WORK ? actor.workId : null,
+                        missionId:
+                            actor.scope === AgentScope.MISSION
+                                ? (actor.missionId ?? undefined)
+                                : null,
+                        ideaId:
+                            actor.scope === AgentScope.IDEA ? (actor.ideaId ?? undefined) : null,
+                        workId:
+                            actor.scope === AgentScope.WORK ? (actor.workId ?? undefined) : null,
                         name: args.name,
-                        slug: slugify(args.name),
                         title: args.title ?? null,
                         capabilities: args.capabilities ?? null,
                         aiProviderId: actor.aiProviderId ?? null,
                         modelId: actor.modelId ?? null,
                         maxSkillContextTokens: 4000,
-                        // Second-pass fix: drop the redundant `as any` casts —
-                        // the enum values are well-typed.
-                        status: AgentStatus.DRAFT,
-                        permissions: { ...AGENT_PERMISSIONS_DEFAULT } as AgentPermissions,
-                        targets: null,
-                        heartbeatCadence: null,
-                        idleBehavior: actor.idleBehavior,
-                        pauseAfterFailures: 3,
-                        errorCount: 0,
-                        avatarMode: AgentAvatarMode.INITIALS,
-                        avatarIcon: null,
-                        avatarImageUploadId: null,
+                        // Spec security §6 — sub-Agent always DRAFT,
+                        // permissions all-false (use the shared default
+                        // constant so future flag additions stay in sync).
+                        permissions: { ...AGENT_PERMISSIONS_DEFAULT },
                     });
-                    return { id: created.id, slug: created.slug };
+                    return { id: dto.id, slug: dto.slug };
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };
                 }
@@ -988,12 +950,4 @@ export class AgentToolService {
             },
         };
     }
-}
-
-function slugify(text: string): string {
-    return text
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 80);
 }

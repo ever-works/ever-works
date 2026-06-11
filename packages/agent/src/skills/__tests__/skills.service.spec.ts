@@ -52,6 +52,7 @@ describe('SkillsService', () => {
             findByIdAndUser: jest.fn(),
             create: jest.fn(),
             deleteById: jest.fn(),
+            deleteByIdAndUser: jest.fn(),
             resolveActive: jest.fn().mockResolvedValue([]),
         };
         activity = { log: jest.fn().mockResolvedValue(undefined) };
@@ -271,10 +272,28 @@ describe('SkillsService', () => {
         });
     });
 
+    describe('listBindings', () => {
+        it('forwards userId so the repository scopes the lookup (IDOR defense)', async () => {
+            skills.findByIdAndUser.mockResolvedValueOnce(makeSkill());
+            await svc.listBindings('u1', 'sk1');
+            expect(bindings.findBySkillId).toHaveBeenCalledWith('sk1', 'u1');
+        });
+    });
+
     describe('removeBinding', () => {
         it('404s for cross-user', async () => {
             bindings.findByIdAndUser.mockResolvedValueOnce(null);
             await expect(svc.removeBinding('u1', 'b1')).rejects.toThrow(NotFoundException);
+            expect(bindings.deleteByIdAndUser).not.toHaveBeenCalled();
+            expect(bindings.deleteById).not.toHaveBeenCalled();
+        });
+
+        it('uses ownership-scoped delete (IDOR defense)', async () => {
+            bindings.findByIdAndUser.mockResolvedValueOnce({ id: 'b1', userId: 'u1' });
+            const out = await svc.removeBinding('u1', 'b1');
+            expect(out).toEqual({ deleted: true });
+            expect(bindings.deleteByIdAndUser).toHaveBeenCalledWith('b1', 'u1');
+            expect(bindings.deleteById).not.toHaveBeenCalled();
         });
     });
 });

@@ -196,7 +196,7 @@ export const templatesAPI = {
     }) => {
         return serverMutation<AddCustomTemplateResponse>({
             endpoint: '/templates/custom',
-            data: {},
+            data,
             method: 'POST',
             wrapInData: false,
         });

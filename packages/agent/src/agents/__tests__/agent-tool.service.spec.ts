@@ -52,6 +52,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
 
 describe('AgentToolService.resolveAllowedTools', () => {
     let agents: any;
+    let agentsService: any;
     let skills: any;
     let bindings: any;
     let files: any;
@@ -59,10 +60,15 @@ describe('AgentToolService.resolveAllowedTools', () => {
 
     beforeEach(() => {
         agents = { create: jest.fn() };
+        // EW-721 #10: AgentsService is now a REQUIRED dependency — the
+        // optional injection + raw-repository fallback bypassed scope-
+        // ownership, slug-uniqueness and avatar validation when DI
+        // omitted the service.
+        agentsService = { create: jest.fn() };
         skills = { findByIdAndUser: jest.fn() };
         bindings = { resolveActive: jest.fn().mockResolvedValue([]) };
         files = { write: jest.fn() };
-        svc = new AgentToolService(agents, skills, bindings, files);
+        svc = new AgentToolService(agents, agentsService, skills, bindings, files);
     });
 
     it('always exposes the placeholder tools (getActivity + getKbDocument)', () => {
@@ -148,18 +154,24 @@ describe('AgentToolService.resolveAllowedTools', () => {
     });
 
     describe('createSubAgent tool', () => {
-        it('always creates the sub-Agent in DRAFT with all permissions FALSE', async () => {
-            agents.create.mockResolvedValueOnce({ id: 'sub-1', slug: 'helper' });
+        // EW-721 #10: createSubAgent assertions now target AgentsService.create
+        // (userId, input) — the raw AgentRepository fallback was removed because
+        // it bypassed scope-ownership, slug-uniqueness and avatar validation.
+        it('always creates the sub-Agent with all permissions FALSE via AgentsService', async () => {
+            agentsService.create.mockResolvedValueOnce({ id: 'sub-1', slug: 'helper' });
             const tools = svc.resolveAllowedTools(
                 makeAgent({
                     permissions: { ...makeAgent().permissions, canCreateAgents: true },
                 }),
             );
             const tool = tools.find((t) => t.name === 'createSubAgent')!;
-            await tool.invoke({ name: 'Helper' });
-            const arg = agents.create.mock.calls[0][0];
-            expect(arg.status).toBe('draft');
-            expect(arg.permissions).toEqual({
+            const out = await tool.invoke({ name: 'Helper' });
+            expect(out).toEqual({ id: 'sub-1', slug: 'helper' });
+            const [userId, input] = agentsService.create.mock.calls[0];
+            expect(userId).toBe('u1');
+            // DRAFT status is enforced INSIDE AgentsService.create (it is not
+            // a CreateAgentInput field), so the tool cannot escalate it.
+            expect(input.permissions).toEqual({
                 canCreateAgents: false,
                 canAssignTasks: false,
                 canEditSkills: false,
@@ -169,10 +181,13 @@ describe('AgentToolService.resolveAllowedTools', () => {
                 canOpenPullRequests: false,
                 canCallExternalTools: false,
             });
+            // Security: the validating service is the ONLY path — the raw
+            // repository must never be written directly.
+            expect(agents.create).not.toHaveBeenCalled();
         });
 
         it('inherits the actor scope into the sub-Agent', async () => {
-            agents.create.mockResolvedValueOnce({ id: 'sub-1', slug: 'helper' });
+            agentsService.create.mockResolvedValueOnce({ id: 'sub-1', slug: 'helper' });
             const tools = svc.resolveAllowedTools(
                 makeAgent({
                     scope: AgentScope.MISSION,
@@ -182,9 +197,9 @@ describe('AgentToolService.resolveAllowedTools', () => {
             );
             const tool = tools.find((t) => t.name === 'createSubAgent')!;
             await tool.invoke({ name: 'Helper' });
-            const arg = agents.create.mock.calls[0][0];
-            expect(arg.scope).toBe(AgentScope.MISSION);
-            expect(arg.missionId).toBe('m1');
+            const [, input] = agentsService.create.mock.calls[0];
+            expect(input.scope).toBe(AgentScope.MISSION);
+            expect(input.missionId).toBe('m1');
         });
 
         it('requires a name', async () => {
@@ -196,6 +211,26 @@ describe('AgentToolService.resolveAllowedTools', () => {
             const tool = tools.find((t) => t.name === 'createSubAgent')!;
             const out = (await tool.invoke({} as any)) as Record<string, unknown>;
             expect('error' in out).toBe(true);
+            expect(agentsService.create).not.toHaveBeenCalled();
+        });
+
+        it('surfaces AgentsService validation failures as tool errors', async () => {
+            // e.g. slug-uniqueness ConflictException or scope-ownership
+            // BadRequestException — must reach the model as { error }, not throw.
+            agentsService.create.mockRejectedValueOnce(
+                new Error('An Agent named "Helper" already exists in this scope.'),
+            );
+            const tools = svc.resolveAllowedTools(
+                makeAgent({
+                    permissions: { ...makeAgent().permissions, canCreateAgents: true },
+                }),
+            );
+            const tool = tools.find((t) => t.name === 'createSubAgent')!;
+            const out = (await tool.invoke({ name: 'Helper' })) as Record<string, unknown>;
+            expect(out).toEqual({
+                error: 'An Agent named "Helper" already exists in this scope.',
+            });
+            expect(agents.create).not.toHaveBeenCalled();
         });
     });
 
@@ -215,6 +250,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
             const facade = makeEmailFacade();
             const withFacade = new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,
@@ -230,6 +266,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
             const facade = makeEmailFacade();
             const withFacade = new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,
@@ -254,6 +291,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
             });
             const withFacade = new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,
@@ -294,6 +332,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
             });
             const withFacade = new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,
@@ -336,6 +375,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
         const wire = (facade: unknown) =>
             new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,
@@ -400,6 +440,7 @@ describe('AgentToolService.resolveAllowedTools', () => {
         const wire = (facade: unknown) =>
             new AgentToolService(
                 agents,
+                agentsService,
                 skills,
                 bindings,
                 files,

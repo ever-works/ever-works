@@ -69,6 +69,14 @@ export class TenantEmailAddress {
     @Column({ type: 'varchar', length: 64, nullable: true })
     verificationToken?: string | null;
 
+    /**
+     * EW-711 #44 — verification tokens are time-boxed (24h, stamped by
+     * `EmailService.createAddress`). NULL = no pending token, or a legacy
+     * token issued before this column existed (treated as non-expiring).
+     */
+    @PortableDateColumn({ nullable: true })
+    verificationTokenExpiresAt?: Date | null;
+
     @Column({ type: 'boolean', default: false })
     defaultForReplies: boolean;
 
