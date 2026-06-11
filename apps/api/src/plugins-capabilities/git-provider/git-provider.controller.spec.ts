@@ -15,7 +15,9 @@ describe('GitProviderController', () => {
         getUser: jest.Mock;
     };
     let controller: GitProviderController;
-    const req = { user: { userId: 'user-1' } } as any;
+    // @CurrentUser() injects the unwrapped request.user, so the controller now
+    // receives { userId } directly (not the full { user: { userId } } request).
+    const auth = { userId: 'user-1' } as any;
 
     beforeEach(() => {
         gitProviderService = {
@@ -60,7 +62,7 @@ describe('GitProviderController', () => {
             const info = { id: 'github', connected: true, username: 'alice' };
             gitProviderService.checkConnection.mockResolvedValue(info);
 
-            const result = await controller.checkConnection(req, 'github');
+            const result = await controller.checkConnection(auth, 'github');
 
             expect(gitProviderService.checkConnection).toHaveBeenCalledWith('user-1', 'github');
             expect(result).toBe(info);
@@ -70,7 +72,7 @@ describe('GitProviderController', () => {
             const err = new Error('boom');
             gitProviderService.checkConnection.mockRejectedValue(err);
 
-            await expect(controller.checkConnection(req, 'github')).rejects.toBe(err);
+            await expect(controller.checkConnection(auth, 'github')).rejects.toBe(err);
         });
     });
 
@@ -78,28 +80,29 @@ describe('GitProviderController', () => {
         it('returns { success: true, organizations } on success', async () => {
             gitProviderService.getOrganizations.mockResolvedValue([{ id: 'o1' }]);
 
-            const result = await controller.getOrganizations(req, 'github');
+            const result = await controller.getOrganizations(auth, 'github');
 
             expect(gitProviderService.getOrganizations).toHaveBeenCalledWith('user-1', 'github');
             expect(result).toEqual({ success: true, organizations: [{ id: 'o1' }] });
         });
 
-        it('returns { success: false, organizations: [], error: <message> } on Error rejection', async () => {
+        it('returns generic error (does NOT leak upstream Error.message) on Error rejection', async () => {
             gitProviderService.getOrganizations.mockRejectedValue(new Error('rate limited'));
 
-            const result = await controller.getOrganizations(req, 'github');
+            const result = await controller.getOrganizations(auth, 'github');
 
             expect(result).toEqual({
                 success: false,
                 organizations: [],
-                error: 'rate limited',
+                error: 'Failed to fetch organizations',
             });
+            expect((result as { error: string }).error).not.toContain('rate limited');
         });
 
         it('returns generic error fallback when rejection is not an Error instance', async () => {
             gitProviderService.getOrganizations.mockRejectedValue('string-thrown');
 
-            const result = await controller.getOrganizations(req, 'github');
+            const result = await controller.getOrganizations(auth, 'github');
 
             expect(result).toEqual({
                 success: false,
@@ -113,7 +116,7 @@ describe('GitProviderController', () => {
         it('parses page+perPage with parseInt(_, 10) and forwards to service', async () => {
             gitProviderService.getRepositories.mockResolvedValue([{ id: 'r1' }]);
 
-            const result = await controller.getRepositories(req, 'github', '3', '25');
+            const result = await controller.getRepositories(auth, 'github', '3', '25');
 
             expect(gitProviderService.getRepositories).toHaveBeenCalledWith(
                 'user-1',
@@ -127,9 +130,9 @@ describe('GitProviderController', () => {
         it('passes undefined when page/perPage are undefined (each independently undefined-able)', async () => {
             gitProviderService.getRepositories.mockResolvedValue([]);
 
-            await controller.getRepositories(req, 'github');
-            await controller.getRepositories(req, 'github', undefined, '10');
-            await controller.getRepositories(req, 'github', '2', undefined);
+            await controller.getRepositories(auth, 'github');
+            await controller.getRepositories(auth, 'github', undefined, '10');
+            await controller.getRepositories(auth, 'github', '2', undefined);
 
             expect(gitProviderService.getRepositories.mock.calls).toEqual([
                 ['user-1', 'github', undefined, undefined],
@@ -138,22 +141,23 @@ describe('GitProviderController', () => {
             ]);
         });
 
-        it('returns { success: false, repositories: [], error: <message> } on Error rejection', async () => {
+        it('returns generic error (does NOT leak upstream Error.message) on Error rejection', async () => {
             gitProviderService.getRepositories.mockRejectedValue(new Error('forbidden'));
 
-            const result = await controller.getRepositories(req, 'github');
+            const result = await controller.getRepositories(auth, 'github');
 
             expect(result).toEqual({
                 success: false,
                 repositories: [],
-                error: 'forbidden',
+                error: 'Failed to fetch repositories',
             });
+            expect((result as { error: string }).error).not.toContain('forbidden');
         });
 
         it('returns generic error fallback when rejection is not an Error instance', async () => {
             gitProviderService.getRepositories.mockRejectedValue({ code: 502 });
 
-            const result = await controller.getRepositories(req, 'github');
+            const result = await controller.getRepositories(auth, 'github');
 
             expect(result).toEqual({
                 success: false,
@@ -167,24 +171,25 @@ describe('GitProviderController', () => {
         it('returns { success: true, user } on success', async () => {
             gitProviderService.getUser.mockResolvedValue({ login: 'alice' });
 
-            const result = await controller.getUser(req, 'github');
+            const result = await controller.getUser(auth, 'github');
 
             expect(gitProviderService.getUser).toHaveBeenCalledWith('user-1', 'github');
             expect(result).toEqual({ success: true, user: { login: 'alice' } });
         });
 
-        it('returns { success: false, user: null, error: <message> } on Error rejection', async () => {
-            gitProviderService.getUser.mockRejectedValue(new Error('401'));
+        it('returns generic error (does NOT leak upstream Error.message) on Error rejection', async () => {
+            gitProviderService.getUser.mockRejectedValue(new Error('secret-token-401'));
 
-            const result = await controller.getUser(req, 'github');
+            const result = await controller.getUser(auth, 'github');
 
-            expect(result).toEqual({ success: false, user: null, error: '401' });
+            expect(result).toEqual({ success: false, user: null, error: 'Failed to fetch user' });
+            expect((result as { error: string }).error).not.toContain('secret-token-401');
         });
 
         it('returns generic error fallback when rejection is not an Error instance', async () => {
             gitProviderService.getUser.mockRejectedValue(undefined);
 
-            const result = await controller.getUser(req, 'github');
+            const result = await controller.getUser(auth, 'github');
 
             expect(result).toEqual({
                 success: false,

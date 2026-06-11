@@ -174,7 +174,12 @@ spec:
         await expect(
             service.handle({ body: validBody as any, githubToken: 'token-aaaa' }),
         ).rejects.toMatchObject({
-            response: { code: 'repo_already_owned' },
+            response: {
+                code: 'repo_already_owned',
+                // Security: the message must stay generic and not reveal that
+                // the repo belongs to a different GitHub identity (info leak).
+                message: 'A conflict exists for this repository',
+            },
         });
     });
 
@@ -384,6 +389,102 @@ spec:
         await expect(
             service.handle({ body: validBody as any, githubToken: '' }),
         ).rejects.toMatchObject({ response: { code: 'gh_credential_invalid' } });
+    });
+
+    describe('webhookUrl SSRF guard', () => {
+        const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+
+        afterEach(() => {
+            process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+        });
+
+        it('rejects a private/loopback webhookUrl in a non-local env (production)', async () => {
+            process.env.NODE_ENV = 'production';
+            const repo = fakeRepository();
+            const { service } = createService({ repo });
+
+            await expect(
+                service.handle({
+                    body: {
+                        ...validBody,
+                        webhookUrl: 'http://169.254.169.254/latest/meta-data',
+                    } as any,
+                    githubToken: 'token-aaaa',
+                }),
+            ).rejects.toMatchObject({ response: { code: 'validation_error' } });
+
+            // Rejected before any persistence / GitHub work.
+            expect(repo.save).not.toHaveBeenCalled();
+        });
+
+        it('allows a private webhookUrl in local dev/test env (env-gate parity with WebhooksService)', async () => {
+            process.env.NODE_ENV = 'test';
+            const repo = fakeRepository();
+            repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+            const { service } = createService({ repo });
+
+            const result = await service.handle({
+                body: {
+                    ...validBody,
+                    webhookUrl: 'http://127.0.0.1:9000/hook',
+                    subdomain: 'my-dir',
+                } as any,
+                githubToken: 'token-aaaa',
+            });
+
+            expect(repo.save).toHaveBeenCalled();
+            const saved = repo.save.mock.calls[0][0];
+            expect(saved.webhookUrl).toBe('http://127.0.0.1:9000/hook');
+            expect(result.status).toBe('queued');
+        });
+
+        it('rejects a plaintext http:// webhookUrl in a non-local env even when the host is public (HMAC exposure)', async () => {
+            // The host is public, so isSafeWebhookUrl() returns true and the
+            // SSRF guard above lets it through. Only the https-only crypto
+            // guard rejects it — this test fails without that guard.
+            process.env.NODE_ENV = 'production';
+            const repo = fakeRepository();
+            const { service } = createService({ repo });
+
+            await expect(
+                service.handle({
+                    body: {
+                        ...validBody,
+                        webhookUrl: 'http://my-agent.example.com/webhooks/ever-works',
+                    } as any,
+                    githubToken: 'token-aaaa',
+                }),
+            ).rejects.toMatchObject({
+                response: {
+                    code: 'validation_error',
+                    message: 'webhookUrl must use https in non-local environments',
+                },
+            });
+
+            // Rejected before any persistence / GitHub work.
+            expect(repo.save).not.toHaveBeenCalled();
+        });
+
+        it('allows a public webhookUrl in a non-local env (production)', async () => {
+            process.env.NODE_ENV = 'production';
+            const repo = fakeRepository();
+            repo.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
+            const { service } = createService({ repo });
+
+            const result = await service.handle({
+                body: {
+                    ...validBody,
+                    webhookUrl: 'https://my-agent.example.com/webhooks/ever-works',
+                    subdomain: 'my-dir',
+                } as any,
+                githubToken: 'token-aaaa',
+            });
+
+            expect(repo.save).toHaveBeenCalled();
+            const saved = repo.save.mock.calls[0][0];
+            expect(saved.webhookUrl).toBe('https://my-agent.example.com/webhooks/ever-works');
+            expect(result.status).toBe('queued');
+        });
     });
 
     it('getStatus rejects when token does not match the row owner', async () => {

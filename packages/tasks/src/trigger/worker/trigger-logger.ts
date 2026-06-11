@@ -38,8 +38,10 @@ export class TriggerLogger implements LoggerService {
             if (typeof param === 'string') {
                 context = param;
             } else if (param instanceof Error) {
+                // Only forward the error message; never the stack trace.
+                // Stack traces leak internal file paths / module structure into
+                // the trigger.dev dashboard logs (information disclosure).
                 data.error = param.message;
-                data.stack = param.stack;
             } else if (typeof param === 'object' && param !== null) {
                 Object.assign(data, param);
             }

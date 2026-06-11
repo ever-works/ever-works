@@ -9,6 +9,21 @@ import { CustomCapabilityRegistryService } from '../services/custom-capability-r
 import { PLUGINS_MODULE_OPTIONS } from '../plugins.constants';
 import type { IPlugin, PluginManifest, CustomCapabilityDefinition } from '@ever-works/plugin';
 
+// Security: the plugin HTTP client routes every request through the DNS-pinned
+// SSRF guard `safeFetchWithDnsPin`. We mock that module so the HTTP-client tests
+// don't perform real DNS lookups, while keeping the real `SsrfBlockedError`
+// class so the guard-block / error-remap path can be exercised faithfully.
+jest.mock('../../utils/ssrf-guard', () => {
+    const actual = jest.requireActual('../../utils/ssrf-guard');
+    return {
+        ...actual,
+        safeFetchWithDnsPin: jest.fn(),
+    };
+});
+import { safeFetchWithDnsPin, SsrfBlockedError } from '../../utils/ssrf-guard';
+
+const safeFetchWithDnsPinMock = safeFetchWithDnsPin as unknown as jest.Mock;
+
 // Silence Logger output during tests
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
@@ -269,8 +284,11 @@ describe('PluginContextFactoryService', () => {
 
     describe('PluginHttpClient', () => {
         beforeEach(() => {
-            // Mock global fetch
-            global.fetch = jest.fn().mockResolvedValue({
+            // The plugin HTTP client routes every request through the DNS-pinned
+            // SSRF guard `safeFetchWithDnsPin` (mocked at module scope above), so
+            // assertions are made against that call rather than `global.fetch`.
+            safeFetchWithDnsPinMock.mockReset();
+            safeFetchWithDnsPinMock.mockResolvedValue({
                 json: jest.fn().mockResolvedValue({ data: 'test' }),
                 status: 200,
                 statusText: 'OK',
@@ -278,16 +296,12 @@ describe('PluginContextFactoryService', () => {
             });
         });
 
-        afterEach(() => {
-            (global.fetch as jest.Mock).mockRestore();
-        });
-
         it('should provide get method', async () => {
             const context = service.createContext('test-plugin');
 
             const result = await context.http.get('https://api.example.com/data');
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     method: 'GET',
@@ -301,7 +315,7 @@ describe('PluginContextFactoryService', () => {
 
             await context.http.post('https://api.example.com/data', { key: 'value' });
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     method: 'POST',
@@ -315,7 +329,7 @@ describe('PluginContextFactoryService', () => {
 
             await context.http.put('https://api.example.com/data', { key: 'value' });
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     method: 'PUT',
@@ -328,7 +342,7 @@ describe('PluginContextFactoryService', () => {
 
             await context.http.patch('https://api.example.com/data', { key: 'value' });
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     method: 'PATCH',
@@ -341,7 +355,7 @@ describe('PluginContextFactoryService', () => {
 
             await context.http.delete('https://api.example.com/data');
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     method: 'DELETE',
@@ -356,7 +370,7 @@ describe('PluginContextFactoryService', () => {
                 headers: { Authorization: 'Bearer token' },
             });
 
-            expect(global.fetch).toHaveBeenCalledWith(
+            expect(safeFetchWithDnsPinMock).toHaveBeenCalledWith(
                 'https://api.example.com/data',
                 expect.objectContaining({
                     headers: expect.objectContaining({ Authorization: 'Bearer token' }),
@@ -371,6 +385,55 @@ describe('PluginContextFactoryService', () => {
 
             expect(result.status).toBe(200);
             expect(result.statusText).toBe('OK');
+        });
+
+        describe('SSRF guard (DNS-pinned)', () => {
+            it('routes requests through safeFetchWithDnsPin, not raw fetch', async () => {
+                const context = service.createContext('test-plugin');
+
+                await context.http.get('https://api.example.com/data');
+
+                // The DNS-pinned guard re-runs the lexical check AND resolves the
+                // hostname to refuse private/rebinding targets before connecting.
+                expect(safeFetchWithDnsPinMock).toHaveBeenCalledTimes(1);
+            });
+
+            it('re-maps a lexically blocked URL (SsrfBlockedError) to the generic plugin error', async () => {
+                safeFetchWithDnsPinMock.mockRejectedValueOnce(
+                    new SsrfBlockedError('lexical_blocked', 'URL rejected by lexical SSRF guard'),
+                );
+                const context = service.createContext('test-plugin');
+
+                await expect(
+                    context.http.get('http://169.254.169.254/latest/meta-data'),
+                ).rejects.toThrow('Request blocked: target URL is not permitted');
+            });
+
+            it('re-maps a DNS-rebinding block (private-IP resolution) to the generic plugin error', async () => {
+                // safeFetchWithDnsPin resolves the hostname and throws when it
+                // points at a private IP — the case the old lexical-only guard
+                // missed entirely.
+                safeFetchWithDnsPinMock.mockRejectedValueOnce(
+                    new SsrfBlockedError(
+                        'dns_private_ip',
+                        'rebind.evil.test resolved to private IPv4 127.0.0.1',
+                    ),
+                );
+                const context = service.createContext('test-plugin');
+
+                await expect(
+                    context.http.post('https://rebind.evil.test/x', { a: 1 }),
+                ).rejects.toThrow('Request blocked: target URL is not permitted');
+            });
+
+            it('does not swallow non-SSRF errors (e.g. network failures)', async () => {
+                safeFetchWithDnsPinMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+                const context = service.createContext('test-plugin');
+
+                await expect(context.http.get('https://api.example.com/data')).rejects.toThrow(
+                    'ECONNREFUSED',
+                );
+            });
         });
     });
 
@@ -420,8 +483,27 @@ describe('PluginContextFactoryService', () => {
     });
 
     describe('EnvironmentVariables', () => {
+        // The plugin must DECLARE the env var it reads via the `x-envVar`
+        // JSON-Schema extension; `TEST_VAR` is declared on the mock plugin's
+        // settings schema below so the legitimate happy path keeps working.
+        const createPluginDeclaringEnvVar = (envVarName: string): RegisteredPlugin => {
+            const registered = createRegisteredPlugin();
+            (registered.plugin as any).settingsSchema = {
+                type: 'object',
+                properties: {
+                    apiKey: {
+                        type: 'string',
+                        'x-secret': true,
+                        'x-envVar': envVarName,
+                    },
+                },
+            };
+            return registered;
+        };
+
         beforeEach(() => {
             process.env.TEST_VAR = 'test-value';
+            jest.spyOn(registry, 'get').mockReturnValue(createPluginDeclaringEnvVar('TEST_VAR'));
         });
 
         afterEach(() => {
@@ -456,6 +538,101 @@ describe('PluginContextFactoryService', () => {
             expect(() => context.envVars.getRequired('NON_EXISTENT')).toThrow(
                 'Required environment variable "NON_EXISTENT" is not set',
             );
+        });
+
+        describe('allowlist (security)', () => {
+            const SECRET_ENV_KEYS = ['DATABASE_URL', 'AUTH_SECRET', 'AWS_SECRET_KEY'];
+
+            beforeEach(() => {
+                process.env.DATABASE_URL = 'postgres://secret';
+                process.env.AUTH_SECRET = 'super-secret';
+                process.env.AWS_SECRET_KEY = 'aws-secret';
+                // A different plugin's declared key, which THIS plugin must not read.
+                process.env.OTHER_PLUGIN_API_KEY = 'other-key';
+            });
+
+            afterEach(() => {
+                for (const key of [...SECRET_ENV_KEYS, 'OTHER_PLUGIN_API_KEY']) {
+                    delete process.env[key];
+                }
+            });
+
+            it('blocks reading undeclared platform secrets via every accessor', () => {
+                const context = service.createContext('test-plugin');
+
+                for (const key of SECRET_ENV_KEYS) {
+                    expect(context.envVars.get(key)).toBeUndefined();
+                    expect(context.envVars.getOrDefault(key, 'fallback')).toBe('fallback');
+                    expect(context.envVars.has(key)).toBe(false);
+                    expect(() => context.envVars.getRequired(key)).toThrow(
+                        `Required environment variable "${key}" is not set`,
+                    );
+                }
+            });
+
+            it("blocks reading another plugin's declared env var", () => {
+                // This plugin declares only TEST_VAR; OTHER_PLUGIN_API_KEY belongs
+                // to a different plugin and must not be reachable.
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('OTHER_PLUGIN_API_KEY')).toBeUndefined();
+                expect(context.envVars.has('OTHER_PLUGIN_API_KEY')).toBe(false);
+            });
+
+            it('allows reading a key the plugin declared via x-envVar', () => {
+                process.env.FOO_KEY = 'foo-value';
+                jest.spyOn(registry, 'get').mockReturnValue(createPluginDeclaringEnvVar('FOO_KEY'));
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('FOO_KEY')).toBe('foo-value');
+                expect(context.envVars.has('FOO_KEY')).toBe(true);
+                expect(context.envVars.getRequired('FOO_KEY')).toBe('foo-value');
+                // ...but still cannot reach unrelated secrets.
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                delete process.env.FOO_KEY;
+            });
+
+            it('collects x-envVar names declared under anyOf/allOf/oneOf branches', () => {
+                process.env.COMPOSED_KEY = 'composed-value';
+                const registered = createRegisteredPlugin();
+                (registered.plugin as any).settingsSchema = {
+                    type: 'object',
+                    anyOf: [
+                        {
+                            properties: {
+                                token: {
+                                    type: 'string',
+                                    'x-envVar': 'COMPOSED_KEY',
+                                },
+                            },
+                        },
+                    ],
+                };
+                jest.spyOn(registry, 'get').mockReturnValue(registered);
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('COMPOSED_KEY')).toBe('composed-value');
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                delete process.env.COMPOSED_KEY;
+            });
+
+            it('allows the fixed non-sensitive platform env (NODE_ENV)', () => {
+                const previous = process.env.NODE_ENV;
+                process.env.NODE_ENV = 'test';
+                // A plugin declaring no env vars at all.
+                jest.spyOn(registry, 'get').mockReturnValue(createRegisteredPlugin());
+
+                const context = service.createContext('test-plugin');
+
+                expect(context.envVars.get('NODE_ENV')).toBe('test');
+                expect(context.envVars.get('DATABASE_URL')).toBeUndefined();
+
+                process.env.NODE_ENV = previous;
+            });
         });
     });
 

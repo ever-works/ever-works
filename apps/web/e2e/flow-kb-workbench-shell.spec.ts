@@ -11,10 +11,10 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *   - Index page `/{locale}/works/:id/kb` shows the empty-state in the
  *     centre pane and the tree on the left.
  *   - Catch-all `/{locale}/works/:id/kb/{...path}` swaps the centre pane
- *     for `KbDocumentHeader` + `MarkdownEditor` and pre-highlights the
- *     active row.
- *   - The textarea + 800 ms debounced autosave actually persists to the
- *     API; a reload re-reads the same body.
+ *     for `KbDocumentHeader` + the Tiptap WYSIWYG editor and pre-highlights
+ *     the active row.
+ *   - The Tiptap contenteditable + 800 ms debounced autosave actually
+ *     persists to the API; a reload re-reads the same body.
  *   - The header class chip + lock badge render from the doc DTO.
  *
  * Auth: uses the shared seeded user (via `loadSeededTestUser` +
@@ -164,9 +164,11 @@ test.describe('KB workbench shell — slice A', () => {
         await expect(row).toBeVisible();
         await row.click();
 
-        // URL transitions to the catch-all path.
+        // URL transitions to the catch-all path. Budget 90s: this is the
+        // FIRST hit on the per-doc `[...path]` route, which cold-compiles
+        // under Next.js dev mode in CI (the 30s default raced the compile).
         await page.waitForURL((url) => url.pathname.endsWith(`/works/${workId}/kb/${brand.path}`), {
-            timeout: 30_000,
+            timeout: 90_000,
         });
 
         // Header chip + editor render with the seeded body.
@@ -177,12 +179,17 @@ test.describe('KB workbench shell — slice A', () => {
             'data-kb-class',
             'brand',
         );
-        const textarea = page.getByTestId('kb-workbench-editor-textarea');
-        await expect(textarea).toBeVisible();
-        await expect(textarea).toHaveValue(brandBody);
+        // The editor is a Tiptap contenteditable, not a textarea: it
+        // renders the seeded Markdown as rich text, so assert on the
+        // VISIBLE heading text (`# Brand voice <id>` → "Brand voice <id>")
+        // rather than the raw Markdown string.
+        const editorBody = page.getByTestId('kb-tiptap-editor-body');
+        await expect(editorBody).toBeVisible();
+        await expect(editorBody).toContainText(`Brand voice ${id}`);
+        await expect(editorBody).toContainText('We write plainly.');
     });
 
-    test('textarea edit autosaves and persists across reload', async ({ page, request }) => {
+    test('editor edit autosaves and persists across reload', async ({ page, request }) => {
         test.setTimeout(180_000);
         const id = runId();
         const seeded = loadSeededTestUser();
@@ -201,20 +208,34 @@ test.describe('KB workbench shell — slice A', () => {
         });
 
         await page.goto(`/en/works/${workId}/kb/${doc.path}`, { waitUntil: 'domcontentloaded' });
-        const textarea = page.getByTestId('kb-workbench-editor-textarea');
-        await expect(textarea).toBeVisible({ timeout: 60_000 });
-        await expect(textarea).toHaveValue(seedBody);
+        // The editor is a Tiptap contenteditable (`kb-tiptap-editor-body`),
+        // NOT a textarea — it renders the seeded Markdown as rich text, so
+        // assert on the visible body text rather than a `.toHaveValue()`.
+        const editorBody = page.getByTestId('kb-tiptap-editor-body');
+        await expect(editorBody).toBeVisible({ timeout: 60_000 });
+        await expect(editorBody).toContainText(`Autosave ${id}`);
+        await expect(editorBody).toContainText('original body');
 
-        // Type a marker the assertion below can pin against. Replacing
-        // the textarea value bypasses Tiptap-style IME concerns and
-        // matches how a paste-then-edit flow lands.
-        const newBody = `${seedBody}\n\nAutosaved marker ${id}\n`;
-        await textarea.fill(newBody);
+        // Type a distinct marker the API poll below can pin against.
+        // Click into the contenteditable, jump to the very end, and type
+        // the marker on a fresh line. Tiptap serialises this back to
+        // Markdown on the `update` event and schedules the debounced
+        // autosave.
+        const marker = `Autosaved marker ${id}`;
+        await editorBody.click();
+        await page.keyboard.press('Control+End');
+        await page.keyboard.press('Enter');
+        await page.keyboard.type(marker);
+
+        // The marker should render in the contenteditable immediately.
+        await expect(editorBody).toContainText(marker);
 
         // Editor debounces autosave at 800 ms; wait the spec-mandated 1.5 s
         // for the save to start and land, then poll the persisted body via
         // the API (cheaper + less flaky than waiting on the inline status
-        // chip which is sr-only when idle).
+        // chip which is sr-only when idle). Tiptap round-trips through
+        // Markdown so whitespace/formatting can shift — assert the
+        // persisted body CONTAINS the marker rather than exact-equality.
         await page.waitForTimeout(1_500);
         await expect
             .poll(
@@ -223,18 +244,18 @@ test.describe('KB workbench shell — slice A', () => {
                     return fresh.body;
                 },
                 {
-                    message: 'autosave should persist the new body within ~5s of the debounce',
+                    message: 'autosave should persist the marker within ~5s of the debounce',
                     timeout: 5_000,
                     intervals: [200, 500, 1_000],
                 },
             )
-            .toBe(newBody);
+            .toContain(marker);
 
-        // Reload + reassert the textarea was rehydrated from the server
-        // copy — proves the persisted body round-trips through the page
-        // load and into the controlled component's initial value.
+        // Reload + reassert the editor was rehydrated from the server copy
+        // — proves the persisted body round-trips through the page load and
+        // back into the editor's initial content.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-workbench-editor-textarea')).toHaveValue(newBody, {
+        await expect(page.getByTestId('kb-tiptap-editor-body')).toContainText(marker, {
             timeout: 30_000,
         });
     });

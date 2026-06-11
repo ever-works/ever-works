@@ -1422,6 +1422,84 @@ describe('KnowledgeBaseService', () => {
             expect(kinds).toContain(ActivityActionType.KB_DOCUMENT_CREATED);
         });
 
+        // Security (info-leak): extractionError is a client-visible KbUploadDto
+        // field. Raw extractor errors carry multi-line stack traces and internal
+        // paths — the service must persist a sanitized single-line, length-capped
+        // reason instead of the verbatim message.
+        it('sanitizes multi-line extractor errors before persisting extractionError', async () => {
+            const stackTraceError = new Error(
+                'KB PDF extraction failed: Invalid PDF structure\n' +
+                    '    at PdfParser.parse (/app/node_modules/internal/pdf.js:42:13)\n' +
+                    `    at ${'x'.repeat(600)}`,
+            );
+            const throwingExtractor = {
+                extract: jest.fn().mockRejectedValue(stackTraceError),
+                supports: jest.fn().mockReturnValue(true),
+            };
+            const module4: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    { provide: KnowledgeBaseBufferExtractorService, useValue: throwingExtractor },
+                ],
+            }).compile();
+            const wired = module4.get(KnowledgeBaseService);
+
+            storage.putObject.mockResolvedValue({ key: 'kb-originals/freeform/abc.pdf', url: '' });
+            const uploadRow = buildUpload({
+                mimeType: 'application/pdf',
+                originalFilename: 'broken.pdf',
+            });
+            uploadRepo.create.mockResolvedValue(uploadRow);
+            const failedRow = {
+                ...uploadRow,
+                extractionStatus: 'failed' as KbUploadExtractionStatus,
+            };
+            uploadRepo.update.mockResolvedValue(failedRow);
+            uploadRepo.findById.mockResolvedValue(failedRow);
+            const stubDoc = buildDocument({
+                id: '00000000-0000-0000-0000-000000000061',
+                path: 'freeform/broken.md',
+                kbDocumentClass: 'freeform' as KbDocumentClass,
+                source: 'imported' as KbDocumentSource,
+                sourceUploadId: uploadRow.id,
+            });
+            docRepo.create.mockResolvedValue(stubDoc);
+            docRepo.findById.mockResolvedValue(stubDoc);
+
+            await wired.createUpload({
+                workId: WORK_ID,
+                userId: USER_ID,
+                file: {
+                    buffer: Buffer.from('%PDF-broken', 'utf-8'),
+                    originalFilename: 'broken.pdf',
+                    mimeType: 'application/pdf',
+                    size: 11,
+                },
+                targetClass: undefined,
+            });
+
+            const failedUpdate = uploadRepo.update.mock.calls.find(
+                (c) => (c[1] as Partial<WorkKnowledgeUpload>).extractionStatus === 'failed',
+            );
+            expect(failedUpdate).toBeDefined();
+            const persistedReason = (failedUpdate?.[1] as { extractionError: string })
+                .extractionError;
+            // Newlines collapsed to single spaces, length capped at 500.
+            expect(persistedReason).not.toContain('\n');
+            expect(persistedReason.length).toBeLessThanOrEqual(500);
+            expect(persistedReason).toContain('KB PDF extraction failed: Invalid PDF structure');
+        });
+
         it('viewable binary on retry: reuses the existing stub instead of duplicating', async () => {
             // `extractAndMaterialize` is also the retry-extraction workhorse.
             // When the upload already links a stub (extractedDocumentId set),

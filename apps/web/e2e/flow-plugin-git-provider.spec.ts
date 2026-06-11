@@ -229,11 +229,14 @@ test.describe('flow: git-provider full connection lifecycle (status → connect 
                         expect(Array.isArray(body[key]), `disconnected ${path} → array`).toBe(true);
                         expect(body[key].length, `disconnected ${path} → empty`).toBe(0);
                     }
-                    // The error names the provider but must NOT leak a token.
+                    // EW-721 Wave J (#1264): the error is a SANITIZED generic
+                    // message (the old detail named the provider AND the
+                    // caller's userId — an identifier leak). It must be
+                    // non-empty and must NOT leak a token.
                     expect(
-                        String(body.error),
-                        `disconnected ${path} error names the provider`,
-                    ).toMatch(new RegExp(`provider ${PROVIDER}`, 'i'));
+                        String(body.error).length,
+                        `disconnected ${path} error is a non-empty generic message`,
+                    ).toBeGreaterThan(0);
                     expect(
                         String(body.error),
                         `disconnected ${path} error leaks no token`,

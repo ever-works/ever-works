@@ -148,6 +148,32 @@ const GEMINI_SUPPORTED_MODELS: readonly AiModel[] = [
 ] as const;
 
 const LOG_MESSAGE_MAX_LENGTH = 500;
+
+// Security: strip control characters (C0/C1) and ANSI/CSI escape sequences from
+// any string forwarded to the platform log sink. Gemini CLI stdout/stderr is
+// derived from hostile external content (web pages it visited, files it read),
+// so tool results / assistant text can carry log-injection payloads: ANSI
+// escapes, carriage returns that overwrite prior log lines, or NUL bytes that
+// confuse downstream log aggregators. Tab and newline are preserved so genuine
+// multi-line CLI output stays readable.
+// Built via `RegExp` from `\u` string escapes so the source contains no
+// control-char regex literal and stays fully printable. The first alternative
+// removes whole ANSI/CSI escape sequences (ESC, `[`, params, final byte; e.g.
+// colour codes). The trailing character class then strips any remaining lone
+// control bytes: every C0 control except TAB (0x09) and LF (0x0A) — so CR
+// (0x0D) is stripped too — plus DEL (0x7F) and the C1 range (0x80-0x9F).
+function buildLogControlCharsRe(): RegExp {
+	const ansiCsi = '\\u001b\\[[0-?]*[\\u0020-\\u002f]*[@-~]';
+	const loneControls = '[\\u0000-\\u0008\\u000b-\\u001f\\u007f-\\u009f]';
+	return new RegExp(`${ansiCsi}|${loneControls}`, 'g');
+}
+
+const LOG_CONTROL_CHARS_RE = buildLogControlCharsRe();
+
+function stripLogControlChars(message: string): string {
+	return message.replace(LOG_CONTROL_CHARS_RE, '');
+}
+
 const STEP_CONTEXT_BY_ID = new Map(
 	STEP_DEFINITIONS.map((step, stepIndex) => [step.id, { stepIndex, stepName: step.name }])
 );
@@ -881,7 +907,12 @@ export class GeminiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvid
 	}
 
 	private truncateLogMessage(message: string): string {
-		return message.trim().slice(0, LOG_MESSAGE_MAX_LENGTH);
+		// Security: strip control/ANSI sequences before truncating. Every log line
+		// emitted to `onLogEntry` funnels through here (via `emitGeminiLog`), and
+		// Gemini CLI output is derived from hostile external content, so this is the
+		// single choke point that neutralises log-injection payloads (ANSI escapes,
+		// CR line-overwrites, NUL bytes) regardless of which parser produced them.
+		return stripLogControlChars(message.trim()).slice(0, LOG_MESSAGE_MAX_LENGTH);
 	}
 
 	private startStep(stepId: GeminiStepId, onLogEntry?: PipelineExecutionOptions['onLogEntry']): number {

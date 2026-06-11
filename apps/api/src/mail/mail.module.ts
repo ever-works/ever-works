@@ -46,7 +46,7 @@ import { MailerService } from './providers/mailer.service';
                     // stack short-circuits TLS via `SMTP_IGNORE_TLS=true`, so
                     // this default does not affect it.
                     tls: {
-                        rejectUnauthorized: process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
+                        rejectUnauthorized: config.mail.smtpRejectUnauthorized(),
                     },
                 },
                 defaults: {

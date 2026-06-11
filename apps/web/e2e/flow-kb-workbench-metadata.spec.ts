@@ -14,6 +14,8 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *   - Toggling the lock surfaces the lock badge in the centre header
  *     and (when displayed) on the tree row.
  *   - Changing status to 'archived' updates the centre status chip.
+ *   - The "View Git history" button is enabled (slice E) and opens the
+ *     Git-history modal.
  *
  * The whole describe is gated behind `KB_E2E_LIVE_SKIP=1` so operators
  * can opt out when the in-process API is unreachable (same gate as the
@@ -66,7 +68,17 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(page.getByTestId('kb-workbench-metadata-lock')).toBeVisible();
         await expect(page.getByTestId('kb-workbench-metadata-language')).toBeVisible();
         await expect(page.getByTestId('kb-workbench-metadata-source')).toBeVisible();
-        await expect(page.getByTestId('kb-workbench-metadata-history-button')).toBeDisabled();
+
+        // Slice E enabled the history affordance: the button is now active
+        // and opens the Git-history modal (it was a disabled placeholder in
+        // slice B). Confirm it is enabled and wires up the modal.
+        const historyButton = page.getByTestId('kb-workbench-metadata-history-button');
+        await expect(historyButton).toBeEnabled();
+        await historyButton.click();
+        await expect(page.getByTestId('kb-workbench-history-modal')).toBeVisible({
+            timeout: 30_000,
+        });
+        await page.getByTestId('kb-workbench-history-modal-close').click();
     });
 
     test('adding a tag persists across reload', async ({ page, request }) => {
@@ -164,7 +176,11 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await page.goto(`/en/works/${workId}/kb/${doc.path}`, { waitUntil: 'domcontentloaded' });
         const toggle = page.getByTestId('kb-workbench-metadata-lock-toggle');
         await expect(toggle).toBeVisible({ timeout: 60_000 });
-        await toggle.check();
+        // Use click() not check(): the lock checkbox is controlled — its
+        // `checked` only flips after the lock mutation round-trips, so
+        // check()'s synchronous post-click state assertion races and fails.
+        // The lock badge appearing below is the real, settled assertion.
+        await toggle.click();
 
         const badge = page.getByTestId('kb-workbench-lock-badge');
         await expect(badge).toBeVisible({ timeout: 30_000 });
@@ -195,11 +211,14 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(select).toBeVisible({ timeout: 60_000 });
         await select.selectOption('archived');
 
-        // Allow the action + revalidation cycle.
-        await page.waitForTimeout(800);
-        await page.reload({ waitUntil: 'domcontentloaded' });
-
+        // The status change is a SERVER ACTION (updateKbDocumentAction) that
+        // PATCHes the doc and revalidatePath()'s the detail route, so the
+        // server-rendered centre status chip updates IN PLACE. Do NOT reload:
+        // navigating mid-action aborts the in-flight PATCH, which left the row
+        // stuck on 'active'. Assert the revalidated chip directly, with a
+        // budget generous enough for the action + route revalidation under
+        // Next.js dev-mode cold compile in CI.
         const chip = page.getByTestId('kb-workbench-status-chip');
-        await expect(chip).toHaveAttribute('data-kb-status', 'archived', { timeout: 30_000 });
+        await expect(chip).toHaveAttribute('data-kb-status', 'archived', { timeout: 45_000 });
     });
 });

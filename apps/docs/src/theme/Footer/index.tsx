@@ -5,7 +5,7 @@ import { useThemeConfig } from '@docusaurus/theme-common';
 import { SocialLinks } from './SocialLinks';
 import { SystemStatus } from './SystemStatus';
 import { ThemeToggle } from './ThemeToggle';
-import { FooterLinks } from './FooterLinks';
+import { FooterLinks, type FooterLinkColumn } from './FooterLinks';
 import EverLogo from './EverLogo';
 import LocaleDropdown from '../Navbar/LocaleDropdown';
 
@@ -54,7 +54,7 @@ function Footer(): ReactNode {
 						</div>
 
 						{/* Footer link columns */}
-						<FooterLinks columns={links as any} />
+						<FooterLinks columns={links as FooterLinkColumn[]} />
 					</div>
 				</div>
 			</div>

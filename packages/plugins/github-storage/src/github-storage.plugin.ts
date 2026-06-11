@@ -784,7 +784,18 @@ function readLfsEnabled(): boolean {
 }
 
 function readPathPrefix(): string {
-	return (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(/(^\/+|\/+$)/g, '');
+	const stripped = (process.env.GITHUB_STORAGE_PATH_PREFIX || 'uploads').replace(/(^\/+|\/+$)/g, '');
+	// Security: reject `..` path components so a misconfigured
+	// `GITHUB_STORAGE_PATH_PREFIX` (e.g. `uploads/../.github/workflows`)
+	// can't aim upload keys or the `.gitattributes` LFS pattern outside
+	// the intended uploads scope. This is the single chokepoint for both
+	// the Contents-API transport (via `ensureGitattributes`) and the
+	// git-cli transport — same guard as `sanitizeTrackPattern()` in
+	// lfs-cli.ts.
+	if (/(^|\/)\.\.(\/|$)/.test(stripped)) {
+		throw new Error('GITHUB_STORAGE_PATH_PREFIX must not contain .. components');
+	}
+	return stripped;
 }
 
 function resolveTransport(cfg: ResolvedConfig): 'contents-api' | 'clone-and-push' {

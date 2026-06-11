@@ -574,7 +574,7 @@ describe('DeployController', () => {
             });
         });
 
-        it('wraps facade Errors into BadRequestException carrying the original message', async () => {
+        it('wraps facade Errors into BadRequestException with the static provider-name fallback (raw message NOT leaked)', async () => {
             const work = buildWork({ user: { id: 'caller-1' }, deployProvider: 'vercel' });
             ownershipService.ensureCanView.mockResolvedValue({ work, isCreator: true });
             deployFacade.getAvailableProviders.mockReturnValue([
@@ -582,8 +582,14 @@ describe('DeployController', () => {
             ]);
             deployFacade.getTeams.mockRejectedValue(new Error('teams api down'));
 
+            // EW-721: the raw facade error message must NOT be echoed back to
+            // the client; the controller substitutes a static fallback string.
             await expect(controller.getTeamsForWork(auth, 'work-1')).rejects.toMatchObject({
-                response: { status: 'error', message: 'teams api down' },
+                response: {
+                    status: 'error',
+                    message:
+                        'Failed to get teams. Please configure your Vercel token in Plugin Settings.',
+                },
             });
         });
 
@@ -1012,13 +1018,15 @@ describe('DeployController', () => {
             });
         });
 
-        it('wraps facade error into BadRequestException w/ verbatim message', async () => {
+        it('wraps facade error into BadRequestException with the static fallback (raw message NOT leaked)', async () => {
             const work = buildWork({ user: { id: 'caller-1' } });
             ownershipService.ensureCanView.mockResolvedValue({ work, isCreator: true });
             deployFacade.getDomains.mockRejectedValue(new Error('domains api down'));
 
+            // EW-721: raw facade error message is no longer echoed; the
+            // controller returns a generic static fallback.
             await expect(controller.listDomains(auth, 'work-1')).rejects.toMatchObject({
-                response: { message: 'domains api down' },
+                response: { message: 'Failed to get domains' },
             });
         });
 
@@ -1093,6 +1101,21 @@ describe('DeployController', () => {
     });
 
     describe('removeDomain', () => {
+        it('rejects an invalid/path-traversal domain before touching ownership or facade (EW-721 guard)', async () => {
+            await expect(
+                controller.removeDomain(auth, 'work-1', '../../etc/passwd'),
+            ).rejects.toMatchObject({
+                response: {
+                    status: 'error',
+                    message: 'Invalid domain format. Example: example.com',
+                },
+            });
+
+            // guard short-circuits BEFORE ownership/facade are consulted
+            expect(ownershipService.ensureCanEdit).not.toHaveBeenCalled();
+            expect(deployFacade.removeDomain).not.toHaveBeenCalled();
+        });
+
         it('rejects when work has no website', async () => {
             const work = buildWork({ user: { id: 'caller-1' }, website: null });
             ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
@@ -1150,6 +1173,20 @@ describe('DeployController', () => {
     });
 
     describe('verifyDomain', () => {
+        it('rejects an invalid domain before touching ownership or facade (EW-721 guard)', async () => {
+            await expect(
+                controller.verifyDomain(auth, 'work-1', 'not a domain'),
+            ).rejects.toMatchObject({
+                response: {
+                    status: 'error',
+                    message: 'Invalid domain format. Example: example.com',
+                },
+            });
+
+            expect(ownershipService.ensureCanEdit).not.toHaveBeenCalled();
+            expect(deployFacade.verifyDomain).not.toHaveBeenCalled();
+        });
+
         it('rejects when work has no website', async () => {
             const work = buildWork({ user: { id: 'caller-1' }, website: null });
             ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });

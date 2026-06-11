@@ -198,4 +198,43 @@ describe('NotificationChannelFacadeService channel-ownership scoping', () => {
         expect(result.status).toBe('failed');
         expect(channels.findById).not.toHaveBeenCalled();
     });
+
+    it('redacts credential-shaped tokens from the delivery error message', async () => {
+        // Security (EW-722 info-leak): a hostile/misconfigured webhook endpoint
+        // can echo back the credential it received in its error body, which the
+        // plugin folds into the thrown message. sendOne must redact it before
+        // the message is logged, persisted to the delivery_log, and returned.
+        channels.findByIdForUser.mockResolvedValue({
+            id: 'ch-1',
+            pluginId: 'discord-channel',
+            userId: 'user-1',
+            disabledAt: null,
+            targetConfig: {},
+        } as any);
+        (settings as any).getSettings = jest.fn().mockResolvedValue({});
+        registry.getByCapability.mockReturnValue([
+            {
+                state: 'loaded',
+                plugin: {
+                    id: 'discord-channel',
+                    capabilities: ['notification-channel'],
+                    send: jest
+                        .fn()
+                        .mockRejectedValue(
+                            new Error('webhook rejected token sk-abc123def456ghi789jkl'),
+                        ),
+                },
+            },
+        ] as any);
+
+        const result = await facade.sendDirect(
+            'ch-1',
+            { text: 'hi', messageRef: 'ref-1' },
+            { userId: 'user-1' },
+        );
+
+        expect(result.status).toBe('failed');
+        expect(result.error).not.toContain('sk-abc123def456ghi789jkl');
+        expect(result.error).toContain('[redacted secret]');
+    });
 });

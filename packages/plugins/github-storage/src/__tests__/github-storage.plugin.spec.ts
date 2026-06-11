@@ -180,6 +180,28 @@ describe('GitHubStoragePlugin — separate-repo mode', () => {
 		expect(call.path).toBe(result.key);
 	});
 
+	it('rejects a `..` path prefix before any commit is attempted', async () => {
+		// Security: `readPathPrefix()` must refuse `..` components so a
+		// misconfigured GITHUB_STORAGE_PATH_PREFIX can't aim upload keys or
+		// the `.gitattributes` LFS pattern outside the uploads scope (same
+		// guard as `sanitizeTrackPattern()` in lfs-cli.ts).
+		process.env.GITHUB_STORAGE_PATH_PREFIX = 'uploads/../.github/workflows';
+		const plugin = await loadPlugin();
+		await plugin.onLoad(ctx());
+		await expect(
+			plugin.putObject({
+				buffer: Buffer.from('hello'),
+				filename: 'note.txt',
+				mimeType: 'text/plain',
+				size: 5,
+				ownerId: 'user1'
+			})
+		).rejects.toThrow('GITHUB_STORAGE_PATH_PREFIX must not contain .. components');
+		// The guard fires during config resolution — nothing reaches GitHub.
+		expect(octokitMockState.createOrUpdateFileContents).not.toHaveBeenCalled();
+		expect(fetchCalls).toHaveLength(0);
+	});
+
 	it('LFS path: uploads to LFS host first, then commits a pointer + .gitattributes', async () => {
 		process.env.GITHUB_STORAGE_MODE = 'separate-repo';
 		process.env.GITHUB_STORAGE_LFS_ENABLED = 'true';

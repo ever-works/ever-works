@@ -2,6 +2,7 @@ import type { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { In, IsNull, LessThanOrEqual } from 'typeorm';
 import { WorkRepository } from '../work.repository';
 import { Work } from '../../../entities/work.entity';
+import { Mission, WorkProposal } from '../../../entities';
 import type { User } from '../../../entities';
 
 type Mocked = jest.Mocked<
@@ -65,15 +66,16 @@ describe('WorkRepository', () => {
             delete: jest.fn(),
             createQueryBuilder: jest.fn(),
         };
-        // Phase 2 PR F — getAccessibleStats now also runs 2 raw
-        // COUNT(*) queries (missions + work_proposals) via
-        // `repository.manager.query`. Stub it with a no-op that
-        // returns the empty-result shape (`[{ c: 0 }]`) so the
-        // numeric coercion path still works in tests that don't
-        // care about the mission/idea counts. Tests that DO care
-        // about specific values override per-test via mockResolvedValueOnce.
-        (repository as unknown as { manager: { query: jest.Mock } }).manager = {
-            query: jest.fn().mockResolvedValue([{ c: '0' }]),
+        // Phase 2 PR F + EW-721 — getAccessibleStats counts missions +
+        // work_proposals (Ideas) via the DB-agnostic
+        // `repository.manager.count(Entity, { where: { userId } })`
+        // (previously a Postgres-only `SELECT COUNT(*) ... WHERE
+        // "userId" = $1` raw query that silently broke on SQLite). Stub
+        // it with a no-op that returns 0 so the numeric path still works
+        // in tests that don't care about the mission/idea counts. Tests
+        // that DO care override per-test via mockResolvedValueOnce.
+        (repository as unknown as { manager: { count: jest.Mock } }).manager = {
+            count: jest.fn().mockResolvedValue(0),
         };
         service = new WorkRepository(repository as unknown as Repository<Work>);
     });
@@ -918,9 +920,9 @@ describe('WorkRepository', () => {
                 totalItems: 50,
                 activeWebsites: 7,
                 generatingCount: 2,
-                // Phase 2 PR F — manager.query mock returns
-                // `[{ c: '0' }]` from the beforeEach default; missions
-                // + ideas counts therefore parse to 0.
+                // Phase 2 PR F / EW-721 — manager.count mock returns 0
+                // from the beforeEach default; missions + ideas counts
+                // therefore resolve to 0.
                 totalMissions: 0,
                 totalIdeas: 0,
             });
@@ -969,8 +971,8 @@ describe('WorkRepository', () => {
                 totalItems: 0,
                 activeWebsites: 0,
                 generatingCount: 0,
-                // Phase 2 PR F — defaults from the beforeEach
-                // manager.query stub.
+                // Phase 2 PR F / EW-721 — defaults from the beforeEach
+                // manager.count stub.
                 totalMissions: 0,
                 totalIdeas: 0,
             });
@@ -1003,6 +1005,66 @@ describe('WorkRepository', () => {
                 (call: unknown[]) => call.length === 1,
             );
             expect(bracketsCalls).toHaveLength(1);
+        });
+
+        it('EW-721: counts Missions + Ideas via DB-agnostic manager.count scoped to userId (no pg-only $1 raw query)', async () => {
+            const getRawOne = jest.fn().mockResolvedValueOnce({
+                totalWorks: '0',
+                totalItems: '0',
+                activeWebsites: '0',
+                generatingCount: '0',
+            });
+            const chain: any = {};
+            for (const m of ['where', 'andWhere', 'select', 'addSelect']) {
+                chain[m] = jest.fn(() => chain);
+            }
+            chain.getRawOne = getRawOne;
+            repository.createQueryBuilder.mockReturnValueOnce(
+                chain as unknown as SelectQueryBuilder<Work>,
+            );
+
+            const managerCount = (repository as unknown as { manager: { count: jest.Mock } })
+                .manager.count;
+            managerCount.mockReset();
+            managerCount.mockResolvedValueOnce(3).mockResolvedValueOnce(4);
+
+            const stats = await service.getAccessibleStats({ userId: 'u1' });
+
+            // Entity-typed + userId-scoped count, NOT a raw `WHERE "userId" = $1` query.
+            expect(managerCount).toHaveBeenCalledWith(Mission, { where: { userId: 'u1' } });
+            expect(managerCount).toHaveBeenCalledWith(WorkProposal, { where: { userId: 'u1' } });
+            expect(stats.totalMissions).toBe(3);
+            expect(stats.totalIdeas).toBe(4);
+        });
+
+        it('EW-721: degrades a failed mission/idea count to 0 instead of throwing the whole stats endpoint', async () => {
+            const getRawOne = jest.fn().mockResolvedValueOnce({
+                totalWorks: '1',
+                totalItems: '0',
+                activeWebsites: '0',
+                generatingCount: '0',
+            });
+            const chain: any = {};
+            for (const m of ['where', 'andWhere', 'select', 'addSelect']) {
+                chain[m] = jest.fn(() => chain);
+            }
+            chain.getRawOne = getRawOne;
+            repository.createQueryBuilder.mockReturnValueOnce(
+                chain as unknown as SelectQueryBuilder<Work>,
+            );
+
+            const managerCount = (repository as unknown as { manager: { count: jest.Mock } })
+                .manager.count;
+            managerCount.mockReset();
+            managerCount
+                .mockRejectedValueOnce(new Error('no such table: missions'))
+                .mockRejectedValueOnce(new Error('no such table: work_proposals'));
+
+            const stats = await service.getAccessibleStats({ userId: 'u1' });
+
+            expect(stats.totalWorks).toBe(1);
+            expect(stats.totalMissions).toBe(0);
+            expect(stats.totalIdeas).toBe(0);
         });
     });
 

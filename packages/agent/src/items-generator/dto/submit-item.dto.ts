@@ -9,6 +9,7 @@ import {
     Min,
     MaxLength,
     ValidateIf,
+    ArrayMaxSize,
     ArrayMinSize,
     Validate,
     ValidatorConstraint,
@@ -39,14 +40,23 @@ class IsNotSsrfUrlConstraint implements ValidatorConstraintInterface {
 }
 
 export class SubmitItemDto implements ISubmitItemDto {
-    @ApiProperty({ description: 'Name of the item' })
+    // Security (resource abuse): the free-text fields below (name,
+    // description, category/categories, tags, brand) feed git commit
+    // messages and YAML/markdown file writes downstream, so each carries a
+    // MaxLength cap at the DTO boundary — mirroring the existing 100k cap
+    // on `markdown` — to keep an oversized payload from bloating commits
+    // and repository files. Caps are generous for legitimate callers
+    // (taxonomy DTOs cap tag names at 50 and category names at 100).
+    @ApiProperty({ description: 'Name of the item', maxLength: 200 })
     @IsString()
     @IsNotEmpty()
+    @MaxLength(200)
     name: string;
 
-    @ApiProperty({ description: 'Description of the item' })
+    @ApiProperty({ description: 'Description of the item', maxLength: 5000 })
     @IsString()
     @IsNotEmpty()
+    @MaxLength(5000)
     description: string;
 
     @ApiProperty({ description: 'Source URL of the item', example: 'https://example.com' })
@@ -65,6 +75,7 @@ export class SubmitItemDto implements ISubmitItemDto {
     @ValidateIf((o) => !Array.isArray(o.categories) || o.categories.length === 0)
     @IsString()
     @IsNotEmpty()
+    @MaxLength(200)
     category?: string;
 
     @ApiPropertyOptional({ description: 'Categories for the item', type: [String] })
@@ -72,12 +83,17 @@ export class SubmitItemDto implements ISubmitItemDto {
     @IsArray()
     @ArrayMinSize(1)
     @IsString({ each: true })
+    // Security: same 200-char cap as `category` — without it the singular
+    // cap would be trivially bypassed via the array form of the same field.
+    @MaxLength(200, { each: true })
     categories?: string[];
 
     @ApiPropertyOptional({ description: 'Tags for the item', type: [String] })
     @IsOptional()
     @IsArray()
+    @ArrayMaxSize(50)
     @IsString({ each: true })
+    @MaxLength(50, { each: true })
     tags?: string[];
 
     @ApiPropertyOptional({ description: 'Whether the item is featured', default: false })
@@ -101,9 +117,10 @@ export class SubmitItemDto implements ISubmitItemDto {
     @IsString()
     slug?: string;
 
-    @ApiPropertyOptional({ description: 'Brand name associated with the item' })
+    @ApiPropertyOptional({ description: 'Brand name associated with the item', maxLength: 200 })
     @IsOptional()
     @IsString()
+    @MaxLength(200)
     brand?: string;
 
     @ApiPropertyOptional({ description: 'Brand logo URL', example: 'https://example.com/logo.png' })

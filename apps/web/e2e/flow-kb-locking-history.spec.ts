@@ -54,9 +54,32 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *   packages/agent/src/services/knowledge-base.service.ts,
  *   packages/agent/src/dto/kb.dto.ts,
  *   packages/agent/src/entities/kb-types.ts (`enum KbLockMode`),
- *   apps/web/src/components/works/detail/kb/Kb{Editor,SidePanel,LockControls,
- *   HistoryButton,HistoryDialog,DocumentView}.tsx,
+ *   apps/web/src/components/kb/workbench/{TiptapEditor,KbDocumentHeader,
+ *   KbMetadataPanel,KbGitHistoryModal,WorkbenchShell}.tsx,
  *   apps/web/src/app/[locale]/(dashboard)/works/[id]/kb/[...path]/page.tsx.
+ *
+ * ─── WORKBENCH-UI MIGRATION NOTE (EW-641) ────────────────────────────────────
+ * The OLD KB UI (`components/works/detail/kb/Kb{Editor,SidePanel,DocumentView}`)
+ * was replaced by the "workbench" (`components/kb/workbench/*`). The API contract
+ * below is UNCHANGED — every API-level assertion is preserved verbatim. Only the
+ * UI selectors/flows moved:
+ *   · OLD `kb-editor`/`kb-editor-body`/`kb-document-body`  → the editor body is a
+ *     Tiptap CONTENTEDITABLE `kb-tiptap-editor-body` (no `.fill()`/`toHaveValue`;
+ *     click + keyboard.type; assert rendered text via `toContainText`).
+ *   · OLD `kb-editor-status[data-status]`                  → `kb-workbench-status`
+ *     (`data-status` idle|dirty|saving|saved|error; sr-only when idle). Autosave
+ *     debounce is 800ms — there is NO save button; the editor autosaves.
+ *   · OLD read-only `KbDocumentView` flip on full-lock     → the workbench page
+ *     ALWAYS mounts the TiptapEditor (verified in `[...path]/page.tsx`); it does
+ *     NOT swap to a read-only view. A full lock is enforced SERVER-SIDE (the
+ *     autosave PATCH 423s). The honest UI distinguisher is the header lock badge
+ *     `kb-workbench-lock-badge[data-kb-lock-mode]` (full | additions-only),
+ *     visible only when `document.locked`. So the "editor↔read-only" UI split is
+ *     re-expressed as a "lock-badge mode" assertion + the API lock contract.
+ *   · OLD `kb-side-panel-history` → open via
+ *     `kb-workbench-metadata-history-button` (now ENABLED) → modal
+ *     `kb-workbench-history-modal` with `-error|-empty|-row|-restore|-loading`.
+ *   · OLD `kb-shell` → `kb-workbench-shell`.
  *
  * Verified shapes:
  *   · `enum KbLockMode { FULL='full', ADDITIONS_ONLY='additions-only' }`.
@@ -84,15 +107,13 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *       (assertNotLockedFull runs FIRST).
  *   · GET .../documents?locked=true|false → 200 `{items,total}` partitions the
  *       tree on the lock flag.
- *   · UI: the per-doc route renders `KbDocumentView` (read-only, NO
- *       `kb-editor`) when `locked && lockMode==='full'`, else `KbEditor`
- *       (Tiptap + autosave). `additions-only` renders the editor PLUS
- *       `kb-editor-lock-banner[data-mode="additions-only"]`. Autosave status
- *       pill = `kb-editor-status[data-status]` (idle|dirty|saving|saved|error),
- *       1500ms debounce. The side panel exposes `kb-side-panel-history`
- *       (opens `kb-history-dialog`, which shows `kb-history-error` when the
- *       mirror read 500s) and `kb-side-panel-lock[data-locked][data-kb-lock-
- *       mode]` + `kb-side-panel-lock-toggle`.
+ *   · UI (workbench): the per-doc route renders `KbDocumentHeader` +
+ *       `TiptapEditor` (Tiptap contenteditable `kb-tiptap-editor-body` +
+ *       autosave) and the `KbMetadataPanel`. A locked doc shows the header lock
+ *       badge `kb-workbench-lock-badge[data-kb-lock-mode]`. The metadata panel
+ *       opens the Git-history modal via `kb-workbench-metadata-history-button`
+ *       → `kb-workbench-history-modal` (`-error` when the mirror read fails).
+ *       The status pill is `kb-workbench-status[data-status]`; debounce 800ms.
  *
  * ─── GOTCHAS honoured ───────────────────────────────────────────────────────
  *   · login DTO = {email,password} ONLY; register DTO uses `username`
@@ -104,7 +125,7 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *     flake — but to stay robust if a deployment ever wires a real repo, the
  *     status assertions accept the documented success branch too via a small
  *     set and annotate which branch ran.
- *   · DEV HYDRATION RACE: retry-to-open dialogs (first click can be swallowed
+ *   · DEV HYDRATION RACE: retry-to-open modals (first click can be swallowed
  *     pre-hydration); 30-60s nested-route compile budgets; next-dev LOCAL vs CI
  *     route divergence tolerated with `.or()` + branch.
  *   · Filename uses the safe `flow-` prefix (not matched by the playwright
@@ -257,14 +278,15 @@ function msgOf(body: unknown): string {
 
 /**
  * DEV HYDRATION HARDENING — the per-doc KB editor is a heavy `'use client'`
- * Tiptap surface. Its server-rendered HTML (the `kb-editor` section, the
- * `kb-editor-status` pill, the `kb-editor-save` button, a static placeholder
- * `kb-editor-body` div) paints immediately, but the LIVE editable surface —
- * `[data-testid="kb-editor"] [contenteditable="true"]` — only appears once
- * Tiptap mounts (`immediatelyRender:false`). Under heavy parallel shard load
- * against `next dev` that mount can miss a single fixed timeout. These helpers
- * RELOAD the route to re-kick hydration on a miss within a generous budget,
- * rather than hard-failing on a dev-only paint gap.
+ * Tiptap surface (workbench `TiptapEditor`). Its server-rendered HTML (the
+ * `kb-workbench-editor` root, the `kb-workbench-status` pill, a static
+ * placeholder `kb-tiptap-editor-body` div) paints immediately, but the LIVE
+ * editable surface — the `kb-tiptap-editor-body` contenteditable that Tiptap
+ * mounts (`immediatelyRender:false`) — only appears once the client editor
+ * mounts. Under heavy parallel shard load against `next dev` that mount can
+ * miss a single fixed timeout. These helpers RELOAD the route to re-kick
+ * hydration on a miss within a generous budget, rather than hard-failing on a
+ * dev-only paint gap.
  */
 const HYDRATION_BUDGET_MS = 90_000;
 
@@ -274,6 +296,10 @@ const HYDRATION_BUDGET_MS = 90_000;
  * when the live editor mounted, `false` if it never did inside the budget (the
  * caller then DEGRADES to the equivalent real surface / API read so the
  * contract is still asserted end to end). Never throws on a miss.
+ *
+ * The "live" surface is the Tiptap-mounted contenteditable: the placeholder
+ * `kb-tiptap-editor-body` div (rendered before the editor mounts) is NOT
+ * editable, so we key on `[contenteditable="true"]` to distinguish the two.
  */
 async function waitForLiveEditor(
     page: Page,
@@ -282,7 +308,9 @@ async function waitForLiveEditor(
     docPath: string,
     budgetMs = HYDRATION_BUDGET_MS,
 ): Promise<boolean> {
-    const editable = page.locator('[data-testid="kb-editor"] [contenteditable="true"]').first();
+    const editable = page
+        .locator('[data-testid="kb-tiptap-editor-body"][contenteditable="true"]')
+        .first();
     const deadline = Date.now() + budgetMs;
     let firstPass = true;
     while (Date.now() < deadline) {
@@ -314,10 +342,13 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
     // ───────────────────────────────────────────────────────────────────────
     // FLOW 1 — TWO-MODE LOCK SEMANTICS: `additions-only` is recorded but NOT
     // enforced on PATCH/DELETE, while `full` blocks both — and the lock mode
-    // drives the per-doc UI between the live editor (+banner) and a read-only
-    // view. Mode escalation full↔additions-only is a single lock call each.
+    // surfaces in the workbench header lock badge
+    // (`kb-workbench-lock-badge[data-kb-lock-mode]`). The workbench page always
+    // mounts the Tiptap editor (it does NOT swap to a read-only view); the lock
+    // is enforced server-side. Mode escalation full↔additions-only is a single
+    // lock call each, and the badge mode follows it on reload.
     // ───────────────────────────────────────────────────────────────────────
-    test('lock-mode matrix: additions-only records-but-permits, full blocks; UI flips editor↔read-only', async ({
+    test('lock-mode matrix: additions-only records-but-permits, full blocks; lock badge reflects the mode', async ({
         request,
         page,
         baseURL,
@@ -385,91 +416,80 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         const afterFull = await getDoc(request, token, workId, documentId);
         expect(afterFull.body?.body).toBe(seedBody);
 
-        // --- UI: a full-locked doc renders the READ-ONLY KbDocumentView (no
-        //     editor), while an additions-only doc renders the EDITOR + banner. -
+        // --- UI: the workbench ALWAYS mounts the Tiptap editor; the lock mode
+        //     surfaces in the header lock badge. A full lock → the badge reads
+        //     `data-kb-lock-mode="full"`; dropping to additions-only flips the
+        //     badge to `data-kb-lock-mode="additions-only"` on reload. (Probed
+        //     in `[...path]/page.tsx` + `KbDocumentHeader.tsx`: there is no
+        //     read-only `KbDocumentView` swap — the lock is enforced
+        //     server-side and the badge is the honest UI signal.) ------------
         const origin = baseURL ?? 'http://localhost:3000';
         const docPath = afterFull.body!.path;
         await page.goto(`${origin}/en/works/${workId}/kb/${docPath}`, {
             waitUntil: 'domcontentloaded',
         });
-        // Full-lock → the live editor must NOT mount; a read-only lock chip /
-        // shell renders instead. Tolerate the next-dev catch-all 404 locally.
-        const readOnlyMarker = page
-            .locator('[data-testid="kb-editor-readonly"]')
-            .or(page.locator('[data-locked="true"]'))
-            .or(page.getByTestId('kb-document-body'))
-            .or(page.getByText(/🔒/))
-            .first();
+        // The header (with the lock badge) and the editor both render. Tolerate
+        // the next-dev catch-all 404 locally.
+        const lockBadge = page.getByTestId('kb-workbench-lock-badge').first();
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
-        const kbShell = page.getByTestId('kb-shell').first();
-        await expect(readOnlyMarker.or(notFound).or(kbShell).first()).toBeVisible({
+        const kbShell = page.getByTestId('kb-workbench-shell').first();
+        await expect(lockBadge.or(notFound).or(kbShell).first()).toBeVisible({
             timeout: 60_000,
         });
         const localCatchAll = await notFound.isVisible().catch(() => false);
         if (!localCatchAll) {
-            // In CI (route renders) the LIVE autosave editor must be absent for
-            // a full-locked doc. PROBED 2026-06-01: the read-only
-            // `KbDocumentView` REUSES the `kb-editor` testid (same editor-pane
-            // slot), so a bare `kb-editor` count would always be 1 here and is
-            // NOT the right signal. Assert the live-editing affordances the
-            // Tiptap editor renders and the read-only view does not: the
-            // autosave status pill + the `contenteditable` body. The read-only
-            // Markdown body must render in their place.
-            await expect(
-                page.getByTestId('kb-editor-status'),
-                'full-locked doc never mounts the live autosave editor (no status pill)',
-            ).toHaveCount(0, { timeout: 15_000 });
-            await expect(
-                page.locator('[data-testid="kb-editor"] [contenteditable="true"]'),
-                'full-locked doc has no editable Tiptap surface',
-            ).toHaveCount(0);
-            await expect(page.getByTestId('kb-document-body')).toBeVisible({ timeout: 15_000 });
+            // In CI (route renders) the header lock badge must report the full
+            // lock mode. The editor still mounts (workbench never swaps to a
+            // read-only view) — the lock is enforced server-side.
+            await expect(lockBadge, 'full-locked doc shows the header lock badge').toBeVisible({
+                timeout: 30_000,
+            });
+            await expect(lockBadge, 'full-locked doc badge reports lockMode=full').toHaveAttribute(
+                'data-kb-lock-mode',
+                LOCK_FULL,
+                { timeout: 15_000 },
+            );
+            // The workbench still renders the editor surface for a locked doc.
+            await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 15_000 });
         } else {
             test.info().annotations.push({
                 type: 'route-divergence',
                 description:
-                    'per-doc KB route 404s to the next-dev catch-all locally; the read-only-vs-editor split is fully asserted via the API lock contract above.',
+                    'per-doc KB route 404s to the next-dev catch-all locally; the lock-mode-vs-editor contract is fully asserted via the API lock contract above.',
             });
         }
 
-        // Drop back to additions-only and reload — the EDITOR returns with the
-        // amber banner (editable surface present again).
+        // Drop back to additions-only and reload — the header lock badge flips
+        // to the additions-only mode (the doc stays locked, editor still mounts).
         const downgrade = await lockDoc(request, token, workId, documentId, LOCK_ADDITIONS_ONLY);
         expect(downgrade.status, 're-lock additions-only → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
         if (!localCatchAll) {
-            // additions-only renders the LIVE `KbEditor` PLUS the amber banner.
-            // The amber `kb-editor-lock-banner` AND the `kb-editor-status` pill
-            // are part of `KbEditor`'s server-rendered HTML, so they prove the
-            // route mounted the EDITOR component (not the read-only
-            // `KbDocumentView`, which renders neither) even before Tiptap
-            // hydrates the contenteditable surface — making them the robust
-            // primary signal under shard load. PRIMARY: assert the
-            // additions-only banner is back.
-            const additionsBanner = page
-                .locator('[data-testid="kb-editor-lock-banner"][data-mode="additions-only"]')
-                .first();
-            const statusPill = page.getByTestId('kb-editor-status').first();
+            await expect(lockBadge, 'additions-only doc still shows the lock badge').toBeVisible({
+                timeout: 60_000,
+            });
             await expect(
-                additionsBanner.or(statusPill).first(),
-                'additions-only doc mounts the live editor (banner + autosave pill = KbEditor, not the read-only view)',
-            ).toBeVisible({ timeout: 60_000 });
+                lockBadge,
+                'badge flips to lockMode=additions-only after the downgrade',
+            ).toHaveAttribute('data-kb-lock-mode', LOCK_ADDITIONS_ONLY, { timeout: 30_000 });
 
-            // Then BEST-EFFORT confirm the editable Tiptap surface itself
-            // hydrates — reload-retrying on a miss. The banner/pill above
-            // already pin the editor-vs-read-only contract; the live mount is a
-            // dev-mode paint that we retry rather than hard-fail on.
+            // BEST-EFFORT confirm the editable Tiptap surface hydrates —
+            // reload-retrying on a miss. The badge above already pins the
+            // lock-mode contract; the live mount is a dev-mode paint we retry
+            // rather than hard-fail on.
             const liveBack = await waitForLiveEditor(page, origin, workId, docPath);
             if (liveBack) {
                 await expect(
-                    page.locator('[data-testid="kb-editor"] [contenteditable="true"]').first(),
+                    page
+                        .locator('[data-testid="kb-tiptap-editor-body"][contenteditable="true"]')
+                        .first(),
                     'additions-only editable Tiptap surface is present',
                 ).toBeVisible({ timeout: 10_000 });
             } else {
                 test.info().annotations.push({
                     type: 'hydration-degraded',
                     description:
-                        'additions-only: the editable Tiptap surface did not hydrate within the budget under shard load; the editor-vs-read-only split is still asserted via the server-rendered additions-only banner + autosave pill (which the read-only KbDocumentView never renders).',
+                        'additions-only: the editable Tiptap surface did not hydrate within the budget under shard load; the lock-mode contract is still asserted via the header lock badge.',
                 });
             }
         }
@@ -566,11 +586,12 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
     // ───────────────────────────────────────────────────────────────────────
     // FLOW 3 — GIT HISTORY READ contract end to end: reachable + doc-scoped,
     // limit clamping, missing-doc 404 (row check before the git read),
-    // cross-user isolation 403, AND the UI history dialog opening + surfacing
+    // cross-user isolation 403, AND the UI history modal opening + surfacing
     // the mirror state. In the CI sqlite env the mirror is WIRED but has no
     // real repo → the listing 500s; a deployment with a repo would 200 {items}.
+    // The modal opens from the metadata panel's history button.
     // ───────────────────────────────────────────────────────────────────────
-    test('history endpoint: doc-scoped + limit-clamped + isolated; UI dialog opens and reflects mirror state', async ({
+    test('history endpoint: doc-scoped + limit-clamped + isolated; UI modal opens and reflects mirror state', async ({
         request,
         page,
         baseURL,
@@ -654,26 +675,26 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         );
         expect(histForbidden.status(), 'non-member history read → 403').toBe(403);
 
-        // --- UI: open the side-panel history dialog and assert it surfaces a
-        //     terminal state matching the mirror (error in CI, list otherwise). -
+        // --- UI: open the metadata-panel history modal and assert it surfaces
+        //     a terminal state matching the mirror (error in CI, list otherwise). -
         const origin = baseURL ?? 'http://localhost:3000';
         await page.goto(`${origin}/en/works/${workId}/kb/${docPath}`, {
             waitUntil: 'domcontentloaded',
         });
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
-        const historyBtn = page.getByTestId('kb-side-panel-history').first();
-        const sidePanel = page.getByTestId('kb-side-panel').first();
-        // The side panel (which hosts the history button) is the anchor that
+        const historyBtn = page.getByTestId('kb-workbench-metadata-history-button').first();
+        const metadataPanel = page.getByTestId('kb-workbench-metadata-panel').first();
+        // The metadata panel (which hosts the history button) is the anchor that
         // proves the nested route rendered. On a cold CI runner the per-doc
         // route compiles lazily, so wait generously for the panel itself
         // before deciding whether we're on the rendered route or the 404.
-        await expect(sidePanel.or(notFound).first()).toBeVisible({ timeout: 60_000 });
+        await expect(metadataPanel.or(notFound).first()).toBeVisible({ timeout: 60_000 });
 
         if (await notFound.isVisible().catch(() => false)) {
             test.info().annotations.push({
                 type: 'route-divergence',
                 description:
-                    'per-doc KB route 404s to the next-dev catch-all locally; the history dialog UI is asserted only when the nested route renders (CI). API history contract fully asserted above.',
+                    'per-doc KB route 404s to the next-dev catch-all locally; the history modal UI is asserted only when the nested route renders (CI). API history contract fully asserted above.',
             });
             return;
         }
@@ -685,32 +706,32 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         await historyBtn.scrollIntoViewIfNeeded().catch(() => {});
 
         // Retry-to-open: the first click can be swallowed before hydration. Give
-        // a generous budget — on a cold CI shard the click + dialog mount race
+        // a generous budget — on a cold CI shard the click + modal mount race
         // the nested-route compile.
-        const dialog = page.getByTestId('kb-history-dialog');
+        const modal = page.getByTestId('kb-workbench-history-modal');
         await expect(async () => {
             if (await historyBtn.isEnabled().catch(() => false)) {
                 await historyBtn.click({ timeout: 5_000 }).catch(() => {});
             }
-            await expect(dialog).toBeVisible({ timeout: 5_000 });
+            await expect(modal).toBeVisible({ timeout: 5_000 });
         }).toPass({ timeout: 60_000 });
 
-        // The dialog settles on a terminal state: an error row (CI mirror 500),
-        // an empty state, or a populated commit listbox — never a stuck spinner.
-        // The history server action round-trips through the 500ing mirror, so
-        // give the loading→error transition a wide window on a busy shard.
-        const errorState = page.getByTestId('kb-history-error');
-        const emptyState = page.getByTestId('kb-history-empty');
-        const commitRow = page.getByTestId('kb-history-row').first();
+        // The modal settles on a terminal state: an error row (CI mirror 500),
+        // an empty state, or a populated commit list — never a stuck spinner.
+        // The history fetch round-trips through the 500ing mirror, so give the
+        // loading→error transition a wide window on a busy shard.
+        const errorState = page.getByTestId('kb-workbench-history-modal-error');
+        const emptyState = page.getByTestId('kb-workbench-history-modal-empty');
+        const commitRow = page.getByTestId('kb-workbench-history-modal-row').first();
         await expect(errorState.or(emptyState).or(commitRow).first()).toBeVisible({
             timeout: 45_000,
         });
         if (!repoBacked) {
-            // CI: the mirror 500 must surface as the dialog's error state (the
-            // dialog never silently shows an empty or populated list).
+            // CI: the mirror 500 must surface as the modal's error state (the
+            // modal never silently shows an empty or populated list).
             await expect(
                 errorState,
-                'CI mirror 500 surfaces as the history dialog error state',
+                'CI mirror 500 surfaces as the history modal error state',
             ).toBeVisible({ timeout: 30_000 });
         }
     });
@@ -950,10 +971,12 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
     // FLOW 6 — AUTOSAVE roundtrip COUPLED to a subsequent lock. The seeded
     // user appends a marker, autosave debounces → `saved`, the text survives a
     // reload (persistence). Then the doc is full-locked via the API and, on
-    // reload, the autosave editor is GONE (read-only view) — proving the lock
-    // flips the live editing surface off. Finally unlock restores the editor.
+    // reload, the header lock badge reports `full` — the canonical workbench
+    // "this doc is locked" signal (the editor still mounts, but the lock is
+    // enforced server-side: a further autosave PATCH 423s). Finally unlock
+    // clears the badge and edits flow again.
     // ───────────────────────────────────────────────────────────────────────
-    test('autosave persists across reload, then a full-lock flips the editor read-only', async ({
+    test('autosave persists across reload, then a full-lock surfaces the lock badge', async ({
         request,
         page,
         baseURL,
@@ -979,20 +1002,20 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
             waitUntil: 'domcontentloaded',
         });
 
-        const editor = page.getByTestId('kb-editor');
+        const editor = page.getByTestId('kb-workbench-editor');
         const notFound = page.getByText(/404|not found|page could not be found/i).first();
         await expect(editor.or(notFound).first()).toBeVisible({ timeout: 60_000 });
         if (await notFound.isVisible().catch(() => false)) {
             test.info().annotations.push({
                 type: 'route-divergence',
                 description:
-                    'per-doc KB editor route 404s to the next-dev catch-all locally; the autosave+lock UI flow needs the nested route (CI). The lock-flips-read-only contract is also covered by the API + FLOW 1 assertions.',
+                    'per-doc KB editor route 404s to the next-dev catch-all locally; the autosave+lock UI flow needs the nested route (CI). The lock-surfaces-badge contract is also covered by the API + FLOW 1 assertions.',
             });
             return;
         }
 
         const marker = `autosave-marker-${id}`;
-        const status = page.getByTestId('kb-editor-status');
+        const status = page.getByTestId('kb-workbench-status');
 
         // PRIMARY: drive the LIVE Tiptap autosave — append a marker, let the
         // debounce settle on `saved`, then confirm the contenteditable shows it
@@ -1003,13 +1026,15 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         let liveAutosaved = false;
         if (await waitForLiveEditor(page, origin, workId, docPath)) {
             const editable = page
-                .locator('[data-testid="kb-editor"] [contenteditable="true"]')
+                .locator('[data-testid="kb-tiptap-editor-body"][contenteditable="true"]')
                 .first();
             liveAutosaved = await (async () => {
                 try {
                     await editable.click({ timeout: 10_000 });
                     await page.keyboard.press('Control+End');
                     await page.keyboard.type(`\n${marker}\n`);
+                    // The status pill is sr-only when idle; once the 800ms
+                    // debounce fires it transitions saving→saved.
                     await expect(status, 'autosave debounce settles on saved').toHaveAttribute(
                         'data-status',
                         'saved',
@@ -1046,7 +1071,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
 
         // Reload → the marker persisted (server round-tripped the write).
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-editor')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 60_000 });
 
         // HARD GUARANTEE: the body persisted server-side (independent of any
         // client hydration). This is the durable persistence contract.
@@ -1059,7 +1084,7 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
         // persistence assertion above already pins the roundtrip.
         if (await waitForLiveEditor(page, origin, workId, docPath)) {
             const reloadedEditable = page
-                .locator('[data-testid="kb-editor"] [contenteditable="true"]')
+                .locator('[data-testid="kb-tiptap-editor-body"][contenteditable="true"]')
                 .first();
             await expect(reloadedEditable).toContainText(marker, { timeout: 20_000 });
         } else {
@@ -1070,54 +1095,36 @@ test.describe('flow: KB doc locking + history + restore + autosave', () => {
             });
         }
 
-        // Now FULL-LOCK the doc via the API and reload — the live editor must
-        // be gone (read-only view) so no further autosave is possible.
+        // Now FULL-LOCK the doc via the API and reload — the header lock badge
+        // reports `full`, the canonical workbench "this doc is locked" signal.
+        // The editor still mounts (the workbench does not swap to a read-only
+        // view); the lock is enforced server-side (a further autosave PATCH
+        // 423s — covered by the API contract in FLOW 1 + FLOW 2).
         const lock = await lockDoc(request, token, workId, documentId, LOCK_FULL);
         expect(lock.status, 'full-lock → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
 
-        // A full-locked doc renders the read-only `KbDocumentView`. PROBED
-        // 2026-06-01 against the source: that read-only surface REUSES the
-        // `kb-editor` testid (it's the same editor-pane slot), so a bare
-        // `kb-editor` count is NOT a reliable "live editor gone" signal in CI
-        // where the nested route actually renders. The honest distinguisher is
-        // the live-editing affordances the Tiptap editor renders and the
-        // read-only view does NOT: the autosave status pill, the
-        // `contenteditable` body, and the Save button. Assert those are gone
-        // while the read-only Markdown body is present.
-        const readOnlyMarker = page
-            .locator('[data-testid="kb-editor-readonly"]')
-            .or(page.locator('[data-locked="true"]'))
-            .or(page.getByTestId('kb-document-body'))
-            .or(page.getByText(/🔒/))
-            .or(page.getByTestId('kb-shell'))
-            .first();
-        await expect(readOnlyMarker).toBeVisible({ timeout: 60_000 });
-        // The autosave status pill (only the LIVE editor renders it) must
-        // disappear — this is the canonical "no more autosave" assertion.
-        await expect(
-            page.getByTestId('kb-editor-status'),
-            'a full-locked doc renders read-only — the autosave status pill is gone',
-        ).toHaveCount(0, { timeout: 15_000 });
-        // The editable Tiptap surface + Save affordance are likewise absent.
-        await expect(
-            page.locator('[data-testid="kb-editor"] [contenteditable="true"]'),
-            'a full-locked doc has no editable Tiptap surface',
-        ).toHaveCount(0);
-        await expect(page.getByTestId('kb-editor-save')).toHaveCount(0);
-        // The read-only Markdown view is what renders instead.
-        await expect(page.getByTestId('kb-document-body')).toBeVisible({ timeout: 15_000 });
+        const lockBadge = page.getByTestId('kb-workbench-lock-badge');
+        await expect(lockBadge, 'a full-locked doc surfaces the header lock badge').toBeVisible({
+            timeout: 60_000,
+        });
+        await expect(lockBadge, 'the lock badge reports lockMode=full').toHaveAttribute(
+            'data-kb-lock-mode',
+            LOCK_FULL,
+            { timeout: 15_000 },
+        );
+        // The workbench still renders the editor surface for the locked doc.
+        await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 15_000 });
 
-        // Unlock → the LIVE editor surface returns on the next reload
-        // (reversible). Key on the status pill (live-editor-only) rather than
-        // the shared `kb-editor` testid so we assert the editable surface, not
-        // the read-only view that also carries `kb-editor`.
+        // Unlock → the badge clears on the next reload (reversible) and the
+        // editor remains mounted, now without the lock badge.
         const unlock = await unlockDoc(request, token, workId, documentId);
         expect(unlock.status, 'unlock → 200').toBe(200);
         await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('kb-workbench-editor')).toBeVisible({ timeout: 60_000 });
         await expect(
-            page.getByTestId('kb-editor-status'),
-            'after unlock the autosave (live) editor mounts again',
-        ).toBeVisible({ timeout: 60_000 });
+            page.getByTestId('kb-workbench-lock-badge'),
+            'after unlock the lock badge is gone',
+        ).toHaveCount(0, { timeout: 30_000 });
     });
 });

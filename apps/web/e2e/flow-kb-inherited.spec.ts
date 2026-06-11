@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
 import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
+import { createOrganizationViaAPI } from './helpers/organizations';
 
 /**
  * EW-643 Phase 3 slice 5 — A33/A34/A35 acceptance e2e for the KB
@@ -19,9 +19,10 @@ import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
  *         the same lock semantics as native Work docs).
  *
  * Realistic test data: every scenario mints a fresh user, fresh Work,
- * and a unique-UUID "organization" via `seedOrgKbDoc` (the org-KB
- * controller does not enforce org membership today, per its docstring
- * — see kb-fixtures comment block). Run-id suffixed paths/slugs keep
+ * and a REAL organization via `createOrganizationViaAPI` (the org-KB
+ * endpoint now 404s for a fabricated orgId — it validates the org
+ * exists; the controller still does not enforce org membership today,
+ * per the kb-fixtures comment block). Run-id suffixed paths/slugs keep
  * parallel shards isolated.
  *
  * Skip-gates: none — pure REST, no ffmpeg/Whisper/external-storage
@@ -113,7 +114,8 @@ test.describe('flow: KB org→Work inheritance acceptance (A33/A34/A35)', () => 
         test.setTimeout(120_000);
         const id = runId();
         const owner = await registerUserViaAPI(request, { name: `Inh A33 ${id}` });
-        const orgId = randomUUID();
+        const org = await createOrganizationViaAPI(request, owner.access_token, `Org A33 ${id}`);
+        const orgId = org.id;
         const { id: workId } = await createWorkViaAPI(request, owner.access_token, {
             name: `KB A33 ${id}`,
         });
@@ -151,7 +153,8 @@ test.describe('flow: KB org→Work inheritance acceptance (A33/A34/A35)', () => 
         test.setTimeout(120_000);
         const id = runId();
         const owner = await registerUserViaAPI(request, { name: `Inh A34 ${id}` });
-        const orgId = randomUUID();
+        const org = await createOrganizationViaAPI(request, owner.access_token, `Org A34 ${id}`);
+        const orgId = org.id;
         const { id: workId } = await createWorkViaAPI(request, owner.access_token, {
             name: `KB A34 ${id}`,
         });
@@ -208,7 +211,8 @@ test.describe('flow: KB org→Work inheritance acceptance (A33/A34/A35)', () => 
         test.setTimeout(120_000);
         const id = runId();
         const owner = await registerUserViaAPI(request, { name: `Inh A35 ${id}` });
-        const orgId = randomUUID();
+        const org = await createOrganizationViaAPI(request, owner.access_token, `Org A35 ${id}`);
+        const orgId = org.id;
         const { id: workId } = await createWorkViaAPI(request, owner.access_token, {
             name: `KB A35 ${id}`,
         });

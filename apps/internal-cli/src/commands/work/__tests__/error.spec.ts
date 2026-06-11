@@ -125,4 +125,38 @@ describe('handleCliError', () => {
         // 42 is truthy, so we go through the data/message extraction branch and print '42'.
         expect(errorSpy.mock.calls[0][1]).toBe('42');
     });
+
+    // Security (EW-718): credential-bearing upstream messages must be redacted
+    // before they reach the console.
+    it('redacts a secret-like token from the printed message', () => {
+        const secret = 'ghp_0123456789abcdefghijklmnopqrstuvwxyzABCD';
+        const error = {
+            response: { status: 500, data: { message: `auth failed for ${secret}` } },
+        };
+        handleCliError(error);
+        const printed = String(errorSpy.mock.calls[0][1]);
+        expect(printed).not.toContain(secret);
+        expect(printed).toContain('[redacted secret]');
+    });
+
+    it('redacts a Bearer token from the printed message', () => {
+        const error = {
+            response: {
+                status: 401,
+                data: { message: 'Unauthorized: Bearer sk-abcdef0123456789ABCDEF' },
+            },
+        };
+        handleCliError(error);
+        const printed = String(errorSpy.mock.calls[0][1]);
+        expect(printed).not.toContain('sk-abcdef0123456789ABCDEF');
+        expect(printed).toContain('[redacted secret]');
+    });
+
+    it('leaves an ordinary message unchanged (no false-positive redaction)', () => {
+        const error = {
+            response: { status: 500, data: { message: 'Internal server error' } },
+        };
+        handleCliError(error);
+        expect(errorSpy.mock.calls[0][1]).toBe('Internal server error');
+    });
 });

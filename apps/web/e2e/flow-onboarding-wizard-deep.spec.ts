@@ -21,11 +21,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      • `{ state:{ ai:{} } }`          → 400 "state.ai.choice must be one of
  *                                         the following values: …" (nested
  *                                         choice is REQUIRED once `ai` present)
- *      • `{ state:{ prompt:'…' } }`     → 400 "state.property prompt should
- *                                         not exist" — the DTO is whitelisted
- *                                         WITHOUT `prompt` even though the
- *                                         contract `OnboardingStatePatchRequest`
- *                                         type permits it (DTO ⟂ type drift).
+ *      • `{ state:{ prompt:'…' } }`     → 200 persisted. EW-722 (security
+ *                                         wave M): the contract-declared
+ *                                         `prompt` is now whitelisted in the
+ *                                         DTO with @MaxLength(5000); an
+ *                                         OVERSIZED prompt (>5000) → 400.
  *      • unknown field                  → 400 "…should not exist"
  *      • `lastStep:-3`                  → 400 "must not be less than 0"
  *      • `lastStep:2.5`                 → 400 "must be an integer number"
@@ -309,13 +309,15 @@ test.describe('Onboarding deep — partial deep-merge never clobbers sibling fie
         const aiEmpty = await patchExpect400(request, token, { state: { ai: {} } });
         expect(aiEmpty).toContain('state.ai.choice must be one of the following values');
 
-        // (b) `prompt` is in the contract TYPE but NOT whitelisted by the DTO
-        //     → 400 "property prompt should not exist". Documents the DTO⟂type
-        //     drift so a future "add prompt to the DTO" change re-flags here.
+        // (b) EW-722 (security wave M): `prompt` is now whitelisted in the DTO
+        //     with the contract's @MaxLength(5000) bound and persisted, closing
+        //     the former DTO⟂type drift. The malformed probe is therefore an
+        //     OVERSIZED prompt — rejected so user-controlled text cannot bloat
+        //     the onboarding_state column.
         const prompt = await patchExpect400(request, token, {
-            state: { prompt: 'AI tools directory' },
+            state: { prompt: 'x'.repeat(5001) },
         });
-        expect(prompt).toContain('property prompt should not exist');
+        expect(prompt).toContain('prompt must be shorter than or equal to 5000 characters');
 
         // (c) Unknown field → forbidNonWhitelisted 400.
         const unknown = await patchExpect400(request, token, { state: { bogusField: true } });

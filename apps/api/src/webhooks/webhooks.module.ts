@@ -1,8 +1,12 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
+// Security (EW-711 #14): WorkModule provides/exports WorkOwnershipService so
+// WebhooksService can authorize a supplied workId before binding a
+// subscription to that Work's event stream.
 import {
     WebhookDeliveryService,
     WebhookSubscriptionDeliveryService,
+    WorkModule,
 } from '@ever-works/agent/services';
 import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { AuthModule } from '../auth/auth.module';
@@ -29,7 +33,7 @@ import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
  *    delivery when Trigger.dev is unconfigured.
  */
 @Module({
-    imports: [DatabaseModule, AuthModule, TasksTriggerModule],
+    imports: [DatabaseModule, AuthModule, TasksTriggerModule, WorkModule],
     controllers: [WebhooksController],
     providers: [
         WebhooksService,

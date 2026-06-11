@@ -45,10 +45,18 @@ export function displayConfigurationWarnings(warnings: string[]): void {
  * Masks sensitive values for display
  */
 export function maskSecret(secret: string): string {
-	const MIN_SECRET_LENGTH = 8;
-	if (!secret || secret.length < MIN_SECRET_LENGTH) {
+	const VISIBLE_PREFIX = 4;
+	const VISIBLE_SUFFIX = 4;
+	const VISIBLE_TOTAL = VISIBLE_PREFIX + VISIBLE_SUFFIX;
+	// Only reveal the first/last 4 chars when doing so leaks at most half of the
+	// secret (i.e. the masked middle is at least as long as the revealed edges).
+	// Shorter secrets — including the previously-leaky 8 and 9 char cases — are
+	// fully masked so we never return them verbatim or expose >50% of their value.
+	const MIN_REVEAL_LENGTH = VISIBLE_TOTAL * 2;
+	if (!secret || secret.length < MIN_REVEAL_LENGTH) {
 		return '****';
 	}
 
-	return secret.substring(0, 4) + '*'.repeat(secret.length - MIN_SECRET_LENGTH) + secret.substring(secret.length - 4);
+	const stars = secret.length - VISIBLE_TOTAL;
+	return secret.substring(0, VISIBLE_PREFIX) + '*'.repeat(stars) + secret.substring(secret.length - VISIBLE_SUFFIX);
 }

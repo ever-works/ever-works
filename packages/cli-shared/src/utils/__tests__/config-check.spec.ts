@@ -17,18 +17,28 @@ describe('maskSecret', () => {
 		expect(masked.length).toBe(secret.length);
 	});
 
-	it('handles the boundary value (exactly 8 chars) by returning input unchanged', () => {
-		// length === MIN_SECRET_LENGTH: not short, but length-MIN=0 → no middle stars
-		// so first4 + '' + last4 reconstructs the original.
-		expect(maskSecret('12345678')).toBe('12345678');
+	it('never returns an 8-char secret verbatim (no >50% leak)', () => {
+		const secret = '12345678';
+		const masked = maskSecret(secret);
+		expect(masked).not.toBe(secret);
+		expect(masked).toContain('*');
+		expect(masked).toBe('****');
 	});
 
-	it('handles a 9-character secret with one masked middle char', () => {
-		const masked = maskSecret('123456789');
-		expect(masked.length).toBe(9);
-		expect(masked.startsWith('1234')).toBe(true);
-		expect(masked.endsWith('6789')).toBe(true);
-		expect(masked.charAt(4)).toBe('*');
+	it('never returns a 9-char secret verbatim (no >50% leak)', () => {
+		const secret = '123456789';
+		const masked = maskSecret(secret);
+		expect(masked).not.toBe(secret);
+		expect(masked).toContain('*');
+		expect(masked).toBe('****');
+	});
+
+	it('fully masks any secret shorter than 16 chars so the middle is never narrower than the edges', () => {
+		// 15 chars: revealing first4+last4 would expose 8/15 (>50%) → fully masked.
+		const secret = '123456789012345';
+		const masked = maskSecret(secret);
+		expect(masked).not.toBe(secret);
+		expect(masked).toBe('****');
 	});
 });
 

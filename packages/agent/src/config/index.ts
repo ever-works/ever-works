@@ -169,6 +169,26 @@ export const config = {
         isEnabled() {
             return process.env.SUBSCRIPTIONS_ENABLED === 'true';
         },
+        /**
+         * E2E/test-only escape hatch (default OFF, hard-gated off in
+         * production). When enabled, `changePlanSelfService` permits
+         * self-assigning a PAID plan so the subscription tier-gating /
+         * billing-grace e2e specs can drive a user onto STANDARD/PREMIUM
+         * without a real billing integration wired in.
+         *
+         * The EW-711 #23 free→paid privilege-escalation guard stays fully
+         * active in production: the flag is IGNORED unless
+         * `NODE_ENV !== 'production'`, so even an accidental prod env value
+         * can never re-open the self-serve paid escalation. Mirrors the
+         * existing e2e-only relaxations (E2E_DISABLE_AUTH_THROTTLE,
+         * REQUIRE_EMAIL_VERIFICATION=false).
+         */
+        allowSelfServePaidPlans() {
+            return (
+                process.env.NODE_ENV !== 'production' &&
+                process.env.SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID === 'true'
+            );
+        },
         scheduledUpdatesEnabled() {
             return process.env.SCHEDULED_UPDATES_ENABLED !== 'false';
         },

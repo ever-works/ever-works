@@ -1,25 +1,29 @@
-// Field names matched against the response body by exact-string equality
-// (case-sensitive, no regex / prefix matching). Both camelCase and snake_case
-// variants are listed for fields that travel through both REST DTOs (camel)
-// and OAuth-style responses (snake). Add either spelling when introducing a
-// new sensitive field — there is no automatic case-normalisation.
+// Field names matched against the response body. Matching is
+// case-insensitive: every entry below is stored lowercase and lookups
+// lowercase the candidate key first, so `PASSWORD`, `AccessToken`, and
+// `apiKey` all match regardless of casing. Matching is still exact-string
+// (no regex / prefix matching). Both camelCase and snake_case variants are
+// listed for fields that travel through both REST DTOs (camel) and
+// OAuth-style responses (snake), because lowercasing alone does not bridge
+// the `_` separator (e.g. `apikey` vs `api_key`). Add new sensitive fields
+// in lowercase; casing of the incoming key no longer matters.
 const SENSITIVE_FIELDS = new Set([
 	'password',
-	'passwordResetToken',
-	'passwordResetExpires',
-	'emailVerificationToken',
-	'emailVerificationExpires',
-	'lastLoginIp',
-	'apiKey',
+	'passwordresettoken',
+	'passwordresetexpires',
+	'emailverificationtoken',
+	'emailverificationexpires',
+	'lastloginip',
+	'apikey',
 	'api_key',
 	'secret',
-	'clientSecret',
+	'clientsecret',
 	'client_secret',
-	'accessToken',
+	'accesstoken',
 	'access_token',
-	'refreshToken',
+	'refreshtoken',
 	'refresh_token',
-	'privateKey',
+	'privatekey',
 	'private_key',
 	'token',
 	// Security: additional unambiguous credential/secret field names that can
@@ -27,37 +31,37 @@ const SENSITIVE_FIELDS = new Set([
 	// Only exact, non-ambiguous names are added here — a bare `hash` is left
 	// out on purpose because in this repo it commonly denotes a git commit /
 	// content hash (a legitimate, non-sensitive value).
-	'passwordHash',
+	'passwordhash',
 	'password_hash',
-	'hashedPassword',
+	'hashedpassword',
 	'hashed_password',
 	'salt',
-	'authToken',
+	'authtoken',
 	'auth_token',
-	'apiToken',
+	'apitoken',
 	'api_token',
-	'bearerToken',
+	'bearertoken',
 	'bearer_token',
-	'oauthToken',
+	'oauthtoken',
 	'oauth_token',
-	'sessionToken',
+	'sessiontoken',
 	'session_token',
-	'verificationToken',
+	'verificationtoken',
 	'verification_token',
 	'jwt',
-	'jwtToken',
-	'idToken',
+	'jwttoken',
+	'idtoken',
 	'id_token',
-	'twoFactorSecret',
+	'twofactorsecret',
 	'two_factor_secret',
-	'totpSecret',
+	'totpsecret',
 	'totp_secret',
-	'twoFactorBackupCodes',
-	'backupCodes',
+	'twofactorbackupcodes',
+	'backupcodes',
 	'backup_codes',
-	'encryptedKey',
+	'encryptedkey',
 	'encrypted_key',
-	'encryptedSecret',
+	'encryptedsecret',
 	'encrypted_secret',
 	'otp'
 ]);
@@ -73,7 +77,7 @@ function sanitizeValue(data: unknown): unknown {
 
 	const result: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
-		if (SENSITIVE_FIELDS.has(key)) {
+		if (SENSITIVE_FIELDS.has(key.toLowerCase())) {
 			continue;
 		}
 		result[key] = sanitizeValue(value);
@@ -92,8 +96,10 @@ function sanitizeValue(data: unknown): unknown {
  *   sentinel because tool results are surfaced verbatim to the model,
  *   and a sentinel could mislead the model into thinking the data
  *   exists in some retrievable form.
- * - Match is **case-sensitive exact-string** against the `SENSITIVE_FIELDS`
- *   set; `Token` would not match `token`. Add casing variants explicitly.
+ * - Match is **case-insensitive exact-string** against the `SENSITIVE_FIELDS`
+ *   set; the candidate key is lowercased before lookup, so `Token`,
+ *   `TOKEN`, and `token` all match. Matching is still whole-key exact
+ *   (no prefix / regex), so add snake_case spellings explicitly.
  * - Recurses into objects and arrays; leaves primitives, `null`, and
  *   `undefined` untouched. Cycles are not handled — pass DAG-shaped
  *   data only.

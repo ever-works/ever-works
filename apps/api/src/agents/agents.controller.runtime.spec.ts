@@ -89,8 +89,11 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         exportService = {};
         dispatcher = { dispatchOne: jest.fn() };
         agentRuns = {
-            findByAgent: jest.fn().mockResolvedValue([]),
-            countByAgent: jest.fn().mockResolvedValue(0),
+            // Security (EW-710 wave M): listRuns now calls the user-scoped
+            // repository variants instead of the @internal unscoped
+            // findByAgent/countByAgent (latent-IDOR hardening).
+            findByAgentAndUser: jest.fn().mockResolvedValue([]),
+            countByAgentAndUser: jest.fn().mockResolvedValue(0),
             cancel: jest.fn(),
             createQueued: jest.fn(),
             findInFlightForTaskAgent: jest.fn().mockResolvedValue(null),
@@ -173,7 +176,11 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
 
     describe('GET /:id/runs', () => {
         it('returns paginated runs + total', async () => {
-            agentRuns.findByAgent.mockResolvedValueOnce([
+            // Security (EW-710 wave M): the controller must use the
+            // user-scoped findByAgentAndUser/countByAgentAndUser so run
+            // history stays ownership-filtered at the repository layer
+            // even if the service-level getOne() gate is ever removed.
+            agentRuns.findByAgentAndUser.mockResolvedValueOnce([
                 {
                     id: runId,
                     status: 'completed',
@@ -187,12 +194,14 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                     createdAt: new Date('2026-01-01T00:00:00Z'),
                 },
             ]);
-            agentRuns.countByAgent.mockResolvedValueOnce(1);
+            agentRuns.countByAgentAndUser.mockResolvedValueOnce(1);
 
             const result = await controller.listRuns(auth, agentId, { limit: 25, offset: 0 });
             expect(result.meta).toEqual({ total: 1, limit: 25, offset: 0 });
             expect(result.data).toHaveLength(1);
             expect(result.data[0]).toMatchObject({ status: 'completed' });
+            expect(agentRuns.findByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1', 25, 0);
+            expect(agentRuns.countByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1');
         });
     });
 

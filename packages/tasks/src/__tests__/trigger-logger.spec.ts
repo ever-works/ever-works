@@ -67,14 +67,17 @@ describe('TriggerLogger', () => {
             expect(triggerLoggerMock.log).toHaveBeenCalledWith('hi', { foo: 1, bar: 2 });
         });
 
-        it('flattens Error objects into message + stack', () => {
+        it('flattens Error objects into message only (never the stack trace)', () => {
             const logger = new TriggerLogger();
             const err = new Error('boom');
             logger.log('hi', err);
             expect(triggerLoggerMock.log).toHaveBeenCalledWith(
                 'hi',
-                expect.objectContaining({ error: 'boom', stack: expect.any(String) }),
+                expect.objectContaining({ error: 'boom' }),
             );
+            // Stack traces must NOT be forwarded to trigger.dev logs (info disclosure).
+            const data = triggerLoggerMock.log.mock.calls[0][1];
+            expect(data).not.toHaveProperty('stack');
         });
 
         it('coerces non-string messages via String()', () => {
@@ -91,13 +94,16 @@ describe('TriggerLogger', () => {
             expect(triggerLoggerMock.error).toHaveBeenCalledWith('[Ctx] bad', {});
         });
 
-        it('captures Error info when provided', () => {
+        it('captures Error message only when provided (never the stack trace)', () => {
             const logger = new TriggerLogger();
             logger.error('failed', new Error('nope'));
             expect(triggerLoggerMock.error).toHaveBeenCalledWith(
                 'failed',
-                expect.objectContaining({ error: 'nope', stack: expect.any(String) }),
+                expect.objectContaining({ error: 'nope' }),
             );
+            // Stack traces must NOT be forwarded to trigger.dev logs (info disclosure).
+            const data = triggerLoggerMock.error.mock.calls[0][1];
+            expect(data).not.toHaveProperty('stack');
         });
     });
 

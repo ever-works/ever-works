@@ -7,7 +7,7 @@ export interface ParsedGitHubRepository {
 export function parseGitHubRepositoryUrl(input: string): ParsedGitHubRepository | null {
 	try {
 		const url = new URL(input);
-		if (!['https:', 'http:'].includes(url.protocol)) {
+		if (!['https:'].includes(url.protocol)) {
 			return null;
 		}
 
@@ -26,6 +26,10 @@ export function parseGitHubRepositoryUrl(input: string): ParsedGitHubRepository 
 
 		const owner = segments[0].toLowerCase();
 		const repo = segments[1].toLowerCase();
+
+		if (!/^[a-z0-9._-]+$/.test(owner) || !/^[a-z0-9._-]+$/.test(repo)) {
+			return null;
+		}
 
 		return {
 			owner,

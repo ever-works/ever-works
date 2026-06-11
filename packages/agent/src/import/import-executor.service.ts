@@ -19,6 +19,7 @@ import {
 } from '@src/works-config/services/works-config.service';
 import { mergeWorksConfigIntoDataConfig } from '@src/works-config/works-config-data';
 import { sanitizePrompt } from '../utils/sanitize.util';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 
 export interface ExecuteBySourceTypeOptions {
     work: Work;
@@ -340,6 +341,16 @@ export class ImportExecutorService {
             const sanitizedInitialPrompt = resolvedWorksConfig?.initialPrompt
                 ? sanitizePrompt(resolvedWorksConfig.initialPrompt, 5000)
                 : '';
+
+            // Security (EW-714 / D11): the sanitizer above strips control chars
+            // and caps length but does NOT reject chat-template control tokens
+            // (`<|im_start|>`, `[INST]`, …). Those are the prompt-injection /
+            // system-turn-hijack vector when this attacker-controlled
+            // `works.yml:initial_prompt` is fed verbatim to the LLM. Hard-reject
+            // them at the import boundary — same posture as
+            // agent-export.service.ts and skills.service.ts. No-op for
+            // legitimate prompts (markdown never legitimately contains these).
+            assertNoInjectionTokens(sanitizedInitialPrompt, 'works.yml:initial_prompt');
 
             if (!resolvedWorksConfig?.initialPrompt || !sanitizedInitialPrompt) {
                 return {

@@ -14,6 +14,27 @@ export class PluginValidationService {
     ) {}
 
     /**
+     * Resolve the REAL plugin instance behind a possibly-lazy registry stub.
+     *
+     * A lazy-plugin stub reports EVERY optional method as a function (its
+     * proxy forwards unknown property reads), so `typeof` capability probes
+     * lie until the real plugin is materialized — validateConnection would
+     * "exist", resolve to undefined, and `.success` would 500 the validate
+     * endpoint; isAvailable would throw "has no method". Callers here are
+     * about to invoke the plugin's validation methods anyway (which
+     * materializes regardless), so materializing up front costs nothing extra
+     * and makes every probe truthful.
+     */
+    private async getRealPlugin(pluginLike: unknown): Promise<Record<string, unknown>> {
+        const maybeLazy = pluginLike as { __materialize?: () => Promise<unknown> };
+        const real =
+            typeof maybeLazy.__materialize === 'function'
+                ? await maybeLazy.__materialize()
+                : pluginLike;
+        return real as Record<string, unknown>;
+    }
+
+    /**
      * Non-throwing validation for use after settings save.
      * Returns the validation result or null if the plugin has no validation capability.
      * When workId is provided, settings are resolved with work overrides merged on top of user settings.
@@ -28,7 +49,15 @@ export class PluginValidationService {
             return null;
         }
 
-        const plugin = registered.plugin as unknown as Record<string, unknown>;
+        let plugin: Record<string, unknown>;
+        try {
+            plugin = await this.getRealPlugin(registered.plugin);
+        } catch (error) {
+            // Non-throwing contract: a plugin that fails to materialize has no
+            // validation capability we can exercise.
+            this.logger.warn(`Failed to materialize plugin "${pluginId}" for validation: ${error}`);
+            return null;
+        }
         const hasValidateConnection = typeof plugin.validateConnection === 'function';
         const hasIsAvailable = typeof plugin.isAvailable === 'function';
         const isGitProvider = registered.plugin.capabilities.includes('git-provider');
@@ -105,7 +134,9 @@ export class PluginValidationService {
             includeSecrets: true,
         });
 
-        const plugin = registered.plugin as unknown as Record<string, unknown>;
+        // Probe the REAL instance — lazy stubs over-report optional methods
+        // (see getRealPlugin).
+        const plugin = await this.getRealPlugin(registered.plugin);
 
         // Prefer validateConnection() — plugins self-describe their validation logic
         const validateConnection = plugin.validateConnection as

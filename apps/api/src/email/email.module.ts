@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { NotificationsModule as AgentNotificationsModule } from '@ever-works/agent/notifications';
+// EW-711 #16: AgentsModule re-exports AgentRepository so EmailService can
+// verify the caller owns the agentId named in a send (IDOR guard).
+import { AgentsModule } from '@ever-works/agent/agents';
 import { AuthModule } from '@src/auth';
 import { EmailController } from './email.controller';
 import { EmailService } from './email.service';
@@ -19,7 +22,7 @@ import { EmailService } from './email.service';
  * keep working unchanged — see notifications-v2 hard rule (additive).
  */
 @Module({
-    imports: [DatabaseModule, FacadesModule, AgentNotificationsModule, AuthModule],
+    imports: [DatabaseModule, FacadesModule, AgentNotificationsModule, AgentsModule, AuthModule],
     controllers: [EmailController],
     providers: [EmailService],
     exports: [EmailService],

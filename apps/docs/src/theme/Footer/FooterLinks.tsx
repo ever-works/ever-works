@@ -8,7 +8,7 @@ interface FooterLinkItem {
 	html?: string;
 }
 
-interface FooterLinkColumn {
+export interface FooterLinkColumn {
 	title: string;
 	items: FooterLinkItem[];
 }

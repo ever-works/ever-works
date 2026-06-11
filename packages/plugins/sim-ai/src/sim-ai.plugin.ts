@@ -57,6 +57,13 @@ import {
 } from './form-schema.js';
 import { README } from './readme.js';
 
+// Security (secret-leak): SIM workflow output is echoed into debug logs below.
+// When `pass_repo_access` is enabled the caller forwards a GitHub token to the
+// workflow, and a misbehaving/echoing workflow could reflect that token back in
+// its output. Scrub any GitHub token shapes before they reach the logger so the
+// `repo_access_token` is never persisted in plaintext log lines.
+const scrubTokens = (s: string): string => s.replace(/\b(ghp_|github_pat_|gho_|ghs_|ghr_)[A-Za-z0-9_]+/g, '[REDACTED]');
+
 /**
  * SIM AI Workflows Plugin
  *
@@ -358,7 +365,9 @@ export class SimAiPlugin implements IPlugin, IPipelinePlugin, IFormSchemaProvide
 			reportProgress(onProgress, 3, 75, 'Collect & Validate Results');
 
 			logger.log(
-				`Raw SIM output type: ${typeof execResult.output}, value: ${JSON.stringify(execResult.output).substring(0, 500)}`
+				`Raw SIM output type: ${typeof execResult.output}, value: ${scrubTokens(
+					JSON.stringify(execResult.output).substring(0, 500)
+				)}`
 			);
 
 			const parsed = parseSimOutput(execResult.output);

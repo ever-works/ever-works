@@ -2,6 +2,12 @@ jest.mock('@ever-works/agent/database', () => ({
     WebhookSubscriptionRepository: class {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
+// Security (EW-711 #14): the service now injects WorkOwnershipService to
+// authorize work-scoped subscriptions; a class shell keeps the spec from
+// pulling the real services barrel (TypeORM repos/entities).
+jest.mock('@ever-works/agent/services', () => ({
+    WorkOwnershipService: class {},
+}));
 
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { WebhooksService } from './webhooks.service';
@@ -17,6 +23,7 @@ describe('WebhooksService', () => {
         delete: jest.Mock;
     };
     let secrets: WebhookSecretService;
+    let workOwnership: { ensureCanView: jest.Mock };
     let service: WebhooksService;
     const ACCOUNT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
     const SAVED_NODE_ENV = process.env.NODE_ENV;
@@ -45,7 +52,10 @@ describe('WebhooksService', () => {
         // the raw secret shape without an encryption key.
         delete process.env.PLATFORM_ENCRYPTION_KEY;
         secrets = new WebhookSecretService();
-        service = new WebhooksService(repo as any, secrets);
+        // Security (EW-711 #14): ownership gate passes by default so the
+        // existing (no-workId / own-workId) flows stay green.
+        workOwnership = { ensureCanView: jest.fn().mockResolvedValue({}) };
+        service = new WebhooksService(repo as any, secrets, workOwnership as any);
     });
 
     afterEach(() => {
@@ -111,12 +121,94 @@ describe('WebhooksService', () => {
             ).resolves.toBeDefined();
         });
 
+        it('rejects plaintext http in non-local envs (HMAC exposure)', async () => {
+            // A public, non-private https host so the SSRF guard passes and we
+            // isolate the https-only protocol check.
+            process.env.NODE_ENV = 'production';
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).rejects.toThrow(BadRequestException);
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).rejects.toThrow(/https/);
+        });
+
+        it('accepts https in non-local envs', async () => {
+            process.env.NODE_ENV = 'production';
+            // Encryption-at-rest is mandatory in prod before a secret can be
+            // minted; supply a valid 32-byte (hex) key so the https path
+            // reaches a successful create instead of the secret-service guard.
+            process.env.PLATFORM_ENCRYPTION_KEY = 'a'.repeat(64);
+            service = new WebhooksService(
+                repo as any,
+                new WebhookSecretService(),
+                workOwnership as any,
+            );
+            await expect(
+                service.create(ACCOUNT, { url: 'https://hooks.example.com/ingest' }),
+            ).resolves.toBeDefined();
+        });
+
+        it('still accepts http in local dev (tunnels)', async () => {
+            process.env.NODE_ENV = 'development';
+            await expect(
+                service.create(ACCOUNT, { url: 'http://hooks.example.com/ingest' }),
+            ).resolves.toBeDefined();
+        });
+
         it('enforces per-account cap (25)', async () => {
             const rows = Array.from({ length: 25 }, (_, i) => ({ id: `wh-${i}` }));
             repo.listActiveForAccount.mockResolvedValueOnce(rows as any);
             await expect(
                 service.create(ACCOUNT, { url: 'https://hooks.example/ingest' }),
             ).rejects.toThrow(/per-account limit of 25/);
+        });
+    });
+
+    // Security (EW-711 #14): create() must authorize a supplied workId via
+    // WorkOwnershipService.ensureCanView so a caller can't bind a
+    // subscription to a foreign Work and exfiltrate its event stream.
+    describe('create — workId ownership (EW-711 #14)', () => {
+        const WORK = '11111111-2222-3333-4444-555555555555';
+
+        it('skips the ownership gate when no workId is supplied', async () => {
+            await service.create(ACCOUNT, { url: 'https://hooks.example/ingest' });
+            expect(workOwnership.ensureCanView).not.toHaveBeenCalled();
+        });
+
+        it('authorizes the supplied workId for the caller before persisting', async () => {
+            const r = await service.create(ACCOUNT, {
+                url: 'https://hooks.example/ingest',
+                workId: WORK,
+            });
+            expect(workOwnership.ensureCanView).toHaveBeenCalledWith(WORK, ACCOUNT);
+            expect(r.subscription.workId).toBe(WORK);
+        });
+
+        it('masks a foreign workId (Forbidden) as NotFound — no enumeration', async () => {
+            workOwnership.ensureCanView.mockRejectedValueOnce(
+                new ForbiddenException('You do not have permission to access this work'),
+            );
+            await expect(
+                service.create(ACCOUNT, {
+                    url: 'https://hooks.example/ingest',
+                    workId: WORK,
+                }),
+            ).rejects.toThrow(NotFoundException);
+            expect(repo.createForAccount).not.toHaveBeenCalled();
+        });
+
+        it('propagates NotFound for a nonexistent workId (404-safe)', async () => {
+            workOwnership.ensureCanView.mockRejectedValueOnce(
+                new NotFoundException(`Work with id '${WORK}' not found`),
+            );
+            await expect(
+                service.create(ACCOUNT, {
+                    url: 'https://hooks.example/ingest',
+                    workId: WORK,
+                }),
+            ).rejects.toThrow(NotFoundException);
+            expect(repo.createForAccount).not.toHaveBeenCalled();
         });
     });
 

@@ -49,11 +49,22 @@ export const oauthAPI = {
         }>(`/oauth/${providerId}/connect/url${query}`);
     },
 
+    /**
+     * Complete the plugin OAuth connect flow.
+     *
+     * EW-722 #20: the API now verifies `?state=` against its
+     * `ew_oauth_state` cookie (C-03 parity with the auth login flow).
+     * This call is server-to-server — the browser's cookies never reach
+     * the API origin — so synthesize the cookie from the same `state` the
+     * web callback route already validated against its own host-scoped
+     * `oauth_state` cookie. Mirrors `authAPI.connectOAuthCallback`.
+     */
     connectCallback: async (providerId: string, code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
         return serverFetch<OAuthConnectionInfo>(
             `/oauth/${providerId}/callback/plugins?${params.toString()}`,
+            state ? { headers: { cookie: `ew_oauth_state=${state}` } } : undefined,
         );
     },
 
@@ -78,12 +89,17 @@ export const oauthAPI = {
         }>(`/oauth/${providerId}/read-packages/connect/url${query}`);
     },
 
-    /** Callback for the read-packages OAuth flow (server-side, no UI). */
+    /**
+     * Callback for the read-packages OAuth flow (server-side, no UI).
+     * EW-722 #20: same synthesized `ew_oauth_state` cookie contract as
+     * {@link connectCallback} — see the comment there.
+     */
     readPackagesCallback: async (providerId: string, code: string, state?: string) => {
         const params = new URLSearchParams({ code });
         if (state) params.append('state', state);
         return serverFetch<{ providerId: string; connected: true }>(
             `/oauth/${providerId}/callback/plugins/read-packages?${params.toString()}`,
+            state ? { headers: { cookie: `ew_oauth_state=${state}` } } : undefined,
         );
     },
 

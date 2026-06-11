@@ -30,7 +30,18 @@ const PASSTHROUGH_ENV_KEYS = [
 	'CURL_CA_BUNDLE'
 ] as const;
 
-const CLAUDE_CODE_ENV_PREFIXES = ['ANTHROPIC_', 'CLAUDE_CODE_'] as const;
+// Explicit allow-list of Anthropic-/Claude-Code-specific vars the CLI actually
+// consumes. We list each var by exact name rather than matching by prefix so a
+// future/custom var that merely starts with ANTHROPIC_ or CLAUDE_CODE_ is NOT
+// silently forwarded into the subprocess (audit: prefix forwarding leaks any
+// such var to the model).
+const PASSTHROUGH_ANTHROPIC_KEYS = [
+	'ANTHROPIC_API_KEY',
+	'ANTHROPIC_BASE_URL',
+	'ANTHROPIC_AUTH_TOKEN',
+	'CLAUDE_CODE_OAUTH_TOKEN',
+	'CLAUDE_CODE_CONFIG_DIR'
+] as const;
 
 export function buildSubprocessEnv(overrides: Record<string, string> = {}): Record<string, string> {
 	const env: Record<string, string> = {
@@ -59,14 +70,14 @@ export function buildSubprocessEnv(overrides: Record<string, string> = {}): Reco
 		}
 	}
 
-	// Allow through Anthropic-/Claude-Code-prefixed vars only. The caller is
-	// expected to set the actual auth token via `overrides` (CLAUDE_CODE_OAUTH_TOKEN
-	// or ANTHROPIC_API_KEY) — passing them through here too is harmless and
-	// preserves manual overrides in dev (e.g. ANTHROPIC_BASE_URL pointed at a
-	// local proxy).
-	for (const [key, value] of Object.entries(process.env)) {
-		if (typeof value !== 'string') continue;
-		if (CLAUDE_CODE_ENV_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+	// Allow through the explicitly named Anthropic-/Claude-Code vars only. The
+	// caller is expected to set the actual auth token via `overrides`
+	// (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY) — passing them through here
+	// too is harmless and preserves manual overrides in dev (e.g.
+	// ANTHROPIC_BASE_URL pointed at a local proxy).
+	for (const key of PASSTHROUGH_ANTHROPIC_KEYS) {
+		const value = process.env[key];
+		if (value) {
 			env[key] = value;
 		}
 	}

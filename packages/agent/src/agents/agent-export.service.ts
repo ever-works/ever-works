@@ -33,6 +33,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { createHash } from 'crypto';
 import { slugifyText } from '../utils/text.utils';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 import type { AgentDto } from './types';
 import { toAgentDto } from './types';
 
@@ -363,6 +364,11 @@ export class AgentExportService {
                     );
                 }
                 assertNoSecrets(body, `import-envelope:${name}`);
+                // D11: reject imported instruction bodies that carry
+                // chat-template control tokens (<|im_start|>, [INST], …) — a
+                // shared/catalog Agent could otherwise inject a forged system
+                // turn into the importer's runtime context.
+                assertNoInjectionTokens(body, `import-envelope:${name}`);
             }
         }
 
@@ -409,13 +415,17 @@ export class AgentExportService {
             }
         }
 
-        const permissions: AgentPermissions = {
-            ...AGENT_PERMISSIONS_DEFAULT,
-            ...envelope.runtime.permissions,
-        };
-        if (permissions.canOpenPullRequests && !permissions.canCommitToRepo) {
-            permissions.canCommitToRepo = true;
-        }
+        // Security (D9): clamp imported permissions to least-privilege.
+        // The envelope's `runtime.permissions` is attacker-controllable
+        // (it round-trips through an off-platform JSON file an importer
+        // can hand-edit), so honouring it would let an import grant an
+        // Agent ELEVATED capabilities the importer may not be entitled to
+        // (privilege escalation across import). Start every imported Agent
+        // at the all-false frozen default — the owner must explicitly
+        // re-grant capabilities via the normal permissions UI after
+        // vetting the imported Agent (which also starts in DRAFT). We
+        // deliberately do NOT spread `envelope.runtime.permissions` here.
+        const permissions: AgentPermissions = { ...AGENT_PERMISSIONS_DEFAULT };
 
         // Image uploads from a different tenant are not visible to this
         // user — fall back to initials so the import never 404s on a
@@ -604,7 +614,13 @@ export class AgentExportService {
             aiProviderId: envelope.model.aiProviderId,
             modelId: envelope.model.modelId,
             maxSkillContextTokens: envelope.model.maxSkillContextTokens,
-            permissions: envelope.runtime.permissions,
+            // Security (D9): clamp imported permissions to least-privilege
+            // on the overwrite path too — the envelope is attacker-editable,
+            // so an overwrite import must NOT silently elevate an existing
+            // Agent beyond the all-false frozen default. Mirrors the
+            // create-path clamp in `importOne`; the owner re-grants
+            // explicitly after vetting. Deliberately not the envelope value.
+            permissions: { ...AGENT_PERMISSIONS_DEFAULT },
             targets: envelope.runtime.targets,
             heartbeatCadence: envelope.runtime.heartbeatCadence,
             idleBehavior: envelope.runtime.idleBehavior,

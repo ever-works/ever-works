@@ -27,9 +27,10 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *
  * THIS file deliberately covers what those do NOT:
  *   1. TWO real fresh users each holding an INDEPENDENT connection record whose
- *      disconnected sub-resource error envelopes are scoped to their OWN userId
- *      (no cross-leak), and one user's DELETE-disconnect never perturbs the
- *      other's connection state (lifecycle ∩ isolation).
+ *      disconnected sub-resource error envelopes are SANITIZED (EW-721 Wave J:
+ *      generic message, no userId echo — own or cross-user), and one user's
+ *      DELETE-disconnect never perturbs the other's connection state
+ *      (lifecycle ∩ isolation).
  *   2. The "connected-as" display contract is verifiably ABSENT for a
  *      disconnected user (no @username / avatar / email / Organizations card; the
  *      summary reads "No providers connected") — proving no fabricated identity.
@@ -66,7 +67,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *            { id:p, name:'Unknown', enabled:false, connected:false }. (anon 401)
  *   GET    /api/git-providers/:p/{organizations|repositories|user}
  *            (disconnected) → 200 { success:false, <collection>:[]/null,
- *              error:'No connected account found for user <THIS-userId> with provider <p>' }
+ *              error:<generic sanitized message, e.g. 'Failed to fetch organizations'> }
+ *            (EW-721 Wave J #1264: the old 'No connected account found for user
+ *             <userId> with provider <p>' detail was a userId/provider leak)
  *   GET    /api/oauth/providers               (authed) → { configured:true,
  *            providers:[{ id:'github', name:'GitHub', enabled:true }] }
  *   GET    /api/oauth/:p/connection           (authed) → { id, name:'GitHub',
@@ -172,7 +175,7 @@ async function gotoAuthed(page: Page, url: string): Promise<number> {
 }
 
 test.describe('flow: per-user connection isolation — two fresh users hold independent, leak-free connection records', () => {
-    test("each user sees their OWN disconnected connection, every sub-resource error names THAT user's id (no cross-leak), and user A disconnecting never perturbs user B", async ({
+    test('each user sees their OWN disconnected connection, every sub-resource error is sanitized (leaks NO userId, neither own nor cross-user), and user A disconnecting never perturbs user B', async ({
         request,
     }) => {
         // Two completely independent fresh accounts.
@@ -211,10 +214,11 @@ test.describe('flow: per-user connection isolation — two fresh users hold inde
             );
         }
 
-        // STEP 2 — The disconnected sub-resource error envelope is SCOPED to each
-        // caller's own userId. User A's "no connected account" error must name
-        // A's id and NOT B's id, and vice-versa — proving the error is derived
-        // from the authenticated principal, not a shared/global lookup.
+        // STEP 2 — The disconnected sub-resource error envelope is SANITIZED.
+        // EW-721 Wave J (#1264) replaced the old detailed "no connected account
+        // found for user <id>" errors with generic non-leaking messages: the
+        // envelope must not echo ANY internal identifier — not even the
+        // caller's own userId — and certainly not the other user's.
         const aOrgs = await request.get(`${API_BASE}/api/git-providers/${PROVIDER}/organizations`, {
             headers: hA,
         });
@@ -225,7 +229,10 @@ test.describe('flow: per-user connection isolation — two fresh users hold inde
             true,
         );
         const aErr = String(aOrgsBody.error ?? '');
-        expect(aErr, "A's error names A's userId").toContain(userA.user.id);
+        expect(aErr.length, "A's error is a non-empty generic message").toBeGreaterThan(0);
+        expect(aErr, "A's error does NOT leak A's own userId (sanitized)").not.toContain(
+            userA.user.id,
+        );
         expect(aErr, "A's error does NOT name B's userId (no cross-user leak)").not.toContain(
             userB.user.id,
         );
@@ -238,7 +245,10 @@ test.describe('flow: per-user connection isolation — two fresh users hold inde
         const bReposBody = await bRepos.json();
         expect(bReposBody.success, 'B repositories success:false (disconnected)').toBe(false);
         const bErr = String(bReposBody.error ?? '');
-        expect(bErr, "B's error names B's userId").toContain(userB.user.id);
+        expect(bErr.length, "B's error is a non-empty generic message").toBeGreaterThan(0);
+        expect(bErr, "B's error does NOT leak B's own userId (sanitized)").not.toContain(
+            userB.user.id,
+        );
         expect(bErr, "B's error does NOT name A's userId").not.toContain(userA.user.id);
         expectNoTokenLeak(bErr, 'B repositories error');
 

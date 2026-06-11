@@ -9,13 +9,69 @@ import {
     MaxLength,
     Min,
     MinLength,
+    Validate,
     ValidateIf,
     ValidateNested,
+    ValidatorConstraint,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { MissionType } from '@ever-works/agent/missions';
+// Security (SSRF): lexical guard reused by MissionsService.normalizeTemplateRepo to
+// vet full-URL forms of `missionTemplateRepo`. Mirror that check at the DTO boundary
+// so a hostile value is rejected before the service ever sees it (defense-in-depth).
+import { isSafeWebhookUrl } from '@ever-works/agent/utils';
 // Security: import the typed guardrails DTO so guardrailsOverride is validated against a strict allowlist
 import { WorkAgentGuardrailsDto } from '../../work-agent/dto/work-agent.dto';
+
+// Security (SSRF defense-in-depth): `missionTemplateRepo` is consumed by the Phase 8
+// scaffolder to clone/fetch a template repo. The service-layer
+// `MissionsService.normalizeTemplateRepo` (packages/agent/src/missions/missions.service.ts)
+// already vets the value, but it runs AFTER the DTO. Enforce the SAME accepted shapes
+// at the DTO boundary so SSRF/scheme-injection payloads are rejected by the global
+// ValidationPipe before they reach the service. The three accepted shapes mirror the
+// service exactly:
+//   1. GitHub-style `owner/repo` slug  (2+ segments of [A-Za-z0-9._-] joined by `/`)
+//   2. bare catalog-id selector        (single [A-Za-z0-9._-] segment, no `/`)
+//   3. a full HTTPS git URL on a public host (no embedded credentials, passes the
+//      lexical SSRF guard) — `http://`, `file://`, `git://`, `ssh://`, private/
+//      loopback/metadata hosts and `user:pass@` forms are all rejected.
+// Empty / whitespace-only strings are accepted here because the service treats them as
+// "clear the field" (returns null) — preserving the currently-accepted clear behavior.
+const TEMPLATE_REPO_SLUG_RE = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/;
+const TEMPLATE_REPO_BARE_SLUG_RE = /^[A-Za-z0-9._-]+$/;
+
+@ValidatorConstraint({ name: 'isMissionTemplateRepo', async: false })
+class IsMissionTemplateRepo implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        // Empty/whitespace clears the field at the service layer — preserve that.
+        if (trimmed.length === 0) return true;
+        if (trimmed.length > 200) return false;
+        if (TEMPLATE_REPO_SLUG_RE.test(trimmed)) return true;
+        if (TEMPLATE_REPO_BARE_SLUG_RE.test(trimmed)) return true;
+        // Only other acceptable shape: a full HTTPS git URL on a public host with no
+        // embedded credentials, passing the shared lexical SSRF guard.
+        let parsed: URL | null = null;
+        try {
+            parsed = new URL(trimmed);
+        } catch {
+            parsed = null;
+        }
+        return Boolean(
+            parsed &&
+            parsed.protocol === 'https:' &&
+            !parsed.username &&
+            !parsed.password &&
+            isSafeWebhookUrl(trimmed),
+        );
+    }
+
+    defaultMessage(): string {
+        return 'missionTemplateRepo must be a GitHub-style "owner/repo" slug, a bare catalog id, or an HTTPS git URL on a public host';
+    }
+}
 
 /**
  * Phase 3 PR H — request body for `POST /me/missions`. Validated
@@ -97,6 +153,10 @@ export class CreateMissionDto {
     @ValidateIf((o) => o.missionTemplateRepo !== null)
     @IsString()
     @MaxLength(200)
+    // Security (SSRF defense-in-depth): enforce the accepted owner/repo-slug,
+    // bare-catalog-id, or HTTPS-public-host shape at the DTO boundary, mirroring
+    // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
+    @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
 }
 
@@ -181,6 +241,10 @@ export class UpdateMissionDto {
     @ValidateIf((o) => o.missionTemplateRepo !== null)
     @IsString()
     @MaxLength(200)
+    // Security (SSRF defense-in-depth): enforce the accepted owner/repo-slug,
+    // bare-catalog-id, or HTTPS-public-host shape at the DTO boundary, mirroring
+    // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
+    @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
 }
 

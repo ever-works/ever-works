@@ -56,6 +56,34 @@ export const config = {
         },
     },
 
+    // #21: PLATFORM_ENCRYPTION_KEY is the master key used to encrypt
+    // operator-supplied secrets at rest (plugin/integration credentials).
+    // A missing key in a real deployment means either secrets are stored
+    // in plaintext or every encrypt/decrypt call fails deep inside a
+    // request — both surface late and opaquely. Fail fast at boot
+    // (main.ts calls this right after auth.secret()) so the
+    // misconfiguration is visible immediately. Local development/test
+    // runs (where NODE_ENV is 'development', 'test', or simply unset)
+    // are exempt so contributors don't need to provision a key to boot,
+    // mirroring the local-friendly fallbacks elsewhere in this config.
+    platformEncryptionKey: () => {
+        const key = process.env.PLATFORM_ENCRYPTION_KEY;
+        const nodeEnv = process.env.NODE_ENV;
+        const isLocal =
+            nodeEnv === 'development' ||
+            nodeEnv === 'test' ||
+            nodeEnv === undefined ||
+            nodeEnv === '';
+        if (!key && !isLocal) {
+            throw new Error(
+                'PLATFORM_ENCRYPTION_KEY environment variable is required in non-local environments. ' +
+                    'It is the master key used to encrypt operator-supplied secrets at rest; ' +
+                    'set it (e.g. `openssl rand -base64 48`) and re-deploy.',
+            );
+        }
+        return key;
+    },
+
     branding: {
         appName: () => process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'Ever Works',
         companyOwner: () =>
@@ -93,6 +121,14 @@ export const config = {
         smtpPassword: () => process.env.SMTP_PASSWORD,
         smtpSecure: () => process.env.SMTP_SECURE === 'true',
         smtpIgnoreTLS: () => process.env.SMTP_IGNORE_TLS === 'true',
+        // #31: verify the SMTP relay's TLS certificate by default so outbound
+        // mail (password-reset, magic-link, account-deletion tokens) can't be
+        // intercepted via a MITM presenting an invalid cert. Verification stays
+        // ON unless an operator explicitly opts out with
+        // `SMTP_REJECT_UNAUTHORIZED=false` (e.g. a local MailHog/Mailpit relay
+        // with a self-signed cert). Centralised here so mail.module.ts reads it
+        // through the config surface instead of touching process.env inline.
+        smtpRejectUnauthorized: () => process.env.SMTP_REJECT_UNAUTHORIZED !== 'false',
         resend: {
             apiKey: () => process.env.RESEND_APIKEY,
             emailFrom: () => {

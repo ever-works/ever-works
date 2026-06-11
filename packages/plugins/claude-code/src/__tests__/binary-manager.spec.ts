@@ -66,9 +66,28 @@ describe('binary-manager', () => {
 		it('should use default version when none specified', async () => {
 			vi.mocked(fs.access).mockResolvedValueOnce(undefined);
 
+			// undefined triggers the DEFAULT_CLI_VERSION default param (a valid semver),
+			// so the version semver guard passes.
 			await ensureBinary(undefined as unknown as string, mockLogger);
 
 			expect(detectPlatform).toHaveBeenCalled();
+		});
+
+		it('should reject a non-semver version string (path-traversal guard)', async () => {
+			await expect(ensureBinary('../../etc/passwd', mockLogger)).rejects.toThrow(/Invalid version string/);
+			// Guard fires before any platform detection / network work.
+			expect(detectPlatform).not.toHaveBeenCalled();
+		});
+
+		it('should reject a version with extra path segments', async () => {
+			await expect(ensureBinary('2.1.37/../../evil', mockLogger)).rejects.toThrow(/Invalid version string/);
+			expect(detectPlatform).not.toHaveBeenCalled();
+		});
+
+		it('should reject when getBinaryPath escapes the base cache directory', async () => {
+			vi.mocked(getBinaryPath).mockReturnValueOnce('/etc/cron.d/evil');
+			// fs.access would otherwise short-circuit; force the containment check to be reached.
+			await expect(ensureBinary('2.1.37', mockLogger)).rejects.toThrow(/escapes the expected cache directory/);
 		});
 	});
 });
