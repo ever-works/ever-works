@@ -335,12 +335,19 @@ export const databaseConfig = registerAs('database', (): DatabaseConfig => {
     // Handle Database URL if provided
     if (config.database.getUrl()) {
         const parsedUrl = parseDatabaseUrl(config.database.getUrl());
+        // Security/misconfig guard (EW-721): fail fast instead of silently
+        // starting a DataSource with an undefined database name.
+        if (parsedUrl === null) {
+            throw new Error(
+                'DATABASE_URL could not be parsed; refusing to start with undefined database name.',
+            );
+        }
 
         return {
             ...baseConfig,
             type: dbType,
             url: config.database.getUrl(),
-            database: parsedUrl?.database,
+            database: parsedUrl.database,
         };
     }
 

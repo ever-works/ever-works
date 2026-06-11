@@ -9,6 +9,7 @@ import {
     NotificationCategory,
 } from '@src/entities';
 import { sanitizeName, sanitizeDescription } from '@src/utils/sanitize.util';
+import { redactSecrets } from '@src/utils/secret-scan';
 
 /**
  * Notifications v2 (EW-664 / EW-678) — payload emitted on
@@ -72,9 +73,12 @@ export class NotificationService {
      * them in notifications. AI provider SDKs can embed endpoint URLs, request
      * IDs, or stack traces in error messages; truncating limits accidental
      * information leakage while still giving users actionable context.
+     * Credential-shaped tokens (API keys, JWTs, PEM blocks, …) are redacted
+     * BEFORE the length cap so a leaked secret can neither survive intact nor
+     * be split by truncation into a partially-leaked prefix.
      */
     private sanitizeErrorMessage(value: string): string {
-        return sanitizeDescription(value, 500);
+        return sanitizeDescription(redactSecrets(value).cleaned, 500);
     }
 
     /**

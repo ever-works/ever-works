@@ -407,6 +407,52 @@ describe('GeminiPlugin', () => {
 			);
 		});
 
+		it('should strip ANSI escapes and control characters from streamed CLI log lines', async () => {
+			// Security regression test (log injection): Gemini CLI stdout/stderr is
+			// derived from hostile external content, so ANSI/CSI escape sequences,
+			// carriage returns and NUL bytes must be stripped before lines reach
+			// onLogEntry. Guards the stripLogControlChars choke point that the
+			// round-2 revert (e2ebb30e) previously swept out.
+			const { executeGemini } = await import('../utils/process-runner');
+			vi.mocked(executeGemini).mockImplementationOnce((options) => {
+				options.onStderrLine?.('\u001b[31mDanger\u001b[0m warning\r\u0000 tail');
+
+				return {
+					promise: Promise.resolve({
+						stdout: '',
+						stderr: '',
+						exitCode: 0,
+						killed: false,
+						duration: 5000
+					}),
+					kill: vi.fn()
+				};
+			});
+
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			const logs: Array<{ event: string; message: string; level: string }> = [];
+
+			await plugin.execute(work, request, existing, {
+				onLogEntry: (log) => logs.push(log)
+			});
+
+			expect(logs).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						event: 'message',
+						level: 'error',
+						message: 'Danger warning tail'
+					})
+				])
+			);
+			// No emitted log line may retain ESC, CR, or NUL bytes.
+			for (const log of logs) {
+				expect(log.message).not.toMatch(/[\u0000\u000d\u001b]/);
+			}
+		});
+
 		it('should include a warning when CLI exits with non-zero code', async () => {
 			const { executeGemini } = await import('../utils/process-runner');
 			vi.mocked(executeGemini).mockReturnValueOnce({

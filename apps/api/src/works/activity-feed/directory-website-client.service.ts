@@ -208,7 +208,12 @@ export class DirectoryWebsiteClient {
         if (status && status >= 400) {
             return degraded('parse_error', `Upstream ${status}`);
         }
-        return degraded('network', err.message);
+        // Security (info leak): raw Axios messages embed internal IPs/hostnames
+        // (e.g. `connect ECONNREFUSED 10.96.0.1:443`) and `degraded.detail` is
+        // serialised to the browser via FeedResponse. Keep the full message
+        // server-side in the log and return a static, safe detail string.
+        this.logger.warn(`directory-site network error for work ${workId}: ${err.message}`);
+        return degraded('network', 'Network error');
     }
 }
 

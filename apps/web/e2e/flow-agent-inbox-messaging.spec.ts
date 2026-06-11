@@ -630,8 +630,12 @@ test.describe('Agent inbox + messaging', () => {
             // surfaces the red error banner (404 "no outbound address"); a configured
             // provider would instead show the green "Sent ✓" banner. Either banner
             // proves the composer → server-action → API wiring works end-to-end.
+            // Security (EW-722 info-leak fix): the compose server action no longer
+            // forwards raw backend error messages (e.g. the 404 "no outbound email
+            // address" text) to the client — its catch block now returns the static
+            // "Send failed — please try again." string, so match that too.
             const errorBanner = page.getByText(
-                /no outbound email address|From address not found|requires bodyText|error/i,
+                /no outbound email address|From address not found|requires bodyText|Send failed|error/i,
             );
             const successBanner = page.getByText(/Sent ✓/i);
             const banner = errorBanner.or(successBanner).first();

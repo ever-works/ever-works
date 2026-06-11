@@ -91,4 +91,15 @@ describe('MailchimpTransactionalPlugin', () => {
 		await plugin.sendEmail(input, { userId: 'u' });
 		expect(sendMock).toHaveBeenCalledTimes(1);
 	});
+
+	it('does NOT serve a cached result across different userIds (tenant isolation)', async () => {
+		// Security: the local idempotency cache key is scoped by
+		// options.userId/workId — the same messageRef from two different users
+		// must trigger two real sends, never leak user A's cached result to B.
+		sendMock.mockResolvedValue([{ email: 'b@x.com', status: 'sent', _id: 'mand-scoped' }]);
+		const input = { from: 'a@x.com', to: ['b@x.com'], subject: 's', bodyText: 't', messageRef: 'r-shared' };
+		await plugin.sendEmail(input, { userId: 'user-a' });
+		await plugin.sendEmail(input, { userId: 'user-b' });
+		expect(sendMock).toHaveBeenCalledTimes(2);
+	});
 });

@@ -329,3 +329,17 @@ export class AssignTaskToAgentDto {
     @IsUUID()
     taskId: string;
 }
+
+/**
+ * Payload for `POST /api/agents/:id/attachments`.
+ *
+ * Security (EW-710 wave M): mirrors `AddAttachmentDto` (tasks) and
+ * `AddWorkProposalAttachmentDto` (work-proposals) so the global
+ * ValidationPipe schema-validates `uploadId` instead of accepting a
+ * raw inline `{ uploadId: string }` object with no decorators.
+ */
+export class AddAgentAttachmentDto {
+    @ApiProperty()
+    @IsUUID()
+    uploadId: string;
+}

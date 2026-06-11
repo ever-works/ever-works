@@ -68,7 +68,12 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 	private readonly idempotencyCache = new Map<string, EmailSendResult>();
 
 	async sendEmail(input: EmailSendInput, options: EmailOptions): Promise<EmailSendResult> {
-		const cached = this.idempotencyCache.get(input.messageRef);
+		// Security (tenant isolation): scope the local idempotency cache key by
+		// the calling user/work — a bare messageRef would let one tenant's send
+		// short-circuit (and return the cached EmailSendResult of) another
+		// tenant's send that happened to reuse the same ref.
+		const cacheKey = `${options.userId ?? options.workId ?? ''}:${input.messageRef}`;
+		const cached = this.idempotencyCache.get(cacheKey);
 		if (cached) return cached;
 
 		const client = mailchimp(resolveApiKey(options));
@@ -117,7 +122,7 @@ export class MailchimpTransactionalPlugin implements IEmailOutboundPlugin {
 			accepted: accepted.length ? accepted : [...input.to],
 			rejected
 		};
-		this.idempotencyCache.set(input.messageRef, result);
+		this.idempotencyCache.set(cacheKey, result);
 		if (this.idempotencyCache.size > 500) {
 			const firstKey = this.idempotencyCache.keys().next().value;
 			if (firstKey) this.idempotencyCache.delete(firstKey);

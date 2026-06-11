@@ -46,6 +46,7 @@ import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '..
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } from '../tasks';
 import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { sanitizeDescription } from '../utils/sanitize.util';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -1846,7 +1847,10 @@ export class KnowledgeBaseService {
                 // fall through to the "no body" branch which transitions
                 // to SKIPPED and returns a null document. Operator can
                 // recover via POST /retry-extraction.
-                const reason = (error as Error).message;
+                // Security (info-leak): extractionError is a client-visible
+                // KbUploadDto field — sanitize the raw message (strip control
+                // chars/newlines, cap at 500) before persisting it.
+                const reason = sanitizeDescription((error as Error).message, 500);
                 this.logger.warn(
                     `KB extractor threw for upload=${upload.id} mime=${input.file.mimeType}: ${reason}`,
                 );
@@ -1965,7 +1969,10 @@ export class KnowledgeBaseService {
             );
             return docRow;
         } catch (error) {
-            const reason = (error as Error).message;
+            // Security (info-leak): extractionError is a client-visible
+            // KbUploadDto field — sanitize the raw message (strip control
+            // chars/newlines, cap at 500) before persisting it.
+            const reason = sanitizeDescription((error as Error).message, 500);
             await this.uploadRepository.update(upload.id, {
                 extractionStatus: KbUploadExtractionStatus.FAILED,
                 extractionFinishedAt: new Date(),

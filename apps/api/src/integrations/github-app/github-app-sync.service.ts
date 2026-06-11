@@ -55,12 +55,18 @@ export class GitHubAppSyncService {
             await this.gitHubAppInstallationRepository.listByCreatedByUserId(userId);
 
         return Promise.all(
-            installations.map(async (installation) => ({
-                ...installation,
-                repositories: await this.gitHubAppInstallationRepoRepository.listForInstallation(
-                    installation.id,
-                ),
-            })),
+            installations.map(async (installation) => {
+                // Security (info-leak): never return the raw GitHub webhook
+                // payload to API clients — it is an internal audit blob.
+                const { rawPayload: _rawPayload, ...safeInstallation } = installation;
+                return {
+                    ...safeInstallation,
+                    repositories:
+                        await this.gitHubAppInstallationRepoRepository.listForInstallation(
+                            installation.id,
+                        ),
+                };
+            }),
         );
     }
 
@@ -103,8 +109,11 @@ export class GitHubAppSyncService {
                 })),
             );
 
+        // Security (info-leak): strip the raw GitHub webhook payload before
+        // returning the installation to API clients.
+        const { rawPayload: _rawPayload, ...safeInstallation } = installation;
         return {
-            ...installation,
+            ...safeInstallation,
             repositories: persistedRepositories,
         };
     }

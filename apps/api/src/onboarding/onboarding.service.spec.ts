@@ -174,7 +174,12 @@ spec:
         await expect(
             service.handle({ body: validBody as any, githubToken: 'token-aaaa' }),
         ).rejects.toMatchObject({
-            response: { code: 'repo_already_owned' },
+            response: {
+                code: 'repo_already_owned',
+                // Security: the message must stay generic and not reveal that
+                // the repo belongs to a different GitHub identity (info leak).
+                message: 'A conflict exists for this repository',
+            },
         });
     });
 

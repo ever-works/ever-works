@@ -67,6 +67,26 @@ describe('NotificationPreferencesService.setEventSubscription validation', () =>
         ]);
     });
 
+    // Security (DoS / storage amplification): ownership validation runs one
+    // DB query per unique channel id, so an unbounded channelIds list lets a
+    // caller force N sequential queries and persist an arbitrarily large
+    // array. The service caps a subscription at 20 unique channel ids.
+    it('rejects more than 20 unique channel ids before any ownership lookup', async () => {
+        const tooMany = Array.from({ length: 21 }, (_, i) => `ch-${i}`);
+        await expect(
+            service.setEventSubscription('user-1', 'ai.credits.depleted', tooMany),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(channels.findByIdForUser).not.toHaveBeenCalled();
+        expect(subscriptions.upsert).not.toHaveBeenCalled();
+    });
+
+    it('accepts exactly 20 unique channel ids (cap is inclusive)', async () => {
+        const atCap = Array.from({ length: 20 }, (_, i) => `ch-${i}`);
+        await service.setEventSubscription('user-1', 'ai.credits.depleted', atCap);
+        expect(channels.findByIdForUser).toHaveBeenCalledTimes(20);
+        expect(subscriptions.upsert).toHaveBeenCalledWith('user-1', 'ai.credits.depleted', atCap);
+    });
+
     it('accepts an owned channel id and dedupes the list', async () => {
         await service.setEventSubscription('user-1', 'ai.credits.depleted', [
             'in-app',

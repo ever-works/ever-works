@@ -100,6 +100,18 @@ export class OnboardingStatePatchInnerDto {
     @IsOptional()
     @IsBoolean()
     pluginsReviewed?: boolean;
+
+    // Security (EW-722): `prompt` is contract-declared on
+    // `OnboardingStatePatchRequest` (EW-617 G4 landing-page prompt) but was
+    // previously rejected by `forbidNonWhitelisted`. Whitelist it here with
+    // the contract's 5000-char bound (same cap as
+    // `CreateItemsGeneratorDto.prompt`) so oversized user-controlled text
+    // cannot bloat the onboarding_state column.
+    @ApiPropertyOptional({ maxLength: 5000 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(5000)
+    prompt?: string;
 }
 
 export class OnboardingStatePatchBodyDto {
