@@ -273,10 +273,10 @@ test.describe('Skill CRUD + scope/owner validation', () => {
     /**
      * Flow 3 — Body-validation matrix on the write path. Each branch is a
      * distinct guard with a distinct status: required-field 400, oversize-body
-     * 400 (64 KB cap), secret-scan 500 (raw Error), invalid ownerType 400,
+     * 400 (64 KB cap), secret-scan 400 (BadRequestException, #1276), invalid ownerType 400,
      * missing ownerId 400, and ParseUUIDPipe 400 on a malformed :id read.
      */
-    test('write-path validation: required-field/oversize 400, secret-body 500, bad ownerType/ownerId 400, bad-UUID 400', async ({
+    test('write-path validation: required-field/oversize 400, secret-body 400, bad ownerType/ownerId 400, bad-UUID 400', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -317,9 +317,10 @@ test.describe('Skill CRUD + scope/owner validation', () => {
             /instructionsMd must be shorter than or equal to 65536 characters/i,
         );
 
-        // (c) secret-like value in the body → 500. assertNoSecrets throws a plain
-        // Error (no HttpException wrap), so this surfaces as Internal server error.
-        // Truthful assertion: the create is rejected (NOT persisted), not a 201.
+        // (c) secret-like value in the body → 400. Security fix (EW-716
+        // follow-up, #1276): assertNoSecrets now throws BadRequestException —
+        // the old plain-Error 500 mislabeled a user-input rejection as a
+        // server fault. Truthful assertion: rejected (NOT persisted), not 201.
         const secretBody = await request.post(`${API_BASE}/api/skills`, {
             headers,
             data: {
@@ -330,7 +331,7 @@ test.describe('Skill CRUD + scope/owner validation', () => {
                 instructionsMd: 'token: ghp_abcdefghijklmnopqrstuvwxyz0123456789AB',
             },
         });
-        expect(secretBody.status()).toBe(500);
+        expect(secretBody.status()).toBe(400);
         expect(secretBody.ok()).toBe(false);
 
         // (d) invalid ownerType ('user' is not in the lattice) → 400.
