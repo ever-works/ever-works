@@ -52,6 +52,7 @@ import {
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
+    AddAgentAttachmentDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
     ListAgentRunsQueryDto,
@@ -415,9 +416,13 @@ export class AgentsController {
         await this.service.getOne(auth.userId, id);
         const limit = query.limit ?? 25;
         const offset = query.offset ?? 0;
+        // Security (EW-710 wave M): use the user-scoped repository variants —
+        // the unscoped findByAgent/countByAgent are @internal-only and would
+        // become a latent IDOR if the getOne() ownership gate above were ever
+        // refactored away.
         const [rows, total] = await Promise.all([
-            this.agentRuns.findByAgent(id, limit, offset),
-            this.agentRuns.countByAgent(id),
+            this.agentRuns.findByAgentAndUser(id, auth.userId, limit, offset),
+            this.agentRuns.countByAgentAndUser(id, auth.userId),
         ]);
         return {
             data: rows.map((r) => ({
@@ -657,7 +662,10 @@ export class AgentsController {
     async addAttachment(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Body() body: { uploadId: string },
+        // Security (EW-710 wave M): class-validator DTO (mirrors the Task /
+        // WorkProposal attachment endpoints) so the global ValidationPipe
+        // enforces a UUID `uploadId` instead of a raw inline object type.
+        @Body() body: AddAgentAttachmentDto,
     ) {
         return this.service.addAttachment(auth.userId, id, body?.uploadId);
     }

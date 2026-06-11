@@ -409,14 +409,15 @@ describe('database.config', () => {
             });
         });
 
-        it('passes through `database: undefined` when URL parser returns null', () => {
+        // Security/misconfig guard (EW-721): an unparseable DATABASE_URL used to
+        // silently produce `database: undefined`; the config now fails fast instead
+        // of starting a misconfigured DataSource.
+        it('throws when URL parser returns null', () => {
             cfgMock.database.getType.mockReturnValue('postgres');
             cfgMock.database.getUrl.mockReturnValue('postgres://invalid');
             parseMock.mockReturnValue(null as any);
 
-            const result = (databaseConfig as any)();
-
-            expect(result).toMatchObject({ url: 'postgres://invalid', database: undefined });
+            expect(() => (databaseConfig as any)()).toThrow('DATABASE_URL could not be parsed');
         });
 
         it('honours URL even when DATABASE_TYPE is mysql', () => {

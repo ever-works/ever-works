@@ -12,6 +12,14 @@ import {
  * available to every user and therefore exempt from the ownership check.
  */
 const BUILT_IN_CHANNEL_IDS = new Set<string>(['in-app']);
+
+/**
+ * Security (DoS / storage amplification): cap the number of channel ids a
+ * single subscription may carry. Ownership validation below issues one DB
+ * query per unique id, so an unbounded list lets a caller force N
+ * sequential queries and persist an arbitrarily large array.
+ */
+const MAX_SUBSCRIPTION_CHANNELS = 20;
 import type {
     NotificationEventType,
     UserNotificationSubscription,
@@ -84,6 +92,11 @@ export class NotificationPreferencesService {
         // blocks cross-tenant *delivery*, but storing foreign ids is a
         // storage-integrity / info-leak gap. Dedupe first.
         const unique = [...new Set(channelIds)];
+        if (unique.length > MAX_SUBSCRIPTION_CHANNELS) {
+            throw new BadRequestException(
+                `Too many notification channels: maximum ${MAX_SUBSCRIPTION_CHANNELS} allowed per subscription.`,
+            );
+        }
         for (const id of unique) {
             if (BUILT_IN_CHANNEL_IDS.has(id)) continue;
             const owned = await this.channels.findByIdForUser(id, userId);

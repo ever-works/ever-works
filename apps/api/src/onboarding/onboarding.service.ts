@@ -140,7 +140,9 @@ export class OnboardingService {
         if (existingForOtherOwner) {
             this.fail({
                 code: 'repo_already_owned',
-                message: 'This repo is already onboarded by another GitHub identity',
+                // Security: keep the message generic — do not disclose that the
+                // repo is registered to a different GitHub identity (info leak).
+                message: 'A conflict exists for this repository',
             });
         }
 

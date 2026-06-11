@@ -26,9 +26,13 @@ export async function getActivityFeed(
         return { success: true, data };
     } catch (error) {
         console.error(`Failed to get activity feed for work ${workId}:`, error);
+        // Security (info-leak): return a static message instead of the raw
+        // error.message — backend/network exception text (internal hostnames,
+        // stack details) must not cross the server/client boundary. The full
+        // error is already logged server-side above.
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to get activity feed',
+            error: 'Failed to get activity feed',
         };
     }
 }

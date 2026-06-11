@@ -506,6 +506,26 @@ describe('NotificationService', () => {
             // No `isPersistent: true` for this convenience method
             expect(args.isPersistent).toBeUndefined();
         });
+
+        it('redacts credential-shaped tokens from the stored error message', async () => {
+            // Security (EW-722 info-leak): AI provider SDK errors can echo back
+            // the API key that was used — sanitizeErrorMessage must run
+            // redactSecrets before the message is persisted/fanned out.
+            const { service, repository } = makeService({
+                findByDeduplicationKey: jest.fn().mockResolvedValue(null),
+                create: jest.fn().mockResolvedValue({ id: 'c' }),
+            });
+
+            await service.notifyAiProviderError(
+                'u',
+                'OpenAI',
+                'Invalid API key: sk-abc123def456ghi789jkl (401)',
+            );
+
+            const args = (repository.create as jest.Mock).mock.calls[0][0];
+            expect(args.message).not.toContain('sk-abc123def456ghi789jkl');
+            expect(args.message).toContain('[redacted secret]');
+        });
     });
 
     describe('notifyGenerationAccountError', () => {

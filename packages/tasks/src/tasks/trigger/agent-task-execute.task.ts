@@ -5,6 +5,8 @@ import { AgentRunService } from '@ever-works/agent/agents';
 import { TasksService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
+// Security: import assertUuid to validate Trigger.dev payload fields before any DB access
+import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 
 /**
  * Security (prompt-injection hardening): chat-template control markers that
@@ -63,6 +65,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
     maxDuration: 3600,
     onFailure: async ({ payload, error }) => {
         if (!payload) return;
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentTaskExecute:Failure'));
@@ -83,6 +89,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
         }
     },
     run: async (payload: AgentTaskExecutePayload) => {
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('AgentTaskExecute'));
 

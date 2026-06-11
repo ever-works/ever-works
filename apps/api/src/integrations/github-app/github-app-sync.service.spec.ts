@@ -65,10 +65,73 @@ describe('GitHubAppSyncService', () => {
 
         return {
             service,
+            gitHubAppService,
             gitHubAppInstallationRepository,
+            gitHubAppInstallationRepoRepository,
             workRepository,
         };
     };
+
+    // Security (EW-722 info-leak): `rawPayload` is the verbatim GitHub
+    // webhook payload persisted for auditing. It must never be returned
+    // to API clients — both read paths strip it before responding.
+    describe('rawPayload is stripped from API responses', () => {
+        it('listInstallationsForUser omits rawPayload', async () => {
+            const {
+                service,
+                gitHubAppInstallationRepository,
+                gitHubAppInstallationRepoRepository,
+            } = createService();
+            gitHubAppInstallationRepository.listByCreatedByUserId.mockResolvedValue([
+                {
+                    id: 'installation-row-1',
+                    installationId: '12345',
+                    accountLogin: 'acme',
+                    rawPayload: { secret: 'do-not-leak' },
+                },
+            ]);
+            gitHubAppInstallationRepoRepository.listForInstallation.mockResolvedValue([]);
+
+            const result = await service.listInstallationsForUser('user-1');
+
+            expect(result).toHaveLength(1);
+            expect(result[0]).not.toHaveProperty('rawPayload');
+            expect(result[0]).toMatchObject({
+                id: 'installation-row-1',
+                installationId: '12345',
+                accountLogin: 'acme',
+                repositories: [],
+            });
+        });
+
+        it('syncInstallation omits rawPayload', async () => {
+            const {
+                service,
+                gitHubAppService,
+                gitHubAppInstallationRepository,
+                gitHubAppInstallationRepoRepository,
+            } = createService();
+            gitHubAppInstallationRepository.findByInstallationId.mockResolvedValue({
+                id: 'installation-row-1',
+                installationId: '12345',
+                createdByUserId: 'user-1',
+                accountLogin: 'acme',
+                rawPayload: { secret: 'do-not-leak' },
+            });
+            gitHubAppService.listInstallationRepositories.mockResolvedValue([]);
+            gitHubAppInstallationRepoRepository.replaceForInstallation.mockResolvedValue([]);
+
+            const result = await service.syncInstallation('12345', 'user-1');
+
+            expect(result).not.toBeNull();
+            expect(result).not.toHaveProperty('rawPayload');
+            expect(result).toMatchObject({
+                id: 'installation-row-1',
+                installationId: '12345',
+                repositories: [],
+            });
+        });
+    });
 
     it('only sets createdByGithubUserId on installation.created', async () => {
         const { service, gitHubAppInstallationRepository } = createService();

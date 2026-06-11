@@ -81,6 +81,23 @@ describe('SendGridPlugin', () => {
 		expect(sendMock).toHaveBeenCalledTimes(1);
 	});
 
+	it('does NOT serve a cached result across different userIds (tenant isolation)', async () => {
+		// Security: the local idempotency cache key is scoped by
+		// options.userId/workId — the same messageRef from two different users
+		// must trigger two real sends, never leak user A's cached result to B.
+		sendMock.mockResolvedValue([{ statusCode: 202, headers: { 'x-message-id': 'sg-scoped' } }, {}]);
+		const input = {
+			from: 'a@example.com',
+			to: ['b@example.com'],
+			subject: 'hi',
+			bodyText: 'hi',
+			messageRef: 'ref-shared'
+		};
+		await plugin.sendEmail(input, { userId: 'user-a' });
+		await plugin.sendEmail(input, { userId: 'user-b' });
+		expect(sendMock).toHaveBeenCalledTimes(2);
+	});
+
 	it('throws a clear error when no API key is configured', async () => {
 		delete process.env.SENDGRID_API_KEY;
 		await expect(

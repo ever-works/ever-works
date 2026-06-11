@@ -16,6 +16,7 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { NotificationChannelRepository } from '../database/repositories/notification-channel.repository';
 import { NotificationChannelDeliveryLogRepository } from '../database/repositories/notification-channel-delivery-log.repository';
 import { PluginUsageService } from '../usage/plugin-usage.service';
+import { redactSecrets } from '../utils/secret-scan';
 import { PluginUsageCapability } from '@src/entities/plugin-usage-event.entity';
 import { BaseFacadeService, FacadeError } from './base.facade';
 
@@ -392,11 +393,17 @@ export class NotificationChannelFacadeService extends BaseFacadeService {
         } catch (err) {
             // Security: a channel plugin's send() can wrap an attacker-controlled
             // HTTP error-response body (e.g. a hostile webhook endpoint) into the
-            // thrown message. Cap its length before it is logged, persisted to the
+            // thrown message. Redact credential-shaped tokens (provider error
+            // bodies can echo back the API key / webhook secret that was used),
+            // then cap the length before it is logged, persisted to the
             // delivery_log row, and returned in the fanout result to limit
-            // log/store bloat and the exfiltration surface. Legitimate errors are
-            // short, so this is behavior-preserving for normal failures.
-            const rawErrorMessage = err instanceof Error ? err.message : String(err);
+            // log/store bloat and the exfiltration surface. Redaction runs FIRST
+            // so truncation can never split a secret into a leaked prefix.
+            // Legitimate errors are short and credential-free, so this is
+            // behavior-preserving for normal failures.
+            const rawErrorMessage = redactSecrets(
+                err instanceof Error ? err.message : String(err),
+            ).cleaned;
             const errorMessage =
                 rawErrorMessage.length > MAX_DELIVERY_ERROR_MESSAGE_LENGTH
                     ? `${rawErrorMessage.slice(0, MAX_DELIVERY_ERROR_MESSAGE_LENGTH)}… [truncated]`

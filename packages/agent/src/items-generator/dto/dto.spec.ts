@@ -427,6 +427,75 @@ describe('items-generator/dto', () => {
             });
             expect(errors).toEqual([]);
         });
+
+        // Security (resource abuse): name/description/category/categories/
+        // tags/brand feed git commit messages and YAML/markdown file writes,
+        // so the DTO caps their length — pin each cap (reject over, accept
+        // at the boundary) so removing a cap is a deliberate change.
+        it('rejects name longer than 200 characters, accepts exactly 200', async () => {
+            const over = await validateDto(SubmitItemDto, { ...valid, name: 'a'.repeat(201) });
+            expect(constraintNames(over.errors)).toContain('maxLength');
+            const at = await validateDto(SubmitItemDto, { ...valid, name: 'a'.repeat(200) });
+            expect(at.errors).toEqual([]);
+        });
+
+        it('rejects description longer than 5000 characters, accepts exactly 5000', async () => {
+            const over = await validateDto(SubmitItemDto, {
+                ...valid,
+                description: 'a'.repeat(5001),
+            });
+            expect(constraintNames(over.errors)).toContain('maxLength');
+            const at = await validateDto(SubmitItemDto, {
+                ...valid,
+                description: 'a'.repeat(5000),
+            });
+            expect(at.errors).toEqual([]);
+        });
+
+        it('rejects category longer than 200 characters', async () => {
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...valid,
+                category: 'a'.repeat(201),
+            });
+            expect(constraintNames(errors)).toContain('maxLength');
+        });
+
+        it('rejects a categories[] element longer than 200 characters (no array-form bypass of the category cap)', async () => {
+            const { category: _, ...rest } = valid;
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...rest,
+                categories: ['ok', 'a'.repeat(201)],
+            });
+            expect(constraintNames(errors)).toContain('maxLength');
+        });
+
+        it('rejects a tag longer than 50 characters (matches the CreateTagDto 50-char bound)', async () => {
+            const { errors } = await validateDto(SubmitItemDto, {
+                ...valid,
+                tags: ['ok', 'a'.repeat(51)],
+            });
+            expect(constraintNames(errors)).toContain('maxLength');
+        });
+
+        it('rejects more than 50 tags (ArrayMaxSize:50), accepts exactly 50', async () => {
+            const over = await validateDto(SubmitItemDto, {
+                ...valid,
+                tags: Array.from({ length: 51 }, (_, i) => `tag-${i}`),
+            });
+            expect(constraintNames(over.errors)).toContain('arrayMaxSize');
+            const at = await validateDto(SubmitItemDto, {
+                ...valid,
+                tags: Array.from({ length: 50 }, (_, i) => `tag-${i}`),
+            });
+            expect(at.errors).toEqual([]);
+        });
+
+        it('rejects brand longer than 200 characters, accepts exactly 200', async () => {
+            const over = await validateDto(SubmitItemDto, { ...valid, brand: 'a'.repeat(201) });
+            expect(constraintNames(over.errors)).toContain('maxLength');
+            const at = await validateDto(SubmitItemDto, { ...valid, brand: 'a'.repeat(200) });
+            expect(at.errors).toEqual([]);
+        });
     });
 
     // ───────────────────────────────────────────────────────────────────
