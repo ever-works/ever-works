@@ -635,8 +635,30 @@ test.describe('Flow — KB search: keyword + semantic/RRF + scoping', () => {
             timeout: 20_000,
         });
 
-        // The close control dismisses the dialog.
-        await page.getByTestId('kb-workbench-search-palette-close').click();
+        // The close control dismisses the dialog. Under prebuilt-web/prod
+        // `next start` (run 27374977059) the palette re-renders rapidly while
+        // the debounced search resolves (loading → results), and a bare
+        // `.click()` loops "element was detached from the DOM, retrying" until
+        // the test timeout. Settle first — the loading shimmer must be gone,
+        // i.e. the in-flight query has resolved — then click-and-verify in a
+        // toPass retry (mirroring the Ctrl+K open above) so a click swallowed
+        // by a late re-render is re-attempted instead of burning the budget.
+        // The contract is unchanged: the close control still dismisses the
+        // dialog, and the dialog (conditionally rendered on `open`) unmounts.
+        await expect(page.getByTestId('kb-workbench-search-palette-loading')).toBeHidden({
+            timeout: 20_000,
+        });
+        // NOTE: the click can dispatch AND still throw "element was detached"
+        // (the dismissal unmounts the button mid-action under prod next start),
+        // so a retry must treat an already-hidden palette as success. This
+        // cannot mask a phantom dismissal: between the Ctrl+K open above and
+        // this point the close control is the only interaction that can close
+        // the palette (the fill/expects are programmatic and non-dismissing).
+        await expect(async () => {
+            if (await palette.isHidden()) return;
+            await page.getByTestId('kb-workbench-search-palette-close').click({ timeout: 2_000 });
+            await expect(palette).toBeHidden({ timeout: 3_000 });
+        }).toPass({ timeout: 30_000 });
         await expect(palette).toBeHidden({ timeout: 10_000 });
     });
 });

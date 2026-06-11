@@ -52,10 +52,17 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22.x]
-        # 8 shards (was 4): the suite grew to ~1500 tests with the 1000-flow
-        # build, so 4 shards pushed each shard's wall-clock toward the 90min
-        # cap under dev-mode cold-compile + retries. 8 keeps each shard ~half.
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        # 16 shards (was 8, was 4): the suite kept growing (now ~3200 tests
+        # with the +1000 mega-wave). The binding constraint is NOT wall-clock
+        # but MEMORY: `next dev` accumulates compiled-route memory over a long
+        # shard, and on a long run the web (or the API's RegExp route-table
+        # compiler) eventually OOM-aborts mid-shard — every later spec on that
+        # shard then fails ERR_CONNECTION_REFUSED, and the casualty shard moves
+        # run-to-run (the classic "random" e2e red). Halving each shard's spec
+        # count (and therefore its peak resident memory + duration) is a pure-
+        # parallelism, zero-behaviour-change mitigation: each runner is its own
+        # 32 GB box, so 16 shards = ~half the per-shard memory accumulation.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
     # Service containers — let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
@@ -147,8 +154,22 @@ jobs:
           echo "API pid=$API_PID"
           echo "::endgroup::"
 
-          echo "::group::Starting Web on :3000"
-          nohup pnpm --filter ever-works-web dev > /tmp/web.log 2>&1 &
+          echo "::group::Starting Web on :3000 (prebuilt next start — no dev compiler)"
+          # Run the PREBUILT web (`next start` from the .next the "Build all
+          # packages" step already produced) instead of `next dev`. Why:
+          # `next dev` keeps the whole compiler + HMR resident and LAZILY
+          # compiles every route on first hit, so a shard that navigates many
+          # distinct UI routes accumulates route-compile memory until the web
+          # process (and sometimes the API alongside it) OOM-aborts mid-shard —
+          # after which every later spec on that shard fails
+          # ERR_CONNECTION_REFUSED and the casualty shard moves run-to-run.
+          # The prebuilt server has no per-route compile and a fraction of the
+          # resident memory, which removes the OOM mechanism AND the cold-
+          # compile timing flake. The separate e2e-prod-build job already runs
+          # the web exactly this way in CI, so the prod boot path is proven.
+          # NODE_ENV=production must precede `start` so Next serves the prod
+          # build; the API stays in its dev-mode config (env block below).
+          NODE_ENV=production nohup pnpm --filter ever-works-web start > /tmp/web.log 2>&1 &
           WEB_PID=$!
           disown $WEB_PID
           echo "Web pid=$WEB_PID"
@@ -181,8 +202,8 @@ jobs:
           # --shard=N/M splits the test suite across M machines, deterministic.
           # Each shard runs its own subset; combined across the matrix they
           # cover every test exactly once. Keep --shard total in sync with
-          # the `shard:` matrix length above.
-          pnpm exec playwright test --shard=${{ matrix.shard }}/8
+          # the `shard:` matrix length above (16).
+          pnpm exec playwright test --shard=${{ matrix.shard }}/16
           echo "::endgroup::"
         env:
           # Give every Node process (API, web, the swc/tsc type-checker, and
