@@ -365,7 +365,11 @@ test.describe('Skill bindings — deep per-skill list lifecycle + filtering + DT
         const mission = await (
             await request.post(`${API_BASE}/api/me/missions`, {
                 headers: authedHeaders(a.access_token),
-                data: { title: `Multi Mission ${suffix('multi')}`, description: 'd', type: 'one-shot' },
+                data: {
+                    title: `Multi Mission ${suffix('multi')}`,
+                    description: 'd',
+                    type: 'one-shot',
+                },
             })
         ).json();
 
@@ -709,9 +713,9 @@ test.describe('Skill bindings — deep per-skill list lifecycle + filtering + DT
         const siblingBinding = await bind(request, a.access_token, sibling.id, {
             targetType: 'tenant',
         });
-        expect((await listBindings(request, a.access_token, doomed.id)).map((r) => r.id).sort()).toEqual(
-            [doomedTenant.id, doomedWork.id].sort(),
-        );
+        expect(
+            (await listBindings(request, a.access_token, doomed.id)).map((r) => r.id).sort(),
+        ).toEqual([doomedTenant.id, doomedWork.id].sort());
 
         // Delete the parent skill → its bindings cascade away.
         const delSkill = await request.delete(`${API_BASE}/api/skills/${doomed.id}`, {

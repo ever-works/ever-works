@@ -271,12 +271,9 @@ test.describe('Search providers — deep facade + controller resolution', () => 
         // must NOT move off tavily (defaultForCapabilities-first resolution), and
         // the body shape stays identical — availability is anchored to the default.
         await enablePluginViaAPI(request, user.access_token, SECONDARY_SEARCH);
-        const cfg = await patchPluginSettingsViaAPI(
-            request,
-            user.access_token,
-            SECONDARY_SEARCH,
-            { secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` } },
-        );
+        const cfg = await patchPluginSettingsViaAPI(request, user.access_token, SECONDARY_SEARCH, {
+            secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` },
+        });
         expect(cfg.status, `brave patch body=${JSON.stringify(cfg.body)}`).toBe(200);
 
         await expect
@@ -301,12 +298,9 @@ test.describe('Search providers — deep facade + controller resolution', () => 
 
         // Wire up brave with a real-looking key, leave tavily WITHOUT a key.
         await enablePluginViaAPI(request, user.access_token, SECONDARY_SEARCH);
-        const cfg = await patchPluginSettingsViaAPI(
-            request,
-            user.access_token,
-            SECONDARY_SEARCH,
-            { secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` } },
-        );
+        const cfg = await patchPluginSettingsViaAPI(request, user.access_token, SECONDARY_SEARCH, {
+            secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` },
+        });
         expect(cfg.status).toBe(200);
 
         // A plain (no-workId) search. The controller sorts defaultForCapabilities
@@ -506,17 +500,17 @@ test.describe('Search providers — deep facade + controller resolution', () => 
         const work = await createWorkViaAPI(request, user.access_token, {
             name: `Deep Search Work ${uniqueSuffix()}`,
         });
-        expect(work.id, `work created (raw=${JSON.stringify(work.raw).slice(0, 160)})`).toBeTruthy();
+        expect(
+            work.id,
+            `work created (raw=${JSON.stringify(work.raw).slice(0, 160)})`,
+        ).toBeTruthy();
 
         // Fully wire brave: user-enable, key it, then make it the work-ACTIVE search
         // provider. This is the strongest case for brave to "win" — yet it doesn't.
         await enablePluginViaAPI(request, user.access_token, SECONDARY_SEARCH);
-        const cfg = await patchPluginSettingsViaAPI(
-            request,
-            user.access_token,
-            SECONDARY_SEARCH,
-            { secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` } },
-        );
+        const cfg = await patchPluginSettingsViaAPI(request, user.access_token, SECONDARY_SEARCH, {
+            secretSettings: { apiKey: `fake-brave-${uniqueSuffix()}` },
+        });
         expect(cfg.status).toBe(200);
 
         const workEnable = await request.post(
@@ -628,10 +622,15 @@ test.describe('Search providers — deep facade + controller resolution', () => 
         // shaped so the first/last 4 chars are easy to assert.
         await enablePluginViaAPI(request, user.access_token, TERTIARY_SEARCH);
         const RAW_KEY = 'abcd1234567890wxyz';
-        const patched = await patchPluginSettingsViaAPI(request, user.access_token, TERTIARY_SEARCH, {
-            settings: { maxResults: 7 },
-            secretSettings: { apiKey: RAW_KEY },
-        });
+        const patched = await patchPluginSettingsViaAPI(
+            request,
+            user.access_token,
+            TERTIARY_SEARCH,
+            {
+                settings: { maxResults: 7 },
+                secretSettings: { apiKey: RAW_KEY },
+            },
+        );
         expect(patched.status, `exa patch body=${JSON.stringify(patched.body)}`).toBe(200);
         const pBody = patched.body as {
             settings?: Record<string, unknown>;

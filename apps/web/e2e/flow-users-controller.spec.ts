@@ -132,7 +132,9 @@ test.describe('Users controller — GET /api/users/check-username + route surfac
                     'x-e2e-throttle-key': uniqueKey('bearer'),
                 },
             });
-            expect(r.status(), 'Public route accepts a bearer without changing behaviour').toBe(200);
+            expect(r.status(), 'Public route accepts a bearer without changing behaviour').toBe(
+                200,
+            );
             const body = (await r.json()) as CheckResult;
             expect(body.available).toBe(true);
             expect(body.normalized).toBe(value.toLowerCase());
@@ -187,9 +189,12 @@ test.describe('Users controller — GET /api/users/check-username + route surfac
     }) => {
         const ctx = await newCleanContext(playwright);
         try {
-            const r = await ctx.get(`${CHECK_USERNAME}?value=${encodeURIComponent('--Hello--World--')}`, {
-                headers: { 'x-e2e-throttle-key': uniqueKey('strip') },
-            });
+            const r = await ctx.get(
+                `${CHECK_USERNAME}?value=${encodeURIComponent('--Hello--World--')}`,
+                {
+                    headers: { 'x-e2e-throttle-key': uniqueKey('strip') },
+                },
+            );
             expect(r.status()).toBe(200);
             const body = (await r.json()) as CheckResult;
             expect(body.normalized).toBe('hello-world');
@@ -238,7 +243,9 @@ test.describe('Users controller — GET /api/users/check-username + route surfac
         }
     });
 
-    test('8. DTO validation: an empty value → 400 (fails length + charset)', async ({ playwright }) => {
+    test('8. DTO validation: an empty value → 400 (fails length + charset)', async ({
+        playwright,
+    }) => {
         const ctx = await newCleanContext(playwright);
         try {
             const r = await ctx.get(`${CHECK_USERNAME}?value=`, {
@@ -283,7 +290,9 @@ test.describe('Users controller — GET /api/users/check-username + route surfac
             });
             expect(over.status(), '65 chars must be rejected').toBe(400);
             const overBody = (await over.json()) as ValidationError;
-            expect(overBody.message).toContain('value must be shorter than or equal to 64 characters');
+            expect(overBody.message).toContain(
+                'value must be shorter than or equal to 64 characters',
+            );
 
             const exact = 'b'.repeat(64);
             const ok = await ctx.get(`${CHECK_USERNAME}?value=${exact}`, {
@@ -337,7 +346,9 @@ test.describe('Users controller — GET /api/users/check-username + route surfac
                 headers: { 'x-e2e-throttle-key': uniqueKey('bare') },
             });
             expect(bare.status(), 'no controller-root handler').toBe(404);
-            expect(((await bare.json()) as { message: string }).message).toBe('Cannot GET /api/users');
+            expect(((await bare.json()) as { message: string }).message).toBe(
+                'Cannot GET /api/users',
+            );
 
             const me = await ctx.get(`${API_BASE}/api/users/me`, {
                 headers: { 'x-e2e-throttle-key': uniqueKey('me') },

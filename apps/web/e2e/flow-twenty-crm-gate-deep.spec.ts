@@ -225,7 +225,9 @@ test.describe('twenty-crm config-gate (fail-closed surface, ordering, route enum
         expect(extraField.status(), 'extra/wrong-typed POST body is gate-refused (403)').toBe(403);
 
         const missingRequired = await request.post(COMPANIES, { headers, data: {} });
-        expect(missingRequired.status(), 'empty POST body is gate-refused (403), not 400').toBe(403);
+        expect(missingRequired.status(), 'empty POST body is gate-refused (403), not 400').toBe(
+            403,
+        );
     });
 
     test('6. the PeopleController is REGISTERED-as-code but NOT mounted: every /people verb returns a 404 "Cannot <VERB> /api/twenty-crm/people" for an authed user — its AuthSessionGuard never even fires (no 401/403)', async ({
@@ -234,30 +236,31 @@ test.describe('twenty-crm config-gate (fail-closed surface, ordering, route enum
         const { access_token } = await registerUserViaAPI(request);
         const headers = authedHeaders(access_token);
 
-        const probes: Array<{ verb: string; res: Promise<{ status: () => number; json: () => Promise<unknown> }> }> =
-            [
-                { verb: 'GET', res: request.get(PEOPLE, { headers }) },
-                { verb: 'GET', res: request.get(`${PEOPLE}/${VALID_UUID}`, { headers }) },
-                {
-                    verb: 'POST',
-                    res: request.post(PEOPLE, { headers, data: { firstName: uniq('A') } }),
-                },
-                {
-                    verb: 'PATCH',
-                    res: request.patch(`${PEOPLE}/${VALID_UUID}`, {
-                        headers,
-                        data: { firstName: uniq('B') },
-                    }),
-                },
-                { verb: 'DELETE', res: request.delete(`${PEOPLE}/${VALID_UUID}`, { headers }) },
-            ];
+        const probes: Array<{
+            verb: string;
+            res: Promise<{ status: () => number; json: () => Promise<unknown> }>;
+        }> = [
+            { verb: 'GET', res: request.get(PEOPLE, { headers }) },
+            { verb: 'GET', res: request.get(`${PEOPLE}/${VALID_UUID}`, { headers }) },
+            {
+                verb: 'POST',
+                res: request.post(PEOPLE, { headers, data: { firstName: uniq('A') } }),
+            },
+            {
+                verb: 'PATCH',
+                res: request.patch(`${PEOPLE}/${VALID_UUID}`, {
+                    headers,
+                    data: { firstName: uniq('B') },
+                }),
+            },
+            { verb: 'DELETE', res: request.delete(`${PEOPLE}/${VALID_UUID}`, { headers }) },
+        ];
 
         for (const p of probes) {
             const res = await p.res;
-            expect(
-                res.status(),
-                `${p.verb} /people is unmounted -> 404 (not 401/403/5xx)`,
-            ).toBe(404);
+            expect(res.status(), `${p.verb} /people is unmounted -> 404 (not 401/403/5xx)`).toBe(
+                404,
+            );
             const body = await jsonBody(res);
             expect(body.statusCode).toBe(404);
             expect(body.error).toBe('Not Found');

@@ -117,7 +117,8 @@ async function postRegisterWork(
         }
         // Drained bucket: honour the route's reset window then try once more.
         const retryAfter = Number(res.headers()['retry-after-long'] ?? '');
-        const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? (retryAfter + 1) * 1000 : 5000;
+        const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0 ? (retryAfter + 1) * 1000 : 5000;
         if (attempt === 0) {
             await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 65_000)));
         } else {
@@ -146,7 +147,11 @@ test.describe('register-work — credential & status state machine (GET, unthrot
     test('GET status: unknown-but-well-formed uuid → 404 not_found (no id enumeration behind a token)', async ({
         request,
     }) => {
-        const { status, body } = await getStatus(request, PARAM_UUID_UNKNOWN, UNRESOLVABLE_GH_TOKEN);
+        const { status, body } = await getStatus(
+            request,
+            PARAM_UUID_UNKNOWN,
+            UNRESOLVABLE_GH_TOKEN,
+        );
         // Row lookup precedes credential resolution: an unknown id is a clean 404,
         // NOT a 403 — so a caller cannot probe which onboarding ids exist.
         expect(status, 'unknown onboarding id is 404').toBe(404);
@@ -168,7 +173,11 @@ test.describe('register-work — credential & status state machine (GET, unthrot
     test('GET status: non-uuid id → 400 ParseUUIDPipe (validation precedes the handler)', async ({
         request,
     }) => {
-        const { status, body } = await getStatus(request, 'not-a-valid-uuid', UNRESOLVABLE_GH_TOKEN);
+        const { status, body } = await getStatus(
+            request,
+            'not-a-valid-uuid',
+            UNRESOLVABLE_GH_TOKEN,
+        );
         expect(status, 'non-uuid path param is rejected by the pipe').toBe(400);
         expect(body.statusCode).toBe(400);
         expect(body.error).toBe('Bad Request');
@@ -222,7 +231,11 @@ test.describe('register-work — registration validation gate (POST, throttle-bu
     test('POST: empty body (token present) → 400 class-validator array citing the required repo field', async ({
         request,
     }) => {
-        const { status, body, throttled } = await postRegisterWork(request, {}, UNRESOLVABLE_GH_TOKEN);
+        const { status, body, throttled } = await postRegisterWork(
+            request,
+            {},
+            UNRESOLVABLE_GH_TOKEN,
+        );
         test.skip(throttled, 'shared-IP @Throttle bucket drained — DTO gate not reachable');
         expect(status, 'missing repo fails DTO validation').toBe(400);
         expect(body.statusCode).toBe(400);

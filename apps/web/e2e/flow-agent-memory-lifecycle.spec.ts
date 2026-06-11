@@ -179,7 +179,11 @@ test.describe('Flow: agent-memory lifecycle (keyless) — open/save/search/conte
         await expectNoProvider(
             await request.post(`${AM}/save`, {
                 headers: authedHeaders(u.access_token),
-                data: { content: 'fixed the auth migration', tags: ['bug-fix'], projectId: project },
+                data: {
+                    content: 'fixed the auth migration',
+                    tags: ['bug-fix'],
+                    projectId: project,
+                },
             }),
             'saveMemory',
         );
@@ -292,9 +296,12 @@ test.describe('Flow: agent-memory owner-stamp IDOR (EW-711 #29) — Work-scoped 
                     data: { workId: work.id },
                 }),
             ],
-            ['list-sessions', request.get(`${AM}/sessions?workId=${work.id}`, {
-                headers: authedHeaders(stranger.access_token),
-            })],
+            [
+                'list-sessions',
+                request.get(`${AM}/sessions?workId=${work.id}`, {
+                    headers: authedHeaders(stranger.access_token),
+                }),
+            ],
         ];
         for (const [label, p] of readEndpoints) {
             const res = await p;
@@ -320,9 +327,12 @@ test.describe('Flow: agent-memory owner-stamp IDOR (EW-711 #29) — Work-scoped 
         // to A's Work are both 403, pre-empting the facade. This is the core of the
         // owner-stamp IDOR fix: an id you guessed is useless without Work edit (or,
         // unscoped, without owning the stamped resource).
-        const closeRes = await request.post(`${AM}/sessions/${uniq('sid')}/close?workId=${work.id}`, {
-            headers: authedHeaders(stranger.access_token),
-        });
+        const closeRes = await request.post(
+            `${AM}/sessions/${uniq('sid')}/close?workId=${work.id}`,
+            {
+                headers: authedHeaders(stranger.access_token),
+            },
+        );
         expect(closeRes.status(), "stranger close on A's Work → 403").toBe(403);
         expect((await closeRes.json()).message).toBe(FOREIGN_WORK_MSG);
 

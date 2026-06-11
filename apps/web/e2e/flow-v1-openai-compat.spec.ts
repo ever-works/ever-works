@@ -70,7 +70,10 @@ function validBody(content = 'ping'): Record<string, unknown> {
  * (NOT a module-scope clock) so collection stays side-effect free.
  */
 async function freshToken(request: APIRequestContext, title: string): Promise<string> {
-    const suffix = title.replace(/[^a-z0-9]+/gi, '-').slice(0, 24).toLowerCase();
+    const suffix = title
+        .replace(/[^a-z0-9]+/gi, '-')
+        .slice(0, 24)
+        .toLowerCase();
     const u = await registerUserViaAPI(request, {
         email: `v1compat-${suffix}-${Math.random().toString(36).slice(2, 8)}@test.local`,
     });
@@ -96,7 +99,9 @@ test.describe('v1 OpenAI-compat — auth contract', () => {
         expect(res.status(), 'garbage bearer → 401').toBe(401);
     });
 
-    test('GET on the completions route is 404 (POST-only contract)', async ({ request }, testInfo) => {
+    test('GET on the completions route is 404 (POST-only contract)', async ({
+        request,
+    }, testInfo) => {
         const token = await freshToken(request, testInfo.title);
         const res = await request.get(url(V1_COMPLETIONS), { headers: authedHeaders(token) });
         expect(res.status(), 'wrong method must not reach the handler').toBe(404);
@@ -295,7 +300,10 @@ test.describe('v1 OpenAI-compat — streaming acceptance', () => {
         // Only meaningful in the keyless 422 path; skip the assertion if a
         // provider key happened to be wired (200).
         if (res.status() === 200) {
-            test.info().annotations.push({ type: 'note', description: 'provider key wired; skipped redaction check' });
+            test.info().annotations.push({
+                type: 'note',
+                description: 'provider key wired; skipped redaction check',
+            });
             return;
         }
         expect(res.status()).toBe(422);

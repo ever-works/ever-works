@@ -120,10 +120,7 @@ test.describe('device-auth controller — happy-path status/start envelope', () 
             headers: authedHeaders(token),
         });
         expect(res.status(), 'codex status is 200 for an authed user').toBe(200);
-        expect(
-            res.headers()['content-type'],
-            'status is JSON',
-        ).toMatch(/application\/json/i);
+        expect(res.headers()['content-type'], 'status is JSON').toMatch(/application\/json/i);
         assertStatusShape(await res.json(), 'codex status');
     });
 
@@ -160,7 +157,9 @@ test.describe('device-auth controller — happy-path status/start envelope', () 
         // pending; in the not-pending branch it must be ABSENT, never half-set.
         if (s.pending) {
             expect(s.prompt, 'a pending session carries a prompt').toBeTruthy();
-            expect(typeof s.prompt?.verificationUri, 'prompt.verificationUri string').toBe('string');
+            expect(typeof s.prompt?.verificationUri, 'prompt.verificationUri string').toBe(
+                'string',
+            );
             expect(typeof s.prompt?.userCode, 'prompt.userCode string').toBe('string');
         } else {
             expect(s.prompt, 'no prompt is emitted when not pending').toBeFalsy();
@@ -195,9 +194,13 @@ test.describe('device-auth controller — happy-path status/start envelope', () 
         );
         // Same machine, same user, no CLI: installed/connected are stable. start
         // never DOWNGRADES an already-connected user to disconnected either.
-        expect(second.installed, 'installed bit stable across repeated start').toBe(first.installed);
+        expect(second.installed, 'installed bit stable across repeated start').toBe(
+            first.installed,
+        );
         if (first.connected) {
-            expect(second.connected, 'repeated start never disconnects a connected user').toBe(true);
+            expect(second.connected, 'repeated start never disconnects a connected user').toBe(
+                true,
+            );
         }
         // And a status read right after agrees with start on the machine bit.
         const afterStatus = assertStatusShape(
@@ -208,7 +211,9 @@ test.describe('device-auth controller — happy-path status/start envelope', () 
             ).json(),
             'status after start',
         );
-        expect(afterStatus.installed, 'status agrees with start on installed').toBe(first.installed);
+        expect(afterStatus.installed, 'status agrees with start on installed').toBe(
+            first.installed,
+        );
     });
 });
 

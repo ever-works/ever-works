@@ -178,9 +178,10 @@ test.describe('flow: git-providers LIST descriptor shape (configured flag + the 
         // item surfaces the rich plugin metadata (description/homepage/icon) and
         // has NO `name` key. Pinning the key-set guards against an accidental
         // shape drift between the two controllers.
-        expect(github && 'name' in github, 'git-list item has NO name key (unlike the oauth list)').toBe(
-            false,
-        );
+        expect(
+            github && 'name' in github,
+            'git-list item has NO name key (unlike the oauth list)',
+        ).toBe(false);
         expect(typeof github?.description, 'github descriptor carries a string description').toBe(
             'string',
         );
@@ -194,14 +195,16 @@ test.describe('flow: git-providers LIST descriptor shape (configured flag + the 
         // The structured icon object: { type:'svg', value:'<svg…', darkValue:'<svg…' }.
         // A real plugin descriptor — not a bare string — with both light + dark svgs.
         const icon = github?.icon;
-        expect(icon && typeof icon === 'object', 'github descriptor carries a structured icon object').toBe(
-            true,
-        );
+        expect(
+            icon && typeof icon === 'object',
+            'github descriptor carries a structured icon object',
+        ).toBe(true);
         expect(icon?.type, "icon.type is 'svg'").toBe('svg');
         expect(String(icon?.value), 'icon.value is inline svg markup').toMatch(/^<svg\b/);
-        expect(String(icon?.darkValue), 'icon.darkValue is inline svg markup (dark variant)').toMatch(
-            /^<svg\b/,
-        );
+        expect(
+            String(icon?.darkValue),
+            'icon.darkValue is inline svg markup (dark variant)',
+        ).toMatch(/^<svg\b/);
 
         // The descriptor never embeds a credential/token (defensive — list is public-ish metadata).
         expectNoTokenLeak(JSON.stringify(github), 'github list descriptor');
@@ -352,7 +355,9 @@ test.describe('flow: the disconnected sub-resource success-envelope MATRIX (gith
                 // The error is the generic, sanitized message — non-empty, matches
                 // the documented copy, and leaks NEITHER the caller's userId NOR a token.
                 const errStr = String(body.error ?? '');
-                expect(errStr.length, `${providerId}/${path} error is non-empty`).toBeGreaterThan(0);
+                expect(errStr.length, `${providerId}/${path} error is non-empty`).toBeGreaterThan(
+                    0,
+                );
                 expect(errStr, `${providerId}/${path} error is the generic sanitized copy`).toMatch(
                     error,
                 );
@@ -416,7 +421,9 @@ test.describe('flow: the git-providers controller is READ-ONLY (route discipline
         // The list is GET-only — there is no mutation endpoint to create/register a
         // provider. (Disconnect lives on the SEPARATE oauth controller.)
         expect(
-            (await request.post(`${API_BASE}/api/git-providers`, { headers: h, data: {} })).status(),
+            (
+                await request.post(`${API_BASE}/api/git-providers`, { headers: h, data: {} })
+            ).status(),
             'POST /api/git-providers is not a route → 404',
         ).toBe(404);
 

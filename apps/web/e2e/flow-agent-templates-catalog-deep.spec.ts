@@ -143,7 +143,9 @@ test.describe('Agent-template catalog — HTTP surface + @Public semantics (deep
      * 404 (no route), proving there is no hidden mutation surface on a route that
      * is intentionally public + unauthenticated. HEAD mirrors GET (200).
      */
-    test('only GET/HEAD are routed; POST/PUT/DELETE on the catalog are 404', async ({ request }) => {
+    test('only GET/HEAD are routed; POST/PUT/DELETE on the catalog are 404', async ({
+        request,
+    }) => {
         const get = await request.get(`${CATALOG_PATH}?entity=agent`);
         expect(get.status()).toBe(200);
 
@@ -279,8 +281,12 @@ test.describe('Agent-template catalog — entity normalization edge cases (deep)
     test('catalog is stable across repeated reads and entries are well-shaped when present', async ({
         request,
     }) => {
-        const first = (await (await request.get(`${CATALOG_PATH}?entity=agent`)).json()) as AstTemplateEntry[];
-        const second = (await (await request.get(`${CATALOG_PATH}?entity=agent`)).json()) as AstTemplateEntry[];
+        const first = (await (
+            await request.get(`${CATALOG_PATH}?entity=agent`)
+        ).json()) as AstTemplateEntry[];
+        const second = (await (
+            await request.get(`${CATALOG_PATH}?entity=agent`)
+        ).json()) as AstTemplateEntry[];
         expect(second.length).toBe(first.length);
         expect(second.map((e) => e.slug)).toEqual(first.map((e) => e.slug));
 

@@ -141,10 +141,7 @@ const LEAK_TOKENS = [
     'queryfailederror',
 ];
 
-async function assertNoLeak(
-    res: { text(): Promise<string> },
-    context: string,
-): Promise<string> {
+async function assertNoLeak(res: { text(): Promise<string> }, context: string): Promise<string> {
     const raw = await res.text();
     const lower = raw.toLowerCase();
     for (const token of LEAK_TOKENS) {
@@ -233,10 +230,9 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
         expect(numBody.statusCode).toBe(401);
         expect(numBody.message).toBe('GitHub App installation not found for this user');
 
-        const nonNumeric = await request.post(
-            `${API_BASE}${INSTALLATIONS}/abc-not-numeric/sync`,
-            { headers: a.headers },
-        );
+        const nonNumeric = await request.post(`${API_BASE}${INSTALLATIONS}/abc-not-numeric/sync`, {
+            headers: a.headers,
+        });
         expect(nonNumeric.status(), 'authed non-numeric installation sync').toBe(401);
         const nnBody = JSON.parse(await assertNoLeak(nonNumeric, 'sync non-numeric')) as {
             message: string;
@@ -277,9 +273,7 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
 
     // ── 6 ── onboard: anonymous is 401.
     test('onboard — anonymous POST is 401', async ({ request }) => {
-        const res = await request.post(
-            `${API_BASE}${INSTALLATIONS}/123/repositories/456/onboard`,
-        );
+        const res = await request.post(`${API_BASE}${INSTALLATIONS}/123/repositories/456/onboard`);
         expect(res.status(), 'anon onboard').toBe(401);
         const body = JSON.parse(await assertNoLeak(res, 'anon onboard')) as { statusCode: number };
         expect(body.statusCode).toBe(401);
@@ -294,10 +288,9 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
         request,
     }) => {
         const a = await makeActor(request);
-        const res = await request.post(
-            `${API_BASE}${INSTALLATIONS}/999/repositories/456/onboard`,
-            { headers: a.headers },
-        );
+        const res = await request.post(`${API_BASE}${INSTALLATIONS}/999/repositories/456/onboard`, {
+            headers: a.headers,
+        });
         expect(res.status(), 'authed unknown onboard').toBe(404);
         const body = JSON.parse(await assertNoLeak(res, 'onboard unknown')) as {
             message: string;
@@ -382,10 +375,9 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
             message: string[];
         };
         expect(onlyCodeBody.message).toContain('state must be a string');
-        expect(
-            onlyCodeBody.message,
-            'a supplied code is not re-flagged',
-        ).not.toContain('code must be a string');
+        expect(onlyCodeBody.message, 'a supplied code is not re-flagged').not.toContain(
+            'code must be a string',
+        );
     });
 
     // ── 11 ── callback: code+state present but state is not HMAC-signed →

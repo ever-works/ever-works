@@ -305,9 +305,10 @@ test.describe('Screenshot capability — deep: URL-security, signed-url matrix, 
         const avail = await checkAvailability(request, token, NONEXISTENT_WORK_UUID);
         expect(avail.status, 'check-availability foreign workId → 404').toBe(404);
         expect(avail.body.status, 'error envelope').toBe('error');
-        expect(messageText(avail.body as unknown as Record<string, unknown>), 'names the work').toMatch(
-            /Work with id .* not found/i,
-        );
+        expect(
+            messageText(avail.body as unknown as Record<string, unknown>),
+            'names the work',
+        ).toMatch(/Work with id .* not found/i);
 
         for (const op of ['get-url', 'capture'] as const) {
             const res = await postScreenshot(request, token, op, {
@@ -399,7 +400,8 @@ test.describe('Screenshot capability — deep: URL-security, signed-url matrix, 
         if (!screenshotIds.includes('urlbox')) {
             testInfo.annotations.push({
                 type: 'note',
-                description: 'urlbox not registered in this build — skipped its URL-shape assertions',
+                description:
+                    'urlbox not registered in this build — skipped its URL-shape assertions',
             });
             test.skip(true, 'urlbox not registered in this build');
             return;
@@ -437,7 +439,9 @@ test.describe('Screenshot capability — deep: URL-security, signed-url matrix, 
         expect(url, 'urlbox uses height= (not viewport_height)').toContain('height=700');
         expect(url, 'urlbox full_page honoured').toContain('full_page=true');
         expect(url, 'urlbox emits quality=80').toContain('quality=80');
-        expect(url, 'urlbox uses its own cookie-banner param').toContain('hide_cookie_banners=true');
+        expect(url, 'urlbox uses its own cookie-banner param').toContain(
+            'hide_cookie_banners=true',
+        );
         // Genuinely different shape from screenshotone.
         expect(url, 'not a screenshotone URL').not.toContain('api.screenshotone.com');
         expect(url, 'no viewport_width leaks into urlbox shape').not.toContain('viewport_width');
