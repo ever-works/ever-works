@@ -76,11 +76,15 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
 
 describe('AgentToolService git tools (Phase 16.6 + 16.7)', () => {
     let agentsRepo: any;
+    let agentsService: any;
     let git: jest.Mocked<AgentGitFacade>;
     let svc: AgentToolService;
 
     beforeEach(() => {
         agentsRepo = { create: jest.fn() };
+        // EW-721 #10: AgentsService became a required ctor dep (the
+        // optional raw-repo fallback for createSubAgent was removed).
+        agentsService = { create: jest.fn() };
         git = {
             commitToRepo: jest
                 .fn()
@@ -91,7 +95,7 @@ describe('AgentToolService git tools (Phase 16.6 + 16.7)', () => {
                 state: 'open',
             }),
         };
-        svc = new AgentToolService(agentsRepo, undefined, undefined, undefined, git);
+        svc = new AgentToolService(agentsRepo, agentsService, undefined, undefined, undefined, git);
     });
 
     it('does NOT register commitToRepo when canCommitToRepo is false', () => {
@@ -100,7 +104,7 @@ describe('AgentToolService git tools (Phase 16.6 + 16.7)', () => {
     });
 
     it('does NOT register commitToRepo when git facade is unbound (even with permission)', () => {
-        const bareSvc = new AgentToolService(agentsRepo);
+        const bareSvc = new AgentToolService(agentsRepo, agentsService);
         const tools = bareSvc.resolveAllowedTools(
             makeAgent({ permissions: makePerms({ canCommitToRepo: true }) }),
         );

@@ -54,9 +54,10 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   PATCH /api/onboarding/state deep-merges a partial { state }. The DTO
  *   validates `ai/storage/deploy.choice` against the ENUM, NOT against the
  *   catalog's `available` flag — so a valid-but-"planned" choice (user-gitlab)
- *   is ACCEPTED (200). `whitelist: forbidNonWhitelisted` is on: an unknown
- *   inner key (e.g. `prompt`, which the web contract type lists but the DTO
- *   omits) → 400 "state.property prompt should not exist".
+ *   is ACCEPTED (200). `whitelist: forbidNonWhitelisted` is on for truly
+ *   unknown inner keys. EW-722 (security wave M): the contract-declared
+ *   `prompt` is now whitelisted with @MaxLength(5000) — a valid prompt
+ *   persists (200); an oversized one (>5000 chars) → 400.
  *
  *   POST /api/onboarding/telemetry allow-list (probe-verified full set):
  *     onboarding_opened, onboarding_closed, onboarding_completed,
@@ -113,6 +114,9 @@ interface WizardStateV2 {
     deploy: { choice: DeployChoice };
     skippedSteps: string[];
     pluginsReviewed: boolean;
+    // EW-722: contract-declared landing-page prompt (EW-617 G4), validated
+    // server-side with @MaxLength(5000) and persisted.
+    prompt?: string;
 }
 
 interface StateResponse {
@@ -644,7 +648,7 @@ test.describe('Onboarding device-auth — the codex AI choice drives the device-
 // ─── Flow 5: catalog availability ≠ state acceptance; client/server divergences ─
 
 test.describe('Onboarding state — catalog availability does not gate the state machine', () => {
-    test('a valid-but-"planned" choice is accepted, an unknown inner key is rejected, and onboarding_prompt_set is not allow-listed', async ({
+    test('a valid-but-"planned" choice is accepted, prompt is validated and persisted, and onboarding_prompt_set is not allow-listed', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -677,25 +681,33 @@ test.describe('Onboarding state — catalog availability does not gate the state
             'must be one of the following values',
         );
 
-        // CLIENT/SERVER DIVERGENCE #1 — the web contract type
-        // `OnboardingStatePatchRequest` lists a `prompt` field, but the server
-        // DTO is `forbidNonWhitelisted`, so sending it is a precise 400. The web
-        // hook strips `prompt` before patching for exactly this reason; if a
-        // caller forgets, the server rejects it loudly.
+        // EW-722 (security wave M): the former client/server divergence is
+        // CLOSED — the contract-declared `prompt` is now whitelisted in the
+        // server DTO with @MaxLength(5000) and persisted, so the web hook's
+        // patch (which includes `prompt` when the landing page set one) is a
+        // clean 200. Oversized user-controlled text is still rejected so it
+        // cannot bloat the onboarding_state column.
         const withPrompt = await request.patch(ONB.state, {
             headers: authedHeaders(token),
             data: { state: { prompt: 'build me a cafe directory' } },
         });
-        expect(withPrompt.status(), 'unknown inner key prompt → 400').toBe(400);
-        expect(JSON.stringify(await withPrompt.json().catch(() => ({})))).toMatch(
-            /prompt should not exist/i,
+        expect(withPrompt.status(), 'contract-declared prompt is accepted → 200').toBe(200);
+        const oversizedPrompt = await request.patch(ONB.state, {
+            headers: authedHeaders(token),
+            data: { state: { prompt: 'x'.repeat(5001) } },
+        });
+        expect(oversizedPrompt.status(), 'prompt over 5000 chars → 400').toBe(400);
+        expect(JSON.stringify(await oversizedPrompt.json().catch(() => ({})))).toMatch(
+            /prompt must be shorter than or equal to 5000 characters/i,
         );
 
-        // The rejected patches above never mutated state beyond the accepted one.
+        // The rejected patches above never mutated state beyond the accepted
+        // ones; the valid prompt round-trips on an independent GET.
         const after = await getState(request, token);
         expect(after.state.storage.choice, 'only the accepted planned choice stuck').toBe(
             plannedStorage!.choice,
         );
+        expect(after.state.prompt, 'valid prompt persisted').toBe('build me a cafe directory');
 
         // CLIENT/SERVER DIVERGENCE #2 — `onboarding_prompt_set` is fired by the
         // web wizard (setPrompt → trackEvent) but is NOT on the server telemetry

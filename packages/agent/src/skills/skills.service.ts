@@ -20,6 +20,7 @@ import type { SkillBinding, SkillBindingTargetType } from '../entities/skill-bin
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 import { slugifyText } from '../utils/text.utils';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -212,7 +213,9 @@ export class SkillsService {
 
     async listBindings(userId: string, skillId: string): Promise<SkillBinding[]> {
         await this.getOne(userId, skillId);
-        return this.bindings.findBySkillId(skillId);
+        // Security: forward userId so the repository scopes the lookup to the
+        // owner in the WHERE clause (defense-in-depth vs. cross-user IDOR).
+        return this.bindings.findBySkillId(skillId, userId);
     }
 
     async createBinding(userId: string, input: CreateBindingInput): Promise<SkillBinding> {
@@ -244,7 +247,10 @@ export class SkillsService {
     async removeBinding(userId: string, bindingId: string): Promise<{ deleted: true }> {
         const binding = await this.bindings.findByIdAndUser(bindingId, userId);
         if (!binding) throw new NotFoundException(`Skill binding ${bindingId} not found.`);
-        await this.bindings.deleteById(bindingId);
+        // Security: ownership-scoped delete — userId is enforced in the WHERE
+        // clause so a TOCTOU gap after the guard above cannot delete another
+        // user's binding (cross-user IDOR).
+        await this.bindings.deleteByIdAndUser(bindingId, userId);
         return { deleted: true };
     }
 
@@ -342,6 +348,12 @@ function assertBody(body: string, fieldHint: string): void {
         throw new BadRequestException(`${fieldHint} exceeds max 64 KB.`);
     }
     assertNoSecrets(body, fieldHint);
+    // D11: reject chat-template control tokens (<|im_start|>, [INST], …) in
+    // any Skill body — they can hijack the agent's system prompt when the
+    // Skill is injected, and are never legitimate in a markdown body. Matters
+    // most for `installFromCatalog` (cross-user import) but is safe on every
+    // write since no human-authored body contains model control sequences.
+    assertNoInjectionTokens(body, fieldHint);
 }
 
 function hashBody(body: string): string {

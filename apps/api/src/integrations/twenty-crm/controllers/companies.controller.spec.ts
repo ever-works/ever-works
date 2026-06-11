@@ -20,6 +20,8 @@ import {
     ParseUUIDPipe,
 } from '@nestjs/common';
 import { CompaniesController } from './companies.service';
+import { AuthSessionGuard } from '@src/auth/guards/auth-session.guard';
+import { CrmSyncGuard } from '../guards/crm-sync.guard';
 import { CrmTenantService } from '../services/crm-tenant.service';
 import type { ClientService } from '../services/client.service';
 import type { UserRepository } from '@ever-works/agent/database';
@@ -177,5 +179,15 @@ describe('CompaniesController', () => {
     it('propagates ClientService errors back to the caller', async () => {
         client.getCompanies.mockRejectedValue(new Error('upstream failure'));
         await expect(controller.getCompanies(authUser())).rejects.toThrow('upstream failure');
+    });
+
+    // Security (audit #61): CrmSyncGuard existed but was never applied, leaving
+    // every /api/twenty-crm/companies route reachable even with the CRM
+    // integration disabled or misconfigured. Guards do not run on direct method
+    // calls in a unit test, so assert the class-level `@UseGuards` wiring via
+    // Nest's `__guards__` metadata: auth first, then the fail-closed CRM gate.
+    it('class-level guards are AuthSessionGuard then CrmSyncGuard (fail-closed when CRM sync is off)', () => {
+        const guards = Reflect.getMetadata('__guards__', CompaniesController) as unknown[];
+        expect(guards).toEqual([AuthSessionGuard, CrmSyncGuard]);
     });
 });

@@ -5,6 +5,7 @@ import {
     Delete,
     Get,
     Param,
+    ParseUUIDPipe,
     Post,
     UseGuards,
 } from '@nestjs/common';
@@ -29,6 +30,13 @@ import { AddDomainDto } from './dto/domain.dto';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
+
+// Mirrors the @Matches() regex on AddDomainDto.domain so that domain names
+// arriving via path params (removeDomain/verifyDomain) get the same format
+// guard as the request-body path (addDomain), instead of being forwarded
+// to the deploy provider unvalidated.
+const DOMAIN_RE =
+    /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
 
 function resolveDeployProviderId(providerId: string): string {
     return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
@@ -139,7 +147,7 @@ export class DeployController {
     async deploy(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() deployDto: DeployWorkDto,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
@@ -254,10 +262,10 @@ export class DeployController {
                 message:
                     'To fetch teams, use the work-specific endpoint or configure your token in Plugin Settings.',
             };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message: error?.message || 'Failed to get teams',
+                message: 'Failed to get teams',
             });
         }
     }
@@ -272,7 +280,10 @@ export class DeployController {
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'List of teams' })
-    async getTeamsForWork(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+    async getTeamsForWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
         const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
         const providerName = this.getProviderName(work.deployProvider);
 
@@ -286,12 +297,10 @@ export class DeployController {
                 status: 'success',
                 teams,
             };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message:
-                    error?.message ||
-                    `Failed to get teams. Please configure your ${providerName} token in Plugin Settings.`,
+                message: `Failed to get teams. Please configure your ${providerName} token in Plugin Settings.`,
             });
         }
     }
@@ -308,7 +317,7 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Deployment capability status' })
     async checkDeploymentCapability(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
@@ -348,7 +357,7 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Deployment lookup result' })
     async lookupExistingDeployment(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
@@ -470,7 +479,10 @@ export class DeployController {
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'List of domains' })
-    async listDomains(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+    async listDomains(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
         const { work, isCreator } = await this.ownershipService.ensureCanView(id, auth.userId);
 
         if (!work.website) {
@@ -487,10 +499,10 @@ export class DeployController {
                 workId: id,
             });
             return { status: 'success', domains };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message: error?.message || 'Failed to get domains',
+                message: 'Failed to get domains',
             });
         }
     }
@@ -507,7 +519,7 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Domain added' })
     async addDomain(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: AddDomainDto,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);
@@ -525,10 +537,10 @@ export class DeployController {
                 workId: id,
             });
             return { status: 'success', ...result };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message: error?.message || 'Failed to add domain',
+                message: 'Failed to add domain',
             });
         }
     }
@@ -546,9 +558,16 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Domain removed' })
     async removeDomain(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Param('domain') domain: string,
     ) {
+        if (!DOMAIN_RE.test(domain)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Invalid domain format. Example: example.com',
+            });
+        }
+
         const { isCreator, work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
         if (!work.website) {
@@ -565,10 +584,10 @@ export class DeployController {
                 workId: id,
             });
             return { status: 'success', removed };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message: error?.message || 'Failed to remove domain',
+                message: 'Failed to remove domain',
             });
         }
     }
@@ -586,9 +605,16 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Verification result' })
     async verifyDomain(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Param('domain') domain: string,
     ) {
+        if (!DOMAIN_RE.test(domain)) {
+            throw new BadRequestException({
+                status: 'error',
+                message: 'Invalid domain format. Example: example.com',
+            });
+        }
+
         const { isCreator, work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
 
         if (!work.website) {
@@ -605,10 +631,10 @@ export class DeployController {
                 workId: id,
             });
             return { status: 'success', domain: result };
-        } catch (error) {
+        } catch {
             throw new BadRequestException({
                 status: 'error',
-                message: error?.message || 'Failed to verify domain',
+                message: 'Failed to verify domain',
             });
         }
     }
@@ -620,7 +646,10 @@ export class DeployController {
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'List of deployments' })
-    async listDeployments(@CurrentUser() auth: AuthenticatedUser, @Param('id') id: string) {
+    async listDeployments(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
         await this.ownershipService.ensureCanView(id, auth.userId);
         const deployments = await this.deploymentRepository.findByWork(id, { limit: 50 });
         return { status: 'success', deployments };
@@ -635,7 +664,7 @@ export class DeployController {
     @ApiResponse({ status: 200, description: 'Rollback initiated' })
     async rollback(
         @CurrentUser() auth: AuthenticatedUser,
-        @Param('id') id: string,
+        @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: RollbackDto,
     ) {
         const { work, isCreator } = await this.ownershipService.ensureCanEdit(id, auth.userId);

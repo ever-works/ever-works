@@ -125,6 +125,9 @@ interface EmailAddress {
 
 const NO_ADDRESS = 'Agent has no outbound email address assigned';
 const NO_FROM = 'From address not found';
+// EW-711 #16 (IDOR guard): compose verifies the caller OWNS input.agentId
+// BEFORE from-address resolution, so a foreign agentId 404s with this message.
+const NO_AGENT = 'Agent not found';
 const NO_BODY = 'Email requires bodyText, bodyHtml, or a template';
 const NOT_FOUND_MSG = 'Message not found';
 const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
@@ -328,8 +331,9 @@ test.describe('Agent inbox + messaging', () => {
         expect(bGet.status()).toBe(404);
         expect((await bGet.json()).message).toContain(NOT_FOUND_MSG);
 
-        // B cannot compose FROM A's reply-from address (fromAddressId is
-        // caller-scoped) → 404 "From address not found", NOT a leak.
+        // B cannot compose naming A's agent: EW-711 #16 rejects the foreign
+        // agentId BEFORE from-address resolution → 404 "Agent not found"
+        // (previously the from-address check fired first with NO_FROM).
         const bBorrow = await request.post(`${API_BASE}/api/email/messages`, {
             headers: authedHeaders(tokenB),
             data: {
@@ -341,7 +345,29 @@ test.describe('Agent inbox + messaging', () => {
             },
         });
         expect(bBorrow.status(), `borrow body=${await bBorrow.text().catch(() => '')}`).toBe(404);
-        expect((await bBorrow.json()).message).toContain(NO_FROM);
+        expect((await bBorrow.json()).message).toContain(NO_AGENT);
+
+        // And even with B's OWN agent, A's fromAddressId stays caller-scoped
+        // → 404 "From address not found", NOT a leak (Codex P1, PR #1085).
+        const agentB = await createAgentViaAPI(request, tokenB, {
+            name: uniq('B owns'),
+            scope: 'tenant',
+        });
+        const bBorrowFrom = await request.post(`${API_BASE}/api/email/messages`, {
+            headers: authedHeaders(tokenB),
+            data: {
+                agentId: agentB.id,
+                fromAddressId: addrA.id,
+                to: ['x@example.com'],
+                subject: uniq('s'),
+                bodyText: 'b body',
+            },
+        });
+        expect(
+            bBorrowFrom.status(),
+            `borrow-from body=${await bBorrowFrom.text().catch(() => '')}`,
+        ).toBe(404);
+        expect((await bBorrowFrom.json()).message).toContain(NO_FROM);
 
         // B cannot mutate (disable) or delete A's reply-from address → 404.
         const bPatch = await request.patch(`${API_BASE}/api/email/addresses/${addrA.id}`, {
@@ -604,8 +630,12 @@ test.describe('Agent inbox + messaging', () => {
             // surfaces the red error banner (404 "no outbound address"); a configured
             // provider would instead show the green "Sent ✓" banner. Either banner
             // proves the composer → server-action → API wiring works end-to-end.
+            // Security (EW-722 info-leak fix): the compose server action no longer
+            // forwards raw backend error messages (e.g. the 404 "no outbound email
+            // address" text) to the client — its catch block now returns the static
+            // "Send failed — please try again." string, so match that too.
             const errorBanner = page.getByText(
-                /no outbound email address|From address not found|requires bodyText|error/i,
+                /no outbound email address|From address not found|requires bodyText|Send failed|error/i,
             );
             const successBanner = page.getByText(/Sent ✓/i);
             const banner = errorBanner.or(successBanner).first();

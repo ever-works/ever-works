@@ -91,6 +91,9 @@ export class VercelAiGatewayPlugin extends BaseAiProvider {
 			baseUrl: {
 				type: 'string',
 				title: 'Base URL',
+				// Security (D4): a SaaS provider API endpoint is admin-controlled — a
+				// non-admin user must not repoint it (defense-in-depth atop the SSRF guard).
+				'x-adminOnly': true,
 				description: 'Custom API endpoint for proxies or compatible services',
 				default: 'https://ai-gateway.vercel.sh/v1',
 				'x-envVar': 'PLUGIN_VERCEL_AI_GATEWAY_BASE_URL',

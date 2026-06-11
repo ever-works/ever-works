@@ -62,6 +62,11 @@ export async function sendAgentEmailAction(
         });
         return { ok: true, providerMessageId: result.providerMessageId };
     } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : 'Send failed.' };
+        // Security (info-leak): do NOT forward raw backend/provider error
+        // messages (which can carry internal hostnames, provider details or
+        // upstream response bodies) across the server-action boundary to the
+        // browser. Log server-side; return a static client-safe string.
+        console.error('sendAgentEmailAction failed:', err);
+        return { ok: false, error: 'Send failed — please try again.' };
     }
 }

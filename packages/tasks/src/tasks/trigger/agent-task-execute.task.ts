@@ -5,6 +5,34 @@ import { AgentRunService } from '@ever-works/agent/agents';
 import { TasksService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
+// Security: import assertUuid to validate Trigger.dev payload fields before any DB access
+import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
+
+/**
+ * Security (prompt-injection hardening): chat-template control markers that
+ * some models treat as out-of-band role/turn delimiters. Mirrors the
+ * `CHAT_TEMPLATE_MARKER_PATTERN` shared by the prompt assembler
+ * (`@ever-works/agent` `prompt-assembler.service.ts`
+ * `neutralizeInjectedBlock`) and the standard pipeline's prompt utils.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN =
+    /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
+
+/**
+ * Security (prompt-injection hardening): `taskRow.title` / `taskRow.description`
+ * are attacker-controlled for inbound-email-spawned Tasks (the email subject /
+ * body land verbatim in those fields). They are interpolated into
+ * `immediateInput`, the single user message that drives the agent's tool loop,
+ * so a crafted title/description containing a chat-template control marker
+ * (e.g. `<|im_start|>system`) could spoof a system/user turn and nudge tool
+ * use. Strip those control tokens before the field enters the prompt. This is
+ * a pure mechanical strip — newlines, whitespace, and all benign content pass
+ * through unchanged, so legitimate Task fields are unaffected; only the
+ * forgeable control markers are defused.
+ */
+function neutralizeControlTokens(value: string): string {
+    return value.replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
+}
 
 export interface AgentTaskExecutePayload {
     agentId: string;
@@ -37,6 +65,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
     maxDuration: 3600,
     onFailure: async ({ payload, error }) => {
         if (!payload) return;
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentTaskExecute:Failure'));
@@ -57,6 +89,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
         }
     },
     run: async (payload: AgentTaskExecutePayload) => {
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('AgentTaskExecute'));
 
@@ -142,8 +178,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // mutation; it is guaranteed non-null here.
             const immediateInput = taskRow
                 ? [
-                      `Task ${taskRow.slug ?? taskRow.id}: ${taskRow.title}`,
-                      taskRow.description ? `Description: ${taskRow.description}` : null,
+                      `Task ${taskRow.slug ?? taskRow.id}: ${neutralizeControlTokens(taskRow.title)}`,
+                      taskRow.description
+                          ? `Description: ${neutralizeControlTokens(taskRow.description)}`
+                          : null,
                       `Status: ${taskRow.status}`,
                       `Priority: ${taskRow.priority}`,
                       taskRow.labels?.length ? `Labels: ${taskRow.labels.join(', ')}` : null,

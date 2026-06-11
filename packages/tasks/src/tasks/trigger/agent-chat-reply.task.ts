@@ -5,6 +5,8 @@ import { AgentRunService } from '@ever-works/agent/agents';
 import { TaskChatService, TasksService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
+// Security: import assertUuid to validate Trigger.dev payload fields before any DB access
+import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
 
 export interface AgentChatReplyPayload {
     agentId: string;
@@ -42,6 +44,10 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
     maxDuration: 300,
     onFailure: async ({ payload, error }) => {
         if (!payload) return;
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
         try {
             const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
             appContext.useLogger(createTriggerLogger('AgentChatReply:Failure'));
@@ -62,6 +68,13 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
         }
     },
     run: async (payload: AgentChatReplyPayload) => {
+        // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat).
+        // triggeringMessageId is also asserted: it is a TaskChatMessage uuid PK and its raw value
+        // flows into the prompt fallback (`Chat message ${...}`) and the AgentRun row.
+        assertUuid(payload.agentId, 'payload.agentId');
+        assertUuid(payload.userId, 'payload.userId');
+        assertUuid(payload.taskId, 'payload.taskId');
+        assertUuid(payload.triggeringMessageId, 'payload.triggeringMessageId');
         const appContext = await NestFactory.createApplicationContext(TriggerInternalModule);
         appContext.useLogger(createTriggerLogger('AgentChatReply'));
 

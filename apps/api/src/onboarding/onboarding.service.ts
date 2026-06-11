@@ -20,6 +20,7 @@ import {
     ONBOARDING_WORK_CREATOR,
     OnboardingRequestRepository,
     WorksManifestService,
+    isSafeWebhookUrl,
     type OnboardingAccountUpsert,
     type OnboardingGitProvider,
     type OnboardingWorkCreator,
@@ -88,6 +89,37 @@ export class OnboardingService {
      *   - Webhook + state-marker fan-out on terminal status (T10, T11, T21).
      */
     async handle(ctx: OnboardingContext): Promise<RegisterWorkResponse> {
+        // Security (SSRF): the DTO only enforces an http(s) shape on
+        // webhookUrl. The persisted URL is later fetched server-side on
+        // terminal status, so a private / loopback / link-local / metadata
+        // target must be refused before it is stored. Mirror
+        // WebhooksService.assertValidUrl()'s env-gate: allow local targets in
+        // dev/test so a developer can point at a local tunnel, but enforce in
+        // every other (staging/prod) env that shares internal network access.
+        if (ctx.body.webhookUrl) {
+            const env = process.env.NODE_ENV;
+            const isLocalEnv =
+                env === 'development' || env === 'test' || env === undefined || env === '';
+            if (!isLocalEnv && !isSafeWebhookUrl(ctx.body.webhookUrl)) {
+                this.fail({
+                    code: 'validation_error',
+                    message: 'webhookUrl resolves to a private/loopback/link-local address',
+                });
+            }
+            // Security (crypto/HMAC exposure): the register-work DTO accepts an
+            // http(s) shape, so a plaintext http:// webhook would be fetched
+            // server-side and the request-signing HMAC sent in the clear. The
+            // DTO regex intentionally still allows http:// so a developer can
+            // point at a local tunnel in dev/test — enforce https only in
+            // non-local (staging/prod) envs, mirroring the isLocalEnv gate above.
+            if (!isLocalEnv && !ctx.body.webhookUrl.startsWith('https://')) {
+                this.fail({
+                    code: 'validation_error',
+                    message: 'webhookUrl must use https in non-local environments',
+                });
+            }
+        }
+
         const coords = parseRepoCoords(ctx.body.repo);
         if (!coords) {
             this.fail({ code: 'validation_error', message: 'invalid repo URL' });
@@ -108,7 +140,9 @@ export class OnboardingService {
         if (existingForOtherOwner) {
             this.fail({
                 code: 'repo_already_owned',
-                message: 'This repo is already onboarded by another GitHub identity',
+                // Security: keep the message generic — do not disclose that the
+                // repo is registered to a different GitHub identity (info leak).
+                message: 'A conflict exists for this repository',
             });
         }
 

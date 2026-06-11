@@ -121,6 +121,23 @@ describe('OnboardingStateService', () => {
         it('throws NotFoundException for an unknown user', async () => {
             await expect(svc.patchState('other', {})).rejects.toBeInstanceOf(NotFoundException);
         });
+
+        // EW-722 (security wave M, idx 165): `prompt` is contract-declared on
+        // `OnboardingStatePatchRequest` and now validated (@MaxLength(5000) in
+        // the DTO) AND persisted — previously it was silently dropped.
+        it('persists the contract-declared prompt and preserves it across later patches', async () => {
+            const first = await svc.patchState('u1', {
+                state: { prompt: 'build me a cafe directory' },
+            });
+            expect(first.state.prompt).toBe('build me a cafe directory');
+
+            // A later patch without `prompt` keeps the persisted value.
+            const second = await svc.patchState('u1', {
+                state: { lastStep: 3 },
+            });
+            expect(second.state.prompt).toBe('build me a cafe directory');
+            expect(second.state.lastStep).toBe(3);
+        });
     });
 
     describe('markCompleted', () => {
@@ -176,6 +193,36 @@ describe('OnboardingStateService', () => {
             });
             expect(merged.ai.choice).toBe('grok');
             expect(merged.storage.choice).toBe(ONBOARDING_DEFAULT_STATE.storage.choice);
+        });
+
+        // EW-722 (idx 165): prompt round-trips through both helpers; legacy
+        // non-string values are dropped rather than persisted.
+        it('normaliseState round-trips a string prompt and drops non-string values', () => {
+            const withPrompt = __test__.normaliseState({
+                ...ONBOARDING_DEFAULT_STATE,
+                prompt: 'AI tools directory',
+            });
+            expect(withPrompt.prompt).toBe('AI tools directory');
+
+            const withBadPrompt = __test__.normaliseState({
+                ...ONBOARDING_DEFAULT_STATE,
+                prompt: 42 as unknown as string,
+            });
+            expect(withBadPrompt.prompt).toBeUndefined();
+        });
+
+        it('mergeState applies a patched prompt and preserves the current one when omitted', () => {
+            const applied = __test__.mergeState(ONBOARDING_DEFAULT_STATE, {
+                prompt: 'build me a cafe directory',
+            });
+            expect(applied.prompt).toBe('build me a cafe directory');
+
+            const preserved = __test__.mergeState(
+                { ...ONBOARDING_DEFAULT_STATE, prompt: 'kept' },
+                { lastStep: 2 },
+            );
+            expect(preserved.prompt).toBe('kept');
+            expect(preserved.lastStep).toBe(2);
         });
     });
 });

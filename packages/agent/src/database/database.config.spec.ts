@@ -164,10 +164,27 @@ describe('database.config', () => {
             });
         });
 
-        it('uses DATABASE_PATH literally when set', () => {
+        it('uses DATABASE_PATH (resolved to absolute) when set', () => {
             cfgMock.database.getPath.mockReturnValue('/var/lib/test.db');
             const result = (databaseConfig as any)();
-            expect(result).toMatchObject({ type: 'better-sqlite3', database: '/var/lib/test.db' });
+            // DATABASE_PATH is normalized via path.resolve to block relative
+            // traversal. For an already-absolute input this is an identity op
+            // on POSIX; on Windows it gains the current drive letter. Assert
+            // against the platform-resolved value rather than a hard literal.
+            expect(result).toMatchObject({
+                type: 'better-sqlite3',
+                database: path.resolve('/var/lib/test.db'),
+            });
+        });
+
+        it('normalizes a relative DATABASE_PATH to an absolute path (blocks traversal)', () => {
+            cfgMock.database.getPath.mockReturnValue('../../etc/evil.db');
+            const result = (databaseConfig as any)();
+            // The raw relative/traversal string must NOT survive verbatim; it
+            // is collapsed to an absolute path rooted at cwd.
+            expect(result.database).toBe(path.resolve('../../etc/evil.db'));
+            expect(path.isAbsolute(result.database)).toBe(true);
+            expect(result.database).not.toContain('..');
         });
 
         it('CLI app type composes ~/.ever-works/ever-works.db', () => {
@@ -213,7 +230,12 @@ describe('database.config', () => {
             cfgMock.database.getPath.mockReturnValue('/missing/dir/db.sqlite');
             fsMock.existsSync.mockReturnValue(false);
             (databaseConfig as any)();
-            expect(fsMock.mkdirSync).toHaveBeenCalledWith('/missing/dir', { recursive: true });
+            // DATABASE_PATH is normalized via path.resolve, so the parent dir
+            // is derived from the platform-resolved absolute path.
+            expect(fsMock.mkdirSync).toHaveBeenCalledWith(
+                path.dirname(path.resolve('/missing/dir/db.sqlite')),
+                { recursive: true },
+            );
         });
 
         it('does NOT mkdir when the parent dir already exists', () => {
@@ -387,14 +409,15 @@ describe('database.config', () => {
             });
         });
 
-        it('passes through `database: undefined` when URL parser returns null', () => {
+        // Security/misconfig guard (EW-721): an unparseable DATABASE_URL used to
+        // silently produce `database: undefined`; the config now fails fast instead
+        // of starting a misconfigured DataSource.
+        it('throws when URL parser returns null', () => {
             cfgMock.database.getType.mockReturnValue('postgres');
             cfgMock.database.getUrl.mockReturnValue('postgres://invalid');
             parseMock.mockReturnValue(null as any);
 
-            const result = (databaseConfig as any)();
-
-            expect(result).toMatchObject({ url: 'postgres://invalid', database: undefined });
+            expect(() => (databaseConfig as any)()).toThrow('DATABASE_URL could not be parsed');
         });
 
         it('honours URL even when DATABASE_TYPE is mysql', () => {

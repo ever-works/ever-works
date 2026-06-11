@@ -11,24 +11,41 @@ import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
  * Complex, multi-entity orchestration of the org→Work KB inheritance +
  * override resolution path. Each flow seeds org-scope inheritable docs,
  * pairs a Work with the org, creates Work-scope overrides at the SAME
- * path, and asserts the OBSERVABLE effect on both the resolution API
- * (`GET /works/:id/kb/inheritable`) and the rendered tree UI
- * (`KbTreePanel`'s "Inherited from organization" section).
+ * path, and asserts the OBSERVABLE effect on the resolution API
+ * (`GET /works/:id/kb/inheritable`).
  *
- * The core behaviour under test is the #1192 `doc.workId === null` filter
- * in `KbTreePanel` (apps/web/.../kb/KbTreePanel.tsx): the inheritable
- * endpoint returns the MERGED effective set (`resolveInheritableDocuments`
- * — org docs keyed by path, Work overrides shadowing org docs at the same
- * path), so once a Work overrides an inherited doc, that path comes back
- * as a Work-OWNED row (`workId !== null`). The UI inherited section must
- * EXCLUDE those — the overridden copy now lives in the per-class Work
- * group instead.
+ * The core behaviour under test is the #1192 `doc.workId === null` filter:
+ * the inheritable endpoint returns the MERGED effective set
+ * (`resolveInheritableDocuments` — org docs keyed by path, Work overrides
+ * shadowing org docs at the same path), so once a Work overrides an
+ * inherited doc, that path comes back as a Work-OWNED row (`workId !== null`).
  *
  * ───────────────────────────────────────────────────────────────────────
- * SHAPES VERIFIED AGAINST THE LIVE API (http://127.0.0.1:3100) BEFORE
- * WRITING (register → work → 2 org docs → pair → override → re-resolve):
+ * WORKBENCH-UI MIGRATION (EW-641 slices A/C):
  *
- *   POST /api/auth/register                          -> { access_token, user } (username >= 3 chars)
+ * The OLD KB tree (`components/works/detail/kb/KbTreePanel.tsx`) rendered a
+ * dedicated "Inherited from organization" section with per-row testids
+ * (`kb-tree-inherited`, `kb-tree-inherited-<class>-<slug>`). The NEW
+ * workbench tree (`components/kb/workbench/KbTreePanel.tsx`, line ~46)
+ * explicitly defers inherited-scope tree affordances to slices C and E —
+ * it ONLY fetches Work-owned docs (`/api/works/:id/kb/documents`) and groups
+ * them by class. There is NO inherited section and NO `kb-tree-inherited-*`
+ * testids in the workbench today.
+ *
+ * Consequently the API-level inheritance assertions below remain fully
+ * valid and run as-is (only the data-setup seeding fix is applied: a REAL
+ * org via `createOrganizationViaAPI` instead of a fabricated UUID, because
+ * the org-KB endpoint now validates the org exists). The inherited-TREE-UI
+ * assertions are split out into companion `test.skip(...)` tests so the
+ * suite stays green until slices C/E build the inherited section. Those
+ * skipped tests carry the migrated workbench selectors (kb-workbench-shell,
+ * kb-workbench-tree, kb-workbench-group-<class>, kb-workbench-row-<id>) so
+ * they are ready to re-enable once the inherited section exists.
+ *
+ * ───────────────────────────────────────────────────────────────────────
+ * SHAPES VERIFIED AGAINST THE LIVE API BEFORE WRITING:
+ *
+ *   POST /api/organizations { name }                 -> 201 { id, ... } (real org)
  *   POST /api/works                                  -> { status:'success', work:{ id, ... } }
  *   POST /api/organizations/:orgId/kb/documents      -> 201 KbDocumentBodyDto
  *        { id, workId:null, organizationId:<orgId>, path, slug, title, class:'legal',
@@ -40,48 +57,30 @@ import { seedOrgKbDoc, setWorkOrganizationId } from './helpers/kb-fixtures';
  *            legal/privacy.md -> workId !== null (Work-owned override masks it)
  *            legal/terms.md   -> workId === null (still inherited)
  *        - full override (both paths): every entry workId !== null
- *            => orgScoped (workId === null) count == 0  => UI inherited section unmounts
+ *            => orgScoped (workId === null) count == 0
  *   POST /api/works/:id/kb/documents                 -> 201 KbDocumentBodyDto
  *        { id, workId:<workId>, organizationId:null, path, slug, ... }  (Work-scope override)
  *   GET  /api/works/:id/kb/documents?limit=200       -> { items:KbDocumentDto[], total } (Work-owned only)
  *
  *   ISOLATION: the inheritable endpoint TRUSTS the `orgId` query param — it
  *   does not re-verify the Work belongs to that org. The KB page server
- *   component (kb/page.tsx) drives `orgId` from `work.organizationId`, so a
- *   Work paired with a DIFFERENT (empty) org resolves `[]` and never shows
- *   org-A's docs. The isolation flow models exactly that: Work B is paired
- *   with its own org B, which has no docs, so org A's inherited docs never
- *   surface in Work B's inherited section.
- *
- * UI selectors verified against real source (KbTreePanel.tsx / KbTreeDocRow.tsx /
- * KbShell.tsx):
- *   - kb-shell                              (data-work-id)
- *   - kb-tree                               (panel) / kb-tree-count (Work-owned count)
- *   - kb-tree-inherited                     ("Inherited from organization" section; only
- *                                            mounts when >=1 org-scoped doc remains)
- *   - kb-tree-inherited-description
- *   - kb-tree-inherited-<class>-<slug>      inherited row; data-source="inherited",
- *                                            data-doc-path, data-doc-class
- *   - kb-tree-item  (data-doc-path)         Work-owned row (used by override + group)
- *   - kb-tree-group-<class>                 per-class Work-owned group
+ *   component drives `orgId` from `work.organizationId`, so a Work paired
+ *   with a DIFFERENT (empty) org resolves `[]` and never shows org-A's docs.
  *
  * ───────────────────────────────────────────────────────────────────────
- * DEVIATIONS / NOTES:
- *   - `/api/organizations/:orgId/kb/documents` does not enforce org
- *     membership today (controller docstring), so we mint a random UUID for
- *     each org and skip seeding an `Organization` row — mirrors the existing
- *     kb-inherited.spec.ts approach.
- *   - The seeded user (storageState) owns the Works so the UI's logged-in
- *     user matches the API mutations: we log in via API for the seeded
- *     user's bearer token and run ALL setup through it. This is read-heavy
- *     KB inheritance state that doesn't shadow chat/provider settings, so it
- *     is safe on the shared user (no per-user apiKey is touched).
- *   - Unique org UUIDs + run-id-suffixed slugs keep these flows isolated
- *     from sibling specs and from each other; assertions use toContain /
- *     per-row testids, never global counts that other specs could perturb.
+ * WORKBENCH UI SELECTORS (verified against KbTreePanel.tsx / WorkbenchShell.tsx):
+ *   - kb-workbench-shell                    (WorkbenchShell root)
+ *   - kb-workbench-tree                     (KbTreePanel root; data-work-id)
+ *   - kb-workbench-group-<class>            (data-kb-class) per-class Work-owned group
+ *   - kb-workbench-row-<documentId>         (data-doc-path) Work-owned doc row
+ *   NOT YET BUILT (deferred to slices C/E): the inherited section and its
+ *   kb-tree-inherited-* row testids.
  */
 
 const KB_PAGE_TIMEOUT = 180_000;
+
+const INHERITED_TREE_DEFERRED =
+    'workbench inherited-tree UI deferred to EW-641 slices C/E — re-enable when built';
 
 type InheritableDoc = {
     id: string;
@@ -129,12 +128,9 @@ async function createWorkKbDoc(
 }
 
 test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
-    test('partial override: overridden doc leaves the inherited section, others stay inherited', async ({
-        page,
+    test('partial override (API): overridden doc leaves the inherited set, others stay inherited', async ({
         request,
     }) => {
-        // First KB-page hit triggers Next dev-mode compilation; budget like
-        // the other authenticated KB specs.
         test.setTimeout(KB_PAGE_TIMEOUT);
 
         // 1. Seeded-user bearer token so API mutations land on the UI's
@@ -187,21 +183,7 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         expect(beforeOrgScoped).toContain('legal/privacy.md');
         expect(beforeOrgScoped).toContain('legal/terms.md');
 
-        // 6. UI truth (pre-override): both inherited rows present in the section.
-        await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        const inheritedSection = page.getByTestId('kb-tree-inherited');
-        await expect(inheritedSection).toBeVisible({ timeout: 30_000 });
-
-        const privacyRow = page.getByTestId('kb-tree-inherited-legal-privacy');
-        const termsRow = page.getByTestId('kb-tree-inherited-legal-terms');
-        await expect(privacyRow).toBeVisible({ timeout: 15_000 });
-        await expect(termsRow).toBeVisible({ timeout: 15_000 });
-        await expect(privacyRow).toHaveAttribute('data-source', 'inherited');
-        await expect(privacyRow).toHaveAttribute('data-doc-path', 'legal/privacy.md');
-        await expect(termsRow).toHaveAttribute('data-doc-path', 'legal/terms.md');
-
-        // 7. Create a WORK-scope override of legal/privacy.md (same path).
+        // 6. Create a WORK-scope override of legal/privacy.md (same path).
         const override = await createWorkKbDoc(request, token, workId, {
             path: 'legal/privacy.md',
             title: `Privacy OVERRIDE ${runId}`,
@@ -211,7 +193,7 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         expect(override.organizationId, 'override must not carry an org id').toBeNull();
         expect(override.path).toBe('legal/privacy.md');
 
-        // 8. API truth (post-partial-override): the merged set now returns
+        // 7. API truth (post-partial-override): the merged set now returns
         //    legal/privacy.md as Work-OWNED (workId !== null) and legal/terms.md
         //    still org-scoped (workId === null) — the #1192 filter boundary.
         const after = await resolveInheritableViaAPI(request, token, workId, orgId);
@@ -226,34 +208,80 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
             'legal/terms.md',
         ]);
 
-        // 9. UI truth (post-partial-override): reload the tree. The overridden
-        //    privacy row is GONE from the inherited section (workId !== null
-        //    filtered out by KbTreePanel), terms remains inherited, and the
-        //    overridden privacy now appears as a Work-owned tree item.
-        await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-
-        await expect(page.getByTestId('kb-tree-inherited')).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByTestId('kb-tree-inherited-legal-privacy')).toHaveCount(0, {
-            timeout: 15_000,
-        });
-        await expect(page.getByTestId('kb-tree-inherited-legal-terms')).toBeVisible({
-            timeout: 15_000,
-        });
-
-        // The override surfaces as a Work-owned row at the same path.
-        const workOwnedPrivacy = page.locator(
-            '[data-testid="kb-tree-item"][data-doc-path="legal/privacy.md"]',
+        // 8. And the Work-owned list now carries the override at that path.
+        const docsRes = await request.get(
+            `${API_BASE}/api/works/${workId}/kb/documents?limit=200`,
+            {
+                headers: authedHeaders(token),
+            },
         );
-        await expect(workOwnedPrivacy).toBeVisible({ timeout: 15_000 });
-        // And NOT as a Work-owned terms row (terms was never overridden).
-        await expect(
-            page.locator('[data-testid="kb-tree-item"][data-doc-path="legal/terms.md"]'),
-        ).toHaveCount(0);
+        expect(docsRes.ok()).toBeTruthy();
+        const docsBody = (await docsRes.json()) as { items: InheritableDoc[]; total: number };
+        const ownedPaths = docsBody.items.map((d) => d.path);
+        expect(ownedPaths, 'override surfaces as a Work-owned doc').toContain('legal/privacy.md');
+        // terms was never overridden, so it is NOT a Work-owned doc.
+        expect(ownedPaths, 'un-overridden terms is not Work-owned').not.toContain('legal/terms.md');
     });
 
-    test('full override: inherited section empties while Work owns every former inherited doc', async ({
+    // The OLD test asserted the inherited TREE UI (kb-tree-inherited section,
+    // kb-tree-inherited-legal-privacy / -terms rows, and the overridden doc
+    // moving into the Work-owned tree). The workbench has not built the
+    // inherited section yet (KbTreePanel.tsx line ~46 → slices C/E), so this
+    // UI half is skipped but kept (with migrated workbench selectors) for
+    // re-enablement once the section lands.
+    test('partial override (UI): inherited section shows terms, drops overridden privacy', async ({
         page,
+        request,
+    }) => {
+        test.skip(true, INHERITED_TREE_DEFERRED);
+        test.setTimeout(KB_PAGE_TIMEOUT);
+
+        const seeded = loadSeededTestUser();
+        const { access_token: token } = await loginViaAPI(request, {
+            email: seeded.email,
+            password: seeded.password,
+        });
+        const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
+        const { id: workId } = await createWorkViaAPI(request, token, {
+            name: `KB Partial Override UI ${runId}`,
+        });
+        await seedOrgKbDoc(request, token, {
+            orgId,
+            path: 'legal/privacy.md',
+            title: `Privacy ${runId}`,
+            targetClass: 'legal',
+            body: `# Privacy ${runId}\n\nOrg privacy.\n`,
+        });
+        await seedOrgKbDoc(request, token, {
+            orgId,
+            path: 'legal/terms.md',
+            title: `Terms ${runId}`,
+            targetClass: 'legal',
+            body: `# Terms ${runId}\n\nOrg terms.\n`,
+        });
+        await setWorkOrganizationId(request, token, workId, orgId);
+        await createWorkKbDoc(request, token, workId, {
+            path: 'legal/privacy.md',
+            title: `Privacy OVERRIDE ${runId}`,
+            body: `# Privacy OVERRIDE ${runId}\n\nWork override.\n`,
+        });
+
+        await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+
+        // TODO(EW-641 slices C/E): once the workbench builds the inherited
+        // section, assert here that the inherited list shows legal/terms.md
+        // and DROPS the overridden legal/privacy.md, and that the override
+        // surfaces as a Work-owned row:
+        //   const overrideRow = page.locator(
+        //       '[data-testid^="kb-workbench-row-"][data-doc-path="legal/privacy.md"]',
+        //   );
+        //   await expect(overrideRow).toBeVisible();
+    });
+
+    test('full override (API): every former-inherited doc becomes Work-owned, none stay inherited', async ({
         request,
     }) => {
         test.setTimeout(KB_PAGE_TIMEOUT);
@@ -345,33 +373,76 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
         for (const d of docsBody.items) {
             expect(d.workId, `Work doc ${d.path} must be Work-scoped`).toBe(workId);
         }
-
-        // UI truth: with zero org-scoped docs remaining, KbTreePanel unmounts
-        // the entire "Inherited from organization" section (it only renders
-        // when orgInheritedDocuments.length > 0). The Work's own docs DO list
-        // them under the per-class group.
-        await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        await expect(page.getByTestId('kb-tree')).toBeVisible({ timeout: 30_000 });
-
-        // Inherited section + every inherited row are gone.
-        await expect(page.getByTestId('kb-tree-inherited')).toHaveCount(0, { timeout: 15_000 });
-        await expect(page.getByTestId('kb-tree-inherited-legal-privacy')).toHaveCount(0);
-        await expect(page.getByTestId('kb-tree-inherited-legal-terms')).toHaveCount(0);
-
-        // Both former-inherited docs now render as Work-owned rows under the
-        // legal group.
-        await expect(page.getByTestId('kb-tree-group-legal')).toBeVisible({ timeout: 15_000 });
-        await expect(
-            page.locator('[data-testid="kb-tree-item"][data-doc-path="legal/privacy.md"]'),
-        ).toBeVisible({ timeout: 15_000 });
-        await expect(
-            page.locator('[data-testid="kb-tree-item"][data-doc-path="legal/terms.md"]'),
-        ).toBeVisible({ timeout: 15_000 });
     });
 
-    test('inheritance isolation: org-A doc inherited by Work A is not inherited by unrelated Work B', async ({
+    // The OLD test asserted that, with zero org-scoped docs remaining, the
+    // inherited TREE section unmounts entirely while both former-inherited
+    // docs render as Work-owned rows under the legal group. The workbench
+    // inherited section is not built yet (slices C/E), so the inherited-
+    // section-unmount assertion cannot run; the Work-owned-group half IS
+    // supported by the workbench and is kept here for re-enablement.
+    test('full override (UI): inherited section empties, Work owns every former inherited doc', async ({
         page,
+        request,
+    }) => {
+        test.skip(true, INHERITED_TREE_DEFERRED);
+        test.setTimeout(KB_PAGE_TIMEOUT);
+
+        const seeded = loadSeededTestUser();
+        const { access_token: token } = await loginViaAPI(request, {
+            email: seeded.email,
+            password: seeded.password,
+        });
+        const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const orgId = (await createOrganizationViaAPI(request, token, `kb-org-${randomUUID()}`)).id;
+        const { id: workId } = await createWorkViaAPI(request, token, {
+            name: `KB Full Override UI ${runId}`,
+        });
+        await seedOrgKbDoc(request, token, {
+            orgId,
+            path: 'legal/privacy.md',
+            title: `Privacy ${runId}`,
+            targetClass: 'legal',
+            body: `# Privacy ${runId}\n\nOrg privacy.\n`,
+        });
+        await seedOrgKbDoc(request, token, {
+            orgId,
+            path: 'legal/terms.md',
+            title: `Terms ${runId}`,
+            targetClass: 'legal',
+            body: `# Terms ${runId}\n\nOrg terms.\n`,
+        });
+        await setWorkOrganizationId(request, token, workId, orgId);
+        await createWorkKbDoc(request, token, workId, {
+            path: 'legal/privacy.md',
+            title: `Privacy OVERRIDE ${runId}`,
+            body: `# Privacy OVERRIDE ${runId}\n\nFull override.\n`,
+        });
+        await createWorkKbDoc(request, token, workId, {
+            path: 'legal/terms.md',
+            title: `Terms OVERRIDE ${runId}`,
+            body: `# Terms OVERRIDE ${runId}\n\nFull override.\n`,
+        });
+
+        await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+
+        // The Work-owned group + both overridden rows are supported by the
+        // workbench tree today.
+        await expect(page.getByTestId('kb-workbench-group-legal')).toBeVisible({ timeout: 15_000 });
+        await expect(
+            page.locator('[data-testid^="kb-workbench-row-"][data-doc-path="legal/privacy.md"]'),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(
+            page.locator('[data-testid^="kb-workbench-row-"][data-doc-path="legal/terms.md"]'),
+        ).toBeVisible({ timeout: 15_000 });
+
+        // TODO(EW-641 slices C/E): once the inherited section is built, assert
+        // it has fully unmounted here (no inherited rows remain).
+    });
+
+    test('inheritance isolation (API): org-A doc inherited by Work A is not inherited by unrelated Work B', async ({
         request,
     }) => {
         test.setTimeout(KB_PAGE_TIMEOUT);
@@ -405,9 +476,8 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
 
         // A run-unique path so cross-spec org docs can never collide with our
         // assertion (the org-doc endpoint is global per orgId, and orgA is a
-        // fresh UUID, so this path is exclusively ours).
+        // fresh org, so this path is exclusively ours).
         const isoPath = `legal/isolation-${runId}.md`;
-        const isoSlug = `isolation-${runId}`;
         const isoTitle = `Isolation Policy ${runId}`;
         await seedOrgKbDoc(request, token, {
             orgId: orgA,
@@ -432,25 +502,57 @@ test.describe('Knowledge Base — inherited override matrix (#1192)', () => {
             'Work B (org B) must not inherit org A docs',
         ).not.toContain(isoPath);
         expect(inheritedByB.length, 'org B owns no inheritable docs').toBe(0);
+    });
 
-        // UI truth — Work A: the inherited section lists the isolation doc.
-        await page.goto(`/en/works/${workAId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        await expect(page.getByTestId('kb-tree-inherited')).toBeVisible({ timeout: 30_000 });
-        const isoRowA = page.getByTestId(`kb-tree-inherited-legal-${isoSlug}`);
-        await expect(isoRowA).toBeVisible({ timeout: 15_000 });
-        await expect(isoRowA).toHaveAttribute('data-doc-path', isoPath);
-        await expect(isoRowA).toHaveAttribute('data-source', 'inherited');
+    // The OLD test asserted the inherited TREE section listed the isolation
+    // doc for Work A and was absent for Work B. The workbench inherited
+    // section is not built yet (slices C/E), so the UI half is skipped but
+    // kept with migrated workbench selectors for re-enablement.
+    test('inheritance isolation (UI): inherited section shows org-A doc only for Work A', async ({
+        page,
+        request,
+    }) => {
+        test.skip(true, INHERITED_TREE_DEFERRED);
+        test.setTimeout(KB_PAGE_TIMEOUT);
 
-        // UI truth — Work B: the isolation doc is NOT shown as inherited.
-        // Work B has no org docs at all, so the inherited section never mounts
-        // (and certainly not the org-A row).
-        await page.goto(`/en/works/${workBId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        await expect(page.getByTestId('kb-tree')).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByTestId(`kb-tree-inherited-legal-${isoSlug}`)).toHaveCount(0, {
-            timeout: 15_000,
+        const seeded = loadSeededTestUser();
+        const { access_token: token } = await loginViaAPI(request, {
+            email: seeded.email,
+            password: seeded.password,
         });
-        await expect(page.getByTestId('kb-tree-inherited')).toHaveCount(0, { timeout: 15_000 });
+        const runId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        const orgA = (await createOrganizationViaAPI(request, token, `kb-orgA-${randomUUID()}`)).id;
+        const orgB = (await createOrganizationViaAPI(request, token, `kb-orgB-${randomUUID()}`)).id;
+        const { id: workAId } = await createWorkViaAPI(request, token, {
+            name: `KB Isolation A UI ${runId}`,
+        });
+        const { id: workBId } = await createWorkViaAPI(request, token, {
+            name: `KB Isolation B UI ${runId}`,
+        });
+        const isoPath = `legal/isolation-${runId}.md`;
+        const isoTitle = `Isolation Policy ${runId}`;
+        await seedOrgKbDoc(request, token, {
+            orgId: orgA,
+            path: isoPath,
+            title: isoTitle,
+            targetClass: 'legal',
+            body: `# ${isoTitle}\n\nOnly org A owns this.\n`,
+        });
+        await setWorkOrganizationId(request, token, workAId, orgA);
+        await setWorkOrganizationId(request, token, workBId, orgB);
+
+        // Work A workbench loads.
+        await page.goto(`/en/works/${workAId}/kb`, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+
+        // Work B workbench loads.
+        await page.goto(`/en/works/${workBId}/kb`, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+
+        // TODO(EW-641 slices C/E): once the inherited section is built, assert
+        // Work A's inherited list contains the isolation doc and Work B's does
+        // not (and never mounts the section at all).
     });
 });

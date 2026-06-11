@@ -1,7 +1,9 @@
 import { redirect } from '@/i18n/navigation';
 import { oauthAPI } from '@/lib/api';
+import { OAuthProvider } from '@/lib/api/enums';
 import { getOAuthStateCookie, removeOAuthStateCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
+import { isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 import { appendQueryParams, getOAuthRouteErrorCode } from '../../../../callback-errors';
@@ -28,7 +30,17 @@ export async function GET(
     const state = queryParams.get('state');
     const returnPath = queryParams.get('returnPath');
     const defaultPath = ROUTES.DASHBOARD_SETTINGS_PLUGIN_CATEGORY('git-provider');
-    const targetPath = returnPath || defaultPath;
+    // Security: `returnPath` is attacker-controllable (it round-trips through the
+    // OAuth callback query string). Although `appendQueryParams` already strips
+    // any foreign host, validate on read so the only accepted values are safe
+    // same-origin relative paths — rejecting protocol-relative ("//evil.com"),
+    // backslash-obfuscated, and absolute targets up front and hardening against a
+    // future refactor that uses `targetPath` without `appendQueryParams`.
+    // Mirrors the main plugins-callback route.
+    const targetPath =
+        returnPath && isValidRedirectUrl(returnPath) && returnPath.startsWith('/')
+            ? returnPath
+            : defaultPath;
 
     const locale = await getLocale();
 
@@ -60,6 +72,22 @@ export async function GET(
     }
 
     await removeOAuthStateCookie();
+
+    // Security: validate the `providerId` route segment against the known
+    // provider enum before forwarding it. It is interpolated into the
+    // server-to-server API path inside `oauthAPI.readPackagesCallback`, so an
+    // unrecognized/crafted value must not reach the backend. Mirrors the main
+    // plugins-callback route's enum check.
+    if (!Object.values(OAuthProvider).includes(providerId as OAuthProvider)) {
+        return redirect({
+            locale,
+            href: appendQueryParams(defaultPath, {
+                oauth_error: 'oauth_unsupported_provider',
+                oauth_provider: providerId,
+                oauth_intent: 'read_packages',
+            }),
+        });
+    }
 
     let href: string;
     try {

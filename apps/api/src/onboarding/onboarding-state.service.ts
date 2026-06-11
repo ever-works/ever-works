@@ -143,6 +143,9 @@ function normaliseState(raw: OnboardingWizardStateV2 | null | undefined): Onboar
         deploy: { choice: raw.deploy?.choice ?? ONBOARDING_DEFAULT_STATE.deploy.choice },
         skippedSteps: Array.isArray(raw.skippedSteps) ? [...raw.skippedSteps] : [],
         pluginsReviewed: raw.pluginsReviewed === true,
+        // EW-722: contract-declared optional `prompt` (EW-617 G4) round-trips
+        // when persisted; non-string legacy values are dropped.
+        ...(typeof raw.prompt === 'string' ? { prompt: raw.prompt } : {}),
     };
 }
 
@@ -163,6 +166,14 @@ function mergeState(
             typeof patch.pluginsReviewed === 'boolean'
                 ? patch.pluginsReviewed
                 : current.pluginsReviewed,
+        // EW-722: persist the contract-declared `prompt` (validated to
+        // ≤ 5000 chars by `OnboardingStatePatchInnerDto`); keep the current
+        // value when the patch omits it, matching the other fields.
+        ...(typeof patch.prompt === 'string'
+            ? { prompt: patch.prompt }
+            : typeof current.prompt === 'string'
+              ? { prompt: current.prompt }
+              : {}),
     };
 }
 

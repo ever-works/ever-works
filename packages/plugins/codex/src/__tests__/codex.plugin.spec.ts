@@ -458,10 +458,17 @@ describe('CodexPlugin', () => {
 			expect(processRunner.executeCodex).toHaveBeenCalledWith(
 				expect.objectContaining({
 					env: expect.objectContaining({
-						CODEX_HOME: expect.stringContaining('/_meta/device-auth/.codex')
+						// Security: the device-auth CODEX_HOME must be materialized in an isolated
+						// os.tmpdir() directory (ending in /.codex), NOT under the agent-readable
+						// workspace/_meta, so the user's auth.json secret is not exposed to Codex.
+						CODEX_HOME: expect.stringMatching(/\/\.codex$/)
 					})
 				})
 			);
+			const codexHomeArg = vi.mocked(processRunner.executeCodex).mock.calls[0]?.[0]?.env?.CODEX_HOME;
+			expect(codexHomeArg).toBeDefined();
+			expect(codexHomeArg).not.toContain('/_meta/');
+			expect(codexHomeArg).not.toContain('/tmp/codex-generator/user1/dir1');
 		});
 
 		it('passes the unsafe bypass flag to the runner when enabled in settings', async () => {

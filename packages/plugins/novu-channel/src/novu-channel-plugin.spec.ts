@@ -131,5 +131,21 @@ describe('NovuChannelPlugin', () => {
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 			fetchMock.mockRestore();
 		});
+
+		it('does NOT serve a cached result across different channelIds (tenant isolation)', async () => {
+			// Security: the idempotency cache key is scoped by options.channelId —
+			// the same messageRef sent through two different channel bindings must
+			// trigger two real sends, never leak channel A's cached result to B.
+			const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
+				ok: true,
+				status: 201,
+				json: async () => ({ data: { transactionId: 'txn-scoped' } })
+			} as Response);
+			const input = { text: 'x', messageRef: 'ref-shared', attribution: { userId: 'u1' }, target };
+			await plugin.send(input, { channelId: 'channel-a' });
+			await plugin.send(input, { channelId: 'channel-b' });
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			fetchMock.mockRestore();
+		});
 	});
 });

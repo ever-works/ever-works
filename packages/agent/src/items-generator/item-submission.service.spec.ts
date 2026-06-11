@@ -852,6 +852,34 @@ describe('ItemSubmissionService', () => {
             expect(result.slug).toBe('best-tools');
         });
 
+        it('does NOT leak a non-Error throwable; returns generic message instead', async () => {
+            const dataRepo = makeDataRepoMock();
+            dataRepoCreateMock.mockResolvedValue(dataRepo);
+            // A non-Error value (e.g. a raw object/string) must not have its
+            // contents surfaced to the API client via `error.message`.
+            const gitFacade = makeGitFacade({
+                cloneOrPull: jest
+                    .fn()
+                    .mockRejectedValue({ internalSecret: 's3cr3t-connection-string' }),
+            });
+            const { service } = makeService(gitFacade);
+
+            const result = await service.submitItem(
+                makeWork() as any,
+                makeUser() as any,
+                {
+                    name: 'Tool A',
+                    description: 'desc',
+                    source_url: 'https://example.com',
+                    category: 'AI',
+                } as any,
+            );
+
+            expect(result.status).toBe('error');
+            expect(result.message).toBe('An unexpected error occurred');
+            expect(JSON.stringify(result)).not.toContain('s3cr3t-connection-string');
+        });
+
         it('rethrow→error envelope when switching to main branch fails in direct-commit mode', async () => {
             const dataRepo = makeDataRepoMock({
                 getConfig: jest.fn().mockResolvedValue({ autoapproval: true }),

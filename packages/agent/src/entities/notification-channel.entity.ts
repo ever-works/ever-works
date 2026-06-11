@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+import { EncryptedJsonColumn } from './_secret-json-column';
 
 /**
  * Notifications v2 — Notification Channels.
@@ -21,7 +22,11 @@ import { PortableDateColumn } from './_types';
  *
  * `targetConfig` carries the per-plugin shape (webhook URL,
  * channel id, bot token reference, novu workflow id, …) and is
- * handed back to the plugin on every send.
+ * handed back to the plugin on every send. It carries live
+ * credentials (Telegram `botToken`, WhatsApp `accessToken`, Novu
+ * `apiKey`, Slack/Discord `webhookUrl`), so it is envelope-encrypted
+ * at rest via `@EncryptedJsonColumn` (EW-716 #22) — transparent to
+ * every reader; the DB never holds plaintext.
  *
  * See `docs/specs/features/notification-channels/spec.md` §4.1.
  */
@@ -45,7 +50,9 @@ export class NotificationChannel {
     @Column({ type: 'varchar', length: 120 })
     name: string;
 
-    @Column({ type: 'simple-json' })
+    // EW-716 #22: envelope-encrypted at rest (AES-256-GCM, `enc::v1::`).
+    // Transparent transformer — readers get plaintext, the DB holds ciphertext.
+    @EncryptedJsonColumn()
     targetConfig: Record<string, unknown>;
 
     @Column({ type: 'boolean', default: false })

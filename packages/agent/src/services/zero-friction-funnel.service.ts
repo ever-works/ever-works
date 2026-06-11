@@ -69,9 +69,11 @@ export class ZeroFrictionFunnelService {
             this.logger.log(`[zero-friction] ${JSON.stringify(enriched)}`);
         } catch {
             // JSON serialisation failures shouldn't take down the request.
-            this.logger.log(
-                `[zero-friction] event=${enriched.event} correlationId=${enriched.correlationId}`,
-            );
+            // Strip CR/LF so attacker-influenced fields can't forge log
+            // lines (log injection) when the structured JSON path is skipped.
+            const safeEvent = String(enriched.event ?? '').replace(/[\r\n]/g, '_');
+            const safeCorr = String(enriched.correlationId ?? '').replace(/[\r\n]/g, '_');
+            this.logger.log(`[zero-friction] event=${safeEvent} correlationId=${safeCorr}`);
         }
 
         // Mirror to PostHog (best-effort — never let analytics throw

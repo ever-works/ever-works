@@ -4,6 +4,7 @@ import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { sanitizePrompt } from '../utils/sanitize.util';
+import { assertNoInjectionTokens } from '../utils/content-policy';
 
 /**
  * Normalize Langfuse-style `{{var}}` placeholders to `{var}` so they
@@ -56,6 +57,16 @@ export class PromptFacadeService implements IPromptFacade {
             if (!result) {
                 return defaultPrompt;
             }
+
+            // Security (prompt-injection): hard-reject at the fetch boundary if
+            // the external template smuggles chat-template CONTROL TOKENS
+            // (e.g. <|im_start|>, [INST]). These are model turn-structure
+            // delimiters that can forge a system turn and hijack the agent's
+            // prompt — sanitizePrompt only strips C0 control chars, not these
+            // markers. This mirrors the import-path gate in `content-policy`.
+            // The throw is caught below and degrades to `defaultPrompt`, so the
+            // facade's never-throw contract and existing return surface hold.
+            assertNoInjectionTokens(result.template, 'external prompt provider template');
 
             this.logger.debug(
                 `Resolved prompt "${key}" from provider (version: ${result.version ?? 'unknown'})`,

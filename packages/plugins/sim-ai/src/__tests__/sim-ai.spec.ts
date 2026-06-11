@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { SimStudioClient } from 'simstudio-ts-sdk';
 import { SimAiPlugin } from '../sim-ai.plugin.js';
 import type { WorkReference, GenerationRequest, ExistingItems, PluginContext } from '@ever-works/plugin';
 
@@ -323,6 +324,43 @@ describe('SimAiPlugin', () => {
 			const state = plugin.getState();
 			expect(state).toBeDefined();
 			expect(state!.completedSteps.length).toBeGreaterThan(0);
+		});
+
+		it('should redact GitHub tokens from the raw SIM output debug log', async () => {
+			// A misbehaving/echoing workflow could reflect the forwarded
+			// repo_access_token back inside its output. Ensure the token shape is
+			// scrubbed from the "Raw SIM output" debug log line.
+			const leakedToken = 'ghp_AbCdEf0123456789AbCdEf0123456789AbCd';
+			vi.mocked(SimStudioClient).mockImplementationOnce(function () {
+				return {
+					validateWorkflow: vi.fn().mockResolvedValue(true),
+					getWorkflowStatus: vi.fn().mockResolvedValue({ isDeployed: true, needsRedeployment: false }),
+					executeWorkflow: vi.fn().mockResolvedValue({
+						success: true,
+						output: {
+							items: [{ name: 'Echoed', description: `token=${leakedToken}` }],
+							categories: [],
+							tags: []
+						}
+					}),
+					getRateLimitInfo: vi.fn().mockReturnValue(null)
+				};
+			} as never);
+
+			const ctx = createMockContext();
+			await plugin.onLoad(ctx);
+
+			await plugin.execute(createWork(), createRequest(), createExisting());
+
+			const logSpy = ctx.logger.log as ReturnType<typeof vi.fn>;
+			const rawOutputLog = logSpy.mock.calls
+				.map((c) => String(c[0]))
+				.find((m) => m.startsWith('Raw SIM output type:'));
+
+			expect(rawOutputLog).toBeDefined();
+			expect(rawOutputLog).not.toContain(leakedToken);
+			expect(rawOutputLog).not.toContain('ghp_');
+			expect(rawOutputLog).toContain('[REDACTED]');
 		});
 	});
 

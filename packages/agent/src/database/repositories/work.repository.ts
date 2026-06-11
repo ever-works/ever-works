@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
-import { User } from '../../entities';
+import { User, Mission, WorkProposal } from '../../entities';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { config } from '../../config';
 
@@ -724,15 +724,11 @@ export class WorkRepository {
         // renders 0 rather than blowing up the whole stats endpoint.
         const manager = this.repository.manager;
         const [missionsCount, ideasCount] = await Promise.all([
-            manager
-                .query('SELECT COUNT(*) AS c FROM missions WHERE "userId" = $1', [userId])
-                .catch(() => [{ c: 0 }]),
-            manager
-                .query('SELECT COUNT(*) AS c FROM work_proposals WHERE "userId" = $1', [userId])
-                .catch(() => [{ c: 0 }]),
+            manager.count(Mission, { where: { userId } }).catch(() => 0),
+            manager.count(WorkProposal, { where: { userId } }).catch(() => 0),
         ]);
-        const totalMissions = parseInt(missionsCount?.[0]?.c ?? '0', 10) || 0;
-        const totalIdeas = parseInt(ideasCount?.[0]?.c ?? '0', 10) || 0;
+        const totalMissions = missionsCount || 0;
+        const totalIdeas = ideasCount || 0;
 
         return {
             totalWorks: parseInt(result.totalWorks, 10) || 0,

@@ -203,11 +203,19 @@ test.describe('Flow — KB document lifecycle (deep)', () => {
         expect(up.body.document!.kbDocumentClass).toBe('research');
         expect(up.body.upload.extractedDocumentId).toBe(docId);
 
-        // 3. The doc renders in the real KB tree UI (server-rendered tree).
+        // 3. The doc renders in the real KB workbench tree UI. The workbench
+        //    tree groups docs by class and every group is COLLAPSED by default
+        //    on the index route (there is no active doc to auto-expand), so the
+        //    row only mounts once we expand its `research` class group. We then
+        //    assert the row leaf for our docId is visible.
         await page.goto(`/en/works/${workId}/kb`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-shell')).toBeVisible({ timeout: 60_000 });
-        const treeItem = page.locator(`[data-testid="kb-tree-item"][data-doc-path="${docPath}"]`);
+        await expect(page.getByTestId('kb-workbench-shell')).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByTestId('kb-workbench-tree')).toBeVisible({ timeout: 30_000 });
+        await page.getByTestId('kb-workbench-group-toggle-research').click();
+        const treeItem = page.getByTestId(`kb-workbench-row-${docId}`);
         await expect(treeItem).toBeVisible({ timeout: 30_000 });
+        // The row carries the canonical `<class>/<slug>.md` path it links to.
+        await expect(treeItem).toHaveAttribute('data-doc-path', docPath);
 
         // 4. Fetch the body via BOTH id and `<class>/<slug>.md` path — both
         //    resolve to the same KbDocumentBodyDto.

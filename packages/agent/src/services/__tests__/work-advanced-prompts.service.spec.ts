@@ -334,6 +334,64 @@ describe('WorkAdvancedPromptsService', () => {
 
             await expect(service.getPromptsForGeneration('w-1')).rejects.toBe(err);
         });
+
+        describe('attribution audit log', () => {
+            // Security regression: getPromptsForGeneration SKIPS access checks
+            // by design, so loading advanced prompts into the generation
+            // pipeline must leave an audit trail — ONE info log carrying
+            // { workId, activeFields } where activeFields is the set of
+            // POPULATED field names. The editor-controlled prompt TEXT must
+            // never be logged (it is untrusted and a prompt-injection surface).
+
+            it('emits one info log with workId + only the populated field names (and no prompt text)', async () => {
+                const promptText = 'SECRET-INJECTED-PROMPT-TEXT-do-not-log';
+                repository.findByWorkId.mockResolvedValue(
+                    buildPrompts({
+                        relevanceAssessment: promptText,
+                        itemGeneration: 'another-secret-prompt',
+                        // these are not "active" → must be excluded from activeFields
+                        itemExtraction: null,
+                        searchQuery: '',
+                        categorization: undefined,
+                        deduplication: null,
+                        sourceValidation: null,
+                    }),
+                );
+                const logSpy = jest
+                    .spyOn((service as any).logger, 'log')
+                    .mockImplementation(() => {});
+
+                await service.getPromptsForGeneration('w-1');
+
+                expect(logSpy).toHaveBeenCalledTimes(1);
+                const payload = logSpy.mock.calls[0][0];
+                expect(payload).toMatchObject({
+                    message: 'advanced-prompts loaded for generation',
+                    workId: 'w-1',
+                    activeFields: ['relevanceAssessment', 'itemGeneration'],
+                });
+                // The editor-controlled prompt TEXT must never appear in the log.
+                const serialized = JSON.stringify(payload);
+                expect(serialized).not.toContain(promptText);
+                expect(serialized).not.toContain('another-secret-prompt');
+            });
+
+            it('logs an empty activeFields array when no advanced-prompt row exists', async () => {
+                repository.findByWorkId.mockResolvedValue(null);
+                const logSpy = jest
+                    .spyOn((service as any).logger, 'log')
+                    .mockImplementation(() => {});
+
+                await service.getPromptsForGeneration('w-1');
+
+                expect(logSpy).toHaveBeenCalledTimes(1);
+                expect(logSpy.mock.calls[0][0]).toMatchObject({
+                    message: 'advanced-prompts loaded for generation',
+                    workId: 'w-1',
+                    activeFields: [],
+                });
+            });
+        });
     });
 
     describe('deleteAdvancedPrompts', () => {

@@ -34,7 +34,9 @@ import { createTaskViaAPI, listAgentRuns } from './helpers/agents-tasks';
  *       `runtime.permissions` block faithfully mirrors the live matrix.
  *   POST  /api/agents/import?onConflict=rename { …envelope } → 201
  *       { created:{ …, permissions }, finalSlug, conflictResolution }. The
- *       imported clone preserves the exported permission matrix byte-for-byte.
+ *       imported clone is CLAMPED to the least-privilege all-false matrix —
+ *       D9 (#1258): envelope runtime.permissions is attacker-controllable,
+ *       so import deliberately ignores it; owners re-grant via the UI.
  *
  *   RUNTIME ENFORCEMENT NOTE: the flags gate the Agent's *tool catalog*
  *   (packages/agent/src/agents/agent-tool.service.ts — editAgentFile /
@@ -314,13 +316,13 @@ test.describe('Agent permissions matrix', () => {
         expect(fresh.permissions.canSpend).toBe(true);
     });
 
-    test('export/import faithfully round-trips a bespoke permission matrix onto the cloned Agent', async ({
+    test('export carries the bespoke permission matrix; import CLAMPS the clone to least-privilege (D9)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
 
         // Build a non-trivial matrix: a couple of orthogonal grants PLUS the
-        // PR pair (so the round-trip has to carry the coerced commit too).
+        // PR pair (so the export has to carry the coerced commit too).
         const source = await createAgent(request, u.access_token, `Perm Export Src ${stamp()}`, {
             canCallExternalTools: true,
             canEditSkills: true,
@@ -353,11 +355,14 @@ test.describe('Agent permissions matrix', () => {
         expect(imported.created?.id).toMatch(UUID_RE);
         expect(imported.created.id).not.toBe(source.id);
 
-        // The clone preserves the matrix byte-for-byte (incl. the coerced
-        // commit), and a follow-up GET on the new id confirms persistence.
-        expect(imported.created.permissions).toEqual(sourceMatrix);
+        // Security (D9, #1258 agent-export hardening): the envelope's
+        // runtime.permissions is attacker-controllable (an envelope can come
+        // from an untrusted export), so import deliberately does NOT honor it
+        // — the clone is clamped to the least-privilege default matrix and
+        // the owner re-grants capabilities through the permissions UI.
+        expect(imported.created.permissions).toEqual(ALL_FALSE);
         const freshClone = await getAgent(request, u.access_token, imported.created.id);
-        expect(freshClone.permissions).toEqual(sourceMatrix);
+        expect(freshClone.permissions).toEqual(ALL_FALSE);
 
         // The original is untouched by the export/import cycle.
         const freshSource = await getAgent(request, u.access_token, source.id);

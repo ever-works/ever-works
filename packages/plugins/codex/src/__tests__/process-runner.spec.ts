@@ -50,7 +50,7 @@ describe('process-runner', () => {
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'codex',
-			['exec', '--full-auto', '--skip-git-repo-check', '--model', 'codex-mini-latest', 'Generate items'],
+			['exec', '--full-auto', '--skip-git-repo-check', '--model', 'codex-mini-latest', '--', 'Generate items'],
 			expect.objectContaining({
 				cwd: '/tmp/workspace',
 				env: expect.objectContaining({ OPENAI_API_KEY: 'sk-test' }),
@@ -83,6 +83,7 @@ describe('process-runner', () => {
 				'/tmp/workspace/_meta/schema.json',
 				'--output-last-message',
 				'/tmp/workspace/_meta/output.json',
+				'--',
 				'Return JSON items'
 			],
 			expect.any(Object)
@@ -125,7 +126,7 @@ describe('process-runner', () => {
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'/usr/local/bin/codex',
-			['exec', '--full-auto', '--skip-git-repo-check', 'Generate items'],
+			['exec', '--full-auto', '--skip-git-repo-check', '--', 'Generate items'],
 			expect.any(Object)
 		);
 
@@ -143,9 +144,26 @@ describe('process-runner', () => {
 
 		expect(spawnMock).toHaveBeenCalledWith(
 			'codex',
-			['exec', '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', 'Generate items'],
+			['exec', '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check', '--', 'Generate items'],
 			expect.any(Object)
 		);
+
+		child.emit('exit', 0);
+		await run.promise;
+	});
+
+	it('passes the prompt after an end-of-options separator so a flag-like prompt is not parsed as an option', async () => {
+		const run = executeCodex({
+			prompt: '--help me build items',
+			cwd: '/tmp/workspace',
+			env: {}
+		});
+
+		const args = spawnMock.mock.calls[0][1] as string[];
+		const promptIndex = args.indexOf('--help me build items');
+		expect(promptIndex).toBeGreaterThan(0);
+		// The prompt must be immediately preceded by the `--` end-of-options marker.
+		expect(args[promptIndex - 1]).toBe('--');
 
 		child.emit('exit', 0);
 		await run.promise;

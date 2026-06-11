@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { securityHeaders } from './security-headers.js';
 
 process.env.MCP_TRANSPORT = 'streamable-http';
 
@@ -38,6 +39,12 @@ async function bootstrap() {
 		},
 		credentials: true
 	});
+
+	// Security: baseline security headers (X-Content-Type-Options,
+	// X-Frame-Options, Referrer-Policy, CSP, ...) on every response.
+	// apps/api uses helmet() for this; helmet is not a dependency of the MCP
+	// app, so the equivalent headers are set manually in security-headers.ts.
+	app.use(securityHeaders());
 
 	await app.listen(config.httpPort);
 

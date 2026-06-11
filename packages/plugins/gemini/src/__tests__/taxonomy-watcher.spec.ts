@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, relative, resolve, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { startTaxonomyWatcher } from '../utils/taxonomy-watcher';
 
@@ -134,6 +134,47 @@ describe('taxonomy-watcher', () => {
 			);
 		} finally {
 			watcher.stop();
+		}
+	});
+
+	it('should not sync taxonomy for path-traversal filenames (workspace confinement)', async () => {
+		// Sibling directory OUTSIDE the workspace root — a successful traversal would
+		// drop a categories.json here (or read/write outside the workspace).
+		const outsideDir = await mkdtemp(join(tmpdir(), 'tax-watcher-outside-'));
+		try {
+			// Pre-seed an item file in the outside dir that a `../` event would target.
+			await writeFile(
+				join(outsideDir, 'evil.json'),
+				JSON.stringify({ name: 'Evil', category: 'Pwned', tags: ['x'] }),
+				'utf-8'
+			);
+
+			// Re-create the watcher's confinement guard in isolation: a relative filename
+			// that escapes the workspace root must be rejected before any read/write.
+			const traversalName = join('..', `${outsideDir.split(/[\\/]/).pop()}`, 'evil.json');
+			const filePath = join(workspacePath, traversalName);
+			const rel = relative(resolve(workspacePath), resolve(filePath));
+			expect(rel.startsWith('..') || isAbsolute(rel)).toBe(true);
+
+			const watcher = startTaxonomyWatcher({ workspacePath, logger });
+			try {
+				// Writing into the workspace must NOT touch the outside dir.
+				await writeFile(
+					join(workspacePath, 'safe.json'),
+					JSON.stringify({ name: 'Safe', category: 'Ok', tags: ['ok'] }),
+					'utf-8'
+				);
+				await sleep(300);
+
+				// The watcher only ever syncs taxonomy under the workspace `_meta/`.
+				// No taxonomy file should leak into the sibling/outside directory.
+				const { access } = await import('node:fs/promises');
+				await expect(access(join(outsideDir, '_meta', 'categories.json'))).rejects.toThrow();
+			} finally {
+				watcher.stop();
+			}
+		} finally {
+			await rm(outsideDir, { recursive: true, force: true });
 		}
 	});
 

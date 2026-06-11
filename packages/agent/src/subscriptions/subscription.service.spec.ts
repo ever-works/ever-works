@@ -702,6 +702,39 @@ describe('SubscriptionService', () => {
                 defaultPlanId: PREMIUM_PLAN.id,
             });
         });
+
+        // E2E/test escape hatch (config.subscriptions.allowSelfServePaidPlans):
+        // SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID=true permits a paid self-assign so
+        // the tier-gating / billing-grace e2e specs can reach STANDARD/PREMIUM
+        // without a real billing integration. The beforeEach above resets
+        // process.env every test (NODE_ENV stays jest's 'test', i.e. non-prod).
+        it('e2e escape hatch: allows a paid self-assign when SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID=true (non-production)', async () => {
+            process.env.SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID = 'true';
+            const user = { id: 'u1' } as any;
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue(PREMIUM_PLAN),
+            });
+            const plan = await service.changePlanSelfService(user, SubscriptionPlanCode.PREMIUM);
+            expect(plan).toBe(PREMIUM_PLAN);
+            expect(userRepository.update).toHaveBeenCalledWith('u1', {
+                defaultPlanId: PREMIUM_PLAN.id,
+            });
+        });
+
+        // Production hard-gate: even with the flag set, NODE_ENV=production
+        // IGNORES it, so the EW-711 #23 free→paid escalation guard can never be
+        // re-opened by an accidental prod env value.
+        it('e2e escape hatch is HARD-GATED off in production (flag set but NODE_ENV=production → still rejected)', async () => {
+            process.env.SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID = 'true';
+            process.env.NODE_ENV = 'production';
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue(PREMIUM_PLAN),
+            });
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as any, SubscriptionPlanCode.PREMIUM),
+            ).rejects.toThrow(ForbiddenException);
+            expect(userRepository.update).not.toHaveBeenCalled();
+        });
     });
 
     describe('summarizePlan', () => {

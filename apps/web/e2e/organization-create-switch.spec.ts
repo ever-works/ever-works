@@ -44,6 +44,10 @@ test.describe('Organizations — create + switch via header', () => {
         request,
         baseURL,
     }) => {
+        // Modal create + header-switch drives several first-hit dashboard +
+        // slug-scoped routes, each cold-compiling under Next.js dev mode in
+        // CI — budget generously so the slug navigation below doesn't race it.
+        test.setTimeout(120_000);
         const stamp = Date.now().toString(36);
         const alpha = `E2E Org Alpha ${stamp}`;
         const beta = `E2E Org Beta ${stamp}`;
@@ -85,6 +89,6 @@ test.describe('Organizations — create + switch via header', () => {
             (o) => o.displayName === alpha,
         )?.slug;
         expect(alphaSlug, 'alpha should have a slug').toBeTruthy();
-        await page.waitForURL(new RegExp(`/${alphaSlug}(/|$)`), { timeout: 30_000 });
+        await page.waitForURL(new RegExp(`/${alphaSlug}(/|$)`), { timeout: 90_000 });
     });
 });

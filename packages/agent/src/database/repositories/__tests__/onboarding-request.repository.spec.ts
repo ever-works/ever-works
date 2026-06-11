@@ -157,11 +157,14 @@ describe('OnboardingRequestRepository', () => {
 
     describe('markFailure', () => {
         it('writes status="failed" + failureCode + failureDetail', async () => {
-            await service.markFailure('o1', 'invalid_repo', { hint: 'private' });
+            // Security: markFailure now only accepts OnboardingFailureDetail
+            // ({ message, code? }) — not `unknown` — so raw Error objects with
+            // stack traces can never be persisted; test input must conform.
+            await service.markFailure('o1', 'invalid_repo', { message: 'private repo' });
             expect(repository.update).toHaveBeenCalledWith('o1', {
                 status: 'failed',
                 failureCode: 'invalid_repo',
-                failureDetail: { hint: 'private' },
+                failureDetail: { message: 'private repo' },
             });
         });
 

@@ -64,6 +64,25 @@ describe('MailgunPlugin', () => {
 		expect(clientMock.mock.calls[0][0]).toMatchObject({ url: 'https://api.eu.mailgun.net' });
 	});
 
+	it('serves a repeated messageRef from the idempotency cache without re-calling the SDK', async () => {
+		createMock.mockResolvedValue({ id: '<cache@mg>' });
+		const input = { from: 'a@x.com', to: ['b@x.com'], subject: 's', bodyText: 't', messageRef: 'r-cache' };
+		await plugin.sendEmail(input, { userId: 'u' });
+		await plugin.sendEmail(input, { userId: 'u' });
+		expect(createMock).toHaveBeenCalledTimes(1);
+	});
+
+	it('does NOT serve a cached result across different userIds (tenant isolation)', async () => {
+		// Security: the local idempotency cache key is scoped by
+		// options.userId/workId — the same messageRef from two different users
+		// must trigger two real sends, never leak user A's cached result to B.
+		createMock.mockResolvedValue({ id: '<scoped@mg>' });
+		const input = { from: 'a@x.com', to: ['b@x.com'], subject: 's', bodyText: 't', messageRef: 'r-shared' };
+		await plugin.sendEmail(input, { userId: 'user-a' });
+		await plugin.sendEmail(input, { userId: 'user-b' });
+		expect(createMock).toHaveBeenCalledTimes(2);
+	});
+
 	it('throws when the Mailgun SDK rejects the send', async () => {
 		createMock.mockRejectedValueOnce({ status: 401, message: 'Forbidden' });
 		await expect(

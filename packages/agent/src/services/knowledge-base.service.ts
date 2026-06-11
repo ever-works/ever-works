@@ -46,6 +46,7 @@ import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '..
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } from '../tasks';
 import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { sanitizeDescription } from '../utils/sanitize.util';
 import type {
     CitationDto,
     KbDocumentBodyDto,
@@ -155,6 +156,40 @@ export class KnowledgeBaseService {
      * doesn't silently flatten retrieval quality forever.
      */
     private vectorStoreDegradedLogged = false;
+
+    /**
+     * True when a vector-store error means "no usable backend right now" and
+     * the caller should degrade gracefully rather than 500.
+     *
+     * Two shapes qualify:
+     *  - `VectorStoreNotConfiguredError` — the facade resolved nothing
+     *    selectable (no plugin installed / pinned).
+     *  - A plugin-surfaced `VectorStoreError` with code `'unavailable'` —
+     *    the facade resolved a plugin but it cannot serve. This is exactly
+     *    what the default `@ever-works/pgvector-plugin` throws when its
+     *    chunk repository port is not wired (Phase-2 host wiring is still a
+     *    TODO), e.g. the SQLite e2e environment: `requireRepository()` →
+     *    `VectorStoreError('… not wired in', 'unavailable')`. Before this
+     *    guard, that error escaped the `NotConfigured`-only catch and 500'd
+     *    every synchronous KB delete (the embed/upsert path is async so it
+     *    never surfaced). A genuine vendor outage in prod is also
+     *    `'unavailable'`; degrading (skip vector cleanup / lexical-only
+     *    search) is the documented fallback there too.
+     *
+     * Matched structurally (name + code) rather than via `instanceof` so the
+     * check survives the agent ↔ plugin package boundary regardless of how
+     * the plugin bundle is built.
+     */
+    private isDegradableVectorStoreError(error: unknown): boolean {
+        if (error instanceof VectorStoreNotConfiguredError) {
+            return true;
+        }
+        return (
+            error instanceof Error &&
+            error.name === 'VectorStoreError' &&
+            (error as { code?: string }).code === 'unavailable'
+        );
+    }
 
     constructor(
         private readonly documentRepository: WorkKnowledgeDocumentRepository,
@@ -1096,7 +1131,7 @@ export class KnowledgeBaseService {
                     distance: 1 - hit.normalizedScore,
                 }));
             } catch (error) {
-                if (error instanceof VectorStoreNotConfiguredError) {
+                if (this.isDegradableVectorStoreError(error)) {
                     if (!this.vectorStoreDegradedLogged) {
                         this.vectorStoreDegradedLogged = true;
                         this.logger.warn(
@@ -1247,7 +1282,7 @@ export class KnowledgeBaseService {
                     { workId: input.workId, userId: input.userId },
                 );
             } catch (error) {
-                if (error instanceof VectorStoreNotConfiguredError) {
+                if (this.isDegradableVectorStoreError(error)) {
                     if (!this.vectorStoreDegradedLogged) {
                         this.vectorStoreDegradedLogged = true;
                         this.logger.warn(
@@ -1279,7 +1314,7 @@ export class KnowledgeBaseService {
                     { workId: input.workId, userId: input.userId },
                 );
             } catch (error) {
-                if (error instanceof VectorStoreNotConfiguredError) {
+                if (this.isDegradableVectorStoreError(error)) {
                     if (!this.vectorStoreDegradedLogged) {
                         this.vectorStoreDegradedLogged = true;
                         this.logger.warn(
@@ -1812,7 +1847,10 @@ export class KnowledgeBaseService {
                 // fall through to the "no body" branch which transitions
                 // to SKIPPED and returns a null document. Operator can
                 // recover via POST /retry-extraction.
-                const reason = (error as Error).message;
+                // Security (info-leak): extractionError is a client-visible
+                // KbUploadDto field — sanitize the raw message (strip control
+                // chars/newlines, cap at 500) before persisting it.
+                const reason = sanitizeDescription((error as Error).message, 500);
                 this.logger.warn(
                     `KB extractor threw for upload=${upload.id} mime=${input.file.mimeType}: ${reason}`,
                 );
@@ -1931,7 +1969,10 @@ export class KnowledgeBaseService {
             );
             return docRow;
         } catch (error) {
-            const reason = (error as Error).message;
+            // Security (info-leak): extractionError is a client-visible
+            // KbUploadDto field — sanitize the raw message (strip control
+            // chars/newlines, cap at 500) before persisting it.
+            const reason = sanitizeDescription((error as Error).message, 500);
             await this.uploadRepository.update(upload.id, {
                 extractionStatus: KbUploadExtractionStatus.FAILED,
                 extractionFinishedAt: new Date(),

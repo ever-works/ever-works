@@ -18,9 +18,16 @@ import {
     TenantEmailAddressRepository,
     AgentEmailAssignmentRepository,
     EmailMessageRepository,
+    AgentRepository,
 } from '@ever-works/agent/database';
 import type { TenantEmailAddress, EmailAddressDirection } from '@ever-works/agent/entities';
 import { EmailFacadeService } from '@ever-works/agent/facades';
+
+/**
+ * EW-711 #44 — how long an address-verification token stays valid after
+ * issuance. A leaked confirmation link must not verify an address forever.
+ */
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 // Security: these request bodies are bound directly via `@Body()` in
 // email.controller.ts. The global ValidationPipe (main.ts) runs with
@@ -134,6 +141,7 @@ export class EmailService {
         private readonly assignments: AgentEmailAssignmentRepository,
         private readonly messages: EmailMessageRepository,
         private readonly emailFacade: EmailFacadeService,
+        private readonly agents: AgentRepository,
     ) {}
 
     async listAddresses(
@@ -157,6 +165,9 @@ export class EmailService {
             defaultForReplies: input.defaultForReplies ?? false,
             verified: false,
             verificationToken,
+            // EW-711 #44: time-box the verification token so a leaked
+            // confirmation link cannot verify the address indefinitely.
+            verificationTokenExpiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
         } as TenantEmailAddress);
     }
 
@@ -195,7 +206,16 @@ export class EmailService {
     async confirmVerification(token: string): Promise<{ verified: boolean }> {
         const row = await this.addresses.findByVerificationToken(token);
         if (!row) return { verified: false };
-        await this.addresses.update(row.id, { verified: true, verificationToken: null });
+        // EW-711 #44: reject expired tokens (24h TTL stamped at issuance).
+        // Rows pre-dating the expiry column have NULL and stay confirmable.
+        if (row.verificationTokenExpiresAt && row.verificationTokenExpiresAt < new Date()) {
+            return { verified: false };
+        }
+        await this.addresses.update(row.id, {
+            verified: true,
+            verificationToken: null,
+            verificationTokenExpiresAt: null,
+        });
         return { verified: true };
     }
 
@@ -221,6 +241,13 @@ export class EmailService {
      * messageRef.
      */
     async sendMessage(userId: string, input: SendMessageInput) {
+        // EW-711 #16 (IDOR): the caller-supplied agentId is persisted on the
+        // email_messages audit row and recorded against usage, so it MUST
+        // belong to the calling user. Verify ownership before any address
+        // resolution or provider send.
+        const agent = await this.agents.findByIdAndUser(input.agentId, userId);
+        if (!agent) throw new NotFoundException('Agent not found');
+
         let address: TenantEmailAddress | null = null;
         if (input.fromAddressId) {
             address = await this.addresses.findByIdForUser(input.fromAddressId, userId);

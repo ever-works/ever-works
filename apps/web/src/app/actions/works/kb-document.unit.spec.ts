@@ -17,7 +17,32 @@ vi.mock('@/lib/api/kb', () => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
+// Security (EW-718): the action's error mapper branches on `ApiResponseError`,
+// so the spec provides a matching stand-in (the real one is `server-only`).
+// Shape mirrors `lib/api/server-api.ts` (message + statusCode + optional
+// code/details). Defined inside the factory because `vi.mock` is hoisted
+// above top-level declarations — other sibling specs mock it the same way.
+vi.mock('@/lib/api/server-api', () => ({
+    ApiResponseError: class ApiResponseError extends Error {
+        constructor(
+            message: string,
+            public readonly statusCode: number,
+            public readonly code?: string,
+            public readonly details?: Record<string, unknown>,
+        ) {
+            super(message);
+            this.name = 'ApiResponseError';
+        }
+    },
+}));
+
 import { overrideInheritedKbDocumentAction } from './kb-document';
+// The pure error mapper lives in its own module (a `'use server'` file may
+// only export async actions), so import it directly for unit testing.
+import { toSafeActionError } from './kb-document-error';
+// Pull the mocked class back out so the tests can construct instances that
+// pass the `instanceof ApiResponseError` check inside `toSafeActionError`.
+import { ApiResponseError } from '@/lib/api/server-api';
 
 const INHERITED_DOC = {
     id: 'org-doc-1',
@@ -138,7 +163,9 @@ describe('overrideInheritedKbDocumentAction (row 38d)', () => {
     });
 
     it('returns failure envelope and skips create + revalidate when fetch throws', async () => {
-        getInheritedDocumentMock.mockRejectedValueOnce(new Error('inherited 404'));
+        // Security (EW-718): a plain Error is NOT an ApiResponseError, so its
+        // raw message must NOT reach the client — the generic fallback is used.
+        getInheritedDocumentMock.mockRejectedValueOnce(new Error('inherited 404 at /var/lib/db'));
 
         const result = await overrideInheritedKbDocumentAction({
             workId: 'work-1',
@@ -146,14 +173,18 @@ describe('overrideInheritedKbDocumentAction (row 38d)', () => {
             idOrPath: 'legal/missing.md',
         });
 
-        expect(result).toEqual({ success: false, error: 'inherited 404' });
+        expect(result).toEqual({ success: false, error: 'Failed to override inherited document' });
         expect(createDocumentMock).not.toHaveBeenCalled();
         expect(revalidatePathMock).not.toHaveBeenCalled();
     });
 
     it('returns failure envelope when create throws (e.g. path collision)', async () => {
         getInheritedDocumentMock.mockResolvedValueOnce(INHERITED_DOC);
-        createDocumentMock.mockRejectedValueOnce(new Error('path already exists'));
+        // Security (EW-718): an ApiResponseError 409 maps to a curated,
+        // business-safe collision message — not the raw backend string.
+        createDocumentMock.mockRejectedValueOnce(
+            new ApiResponseError('Internal: path already exists in shard pg-7', 409),
+        );
 
         const result = await overrideInheritedKbDocumentAction({
             workId: 'work-1',
@@ -161,7 +192,11 @@ describe('overrideInheritedKbDocumentAction (row 38d)', () => {
             idOrPath: 'legal/privacy.md',
         });
 
-        expect(result).toEqual({ success: false, error: 'path already exists' });
+        expect(result).toEqual({
+            success: false,
+            error: 'A document already exists at this location.',
+        });
+        expect(result).not.toMatchObject({ error: expect.stringContaining('shard') });
         expect(revalidatePathMock).not.toHaveBeenCalled();
     });
 
@@ -177,6 +212,64 @@ describe('overrideInheritedKbDocumentAction (row 38d)', () => {
         expect(result.success).toBe(false);
         if (!result.success) {
             expect(result.error).toBe('Failed to override inherited document');
+        }
+    });
+});
+
+describe('toSafeActionError (EW-718 info-leak guard)', () => {
+    const RAW = 'Internal: connection to postgres://kb_user@10.0.3.4:5432 refused';
+    const FALLBACK = 'Failed to save document';
+
+    it('maps 5xx ApiResponseError to a generic message and NEVER echoes the raw string', () => {
+        for (const status of [500, 502, 503, 504]) {
+            const msg = toSafeActionError(new ApiResponseError(RAW, status), FALLBACK);
+            expect(msg).toBe('Something went wrong, please try again.');
+            expect(msg).not.toContain('postgres');
+            expect(msg).not.toContain('10.0.3.4');
+        }
+    });
+
+    it('maps unknown / unhandled 4xx codes to a generic "Request failed." (no raw leak)', () => {
+        const msg = toSafeActionError(new ApiResponseError(RAW, 418), FALLBACK);
+        expect(msg).toBe('Request failed.');
+        expect(msg).not.toContain('postgres');
+    });
+
+    it('does NOT echo raw message for a plain Error — returns the action fallback', () => {
+        const msg = toSafeActionError(new Error(RAW), FALLBACK);
+        expect(msg).toBe(FALLBACK);
+        expect(msg).not.toContain('postgres');
+    });
+
+    it('does NOT echo raw value for a non-Error throw — returns the action fallback', () => {
+        expect(toSafeActionError('boom: /etc/passwd', FALLBACK)).toBe(FALLBACK);
+        expect(toSafeActionError(null, FALLBACK)).toBe(FALLBACK);
+        expect(toSafeActionError({ stack: 'secret' }, FALLBACK)).toBe(FALLBACK);
+    });
+
+    it('returns curated business-safe messages for the well-known 4xx codes (legit path)', () => {
+        // These are intentionally hard-coded strings, NOT the raw backend
+        // message — so a known 4xx still gives the user actionable copy.
+        expect(toSafeActionError(new ApiResponseError(RAW, 401), FALLBACK)).toBe(
+            'You must be signed in to do that.',
+        );
+        expect(toSafeActionError(new ApiResponseError(RAW, 403), FALLBACK)).toBe(
+            'You do not have permission to do that.',
+        );
+        expect(toSafeActionError(new ApiResponseError(RAW, 404), FALLBACK)).toBe(
+            'The requested document was not found.',
+        );
+        expect(toSafeActionError(new ApiResponseError(RAW, 409), FALLBACK)).toBe(
+            'A document already exists at this location.',
+        );
+        expect(toSafeActionError(new ApiResponseError(RAW, 400), FALLBACK)).toBe(
+            'Invalid request. Please check your input and try again.',
+        );
+        // None of the curated 4xx messages contain the raw backend detail.
+        for (const status of [401, 403, 404, 409, 400]) {
+            expect(toSafeActionError(new ApiResponseError(RAW, status), FALLBACK)).not.toContain(
+                'postgres',
+            );
         }
     });
 });

@@ -270,7 +270,13 @@ export class SubscriptionService implements OnModuleInit {
             throw new BadRequestException('Subscriptions are disabled');
         }
         const plan = await this.resolvePlanOrThrow(planCode);
-        if (this.isPaidPlan(plan)) {
+        // EW-711 #23 — a paid plan requires a billing-verified grant
+        // ({@link assignPlanToUser}). The only exception is the e2e/test
+        // escape hatch (default OFF, hard-gated off in production) so the
+        // tier-gating / billing-grace specs can reach STANDARD/PREMIUM
+        // without a real billing integration. See
+        // `config.subscriptions.allowSelfServePaidPlans`.
+        if (this.isPaidPlan(plan) && !config.subscriptions.allowSelfServePaidPlans()) {
             throw new ForbiddenException(
                 'Paid plans must be activated through billing and cannot be self-assigned.',
             );

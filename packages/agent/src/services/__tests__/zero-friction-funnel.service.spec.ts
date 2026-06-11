@@ -61,4 +61,26 @@ describe('ZeroFrictionFunnelService (EW-617 G8)', () => {
         svc.emit(circular as any);
         expect(logCalls[0]).toMatch(/event=x correlationId=corr-2/);
     });
+
+    it('strips CR/LF from event and correlationId in the key=value fallback (log injection)', () => {
+        // Force the JSON.stringify path to throw (circular ref) so the
+        // key=value fallback runs, with attacker-controlled newlines in
+        // both interpolated fields.
+        const circular: any = {
+            funnelStep: 1,
+            event: 'evil\r\n[zero-friction] event=forged',
+            correlationId: 'corr\n3',
+        };
+        circular.self = circular;
+        svc.emit(circular as any);
+
+        // Exactly one log line emitted — no forged second line.
+        expect(logCalls).toHaveLength(1);
+        // No raw CR/LF survives in the emitted line.
+        expect(logCalls[0]).not.toMatch(/[\r\n]/);
+        // Newlines are replaced with '_' and the line is otherwise intact.
+        expect(logCalls[0]).toBe(
+            '[zero-friction] event=evil__[zero-friction] event=forged correlationId=corr_3',
+        );
+    });
 });

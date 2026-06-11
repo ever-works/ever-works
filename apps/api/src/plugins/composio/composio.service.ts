@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Composio } from '@composio/core';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
+import { config } from '../../config/constants';
 // Security: lexical SSRF guard (private/loopback/link-local/IPv4-mapped-IPv6 +
 // cloud-metadata hosts, http(s)-only) reused from the canonical helper so a
 // user-controlled `baseUrl` cannot point the Composio SDK at internal targets.
@@ -86,7 +87,69 @@ export interface ComposioSdkLike {
 export class ComposioService {
     private readonly logger = new Logger(ComposioService.name);
 
-    constructor(private readonly settingsService: PluginSettingsService) {}
+    // EW-719 (open-redirect): host allow-list for the user-supplied
+    // `callbackUrl` that Composio redirects the browser to after the OAuth
+    // dance. Parsed once at construction. The default always includes the
+    // platform web-app host (`config.webAppUrl()`); operators can extend it
+    // with the same `ALLOWED_CALLBACK_HOSTS` env the auth service honours,
+    // so the two allow-lists stay in sync.
+    private readonly allowedCallbackHosts: Set<string>;
+
+    constructor(private readonly settingsService: PluginSettingsService) {
+        this.allowedCallbackHosts = this.parseAllowedCallbackHosts();
+    }
+
+    private parseAllowedCallbackHosts(): Set<string> {
+        const hosts = new Set<string>();
+        try {
+            hosts.add(new URL(config.webAppUrl()).host.toLowerCase());
+        } catch {
+            // webAppUrl validated elsewhere at boot
+        }
+        const env = process.env.ALLOWED_CALLBACK_HOSTS;
+        if (env) {
+            for (const raw of env.split(',')) {
+                const v = raw.trim().toLowerCase();
+                if (v) hosts.add(v);
+            }
+        }
+        return hosts;
+    }
+
+    /**
+     * EW-719: enforce a host allow-list on the user-supplied OAuth
+     * `callbackUrl` before it reaches the Composio SDK. Without this, an
+     * attacker can pass `callbackUrl=https://attacker.example/steal` and
+     * Composio will emit a redirect to that origin once the victim finishes
+     * the OAuth flow — a classic open redirect (and a token-exfiltration
+     * vector if any credential rides the redirect).
+     *
+     * Mirrors `AuthService.validateCallbackUrl`: returns the URL only when
+     * its scheme is http(s) AND its host is allow-listed; otherwise returns
+     * undefined so the caller falls back to Composio's platform default.
+     * Fails CLOSED — a malformed URL or non-http(s) scheme is rejected.
+     */
+    private validateCallbackUrl(callbackUrl: string | undefined | null): string | undefined {
+        if (!callbackUrl) return undefined;
+        let parsed: URL;
+        try {
+            parsed = new URL(callbackUrl);
+        } catch {
+            this.logger.warn(`Rejected Composio callbackUrl: not a valid URL (${callbackUrl})`);
+            return undefined;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            this.logger.warn(`Rejected Composio callbackUrl: bad scheme (${parsed.protocol})`);
+            return undefined;
+        }
+        if (!this.allowedCallbackHosts.has(parsed.host.toLowerCase())) {
+            this.logger.warn(
+                `Rejected Composio callbackUrl: host '${parsed.host}' is not in ALLOWED_CALLBACK_HOSTS`,
+            );
+            return undefined;
+        }
+        return callbackUrl;
+    }
 
     /**
      * Builds a per-request `Composio` SDK client from the caller's stored
@@ -197,10 +260,15 @@ export class ComposioService {
                 'authConfigId is required. Create an auth config for this toolkit in the Composio dashboard or via the auth-configs API and pass its id here.',
             );
         }
+        // EW-719 (open-redirect): only forward the caller's callbackUrl to the
+        // SDK when its host is platform-allow-listed. A rejected URL is dropped
+        // (undefined) so Composio falls back to its configured default rather
+        // than redirecting the victim's browser to an attacker origin.
+        const safeCallbackUrl = this.validateCallbackUrl(body.callbackUrl);
         const sdk = await this.getSdk(userId);
         try {
             const result = await sdk.connectedAccounts.initiate(userId, body.authConfigId, {
-                ...(body.callbackUrl ? { callbackUrl: body.callbackUrl } : {}),
+                ...(safeCallbackUrl ? { callbackUrl: safeCallbackUrl } : {}),
             });
             const redirectUrl = result.connectionRequest?.redirectUrl ?? result.redirectUrl;
             if (!redirectUrl) {

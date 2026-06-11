@@ -246,6 +246,36 @@ describe('DirectoryWebsiteClient', () => {
             expect(httpService.get).toHaveBeenCalledTimes(2);
         });
 
+        // Security (info leak): raw Axios network errors embed internal IPs /
+        // hostnames (e.g. `connect ECONNREFUSED 10.96.0.1:443`) and
+        // `degraded.detail` is serialised to the browser via FeedResponse, so
+        // the network fallback must return a static detail string instead of
+        // forwarding `err.message`.
+        it('does not leak the raw network error message into degraded.detail', async () => {
+            httpService.get.mockReturnValue(
+                throwError(() =>
+                    makeAxiosError({
+                        code: 'ECONNREFUSED',
+                        message: 'connect ECONNREFUSED 10.96.0.1:443',
+                    }),
+                ),
+            );
+            const result = await client.fetchActivityFeed(makeWork() as never, {
+                limit: 50,
+                types: ['all'],
+            });
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                const { degraded } = result as {
+                    ok: false;
+                    degraded: { reason: string; detail?: string };
+                };
+                expect(degraded.reason).toBe('network');
+                expect(degraded.detail).toBe('Network error');
+                expect(degraded.detail).not.toContain('10.96.0.1');
+            }
+        });
+
         it('rejects responses with malformed shape', async () => {
             httpService.get.mockReturnValue(of(makeResponse({ entries: 'not-an-array' })));
             const result = await client.fetchActivityFeed(makeWork() as never, {

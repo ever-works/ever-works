@@ -28,6 +28,21 @@ function sanitizeCustomPrompt(value: string): string {
     );
 }
 
+// Security: item name/description come from SIM-sourced (externally controlled
+// repo) content and are interpolated into single-field prompt slots. Collapse
+// newlines to a space (so the value can't spill across the "- Description:"
+// line into a forged instruction), strip chat-template / instruction delimiter
+// tokens (which let it spoof role/turn boundaries), and cap length. Mirrors the
+// item-health.service.ts `sanitizePromptVariable` pattern.
+const MAX_PROMPT_VARIABLE_LENGTH = 500;
+
+function sanitizePromptVariable(value: string, maxLength = MAX_PROMPT_VARIABLE_LENGTH): string {
+    return value
+        .replace(/\r?\n|\r/g, ' ')
+        .replace(/\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi, '')
+        .slice(0, maxLength);
+}
+
 export interface ComparisonAiDependencies {
     readonly askJson: <T>(prompt: string) => Promise<T>;
     readonly askText: (prompt: string) => Promise<string>;
@@ -195,11 +210,18 @@ export function buildStructurePromptVariables(
     }
 
     return {
-        itemAName: pair.itemA.name,
-        itemADescription: pair.itemA.description || 'No description available',
+        // Security: itemA/B name + description are SIM-sourced (externally
+        // controlled repo content) and could carry control/delimiter tokens —
+        // sanitize before interpolation (see sanitizePromptVariable).
+        itemAName: sanitizePromptVariable(pair.itemA.name),
+        itemADescription: sanitizePromptVariable(
+            pair.itemA.description || 'No description available',
+        ),
         itemASourceUrl: pair.itemA.source_url || 'N/A',
-        itemBName: pair.itemB.name,
-        itemBDescription: pair.itemB.description || 'No description available',
+        itemBName: sanitizePromptVariable(pair.itemB.name),
+        itemBDescription: sanitizePromptVariable(
+            pair.itemB.description || 'No description available',
+        ),
         itemBSourceUrl: pair.itemB.source_url || 'N/A',
         category: pair.category,
         workContextSection,

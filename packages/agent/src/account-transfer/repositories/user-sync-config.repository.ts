@@ -15,13 +15,10 @@ export class UserSyncConfigRepository {
     }
 
     async upsert(userId: string, data: Partial<UserSyncConfig>): Promise<UserSyncConfig | null> {
-        const existing = await this.findByUser(userId);
-        if (existing) {
-            await this.repository.update({ userId }, data);
-            return this.findByUser(userId);
-        }
-        const record = this.repository.create({ userId, ...data });
-        return this.repository.save(record);
+        // Atomic DB-level upsert (INSERT ... ON CONFLICT) avoids the TOCTOU race
+        // that find→update-or-create exposes when two writers hit the same userId.
+        await this.repository.upsert({ userId, ...data }, { conflictPaths: ['userId'] });
+        return this.findByUser(userId);
     }
 
     async delete(userId: string): Promise<boolean> {

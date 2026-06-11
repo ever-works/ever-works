@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OnboardingRequest, type OnboardingStatus } from '../../entities';
+import {
+    OnboardingRequest,
+    type OnboardingFailureDetail,
+    type OnboardingStatus,
+} from '../../entities';
 
 @Injectable()
 export class OnboardingRequestRepository {
@@ -57,7 +61,15 @@ export class OnboardingRequestRepository {
         return (result.affected ?? 0) > 0;
     }
 
-    async markFailure(id: string, failureCode: string, failureDetail?: unknown): Promise<void> {
+    // Security: failureDetail is typed as OnboardingFailureDetail (mirroring the
+    // entity column) instead of `unknown` so callers cannot pass raw Error objects
+    // whose stack traces / internal paths would be persisted and later returned
+    // via status-poll endpoints.
+    async markFailure(
+        id: string,
+        failureCode: string,
+        failureDetail?: OnboardingFailureDetail | null,
+    ): Promise<void> {
         await this.repository.update(id, {
             status: 'failed',
             failureCode,
