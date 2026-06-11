@@ -19,10 +19,17 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *         id, userId,          // identical UUIDs
  *         email, username, provider,   // provider: 'local' | 'anonymous'
  *         emailVerified, isActive, avatar,
- *         iat, iss, aud,       // <-- PATH FINGERPRINT, see below
  *         isAnonymous?         // present on the SESSION path, absent on API-key path
  *       }
  *     -> 401 otherwise.
+ *
+ *   EW-722 (Wave M #156, info-leak): the fabricated iat/iss/aud claims are NO
+ *   LONGER echoed by /profile — the response is a whitelist projection. The
+ *   iss/aud "path fingerprint" assertions below were written defensively
+ *   (`if (body?.iss !== undefined)`) and now self-skip; they are kept (never
+ *   deleted) to document the historical fingerprint and to keep guarding the
+ *   exact values if the fields ever reappear. The isAnonymous
+ *   presence/absence distinction REMAINS a live path discriminator.
  *
  *   TOKEN MODEL: `access_token` from register/login/anonymous is an OPAQUE
  *   session bearer (randomBytes(24) base64url), NOT a JWT. There is NO

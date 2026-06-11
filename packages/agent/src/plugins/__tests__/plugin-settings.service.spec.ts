@@ -7,6 +7,7 @@ import { PluginRepository } from '../repositories/plugin.repository';
 import { UserPluginRepository } from '../repositories/user-plugin.repository';
 import { WorkPluginRepository } from '../repositories/work-plugin.repository';
 import { PluginEvents } from '../plugins.constants';
+import { PluginSecretEncService } from '../services/plugin-secret-enc.service';
 import type { IPlugin, PluginManifest, JsonSchema } from '@ever-works/plugin';
 
 // Silence Logger output during tests
@@ -708,6 +709,158 @@ describe('PluginSettingsService', () => {
                     workId: 'dir-1',
                 }),
             );
+        });
+    });
+
+    // D3 / C-08 (EW-716, D3-SIBLINGS residue) — at-rest encryption proof for the
+    // settings-PATCH persistence layer. The PluginOperationsService PATCH paths
+    // (updateUserPluginSettings / updateWorkPluginSettings) route every secret
+    // write through updateUserSettings / updateWorkSettings below; the
+    // operations-service spec proves that routing with a MOCKED settings
+    // service, so these tests close the remaining gap by running the REAL
+    // PluginSecretEncService with a configured key and asserting the
+    // repository receives `enc::v1::` envelopes — never the plaintext secret.
+    // The keyless dev/preview passthrough (no PLUGIN_SECRET_ENCRYPTION_KEY)
+    // is asserted too, since it is documented, load-bearing behavior.
+    describe('C-08 secret encryption at rest (PATCH-path persistence)', () => {
+        // 32-byte hex key, matching PLUGIN_SECRET_ENCRYPTION_KEY's contract.
+        const TEST_KEY = '0123456789abcdef'.repeat(4);
+        let savedKeyEnv: string | undefined;
+        let enc: PluginSecretEncService;
+        let encryptingService: PluginSettingsService;
+
+        beforeEach(() => {
+            savedKeyEnv = process.env.PLUGIN_SECRET_ENCRYPTION_KEY;
+            process.env.PLUGIN_SECRET_ENCRYPTION_KEY = TEST_KEY;
+            // Fresh instance per test — the service caches the key on first use.
+            enc = new PluginSecretEncService();
+            encryptingService = new PluginSettingsService(
+                registry,
+                pluginRepository,
+                userPluginRepository,
+                workPluginRepository,
+                eventEmitter,
+                undefined,
+                enc,
+            );
+        });
+
+        afterEach(() => {
+            if (savedKeyEnv === undefined) {
+                delete process.env.PLUGIN_SECRET_ENCRYPTION_KEY;
+            } else {
+                process.env.PLUGIN_SECRET_ENCRYPTION_KEY = savedKeyEnv;
+            }
+        });
+
+        it('persists enc::v1:: ciphertext (never plaintext) for user secrets when a key is configured', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            await encryptingService.updateUserSettings('test-plugin', 'user-1', {
+                secretToken: 'sk-patch-plaintext',
+            });
+
+            const created = (userPluginRepository.create as jest.Mock).mock.calls[0][0];
+            // The secret lands in the secret bag as an envelope, not plaintext.
+            expect(created.settings).toEqual({});
+            expect(created.secretSettings.secretToken).toMatch(/^enc::v1::/);
+            expect(JSON.stringify(created)).not.toContain('sk-patch-plaintext');
+            // Round-trip: the persisted envelope decrypts to the exact secret.
+            expect(enc.decryptValue(created.secretSettings.secretToken)).toBe('sk-patch-plaintext');
+        });
+
+        it('re-encrypts the merged secret bag on user PATCH updates (existing secrets preserved)', async () => {
+            const priorEnvelope = enc.encryptValue('old-secret');
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue({
+                id: '1',
+                userId: 'user-1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: { secretToken: priorEnvelope },
+            } as any);
+
+            // apiKey is x-secret + x-envVar (BYOK): the user-supplied value is
+            // kept and must be encrypted, not dropped or stored plaintext.
+            await encryptingService.updateUserSettings('test-plugin', 'user-1', {
+                apiKey: 'sk-new-byok',
+            });
+
+            const [, , regular, secrets] = (userPluginRepository.updateSettings as jest.Mock).mock
+                .calls[0];
+            expect(regular).toEqual({});
+            expect(secrets.apiKey).toMatch(/^enc::v1::/);
+            expect(secrets.secretToken).toMatch(/^enc::v1::/);
+            expect(JSON.stringify(secrets)).not.toContain('sk-new-byok');
+            expect(JSON.stringify(secrets)).not.toContain('old-secret');
+            expect(enc.decryptValue(secrets.apiKey)).toBe('sk-new-byok');
+            expect(enc.decryptValue(secrets.secretToken)).toBe('old-secret');
+        });
+
+        it('persists enc::v1:: ciphertext (never plaintext) for work secrets when a key is configured', async () => {
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(workPluginRepository, 'findByWorkAndPlugin').mockResolvedValue({
+                id: '1',
+                workId: 'dir-1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+
+            await encryptingService.updateWorkSettings('test-plugin', 'dir-1', {
+                secretToken: 'wk-patch-plaintext',
+            });
+
+            const [, , regular, secrets] = (workPluginRepository.updateSettings as jest.Mock).mock
+                .calls[0];
+            expect(regular).toEqual({});
+            expect(secrets.secretToken).toMatch(/^enc::v1::/);
+            expect(JSON.stringify(secrets)).not.toContain('wk-patch-plaintext');
+            expect(enc.decryptValue(secrets.secretToken)).toBe('wk-patch-plaintext');
+        });
+
+        it('preserves the keyless env passthrough (no key configured → plaintext, dev/preview)', async () => {
+            delete process.env.PLUGIN_SECRET_ENCRYPTION_KEY;
+            const keylessEnc = new PluginSecretEncService();
+            const keylessService = new PluginSettingsService(
+                registry,
+                pluginRepository,
+                userPluginRepository,
+                workPluginRepository,
+                eventEmitter,
+                undefined,
+                keylessEnc,
+            );
+            jest.spyOn(pluginRepository, 'findByPluginId').mockResolvedValue({
+                id: '1',
+                pluginId: 'test-plugin',
+                settings: {},
+                secretSettings: {},
+            } as any);
+            jest.spyOn(userPluginRepository, 'findByUserAndPlugin').mockResolvedValue(null);
+
+            await keylessService.updateUserSettings('test-plugin', 'user-1', {
+                secretToken: 'dev-plain',
+            });
+
+            const created = (userPluginRepository.create as jest.Mock).mock.calls[0][0];
+            expect(created.secretSettings.secretToken).toBe('dev-plain');
         });
     });
 

@@ -48,7 +48,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   GET /api/auth/profile        (JWT-DERIVED, Cache-Control private,no-store)
  *     → a SMALLER projection straight off the bearer claims:
  *       { id, userId, email, username, provider, emailVerified, isActive,
- *         avatar, iat, iss, aud, isAnonymous }. It deliberately does NOT carry
+ *         avatar, isAnonymous }. (EW-722 Wave M #156: the fabricated JWT
+ *       envelope claims iat/iss/aud are no longer echoed — whitelist
+ *       projection.) It deliberately does NOT carry
  *       committerName / committerEmail / emailBudgetAlerts — those live only in
  *       the DB row. So a committer-field write is invisible to /profile but
  *       visible to /profile/fresh: this divergence is a real contract, asserted below.
@@ -294,9 +296,14 @@ test.describe('Profile identity deep — JWT projection vs DB-fresh divergence',
         expect(jwtBefore).not.toHaveProperty('committerName');
         expect(jwtBefore).not.toHaveProperty('committerEmail');
         expect(jwtBefore).not.toHaveProperty('emailBudgetAlerts');
-        // It carries JWT envelope claims a DB row never would.
-        expect(jwtBefore).toHaveProperty('iss');
-        expect(jwtBefore).toHaveProperty('aud');
+        // EW-722 (Wave M #156, info-leak): the endpoint used to spread the full
+        // in-request principal, echoing fabricated JWT envelope claims
+        // (iat/iss/aud — deprecated per L-01, they sign nothing and
+        // fingerprinted which auth path resolved the request). The response is
+        // now a whitelist projection, so those claims must NEVER come back.
+        expect(jwtBefore).not.toHaveProperty('iat');
+        expect(jwtBefore).not.toHaveProperty('iss');
+        expect(jwtBefore).not.toHaveProperty('aud');
 
         // 2. Write committer + budget fields. These land in the DB ROW only.
         const committerEmail = `committer-${Date.now().toString(36)}@third-party.test`;
