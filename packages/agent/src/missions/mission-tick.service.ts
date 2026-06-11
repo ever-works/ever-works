@@ -69,6 +69,19 @@ const PLATFORM_DEFAULT_OUTSTANDING_CAP = 20;
 const MAX_IDEAS_PER_TICK = 5;
 
 /**
+ * Security (DoS hardening): upper bound on how many ACTIVE+SCHEDULED
+ * Missions a single tick will load and evaluate. Without a bound the
+ * per-minute tick query loads the entire table, so an attacker (or a
+ * runaway script) mass-creating scheduled Missions could make every
+ * tick slower and heavier until the worker stalls. 500 is far above
+ * realistic deployment load, so legitimate behavior is unchanged; if
+ * the bound is ever hit we log loudly (ops signal) and the overflow
+ * simply waits for the ACTIVE+SCHEDULED set to shrink. Exported so
+ * the unit tests pin the bound to the query.
+ */
+export const MISSION_TICK_MAX_PER_TICK = 500;
+
+/**
  * Phase 3 PR J — Mission tick worker. Drives both the scheduled
  * dispatcher (via Trigger.dev cron `* * * * *`) and the manual
  * `runNow` button on the Mission detail page.
@@ -117,7 +130,21 @@ export class MissionTickService {
     async tickDue(now: Date = new Date()): Promise<MissionTickSummary> {
         const due = await this.missions.find({
             where: { status: MissionStatus.ACTIVE, type: MissionType.SCHEDULED },
+            // Security (DoS hardening): bound the per-tick batch so an
+            // unbounded number of scheduled Missions can't bloat every
+            // tick. Oldest-first keeps the selection deterministic (a
+            // flood of newly-created Missions cannot starve the
+            // long-standing ones).
+            order: { createdAt: 'ASC' },
+            take: MISSION_TICK_MAX_PER_TICK,
         });
+        if (due.length >= MISSION_TICK_MAX_PER_TICK) {
+            this.logger.warn(
+                `Mission tick loaded ${due.length} Missions — the per-tick bound ` +
+                    `(MISSION_TICK_MAX_PER_TICK=${MISSION_TICK_MAX_PER_TICK}) was hit; ` +
+                    `ACTIVE+SCHEDULED Missions beyond the bound were truncated this tick.`,
+            );
+        }
         const summary: MissionTickSummary = {
             evaluated: due.length,
             ran: 0,

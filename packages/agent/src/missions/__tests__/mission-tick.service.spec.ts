@@ -1,5 +1,5 @@
 import type { Repository } from 'typeorm';
-import { MissionTickService } from '../mission-tick.service';
+import { MISSION_TICK_MAX_PER_TICK, MissionTickService } from '../mission-tick.service';
 import { Mission, MissionStatus, MissionType } from '../../entities/mission.entity';
 import {
     WorkProposal,
@@ -11,17 +11,20 @@ import type { WorkProposalService } from '../../user-research/work-proposal.serv
 import type { WorkAgentService } from '../../work-agent/work-agent.service';
 
 /** Hand-rolled Mission repository mock. Enough for tickDue's
- *  TypeORM `find({ where })` + runOnce's `findOne({ where })`. */
+ *  TypeORM `find({ where, order, take })` + runOnce's `findOne({ where })`.
+ *  `take` is honored (insertion order stands in for `createdAt ASC`) so the
+ *  DoS-bound truncation test below exercises a real cut-off. */
 function makeMissionRepo() {
     const rows: Mission[] = [];
     return {
-        find: jest.fn(async (opts: { where?: Partial<Mission> } = {}) => {
+        find: jest.fn(async (opts: { where?: Partial<Mission>; take?: number } = {}) => {
             const where = opts.where ?? {};
-            return rows.filter((m) =>
+            const matched = rows.filter((m) =>
                 Object.entries(where).every(
                     ([k, v]) => (m as unknown as Record<string, unknown>)[k] === v,
                 ),
             );
+            return typeof opts.take === 'number' ? matched.slice(0, opts.take) : matched;
         }),
         findOne: jest.fn(async (opts: { where: { id: string; userId?: string } }) => {
             return (
@@ -184,10 +187,31 @@ describe('MissionTickService', () => {
         it('only fetches ACTIVE + SCHEDULED Missions (one-shot / paused / completed not evaluated)', async () => {
             build();
             // Use the find mock's where clause to verify the query shape.
+            // Security (DoS hardening): the query is also bounded (`take`)
+            // and deterministically ordered so an unbounded number of
+            // scheduled Missions can't bloat every tick — this test pins
+            // the bound to the query.
             await service.tickDue(new Date('2026-05-25T09:00:00Z'));
             expect(missionRepo.find).toHaveBeenCalledWith({
                 where: { status: MissionStatus.ACTIVE, type: MissionType.SCHEDULED },
+                order: { createdAt: 'ASC' },
+                take: MISSION_TICK_MAX_PER_TICK,
             });
+        });
+
+        it('truncates the per-tick batch at MISSION_TICK_MAX_PER_TICK and warns (DoS bound)', async () => {
+            build();
+            // Seed one Mission more than the bound — all with a cron that
+            // never matches the tick so the test stays generator-free.
+            for (let i = 0; i < MISSION_TICK_MAX_PER_TICK + 1; i++) {
+                missionRepo._seed({ id: `m${i}`, userId: 'u1', schedule: '0 9 * * MON' });
+            }
+            const warnSpy = jest.spyOn(service['logger'], 'warn').mockImplementation(() => {});
+            // Sunday — the Monday cron never matches, so every loaded row is skipped.
+            const summary = await service.tickDue(new Date('2026-05-24T09:00:00Z'));
+            expect(summary.evaluated).toBe(MISSION_TICK_MAX_PER_TICK);
+            expect(summary.skipped).toBe(MISSION_TICK_MAX_PER_TICK);
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('per-tick bound'));
         });
     });
 

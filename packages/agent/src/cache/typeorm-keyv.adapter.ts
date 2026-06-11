@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { EventEmitter } from 'events';
 import { LessThan, Like, Repository } from 'typeorm';
 import { CacheEntry } from '../entities/cache.entity';
@@ -34,6 +35,22 @@ export interface TypeORMKeyvOptions {
  *   bag here; the constructor only reads `options.ttl`.
  */
 export class TypeORMKeyvAdapter extends EventEmitter {
+    /**
+     * Security: app-level bound on caller-supplied key length. The
+     * `cache_entries.key` column is an unbounded varchar, so without a
+     * guard a caller that builds keys from external input (e.g. the
+     * plugin cache facade's `plugin:<id>:<key>` keys) could pollute the
+     * shared key namespace with arbitrarily large keys. Keys longer than
+     * this are deterministically rewritten to
+     * `<first 128 chars>:sha256:<hex digest of the full key>` so they
+     * stay readable, bounded, and collision-distinct. Applied inside
+     * {@link createKey}, which every read/write/delete/has path goes
+     * through, so get/set/delete round-trips keep working and all
+     * existing short keys are stored byte-for-byte unchanged.
+     */
+    private static readonly MAX_KEY_LENGTH = 512;
+    private static readonly LONG_KEY_PREFIX_LENGTH = 128;
+
     private repository: Repository<CacheEntry>;
     public _namespace: string;
 
@@ -46,8 +63,17 @@ export class TypeORMKeyvAdapter extends EventEmitter {
         this._namespace = options.namespace || 'app-cache';
     }
 
+    private normalizeKey(key: string): string {
+        if (key.length <= TypeORMKeyvAdapter.MAX_KEY_LENGTH) {
+            return key;
+        }
+
+        const digest = createHash('sha256').update(key).digest('hex');
+        return `${key.slice(0, TypeORMKeyvAdapter.LONG_KEY_PREFIX_LENGTH)}:sha256:${digest}`;
+    }
+
     private createKey(key: string): string {
-        return `${this._namespace}:${key}`;
+        return `${this._namespace}:${this.normalizeKey(key)}`;
     }
 
     async get(key: string): Promise<any> {
