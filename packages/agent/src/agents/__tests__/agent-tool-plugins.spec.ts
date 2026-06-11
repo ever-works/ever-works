@@ -79,11 +79,15 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
 
 describe('AgentToolService plugin pass-through tools (Phase 16.10)', () => {
     let agentsRepo: any;
+    let agentsService: any;
     let pluginTools: jest.Mocked<AgentPluginToolsFacade>;
     let svc: AgentToolService;
 
     beforeEach(() => {
         agentsRepo = { create: jest.fn() };
+        // EW-721 #10: AgentsService became a required ctor dep (the
+        // optional raw-repo fallback for createSubAgent was removed).
+        agentsService = { create: jest.fn() };
         pluginTools = {
             searchWeb: jest.fn().mockResolvedValue({
                 results: [{ title: 'r1', url: 'https://a.example/1', snippet: 's', score: 0.9 }],
@@ -102,6 +106,7 @@ describe('AgentToolService plugin pass-through tools (Phase 16.10)', () => {
         };
         svc = new AgentToolService(
             agentsRepo,
+            agentsService,
             undefined,
             undefined,
             undefined,
@@ -118,7 +123,7 @@ describe('AgentToolService plugin pass-through tools (Phase 16.10)', () => {
     });
 
     it('registers none of the 3 tools when token is unbound (even with permission)', () => {
-        const bareSvc = new AgentToolService(agentsRepo);
+        const bareSvc = new AgentToolService(agentsRepo, agentsService);
         const tools = bareSvc.resolveAllowedTools(
             makeAgent({ permissions: makePerms({ canCallExternalTools: true }) }),
         );

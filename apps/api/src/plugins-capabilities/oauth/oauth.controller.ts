@@ -6,6 +6,7 @@ import {
     Query,
     UseGuards,
     Request,
+    Res,
     BadRequestException,
     HttpCode,
     HttpStatus,
@@ -19,14 +20,71 @@ import {
     ApiQuery,
 } from '@nestjs/swagger';
 import { AuthSessionGuard } from '../../auth/guards/auth-session.guard';
+import { OAuthStateService } from '../../auth/services/oauth-state.service';
 import { OAuthService } from './oauth.service';
+
+// Minimal duck-typed shapes — the platform deliberately doesn't depend on
+// `@types/express` (same pattern as auth/controllers/oauth.controller.ts).
+type OAuthCallbackRequest = {
+    user: { userId: string };
+    headers: Record<string, string | string[] | undefined>;
+};
+type OAuthResponseLike = {
+    getHeader(name: string): string | string[] | number | undefined;
+    setHeader(name: string, value: string | string[]): void;
+};
 
 @ApiTags('OAuth')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/oauth')
 @UseGuards(AuthSessionGuard)
 export class OAuthController {
-    constructor(private readonly oauthService: OAuthService) {}
+    constructor(
+        private readonly oauthService: OAuthService,
+        // EW-722 #20: same server-minted `state` + HttpOnly-cookie CSRF
+        // binding the auth login flow uses (C-03). AuthModule exports it.
+        private readonly oauthState: OAuthStateService,
+    ) {}
+
+    /** Append a Set-Cookie value without clobbering ones already queued. */
+    private appendSetCookie(res: OAuthResponseLike, cookie: string): void {
+        const existing = res.getHeader('Set-Cookie');
+        if (Array.isArray(existing)) {
+            res.setHeader('Set-Cookie', [...existing.map(String), cookie]);
+        } else if (typeof existing === 'string') {
+            res.setHeader('Set-Cookie', [existing, cookie]);
+        } else {
+            res.setHeader('Set-Cookie', cookie);
+        }
+    }
+
+    /**
+     * EW-722 #20: verify the callback's `state` query param against the
+     * `ew_oauth_state` cookie BEFORE any credential lookup or code
+     * exchange. Without this an attacker could complete a victim's plugin
+     * OAuth flow and link an attacker-controlled provider account
+     * (arbitrary code-to-account linkage). The cookie is cleared
+     * regardless of outcome (single-use). Server-to-server callers (the
+     * web callback routes) synthesize the cookie from the same value they
+     * already validated against their own host-scoped cookie.
+     */
+    private verifyOAuthStateOrThrow(
+        req: OAuthCallbackRequest,
+        res: OAuthResponseLike,
+        state?: string,
+    ): void {
+        const rawCookieHeader = req.headers.cookie;
+        const cookieHeader = Array.isArray(rawCookieHeader) ? rawCookieHeader[0] : rawCookieHeader;
+        const result = this.oauthState.verify({
+            cookieHeader,
+            stateQuery: typeof state === 'string' ? state : undefined,
+            secure: process.env.NODE_ENV === 'production',
+        });
+        this.appendSetCookie(res, result.clearCookie);
+        if (!result.valid) {
+            throw new BadRequestException(`OAuth state verification failed: ${result.reason}`);
+        }
+    }
 
     @Get('providers')
     @ApiOperation({ summary: 'List available OAuth providers' })
@@ -49,16 +107,27 @@ export class OAuthController {
     @ApiOperation({ summary: 'Get OAuth authorization URL' })
     @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
     @ApiQuery({ name: 'callbackUrl', required: false })
-    @ApiQuery({ name: 'state', required: false })
     @ApiQuery({ name: 'forceConsent', required: false })
     @ApiResponse({ status: 200, description: 'OAuth authorization URL' })
     async getConnectUrl(
         @Request() req,
         @Param('providerId') providerId: string,
+        @Res({ passthrough: true }) res: OAuthResponseLike,
         @Query('callbackUrl') callbackUrl?: string,
-        @Query('state') state?: string,
         @Query('forceConsent') forceConsent?: string,
     ) {
+        // EW-722 #20: server-mint the OAuth `state` and bind it to the
+        // browser via an HttpOnly cookie. The minted value (never a
+        // client-supplied `?state=`, which is now ignored) is embedded in
+        // the authorize URL AND returned in the body so the web tier can
+        // mirror it into its own host-scoped cookie — the same
+        // dual-channel contract the auth login flow uses (C-03). Minting
+        // before the credential lookup is harmless: the unconfigured-
+        // provider 400 contract below is unchanged.
+        const { state, setCookie } = this.oauthState.mint({
+            secure: process.env.NODE_ENV === 'production',
+        });
+        this.appendSetCookie(res, setCookie);
         try {
             return await this.oauthService.getOAuthUrl({
                 userId: req.user.userId,
@@ -78,18 +147,23 @@ export class OAuthController {
     @ApiOperation({ summary: 'OAuth callback handler' })
     @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
     @ApiQuery({ name: 'code', required: true })
-    @ApiQuery({ name: 'state', required: false })
+    @ApiQuery({ name: 'state', required: true })
     @ApiResponse({ status: 200, description: 'Provider connected successfully' })
     async handleOAuthCallback(
         @Request() req,
         @Param('providerId') providerId: string,
+        @Res({ passthrough: true }) res: OAuthResponseLike,
         @Query('code') code: string,
         @Query('state') state?: string,
     ) {
         if (!code) {
             throw new BadRequestException('Authorization code is required');
         }
-        return this.oauthService.handleOAuthCallback(req.user.userId, providerId, code, state);
+        // EW-722 #20: state verification runs AFTER the code-presence
+        // check (the e2e suite pins 'Authorization code is required' as
+        // the first gate) and BEFORE any credential lookup/code exchange.
+        this.verifyOAuthStateOrThrow(req, res, state);
+        return this.oauthService.handleOAuthCallback(req.user.userId, providerId, code);
     }
 
     @Get(':providerId/user')
@@ -126,16 +200,21 @@ export class OAuthController {
     })
     @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
     @ApiQuery({ name: 'callbackUrl', required: false })
-    @ApiQuery({ name: 'state', required: false })
     @ApiQuery({ name: 'forceConsent', required: false })
     @ApiResponse({ status: 200, description: 'OAuth authorization URL' })
     async getReadPackagesConnectUrl(
         @Request() req,
         @Param('providerId') providerId: string,
+        @Res({ passthrough: true }) res: OAuthResponseLike,
         @Query('callbackUrl') callbackUrl?: string,
-        @Query('state') state?: string,
         @Query('forceConsent') forceConsent?: string,
     ) {
+        // EW-722 #20: same server-minted state + cookie binding as
+        // `getConnectUrl` — see the comment there.
+        const { state, setCookie } = this.oauthState.mint({
+            secure: process.env.NODE_ENV === 'production',
+        });
+        this.appendSetCookie(res, setCookie);
         try {
             return await this.oauthService.getReadPackagesOAuthUrl({
                 userId: req.user.userId,
@@ -159,22 +238,20 @@ export class OAuthController {
     })
     @ApiParam({ name: 'providerId', description: 'OAuth provider ID' })
     @ApiQuery({ name: 'code', required: true })
-    @ApiQuery({ name: 'state', required: false })
+    @ApiQuery({ name: 'state', required: true })
     @ApiResponse({ status: 200, description: 'Read-packages PAT saved' })
     async handleReadPackagesOAuthCallback(
         @Request() req,
         @Param('providerId') providerId: string,
+        @Res({ passthrough: true }) res: OAuthResponseLike,
         @Query('code') code: string,
         @Query('state') state?: string,
     ) {
         if (!code) {
             throw new BadRequestException('Authorization code is required');
         }
-        return this.oauthService.handleReadPackagesOAuthCallback(
-            req.user.userId,
-            providerId,
-            code,
-            state,
-        );
+        // EW-722 #20: code-presence gate first (e2e-pinned), then state.
+        this.verifyOAuthStateOrThrow(req, res, state);
+        return this.oauthService.handleReadPackagesOAuthCallback(req.user.userId, providerId, code);
     }
 }

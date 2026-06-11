@@ -78,6 +78,25 @@ describe('PostmarkPlugin', () => {
 			expect(r1).toEqual(r2);
 			expect(sendEmailMock).toHaveBeenCalledTimes(1);
 		});
+
+		it('does NOT serve a cached result across different userIds (tenant isolation)', async () => {
+			// Security: the local idempotency cache key is scoped by
+			// options.userId/workId — the same messageRef from two different
+			// users must trigger two real sends, never leak user A's cached
+			// result to B.
+			sendEmailMock.mockResolvedValue({ MessageID: 'pm-scoped', ErrorCode: 0 });
+
+			const input = {
+				from: 'a@example.com',
+				to: ['b@example.com'],
+				subject: 'hi',
+				bodyText: 'hi',
+				messageRef: 'ref-shared'
+			};
+			await plugin.sendEmail(input, { userId: 'user-a' });
+			await plugin.sendEmail(input, { userId: 'user-b' });
+			expect(sendEmailMock).toHaveBeenCalledTimes(2);
+		});
 	});
 
 	describe('parseInboundWebhook', () => {

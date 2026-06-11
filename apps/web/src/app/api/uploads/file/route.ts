@@ -22,6 +22,12 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  */
 export async function POST(request: NextRequest) {
     const token = await getAuthAccessCookie();
+    // Security: reject unauthenticated requests at the BFF layer instead of
+    // proxying them upstream without credentials. Mirrors the explicit 401
+    // guard in the sibling image-upload proxy at `../route.ts`.
+    if (!token) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
     const headers = new Headers();
     const contentType = request.headers.get('content-type');

@@ -108,19 +108,21 @@ Checks if the current user has a valid OAuth connection.
 ### Get Authorization URL
 
 ```
-GET /api/oauth/:providerId/connect/url?callbackUrl=...&state=...&forceConsent=true
+GET /api/oauth/:providerId/connect/url?callbackUrl=...&forceConsent=true
 Authorization: Bearer <jwt-token>
 ```
 
-Generates the OAuth authorization URL for the specified provider.
+Generates the OAuth authorization URL for the specified provider. The CSRF
+`state` is always server-minted (never client-supplied) and bound to the
+caller via an HttpOnly `ew_oauth_state` cookie; it is also returned in the
+response body so a proxying web tier can mirror it into its own cookie.
 
 **Query Parameters:**
 
-| Parameter      | Type     | Required | Description                                        |
-| -------------- | -------- | -------- | -------------------------------------------------- |
-| `callbackUrl`  | `string` | No       | Custom redirect URI after authorization            |
-| `state`        | `string` | No       | Custom state parameter (auto-generated if omitted) |
-| `forceConsent` | `string` | No       | Set to `"true"` to force re-authorization          |
+| Parameter      | Type     | Required | Description                               |
+| -------------- | -------- | -------- | ----------------------------------------- |
+| `callbackUrl`  | `string` | No       | Custom redirect URI after authorization   |
+| `forceConsent` | `string` | No       | Set to `"true"` to force re-authorization |
 
 **Response:**
 
@@ -142,10 +144,10 @@ Processes the OAuth callback after user authorization.
 
 **Query Parameters:**
 
-| Parameter | Type     | Required | Description                           |
-| --------- | -------- | -------- | ------------------------------------- |
-| `code`    | `string` | Yes      | Authorization code from provider      |
-| `state`   | `string` | No       | State parameter for CSRF verification |
+| Parameter | Type     | Required | Description                                                                              |
+| --------- | -------- | -------- | ---------------------------------------------------------------------------------------- |
+| `code`    | `string` | Yes      | Authorization code from provider                                                         |
+| `state`   | `string` | Yes      | CSRF state — must match the `ew_oauth_state` cookie minted by `connect/url` (single-use) |
 
 **Response:**
 

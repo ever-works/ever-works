@@ -25,6 +25,7 @@ import { UserRepository } from '@ever-works/agent/database';
 import { ClientService } from '../services/client.service';
 import { CrmTenantService } from '../services/crm-tenant.service';
 import { AuthSessionGuard } from '@src/auth/guards/auth-session.guard';
+import { CrmSyncGuard } from '../guards/crm-sync.guard';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { TwentyOrganization } from '../types/twenty-crm.types';
@@ -87,7 +88,11 @@ class CompanyBodyDto {
 class UpdateCompanyBodyDto extends PartialType(CompanyBodyDto) {}
 
 @Controller('api/twenty-crm/companies')
-@UseGuards(AuthSessionGuard)
+// Security (audit #61): CrmSyncGuard was defined but never applied, so these
+// routes stayed reachable even when the CRM integration was disabled or
+// misconfigured (`CRM_SYNC_ENABLED` off / invalid config). Fail closed: auth
+// first, then the integration-enabled gate (403 when CRM sync is off).
+@UseGuards(AuthSessionGuard, CrmSyncGuard)
 export class CompaniesController {
     constructor(
         private readonly clientService: ClientService,

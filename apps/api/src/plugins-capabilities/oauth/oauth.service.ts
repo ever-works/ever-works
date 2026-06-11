@@ -117,15 +117,18 @@ export class OAuthService {
         return { url, state: finalState };
     }
 
+    /**
+     * EW-722 #20: the OAuth `state` CSRF check happens in the controller
+     * (`OAuthStateService.verify` against the `ew_oauth_state` cookie)
+     * BEFORE this method runs — it deliberately takes no `state` param so
+     * a future caller can't bypass verification by invoking it directly
+     * with an attacker-supplied state.
+     */
     async handleOAuthCallback(
         userId: string,
         providerId: string,
         code: string,
-        state?: string,
     ): Promise<OAuthConnectionInfo> {
-        void userId;
-        void state;
-
         const config = await this.getOAuthConfig(providerId);
         const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
         const user = await this.oauthFacade.getAuthenticatedUser(providerId, token.accessToken);
@@ -221,15 +224,15 @@ export class OAuthService {
      * Critically, this does NOT touch `authAccountRepository`. The main
      * GitHub OAuth connection (used for git operations, repo OAuth scopes)
      * is left untouched; the two tokens live independently.
+     *
+     * EW-722 #20: like {@link handleOAuthCallback}, the `state` CSRF check
+     * happens in the controller before this method runs.
      */
     async handleReadPackagesOAuthCallback(
         userId: string,
         providerId: string,
         code: string,
-        state?: string,
     ): Promise<{ providerId: string; connected: true }> {
-        void state;
-
         const config = await this.getOAuthConfig(providerId);
         const token = await this.oauthFacade.exchangeCodeForToken(providerId, code, config);
         let readPackagesPatOwner = '';

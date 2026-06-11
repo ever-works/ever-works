@@ -13,6 +13,9 @@ import type { WebhookSubscription } from '@ever-works/agent/entities';
 // ULA (fc00::/7), link-local, CGNAT (100.64/10), 0.0.0.0/8 and cloud-metadata
 // hosts — closing the [::1] / ::ffff:127.0.0.1 / IPv6-range bypasses.
 import { isSafeWebhookUrl } from '@ever-works/agent/utils';
+// Security (EW-711 #14): work-scoped subscriptions must be authorized against
+// the caller's access to that Work — see the ownership gate in `create()`.
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { WebhookSecretService } from './webhook-secret.service';
 
 export interface WebhookSubscriptionView {
@@ -36,6 +39,7 @@ export class WebhooksService {
     constructor(
         private readonly repo: WebhookSubscriptionRepository,
         private readonly secrets: WebhookSecretService,
+        private readonly workOwnership: WorkOwnershipService,
     ) {}
 
     async listForAccount(accountId: string): Promise<WebhookSubscriptionView[]> {
@@ -60,6 +64,27 @@ export class WebhooksService {
         input: { url: string; workId?: string | null },
     ): Promise<{ subscription: WebhookSubscriptionView; signingSecret: string }> {
         this.assertValidUrl(input.url);
+
+        // Security (EW-711 #14): a subscription bound to a Work receives that
+        // Work's lifecycle events (names, deployment URLs, error details), so
+        // the caller must be allowed to view the Work they bind to. Nothing
+        // validated `input.workId` before — any authenticated user could
+        // subscribe to a foreign workId and exfiltrate its event stream.
+        // `ensureCanView` passes for the creator and any work member, so
+        // legitimate callers keep working. A Forbidden (work exists, not
+        // yours) is masked as 404 to match this service's enumeration
+        // defense (see `findOwn`) — callers must not learn that a foreign
+        // workId exists.
+        if (input.workId) {
+            try {
+                await this.workOwnership.ensureCanView(input.workId, accountId);
+            } catch (error) {
+                if (error instanceof ForbiddenException) {
+                    throw new NotFoundException(`Work with id '${input.workId}' not found`);
+                }
+                throw error;
+            }
+        }
 
         const existing = await this.repo.listActiveForAccount(accountId);
         if (existing.length >= MAX_PER_ACCOUNT) {
