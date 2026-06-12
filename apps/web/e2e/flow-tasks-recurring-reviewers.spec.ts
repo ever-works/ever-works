@@ -12,7 +12,7 @@ import { createTaskViaAPI } from './helpers/agents-tasks';
  *   - `flow-tasks-advanced-deep.spec.ts` (Batch 5) OWNS the reviewer ADD
  *     lifecycle: the born-`pending` row shape, the OWNED-agent polymorphic
  *     reviewer, bad reviewerType→400, unknown-agent→400, missing-id→400,
- *     duplicate→500, the three-roles-coexist case, cross-user→404, and the
+ *     duplicate→409, the three-roles-coexist case, cross-user→404, and the
  *     "no GET-list / no DELETE-reviewer route (404)" facts. It does NOT touch
  *     RECURRING at all, nor the reviewer DTO WHITELIST strip, nor the reviewer
  *     bad-uuid / no-auth closure pair, nor recurring↔reviewer orthogonality.
