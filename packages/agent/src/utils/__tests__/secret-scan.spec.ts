@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { assertNoSecrets, containsSecret, redactSecrets, scanForSecrets } from '../secret-scan';
 
 describe('secret-scan', () => {
@@ -80,6 +81,20 @@ describe('secret-scan', () => {
             }
             // Truncated form uses ellipsis between prefix and tail.
             expect(msg).toMatch(/…/);
+        });
+
+        it('throws BadRequestException (HTTP 400), not a plain Error', () => {
+            // Security (EW-716 follow-up): a plain Error is unmapped by Nest
+            // and surfaced as a 500 to every caller endpoint (task-chat,
+            // agent-file, skills, agent import) — mislabeling a user-input
+            // rejection as a server fault. The exception must carry 400.
+            try {
+                assertNoSecrets('use AKIAABCDEFGHIJ123456 here');
+                throw new Error('expected assertNoSecrets to throw');
+            } catch (e) {
+                expect(e).toBeInstanceOf(BadRequestException);
+                expect((e as BadRequestException).getStatus()).toBe(400);
+            }
         });
     });
 

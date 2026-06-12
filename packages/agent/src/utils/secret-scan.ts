@@ -43,6 +43,8 @@
  * "token-". A real secret usually has ≥10 chars after the prefix.
  */
 
+import { BadRequestException } from '@nestjs/common';
+
 export interface SecretMatch {
     pattern: string;
     matched: string; // truncated for safe surfacing in error messages
@@ -135,12 +137,20 @@ export function containsSecret(body: string): boolean {
  * path: throws a precise error message that surfaces the pattern
  * name and (truncated) sample so the user can find + fix the
  * offending content without us leaking the full secret back.
+ *
+ * Security (EW-716 follow-up): throws BadRequestException, NOT a plain
+ * Error — a plain Error is unmapped by Nest's exception layer and
+ * surfaced as an HTTP 500 to every caller endpoint (task-chat POST/
+ * PATCH, agent-file writes, skill bodies, agent import), which both
+ * mislabels a user-input rejection as a server fault and risks raw-
+ * message/stack exposure through generic 500 handling. The message is
+ * already safe to return: the sample is display-truncated upstream.
  */
 export function assertNoSecrets(body: string, fieldHint = 'body'): void {
     const hits = scanForSecrets(body);
     if (hits.length === 0) return;
     const first = hits[0];
-    throw new Error(
+    throw new BadRequestException(
         `Secret-like value (${first.pattern}: "${first.matched}") detected in ${fieldHint}. ` +
             `Remove it before saving — credentials must live in plugin settings, not in Agent files or Skill bodies.`,
     );

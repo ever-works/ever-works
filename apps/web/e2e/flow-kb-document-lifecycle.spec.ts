@@ -364,7 +364,7 @@ test.describe('Flow — KB document lifecycle', () => {
             { headers: authedHeaders(token) },
         );
         expect(
-            [200, 500, 502, 503].includes(histRes.status()),
+            [200, 409, 500, 502, 503].includes(histRes.status()),
             `history endpoint reachable (got ${histRes.status()})`,
         ).toBeTruthy();
         if (histRes.status() === 200) {

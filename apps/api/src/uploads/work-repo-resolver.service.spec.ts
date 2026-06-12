@@ -5,6 +5,7 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/facades', () => ({}));
 
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { WorkRepoResolverService } from './work-repo-resolver.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { GitFacadeService } from '@ever-works/agent/facades';
@@ -104,24 +105,28 @@ describe('WorkRepoResolverService (EW-644)', () => {
         expect(gitFacade.getRepository).toHaveBeenCalledTimes(1);
     });
 
-    it('throws a clear error when the Work is not found', async () => {
+    it('throws NotFoundException (404, not 500) when the Work is not found', async () => {
         workRepo.findById.mockResolvedValueOnce(null);
-        await expect(resolver.resolve(workId)).rejects.toThrow(/Work not found/);
+        const err = await resolver.resolve(workId).catch((e) => e);
+        expect(err).toBeInstanceOf(NotFoundException);
+        expect(err.message).toMatch(/Work not found/);
         expect(gitFacade.getAccessToken).not.toHaveBeenCalled();
     });
 
-    it('throws a clear error when the Work has no resolvable repo coordinates', async () => {
+    it('throws ConflictException (409, not 500) when the Work has no resolvable repo coordinates', async () => {
         const work = makeWork({ owner: '' });
         work.getDataRepo = jest.fn().mockReturnValue('');
         workRepo.findById.mockResolvedValueOnce(work as never);
-        await expect(resolver.resolve(workId)).rejects.toThrow(/no resolvable data repo/);
+        const err = await resolver.resolve(workId).catch((e) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect(err.message).toMatch(/no resolvable data repo/);
     });
 
-    it('throws when no GitHub token can be resolved for the Work owner', async () => {
+    it('throws ConflictException (409, not 500) when no GitHub token can be resolved for the Work owner', async () => {
         workRepo.findById.mockResolvedValueOnce(makeWork() as never);
         gitFacade.getAccessToken.mockResolvedValueOnce(null);
-        await expect(resolver.resolve(workId)).rejects.toThrow(
-            /no GitHub token available for user/,
-        );
+        const err = await resolver.resolve(workId).catch((e) => e);
+        expect(err).toBeInstanceOf(ConflictException);
+        expect(err.message).toMatch(/no GitHub token available for user/);
     });
 });

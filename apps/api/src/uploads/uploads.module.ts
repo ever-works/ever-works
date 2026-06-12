@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '@ever-works/agent/database';
+import { DatabaseModule, UserUploadRepository } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { AuthModule } from '../auth/auth.module';
 import { UploadsController } from './uploads.controller';
-import { UploadsService, WORK_REPO_RESOLVER } from './uploads.service';
+import { UploadsService, WORK_REPO_RESOLVER, USER_UPLOAD_REPOSITORY } from './uploads.service';
 import { WorkRepoResolverService } from './work-repo-resolver.service';
 
 @Module({
@@ -26,6 +26,9 @@ import { WorkRepoResolverService } from './work-repo-resolver.service';
         UploadsService,
         WorkRepoResolverService,
         { provide: WORK_REPO_RESOLVER, useExisting: WorkRepoResolverService },
+        // Bind the upload-ownership repo (from DatabaseModule) to the Symbol token
+        // so UploadsService records every upload in `user_uploads`.
+        { provide: USER_UPLOAD_REPOSITORY, useExisting: UserUploadRepository },
     ],
     exports: [UploadsService],
 })

@@ -27,6 +27,7 @@ jest.mock('../plugins/entities', () => ({
     PluginEntity: class PluginEntity {},
     UserPluginEntity: class UserPluginEntity {},
     WorkPluginEntity: class WorkPluginEntity {},
+    PluginAllowlistEntity: class PluginAllowlistEntity {},
 }));
 jest.mock('../account-transfer/entities/user-sync-config.entity', () => ({
     UserSyncConfig: class UserSyncConfig {},

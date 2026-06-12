@@ -29,6 +29,8 @@
  * out of scope here to keep the gate conservative and false-positive-free.
  */
 
+import { BadRequestException } from '@nestjs/common';
+
 export interface InjectionMatch {
     pattern: string;
     matched: string;
@@ -75,14 +77,26 @@ export function containsInjection(body: string): boolean {
  * Hard-reject helper for the import path: throws a precise, actionable
  * error when an imported instruction body carries chat-template control
  * tokens, without echoing the full body back.
+ *
+ * Security (mirrors {@link ../utils/secret-scan#assertNoSecrets}): throws a
+ * `BadRequestException`, NOT a plain `Error`. A plain Error thrown from a
+ * service surfaces through Nest's default exception filter as an UNMAPPED
+ * HTTP 500 ("Internal server error") — wrong for what is a client input
+ * problem, and it obscures the actionable message. As a `BadRequestException`
+ * the caller (skill create/update, agent/works import, prompt-provider
+ * template) returns a clean 400 carrying the guidance below.
  */
 export function assertNoInjectionTokens(body: string, fieldHint = 'imported content'): void {
     const hits = scanForInjection(body);
     if (hits.length === 0) return;
     const first = hits[0];
-    throw new Error(
-        `Disallowed chat-template control token (${first.pattern}: "${first.matched}") detected in ${fieldHint}. ` +
-            `Imported Agent/Skill instructions must not contain model control sequences (e.g. <|im_start|>, [INST]) — ` +
+    // Name the offending pattern CATEGORY only — never echo the literal matched
+    // token. A BadRequestException message IS returned to the client (unlike the
+    // old plain-Error 500, which Nest redacted), so reflecting the raw token
+    // back would undo the no-echo posture the import-policy contract pins.
+    throw new BadRequestException(
+        `Disallowed chat-template control token (${first.pattern}) detected in ${fieldHint}. ` +
+            `Imported Agent/Skill instructions must not contain model control sequences (e.g. ChatML or instruct delimiters) — ` +
             `they can hijack the agent's system prompt. Remove them before importing.`,
     );
 }

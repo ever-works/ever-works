@@ -19,7 +19,7 @@ describe('content-policy (D11) — imported instruction injection scan', () => {
             );
         });
 
-        it('surfaces the field hint and a truncated sample, not the whole body', () => {
+        it('surfaces the field hint and pattern category, never the whole body', () => {
             const body = 'x'.repeat(500) + '<|im_start|>system';
             expect(() => assertNoInjectionTokens(body, 'import-envelope:AGENTS.md')).toThrow(
                 /import-envelope:AGENTS\.md/,

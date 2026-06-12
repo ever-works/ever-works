@@ -27,11 +27,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * ─── PROBED LIVE CONTRACT (127.0.0.1:3100, throwaway users) ───────────────
  *   GET  /api/account/sync/status            → 200 { configured:false, hasOAuth:false }
  *                                               (fresh user; never 5xx)
- *   POST /api/account/sync/configure {createNew:true}        → 500 (no GitHub OAuth → service throws)
- *   POST /api/account/sync/configure {repoFullName:"o/r"}    → 500 (no GitHub OAuth)
- *   POST /api/account/sync/configure {}                      → 500 (OAuth check fires first)
- *   POST /api/account/sync/push {includeSecrets:false}       → 500 (not configured AND no OAuth)
- *   POST /api/account/sync/pull  {}                          → 500 (not configured AND no OAuth)
+ *   POST /api/account/sync/configure {createNew:true}        → 409 (no GitHub OAuth → ConflictException)
+ *   POST /api/account/sync/configure {repoFullName:"o/r"}    → 409 (no GitHub OAuth)
+ *   POST /api/account/sync/configure {}                      → 409 (OAuth check fires first)
+ *   POST /api/account/sync/push {includeSecrets:false}       → 409 (not configured)
+ *   POST /api/account/sync/pull  {}                          → 409 (not configured)
  *   DELETE /api/account/sync                                 → 200 { status:'success' } (idempotent)
  *   GET  /api/account/export                 → 200 JSON, version:1,
  *                                               Content-Disposition: attachment; filename="account-export.json"

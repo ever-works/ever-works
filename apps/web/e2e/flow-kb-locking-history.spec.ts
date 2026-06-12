@@ -137,10 +137,11 @@ const LOCK_FULL = 'full';
 const LOCK_ADDITIONS_ONLY = 'additions-only';
 
 /** Documented status sets — the CI mirror has no repo so the mirror-backed
- *  reads 500, but a deployment with a real repo would 200/404. Accept both so
+ *  reads 500 (or 409 — the FacadeExceptionFilter maps the no-git-credentials
+ *  precondition), but a deployment with a real repo would 200/404. Accept all so
  *  the contract assertion is portable; annotate which branch executed. */
-const HISTORY_OK_OR_MIRROR_DOWN = [200, 500, 502, 503] as const;
-const RESTORE_MIRROR_DOWN_OR_NOT_FOUND = [404, 500, 502, 503] as const;
+const HISTORY_OK_OR_MIRROR_DOWN = [200, 409, 500, 502, 503] as const;
+const RESTORE_MIRROR_DOWN_OR_NOT_FOUND = [404, 409, 500, 502, 503] as const;
 
 interface KbBodyDto {
     id: string;

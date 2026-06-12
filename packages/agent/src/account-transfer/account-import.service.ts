@@ -140,6 +140,63 @@ export class AccountImportService {
             errors.push('Missing or invalid userPlugins array');
         }
 
+        // Element-shape validation. The `Array.isArray` guards above only check
+        // the CONTAINERS — a null/non-object element (or a missing load-bearing
+        // field) then either crashed the slug/pluginId loops below with an
+        // unmapped 500 (e.g. `dir.slug` / `up.pluginId` on null), or passed
+        // preview as `valid:true` and failed mid-apply. Validate each element
+        // up-front so a malformed payload is a clean `valid:false` instead.
+        if (
+            payload.data?.profile !== undefined &&
+            payload.data?.profile !== null &&
+            (typeof payload.data.profile !== 'object' || Array.isArray(payload.data.profile))
+        ) {
+            errors.push('Invalid profile: expected an object');
+        }
+        if (Array.isArray(payload.data?.works)) {
+            (payload.data.works as unknown[]).forEach((dir, i) => {
+                if (!dir || typeof dir !== 'object') {
+                    errors.push(`Invalid work at index ${i}: expected an object`);
+                    return;
+                }
+                const w = dir as { slug?: unknown; name?: unknown; workPlugins?: unknown };
+                if (typeof w.slug !== 'string' || w.slug.length === 0) {
+                    errors.push(`Invalid work at index ${i}: missing or invalid slug`);
+                }
+                if (typeof w.name !== 'string' || w.name.length === 0) {
+                    errors.push(`Invalid work at index ${i}: missing or invalid name`);
+                }
+                if (w.workPlugins !== undefined && w.workPlugins !== null) {
+                    if (!Array.isArray(w.workPlugins)) {
+                        errors.push(`Invalid work at index ${i}: workPlugins must be an array`);
+                    } else {
+                        (w.workPlugins as unknown[]).forEach((dp, j) => {
+                            if (
+                                !dp ||
+                                typeof dp !== 'object' ||
+                                typeof (dp as { pluginId?: unknown }).pluginId !== 'string'
+                            ) {
+                                errors.push(
+                                    `Invalid workPlugin at work ${i}, index ${j}: missing or invalid pluginId`,
+                                );
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        if (Array.isArray(payload.data?.userPlugins)) {
+            (payload.data.userPlugins as unknown[]).forEach((up, i) => {
+                if (
+                    !up ||
+                    typeof up !== 'object' ||
+                    typeof (up as { pluginId?: unknown }).pluginId !== 'string'
+                ) {
+                    errors.push(`Invalid userPlugin at index ${i}: missing or invalid pluginId`);
+                }
+            });
+        }
+
         if (errors.length > 0) {
             return {
                 valid: false,
@@ -279,7 +336,26 @@ export class AccountImportService {
             return result;
         }
 
-        const resolutionMap = new Map(resolutions.map((r) => [r.slug, r]));
+        // Guard `resolutions` BEFORE the `.map` below — it runs outside the
+        // transaction try/catch, so the controller's `body.resolutions || []`
+        // passing a truthy NON-array (string/number/object) or a null element
+        // used to throw a TypeError → unmapped 500. Reject a non-array cleanly
+        // and skip malformed elements rather than crash.
+        if (!Array.isArray(resolutions)) {
+            result.success = false;
+            result.errors.push('Invalid payload: resolutions must be an array');
+            return result;
+        }
+        const resolutionMap = new Map(
+            (resolutions as unknown[])
+                .filter(
+                    (r): r is ConflictResolution =>
+                        !!r &&
+                        typeof r === 'object' &&
+                        typeof (r as { slug?: unknown }).slug === 'string',
+                )
+                .map((r) => [r.slug, r]),
+        );
 
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();

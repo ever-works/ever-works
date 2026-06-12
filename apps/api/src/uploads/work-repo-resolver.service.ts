@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { WorkRepository } from '@ever-works/agent/database';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import type { WorkRepoResolver, ResolvedWorkRepo } from '@ever-works/github-storage-plugin';
@@ -51,13 +51,19 @@ export class WorkRepoResolverService implements WorkRepoResolver {
     async resolve(workId: string): Promise<ResolvedWorkRepo> {
         const work = await this.workRepository.findById(workId);
         if (!work) {
-            throw new Error(`Work not found: ${workId}`);
+            // The upload controller already 404s on a Work the caller can't
+            // access; a miss here is a TOCTOU (deleted between the access
+            // check and the storage write) — still a not-found, never a 500.
+            throw new NotFoundException(`Work not found: ${workId}`);
         }
 
         const owner = work.getRepoOwner('data');
         const repo = work.getDataRepo();
         if (!owner || !repo) {
-            throw new Error(
+            // The Work exists and is owned by the caller, but it isn't
+            // configured with a data repo — a caller-actionable precondition
+            // for `data-repo` mode, not a server fault.
+            throw new ConflictException(
                 `Work ${workId} has no resolvable data repo coordinates ` +
                     `(owner=${JSON.stringify(owner)}, repo=${JSON.stringify(repo)}). ` +
                     `Mode 'data-repo' on the github-storage plugin requires a configured data repo.`,
@@ -70,7 +76,10 @@ export class WorkRepoResolverService implements WorkRepoResolver {
             workId,
         });
         if (!token) {
-            throw new Error(
+            // No connected GitHub credentials for the Work owner — the
+            // message tells the caller exactly how to resolve it, so this is
+            // a precondition (409), not an internal error (500).
+            throw new ConflictException(
                 `Work ${workId}: no GitHub token available for user ${work.userId} ` +
                     `(no GitHub App installation, no connected OAuth account with 'repo' scope, ` +
                     `no PAT in plugin settings). Connect GitHub for this user before using ` +

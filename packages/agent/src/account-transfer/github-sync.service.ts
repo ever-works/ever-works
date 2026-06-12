@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { GitFacadeService } from '../facades/git.facade';
@@ -95,7 +95,7 @@ export class GitHubSyncService {
                 // Verify it's private
                 const repo = await this.gitFacade.getRepository(repoOwner, repoName, gitOptions);
                 if (repo && !repo.isPrivate) {
-                    throw new Error(
+                    throw new BadRequestException(
                         'Repository must be private. Please make it private or choose a different repository.',
                     );
                 }
@@ -103,7 +103,9 @@ export class GitHubSyncService {
         } else if (dto.repoFullName) {
             const parts = dto.repoFullName.split('/');
             if (parts.length !== 2) {
-                throw new Error('Invalid repository name. Expected format: owner/repo');
+                throw new BadRequestException(
+                    'Invalid repository name. Expected format: owner/repo',
+                );
             }
             repoOwner = parts[0];
             repoName = parts[1];
@@ -115,7 +117,7 @@ export class GitHubSyncService {
             // those characters reach the git facade's URL builder.
             const repoCoordPattern = /^[A-Za-z0-9._-]+$/;
             if (!repoCoordPattern.test(repoOwner) || !repoCoordPattern.test(repoName)) {
-                throw new Error(
+                throw new BadRequestException(
                     'Invalid repository name. Owner and repo may only contain letters, digits, dot, underscore, and hyphen.',
                 );
             }
@@ -142,7 +144,9 @@ export class GitHubSyncService {
             // configure sync against this repo".
             const repo = await this.gitFacade.getRepository(repoOwner, repoName, gitOptions);
             if (!repo) {
-                throw new Error(`Repository "${dto.repoFullName}" not found or inaccessible`);
+                throw new BadRequestException(
+                    `Repository "${dto.repoFullName}" not found or inaccessible`,
+                );
             }
             if (!ownsRepo) {
                 // Org repo path — log it so audits can see who's pointing
@@ -152,12 +156,12 @@ export class GitHubSyncService {
                 );
             }
             if (!repo.isPrivate) {
-                throw new Error(
+                throw new BadRequestException(
                     'Repository must be private. Syncing to public repositories is not allowed for security reasons.',
                 );
             }
         } else {
-            throw new Error('Either createNew or repoFullName must be provided');
+            throw new BadRequestException('Either createNew or repoFullName must be provided');
         }
 
         await this.syncConfigRepository.upsert(userId, {
@@ -172,7 +176,9 @@ export class GitHubSyncService {
     async pushToGitHub(userId: string, options: SyncPushOptions = {}): Promise<void> {
         const config = await this.syncConfigRepository.findByUser(userId);
         if (!config) {
-            throw new Error('Sync not configured. Please configure a repository first.');
+            throw new ConflictException(
+                'Sync not configured. Please configure a repository first.',
+            );
         }
 
         const gitOptions = { providerId: PROVIDER_ID, userId };
@@ -231,7 +237,9 @@ export class GitHubSyncService {
     async pullFromGitHub(userId: string): Promise<ImportPreview> {
         const config = await this.syncConfigRepository.findByUser(userId);
         if (!config) {
-            throw new Error('Sync not configured. Please configure a repository first.');
+            throw new ConflictException(
+                'Sync not configured. Please configure a repository first.',
+            );
         }
 
         const gitOptions = { providerId: PROVIDER_ID, userId };
@@ -278,7 +286,9 @@ export class GitHubSyncService {
     async applyPull(userId: string, resolutions: ConflictResolution[]): Promise<ImportResult> {
         const config = await this.syncConfigRepository.findByUser(userId);
         if (!config) {
-            throw new Error('Sync not configured');
+            throw new ConflictException(
+                'Sync not configured. Please configure a repository first.',
+            );
         }
 
         const gitOptions = { providerId: PROVIDER_ID, userId };
@@ -714,7 +724,7 @@ export class GitHubSyncService {
     private async ensureGitHubOAuth(userId: string): Promise<void> {
         const hasOAuth = await this.hasGitHubOAuth(userId);
         if (!hasOAuth) {
-            throw new Error(
+            throw new ConflictException(
                 'GitHub OAuth not connected. Please connect your GitHub account first.',
             );
         }

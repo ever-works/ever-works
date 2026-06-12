@@ -350,6 +350,25 @@ export class TasksService {
 
     // ── Members ───────────────────────────────────────────────────
 
+    /**
+     * Wrap a sub-resource insert so a DB UNIQUE-violation surfaces as a clean
+     * 409 Conflict instead of an unmapped 500. Mirrors the inline guard that
+     * `addBlocker` / `addAttachment` already use — extracted so the assignee /
+     * reviewer / approver / relation adds (which previously 500'd on a duplicate)
+     * share one tested path.
+     */
+    private async insertOrConflict<T>(op: () => Promise<T>, conflictMessage: string): Promise<T> {
+        try {
+            return await op();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (/unique|duplicate|UNIQUE/i.test(message)) {
+                throw new ConflictException(conflictMessage);
+            }
+            throw err;
+        }
+    }
+
     async addAssignee(
         userId: string,
         taskId: string,
@@ -359,7 +378,10 @@ export class TasksService {
         const task = await this.getOne(userId, taskId);
         // Review-fix I4: validate the actor exists / belongs to user.
         await this.assertActorIsValid(userId, assigneeType, assigneeId);
-        const row = await this.assignees.add(taskId, assigneeType, assigneeId);
+        const row = await this.insertOrConflict(
+            () => this.assignees.add(taskId, assigneeType, assigneeId),
+            `Task ${taskId} already has assignee ${assigneeId}.`,
+        );
         await this.logActivity({
             userId,
             taskId,
@@ -411,7 +433,10 @@ export class TasksService {
         await this.getOne(userId, taskId);
         // Review-fix I4: validate the actor exists / belongs to user.
         await this.assertActorIsValid(userId, reviewerType, reviewerId);
-        return this.reviewers.add(taskId, reviewerType, reviewerId);
+        return this.insertOrConflict(
+            () => this.reviewers.add(taskId, reviewerType, reviewerId),
+            `Task ${taskId} already has reviewer ${reviewerId}.`,
+        );
     }
 
     async addApprover(
@@ -423,7 +448,10 @@ export class TasksService {
         await this.getOne(userId, taskId);
         // Review-fix I4: validate the actor exists / belongs to user.
         await this.assertActorIsValid(userId, approverType, approverId);
-        return this.approvers.add(taskId, approverType, approverId);
+        return this.insertOrConflict(
+            () => this.approvers.add(taskId, approverType, approverId),
+            `Task ${taskId} already has approver ${approverId}.`,
+        );
     }
 
     async addBlocker(userId: string, taskId: string, blockedByTaskId: string) {
@@ -484,11 +512,21 @@ export class TasksService {
         kind: 'related' | 'duplicates' | 'follow-up',
     ) {
         await this.getOne(userId, taskId);
+        // A task cannot relate to itself (mirrors the addBlocker self-guard).
+        if (taskId === relatedTaskId) {
+            throw new BadRequestException('Task cannot relate to itself.');
+        }
         const related = await this.tasks.findByIdAndUser(relatedTaskId, userId);
         if (!related) {
             throw new BadRequestException(`Related Task ${relatedTaskId} not found.`);
         }
-        return this.relations.add(taskId, relatedTaskId, kind);
+        // The unique index is on (taskId, relatedTaskId) and EXCLUDES `kind`, so
+        // a second relation on the same ordered pair (even with a different kind)
+        // collides — surface that as 409, not an unmapped 500.
+        return this.insertOrConflict(
+            () => this.relations.add(taskId, relatedTaskId, kind),
+            `Task ${taskId} already has a relation to ${relatedTaskId}.`,
+        );
     }
 
     // ── Phase 13.5 — attachments ──────────────────────────────────

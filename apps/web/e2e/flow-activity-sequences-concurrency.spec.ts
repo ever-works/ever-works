@@ -158,11 +158,22 @@ async function ingest(
  * Ingest one event, RETRYING only on a 429. The ingest endpoint inherits the
  * global per-IP throttlers (short 50/1s, medium 300/10s, long 1000/60s — see
  * apps/api/src/config/throttler.config.ts) plus a 60/min cap on the route. Under
- * a workers=4 run all four workers share one IP, so a dense burst can momentarily
+ * a parallel run all workers share one IP, so a dense burst can momentarily
  * exhaust the per-second budget and bounce a 202 to 429. That is a transient
  * rate-limit, NOT a contract failure: we re-send the SAME event (idempotent by
  * (workId, eventId)) until it is accepted, so every event still lands exactly
  * once and the 202 contract is asserted, never weakened.
+ *
+ * Retry budget rationale (prebuilt-web/prod `next start` CI, e2e run
+ * 27374977059): the old 12-attempt back-off summed to ~18s, but the route's
+ * 60/min cap is a SLIDING window — once this file's own bursts (~65 ingests
+ * across its tests under workers>1) drain it, the next token can be up to
+ * ~60s away, so the bounded loop expired and surfaced the throttler's 429 as
+ * a failure at the 202 assertion. The prebuilt web server removed the dev
+ * cold-compile stalls that used to space the bursts out, making the drain
+ * reproducible. Fix: retry until a ~70s deadline (outlives a fully drained
+ * 60s window, fits the 90s test timeout) and honor the server's own
+ * Retry-After back-pressure header when present instead of guessing.
  */
 async function ingestAccepted(
     request: APIRequestContext,
@@ -175,11 +186,18 @@ async function ingestAccepted(
         metadata?: Record<string, unknown>;
     },
 ) {
+    const deadline = Date.now() + 70_000;
     let res = await ingest(request, workId, fields);
-    // Bounded back-off; the per-second window refills in ~1s, so a few tries
-    // across a couple of seconds comfortably clears even a sustained 429 streak.
-    for (let attempt = 0; res.status() === 429 && attempt < 12; attempt += 1) {
-        await new Promise((r) => setTimeout(r, 400 + attempt * 200));
+    while (res.status() === 429 && Date.now() < deadline) {
+        // NestJS ThrottlerGuard advertises the wait in Retry-After (seconds).
+        // Use it as the event signal for when the window refills; fall back to
+        // ~1s — the steady-state refill rate of the 60/min route cap.
+        const retryAfterSec = Number(res.headers()['retry-after']);
+        const waitMs =
+            Number.isFinite(retryAfterSec) && retryAfterSec > 0
+                ? Math.min(retryAfterSec * 1000 + 250, 10_000)
+                : 1_000;
+        await new Promise((r) => setTimeout(r, waitMs));
         res = await ingest(request, workId, fields);
     }
     expect(res.status(), `ingest body=${await res.text().catch(() => '')}`).toBe(202);
@@ -518,6 +536,16 @@ test.describe('Activity sequence — ordering & integrity under concurrent / hig
 
         // Page through with limit=3. Walk until nextCursor is null. Collect the
         // ordered id stream and the per-page timestamps.
+        //
+        // The walk is fully QUIESCED by construction (prebuilt-web/prod
+        // `next start` CI, run 27374977059 audit): every mutation above is
+        // awaited (202 + row id returned only after the synchronous insert)
+        // before the first page is fetched, and the only deferred writers
+        // (the controller's fire-and-forget work.created/work.updated rows)
+        // stamp createdAt "now" — ABOVE this 2021 ladder — so they can never
+        // enter the inclusive `createdAt <= cursor` window of pages ≥ 2 and
+        // shift it mid-walk. No settle sleep is needed; the flake on this test
+        // was the ingest throttle budget, fixed in `ingestAccepted` above.
         const limit = 3;
         const pages: FeedEntry[][] = [];
         let cursor: string | undefined;

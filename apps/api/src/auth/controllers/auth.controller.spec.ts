@@ -499,17 +499,78 @@ describe('AuthController', () => {
     });
 
     describe('getProfile (GET /api/auth/profile)', () => {
-        it('returns the in-request user with a canonical `id` alias for `userId`', async () => {
-            const user = { userId: 'u1', email: 'a@b.co' };
+        // EW-722 (Wave M #156, info-leak): the controller used to spread the
+        // full `req.user` into the response, echoing the fabricated JWT
+        // envelope claims (`iat`/`iss`/`aud`, deprecated per L-01) and the
+        // internal `tenantId` authz hint to every authenticated caller. The
+        // response is now a WHITELIST projection of the documented profile
+        // fields only — these tests pin the exact key set so a future spread
+        // can't silently reintroduce the leak.
+        const fullAuthenticatedUser = {
+            userId: 'u1',
+            email: 'a@b.co',
+            username: 'alice',
+            provider: 'local',
+            emailVerified: true,
+            isActive: true,
+            avatar: 'https://github.com/alice.png',
+            iat: 1_700_000_000,
+            iss: 'auth-runtime',
+            aud: 'ever-works-users',
+            isAnonymous: false,
+            tenantId: 'tenant-1',
+        };
 
+        it('returns the whitelisted profile with a canonical `id` alias for `userId`', async () => {
             // The controller exposes both `id` (canonical web/contracts
             // shape) and `userId` (legacy AuthenticatedUser shape) so
             // every consumer can read whichever field it expects.
-            await expect(controller.getProfile({ user } as any)).resolves.toEqual({
+            await expect(
+                controller.getProfile({ user: fullAuthenticatedUser } as any),
+            ).resolves.toEqual({
                 id: 'u1',
                 userId: 'u1',
                 email: 'a@b.co',
+                username: 'alice',
+                provider: 'local',
+                emailVerified: true,
+                isActive: true,
+                avatar: 'https://github.com/alice.png',
+                isAnonymous: false,
             });
+        });
+
+        it('never echoes JWT envelope claims (iat/iss/aud/exp) or tenantId — pinned key set', async () => {
+            const result = await controller.getProfile({ user: fullAuthenticatedUser } as any);
+
+            expect(Object.keys(result).sort()).toEqual([
+                'avatar',
+                'email',
+                'emailVerified',
+                'id',
+                'isActive',
+                'isAnonymous',
+                'provider',
+                'userId',
+                'username',
+            ]);
+            for (const leaked of ['iat', 'iss', 'aud', 'exp', 'tenantId']) {
+                expect(result).not.toHaveProperty(leaked);
+            }
+        });
+
+        it('omits `isAnonymous` on the API-key path (guard does not set it) — path distinction preserved', async () => {
+            // The API-key guard path fabricates an AuthenticatedUser WITHOUT
+            // `isAnonymous`; the session path always sets the boolean. The
+            // projection must not mint the key when it is absent.
+            const apiKeyUser: Record<string, unknown> = { ...fullAuthenticatedUser };
+            delete apiKeyUser.isAnonymous;
+            const result = await controller.getProfile({ user: apiKeyUser } as any);
+
+            expect(result).not.toHaveProperty('isAnonymous');
+            expect(result).toEqual(
+                expect.objectContaining({ id: 'u1', userId: 'u1', email: 'a@b.co' }),
+            );
         });
     });
 

@@ -12,6 +12,9 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { WorkProposalRepository } from './work-proposal.repository';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserUpload } from '../entities/user-upload.entity';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -165,6 +168,12 @@ export class WorkProposalService {
         // Production DI provides it via UserResearchModule.
         @Optional()
         private readonly proposalAttachments?: WorkProposalAttachmentRepository,
+        // Upload-ownership validation for addAttachment — `user_uploads` indexes
+        // every upload by (userId, sha256). `@Optional()` so hand-rolled tests
+        // skip; production/e2e DI provides it.
+        @Optional()
+        @InjectRepository(UserUpload)
+        private readonly uploadsRepo?: Repository<UserUpload>,
     ) {}
 
     /**
@@ -195,6 +204,15 @@ export class WorkProposalService {
         }
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
+        }
+        // Security: the uploadId must reference a real upload owned by the
+        // caller (404 — don't leak existence). Closes the dangling/foreign
+        // attachment edge the hunt found.
+        if (this.uploadsRepo) {
+            const owned = await this.uploadsRepo.findOne({
+                where: { sha256: uploadId.toLowerCase(), userId },
+            });
+            if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }
         if (!this.proposalAttachments) {
             throw new BadRequestException(
@@ -535,6 +553,17 @@ export class WorkProposalService {
     ): Promise<boolean> {
         const proposal = await this.repo.findByIdForUser(proposalId, userId);
         if (!proposal) return false;
+        // Security (IDOR): the caller supplies `workId` in the accept body, so
+        // it must be verified to belong to the SAME user before it is written
+        // onto the Idea's `acceptedWorkId`. Without this a user could link
+        // their own Idea to ANOTHER user's Work id (cross-owner reference;
+        // downstream surfaces keyed on acceptedWorkId — detail links, budget/
+        // usage rollups — would then point across the ownership boundary).
+        // Return false (→ controller 404, existence-leak-safe) on mismatch.
+        // The internal Goal-completion caller always passes the freshly-built
+        // Work owned by this user, so the legitimate path is unaffected.
+        const work = await this.works.findById(workId);
+        if (!work || work.userId !== userId) return false;
         return this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
     }
 

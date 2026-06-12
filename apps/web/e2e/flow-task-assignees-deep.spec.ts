@@ -15,7 +15,7 @@ import {
  * assignee↔agent-dispatch correlation. Deep companion to the shallow
  * `tasks-collaboration.spec.ts` (single human+agent 201 / stranger 404) and
  * `agent-task-assignment-flow.spec.ts` (single happy-path dispatch). None of
- * the existing specs exercise: the duplicate-500 + remove + re-add recovery
+ * the existing specs exercise: the duplicate-409 + remove + re-add recovery
  * loop, the polymorphic same-id-different-type rows, the full validation
  * matrix, remove idempotency / by-PK delete semantics, the activity-log audit
  * trail, or the assignee-independent dispatch path. This file does.
@@ -42,9 +42,10 @@ import {
  *       resolved scoped-to-caller, so cross-user assign reads as not-found,
  *       NOT 403).
  *     - DUPLICATE (same taskId+assigneeType+assigneeId while the row is LIVE)
- *       → 500 Internal server error (the `uq_task_assignee` unique index;
- *       the repo `save()`s with no pre-check). The same (type,id) pair on a
- *       DIFFERENT type is a DIFFERENT row (uq is the triple) → both 201.
+ *       → 409 Conflict (the `uq_task_assignee` unique-violation is now mapped
+ *       to a clean Conflict instead of an unmapped 500; the repo `save()`s with
+ *       no pre-check). The same (type,id) pair on a DIFFERENT type is a
+ *       DIFFERENT row (uq is the triple) → both 201.
  *
  *   DELETE /api/tasks/:id/assignees/:assigneeId
  *     → 200 { deleted:true } ONLY when a LIVE row with that PK exists UNDER the
@@ -64,7 +65,7 @@ import {
  *     therefore audited via GET /api/activity-log?taskId=<id> →
  *     { activities:[{ actionType:'task_assignee_added'|'task_assignee_removed',
  *       details:{ assigneeType, assigneeId }, … }] } (newest-first), AND via
- *     the duplicate-500 / re-add-201 behaviour which reveals whether a row is
+ *     the duplicate-409 / re-add-201 behaviour which reveals whether a row is
  *     currently live.
  *
  *   POST /api/agents/:id/assign-task { taskId } → dispatch. Independent of the
@@ -150,13 +151,13 @@ test.describe('Task assignees — deep integration', () => {
         expect(firstRow.assigneeType).toBe('user');
         expect(firstRow.assigneeId).toBe(A_UUID);
 
-        // Duplicate of the LIVE (taskId,user,A_UUID) triple → 500 (uq index;
+        // Duplicate of the LIVE (taskId,user,A_UUID) triple → 409 (uq index;
         // the repo save()s with no pre-check). Never assert it is a 4xx.
         const dup = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(dup.status(), `dup body=${await dup.text()}`).toBe(500);
+        expect(dup.status(), `dup body=${await dup.text()}`).toBe(409);
 
         // Remove the live row → idempotent 200 { deleted:true }.
         const removed = await deleteAssignee(request, token, task.id, firstRow.id);
@@ -174,12 +175,12 @@ test.describe('Task assignees — deep integration', () => {
         expect(reRow.assigneeId).toBe(A_UUID);
         expect(reRow.id).not.toBe(firstRow.id);
 
-        // And the recovered row is itself live again → a second duplicate 500s.
+        // And the recovered row is itself live again → a second duplicate 409s.
         const dup2 = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(dup2.status()).toBe(500);
+        expect(dup2.status()).toBe(409);
     });
 
     test('polymorphic assignee key: same uuid as both user and agent are distinct rows', async ({
@@ -218,20 +219,20 @@ test.describe('Task assignees — deep integration', () => {
         expect(userRow.id).not.toBe(agentRow.id);
 
         // Each (type,id) pair is independently unique: re-adding the agent-type
-        // 500s (live), but its user-type sibling is untouched and still live too.
+        // 409s (live), but its user-type sibling is untouched and still live too.
         const dupAgent = await postAssignee(request, token, task.id, {
             assigneeType: 'agent',
             assigneeId: agent.id,
         });
-        expect(dupAgent.status()).toBe(500);
+        expect(dupAgent.status()).toBe(409);
         const dupUser = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
             assigneeId: agent.id,
         });
-        expect(dupUser.status()).toBe(500);
+        expect(dupUser.status()).toBe(409);
 
         // Removing ONLY the agent-type row frees just that pair: agent-type can
-        // be re-added (201) while the user-type duplicate still 500s.
+        // be re-added (201) while the user-type duplicate still 409s.
         const delAgent = await deleteAssignee(request, token, task.id, agentRow.id);
         expect(delAgent.status()).toBe(200);
         const reAddAgent = await postAssignee(request, token, task.id, {
@@ -243,7 +244,7 @@ test.describe('Task assignees — deep integration', () => {
             assigneeType: 'user',
             assigneeId: agent.id,
         });
-        expect(stillDupUser.status()).toBe(500);
+        expect(stillDupUser.status()).toBe(409);
     });
 
     test('multiple distinct assignees (users + agents) coexist; activity-log audits each add/remove', async ({
@@ -283,7 +284,7 @@ test.describe('Task assignees — deep integration', () => {
         const created = [u1.id, u2.id, ag1.id, ag2.id];
         expect(new Set(created).size, 'all four rows have distinct ids').toBe(4);
 
-        // All four are independently live: each duplicate 500s.
+        // All four are independently live: each duplicate 409s.
         for (const a of [
             { assigneeType: 'user' as const, assigneeId: A_UUID },
             { assigneeType: 'user' as const, assigneeId: B_UUID },
@@ -291,7 +292,7 @@ test.describe('Task assignees — deep integration', () => {
             { assigneeType: 'agent' as const, assigneeId: agent2.id },
         ]) {
             const dup = await postAssignee(request, token, task.id, a);
-            expect(dup.status(), `dup ${a.assigneeType}:${a.assigneeId}`).toBe(500);
+            expect(dup.status(), `dup ${a.assigneeType}:${a.assigneeId}`).toBe(409);
         }
 
         // Audit trail: the activity-log records one add per assignee. The
@@ -313,7 +314,7 @@ test.describe('Task assignees — deep integration', () => {
         }
 
         // Remove one agent from the crew → frees just that pair (re-addable),
-        // the other three remain live (still 500 on duplicate).
+        // the other three remain live (still 409 on duplicate).
         const delAg1 = await deleteAssignee(request, token, task.id, ag1.id);
         expect(delAg1.status()).toBe(200);
         const reAg1 = await postAssignee(request, token, task.id, {
@@ -325,7 +326,7 @@ test.describe('Task assignees — deep integration', () => {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(stillLiveUserA.status(), 'untouched user A still live').toBe(500);
+        expect(stillLiveUserA.status(), 'untouched user A still live').toBe(409);
 
         // And the remove is audited too.
         const afterRemove = await taskActivity(request, token, task.id);
@@ -422,13 +423,13 @@ test.describe('Task assignees — deep integration', () => {
         // (taskId,id) key; 0 rows affected → NotFound, NOT an idempotent 200).
         const ghost = await deleteAssignee(request, token, taskA.id, C_UUID);
         expect(ghost.status(), `ghost delete=${await ghost.text()}`).toBe(404);
-        // A_UUID is still live on task A → duplicate add 500s (ghost delete
+        // A_UUID is still live on task A → duplicate add 409s (ghost delete
         // touched nothing).
         const stillLive = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
-        expect(stillLive.status(), 'A still live after ghost delete').toBe(500);
+        expect(stillLive.status(), 'A still live after ghost delete').toBe(409);
 
         // The :id is BOTH an ownership gate AND part of the delete key
         // (removeForTask deletes the (taskId,id) pair — IDOR hardening). So
@@ -439,13 +440,13 @@ test.describe('Task assignees — deep integration', () => {
             404,
         );
         // Proof the cross-task delete did NOT touch A's row: A_UUID is still
-        // live on task A, so a duplicate add still 500s.
+        // live on task A, so a duplicate add still 409s.
         const stillLiveAfterCross = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
             assigneeId: A_UUID,
         });
         expect(stillLiveAfterCross.status(), 'A still live after cross-task delete attempt').toBe(
-            500,
+            409,
         );
 
         // A correct remove (right task + right id) succeeds → 200 { deleted:true }.

@@ -591,6 +591,12 @@ test.describe('Agent instruction files (deep) — caps, secret-scan, export/impo
         // the shared content hash advances, invalidating the editor's stored
         // agent.yml hash). The editor only re-sends on a fresh keystroke, so its
         // expectedHash is now stale → the next autosave conflicts.
+        //
+        // Capture the hash the editor is holding RIGHT NOW (== the live hash
+        // after its last successful save) so we can prove the conflict window is
+        // genuinely armed below, independent of UI copy.
+        const editorHeldHash = (await readFile(request, token, agent.id, 'agent.yml')).hash;
+        expect(editorHeldHash).toMatch(HEX64);
         const apiSoul = await readFile(request, token, agent.id, 'SOUL.md');
         await writeFile(
             request,
@@ -600,6 +606,22 @@ test.describe('Agent instruction files (deep) — caps, secret-scan, export/impo
             `# out of band ${stamp}`,
             apiSoul.hash,
         );
+
+        // Deterministic conflict-RESPONSE contract (prebuilt-web/prod next start
+        // safe — asserted at the API layer where nothing masks the message):
+        // replaying the editor's now-stale held hash surfaces the exact 400
+        // etag-mismatch the autosave below is about to hit. This is the same
+        // rejected write the UI will perform — proven here byte-for-byte.
+        const staleReplay = await putFileRaw(
+            request,
+            token,
+            agent.id,
+            'agent.yml',
+            'stale replay — must never persist',
+            editorHeldHash,
+        );
+        expect(staleReplay.status()).toBe(400);
+        expect((await staleReplay.json()).message).toBe(CONFLICT_MESSAGE);
 
         // Make another in-browser edit to agent.yml → autosave fires with the
         // now-stale expectedHash → 400 etag-mismatch → status 'conflict'.

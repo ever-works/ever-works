@@ -6,6 +6,7 @@ export * from './work-deployment.entity';
 export * from './work-member.entity';
 export * from './work-invitation.entity';
 export * from './user.entity';
+export * from './user-upload.entity';
 export * from './refresh-token.entity';
 export * from './work-generation-history.entity';
 export * from './subscription-plan.entity';

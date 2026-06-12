@@ -5,6 +5,7 @@ import { FacadesModule } from '../facades/facades.module';
 import { TitlerModule } from '../titler/titler.module';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { UserResearchService } from './user-research.service';
 import { WorkProposalService } from './work-proposal.service';
@@ -23,7 +24,7 @@ import {
         DatabaseModule,
         FacadesModule,
         TitlerModule,
-        TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment]),
+        TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment, UserUpload]),
     ],
     providers: [
         UserResearchService,

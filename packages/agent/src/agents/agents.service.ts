@@ -18,6 +18,12 @@ import {
     type AgentTarget,
 } from '../entities/agent.entity';
 import { AgentAttachment } from '../entities/agent-attachment.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Work } from '../entities/work.entity';
+import { Mission } from '../entities/mission.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { AgentRepository, type ListAgentsFilter } from '../database/repositories/agent.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
@@ -131,6 +137,26 @@ export class AgentsService {
         // AgentsModule.
         @Optional()
         private readonly agentAttachments?: AgentAttachmentRepository,
+        // Parent-existence validation for scoped Agents (work/mission/idea).
+        // Raw TypeORM repositories (not the custom repos) so we only need the
+        // three entities in `forFeature` — no cross-module/custom-repo deps.
+        // `@Optional()` keeps the hand-rolled unit-test surface (which never
+        // wires these) working; production + e2e DI provide them so the check
+        // runs for every real create.
+        @Optional()
+        @InjectRepository(Work)
+        private readonly workRepo?: Repository<Work>,
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missionRepo?: Repository<Mission>,
+        @Optional()
+        @InjectRepository(WorkProposal)
+        private readonly ideaRepo?: Repository<WorkProposal>,
+        // Upload-ownership validation for addAttachment — `user_uploads` indexes
+        // every upload by (userId, sha256). `@Optional()` + raw repo, same as above.
+        @Optional()
+        @InjectRepository(UserUpload)
+        private readonly uploadsRepo?: Repository<UserUpload>,
     ) {}
 
     async list(
@@ -151,6 +177,7 @@ export class AgentsService {
 
     async create(userId: string, input: CreateAgentInput): Promise<AgentDto> {
         this.validateScopeOwnership(input);
+        await this.assertScopeParentExists(userId, input);
 
         const slug = slugifyText(input.name);
         // `slugifyText('---')` returns `-` (dash), not the empty string,
@@ -433,6 +460,18 @@ export class AgentsService {
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
+        // Security: the uploadId must reference a real upload owned by the
+        // caller — without this a ghost/foreign id persisted a dangling
+        // attachment edge. `user_uploads` records every upload by (userId,
+        // sha256). 404 (not 403) — don't leak whether the upload exists.
+        if (this.uploadsRepo) {
+            // sha256 is a case-insensitive content hash stored lowercase; the DTO
+            // accepts /i, so normalize before the ownership lookup.
+            const owned = await this.uploadsRepo.findOne({
+                where: { sha256: uploadId.toLowerCase(), userId },
+            });
+            if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
+        }
         if (!this.agentAttachments) {
             throw new BadRequestException(
                 `AgentAttachmentRepository is not wired — attach the AgentAttachment provider before calling addAttachment`,
@@ -515,6 +554,50 @@ export class AgentsService {
                 break;
             default:
                 throw new BadRequestException(`Unknown scope: ${input.scope}`);
+        }
+    }
+
+    /**
+     * Security (IDOR / dangling-FK): `validateScopeOwnership` only checks scope
+     * CARDINALITY — it never confirmed the referenced parent actually exists or
+     * belongs to the caller, so a work/mission/idea-scoped Agent could be created
+     * against a ghost or another user's id (201). Look the parent up scoped to the
+     * caller and 404 (not 403 — don't leak existence) when it's missing. Resolved
+     * via raw `findOne({ where: { id, userId } })` so a cross-user parent reads as
+     * not-found, matching the rest of the Agents surface.
+     */
+    private async assertScopeParentExists(
+        userId: string,
+        input: Pick<CreateAgentInput, 'scope' | 'missionId' | 'ideaId' | 'workId'>,
+    ): Promise<void> {
+        switch (input.scope) {
+            case AgentScope.WORK: {
+                if (!input.workId || !this.workRepo) return;
+                const work = await this.workRepo.findOne({
+                    where: { id: input.workId, userId },
+                });
+                if (!work) throw new NotFoundException(`Work ${input.workId} not found.`);
+                break;
+            }
+            case AgentScope.MISSION: {
+                if (!input.missionId || !this.missionRepo) return;
+                const mission = await this.missionRepo.findOne({
+                    where: { id: input.missionId, userId },
+                });
+                if (!mission) throw new NotFoundException(`Mission ${input.missionId} not found.`);
+                break;
+            }
+            case AgentScope.IDEA: {
+                if (!input.ideaId || !this.ideaRepo) return;
+                const idea = await this.ideaRepo.findOne({
+                    where: { id: input.ideaId, userId },
+                });
+                if (!idea) throw new NotFoundException(`Idea ${input.ideaId} not found.`);
+                break;
+            }
+            default:
+                // Tenant-scoped Agents have no parent row to validate.
+                break;
         }
     }
 
