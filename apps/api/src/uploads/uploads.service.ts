@@ -10,7 +10,18 @@ import { createHash } from 'node:crypto';
 import { extname } from 'node:path';
 import type { IStoragePlugin } from '@ever-works/plugin';
 import type { WorkRepoResolver } from '@ever-works/github-storage-plugin';
+// Type-only import + Symbol token (mirrors WORK_REPO_RESOLVER below): pulling the
+// `@ever-works/agent/database` VALUE barrel into UploadsService would drag TypeORM
+// into the upload unit-test import graph (path-scurry-under-Jest crash). The
+// UploadsModule binds the token to the real repo via `useExisting`.
+import type { UserUploadRepository } from '@ever-works/agent/database';
 import { getActiveStorageBackend } from './storage-backend.factory';
+
+/**
+ * DI token for the optional `UserUploadRepository`. The UploadsModule provides
+ * this token via `{ provide: USER_UPLOAD_REPOSITORY, useExisting: ... }`.
+ */
+export const USER_UPLOAD_REPOSITORY = Symbol.for('ever-works:user-upload-repository');
 
 /**
  * DI token for the optional `WorkRepoResolver` (EW-644).
@@ -256,6 +267,14 @@ export class UploadsService {
         @Optional()
         @Inject(WORK_REPO_RESOLVER)
         private readonly workRepoResolver?: WorkRepoResolver,
+        // Ownership index for plain uploads. `@Optional()` so the unit tests
+        // that construct `new UploadsService(backend)` still work; in
+        // production / E2E the UploadsModule binds USER_UPLOAD_REPOSITORY to the
+        // real repo, so every upload is recorded and attachments can validate
+        // ownership.
+        @Optional()
+        @Inject(USER_UPLOAD_REPOSITORY)
+        private readonly userUploads?: UserUploadRepository,
     ) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
@@ -275,6 +294,43 @@ export class UploadsService {
             );
         }
         return this.backendPromise;
+    }
+
+    /**
+     * Best-effort: index the upload's ownership (`userId`) + storage location in
+     * `user_uploads` so an attachment can later validate that its `uploadId`
+     * (the sha256) references a real, caller-owned upload. The bytes are already
+     * stored when this runs, so a failure here MUST NOT fail the upload — log
+     * and continue (deduped per `(userId, sha256)` in the repo).
+     */
+    private async recordUpload(input: {
+        userId: string;
+        sha256: string;
+        key: string;
+        originalFilename?: string;
+        mimeType: string;
+        fileSize: number;
+        workId?: string;
+    }): Promise<void> {
+        if (!this.userUploads) return;
+        try {
+            await this.userUploads.record({
+                userId: input.userId,
+                sha256: input.sha256,
+                workId: input.workId ?? null,
+                storageProvider: (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase(),
+                storagePath: input.key,
+                originalFilename: input.originalFilename ?? null,
+                mimeType: input.mimeType,
+                fileSize: input.fileSize,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to record upload ownership (sha256=${input.sha256.slice(0, 12)}…): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     /**
@@ -354,6 +410,16 @@ export class UploadsService {
             size: file.size,
             ownerId: userId,
             ...(workId ? { workId } : {}),
+        });
+
+        await this.recordUpload({
+            userId,
+            sha256: hash,
+            key,
+            originalFilename: file.originalname,
+            mimeType: sniffed.mime,
+            fileSize: file.size,
+            workId,
         });
 
         // Codex P1 finding on PR #890: returning the plugin's backend-native
@@ -486,6 +552,15 @@ export class UploadsService {
                 ownerId: userId,
                 ...(workId ? { workId } : {}),
             });
+            await this.recordUpload({
+                userId,
+                sha256: hash,
+                key,
+                originalFilename: file.originalname,
+                mimeType: declared,
+                fileSize: file.size,
+                workId,
+            });
             const url = workId
                 ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
                 : `/api/uploads/${encodeURIComponent(userId)}/${filename}`;
@@ -527,6 +602,15 @@ export class UploadsService {
                 size: file.size,
                 ownerId: userId,
                 ...(workId ? { workId } : {}),
+            });
+            await this.recordUpload({
+                userId,
+                sha256: hash,
+                key,
+                originalFilename: file.originalname,
+                mimeType: declared,
+                fileSize: file.size,
+                workId,
             });
             const url = workId
                 ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`

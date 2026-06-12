@@ -1,10 +1,32 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Settings & Profile E2E tests.
  *
  * These run WITH pre-authenticated state.
  */
+
+/**
+ * Click a settings sidebar link and assert the client-side nav landed.
+ *
+ * The settings sub-page links are server-rendered, so the <a> is a clickable
+ * DOM node the instant the HTML arrives — but its Next.js client-nav handler
+ * isn't attached until React hydrates. A click in that window is swallowed
+ * (no navigation), and since it never re-fires, a one-shot click + 30s
+ * toHaveURL still times out at /settings. Under the prebuilt-prod CI web
+ * (#1275) hydration is fast but not instantaneous, so this raced
+ * occasionally (settings.spec.ts:60 on shard 13). Re-click until the URL
+ * actually changes — actionability checks don't cover a not-yet-hydrated
+ * onClick, so the retry is the deterministic fix.
+ */
+async function clickSettingsLink(page: Page, href: string, urlPattern: RegExp): Promise<void> {
+    const link = page.locator(`a[href*="${href}"]`).first();
+    await expect(link).toBeVisible({ timeout: 10_000 });
+    await expect(async () => {
+        await link.click();
+        await expect(page).toHaveURL(urlPattern, { timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
+}
 
 test.describe('Settings navigation', () => {
     test('should load settings page with profile form', async ({ page }) => {
@@ -35,10 +57,7 @@ test.describe('Settings navigation', () => {
     test('should navigate to security settings', async ({ page }) => {
         await page.goto('/en/settings');
 
-        const securityLink = page.locator('a[href*="/settings/security"]').first();
-        await securityLink.click();
-
-        await expect(page).toHaveURL(/\/settings\/security/);
+        await clickSettingsLink(page, '/settings/security', /\/settings\/security/);
         // Should have password inputs
         await expect(page.locator('input[type="password"]').first()).toBeVisible({
             timeout: 10_000,
@@ -48,33 +67,19 @@ test.describe('Settings navigation', () => {
     test('should navigate to API keys settings', async ({ page }) => {
         await page.goto('/en/settings');
 
-        const apiKeysLink = page.locator('a[href*="/settings/api-keys"]').first();
-        await apiKeysLink.click();
-
-        // Next.js client-side navigation doesn't fire 'load', so waitForURL
-        // (default waitUntil:'load') times out even when the URL is correct.
-        // toHaveURL polls the URL itself and tolerates client-side nav.
-        await expect(page).toHaveURL(/\/settings\/api-keys/, { timeout: 30_000 });
+        await clickSettingsLink(page, '/settings/api-keys', /\/settings\/api-keys/);
     });
 
     test('should navigate to data management settings', async ({ page }) => {
         await page.goto('/en/settings');
 
-        const dataLink = page.locator('a[href*="/settings/data"]').first();
-        await dataLink.click();
-
-        // Same client-side-nav fix as the API keys test above.
-        await expect(page).toHaveURL(/\/settings\/data/, { timeout: 30_000 });
+        await clickSettingsLink(page, '/settings/data', /\/settings\/data/);
     });
 
     test('should navigate to danger zone settings', async ({ page }) => {
         await page.goto('/en/settings');
 
-        const dangerLink = page.locator('a[href*="/settings/danger"]').first();
-        await dangerLink.click();
-
-        // Same client-side-nav fix as the API keys test above.
-        await expect(page).toHaveURL(/\/settings\/danger/, { timeout: 30_000 });
+        await clickSettingsLink(page, '/settings/danger', /\/settings\/danger/);
     });
 });
 

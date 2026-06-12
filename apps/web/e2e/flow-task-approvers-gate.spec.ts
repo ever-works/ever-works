@@ -41,7 +41,8 @@ import { createTaskViaAPI, transitionTaskViaAPI, createAgentViaAPI } from './hel
  *         "Invalid actor type" string, which the pipe never reaches).
  *       · approverType:'agent' with a non-owned/unknown agent id → 400
  *         "Agent <id> is not reachable for this user — cannot assign."
- *       · DUPLICATE (same taskId+type+id) → 500 (uq_task_approver unique idx).
+ *       · DUPLICATE (same taskId+type+id) → 409 (uq_task_approver unique idx,
+ *         mapped to a clean Conflict instead of an unmapped 500).
  *       · cross-user (stranger adds approver to my task) → 404
  *         "Task <id> not found." (no existence leak via 403).
  *       · adding an approver to an ALREADY-`done` task → 201 (still 'pending'),
@@ -387,7 +388,7 @@ test.describe('Task approver gate — requireAllApprovers on → done (API)', ()
         expect((await getTask(request, token, dependent.id)).status).toBe('done');
     });
 
-    test('approver lifecycle edges: no approve/remove endpoints, duplicate→500, bad actor→400, cross-user→404, add-on-done is non-retroactive', async ({
+    test('approver lifecycle edges: no approve/remove endpoints, duplicate→409, bad actor→400, cross-user→404, add-on-done is non-retroactive', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -430,12 +431,13 @@ test.describe('Task approver gate — requireAllApprovers on → done (API)', ()
         const approverId = (await first.json()).id;
         expect(approverId).toBeTruthy();
 
-        // (d) DUPLICATE add (same task+type+id) → 500 (uq_task_approver).
+        // (d) DUPLICATE add (same task+type+id) → 409 Conflict (uq_task_approver
+        // unique-violation, now mapped to a clean 409 instead of an unmapped 500).
         const dup = await rawAddApprover(request, token, task.id, {
             approverType: 'user',
             approverId: u.user.id,
         });
-        expect(dup.status(), `dup body=${await dup.text().catch(() => '')}`).toBe(500);
+        expect(dup.status(), `dup body=${await dup.text().catch(() => '')}`).toBe(409);
 
         // (e) There is NO approve endpoint and NO remove-approver endpoint —
         // document the real contract so the gate's permanence is explicit.

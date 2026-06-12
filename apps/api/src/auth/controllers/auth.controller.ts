@@ -43,6 +43,7 @@ import { Inject } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { toHeaders } from '../providers/request-headers';
 import { SocialAuthService } from '../services/social-auth.service';
+import type { AuthenticatedUser } from '../types/auth.types';
 
 @ApiTags('Auth')
 @Controller('api/auth')
@@ -423,7 +424,30 @@ export class AuthController {
         // Public API canonical user shape uses `id` (matches UserProfile on the
         // web client), but `req.user` is `AuthenticatedUser` which carries
         // `userId`. Expose both for backwards compatibility.
-        return { id: req.user.userId, ...req.user };
+        //
+        // EW-722 (Wave M #156, info-leak): WHITELIST projection — never spread
+        // `req.user` into the response. The in-request principal carries
+        // fabricated JWT-envelope claims (`iat`/`iss`/`aud`, deprecated per
+        // L-01) and the internal `tenantId` authz hint; none of those are part
+        // of the public profile contract and they leaked which auth path
+        // (API key vs session) resolved the request.
+        const user = req.user as AuthenticatedUser;
+        const profile: Record<string, unknown> = {
+            id: user.userId,
+            userId: user.userId,
+            email: user.email,
+            username: user.username,
+            provider: user.provider,
+            emailVerified: user.emailVerified,
+            isActive: user.isActive,
+            avatar: user.avatar,
+        };
+        // `isAnonymous` is present on the session path and absent on the
+        // API-key path — preserve that distinction rather than minting a key.
+        if (user.isAnonymous !== undefined) {
+            profile.isAnonymous = user.isAnonymous;
+        }
+        return profile;
     }
 
     @UseGuards(AuthSessionGuard)

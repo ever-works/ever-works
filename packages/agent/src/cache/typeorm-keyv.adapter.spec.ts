@@ -41,6 +41,76 @@ describe('TypeORMKeyvAdapter', () => {
         });
     });
 
+    describe('key length guard', () => {
+        // Security: the cache_entries.key column has no length limit, so the
+        // adapter deterministically hash-truncates caller keys longer than 512
+        // chars (readable 128-char prefix + sha256 digest of the full key) to
+        // prevent cache-key namespace pollution. Short keys must be untouched.
+        const storedKeyFor = async (key: string): Promise<string> => {
+            const adapter = create();
+            repository.upsert.mockResolvedValue({});
+            await adapter.set(key, 1);
+            return repository.upsert.mock.calls[repository.upsert.mock.calls.length - 1][0].key;
+        };
+
+        it('stores keys at exactly 512 chars byte-for-byte unchanged', async () => {
+            const key = 'k'.repeat(512);
+            await expect(storedKeyFor(key)).resolves.toBe(`app-cache:${key}`);
+        });
+
+        it('rewrites keys over 512 chars to a bounded prefix + sha256 digest', async () => {
+            const key = 'a'.repeat(513);
+            const stored = await storedKeyFor(key);
+
+            expect(stored.startsWith(`app-cache:${'a'.repeat(128)}:sha256:`)).toBe(true);
+            expect(stored).toMatch(/:sha256:[0-9a-f]{64}$/);
+            expect(stored.length).toBeLessThan(`app-cache:${key}`.length);
+        });
+
+        it('is deterministic for the same long key', async () => {
+            const key = `progress:${'x'.repeat(600)}`;
+            await expect(storedKeyFor(key)).resolves.toBe(await storedKeyFor(key));
+        });
+
+        it('keeps long keys sharing a 128-char prefix collision-distinct', async () => {
+            const prefix = 'p'.repeat(600);
+            const storedA = await storedKeyFor(`${prefix}A`);
+            const storedB = await storedKeyFor(`${prefix}B`);
+
+            expect(storedA).not.toBe(storedB);
+        });
+
+        it('round-trips a long key through set, get, has and delete', async () => {
+            const adapter = create();
+            const key = 'r'.repeat(700);
+            repository.upsert.mockResolvedValue({});
+            repository.count.mockResolvedValue(1);
+            repository.delete.mockResolvedValue({ affected: 1 });
+
+            await adapter.set(key, { ok: true });
+            const stored = repository.upsert.mock.calls[0][0].key;
+
+            repository.findOne.mockResolvedValue({
+                key: stored,
+                value: JSON.stringify({ ok: true }),
+                expiresAt: null,
+            });
+            await expect(adapter.get(key)).resolves.toEqual({ ok: true });
+            expect(repository.findOne).toHaveBeenCalledWith({ where: { key: stored } });
+
+            await expect(adapter.has(key)).resolves.toBe(true);
+            expect(repository.count).toHaveBeenCalledWith({ where: { key: stored } });
+
+            await expect(adapter.delete(key)).resolves.toBe(true);
+            expect(repository.delete).toHaveBeenCalledWith({ key: stored });
+        });
+
+        it('keeps long keys inside the namespace so clear() still matches them', async () => {
+            const stored = await storedKeyFor('n'.repeat(1000));
+            expect(stored.startsWith('app-cache:')).toBe(true);
+        });
+    });
+
     describe('get', () => {
         it('returns undefined when no entry is found', async () => {
             const adapter = create();

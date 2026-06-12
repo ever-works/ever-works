@@ -1,5 +1,6 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { FacadeExceptionFilter } from './common/filters/facade-exception.filter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
@@ -214,6 +215,16 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_INTERCEPTOR,
             useClass: PostHogInterceptor,
+        },
+        // Maps the `@ever-works/agent` FacadeError hierarchy (git / deploy /
+        // oauth / content-extractor "no provider / not connected / not found"
+        // errors) to the correct 4xx instead of the generic 500 Nest's
+        // default filter would emit. Additive: only nets FacadeErrors that
+        // reach a controller UNCAUGHT (e.g. POST /api/templates/fork →
+        // NoGitProviderError). See facade-exception.filter.ts.
+        {
+            provide: APP_FILTER,
+            useClass: FacadeExceptionFilter,
         },
     ],
     controllers: [APIController],

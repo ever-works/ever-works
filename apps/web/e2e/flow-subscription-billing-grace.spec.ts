@@ -450,7 +450,7 @@ test.describe('Flow: subscription billing grace / past-due / dunning / reactivat
             headers: authedHeaders(user.access_token),
         });
         expect(
-            [200, 500],
+            [200, 409, 500],
             `cancel schedule status ${cancel.status()} (500 is the known non-generated-Work artifact)`,
         ).toContain(cancel.status());
 

@@ -14,6 +14,7 @@ import {
     type MissionGuardrailsOverride,
 } from '../entities/mission.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
@@ -165,6 +166,12 @@ export class MissionsService {
         // Production DI provides it via MissionsModule.
         @Optional()
         private readonly missionAttachments?: MissionAttachmentRepository,
+        // Upload-ownership validation for addAttachment — `user_uploads` indexes
+        // every upload by (userId, sha256). `@Optional()` so hand-rolled tests
+        // (no repo) skip; production/e2e DI provides it.
+        @Optional()
+        @InjectRepository(UserUpload)
+        private readonly uploadsRepo?: Repository<UserUpload>,
     ) {}
 
     /**
@@ -436,6 +443,15 @@ export class MissionsService {
         await this.findOrThrow(userId, missionId);
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
+        }
+        // Security: the uploadId must reference a real upload owned by the
+        // caller (404 — don't leak existence). Closes the dangling/foreign
+        // attachment edge the hunt found.
+        if (this.uploadsRepo) {
+            const owned = await this.uploadsRepo.findOne({
+                where: { sha256: uploadId.toLowerCase(), userId },
+            });
+            if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }
         if (!this.missionAttachments) {
             throw new BadRequestException(

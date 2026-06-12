@@ -78,12 +78,21 @@ export function AgentInstructionsEditor({
     async function persist(name: AgentFileName, body: string) {
         setStatus((s) => ({ ...s, [name]: 'saving' }));
         try {
-            const { newHash } = await writeAgentFileAction(agentId, name, body, hashes[name]);
-            setHashes((h) => ({ ...h, [name]: newHash }));
-            setStatus((s) => ({ ...s, [name]: 'saved' }));
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setStatus((s) => ({ ...s, [name]: /etag/i.test(msg) ? 'conflict' : 'error' }));
+            // Expected failures (etag conflict, validation) arrive as DATA —
+            // production Next.js redacts thrown Server Action messages, so the
+            // old `/etag/i.test(err.message)` classification only ever worked
+            // in dev. The action now classifies server-side and returns
+            // { ok:false, conflict } so the conflict banner survives prod.
+            const res = await writeAgentFileAction(agentId, name, body, hashes[name]);
+            if (res.ok) {
+                setHashes((h) => ({ ...h, [name]: res.newHash }));
+                setStatus((s) => ({ ...s, [name]: 'saved' }));
+            } else {
+                setStatus((s) => ({ ...s, [name]: res.conflict ? 'conflict' : 'error' }));
+            }
+        } catch {
+            // Unexpected transport/render failure — generic error state.
+            setStatus((s) => ({ ...s, [name]: 'error' }));
         }
     }
 

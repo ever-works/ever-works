@@ -61,6 +61,7 @@ import { UserNotificationSubscriptionRepository } from './repositories/user-noti
 import { UserRepository } from './repositories/user.repository';
 import { UserSubscriptionRepository } from './repositories/user-subscription.repository';
 import { UserTemplatePreferenceRepository } from './repositories/user-template-preference.repository';
+import { UserUploadRepository } from './repositories/user-upload.repository';
 import { WebhookDeliveryRepository } from './repositories/webhook-delivery.repository';
 import { WebhookSubscriptionRepository } from './repositories/webhook-subscription.repository';
 import { WorkAdvancedPromptsRepository } from './repositories/work-advanced-prompts.repository';
@@ -106,6 +107,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     UserRepository,
     UserSubscriptionRepository,
     UserTemplatePreferenceRepository,
+    UserUploadRepository,
     WebhookDeliveryRepository,
     WebhookSubscriptionRepository,
     WorkAdvancedPromptsRepository,

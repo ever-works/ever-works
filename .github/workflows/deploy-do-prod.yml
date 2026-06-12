@@ -159,6 +159,12 @@ jobs:
           # Required in prod; without it the encryption service degrades to
           # passthrough.
           PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
+          # EW-716 (#1262): master key for at-rest encryption of operator
+          # secrets (per-Work platform_sync_secret). REQUIRED at boot in
+          # non-local envs — without it the API crash-loops on startup
+          # (config/constants.ts platformEncryptionKey()). 32-byte hex
+          # (openssl rand -hex 32). Create the GitHub secret before deploy.
+          PLATFORM_ENCRYPTION_KEY: ${{ secrets.PLATFORM_ENCRYPTION_KEY }}
           # C-11: PRs auto-applied only when the PR author is a verified
           # member of one of these GitHub orgs. Empty = author check off
           # (the COMMUNITY_PR_AUTO_APPLY default-off gate still applies).

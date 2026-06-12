@@ -109,6 +109,19 @@ function classifyError(text: string): string {
     if (/failed to load ai providers|typeerror: failed to fetch|networkerror|load failed/.test(t)) {
         return 'transient-fetch';
     }
+    // Prebuilt-web (prod `next start`) fetch-abort artifact: page transitions
+    // complete fast enough that NotificationDropdown's polls (unread count at
+    // NotificationDropdown.tsx:174, notifications list at :157) still have a
+    // server-action fetch in flight when navigation tears the document down;
+    // the aborted fetch rejects ("TypeError: network error" / "Failed to
+    // fetch") and the component's catch logs it. Benign timing artifact, not
+    // a regression — it never surfaced under slow next-dev and first appeared
+    // on /works reload pass 2 in CI run 27374977059 once CI switched to the
+    // prebuilt prod web server. Deliberately NARROW (two known poll message
+    // prefixes), not a blanket 'other:*' ignore.
+    if (/failed to fetch unread count|failed to fetch notifications/.test(t)) {
+        return 'notification-poll-aborted-fetch';
+    }
     // Anything else is an UNKNOWN error category — the regression signal.
     return `other:${t.slice(0, 60)}`;
 }
@@ -174,6 +187,22 @@ const KNOWN_BASELINE_CATEGORIES = new Set<string>([
     'posthog',
     // Transient dev-server fetch failure under parallel load (see classifyError).
     'transient-fetch',
+    // Prebuilt-web/prod `next start` navigation aborting the notification
+    // polls mid-flight (see classifyError; CI run 27374977059).
+    'notification-poll-aborted-fetch',
+]);
+
+/** Categories that are pure load/abort TIMING artifacts (see classifyError):
+ *  whether they fire depends on how far a poll got before navigation/load
+ *  contention, so they may legitimately appear on one pass and not the next.
+ *  They carry no SSR/CSR-determinism signal, so the reload-idempotency
+ *  fingerprint comparison excludes them — under the prebuilt prod web server
+ *  (`next start`, CI run 27374977059) a fetch-abort on a single pass would
+ *  otherwise read as "fingerprint drift". The per-pass contract is NOT
+ *  weakened: every error must still classify inside KNOWN_BASELINE_CATEGORIES. */
+const TIMING_ARTIFACT_CATEGORIES = new Set<string>([
+    'transient-fetch',
+    'notification-poll-aborted-fetch',
 ]);
 
 /** Categories present in `errors` that are NOT in the allowed set. */
@@ -618,7 +647,16 @@ test.describe('Hydration & console hygiene — baseline-relative, cross-surface'
                 `/works pass ${i} unexpected error categories: ${extra.join(', ')}`,
             ).toEqual([]);
 
-            fingerprints.push([...new Set(passErrors.map(classifyError))].sort());
+            // Fingerprint = the DETERMINISTIC error categories only. Timing
+            // artifacts (aborted polls under fast prebuilt-web transitions —
+            // see TIMING_ARTIFACT_CATEGORIES) are bounded by the per-pass
+            // baseline check above but excluded here, since their presence
+            // varies by pass without implying SSR/CSR non-determinism.
+            fingerprints.push(
+                [...new Set(passErrors.map(classifyError))]
+                    .filter((cat) => !TIMING_ARTIFACT_CATEGORIES.has(cat))
+                    .sort(),
+            );
 
             // Re-load by navigating away and back so each pass is a true fresh
             // document (page.reload would also work; goto keeps offsets clean).
