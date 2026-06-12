@@ -110,6 +110,69 @@ async function listAgents(
 }
 
 test.describe('Agent scoping matrix — deep cascade rules', () => {
+    test('SECURITY: a scoped Agent create validates parent existence + ownership — ghost or foreign work/mission/idea → 404 (no dangling-FK / IDOR)', async ({
+        request,
+    }) => {
+        const owner = await registerUserViaAPI(request);
+        const token = owner.access_token;
+        const stranger = await registerUserViaAPI(request);
+        const s = stamp();
+
+        // Owner's REAL parents (one of each kind).
+        const missionId = await createMission(request, token, `Sec Mission ${s}`);
+        const ideaId = await createIdea(request, token, `Sec Idea ${s} — a directory of tools`);
+        const { id: workId } = await createWorkViaAPI(request, token, {
+            name: `Sec Work ${s}`,
+            slug: `sec-work-${s}`,
+        });
+
+        const rawCreate = (auth: string, body: Record<string, unknown>) =>
+            request.post(`${API_BASE}/api/agents`, { headers: authedHeaders(auth), data: body });
+
+        // GHOST parent (well-formed but non-existent uuid) → 404 for every scope.
+        // `validateScopeOwnership` (cardinality) passes; the new parent-existence
+        // guard then 404s before any row is created. This used to be a 201 that
+        // persisted an Agent bound to a non-existent parent (dangling FK / IDOR).
+        for (const [scope, key] of [
+            ['work', 'workId'],
+            ['mission', 'missionId'],
+            ['idea', 'ideaId'],
+        ] as const) {
+            const ghost = await rawCreate(token, {
+                scope,
+                name: `Ghost ${scope} ${s}`,
+                [key]: UNKNOWN_UUID,
+            });
+            expect(ghost.status(), `ghost ${scope} parent → 404`).toBe(404);
+        }
+
+        // FOREIGN parent: the stranger references the OWNER's REAL ids → 404,
+        // indistinguishable from a ghost (the parent is resolved scoped-to-caller,
+        // so it reads as not-found — no existence leak, no cross-user binding).
+        const strangerToken = stranger.access_token;
+        for (const [scope, key, id] of [
+            ['work', 'workId', workId],
+            ['mission', 'missionId', missionId],
+            ['idea', 'ideaId', ideaId],
+        ] as const) {
+            const foreign = await rawCreate(strangerToken, {
+                scope,
+                name: `Foreign ${scope} ${s}`,
+                [key]: id,
+            });
+            expect(foreign.status(), `foreign ${scope} parent → 404 (ownership)`).toBe(404);
+        }
+
+        // OWNED parent → 201: the guard never blocks a legitimate scoped create.
+        const okAgent = await createAgentViaAPI(request, token, {
+            scope: 'work',
+            name: `Owned Work Agent ${s}`,
+            workId,
+        });
+        expect(okAgent.id).toMatch(UUID_RE);
+        expect(okAgent.scope).toBe('work');
+    });
+
     test('parent-id filter ALONE isolates by parent; cross-parent ANDs always return empty', async ({
         request,
     }) => {
