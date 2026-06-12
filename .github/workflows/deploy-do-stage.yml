@@ -144,6 +144,12 @@ jobs:
 
           # 2026-05-17 security audit env knobs (PR ever-works#816).
           PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
+          # EW-716 (#1262): master key for at-rest encryption of operator
+          # secrets (per-Work platform_sync_secret). REQUIRED at boot in
+          # non-local envs — without it the API crash-loops on startup
+          # (config/constants.ts platformEncryptionKey()). 32-byte hex
+          # (openssl rand -hex 32). Create the GitHub secret before deploy.
+          PLATFORM_ENCRYPTION_KEY: ${{ secrets.PLATFORM_ENCRYPTION_KEY }}
           COMMUNITY_PR_VERIFIED_ORGS: ever-works
           AGENT_BASH_AUDIT_LOG: 'true'
           # C-04 host allow-list. Empty = WEB_URL's host only.
