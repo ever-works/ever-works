@@ -43,8 +43,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   3. accept with an empty body → 400 ["workId must be a UUID"] (the @IsUUID DTO
  *      check runs before the controller's `!body?.workId` guard, so the
  *      "workId is required" string is unreachable). A well-formed but NON-EXISTENT
- *      workId → 500 (FK violation on acceptedWorkId) — we tolerate [200,500] and
- *      never assert a fictional FK-404 contract.
+ *      workId → 404 (#1280 IDOR fix: the workId-ownership guard's findById
+ *      returns null → false → 404, before the acceptedWorkId FK is reached);
+ *      a FOREIGN-owned workId likewise → 404; only the caller's OWN work → 200.
  *   4. Mission linkage: user-manual Ideas are born `missionId:null` and CANNOT be
  *      linked at create (the DTO rejects `missionId`). Linking is an AI-tick
  *      outcome (no AI here), so we assert the testable truth: an accepted Idea's
@@ -416,14 +417,17 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         expect((await readIdea(request, ownerToken, ideaId)).status).toBe('pending');
 
         // ── 4. A well-formed but NON-EXISTENT workId — the accept passes
-        //      validation + the ownership/status guard, then hits the FK on
-        //      acceptedWorkId. Truthful tolerance: 200 (no FK enforced) OR 500
-        //      (FK violation). We never assert a fictional FK-404 contract. ──
+        //      validation + the Idea ownership/status guard, then hits the new
+        //      workId-ownership guard (#1280 IDOR fix): `works.findById` returns
+        //      null → the service returns false → controller 404, BEFORE the
+        //      acceptedWorkId FK is reached. (Was a 200/500 FK tolerance before
+        //      the fix.) The Idea stays pending. ──
         const ghostWork = await request.post(`${API_BASE}/api/me/work-proposals/${ideaId}/accept`, {
             headers: authedHeaders(ownerToken),
             data: { workId: UNKNOWN_UUID },
         });
-        expect([200, 500]).toContain(ghostWork.status());
+        expect(ghostWork.status()).toBe(404);
+        expect((await readIdea(request, ownerToken, ideaId)).status).toBe('pending');
 
         // ── 5. Ownership: user B cannot accept user A's Idea → 404, and the
         //      Idea stays in user A's pre-existing state ─────────────────────
