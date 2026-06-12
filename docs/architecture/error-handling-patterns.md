@@ -46,6 +46,54 @@ flowchart TD
 | `packages/agent/src/facades/base.facade.ts`                       | Facade-level error classes (`FacadeError`, `NoProviderError`)         |
 | `packages/agent/src/facades/ai.facade.ts`                         | AI-specific error class (`AiFacadeError`)                             |
 | `packages/agent/src/pipeline/pipeline-builder.service.ts`         | Pipeline errors (`CircularDependencyError`, `MissingDependencyError`) |
+| `apps/api/src/common/filters/facade-exception.filter.ts`          | Global filter mapping the `FacadeError` hierarchy → HTTP status codes |
+
+## HTTP boundary: the FacadeException filter
+
+**Rule of thumb:** a service must never let a non-`HttpException` reach a
+controller expecting it to become a meaningful status. Nest's default filter
+turns any non-`HttpException` into a generic **500** (and hides its message).
+For domain errors that are caller-actionable — "no provider configured",
+"GitHub not connected", "provider not found" — a 500 is wrong: it implies a
+server fault when the caller can fix it.
+
+The `FacadeError` hierarchy (`git` / `deploy` / `oauth` / `content-extractor`
+facades) is mapped to the correct 4xx by a single **global** exception filter,
+`FacadeExceptionFilter`, registered via `APP_FILTER` in `api.module.ts`:
+
+| Facade error (by `.name`)                                                                                                                                 | HTTP    | Meaning                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------- |
+| `NoProviderError`, `NoGitProviderError`, `NoDeployProviderError`, `NoOAuthProviderError`, `NoContentExtractorProviderError`                               | **409** | No provider enabled for the capability — enable a plugin                    |
+| `NoGitCredentialsError`, `NoDeployCredentialsError`                                                                                                       | **409** | The user hasn't connected the account / added credentials                   |
+| `ProviderNotFoundError`, `GitProviderNotFoundError`, `DeployProviderNotFoundError`, `OAuthProviderNotFoundError`, `ContentExtractorProviderNotFoundError` | **404** | The named `providerId` doesn't exist among loaded plugins                   |
+| `OAuthNotSupportedError`                                                                                                                                  | **400** | The resolved plugin doesn't implement the operation                         |
+| any other `FacadeError` (generic `*FacadeError` wrappers)                                                                                                 | **500** | Genuine upstream/internal failure — body stays generic, **no message leak** |
+
+Design invariants:
+
+- **Map by `.name`, not `instanceof`.** The hierarchy is intentionally
+  inconsistent (`NoGitProviderError extends GitFacadeError`, not
+  `NoProviderError`). Each class assigns a stable `this.name` in its
+  constructor, so the filter keys off that — robust to minification and immune
+  to the class tree.
+- **HTTP-only by construction.** A global filter runs only in the HTTP request
+  pipeline. FacadeErrors thrown in BullMQ workers, Trigger.dev tasks, the
+  internal-CLI, or generation pipelines are never touched — so this can't
+  wrongly 4xx a background failure.
+- **Additive.** Controllers that already catch a `FacadeError` and convert it
+  to an `HttpException` (e.g. `search` / `screenshot` / `agent-memory`) are
+  unaffected; their `HttpException` is not a `FacadeError`, so `@Catch(FacadeError)`
+  never sees it. The filter only nets the previously-UNCAUGHT cases.
+- **No info leak on 500.** For the unmapped wrappers, the filter returns the
+  same generic `"Internal server error"` body Nest's default filter would —
+  the facade's raw message is surfaced ONLY for the mapped 4xx (those messages
+  are intentional and caller-facing).
+
+**Concrete effect.** A data-repo operation on a work whose owner has not
+connected a git provider (`gitFacade.cloneOrPull` → `NoGitCredentialsError`)
+now returns **409** instead of a generic 500. This covers taxonomy writes
+(categories / tags / collections), comparison generation, community-PR
+processing, and `POST /api/templates/fork`.
 
 ## Key Classes
 

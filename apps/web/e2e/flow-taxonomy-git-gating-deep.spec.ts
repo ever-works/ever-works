@@ -6,7 +6,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  * git-gate matrix for the Missions/Ideas/Works surface. Every per-work
  * taxonomy WRITE (POST/PUT/DELETE /api/works/:id/{categories,tags,collections})
  * commits to the work's data repo; on a fresh work with NO connected git
- * provider the save throws and the dedicated endpoints surface a GENERIC 500.
+ * provider the save throws and the dedicated endpoints surface a 409 (NoGitCredentialsError via the FacadeExceptionFilter; was a generic 500).
  * BEFORE that git-gate fire, three layers are exercised independently: the
  * class-validator DTO (ValidationPipe), the AuthSessionGuard (401), and the
  * ownership guard (403 stranger / 404 ghost). This file pins the DTO BOUND
@@ -34,7 +34,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *       (categories-tags + count), the gate-ORDER walk (validation → auth →
  *       ownership → git) demonstrated with category-missing-name + tag-NON-
  *       string-50, stranger-403/ghost-404 on the CATEGORIES write only, the
- *       count↔read invariant, PUT/DELETE git-gate 500, and the submit-item 400
+ *       count↔read invariant, PUT/DELETE git-gate 409, and the submit-item 400
  *       reconnect-git contrast.
  *   · flow-git-provider-connection.spec.ts — that a disconnected user's
  *       categories AND tags AND collections writes are all >=400 git-gated
@@ -58,7 +58,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *      should not exist", and a CATEGORY-only field (description) on a TAG is
  *      rejected because CreateTagDto carries ONLY name.
  *   4. The sanitize @Transform truncates an over-long STRING name to the bound
- *      so it PASSES validation and falls through to the git-gate 500 (proving
+ *      so it PASSES validation and falls through to the git-gate 409 (proving
  *      the transform runs before the validator) — for all three kinds.
  *   5. Cross-user isolation on EACH write verb/kind: a DTO-valid stranger
  *      POST/PUT/DELETE is 403 (ownership precedes the git save) for tags AND
@@ -150,11 +150,17 @@ async function freshWork(
     return { token: u.access_token, workId };
 }
 
-/** A generic Nest 500 envelope — the git-gate signature for the dedicated endpoints. */
-function expectGitGate500(status: number, body: ErrorEnvelope, label: string): void {
-    expect(status, `${label} hits the git-gate → 500`).toBe(500);
-    expect(body.statusCode, `${label} 500 carries statusCode`).toBe(500);
-    expect(body.status, `${label} 500 is NOT a success envelope`).not.toBe('success');
+/**
+ * The git-gate signature for the dedicated taxonomy endpoints: a DTO-valid op
+ * on a work whose owner has NOT connected a git provider hits
+ * `gitFacade.cloneOrPull` → `NoGitCredentialsError`, which the global
+ * FacadeExceptionFilter maps to a clean 409 precondition (was a generic 500
+ * before that filter — see apps/api/src/common/filters).
+ */
+function expectGitGate409(status: number, body: ErrorEnvelope, label: string): void {
+    expect(status, `${label} hits the git-gate → 409 (no git provider connected)`).toBe(409);
+    expect(body.statusCode, `${label} 409 carries statusCode`).toBe(409);
+    expect(body.status, `${label} 409 is NOT a success envelope`).not.toBe('success');
 }
 
 /** A class-validator 400 envelope naming a field. */
@@ -231,7 +237,7 @@ test.describe('flow: taxonomy WRITE — the per-kind name @IsString+@MaxLength b
     }) => {
         // Probed: `{}` → 400 (@IsString fails on undefined). But `{ name: '' }` is a
         // STRING of length 0 — it passes @IsString + @MaxLength, so the DTO is valid
-        // and the request reaches the git-gated save → 500. This pins that the name
+        // and the request reaches the git-gated save → 409. This pins that the name
         // is validated for TYPE/length, NOT for non-emptiness (no @IsNotEmpty).
         const { token, workId } = await freshWork(request, 'name-required');
 
@@ -244,7 +250,7 @@ test.describe('flow: taxonomy WRITE — the per-kind name @IsString+@MaxLength b
         );
 
         const empty = await postTaxonomy(request, token, workId, 'categories', { name: '' });
-        expectGitGate500(empty.status, empty.body, 'empty-string category name');
+        expectGitGate409(empty.status, empty.body, 'empty-string category name');
     });
 });
 
@@ -301,7 +307,7 @@ test.describe('flow: taxonomy WRITE — the optional category/collection field b
     }) => {
         // priority floors at 0. -1 trips @Min(0); a string trips @IsNumber (and the
         // @Min comparison too). priority:0 is the inclusive boundary → it passes
-        // validation and the DTO-valid write falls through to the git-gate 500.
+        // validation and the DTO-valid write falls through to the git-gate 409.
         const { token, workId } = await freshWork(request, 'priority');
 
         const negative = await postTaxonomy(request, token, workId, 'categories', {
@@ -330,7 +336,7 @@ test.describe('flow: taxonomy WRITE — the optional category/collection field b
             name: 'Cat',
             priority: 0,
         });
-        expectGitGate500(zero.status, zero.body, 'priority:0 boundary write');
+        expectGitGate409(zero.status, zero.body, 'priority:0 boundary write');
     });
 });
 
@@ -372,14 +378,14 @@ test.describe('flow: taxonomy WRITE — the create whitelist (forbidNonWhitelist
 });
 
 test.describe('flow: taxonomy WRITE — the sanitize @Transform truncates an over-long STRING name through to the git-gate', () => {
-    test('an over-bound STRING name on each kind is sanitize-truncated to the bound (so it PASSES @MaxLength) and falls through to the git-gate 500 — proving the transform runs before the validator', async ({
+    test('an over-bound STRING name on each kind is sanitize-truncated to the bound (so it PASSES @MaxLength) and falls through to the git-gate 409 — proving the transform runs before the validator', async ({
         request,
     }) => {
         // CreateTagDto.name / Create{Category,Collection}Dto.name carry a
         // @Transform(sanitizeName(value, bound)) that runs (class-transformer)
         // BEFORE @MaxLength (class-validator). A raw STRING longer than the bound is
         // truncated to the bound → validation passes → the DTO-valid write reaches
-        // the git-gated save → 500. Contrast with the NON-string probe above, which
+        // the git-gated save → 409. Contrast with the NON-string probe above, which
         // can't be truncated and so trips @IsString+@MaxLength → 400.
         const { token, workId } = await freshWork(request, 'sanitize');
 
@@ -392,13 +398,13 @@ test.describe('flow: taxonomy WRITE — the sanitize @Transform truncates an ove
             const over = await postTaxonomy(request, token, workId, kind, {
                 name: overByKind[kind],
             });
-            expectGitGate500(over.status, over.body, `${kind} over-length STRING name (truncated)`);
+            expectGitGate409(over.status, over.body, `${kind} over-length STRING name (truncated)`);
         }
     });
 });
 
 test.describe('flow: taxonomy WRITE — the INCLUSIVE @MaxLength boundaries are valid and reach the git-gate', () => {
-    test('a tag name of EXACTLY 50 chars and a category description of EXACTLY 500 chars (the inclusive bounds) both PASS validation and fall through to the git-gate 500', async ({
+    test('a tag name of EXACTLY 50 chars and a category description of EXACTLY 500 chars (the inclusive bounds) both PASS validation and fall through to the git-gate 409', async ({
         request,
     }) => {
         // @MaxLength(n) is INCLUSIVE: a value of exactly n passes. We assert the
@@ -408,13 +414,13 @@ test.describe('flow: taxonomy WRITE — the INCLUSIVE @MaxLength boundaries are 
         const { token, workId } = await freshWork(request, 'boundary');
 
         const tag50 = await postTaxonomy(request, token, workId, 'tags', { name: 't'.repeat(50) });
-        expectGitGate500(tag50.status, tag50.body, 'tag name exactly 50 chars');
+        expectGitGate409(tag50.status, tag50.body, 'tag name exactly 50 chars');
 
         const desc500 = await postTaxonomy(request, token, workId, 'categories', {
             name: 'Cat',
             description: 'd'.repeat(500),
         });
-        expectGitGate500(desc500.status, desc500.body, 'category description exactly 500 chars');
+        expectGitGate409(desc500.status, desc500.body, 'category description exactly 500 chars');
     });
 });
 
@@ -422,7 +428,7 @@ test.describe('flow: taxonomy WRITE — the dedicated endpoints are git-gated fo
     test('a DTO-valid create for categories AND tags AND collections each 500s on a non-connected work and persists NOTHING (the read stays the empty success envelope)', async ({
         request,
     }) => {
-        // The core git-gate, asserted per kind with the GENERIC-500 envelope (distinct
+        // The core git-gate, asserted per kind with the git-gate 409 envelope (distinct
         // from submit-item's friendly 400). After all three blocked writes the
         // categories-tags read still reports the empty success envelope — no partial
         // taxonomy leaked from a half-committed save.
@@ -433,7 +439,7 @@ test.describe('flow: taxonomy WRITE — the dedicated endpoints are git-gated fo
             const write = await postTaxonomy(request, token, workId, kind, {
                 name: `Gated ${kind} ${s}`,
             });
-            expectGitGate500(write.status, write.body, `${kind} create`);
+            expectGitGate409(write.status, write.body, `${kind} create`);
         }
 
         const read = await request.get(`${API_BASE}/api/works/${workId}/categories-tags`, {
@@ -519,7 +525,7 @@ test.describe('flow: taxonomy WRITE — auth + ownership precede the git-gate on
         // DELETE is 403 (ownership precedes the git-gated read inside the service).
         // But the ValidationPipe still runs FIRST: an owner PUT with a non-string
         // name is a 400 (the body never reaches ownership/git), while an owner PUT
-        // with a VALID body reaches the git-gate → 500.
+        // with a VALID body reaches the git-gate → 409.
         const owner = await registerUserViaAPI(request);
         const stranger = await registerUserViaAPI(request);
         const s = uniq('putdel');
@@ -569,7 +575,7 @@ test.describe('flow: taxonomy WRITE — auth + ownership precede the git-gate on
             'owner PUT invalid name',
         );
 
-        // Owner PUT with a VALID name → reaches the git-gate → 500.
+        // Owner PUT with a VALID name → reaches the git-gate → 409.
         const ownerGoodPut = await request.put(
             `${API_BASE}/api/works/${workId}/categories/ghost-${s}`,
             {
@@ -577,18 +583,18 @@ test.describe('flow: taxonomy WRITE — auth + ownership precede the git-gate on
                 data: { name: `Renamed ${s}` },
             },
         );
-        expectGitGate500(
+        expectGitGate409(
             ownerGoodPut.status(),
             await readJson<ErrorEnvelope>(ownerGoodPut),
             'owner PUT valid name',
         );
 
-        // Owner DELETE a non-existent tag id → git-gate 500 (the gated read fires
+        // Owner DELETE a non-existent tag id → git-gate 409 (the gated read fires
         // before the per-child not-found check, so it's a 500, not a 404).
         const ownerDel = await request.delete(`${API_BASE}/api/works/${workId}/tags/ghost-${s}`, {
             headers: ownerH,
         });
-        expectGitGate500(
+        expectGitGate409(
             ownerDel.status(),
             await readJson<ErrorEnvelope>(ownerDel),
             'owner DELETE non-existent tag',
@@ -602,7 +608,7 @@ test.describe('flow: Missions/Ideas taxonomy CHAIN — accepting an Idea onto a 
     }) => {
         // An Idea (WorkProposal) becomes a Work via accept; accept stamps the
         // acceptedWorkId pointer but does NOT connect a git provider. So the linked
-        // Work's taxonomy writes are STILL git-gated (500) and its read is STILL the
+        // Work's taxonomy writes are STILL git-gated (409) and its read is STILL the
         // empty success envelope — proving the gate is about the git connection, not
         // the Idea→Work linkage state.
         const user = await registerUserViaAPI(request);
@@ -636,7 +642,7 @@ test.describe('flow: Missions/Ideas taxonomy CHAIN — accepting an Idea onto a 
         const write = await postTaxonomy(request, user.access_token, workId, 'categories', {
             name: `Chain Cat ${s}`,
         });
-        expectGitGate500(write.status, write.body, 'taxonomy write on accepted-linked work');
+        expectGitGate409(write.status, write.body, 'taxonomy write on accepted-linked work');
 
         // And its read is still the empty success envelope (no taxonomy materialized
         // by the accept).

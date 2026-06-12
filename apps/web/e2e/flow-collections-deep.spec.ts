@@ -37,22 +37,23 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *       route does not exist; a DIFFERENT shape from the ownership 404 below)
  *   - GET  /works/:id/collections/:cid                 → 404 routing-404 (no GET child)
  *   - PATCH /works/:id/collections/:cid                → 404 routing-404 (only PUT/DELETE)
- *   - POST /works/:id/collections (owner, DTO-valid)   → 500 { statusCode:500,
- *       message:'Internal server error' }  (git-gated save on a non-connected work)
- *   - PUT/DELETE /works/:id/collections/:cid (owner)   → 500 git-gate (the gated read
+ *   - POST /works/:id/collections (owner, DTO-valid)   → 409 { statusCode:409,
+ *       error:'NoGitCredentialsError' }  (git-gated save on a non-connected work;
+ *       FacadeExceptionFilter maps NoGitCredentialsError → 409; was 500 pre-filter)
+ *   - PUT/DELETE /works/:id/collections/:cid (owner)   → 409 git-gate (the gated read
  *       inside the service fires before the per-child not-found check)
  *   - POST collections, name a NUMBER                  → 400 ["name must be shorter than
  *       or equal to 100 characters","name must be a string"]
- *   - POST collections, name '' (empty string)         → 500 (passes @IsString+@MaxLength,
+ *   - POST collections, name '' (empty string)         → 409 (passes @IsString+@MaxLength,
  *       no @IsNotEmpty → falls through to the git-gate)
- *   - POST collections, name 'z'×101 (STRING)          → 500 (sanitize @Transform truncates
+ *   - POST collections, name 'z'×101 (STRING)          → 409 (sanitize @Transform truncates
  *       to 100 BEFORE @MaxLength → valid → git-gate; contrast the NUMBER probe's 400)
  *   - POST collections, description a NUMBER            → 400 [both 500-char + must-be-string]
  *   - POST collections, icon_url 'h'×501               → 400 ["icon_url must be shorter than
  *       or equal to 500 characters"]
  *   - POST collections, priority -1                    → 400 ["priority must not be less than 0"]
  *   - POST collections, priority 'high'                → 400 [must-not-be-less-than-0 + must-be-number]
- *   - POST collections, priority 0 (inclusive bound)   → 500 (valid → git-gate)
+ *   - POST collections, priority 0 (inclusive bound)   → 409 (valid → git-gate)
  *   - POST collections, unknown prop                   → 400 ["property <x> should not exist"]
  *   - anon POST collections                            → 401 { statusCode:401 }
  *   - stranger POST/PUT/DELETE collections             → 403 { status:'error', message:
@@ -176,11 +177,17 @@ async function freshWork(
     return { token: u.access_token, workId };
 }
 
-/** The GENERIC Nest 500 envelope — the git-gate signature for the dedicated endpoints. */
-function expectGitGate500(status: number, body: ErrorEnvelope, label: string): void {
-    expect(status, `${label} hits the git-gate → 500`).toBe(500);
-    expect(body.statusCode, `${label} 500 carries statusCode`).toBe(500);
-    expect(body.status, `${label} 500 is NOT a success envelope`).not.toBe('success');
+/**
+ * The git-gate signature for the dedicated collection endpoints: a DTO-valid
+ * write on a work whose owner has NOT connected a git provider fails when the
+ * data-generator calls `gitFacade.cloneOrPull` → `NoGitCredentialsError`. The
+ * global FacadeExceptionFilter maps that to a clean 409 precondition — it was
+ * a generic 500 before that filter (see apps/api/src/common/filters).
+ */
+function expectGitGate409(status: number, body: ErrorEnvelope, label: string): void {
+    expect(status, `${label} hits the git-gate → 409 (no git provider connected)`).toBe(409);
+    expect(body.statusCode, `${label} 409 carries statusCode`).toBe(409);
+    expect(body.status, `${label} 409 is NOT a success envelope`).not.toBe('success');
 }
 
 /** A class-validator 400 envelope naming a field. */
@@ -286,7 +293,7 @@ test.describe('flow: collection CREATE validation gradient — the per-field DTO
         // Create*CollectionDto.name is @IsString @MaxLength(100) with NO @IsNotEmpty.
         // A number can't be sanitized → both @IsString and @MaxLength(100) fire (400).
         // `{}` (undefined) → @IsString fails (400). But `''` is a length-0 STRING → it
-        // passes type + length and the DTO-valid write reaches the git-gated save (500).
+        // passes type + length and the DTO-valid write reaches the git-gated save (409).
         const { token, workId } = await freshWork(request, 'name-field');
 
         const numberName = await postCollection(request, token, workId, { name: 98765 });
@@ -312,7 +319,7 @@ test.describe('flow: collection CREATE validation gradient — the per-field DTO
         );
 
         const emptyName = await postCollection(request, token, workId, { name: '' });
-        expectGitGate500(emptyName.status, emptyName.body, 'collection empty-string name');
+        expectGitGate409(emptyName.status, emptyName.body, 'collection empty-string name');
     });
 
     test('the optional fields on a collection: description NON-STRING (400 both messages), icon_url over-500 (400), and the priority gradient (-1 → 400, "high" → 400, 0 → valid git-gate)', async ({
@@ -323,7 +330,7 @@ test.describe('flow: collection CREATE validation gradient — the per-field DTO
         // sanitized → @IsString + @MaxLength(500) BOTH fire. icon_url has no transform →
         // an over-500 STRING trips @MaxLength directly. priority @IsNumber @Min(0):
         // -1 trips @Min, a string trips @IsNumber (and @Min), but 0 is the INCLUSIVE
-        // floor → valid → git-gate 500.
+        // floor → valid → git-gate 409.
         const { token, workId } = await freshWork(request, 'opt-fields');
 
         const badDesc = await postCollection(request, token, workId, {
@@ -375,21 +382,21 @@ test.describe('flow: collection CREATE validation gradient — the per-field DTO
         );
 
         const zero = await postCollection(request, token, workId, { name: 'Coll', priority: 0 });
-        expectGitGate500(zero.status, zero.body, 'collection priority:0 inclusive boundary');
+        expectGitGate409(zero.status, zero.body, 'collection priority:0 inclusive boundary');
     });
 
-    test('an over-bound STRING name on a collection is sanitize-truncated to 100 (so it PASSES @MaxLength) and falls through to the git-gate 500 — the @Transform runs before the validator', async ({
+    test('an over-bound STRING name on a collection is sanitize-truncated to 100 (so it PASSES @MaxLength) and falls through to the git-gate 409 — the @Transform runs before the validator', async ({
         request,
     }) => {
         // CreateCollectionDto.name carries @Transform(sanitizeName(_,100)) which runs
         // (class-transformer) BEFORE @MaxLength (class-validator). A raw STRING longer
         // than 100 is truncated to 100 → validation passes → the DTO-valid write reaches
-        // the git-gated save → 500. This is the load-bearing contrast with the NUMBER
+        // the git-gated save → 409. This is the load-bearing contrast with the NUMBER
         // probe above (which can't be truncated and so 400s on @IsString + @MaxLength).
         const { token, workId } = await freshWork(request, 'sanitize-name');
 
         const overLong = await postCollection(request, token, workId, { name: 'z'.repeat(101) });
-        expectGitGate500(overLong.status, overLong.body, 'collection over-length STRING name');
+        expectGitGate409(overLong.status, overLong.body, 'collection over-length STRING name');
     });
 
     test('the create whitelist rejects an unknown property on a collection by name (forbidNonWhitelisted), before any ownership/git work', async ({
@@ -413,27 +420,27 @@ test.describe('flow: collection CREATE validation gradient — the per-field DTO
     });
 });
 
-test.describe('flow: collection WRITE git-gate — every verb 500s on a non-connected work and persists NOTHING', () => {
-    test('a DTO-valid owner CREATE/UPDATE/DELETE on a collection each hits the git-gate (500), and the collections array stays empty (no partial state leaked)', async ({
+test.describe('flow: collection WRITE git-gate — every verb 409s on a non-connected work and persists NOTHING', () => {
+    test('a DTO-valid owner CREATE/UPDATE/DELETE on a collection each hits the git-gate (409), and the collections array stays empty (no partial state leaked)', async ({
         request,
     }) => {
         // All three collection write verbs route through ensureCanEdit → the data-repo
         // save (create) or the git-gated taxonomy READ (update/delete, which fires
         // BEFORE the per-child not-found check). On a non-connected work each surfaces
-        // the GENERIC 500. After all three blocked writes the combined read still shows
+        // the git-gate 409. After all three blocked writes the combined read still shows
         // collections:[] — nothing was half-committed.
         const { token, workId } = await freshWork(request, 'gate-all-verbs');
         const s = uniq('gate');
         const headers = authedHeaders(token);
 
         const created = await postCollection(request, token, workId, { name: `Gated Coll ${s}` });
-        expectGitGate500(created.status, created.body, 'collection CREATE');
+        expectGitGate409(created.status, created.body, 'collection CREATE');
 
         const updated = await request.put(
             `${API_BASE}/api/works/${workId}/collections/ghost-${s}`,
             { headers, data: { name: `Renamed ${s}` } },
         );
-        expectGitGate500(
+        expectGitGate409(
             updated.status(),
             await readJson<ErrorEnvelope>(updated),
             'collection UPDATE (non-existent child → gate dominates)',
@@ -443,7 +450,7 @@ test.describe('flow: collection WRITE git-gate — every verb 500s on a non-conn
             `${API_BASE}/api/works/${workId}/collections/ghost-${s}`,
             { headers },
         );
-        expectGitGate500(
+        expectGitGate409(
             deleted.status(),
             await readJson<ErrorEnvelope>(deleted),
             'collection DELETE (non-existent child → gate dominates)',
@@ -457,11 +464,11 @@ test.describe('flow: collection WRITE git-gate — every verb 500s on a non-conn
         );
     });
 
-    test('repeated gated collection CREATEs are idempotent against state — each 500s and the collections array is STILL empty (no accumulation)', async ({
+    test('repeated gated collection CREATEs are idempotent against state — each 409s and the collections array is STILL empty (no accumulation)', async ({
         request,
     }) => {
-        // A gated write that 500s must not partially commit, so retrying it can never
-        // accumulate collections. Fire the SAME create three times; each 500s and the
+        // A gated write that 409s must not partially commit, so retrying it can never
+        // accumulate collections. Fire the SAME create three times; each 409s and the
         // read stays empty — proving the failure is atomic at the data-repo boundary.
         const { token, workId } = await freshWork(request, 'idempotent');
         const s = uniq('retry');
@@ -471,7 +478,7 @@ test.describe('flow: collection WRITE git-gate — every verb 500s on a non-conn
                 name: `Retry Coll ${s}`,
                 priority: attempt,
             });
-            expectGitGate500(write.status, write.body, `collection create attempt ${attempt}`);
+            expectGitGate409(write.status, write.body, `collection create attempt ${attempt}`);
         }
 
         const read = await readTaxonomy(request, token, workId);
@@ -482,7 +489,7 @@ test.describe('flow: collection WRITE git-gate — every verb 500s on a non-conn
     test('collection writes are isolated PER-WORK — a gated CREATE on work A never materialises a collection on work B (same owner)', async ({
         request,
     }) => {
-        // One owner, TWO works. A gated collection create on work A is a 500 and leaves
+        // One owner, TWO works. A gated collection create on work A is a 409 and leaves
         // A's collections empty; crucially it also leaves work B's collections empty —
         // the per-(workId,userId) data path does not bleed a half-committed taxonomy
         // across sibling works.
@@ -503,7 +510,7 @@ test.describe('flow: collection WRITE git-gate — every verb 500s on a non-conn
         const gated = await postCollection(request, u.access_token, workA, {
             name: `Iso Coll ${s}`,
         });
-        expectGitGate500(gated.status, gated.body, 'collection create on work A');
+        expectGitGate409(gated.status, gated.body, 'collection create on work A');
 
         const readA = await readTaxonomy(request, u.access_token, workA);
         expect(readA.body.collections!.length, 'work A has no collection').toBe(0);
@@ -547,7 +554,7 @@ test.describe('flow: collection WRITE authz — auth + ownership precede the git
     }) => {
         // ensureCanEdit fires before the data-repo save, so a non-member's DTO-valid
         // write to every collection verb is a 403 with the canonical { status:'error',
-        // message:'You do not have permission…' } envelope — NOT a 500 (it never reaches
+        // message:'You do not have permission…' } envelope — NOT the git-gate 409 (it never reaches
         // the git-gate) and NOT a 404 (the work exists). The siblings pin stranger-403
         // for collection POST only; here we pin PUT and DELETE on collections too.
         const owner = await registerUserViaAPI(request);
@@ -589,13 +596,13 @@ test.describe('flow: collection WRITE authz — auth + ownership precede the git
         ).toMatch(PERMISSION_RE);
     });
 
-    test('an owner CREATE/PUT/DELETE on a collection of a GHOST (well-formed but absent) work is a precise 404 (the work-row lookup precedes the git save), NOT a 500 or a leak', async ({
+    test('an owner CREATE/PUT/DELETE on a collection of a GHOST (well-formed but absent) work is a precise 404 (the work-row lookup precedes the git save), NOT the git-gate 409 or a leak', async ({
         request,
     }) => {
         // ensureCanEdit looks up the work row before the data-repo save, so a DTO-valid
         // OWNER write to a non-existent work id is the ownership 404 — { status:'error',
         // message:"Work with id '…' not found" } — on ALL THREE collection verbs, never
-        // the owner's own git-gate 500 and never a 200 leak.
+        // the owner's own git-gate 409 and never a 200 leak.
         const owner = await registerUserViaAPI(request);
         const s = uniq('ghost');
         const headers = authedHeaders(owner.access_token);
