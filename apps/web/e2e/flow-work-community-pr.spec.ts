@@ -115,6 +115,45 @@ async function process(request: APIRequestContext, token: string, id: string) {
     return request.post(processUrl(id), { headers: authedHeaders(token) });
 }
 
+/**
+ * Robustly drive a CommunityPrSettings toggle to a target server-side value.
+ *
+ * Replaces the old `expect.poll` that re-clicked EVERY iteration: a Switch
+ * click is a toggle, so under prod-web round-trip lag a second click could
+ * fire before the first persisted and flip the flag back — and the old
+ * `div hasText … button[role=switch].last()` locator could resolve to the
+ * WRONG switch once both the enable + auto-close switches are mounted
+ * (clicking it then toggled `communityPrEnabled` off — the observed flake).
+ *
+ * Here: the switch is scoped to the innermost row that contains BOTH the given
+ * label heading AND a switch (never a shared ancestor), and we only click when
+ * the server still shows the wrong value — so once it flips, clicking stops.
+ */
+async function flipCommunityPrSwitch(
+    page: Page,
+    request: APIRequestContext,
+    token: string,
+    workId: string,
+    label: string,
+    field: 'communityPrEnabled' | 'communityPrAutoClose',
+    target: boolean,
+): Promise<void> {
+    const sw = page
+        .locator('div')
+        .filter({ has: page.getByText(label, { exact: true }) })
+        .filter({ has: page.getByRole('switch') })
+        .last()
+        .getByRole('switch');
+    await expect(async () => {
+        const current = (await getWork(request, token, workId)).work[field];
+        if (current !== target) {
+            await sw.click({ timeout: 5_000 }).catch(() => {});
+        }
+        const after = (await getWork(request, token, workId)).work[field];
+        expect(after).toBe(target);
+    }).toPass({ timeout: 30_000 });
+}
+
 /** Log the SEEDED storageState user in via API to get a bearer for setup. */
 async function seededToken(request: APIRequestContext): Promise<string> {
     const s = loadSeededTestUser();
@@ -469,26 +508,17 @@ test.describe('Work community-PR flags + processing (integration)', () => {
             page.getByText('Auto-close PRs after processing', { exact: true }),
         ).toHaveCount(0);
 
-        // The enable toggle is the switch inside the "Enable Community PR" row;
-        // locate it relative to its label row to avoid grabbing an unrelated
-        // page switch.
-        const enableSwitch = page
-            .locator('div', { hasText: 'Enable Community PR' })
-            .locator('button[role="switch"]')
-            .last();
-
-        // Hydration race: the first click can be swallowed. Retry until the
-        // persisted flag flips server-side (the source of truth), with a toast as
-        // a soft signal.
-        await expect
-            .poll(
-                async () => {
-                    await enableSwitch.click({ timeout: 5_000 }).catch(() => {});
-                    return (await getWork(request, token, work.id)).work.communityPrEnabled;
-                },
-                { timeout: 30_000 },
-            )
-            .toBe(true);
+        // Flip "Enable Community PR" ON via the row-scoped, click-only-if-needed
+        // helper (robust to the hydration race + the prod-web toggle round-trip).
+        await flipCommunityPrSwitch(
+            page,
+            request,
+            token,
+            work.id,
+            'Enable Community PR',
+            'communityPrEnabled',
+            true,
+        );
 
         // Now that it's enabled, router.refresh() re-renders the card WITH the
         // previously-hidden auto-close toggle. Wait for it to mount.
@@ -503,20 +533,18 @@ test.describe('Work community-PR flags + processing (integration)', () => {
         expect(afterEnable.work.communityPrAutoClose).toBe(true);
 
         // Flip auto-close OFF through the now-visible toggle and confirm only that
-        // flag changes server-side (enabled stays true).
-        const autoCloseSwitch = page
-            .locator('div', { hasText: 'Auto-close PRs after processing' })
-            .locator('button[role="switch"]')
-            .last();
-        await expect
-            .poll(
-                async () => {
-                    await autoCloseSwitch.click({ timeout: 5_000 }).catch(() => {});
-                    return (await getWork(request, token, work.id)).work.communityPrAutoClose;
-                },
-                { timeout: 30_000 },
-            )
-            .toBe(false);
+        // flag changes server-side (enabled stays true). The row-scoped helper
+        // targets the auto-close switch precisely (never the enable switch) and
+        // only clicks while the server still shows the wrong value.
+        await flipCommunityPrSwitch(
+            page,
+            request,
+            token,
+            work.id,
+            'Auto-close PRs after processing',
+            'communityPrAutoClose',
+            false,
+        );
 
         const afterAutoClose = await getWork(request, token, work.id);
         expect(afterAutoClose.work.communityPrEnabled).toBe(true);
