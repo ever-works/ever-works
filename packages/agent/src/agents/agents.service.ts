@@ -23,6 +23,7 @@ import { Repository } from 'typeorm';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { AgentRepository, type ListAgentsFilter } from '../database/repositories/agent.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
@@ -151,6 +152,11 @@ export class AgentsService {
         @Optional()
         @InjectRepository(WorkProposal)
         private readonly ideaRepo?: Repository<WorkProposal>,
+        // Upload-ownership validation for addAttachment — `user_uploads` indexes
+        // every upload by (userId, sha256). `@Optional()` + raw repo, same as above.
+        @Optional()
+        @InjectRepository(UserUpload)
+        private readonly uploadsRepo?: Repository<UserUpload>,
     ) {}
 
     async list(
@@ -453,6 +459,18 @@ export class AgentsService {
         await this.requireOwned(userId, id);
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
+        }
+        // Security: the uploadId must reference a real upload owned by the
+        // caller — without this a ghost/foreign id persisted a dangling
+        // attachment edge. `user_uploads` records every upload by (userId,
+        // sha256). 404 (not 403) — don't leak whether the upload exists.
+        if (this.uploadsRepo) {
+            // sha256 is a case-insensitive content hash stored lowercase; the DTO
+            // accepts /i, so normalize before the ownership lookup.
+            const owned = await this.uploadsRepo.findOne({
+                where: { sha256: uploadId.toLowerCase(), userId },
+            });
+            if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }
         if (!this.agentAttachments) {
             throw new BadRequestException(

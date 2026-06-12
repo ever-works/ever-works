@@ -5,6 +5,7 @@ import {
     ApiKey,
     RefreshToken,
     User,
+    UserUpload,
     Work,
     WorkAdvancedPrompts,
     WorkCustomDomain,
@@ -125,6 +126,7 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
 
 export const ENTITIES = [
     ApiKey,
+    UserUpload,
     Work,
     WorkAdvancedPrompts,
     WorkCustomDomain,

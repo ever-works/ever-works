@@ -81,6 +81,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Well-formed RFC-4122 v4 UUIDs that exist nowhere in the DB. */
 const UNKNOWN_UPLOAD_UUID = 'a6c1f0e2-3b4d-4e5f-8a9b-0c1d2e3f4a5b';
+/** A well-formed sha256 (64-hex) that no real upload owns — passes the DTO,
+ *  fails the upload-ownership gate. */
+const UNKNOWN_UPLOAD_SHA = 'a'.repeat(64);
 const UNKNOWN_AGENT_UUID = '9e8d7c6b-5a4f-4321-9876-fedcba987654';
 const UNKNOWN_ATTACHMENT_UUID = 'b7d2e1f3-4c5a-4b6d-9e8f-1a2b3c4d5e6f';
 /** UUID-shaped but RFC-invalid (variant nibble '4' — must be 8/9/a/b). */
@@ -323,11 +326,14 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
             const body = (await res.json()) as ErrorBody;
             expect(body.error).toBe('Bad Request');
             expect(Array.isArray(body.message), 'class-validator message array').toBe(true);
-            expect(body.message).toContain('uploadId must be a UUID');
+            // `uploadId` is the sha256 content hash (NOT a UUID) — aligned with the
+            // Mission/Idea attachment DTOs and the service's own SHA256 guard, so a
+            // malformed/missing/typed-wrong value is a field-scoped sha256 rejection.
+            expect(String(body.message)).toContain('uploadId');
         }
     });
 
-    test('IsUUID is strict RFC-4122: a UUID-shaped id with an invalid variant nibble still 400s', async ({
+    test('a UUID-shaped uploadId is rejected by the DTO — uploadId is a sha256 hash, not a UUID', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -335,11 +341,9 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
             name: `Att Variant ${stamp()}`,
         });
 
-        // '44444444-4444-4444-4444-…' LOOKS like a UUID but its variant
-        // nibble is '4' (RFC-4122 requires 8/9/a/b). class-validator's
-        // IsUUID checks the variant bits, so this is a DTO 400 — NOT the
-        // service-layer "Invalid uploadId" (probed: the lookalike never
-        // reaches the service).
+        // The agent-attachment DTO now `@Matches(/^[0-9a-f]{64}$/i)` (aligned with
+        // Mission/Idea + the service guard, fixing the prior `@IsUUID` that rejected
+        // every real upload id). A UUID-shaped value is therefore a clean field 400.
         const res = await request.post(`${API_BASE}/api/agents/${agent.id}/attachments`, {
             headers: authedHeaders(u.access_token),
             data: { uploadId: BAD_VARIANT_UUID },
@@ -347,10 +351,10 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
         expect(res.status()).toBe(400);
         const body = (await res.json()) as ErrorBody;
         expect(Array.isArray(body.message)).toBe(true);
-        expect(body.message).toContain('uploadId must be a UUID');
+        expect(String(body.message)).toContain('uploadId must match');
     });
 
-    test('a well-formed unknown uploadId passes the DTO but the service guard rejects it — nothing persists', async ({
+    test('a well-formed sha256 uploadId that the caller does NOT own is rejected by the ownership gate (404) — nothing persists', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -358,19 +362,17 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
             name: `Att Service ${stamp()}`,
         });
 
-        // A textbook v4 UUID clears @IsUUID() and reaches the service, whose
-        // own guard (sha-256-hex check from PR #1044) rejects it with a
-        // STRING-message 400 — a different shape than the DTO's array. (The
-        // two layers currently disagree about the uploadId id-space; this
-        // pins the reachable rejection, not any success path.)
+        // A well-formed sha256 clears the DTO and reaches the service, whose
+        // ownership gate (user_uploads lookup) 404s it because no upload with that
+        // hash is owned by the caller — closing the dangling-attachment edge.
         const res = await request.post(`${API_BASE}/api/agents/${agent.id}/attachments`, {
             headers: authedHeaders(u.access_token),
-            data: { uploadId: UNKNOWN_UPLOAD_UUID },
+            data: { uploadId: UNKNOWN_UPLOAD_SHA },
         });
-        expect(res.status()).toBe(400);
+        expect(res.status()).toBe(404);
         const body = (await res.json()) as ErrorBody;
-        expect(body.message).toBe('Invalid uploadId');
-        expect(body.error).toBe('Bad Request');
+        expect(String(body.message)).toContain('Upload');
+        expect(body.error).toBe('Not Found');
 
         // Every rejected write above left zero attachment rows behind.
         const list = await request.get(`${API_BASE}/api/agents/${agent.id}/attachments`, {
@@ -397,15 +399,16 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
             data: { uploadId: 'nope' },
         });
         expect(malformed.status()).toBe(400);
-        expect(((await malformed.json()) as ErrorBody).message).toContain(
-            'uploadId must be a UUID',
+        expect(String(((await malformed.json()) as ErrorBody).message)).toContain(
+            'uploadId must match',
         );
 
-        // (b) Well-formed uploadId from B → now the ownership gate answers:
-        // 404 "Agent <id> not found.", the same as a never-existed agent.
+        // (b) Well-formed (sha256) uploadId from B → the AGENT-ownership gate
+        // (requireOwned) answers first: 404 "Agent <id> not found.", the same as a
+        // never-existed agent (it precedes the upload-ownership lookup).
         const wellFormed = await request.post(`${API_BASE}/api/agents/${agent.id}/attachments`, {
             headers: authedHeaders(b.access_token),
-            data: { uploadId: UNKNOWN_UPLOAD_UUID },
+            data: { uploadId: UNKNOWN_UPLOAD_SHA },
         });
         expect(wellFormed.status()).toBe(404);
         const wfBody = (await wellFormed.json()) as ErrorBody;

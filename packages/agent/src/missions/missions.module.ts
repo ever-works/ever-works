@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from '../entities/mission.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerModule } from '../titler/titler.module';
 import { UserResearchModule } from '../user-research/user-research.module';
@@ -33,7 +34,7 @@ import { MissionTickService } from './mission-tick.service';
         // Repository<WorkProposal> for the Idea-copy half of Full
         // Fork, so the entity is registered here as well as via
         // UserResearchModule.
-        TypeOrmModule.forFeature([Mission, MissionAttachment, WorkProposal]),
+        TypeOrmModule.forFeature([Mission, MissionAttachment, WorkProposal, UserUpload]),
         TitlerModule,
         UserResearchModule,
         WorkAgentModule,

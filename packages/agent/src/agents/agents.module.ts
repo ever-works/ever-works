@@ -5,6 +5,7 @@ import { AgentAttachment } from '../entities/agent-attachment.entity';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { UserUpload } from '../entities/user-upload.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
@@ -50,6 +51,8 @@ import { FacadesModule } from '../facades/facades.module';
             Work,
             Mission,
             WorkProposal,
+            // Upload-ownership validation for addAttachment (user_uploads).
+            UserUpload,
         ]),
         ActivityLogModule,
         // Phase 10 — AgentRunService resolves active skills via

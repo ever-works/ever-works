@@ -6,6 +6,7 @@ export * from './repositories/work.repository';
 export * from './repositories/work-deployment.repository';
 export * from './repositories/work-member.repository';
 export * from './repositories/user.repository';
+export * from './repositories/user-upload.repository';
 export * from './repositories/refresh-token.repository';
 export * from './repositories/auth-account.repository';
 export * from './repositories/work-generation-history.repository';

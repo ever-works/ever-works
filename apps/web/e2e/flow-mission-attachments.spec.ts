@@ -407,6 +407,41 @@ test.describe('FLOW: mission attachments — validation + ownership', () => {
         expect((await list.json()).message).toBe('Mission not found');
     });
 
+    test('upload-ownership: a well-formed uploadId the caller does NOT own → 404, even on their OWN mission (no dangling/foreign edge)', async ({
+        request,
+    }) => {
+        const alice = await registerUserViaAPI(request);
+        const bob = await registerUserViaAPI(request);
+
+        // Alice mints a real upload; Bob owns a mission of his own.
+        const aliceUpload = await mintUploadId(request, alice.access_token);
+        const bobMission = await createMission(request, bob.access_token, 'bob upload-own mission');
+
+        // Bob attaches ALICE's upload to BOB's own mission → 404: the uploadId
+        // does not reference an upload Bob owns (user_uploads is keyed by owner).
+        const foreign = await request.post(
+            `${API_BASE}/api/me/missions/${bobMission}/attachments`,
+            { headers: authedHeaders(bob.access_token), data: { uploadId: aliceUpload } },
+        );
+        expect(foreign.status(), `foreign upload body=${await foreign.text()}`).toBe(404);
+        expect(String((await foreign.json()).message)).toContain('Upload');
+
+        // A never-uploaded (ghost) hash on Bob's own mission → the same 404.
+        const ghost = await request.post(`${API_BASE}/api/me/missions/${bobMission}/attachments`, {
+            headers: authedHeaders(bob.access_token),
+            data: { uploadId: 'f'.repeat(64) },
+        });
+        expect(ghost.status()).toBe(404);
+
+        // Nothing was attached.
+        const list = await (
+            await request.get(`${API_BASE}/api/me/missions/${bobMission}/attachments`, {
+                headers: authedHeaders(bob.access_token),
+            })
+        ).json();
+        expect(list).toEqual([]);
+    });
+
     test('cross-user isolation: B cannot list/attach/delete on A’s mission -> 404 (opaque)', async ({
         request,
     }) => {
