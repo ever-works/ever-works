@@ -47,14 +47,13 @@ import { createTaskViaAPI } from './helpers/agents-tasks';
  *      from tenantId:null to the new tenantId (organizationId STAYS null).
  *
  *  POST /api/organizations/:id/upgrade-from-account
- *    happy path (user has exactly ONE org, :id is that org) → **500** on the
- *      sqlite e2e DB. The Tier-C historical backfill uses Postgres-only
- *      `UPDATE … SET … FROM parent …` syntax (organization.service.ts ~L819/837/851)
- *      which better-sqlite3 rejects, so the whole transaction 500s. This is the
- *      degrade-on-sqlite-only-Postgres-path behaviour this file is themed around
- *      — we assert the TRUTHFUL 500 here (NOT a fictional success), and prove the
- *      data is left coherent (atomic rollback: org/task untouched). On Postgres
- *      (prod) this same call returns 200 UpgradeFromAccountResponse.
+ *    happy path (user has exactly ONE org, :id is that org) → **2xx** and the
+ *      pre-existing unscoped task/work are pulled INTO the org. The backfill SQL
+ *      is now driver-correct: under better-sqlite3 it uses `?` placeholders + an
+ *      `… WHERE fk IN (SELECT id FROM parent WHERE …)` subquery in place of the
+ *      Postgres-only `UPDATE … FROM parent …` join (organization.service.ts), so
+ *      it SUCCEEDS on sqlite exactly as on Postgres prod (it used to 500 here —
+ *      that was the bug, found by the unmapped-500 hunt and fixed in this change).
  *    two orgs → **409** { code:'UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS',
  *      message:'Upgrade is only available before creating a second Organization' }.
  *      The first-org guard fires BEFORE the backfill, so this 409 is reachable
@@ -69,13 +68,11 @@ import { createTaskViaAPI } from './helpers/agents-tasks';
  *      404 not-leak (same shape as unknown), because org.tenantId !== user.tenantId.
  *    no bearer → 401.
  *
- * ── ENVIRONMENT NOTE: because the upgrade happy-path is a Postgres-only feature
- *    that 500s under the CI sqlite driver, the "happy" flow below asserts the
- *    contract is REACHABLE-AND-COHERENT (a 5xx that rolls back cleanly) and
- *    tolerates a 2xx so the SAME spec stays green if it is ever run against a
- *    Postgres-backed stack. Every other flow asserts a deterministic
- *    sqlite-stable status (409/404/400/401/201) that does NOT depend on the
- *    Postgres path.
+ * ── ENVIRONMENT NOTE: the upgrade happy-path now runs end-to-end on BOTH the CI
+ *    sqlite driver and Postgres prod (the backfill SQL is driver-conditional), so
+ *    flow 5 asserts the real success contract (2xx + the task pulled into the
+ *    org). Every flow asserts a deterministic, driver-stable status
+ *    (2xx/409/404/400/401).
  *
  * Cross-spec isolation: every flow runs on a FRESH registerUserViaAPI() user
  * (Date.now()-unique) so the shared in-memory DB stays clean for sibling specs;
@@ -282,8 +279,8 @@ test.describe('Organization register-company — registered Company path mints t
     });
 });
 
-test.describe('Organization upgrade-from-account — first-org guard + sqlite-degraded migration', () => {
-    test('flow 4: the first-org guard 409s deterministically AFTER a second org exists (and never reaches the Postgres-only backfill)', async ({
+test.describe('Organization upgrade-from-account — first-org guard + driver-correct migration', () => {
+    test('flow 4: the first-org guard 409s deterministically AFTER a second org exists (and never reaches the backfill)', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -321,15 +318,15 @@ test.describe('Organization upgrade-from-account — first-org guard + sqlite-de
         expect(new Set(list.map((o) => o.tenantId)).size).toBe(1);
     });
 
-    test('flow 5: the happy upgrade path degrades to a clean 500 on the sqlite CI driver (Postgres-only UPDATE…FROM) and rolls back atomically — no partial migration', async ({
+    test('flow 5: the happy upgrade path SUCCEEDS under the sqlite CI driver (driver-correct backfill SQL) and pulls the pre-existing task into the org', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const s = stamp();
 
-        // 1. Pre-existing Tier-A rows that an upgrade would migrate: a task + a
-        //    work. Born unscoped (no tenant yet).
+        // 1. Pre-existing Tier-A rows that an upgrade migrates: a task + a work.
+        //    Born unscoped (no tenant yet).
         const task = await createTaskViaAPI(request, token, { title: `Upgrade task ${s}` });
         const bornTask = await getTask(request, token, task.id);
         expect(bornTask.tenantId).toBeNull();
@@ -350,71 +347,36 @@ test.describe('Organization upgrade-from-account — first-org guard + sqlite-de
         expect(preUpgradeTask.tenantId, 'createOrg backfilled tenantId').toBe(org.tenantId);
         expect(preUpgradeTask.organizationId, 'but NOT yet pulled into the org').toBeNull();
 
-        // 3. Call upgrade-from-account. On the sqlite e2e DB this returns 500
-        //    because the Tier-C historical backfill uses Postgres-only
-        //    `UPDATE … FROM` syntax. We assert the TRUTHFUL contract:
-        //      - sqlite (CI): 500 with the generic error body, OR
-        //      - Postgres (prod): 200 UpgradeFromAccountResponse.
-        //    We do NOT assert success (that would be a fictional contract on CI),
-        //    and we do NOT assert a 4xx (it's not a client error — the guards all
-        //    passed; it's a driver-capability gap).
+        // 3. Call upgrade-from-account. The backfill SQL is now driver-correct:
+        //    under better-sqlite3 (CI) it uses `?` placeholders and an
+        //    `… WHERE fk IN (SELECT id FROM parent WHERE …)` subquery in place of
+        //    the Postgres-only `UPDATE … FROM` join — so it SUCCEEDS on the sqlite
+        //    DB exactly as it does on Postgres prod (it used to 500 here).
         const res = await upgradeRaw(request, token, org.id);
-        const status = res.status();
-        // Read the body ONCE — Playwright's APIResponse body is single-consume
-        // (no Fetch-style .clone()); both the assert message and the branch
-        // parsing below reuse this text.
         const bodyText = await res.text().catch(() => '');
-        expect([200, 500], `upgrade returned ${status} body=${bodyText}`).toContain(status);
+        expect([200, 201], `upgrade returned ${res.status()} body=${bodyText}`).toContain(
+            res.status(),
+        );
 
-        const parsed = ((): Record<string, unknown> => {
-            try {
-                return JSON.parse(bodyText) as Record<string, unknown>;
-            } catch {
-                return {};
-            }
-        })();
+        const body = JSON.parse(bodyText) as {
+            organizationId?: string;
+            tenantId?: string;
+            tierARowsUpdated?: number;
+        };
+        expect(body.organizationId).toBe(org.id);
+        expect(body.tenantId).toBe(org.tenantId);
+        expect(typeof body.tierARowsUpdated).toBe('number');
 
-        if (status === 500) {
-            // Degraded path: generic 5xx envelope, never a stack-trace leak.
-            const body = parsed;
-            expect((body as { statusCode?: number }).statusCode ?? 500).toBe(500);
-            const msg = String((body as { message?: unknown }).message ?? '');
-            // Truthful, non-leaky message (no SQL / no internal table names).
-            expect(msg.toLowerCase()).toContain('internal server error');
-            expect(msg).not.toMatch(/UPDATE\s|tenantId\s*=|organizationId\s*=/i);
+        // The task is now pulled INTO the org (organizationId stamped) while its
+        // tenantId is unchanged — the migration ran end-to-end under sqlite.
+        const afterTask = await getTask(request, token, task.id);
+        expect(afterTask.organizationId, 'upgrade pulled the task into the org').toBe(org.id);
+        expect(afterTask.tenantId, 'tenantId unchanged by the upgrade').toBe(org.tenantId);
 
-            // ATOMIC ROLLBACK: the failed upgrade left NOTHING half-migrated.
-            // The task's organizationId is STILL null (it was never pulled in),
-            // and its tenantId is unchanged. The whole txn rolled back.
-            const afterTask = await getTask(request, token, task.id);
-            expect(
-                afterTask.organizationId,
-                'failed upgrade must not partially stamp orgId',
-            ).toBeNull();
-            expect(afterTask.tenantId, 'tenantId is untouched by the rolled-back upgrade').toBe(
-                org.tenantId,
-            );
-
-            // The org itself is intact and the user still has exactly one org —
-            // the failure did not corrupt the tenant/org topology.
-            const list = await listOrganizationsViaAPI(request, token);
-            expect(list.map((o) => o.id)).toContain(org.id);
-            expect(list.length).toBe(1);
-        } else {
-            // Postgres path (kept so this spec stays green on a PG-backed stack):
-            // the migration pulls the task INTO the org. Reuse `parsed` — the
-            // single-consume body was already read into `bodyText` above.
-            const body = parsed as {
-                organizationId?: string;
-                tenantId?: string;
-                tierARowsUpdated?: number;
-            };
-            expect(body.organizationId).toBe(org.id);
-            expect(body.tenantId).toBe(org.tenantId);
-            expect(typeof body.tierARowsUpdated).toBe('number');
-            const afterTask = await getTask(request, token, task.id);
-            expect(afterTask.organizationId).toBe(org.id);
-        }
+        // The user still has exactly one org — topology intact.
+        const list = await listOrganizationsViaAPI(request, token);
+        expect(list.map((o) => o.id)).toContain(org.id);
+        expect(list.length).toBe(1);
     });
 
     test('flow 6: upgrade error surface — non-tenant user 409, cross-tenant 404 (not-leak), unknown uuid 404, non-uuid 400, unauth 401', async ({
