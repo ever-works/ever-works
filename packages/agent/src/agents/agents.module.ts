@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from '../entities/agent.entity';
 import { AgentAttachment } from '../entities/agent-attachment.entity';
+import { Work } from '../entities/work.entity';
+import { Mission } from '../entities/mission.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
@@ -42,6 +45,11 @@ import { FacadesModule } from '../facades/facades.module';
             AgentRunLog,
             AgentBudget,
             AgentMembership,
+            // Parent-existence validation for scoped Agents (IDOR fix): raw
+            // repositories for the work/mission/idea a scoped Agent references.
+            Work,
+            Mission,
+            WorkProposal,
         ]),
         ActivityLogModule,
         // Phase 10 — AgentRunService resolves active skills via
