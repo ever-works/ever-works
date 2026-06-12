@@ -749,6 +749,16 @@ export class OrganizationService {
                 // Non-Postgres adapter — ignore.
             }
 
+            // Emit driver-correct SQL. Postgres uses `$n` placeholders and the
+            // `UPDATE … FROM parent` join form; better-sqlite3 (the e2e in-memory
+            // + self-host driver) uses `?` placeholders and has NO `UPDATE … FROM`
+            // — it needs an `… WHERE fk IN (SELECT id FROM parent WHERE …)`
+            // subquery instead. The previously hard-coded Postgres-only SQL threw
+            // a syntax error under sqlite, 500-ing the whole upgrade on the single-
+            // org happy path. Mirrors the `isPostgres` branch `createOrganization`
+            // already uses for its tenantId backfill. Postgres behaviour unchanged.
+            const isPostgres = manager.connection?.options?.type === 'postgres';
+
             // Tier A: stamp BOTH tenantId AND organizationId on rows
             // owned by this user that haven't been pulled into an Org
             // yet. The WHERE filter is `organizationId IS NULL` (NOT
@@ -766,7 +776,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(table);
                 this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ?, "organizationId" = ? WHERE "${userColumn}" = ? AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierARowsUpdated += this.extractAffectedRowCount(result);
@@ -783,7 +795,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(table);
                 this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`,
                     [tenantId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierBRowsUpdated += this.extractAffectedRowCount(result);
@@ -801,7 +815,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(table);
                 this.assertSafeSqlIdentifier(userColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 WHERE "${userColumn}" = $3 AND "organizationId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ?, "organizationId" = ? WHERE "${userColumn}" = ? AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierCRowsUpdated += this.extractAffectedRowCount(result);
@@ -833,7 +849,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(parentFkColumn);
                 this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${parentFkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${parentFkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ?, "organizationId" = ? WHERE "${parentFkColumn}" IN (SELECT "id" FROM "${parentTable}" WHERE "${parentUserColumn}" = ?) AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 tierCRowsUpdated += this.extractAffectedRowCount(result);
@@ -856,7 +874,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(parentTable);
                 this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1, "organizationId" = $2 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $3 AND "${table}"."organizationId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ?, "organizationId" = ? WHERE "${fkColumn}" IN (SELECT "id" FROM "${parentTable}" WHERE "${parentUserColumn}" = ?) AND "organizationId" IS NULL`,
                     [tenantId, newOrgId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 indirectRowsUpdated += this.extractAffectedRowCount(result);
@@ -875,7 +895,9 @@ export class OrganizationService {
                 this.assertSafeSqlIdentifier(parentTable);
                 this.assertSafeSqlIdentifier(parentUserColumn);
                 const result = (await manager.query(
-                    `UPDATE "${table}" SET "tenantId" = $1 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $2 AND "${table}"."tenantId" IS NULL`,
+                    isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1 FROM "${parentTable}" p WHERE "${table}"."${fkColumn}" = p."id" AND p."${parentUserColumn}" = $2 AND "${table}"."tenantId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ? WHERE "${fkColumn}" IN (SELECT "id" FROM "${parentTable}" WHERE "${parentUserColumn}" = ?) AND "tenantId" IS NULL`,
                     [tenantId, userId],
                 )) as [unknown[], number] | { affected?: number } | undefined;
                 indirectRowsUpdated += this.extractAffectedRowCount(result);
