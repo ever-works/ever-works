@@ -84,8 +84,14 @@ import {
     UserNotificationPreference,
     UserNotificationCategoryMute,
     OrganizationNotificationDefault,
+    ComposioTriggerSubscription,
 } from '../entities';
-import { PluginEntity, UserPluginEntity, WorkPluginEntity } from '../plugins/entities';
+import {
+    PluginEntity,
+    UserPluginEntity,
+    WorkPluginEntity,
+    PluginAllowlistEntity,
+} from '../plugins/entities';
 import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
 import * as path from 'path';
 import * as os from 'os';
@@ -197,6 +203,10 @@ export const ENTITIES = [
     PluginEntity,
     UserPluginEntity,
     WorkPluginEntity,
+    // EW-693 — dynamic plugin distribution allowlist (gates non-first-party installs)
+    PluginAllowlistEntity,
+    // Composio Triggers (EW-684 PR-D) — webhook trigger subscriptions
+    ComposioTriggerSubscription,
     // Account transfer entities
     UserSyncConfig,
     // Notifications v2 (EW-650 + siblings)
