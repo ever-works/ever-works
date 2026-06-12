@@ -73,19 +73,21 @@ jobs:
         run: |
           docker push everco/ever-works-api-dev:latest
 
+      # DigitalOcean is the registry k8s pulls the runtime image from, so the
+      # doctl auth + DO push below are FATAL (no continue-on-error): a silent
+      # failure would ship a stale :latest as a "green" build (incident
+      # 2026-06-12 — expired DO token → prod served the prior build). The
+      # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
 
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
-        continue-on-error: true
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
-        continue-on-error: true
         run: doctl registry login --expiry-seconds 3600
 
       - name: Push to DigitalOcean Registry
-        continue-on-error: true
         run: |
           docker push registry.digitalocean.com/ever/ever-works-api-dev:latest
 
@@ -173,18 +175,20 @@ jobs:
         run: |
           docker push everco/ever-works-web-dev:latest
 
+      # DigitalOcean is the registry k8s pulls the runtime image from, so the
+      # doctl auth + DO push below are FATAL (no continue-on-error): a silent
+      # failure would ship a stale :latest as a "green" build (incident
+      # 2026-06-12 — expired DO token → prod served the prior build). The
+      # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
-        continue-on-error: true
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
-        continue-on-error: true
         run: doctl registry login --expiry-seconds 3600
 
       - name: Push to DigitalOcean Registry
-        continue-on-error: true
         run: |
           docker push registry.digitalocean.com/ever/ever-works-web-dev:latest
 
