@@ -6,12 +6,16 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  * Source of truth: apps/api/src/ai-conversation/conversation.controller.ts
  * (mounted under @Controller('api/conversations')), the appendMessages handler.
- * That handler has NO class-validator DTO: it maps the supplied array straight
- * onto ConversationMessage rows, so malformed shapes throw an UNMAPPED Error
- * and surface as HTTP 500 today — and because the batch is NOT transaction
- * wrapped, a value that throws only AFTER a string-coercion+insert leaves a
- * partial row behind. EVERY status/shape below was PROBED live against
- * http://127.0.0.1:3100 before any assertion was written.
+ * That handler now validates its body with AppendMessagesDto (role @IsIn-enum,
+ * content @IsString, nested @ValidateNested) so the global ValidationPipe
+ * rejects every malformed shape with a clean 400 BEFORE the handler runs (and
+ * thus before any insert — so nothing partial leaks). This file was originally
+ * written against the DTO-less handler (malformed → unmapped 500 + non-atomic
+ * partial rows) with TOLERANT [400,422,500] reject sets; those survive the
+ * hardening unchanged, and the two assertions that pinned the exact buggy
+ * behaviour (a coerced numeric role; ownership-before-validation) were flipped
+ * to the corrected contract. EVERY status/shape below was PROBED live against
+ * http://127.0.0.1:3100.
  *
  * ── NON-DUPLICATION ──────────────────────────────────────────────────────────
  * Three sibling specs already own the surfaces below and are NOT repeated here:
@@ -32,22 +36,20 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  * This file pins the GAPS those leave un-asserted — all live-probed:
  *
  * ── PROBED CONTRACTS (live, as throwaway users) ──────────────────────────────
- *  WRONG-TYPE matrix (beyond the deep spec's missing-key matrix). The handler
- *      does NOT type-check field VALUES, so behaviour splits three ways:
- *        • role = number (123)  → 201, persisted with role COERCED to "123"
- *          (a non-string role is silently accepted, like the deep spec's
- *          arbitrary "wizard" string — there is no enum AND no string guard).
- *        • role = null / role = object → 500 + ZERO persist (throws before any
- *          insert for this element).
- *        • content = number (42) / content = boolean (true) → 500 but PARTIAL
- *          persist: the value is string-coerced+inserted ("42" / "1.0") and the
- *          throw happens after, so one row leaks (the non-atomic write).
- *        • content = array / content = object / content = null → 500 + ZERO
+ *  WRONG-TYPE matrix (beyond the deep spec's missing-key matrix). With
+ *      AppendMessagesDto the global ValidationPipe now rejects EVERY wrong-type
+ *      field with a 400 before the handler, so nothing is ever inserted:
+ *        • role = number (123) → 400 (role @IsIn enum) + ZERO persist. (Used to
+ *          be 201, silently coerced to "123"; this assertion was flipped.)
+ *        • role = null / role = object → 400 + ZERO persist.
+ *        • content = number (42) / content = boolean (true) → 400 + ZERO persist.
+ *          (Used to string-coerce+insert one partial row before throwing 500;
+ *          validation-before-handler now eliminates the non-atomic leak.)
+ *        • content = array / content = object / content = null → 400 + ZERO
  *          persist.
- *      Each asserts a TOLERANT hard-reject [400,422,500] (survives a future DTO
- *      fix to 400/422) AND the exact per-shape persist count, so the
- *      non-atomic-write contract is pinned today and the zero-persist invariant
- *      survives a future transactional fix.
+ *      Each asserts a TOLERANT hard-reject [400,422,500] (now always 400) AND
+ *      the ZERO-persist invariant, which the DTO makes unconditional (validation
+ *      runs before any insert, so no partial row can leak).
  *  SINGLE-BATCH ordering: a 5-message interleaved (user/assistant) batch sent in
  *      ONE POST lands in array order (the deep + lifecycle specs pin CROSS-batch
  *      ordering only; neither pins a single >2-element batch's internal order).
@@ -125,28 +127,30 @@ async function appendRaw(
     return { status: res.status(), json };
 }
 
-test.describe('Conversation messages validation — wrong-type field matrix (no DTO → split behaviour)', () => {
-    // Shapes that ACCEPT (the value is coerced and persisted, 201). A non-string
-    // role is silently stored — there is no enum and no string guard on role.
-    test('a numeric role is silently coerced and persisted (201) — no role type guard', async ({
+test.describe('Conversation messages validation — wrong-type field matrix (DTO → 400, never persist)', () => {
+    // A non-string role used to be silently coerced and persisted (no enum / no
+    // string guard). AppendMessageDto now constrains role to @IsIn(...), so a
+    // numeric role is a clean 400 and — because validation runs before the
+    // handler — nothing is written.
+    test('a numeric role is rejected with 400 and persists nothing (role enum enforced)', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const conv = await createConversation(request, token);
 
-        const { status, json } = await appendRaw(request, token, conv.id, {
+        const { status } = await appendRaw(request, token, conv.id, {
             messages: [{ role: 123, content: 'numeric role body' }],
         });
-        expect(status, 'numeric role → 201 (coerced, not rejected)').toBe(201);
-        expect(json, 'response is exactly { success: true }').toEqual({ success: true });
+        expect(status, 'numeric role → 400 (rejected, not coerced)').toBe(400);
 
         const after = await getConversation(request, token, conv.id);
-        const msgs = after.row?.messages ?? [];
-        expect(msgs, 'the coerced-role message persisted').toHaveLength(1);
-        // The number is string-coerced on the way into the text column.
-        expect(msgs[0].role, 'numeric role stored as its string form').toBe('123');
-        expect(msgs[0].content, 'content stored verbatim').toBe('numeric role body');
+        expect(after.status, 'conversation still readable').toBe(200);
+        expect(
+            after.row?.messages,
+            'the rejected numeric-role message persisted nothing',
+        ).toHaveLength(0);
+        expect(after.row?.title, 'no title set by a rejected append').toBeNull();
     });
 
     // Shapes that throw BEFORE any insert → hard-reject + ZERO persist. A future
@@ -447,37 +451,49 @@ test.describe('Conversation messages validation — param + ownership rejection'
         ).toContain('uuid');
     });
 
-    test('a foreign user appending a malformed body is gated by ownership (404) BEFORE any validation', async ({
+    test('the rejection pipeline is layered: auth (401) → body validation (400) → ownership (404), none leaking the thread', async ({
         request,
     }) => {
         const alice = await registerUserViaAPI(request);
         const bob = await registerUserViaAPI(request);
         const conv = await createConversation(request, alice.access_token);
 
-        // The ownership check (findById(id, userId)) resolves before the body is
-        // touched: Bob gets a 404 even though his body is ALSO malformed (a bare
-        // string element). Ownership wins over the would-be 500 — the endpoint
-        // never reveals "your body is bad" to a non-owner.
-        const { status } = await appendRaw(request, bob.access_token, conv.id, {
+        // Now that AppendMessagesDto exists, the global ValidationPipe runs BEFORE
+        // the controller body (and thus before the ownership findById). So a
+        // non-owner with a MALFORMED body is stopped at validation with a 400 —
+        // which reveals only that the BODY is bad, never anything about the
+        // conversation's existence or ownership.
+        const malformed = await appendRaw(request, bob.access_token, conv.id, {
             messages: ['a malformed bare string'],
         });
-        expect(status, "B's malformed append to A's conversation → 404 (ownership first)").toBe(
-            404,
+        expect(malformed.status, "B's MALFORMED append → 400 (validation precedes ownership)").toBe(
+            400,
         );
 
-        // Raw anon context (independent of any storageState) with a malformed body
-        // is likewise an auth rejection, not a 500 — auth precedes validation.
+        // A non-owner with a WELL-FORMED body passes validation and is then gated
+        // by ownership: findById(id, bob) → null → 404. Same 404 a non-existent id
+        // would give, so it never confirms the thread exists.
+        const wellFormed = await appendRaw(request, bob.access_token, conv.id, {
+            messages: [{ role: 'user', content: 'valid but not my conversation' }],
+        });
+        expect(
+            wellFormed.status,
+            "B's WELL-FORMED append to A's conversation → 404 (ownership)",
+        ).toBe(404);
+
+        // Auth precedes everything: a guard rejects an unauthenticated request
+        // with 401 before the ValidationPipe ever sees the (malformed) body.
         const anon = await pwRequest.newContext();
         try {
             const res = await anon.post(`${API_BASE}/api/conversations/${conv.id}/messages`, {
                 data: { messages: ['still malformed'] },
             });
-            expect(res.status(), 'anon malformed append → 401 (auth before validation)').toBe(401);
+            expect(res.status(), 'anon append → 401 (auth before validation)').toBe(401);
         } finally {
             await anon.dispose();
         }
 
-        // Alice's thread was never touched by either rejected attempt.
+        // Alice's thread was never touched by any of the three rejected attempts.
         const after = await getConversation(request, alice.access_token, conv.id);
         expect(
             after.row?.messages,

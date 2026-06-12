@@ -12,7 +12,17 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiProperty, ApiTags, ApiOperation } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsIn,
+    IsObject,
+    IsOptional,
+    IsString,
+    MaxLength,
+    ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import { AuthenticatedUser } from '../auth/types/auth.types';
 import { ConversationRepository } from '@ever-works/agent/database';
@@ -60,14 +70,69 @@ class UpdateConversationDto {
     title: string;
 }
 
-type AIMessage = {
+// Upper bound on messages accepted in a single append. Real clients send 1-2
+// per turn (see apps/web/src/lib/ai/persistence.ts); the cap only stops a
+// pathological mega-batch. Content length is bounded by the JSON body-parser
+// limit, so no per-message length cap is added here (a future tightening can).
+const MAX_MESSAGES_PER_APPEND = 500;
+
+const MESSAGE_ROLES = ['user', 'assistant', 'system', 'tool'] as const;
+
+/**
+ * One message in `POST /api/conversations/:id/messages`.
+ *
+ * Security / robustness: the handler previously took a plain `AIMessage[]`
+ * with NO class-validator metadata, so the global ValidationPipe could not
+ * police it. A malformed element (non-object, null, missing/typed-wrong
+ * `role`/`content`) then threw an UNMAPPED Error mid-loop → HTTP 500 (and,
+ * because the batch is not transaction-wrapped, a partial row could leak).
+ * It also silently persisted an arbitrary `role` string and non-string
+ * `content`. This DTO turns every such shape into a clean 400 BEFORE the
+ * handler runs. Fields mirror exactly what the web BFF serialises.
+ */
+class AppendMessageDto {
+    @ApiProperty({ required: false, maxLength: 200 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
     id?: string;
-    role: string;
+
+    @ApiProperty({ enum: MESSAGE_ROLES })
+    @IsIn(MESSAGE_ROLES)
+    role: (typeof MESSAGE_ROLES)[number];
+
+    @ApiProperty()
+    @IsString()
     content: string;
+
+    @ApiProperty({ required: false, type: [Object] })
+    @IsOptional()
+    @IsArray()
     parts?: unknown[];
+
+    @ApiProperty({ required: false, maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
     model?: string;
+
+    @ApiProperty({ required: false, type: Object })
+    @IsOptional()
+    @IsObject()
     usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
-};
+}
+
+/**
+ * Body for `POST /api/conversations/:id/messages`.
+ */
+class AppendMessagesDto {
+    @ApiProperty({ type: [AppendMessageDto] })
+    @IsArray()
+    @ArrayMaxSize(MAX_MESSAGES_PER_APPEND)
+    @ValidateNested({ each: true })
+    @Type(() => AppendMessageDto)
+    messages: AppendMessageDto[];
+}
 
 @ApiTags('Conversations')
 @ApiBearerAuth('JWT-auth')
@@ -140,7 +205,7 @@ export class ConversationController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body()
-        body: { messages: AIMessage[] },
+        body: AppendMessagesDto,
     ) {
         const conversation = await this.repo.findById(id, auth.userId);
         if (!conversation) throw new NotFoundException();
@@ -148,7 +213,7 @@ export class ConversationController {
         await this.repo.appendMessages(
             body.messages.map((m) => ({
                 conversationId: id,
-                role: m.role as 'user' | 'assistant' | 'system' | 'tool',
+                role: m.role,
                 content: m.content,
                 parts: m.parts,
                 model: m.model,
