@@ -39,11 +39,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *         anon                       -> 401 { message:'Unauthorized', statusCode:401 }
  *         stranger (DTO-valid)       -> 403 { status:'error', message:'You do not have permission…' }
  *         ghost id (DTO-valid)       -> 404 { status:'error', message:"Work with id '<id>' not found" }
- *         OWNER, DTO-valid, NON-git-connected work -> 500 { statusCode:500, message:'Internal server error' }
+ *         OWNER, DTO-valid, NON-git-connected work -> 409 { statusCode:409, error:'NoGitCredentialsError' }
  *           — the dataGenerator save throws (no connected data repo); the dedicated taxonomy-write
- *             endpoints surface this as a GENERIC 500 (distinct from submit-item's 400 reconnect-git).
+ *             endpoints surface this as a 409 git-gate (NoGitCredentialsError; was a generic 500) (distinct from submit-item's 400 reconnect-git).
  *     PUT/DELETE /api/works/:id/{categories|tags|collections}/:childId
- *         OWNER on a real non-connected work -> 500 (the git-gated getCategoriesTags read inside the
+ *         OWNER on a real non-connected work -> 409 (the git-gated getCategoriesTags read inside the
  *         service fires BEFORE the per-child not-found check, so the gate dominates).
  *
  *   The legacy POST /api/works/:id/submit-item carries an item's category+tags; a DTO-VALID body
@@ -54,7 +54,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * NON-DUPLICATION: the sibling specs (work-items-crud, flow-work-items-crud-deep,
  * flow-work-full-lifecycle) assert the empty owner-side read envelope and the submit-item gate.
  * These 6 flows add the surface they LACK: the DEDICATED taxonomy-WRITE endpoints
- * (categories/tags/collections) and their exact 500 git-gate, the gate-ORDER invariant
+ * (categories/tags/collections) and their exact 409 git-gate, the gate-ORDER invariant
  * (validation -> ownership -> git, asserted by switching one variable at a time), stranger-403
  * and ghost-404 on BOTH reads AND writes with their precise envelopes, the count<->read accuracy
  * invariant after a NO-OP gated write, PUT/DELETE git-gate dominance, and per-work isolation.
@@ -277,13 +277,13 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
         assertDenialEnvelope(ghostCount.body, NOT_FOUND_RE, 'ghost count');
     });
 
-    test('dedicated taxonomy WRITES (categories/tags/collections) are git-gated: a DTO-valid owner write 500s on a non-connected work and persists NOTHING', async ({
+    test('dedicated taxonomy WRITES (categories/tags/collections) are git-gated: a DTO-valid owner write 409s on a non-connected work and persists NOTHING', async ({
         request,
     }) => {
         // THE uncovered surface: the dedicated POST /works/:id/{categories,tags,collections} endpoints.
         // On a work with no connected data repo, an owner DTO-VALID write reaches the dataGenerator
-        // save which throws -> the controller surfaces a GENERIC 500 (distinct from submit-item's 400
-        // reconnect-git gate). We assert the 500 for ALL THREE kinds, then prove the gated writes
+        // save which throws -> the controller surfaces a 409 git-gate (NoGitCredentialsError; was a generic 500) (distinct from submit-item's 400
+        // reconnect-git gate). We assert the 409 for ALL THREE kinds, then prove the gated writes
         // committed NOTHING: the read + count still report the empty envelope (no partial taxonomy).
         const u = await registerUserViaAPI(request);
         const s = stamp();
@@ -297,10 +297,11 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
             const write = await postTaxonomy(request, u.access_token, workId, kind, {
                 name: `Gated ${kind} ${s}`,
             });
-            expect(write.status, `git-gated ${kind} write -> 500; body=${write.text}`).toBe(500);
-            // Generic Nest 500 envelope: a statusCode (no success status, no validator array).
-            expect(write.body.statusCode, `${kind} write 500 carries statusCode`).toBe(500);
-            expect(write.body.status, `${kind} write 500 is NOT a success envelope`).not.toBe(
+            expect(write.status, `git-gated ${kind} write -> 409; body=${write.text}`).toBe(409);
+            // 409 git-gate envelope (NoGitCredentialsError via FacadeExceptionFilter; was a
+            // generic 500): a statusCode (no success status, no validator array).
+            expect(write.body.statusCode, `${kind} write 409 carries statusCode`).toBe(409);
+            expect(write.body.status, `${kind} write 409 is NOT a success envelope`).not.toBe(
                 'success',
             );
         }
@@ -348,7 +349,7 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
         // SAME validation layer. We can't probe it with an over-long STRING: CreateTagDto.name has a
         // @Transform(sanitizeName(value, 50)) that runs (class-transformer) BEFORE @MaxLength (class-
         // validator), truncating 'x'.repeat(51) to 50 chars so it passes validation and falls through
-        // to the git-gated save -> 500 (live-probed 2026-06-01). A NON-string name (12345) can't be
+        // to the git-gated save -> 409 (NoGitCredentialsError; live-probed pre-filter as 500). A NON-string name (12345) can't be
         // truncated, so @IsString + @MaxLength(50) both fire -> 400 with the tighter 50-char message
         // — proving the per-kind tag DTO with its 50-bound is the FIRST gate, before ownership/git.
         const tooLong = await postTaxonomy(request, a.access_token, workId, 'tags', {
@@ -383,21 +384,22 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
         assertDenialEnvelope(ghost.body, NOT_FOUND_RE, 'ghost write');
 
         // (e) GIT last — only when validation+ownership+existence all pass does the owner reach the
-        //     git-gated save -> 500 on this non-connected work.
+        //     git-gated save -> 409 on this non-connected work (NoGitCredentialsError → 409 via
+        //     the FacadeExceptionFilter; was a generic 500 before that filter).
         const gated = await postTaxonomy(request, a.access_token, workId, 'categories', {
             name: `Gated ${s}`,
         });
-        expect(gated.status, `owner DTO-valid write hits git-gate -> 500; body=${gated.text}`).toBe(
-            500,
+        expect(gated.status, `owner DTO-valid write hits git-gate -> 409; body=${gated.text}`).toBe(
+            409,
         );
-        expect(gated.body.statusCode).toBe(500);
+        expect(gated.body.statusCode).toBe(409);
     });
 
     test('PUT/DELETE taxonomy writes are equally git-gated, and submit-item exposes the DISTINCT reconnect-git 400 contract', async ({
         request,
     }) => {
         // The update/delete child endpoints read the existing taxonomy from the data repo BEFORE the
-        // per-child not-found check, so on a non-connected work the git-gated read dominates -> 500
+        // per-child not-found check, so on a non-connected work the git-gated read dominates -> 409
         // (NOT a 404 for the bogus child id). Contrast with the legacy submit-item write, which
         // surfaces the human-readable reconnect-git 400 — proving two write paths, two gate shapes.
         const u = await registerUserViaAPI(request);
@@ -408,24 +410,24 @@ test.describe('Work taxonomy (deep) — per-work categories / tags / collections
         });
         expect(workId).toMatch(UUID_RE);
 
-        // PUT a (necessarily) non-existent category id with a DTO-valid body -> git-gate 500.
+        // PUT a (necessarily) non-existent category id with a DTO-valid body -> git-gate 409.
         const put = await request.put(`${API_BASE}/api/works/${workId}/categories/ghost-${s}`, {
             headers: authedHeaders(u.access_token),
             data: { name: `Renamed ${s}` },
         });
         expect(
             put.status(),
-            `PUT category git-gate -> 500; body=${await put.text().catch(() => '')}`,
-        ).toBe(500);
+            `PUT category git-gate -> 409; body=${await put.text().catch(() => '')}`,
+        ).toBe(409);
 
-        // DELETE a non-existent tag id -> git-gate 500 (the read fires before the not-found check).
+        // DELETE a non-existent tag id -> git-gate 409 (the read fires before the not-found check).
         const del = await request.delete(`${API_BASE}/api/works/${workId}/tags/ghost-${s}`, {
             headers: authedHeaders(u.access_token),
         });
         expect(
             del.status(),
-            `DELETE tag git-gate -> 500; body=${await del.text().catch(() => '')}`,
-        ).toBe(500);
+            `DELETE tag git-gate -> 409; body=${await del.text().catch(() => '')}`,
+        ).toBe(409);
 
         // submit-item: a DTO-VALID, taxonomy-bearing item on the same non-connected work returns the
         // DISTINCT reconnect-git 400 (validation passes -> reaches the git gate with a friendly msg).

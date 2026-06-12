@@ -48,7 +48,7 @@
  *   PUT|PATCH /api/works/:id  body {communityPrEnabled?, communityPrAutoClose?} -> 200 { status:'success', work:{...} }
  *                                                            | 400 {message:["communityPrEnabled must be a boolean value"]} (bad type, per field)
  *   POST  /api/works/:id/process-community-prs            -> 400 "Community PR processing is not enabled for this work." (disabled)
- *                                                            | 500 {statusCode:500,message:"Internal server error"} (ENABLED but NO git provider — the DEGRADE path; PROBED)
+ *                                                            | 409 {statusCode:409,message:"No Git provider configured or available"} (ENABLED but NO git provider — precondition via FacadeExceptionFilter; was a generic 500 before that filter)
  *                                                            | 404 {status:'error',message:"Work with id '<id>' not found"} (ghost)
  *                                                            | 403 {status:'error',message:"You do not have permission to access this work"} (stranger)
  *                                                            | 401 {message:"Unauthorized"} (no token)
@@ -65,11 +65,13 @@
  *
  * KEY DEGRADE CONTRACT (PROBED): with the flag ENABLED but no connected git
  * provider (the CI reality — no GitHub OAuth, no plugin creds), the processor
- * calls `gitFacade.listPullRequests` which throws (NoGitProviderError /
- * GitFacadeError — none are HttpExceptions), and the un-try/catch controller
- * surfaces a 500. That IS the truthful "git not connected" degradation: we
- * assert the gate flips from a 400 ("not enabled") to a NON-400 *attempt*
- * (500 here), never a fictional 200.
+ * calls `gitFacade.listPullRequests` which throws `NoGitProviderError` (a
+ * `GitFacadeError`/`FacadeError`, not an HttpException). The global
+ * `FacadeExceptionFilter` (apps/api/src/common/filters) maps that to a clean
+ * 409 precondition ("No Git provider configured or available") — BEFORE that
+ * filter existed it surfaced as a generic 500. That IS the truthful "git not
+ * connected" degradation: we assert the gate flips from a 400 ("not enabled")
+ * to a 409 *precondition attempt*, never a fictional 200 and no longer a 500.
  *
  * Gotchas honored:
  *   - login DTO accepts ONLY {email,password}; register helper sends {username,email,password}.
@@ -230,9 +232,11 @@ test.describe('Work community-PR flags + processing (integration)', () => {
 
         // The gate is now OPEN: the endpoint stops returning the "not enabled" 400
         // and instead ATTEMPTS to process. With no connected git provider in CI it
-        // cannot list pull requests, so the attempt degrades to a 500 (PROBED). We
-        // assert the gate transition (no longer 400-"not enabled") rather than a
-        // fictional 200. findById can briefly lag the PUT under sqlite, so poll.
+        // cannot list pull requests, so the attempt surfaces a clean 409 precondition
+        // ("No Git provider configured or available") via the FacadeExceptionFilter —
+        // it was a generic 500 before that filter landed. We assert the gate
+        // transition (no longer 400-"not enabled") and the specific 409.
+        // findById can briefly lag the PUT under sqlite, so poll.
         let processed!: Awaited<ReturnType<typeof process>>;
         await expect
             .poll(
@@ -244,7 +248,8 @@ test.describe('Work community-PR flags + processing (integration)', () => {
             )
             .not.toBe(400);
         expect(processed.status()).not.toBe(400);
-        expect(processed.status()).toBeGreaterThanOrEqual(200);
+        // No git provider connected → 409 precondition (was 500 pre-FacadeExceptionFilter).
+        expect(processed.status()).toBe(409);
         expect(JSON.stringify(await processed.json())).not.toContain(
             'Community PR processing is not enabled',
         );
@@ -349,8 +354,9 @@ test.describe('Work community-PR flags + processing (integration)', () => {
         await setFlags(request, token, work.id, { communityPrEnabled: true });
 
         // Drive the degrade path a few times. Each attempt must (a) leave the
-        // enablement 400 behind and (b) stay a bounded server response (< 600),
-        // never hang or surface the "not enabled" gate again.
+        // enablement 400 behind and (b) settle on the same clean 409 precondition
+        // (no git provider) via the FacadeExceptionFilter — deterministic, never a
+        // 500/hang, never the "not enabled" gate again.
         await expect
             .poll(async () => (await process(request, token, work.id)).status(), {
                 timeout: 20_000,
@@ -359,7 +365,8 @@ test.describe('Work community-PR flags + processing (integration)', () => {
         for (let i = 0; i < 2; i++) {
             const attempt = await process(request, token, work.id);
             expect(attempt.status()).not.toBe(400);
-            expect(attempt.status()).toBeLessThan(600);
+            // No git provider connected → 409 precondition (was an unbounded 500 before).
+            expect(attempt.status()).toBe(409);
             expect(JSON.stringify(await attempt.json())).not.toContain(
                 'Community PR processing is not enabled',
             );

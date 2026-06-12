@@ -3,24 +3,43 @@ name: E2E Tests
 # Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope (intentionally BRANCH-ONLY — never runs on feature/fix branches):
-#   - push to `develop` / `stage` / `main` (+ `master`) → run (release-line gate)
-#   - workflow_dispatch on any branch                   → run (one-off verification)
+# Scope (intentionally DEVELOP-ONLY — never runs on feature/fix branches,
+# and no longer re-runs on the stage/main release cascade):
+#   - push to `develop`              → run (the single integration gate)
+#   - workflow_dispatch on any branch → run (one-off pre-merge verification)
 #
-# There is deliberately NO `pull_request` trigger. The full suite is
-# sharded 4× across the matrix (~25 min wall-clock per shard on
-# ubicloud-standard-8), so running it on every feature/fix PR burned
-# runners without gating anything the post-merge branch push doesn't
-# already catch. e2e now runs only once code lands on a release-line
-# branch (`develop`, `stage`, `main`/`master`). The `concurrency` block
-# below cancels a superseded run when a newer commit reaches the same
-# branch, so only the latest commit per branch is ever validated.
+# There is deliberately NO `pull_request` trigger, and (since 2026-06-12)
+# NO `stage` / `main` / `master` push trigger either. The full suite is
+# sharded 16× (~25 min wall-clock per shard on ubicloud-standard-8), so:
+#   - running it on every feature/fix PR burned runners without gating
+#     anything the post-merge develop push doesn't already catch; and
+#   - re-running the IDENTICAL suite again when develop cascades to stage
+#     and then to main was pure duplicate work — the code is byte-for-byte
+#     what already passed e2e on develop. `develop` is the integration
+#     point: once code is green there, promotion to stage/main is a
+#     fast-forward cascade, not a re-test.
+#
+# Nothing downstream depends on this workflow (no `workflow_run` consumer),
+# so trimming the cascade triggers cannot break a deploy/release chain —
+# unlike `CI` (ci.yml), whose stage/main push runs are load-bearing for
+# the `release-trigger-{stage,prod}` Trigger.dev releases and MUST stay.
+#
+# Release-branch-SPECIFIC tests still run on stage/main where they belong:
+# `k8s-e2e.yml` (kind-cluster plugin e2e, path-filtered) is deliberately
+# scoped to stage/main and is untouched by this policy.
+#
+# To validate a large feature branch BEFORE merge, dispatch this workflow
+# manually on the branch (`gh workflow run e2e.yml --ref <branch>`); that
+# one-off run is the pre-merge signal, replacing the old auto-on-push runs.
+#
+# The `concurrency` block below cancels a superseded run when a newer
+# commit reaches develop, so only the latest commit is ever validated.
 #
 # See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
 
 on:
   push:
-    branches: [develop, stage, main, master]
+    branches: [develop]
   workflow_dispatch:
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.

@@ -52,7 +52,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *                                'itemASlug must be a string', ...]
  *       extra property   → 400 ['property bogus should not exist']
  *                          (global ValidationPipe forbidNonWhitelisted)
- *   - GET/DELETE /works/:id/comparisons/:slug → git-gated 5xx on a fresh Work.
+ *   - GET/DELETE /works/:id/comparisons/:slug → git-gated 409 on a fresh Work (NoGitCredentialsError via FacadeExceptionFilter; was 5xx).
  *
  * COMPARISON-GENERATOR PLUGIN (category: 'utility', id 'comparison-generator'):
  *   - POST /works/:id/plugins/comparison-generator/enable on a user that has
@@ -77,9 +77,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
 const COMP_TIMEOUT = 30_000;
 const ZERO_UUID = '00000000-0000-0000-0000-000000000000';
 
-/** A git-gated comparison subresource on a fresh Work yields 5xx, never 404. */
+/** A git-gated comparison subresource on a fresh Work yields 409, never 404. */
 function isGitGated(status: number): boolean {
-    return status >= 500 && status < 600;
+    return status === 409;
 }
 
 async function makeWork(request: APIRequestContext, token: string, label: string): Promise<string> {
