@@ -83,6 +83,29 @@ function msgOf(body: { message?: unknown }): string {
     return Array.isArray(body?.message) ? body.message.join(' ') : String(body?.message);
 }
 
+/**
+ * Upload a tiny file via `POST /api/uploads/file` and return its content-addressed
+ * sha256 `id` — a REAL, caller-owned uploadId. Attachment-add now validates the
+ * uploadId against `user_uploads` (owned by the caller), so an arbitrary 64-hex
+ * value no longer lands an edge; mint a real one.
+ */
+async function mintUploadId(request: APIRequestContext, token: string): Promise<string> {
+    const res = await request.post(`${API_BASE}/api/uploads/file`, {
+        headers: authedHeaders(token),
+        multipart: {
+            file: {
+                name: `${uniq('idea-attach')}.md`,
+                mimeType: 'text/markdown',
+                buffer: Buffer.from(`# idea attachment ${uniq('body')}\n`),
+            },
+        },
+    });
+    expect(res.status(), `upload body=${await res.text()}`).toBe(201);
+    const id = (await res.json()).id as string;
+    expect(id, 'upload id is a sha256 hex').toMatch(/^[0-9a-f]{64}$/i);
+    return id;
+}
+
 interface IdeaRow {
     id: string;
     title: string;
@@ -403,10 +426,11 @@ test.describe('Work-Proposals — Idea attachments edge surface', () => {
         expect(empty.status()).toBe(200);
         expect(await empty.json()).toEqual([]);
 
-        // A well-formed 64-hex uploadId creates the WorkProposalAttachment edge.
-        // The keyless stack does NOT FK-check the upload's existence here — the
-        // edge lands as long as the id matches the hash shape.
-        const uploadId = 'a'.repeat(64);
+        // Attach a REAL, caller-owned upload (its sha256 id). Attachment-add now
+        // validates the uploadId against `user_uploads`, so the edge lands only
+        // for an upload the caller actually owns (a ghost/foreign id is 404 —
+        // see the negatives test below).
+        const uploadId = await mintUploadId(request, user.access_token);
         const add = await request.post(`${API_BASE}/api/me/work-proposals/${idea.id}/attachments`, {
             headers,
             data: { uploadId },

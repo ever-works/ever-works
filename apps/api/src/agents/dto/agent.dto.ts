@@ -10,6 +10,7 @@ import {
     IsOptional,
     IsString,
     IsUUID,
+    Matches,
     Max,
     MaxLength,
     Min,
@@ -339,7 +340,12 @@ export class AssignTaskToAgentDto {
  * raw inline `{ uploadId: string }` object with no decorators.
  */
 export class AddAgentAttachmentDto {
-    @ApiProperty()
-    @IsUUID()
+    // `uploadId` is the SHA-256 hex id returned by `POST /api/uploads/file`
+    // (NOT a UUID). The previous `@IsUUID()` rejected every real upload id and
+    // contradicted the service's own `SHA256_RE` guard, so agent attachments
+    // could never succeed. Align with the Mission / Idea attachment DTOs.
+    @ApiProperty({ pattern: '^[0-9a-fA-F]{64}$' })
+    @IsString()
+    @Matches(/^[0-9a-f]{64}$/i)
     uploadId: string;
 }
