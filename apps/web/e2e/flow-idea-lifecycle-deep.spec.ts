@@ -28,9 +28,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  * Those pin the STATE MACHINE and SCOPING. THIS file pins the INPUT EDGE:
  * Idea-create title/slug DERIVATION, the create whitelist (privilege-field
  * rejection), the length boundaries (5000/120), the ParseUUIDPipe path guard,
- * accept's missing WORK-ownership check (foreign workId accepted), accept's
- * ghost-workId FK rollback (idea stays PENDING), and the Mission create
- * validation lattice (cap/type) + mission-scoped budget shape.
+ * accept's WORK-ownership guard (foreign/ghost workId → 404, #1280 IDOR fix),
+ * and the Mission create validation lattice (cap/type) + mission-scoped budget
+ * shape.
  *
  * ── PROBED CONTRACTS (verified live) ─────────────────────────────────────
  *
@@ -56,11 +56,12 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *  POST   /api/me/work-proposals/<stranger>/build|retry|rebuild → 404 "Proposal not found"
  *
  *  POST /api/me/work-proposals/:id/accept  { workId:UUID }
- *    · workId belonging to ANOTHER user → 200 { ok:true } — accept does NOT
- *      enforce Work ownership (the Idea is stamped with the foreign workId).
- *      [SECURITY NOTE: cross-user Work linkage IDOR — flagged separately.]
- *    · workId well-formed but NON-EXISTENT → 500 (FK violation) and the Idea
- *      transaction ROLLS BACK — it stays PENDING with acceptedWorkId:null.
+ *    · workId belonging to ANOTHER user → 404 (#1280 IDOR fix: acceptInternal
+ *      verifies work.userId === caller; the Idea stays PENDING, no foreign
+ *      stamp). Was a 200 cross-user-linkage IDOR before the fix.
+ *    · workId well-formed but NON-EXISTENT → 404 (the same ownership guard
+ *      short-circuits when findById returns null); the Idea stays PENDING.
+ *    · workId the CALLER owns → 200 { ok:true }, Idea ACCEPTED + stamped.
  *    · ACCEPTED Idea → rebuild commits ACCEPTED→building, acceptedWorkId PRESERVED.
  *
  *  POST /api/me/missions  validation lattice
@@ -465,7 +466,7 @@ test.describe('Idea list — combined ?missionId × ?statuses composition', () =
 });
 
 test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rollback)', () => {
-    test('accept against a FOREIGN user’s workId succeeds (accept does not enforce Work ownership) and stamps the foreign workId', async ({
+    test('accept against a FOREIGN user’s workId is REFUSED (404) and never stamps the foreign workId — IDOR guard', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -480,26 +481,25 @@ test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rol
         });
         expect(foreignWork.id).toMatch(UUID_RE);
 
-        // Owner accepts THEIR Idea against the OTHER user's workId. The accept
-        // endpoint validates the Idea ownership + status but NOT the Work's
-        // ownership, so the FK (the Work row exists) is satisfied and it lands.
-        // [SECURITY: cross-user Work linkage — flagged via spawn_task.]
+        // Owner accepts THEIR Idea against the OTHER user's workId. SECURITY
+        // (#1280, EW-711 IDOR fix): acceptInternal now verifies the supplied
+        // workId belongs to the SAME user (work.userId === caller). A foreign
+        // work fails that check and the service returns false → the controller's
+        // existence-leak-safe 404 ("Proposal not found or already finalized").
+        // Previously this SUCCEEDED (200) and stamped the foreign workId onto
+        // the Idea's acceptedWorkId — a cross-owner dangling reference.
         const accept = await request.post(`${API_BASE}/api/me/work-proposals/${idea.id}/accept`, {
             headers: ownerHeaders,
             data: { workId: foreignWork.id },
         });
-        expect(accept.status(), `accept body=${await accept.text()}`).toBe(200);
-        expect(await accept.json()).toEqual({ ok: true });
+        expect(accept.status(), `accept body=${await accept.text()}`).toBe(404);
 
-        // The owner's Idea is now ACCEPTED and stamped with the FOREIGN workId.
+        // The owner's Idea is UNTOUCHED — still PENDING, no foreign stamp.
         const accepted = await readIdea(request, ownerHeaders, idea.id);
-        expect(accepted.status).toBe('accepted');
-        expect(accepted.acceptedWorkId).toBe(foreignWork.id);
+        expect(accepted.status).toBe('pending');
+        expect(accepted.acceptedWorkId).toBeNull();
 
-        // The IDOR is a one-way dangling forward reference: the other user's
-        // Work is NOT mutated — its `acceptedFromIdeaId` back-pointer stays null
-        // (that field is written only by the Goal-completion handler, never by
-        // the user-facing accept). The stranger's Work read confirms it.
+        // The stranger's Work is likewise untouched (no back-pointer).
         const otherWorkRead = await request.get(`${API_BASE}/api/works/${foreignWork.id}`, {
             headers: authedHeaders(other.access_token),
         });
@@ -509,7 +509,7 @@ test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rol
         expect(otherWorkEntity?.acceptedFromIdeaId ?? null).toBeNull();
     });
 
-    test('accept against a GHOST (non-existent) workId is a 500 FK violation and the transaction ROLLS BACK — the Idea stays PENDING', async ({
+    test('accept against a GHOST (non-existent) workId is REFUSED (404) and the Idea stays PENDING — IDOR guard short-circuits before the FK', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -518,25 +518,19 @@ test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rol
         const idea = await createIdea(request, headers, `${IDEA_DESC_MIN} ${uniq('ghost-work')}`);
 
         // A well-formed but non-existent workId passes the @IsUUID DTO + the
-        // ownership/status guard, then violates the acceptedWorkId FK. Truthful
-        // tolerance: 200 (no FK enforced anywhere) OR 500 (FK fires). We never
-        // assert a fictional FK-404.
+        // Idea ownership/status guard, then hits the new workId-ownership guard
+        // (#1280): `works.findById(workId)` returns null → service returns false
+        // → controller 404. (Before the fix this fell through to the
+        // acceptedWorkId FK and surfaced as a 200-or-500.) No state change.
         const ghost = await request.post(`${API_BASE}/api/me/work-proposals/${idea.id}/accept`, {
             headers,
             data: { workId: UNKNOWN_UUID },
         });
-        expect([200, 500]).toContain(ghost.status());
+        expect(ghost.status()).toBe(404);
 
         const after = await readIdea(request, headers, idea.id);
-        if (ghost.status() === 500) {
-            // The accept tx rolled back — no half-finalized state leaked.
-            expect(after.status).toBe('pending');
-            expect(after.acceptedWorkId).toBeNull();
-        } else {
-            // If a future stack tolerates the ghost (no FK), it's a clean accept.
-            expect(after.status).toBe('accepted');
-            expect(after.acceptedWorkId).toBe(UNKNOWN_UUID);
-        }
+        expect(after.status).toBe('pending');
+        expect(after.acceptedWorkId).toBeNull();
     });
 
     test('the accept body DTO is strict: a null workId, a non-UUID workId, and an extra field are each rejected BEFORE any state change', async ({
