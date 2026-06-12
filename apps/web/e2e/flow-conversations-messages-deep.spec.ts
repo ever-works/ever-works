@@ -41,12 +41,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      tests assert the hard-reject is >=400 (today exactly 500) AND pin the
  *      persist outcome — so a future DTO hardening to 400/422 keeps them green
  *      (the established tolerance pattern from flow-task-chat-messages.spec.ts).
- *  Accepted-but-loose inputs (NO enum / NO size cap, unlike task-chat's
- *      16384 @MaxLength): an arbitrary role string ("wizard") → 201 + persisted;
- *      an empty-string content → 201 + persisted; a 500_000-char content → 201 +
- *      persisted in full (title still truncates to 60). Unknown extra keys on a
- *      message element are STRIPPED (only modeled columns persist) and a
- *      client-supplied `id` is IGNORED (server assigns its own).
+ *  Input policing (AppendMessagesDto now governs this — role is @IsIn-enum'd,
+ *      so an arbitrary role string ("wizard") is REJECTED with 400 + zero
+ *      persist (it used to be accepted verbatim); content has NO non-empty/size
+ *      cap, so an empty-string content → 201 + persisted, and a 500_000-char
+ *      content → 201 + persisted in full (title still truncates to 60). Unknown
+ *      extra keys on a message element are STRIPPED (only modeled columns
+ *      persist) and a client-supplied `id` is IGNORED (server assigns its own).
  *  Auto-title empty-vs-whitespace boundary (the branch the CRUD-deep battery
  *      does not reach): a first USER message whose content is "" (FALSY) leaves
  *      the title NULL; a first USER message that is whitespace-only (TRUTHY, then
@@ -171,34 +172,42 @@ test.describe('Conversation messages deep — append input validation (no DTO �
         expect(after.row?.title, 'no malformed message set a title').toBeNull();
     });
 
-    test('append accepts loose inputs the DTO-less handler does not police: arbitrary role + empty content persist', async ({
+    test('append now enforces the role enum (rejects an arbitrary role) while still accepting empty content', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const conv = await createConversation(request, token, {});
 
-        // Unlike the task-chat controller (role enum + 16384 @MaxLength), this
-        // endpoint persists an arbitrary role string and an empty content body.
-        const { status, json } = await appendRaw(request, token, conv.id, {
-            messages: [
-                { role: 'wizard', content: 'magic incantation' },
-                { role: 'user', content: '' },
-            ],
+        // AppendMessageDto now constrains role to @IsIn(['user','assistant',
+        // 'system','tool']) — an arbitrary role string that this DTO-less handler
+        // used to persist verbatim is now a clean 400, and (because validation
+        // runs before the handler) nothing is written.
+        const rejected = await appendRaw(request, token, conv.id, {
+            messages: [{ role: 'wizard', content: 'magic incantation' }],
         });
-        expect(status, 'loose roles/content → 201').toBe(201);
+        expect(rejected.status, 'arbitrary role → 400 (role enum enforced)').toBe(400);
+        const afterReject = await getConversation(request, token, conv.id);
+        expect(
+            afterReject.row?.messages,
+            'a rejected arbitrary-role batch persisted nothing',
+        ).toHaveLength(0);
+
+        // content still has NO non-empty constraint (only @IsString), so an
+        // empty-string body with a VALID role is accepted and stored verbatim.
+        const { status, json } = await appendRaw(request, token, conv.id, {
+            messages: [{ role: 'user', content: '' }],
+        });
+        expect(status, 'valid role + empty content → 201').toBe(201);
         expect(json, 'append response shape is exactly { success: true }').toEqual({
             success: true,
         });
 
         const after = await getConversation(request, token, conv.id);
         const msgs = after.row?.messages ?? [];
-        expect(msgs, 'both loose messages persisted in order').toHaveLength(2);
-        expect(
-            msgs.map((m) => m.role),
-            'arbitrary role stored verbatim (no enum)',
-        ).toEqual(['wizard', 'user']);
-        expect(msgs[1].content, 'empty-string content stored verbatim').toBe('');
+        expect(msgs, 'the valid empty-content message persisted').toHaveLength(1);
+        expect(msgs[0].role, 'valid role stored').toBe('user');
+        expect(msgs[0].content, 'empty-string content stored verbatim').toBe('');
     });
 
     test('a mixed batch (valid message followed by a malformed one) hard-rejects without crashing the conversation', async ({
@@ -376,16 +385,28 @@ test.describe('Conversation messages deep — keyless persistence (provider-agno
 });
 
 test.describe('Conversation messages deep — message DTO completeness + id provenance', () => {
-    test('persisted message DTO is server-shaped: client id ignored, unknown keys stripped, parts/usage/scope columns present', async ({
+    test('persisted message DTO is server-shaped: client id ignored, unknown keys rejected, parts/usage/scope columns present', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const conv = await createConversation(request, token, {});
 
-        // Send a message with a client-supplied id, an unknown field, and the
-        // optional parts/model/usage. The server must assign its OWN id, drop the
-        // unknown key, and round-trip the modeled optional columns.
+        // An unknown extra key on a message element is now REJECTED by the global
+        // ValidationPipe (forbidNonWhitelisted) via AppendMessageDto — 400, zero
+        // persist. (The DTO-less handler used to silently ignore extra keys.)
+        const rejected = await appendRaw(request, token, conv.id, {
+            messages: [{ role: 'assistant', content: 'x', bogusField: 'not allowed' }],
+        });
+        expect(rejected.status, 'unknown message key → 400 (forbidNonWhitelisted)').toBe(400);
+        expect(
+            (await getConversation(request, token, conv.id)).row?.messages,
+            'a rejected unknown-key batch persisted nothing',
+        ).toHaveLength(0);
+
+        // A well-formed message with a client-supplied id + the optional
+        // parts/model/usage: the server assigns its OWN id and round-trips the
+        // modeled optional columns.
         const parts = [{ type: 'text', text: 'structured' }];
         const usage = { promptTokens: 3, completionTokens: 2, totalTokens: 5 };
         const { status } = await appendRaw(request, token, conv.id, {
@@ -397,7 +418,6 @@ test.describe('Conversation messages deep — message DTO completeness + id prov
                     parts,
                     model: 'gpt-4o-mini',
                     usage,
-                    bogusField: 'should be stripped',
                 },
             ],
         });
@@ -412,9 +432,8 @@ test.describe('Conversation messages deep — message DTO completeness + id prov
         expect(msg?.id, 'server id is present').toBeTruthy();
         expect(msg?.conversationId, 'message points back at its conversation').toBe(conv.id);
 
-        // The unknown field never round-trips (only modeled columns persist).
+        // The client-supplied id never round-trips (server assigns its own).
         const asRecord = msg as unknown as Record<string, unknown>;
-        expect('bogusField' in asRecord, 'unknown key stripped from the persisted DTO').toBe(false);
 
         // The modeled optional columns round-trip verbatim.
         expect(msg?.parts, 'parts round-trip').toEqual(parts);
