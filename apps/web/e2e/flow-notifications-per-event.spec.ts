@@ -240,7 +240,7 @@ test.describe('Per-event notification production (REAL integration)', () => {
 
         // Re-issuing the SAME (taskId, event, actor) is dedup-collapsed at the
         // notification layer. The assignee row itself is UNIQUE — a duplicate
-        // POST /assignees 500s on uq_task_assignee BEFORE re-emitting — so we
+        // POST /assignees 409s on uq_task_assignee BEFORE re-emitting — so we
         // can't drive a second emit through the assignee path. Instead we assert
         // the existing dedup INVARIANT: only one task_assigned row exists for
         // this (task, actor), and a duplicate assignee write is rejected.

@@ -64,7 +64,7 @@ import { createAgentViaAPI, createTaskViaAPI, transitionTaskViaAPI } from './hel
  *       · SELF relation (A→A) → 201 ALLOWED — there is NO self-guard here
  *         (deliberate contrast with the blocker's self-block 400).
  *       · UNIQUENESS is (taskId, relatedTaskId), KIND-AGNOSTIC + DIRECTIONAL:
- *         A→B related then A→B duplicates → 500 (same pair, any kind);
+ *         A→B related then A→B duplicates → 409 (same pair, any kind);
  *         BUT reverse B→A related → 201, and A→C related → 201.
  *       · cross-user (stranger on my task) → 404 ; no auth → 401.
  *       · no DELETE route: DELETE /api/tasks/:id/relations/:rid → 404.
@@ -190,7 +190,7 @@ test.describe('Task reviewers — add lifecycle (API)', () => {
         expect(fresh.status).toBe('backlog');
     });
 
-    test('reviewer validation + uniqueness: bad actor 400, unknown agent 400, missing id 400, duplicate 500; no approve/remove-reviewer route (404)', async ({
+    test('reviewer validation + uniqueness: bad actor 400, unknown agent 400, missing id 400, duplicate 409; no approve/remove-reviewer route (404)', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -231,7 +231,7 @@ test.describe('Task reviewers — add lifecycle (API)', () => {
             reviewerType: 'user',
             reviewerId: u.user.id,
         });
-        expect(dup.status(), `dup reviewer body=${await dup.text().catch(() => '')}`).toBe(500);
+        expect(dup.status(), `dup reviewer body=${await dup.text().catch(() => '')}`).toBe(409);
 
         // (e) There is NO approve route and NO remove-reviewer route — reviewers
         // are write-once + advisory on this build (no review-gate is wired).
@@ -286,13 +286,13 @@ test.describe('Task reviewers — add lifecycle (API)', () => {
         expect((await assignee.json()).assigneeId).toBe(u.user.id);
 
         // The duplicate guard is PER-ROLE: a second reviewer(user, same id) still
-        // 500s on the reviewer table even though approver/assignee rows exist for
+        // 409s on the reviewer table even though approver/assignee rows exist for
         // the same actor — the tables don't share a key.
         const dupReviewer = await addReviewer(request, token, task.id, {
             reviewerType: 'user',
             reviewerId: u.user.id,
         });
-        expect(dupReviewer.status(), 'reviewer dup is per-table, still 500').toBe(500);
+        expect(dupReviewer.status(), 'reviewer dup is per-table → 409 Conflict').toBe(409);
     });
 
     test('reviewer closure: cross-user add → 404 (no existence leak), no auth → 401, bad task uuid → 400', async ({
@@ -375,36 +375,30 @@ test.describe('Task relations — related / duplicates / follow-up edges (API)',
         expect((await followUp.json()).kind).toBe('follow-up');
     });
 
-    test('self-relation (A→A) is ALLOWED (201) — deliberate contrast with the blocker self-block 400', async ({
+    test('self-relation (A→A) is REJECTED (400) — now consistent with the blocker self-block guard', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
         const token = u.access_token;
         const a = await createTaskViaAPI(request, token, { title: uniq('Self rel') });
 
-        // Relations carry NO self-guard (unlike POST /blocks which 400s on
-        // self-block). A task may relate to itself.
+        // Relations now carry a self-guard (mirroring POST /blocks which 400s on
+        // self-block). A task may NOT relate to itself — the guard fires before
+        // any insert, so no self-relation row is ever created.
         const selfRel = await addRelation(request, token, a.id, {
             relatedTaskId: a.id,
             kind: 'related',
         });
         expect(selfRel.status(), `self-relation body=${await selfRel.text().catch(() => '')}`).toBe(
-            201,
+            400,
         );
-        const row = await selfRel.json();
-        expect(row.taskId).toBe(a.id);
-        expect(row.relatedTaskId).toBe(a.id);
-
-        // Cross-check the asymmetry: the SAME (taskId,relatedTaskId)=self pair is
-        // now unique-locked → a second self `related` add is a 500.
-        const selfDup = await addRelation(request, token, a.id, {
-            relatedTaskId: a.id,
-            kind: 'related',
-        });
-        expect(selfDup.status(), 'duplicate self-relation hits the unique index').toBe(500);
+        expect(
+            String((await selfRel.json()).message ?? ''),
+            'the 400 names the self-relation rejection',
+        ).toContain('itself');
     });
 
-    test('uniqueness is (taskId, relatedTaskId) — KIND-AGNOSTIC and DIRECTIONAL: same pair any kind → 500, reverse → 201, different target → 201', async ({
+    test('uniqueness is (taskId, relatedTaskId) — KIND-AGNOSTIC and DIRECTIONAL: same pair any kind → 409, reverse → 201, different target → 201', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -420,9 +414,10 @@ test.describe('Task relations — related / duplicates / follow-up edges (API)',
         });
         expect(first.status()).toBe(201);
 
-        // A→B again with a DIFFERENT kind → STILL 500: the unique key is the
+        // A→B again with a DIFFERENT kind → 409 Conflict: the unique key is the
         // (taskId, relatedTaskId) pair, NOT the kind. This is the load-bearing
-        // truth — a relation pair is single-valued regardless of edge type.
+        // truth — a relation pair is single-valued regardless of edge type. (The
+        // unique-violation is now mapped to a clean 409 instead of an unmapped 500.)
         const sameKindlessDup = await addRelation(request, token, a.id, {
             relatedTaskId: b.id,
             kind: 'duplicates',
@@ -430,7 +425,7 @@ test.describe('Task relations — related / duplicates / follow-up edges (API)',
         expect(
             sameKindlessDup.status(),
             `kind-agnostic dup body=${await sameKindlessDup.text().catch(() => '')}`,
-        ).toBe(500);
+        ).toBe(409);
 
         // REVERSE direction B→A is a DISTINCT pair → 201 (the key is ordered).
         const reverse = await addRelation(request, token, b.id, {

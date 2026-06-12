@@ -333,15 +333,15 @@ test.describe('Agent task runs + history', () => {
         // raw `save()` with no pre-check or catch, so the driver's unique-constraint
         // error is unmapped and surfaces as a 500 (probed live: HTTP 500
         // {"statusCode":500,"message":"Internal server error"}). We exercise the
-        // duplicate path to confirm the edge is genuinely unique-constrained, but
-        // we only observe it — no clean 4xx exists today — and the durable
-        // assertion is that exactly ONE assignee row exists for the pair.
+        // duplicate path to confirm the edge is genuinely unique-constrained, and
+        // the durable assertion is that exactly ONE assignee row exists for the pair.
         const dupRes = await request.post(`${API_BASE}/api/tasks/${task.id}/assignees`, {
             headers: authedHeaders(token),
             data: { assigneeType: 'agent', assigneeId: agent.id },
         });
-        // Duplicate-assignee currently 500s server-side (unique-constraint, unmapped).
-        expect(dupRes.status()).toBe(500);
+        // Duplicate-assignee → 409 Conflict (unique-constraint, mapped from the
+        // previously-unmapped 500).
+        expect(dupRes.status()).toBe(409);
 
         // 2. The imperative dispatch: assign-task records a run for the pair.
         await assignTaskToAgent(request, token, agent.id, task.id);
