@@ -28,16 +28,16 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *         account is still 200, and status stays { configured:false } after.
  *   - POST /api/account/sync/configure { createNew:true } | { repoFullName }
  *       — `ensureGitHubOAuth` runs FIRST (before any repoFullName format check),
- *         so with NO connected GitHub OAuth it throws a plain Error
- *         ('GitHub OAuth not connected…'). The plain Error has no Nest HTTP
- *         mapping → 500 { statusCode: 500, message: 'Internal server error' }.
+ *         so with NO connected GitHub OAuth it throws a ConflictException
+ *         → 409 { statusCode:409, error:'Conflict', message:'GitHub OAuth not
+ *         connected. Please connect your GitHub account first.' }.
  *         (Empty body, createNew, well-formed repoFullName, AND a malformed
- *         single-segment repoFullName all 500 identically — the OAuth gate
+ *         single-segment repoFullName all 409 identically — the OAuth gate
  *         short-circuits before the body is ever inspected. PROBED.)
  *   - POST /api/account/sync/push | /pull | /pull/apply
- *       — each first loads the sync config; an unconfigured account throws a plain
- *         Error ('Sync not configured…'/'Sync not configured') → 500 with the SAME
- *         generic { statusCode:500, message:'Internal server error' } envelope.
+ *       — each first loads the sync config; an unconfigured account throws a
+ *         ConflictException → 409 { statusCode:409, error:'Conflict',
+ *         message:'Sync not configured. Please configure a repository first.' }.
  *         (The toggle body — includeSecrets/includeAgents/… on push, resolutions[]
  *         on pull/apply — never matters keyless: the not-configured gate precedes
  *         it. PROBED.)
