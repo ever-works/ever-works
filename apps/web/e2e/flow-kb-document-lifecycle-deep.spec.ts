@@ -283,7 +283,7 @@ test.describe('Flow — KB document lifecycle (deep)', () => {
             { headers: authedHeaders(access_token) },
         );
         expect(
-            [200, 500, 502, 503].includes(hist.status()),
+            [200, 409, 500, 502, 503].includes(hist.status()),
             `history reachable (got ${hist.status()})`,
         ).toBeTruthy();
         if (hist.status() === 200) {

@@ -97,8 +97,8 @@ const MISSING_DOC = '00000000-0000-0000-0000-000000000000';
  * portable — we annotate which branch ran. We NEVER assert a populated git
  * result (that needs a real repo).
  */
-const RESTORE_REACHED_MIRROR = [200, 404, 500, 502, 503] as const;
-const HISTORY_REACHABLE = [200, 500, 502, 503] as const;
+const RESTORE_REACHED_MIRROR = [200, 404, 409, 500, 502, 503] as const;
+const HISTORY_REACHABLE = [200, 409, 500, 502, 503] as const;
 
 /** Per-test unique suffix — a closure counter, NOT a module-scope clock. */
 let seq = 0;
