@@ -287,7 +287,7 @@ Private-development contributors:
 - Claude (790 commits, 540,594++ 102,992--)
 - Paradoxe Ng (273 commits, 569,521++ 263,134--)
 - Gabriel Nt (63 commits, 124,405++ 37,680--)
-- dependabot[bot] (30 commits, 24,912++ 4,519--)
+- Dependabot (30 commits, 24,912++ 4,519--)
 - Joel K. (26 commits, 16,373++ 7,214--)
 - Michał D. (13 commits, 18,944++ 6,930--)
 - Akilimaili C. I. (11 commits, 43,132++ 700--)
