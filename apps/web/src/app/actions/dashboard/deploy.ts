@@ -185,6 +185,62 @@ export async function getDomains(workId: string) {
     }
 }
 
+export async function getWorkRuntimeEnv(workId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.getRuntimeEnv(workId);
+        return {
+            success: response.status === 'success',
+            databaseUrl: response.databaseUrl ?? { configured: false, masked: null },
+            managed: response.managed ?? [],
+        };
+    } catch (error) {
+        console.error('Get runtime env error:', error);
+        return {
+            success: false,
+            databaseUrl: { configured: false, masked: null as string | null },
+            managed: [] as string[],
+            error: error instanceof Error ? error.message : 'Failed to get runtime env',
+        };
+    }
+}
+
+export async function setWorkRuntimeEnv(workId: string, databaseUrl: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const trimmed = databaseUrl.trim();
+    if (!/^postgres(ql)?:\/\/.+/i.test(trimmed)) {
+        return {
+            success: false,
+            databaseUrl: { configured: false, masked: null as string | null },
+            error: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
+        };
+    }
+
+    try {
+        const response = await deployAPI.setRuntimeEnv(workId, trimmed);
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
+        return {
+            success: response.status === 'success',
+            databaseUrl: response.databaseUrl ?? { configured: false, masked: null },
+        };
+    } catch (error) {
+        console.error('Set runtime env error:', error);
+        return {
+            success: false,
+            databaseUrl: { configured: false, masked: null as string | null },
+            error: error instanceof Error ? error.message : 'Failed to set runtime env',
+        };
+    }
+}
+
 export async function addDomain(workId: string, domain: string) {
     const user = await getAuthFromCookie();
     if (!user) {

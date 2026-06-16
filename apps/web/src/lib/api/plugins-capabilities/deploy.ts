@@ -98,6 +98,14 @@ export type VerifyDomainResponseDto = APIResponse<{
     domain: DeploymentDomain;
 }>;
 
+export interface RuntimeEnvState {
+    databaseUrl: { configured: boolean; masked: string | null };
+    /** Secrets auto-managed by the deploy feature (not user-editable). */
+    managed: string[];
+}
+
+export type RuntimeEnvResponseDto = APIResponse<RuntimeEnvState>;
+
 export const deployAPI = {
     // Get available deployment providers
     getProviders: async () => {
@@ -195,6 +203,29 @@ export const deployAPI = {
             endpoint: `/deploy/works/${encodeURIComponent(workId)}/domains`,
             data: { domain },
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Get the per-Work runtime env (masked DATABASE_URL + auto-managed secrets)
+     */
+    getRuntimeEnv(workId: string) {
+        return serverFetch<RuntimeEnvResponseDto>(
+            // Security: encode workId to prevent path-segment injection
+            `/deploy/works/${encodeURIComponent(workId)}/runtime-env`,
+        );
+    },
+
+    /**
+     * Set the per-Work DATABASE_URL (applied on next deploy)
+     */
+    setRuntimeEnv(workId: string, databaseUrl: string) {
+        return serverMutation<RuntimeEnvResponseDto>({
+            // Security: encode workId to prevent path-segment injection
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/runtime-env`,
+            data: { databaseUrl },
+            method: 'PUT',
             wrapInData: false,
         });
     },
