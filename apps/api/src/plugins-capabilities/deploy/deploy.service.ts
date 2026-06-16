@@ -22,6 +22,7 @@ import {
 import {
     PlatformSyncSecretService,
     WebhookSecretService,
+    WorkRuntimeEnvService,
     ZeroFrictionFunnelService,
 } from '@ever-works/agent/services';
 import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
@@ -115,6 +116,7 @@ export class DeployService {
         private readonly eventEmitter: EventEmitter2,
         private readonly platformSyncSecretService: PlatformSyncSecretService,
         private readonly webhookSecretService: WebhookSecretService,
+        private readonly workRuntimeEnvService: WorkRuntimeEnvService,
         private readonly dnsService: EverWorksDnsService,
         private readonly funnel: ZeroFrictionFunnelService,
     ) {}
@@ -208,6 +210,7 @@ export class DeployService {
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
         await this.ensureWebhookSecret(ctx, work);
+        await this.ensureRuntimeEnv(ctx, work, plugin);
 
         const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = env.branch ?? template.branch;
@@ -860,6 +863,55 @@ export class DeployService {
         } catch (error: any) {
             this.logger.warn(
                 `Failed to push WEBHOOK_SECRET for ${ctx.owner}/${ctx.repo}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Provision the per-Work application runtime env that a k8s-deployed
+     * directory site needs to boot in production. Vercel supplied these from
+     * project env + the Neon integration; k8s has no such source, so without
+     * this the deployed site 500s (`[auth] AUTH_SECRET must be set in
+     * production`). Pushed as GitHub secrets; `deploy_k8s.yaml` materializes
+     * them into a `${slug}-runtime-env` k8s Secret the Deployment mounts via
+     * `envFrom`. No-op for non-k8s providers (Vercel manages its own env).
+     *
+     * `AUTH_SECRET`/`COOKIE_SECRET` are generated once and persisted (stable
+     * across redeploys — rotating would drop every live session). `DATABASE_URL`
+     * is the per-Work Postgres (e.g. reused Neon) connection string when
+     * configured. `NEXT_PUBLIC_APP_URL`/`COOKIE_DOMAIN` are derived from the
+     * ingress host inside the manifest, not here.
+     */
+    private async ensureRuntimeEnv(ctx: RepoContext, work: Work, plugin?: IDeploymentPlugin) {
+        if (!this.isKubernetesDeploy(work.deployProvider, plugin?.id)) {
+            return;
+        }
+        try {
+            await this.setSecret(
+                ctx,
+                'AUTH_SECRET',
+                await this.workRuntimeEnvService.getOrGenerateAuthSecret(work.id),
+            );
+            await this.setSecret(
+                ctx,
+                'COOKIE_SECRET',
+                await this.workRuntimeEnvService.getOrGenerateCookieSecret(work.id),
+            );
+            await this.setSecret(ctx, 'COOKIE_SECURE', 'true');
+
+            const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
+            if (databaseUrl) {
+                await this.setSecret(ctx, 'DATABASE_URL', databaseUrl);
+            } else {
+                this.logger.warn(
+                    `No DATABASE_URL configured for work ${work.id}; DB-backed features (auth users, favorites, submissions) will be unavailable on k8s until one is set.`,
+                );
+            }
+        } catch (error: any) {
+            this.logger.warn(
+                `Failed to push runtime env for ${ctx.owner}/${ctx.repo}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
