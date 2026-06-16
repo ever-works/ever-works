@@ -7,13 +7,14 @@ import {
     Param,
     ParseUUIDPipe,
     Post,
+    Put,
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
-import { WorkOwnershipService } from '@ever-works/agent/services';
+import { WorkOwnershipService, WorkRuntimeEnvService } from '@ever-works/agent/services';
 import { WorkDeploymentRepository } from '@ever-works/agent/database';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
@@ -27,6 +28,22 @@ import {
 import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
+import { SetRuntimeEnvDto } from './dto/runtime-env.dto';
+
+/**
+ * Mask a Postgres connection string for display — keep scheme/host/db, hide the
+ * username and password so the value can be shown in the UI/API without leaking
+ * the credential.
+ */
+function maskDatabaseUrl(url: string): string {
+    try {
+        const u = new URL(url);
+        const userPart = u.username ? `${u.username}:***@` : '';
+        return `${u.protocol}//${userPart}${u.host}${u.pathname}`;
+    } catch {
+        return '***';
+    }
+}
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -56,6 +73,7 @@ export class DeployController {
         private readonly deploymentVerifier: DeploymentVerifierService,
         private readonly deploymentRepository: WorkDeploymentRepository,
         private readonly activityLogService: ActivityLogService,
+        private readonly workRuntimeEnvService: WorkRuntimeEnvService,
     ) {}
 
     private getProviderName(deployProvider: string | undefined): string {
@@ -219,6 +237,76 @@ export class DeployController {
             owner: work.getRepoOwner('website'),
             repository: `${work.getRepoOwner('website')}/${work.getWebsiteRepo()}`,
             message: 'Deployment started',
+        };
+    }
+
+    /**
+     * Get the per-Work deploy runtime env state. Only `DATABASE_URL` is
+     * user-managed (and returned masked); `AUTH_SECRET`/`COOKIE_SECRET` are
+     * auto-minted by the deploy feature and intentionally not exposed.
+     */
+    @Get('/works/:id/runtime-env')
+    @ApiOperation({
+        summary: 'Get Work runtime env',
+        description: 'Per-Work DATABASE_URL state (masked) for the k8s-deployed site.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Runtime env state' })
+    async getRuntimeEnv(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ) {
+        await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
+        return {
+            status: 'success',
+            databaseUrl: {
+                configured: Boolean(databaseUrl),
+                masked: databaseUrl ? maskDatabaseUrl(databaseUrl) : null,
+            },
+            // Auto-managed by the deploy feature (minted + rotated server-side),
+            // so they are not editable here.
+            managed: ['AUTH_SECRET', 'COOKIE_SECRET', 'COOKIE_SECURE'],
+        };
+    }
+
+    /**
+     * Set the per-Work `DATABASE_URL`. Persisted AES-256-GCM-encrypted on the
+     * Work and pushed into the `${slug}-runtime-env` k8s Secret on the next
+     * deploy (so the change applies after a redeploy).
+     */
+    @Put('/works/:id/runtime-env')
+    @ApiOperation({
+        summary: 'Set Work runtime env',
+        description: 'Sets the per-Work DATABASE_URL used by the k8s-deployed site.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Runtime env updated' })
+    async setRuntimeEnv(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: SetRuntimeEnvDto,
+    ) {
+        const { work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+        await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl);
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'work.runtime-env.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated DATABASE_URL for ${work.name}`,
+            })
+            .catch(() => {});
+        const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
+        return {
+            status: 'success',
+            databaseUrl: {
+                configured: Boolean(databaseUrl),
+                masked: databaseUrl ? maskDatabaseUrl(databaseUrl) : null,
+            },
+            message: 'Runtime env updated. Redeploy to apply it to the live site.',
         };
     }
 
