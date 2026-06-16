@@ -63,11 +63,14 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
          *  pre-dual-mode tests behaving as before. */
         activitySyncMode?: 'pull' | 'push' | 'disabled';
         githubPluginOverrides?: Record<string, unknown>;
+        /** Work's public `website` URL — drives the per-Work k8s Ingress host. */
+        website?: string;
     }) => {
         const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
             id: 'work-1',
             slug: 'my-site',
+            website: overrides.website,
             deployProvider: overrides.deployProvider ?? 'k8s',
             gitProvider: 'github',
             websiteTemplateId: 'directory-web-template',
@@ -145,6 +148,12 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             getOrGenerate: jest.fn().mockResolvedValue('webhook'.repeat(9) + 'a'), // 64 chars
         };
 
+        const workRuntimeEnvService = {
+            getOrGenerateAuthSecret: jest.fn().mockResolvedValue('auth-secret-base64'),
+            getOrGenerateCookieSecret: jest.fn().mockResolvedValue('cookie-secret-base64'),
+            getDatabaseUrl: jest.fn().mockResolvedValue(null),
+        };
+
         // EW-617 G5: DNS automation no-ops in tests (no env vars). The
         // dns service still needs to be present so the constructor wires
         // — `getProvider` returns null and `ensureWorkSubdomain` is a
@@ -170,6 +179,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             eventEmitter as any,
             platformSyncSecretService as any,
             webhookSecretService as any,
+            workRuntimeEnvService as any,
             dnsService as any,
             funnel as any,
         );
@@ -782,6 +792,50 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             // getDeploymentSecrets when settings.ingressHost is set.
             // (Plugin is mocked here, so we only assert on the call.)
             void githubPlugin; // silence unused
+        });
+
+        it('derives a per-Work k8s Ingress host from work.website (not the shared settings.ingressHost)', async () => {
+            const getDeploymentSecrets = jest.fn().mockResolvedValue({});
+            const { service, dnsService } = buildService({
+                deployProvider: 'k8s',
+                website: 'https://dir.ever.works',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                // Shared plugin setting points at a DIFFERENT Work's host —
+                // the per-Work override must win to avoid Ingress collisions.
+                settings: { kubeconfig: 'apiVersion: v1', ingressHost: 'other-work.ever.works' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const settingsArg = getDeploymentSecrets.mock.calls[0][0];
+            expect(settingsArg.ingressHost).toBe('dir.ever.works');
+            // Not the managed ever-works subdomain path.
+            expect(dnsService.ensureWorkSubdomain).not.toHaveBeenCalled();
+        });
+
+        it('ignores *.vercel.app placeholder websites for the k8s Ingress host', async () => {
+            const getDeploymentSecrets = jest.fn().mockResolvedValue({});
+            const { service } = buildService({
+                deployProvider: 'k8s',
+                website: 'https://my-site.vercel.app',
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                settings: { kubeconfig: 'apiVersion: v1', ingressHost: 'fallback.ever.works' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const settingsArg = getDeploymentSecrets.mock.calls[0][0];
+            // Falls back to the plugin-configured host rather than routing on a
+            // provider placeholder domain.
+            expect(settingsArg.ingressHost).toBe('fallback.ever.works');
         });
 
         it('leaves settings unchanged for non-ever-works providers', async () => {
