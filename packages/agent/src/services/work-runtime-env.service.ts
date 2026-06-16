@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { config } from '../config';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { Work } from '../entities/work.entity';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH_BYTES = 32;
@@ -80,14 +81,14 @@ export class WorkRuntimeEnvService {
 	 */
 	private async getOrGenerate(
 		workId: string,
-		read: (work: { [k: string]: unknown }) => string | null | undefined,
+		read: (work: Work) => string | null | undefined,
 		setIfNull: (workId: string, encrypted: string) => Promise<boolean>,
 	): Promise<string> {
 		const existing = await this.workRepository.findById(workId);
 		if (!existing) {
 			throw new Error(`Work not found: ${workId}`);
 		}
-		const current = read(existing as unknown as { [k: string]: unknown });
+		const current = read(existing);
 		if (current) {
 			return this.decrypt(current);
 		}
@@ -99,9 +100,7 @@ export class WorkRuntimeEnvService {
 		}
 		// Lost the race — another deploy generated it first. Read back.
 		const reread = await this.workRepository.findById(workId);
-		const rereadValue = reread
-			? read(reread as unknown as { [k: string]: unknown })
-			: undefined;
+		const rereadValue = reread ? read(reread) : undefined;
 		if (!rereadValue) {
 			throw new Error(`Runtime-env secret bootstrap race lost but no value found for work ${workId}`);
 		}
