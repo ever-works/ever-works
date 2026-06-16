@@ -22,6 +22,7 @@ export * from './state-marker.service';
 export * from './anonymous-user-cleanup.service';
 export * from './platform-sync-secret.service';
 export * from './webhook-secret.service';
+export * from './work-runtime-env.service';
 export * from './webhook-subscription-secret.service';
 export * from './zero-friction-funnel.service';
 export * from './deploy-ready-poller.service';
