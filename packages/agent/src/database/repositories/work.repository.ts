@@ -375,6 +375,40 @@ export class WorkRepository {
     }
 
     /**
+     * Conditional UPDATE for the lazy bootstrap of the per-Work k8s deploy
+     * `AUTH_SECRET` (`deployAuthSecretEncrypted`). Same race-safe semantics as
+     * `setWebhookSecretIfNull` — the first deploy to win persists its value;
+     * concurrent deploys re-read. Stable across redeploys (rotating would
+     * invalidate live sessions).
+     */
+    async setDeployAuthSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ deployAuthSecretEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('deployAuthSecretEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Conditional UPDATE for the lazy bootstrap of the per-Work k8s deploy
+     * `COOKIE_SECRET` (`deployCookieSecretEncrypted`). Race-safe; see
+     * `setDeployAuthSecretIfNull`.
+     */
+    async setDeployCookieSecretIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ deployCookieSecretEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('deployCookieSecretEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Update platform-sync observability columns after a pull-transport
      * round-trip. Pass `lastSuccessAt` on success or
      * `{ lastErrorAt, lastErrorMessage }` on failure — partial updates are
