@@ -484,25 +484,65 @@ export class DeployService {
         work: Work,
         settings: Record<string, unknown> | undefined,
     ): Promise<Record<string, unknown> | undefined> {
-        if (work.deployProvider !== 'ever-works') {
-            return settings;
+        // EW-617 G5: the managed `ever-works` provider auto-derives
+        // `${slug}.ever.works` and provisions the Cloudflare CNAME.
+        if (work.deployProvider === 'ever-works') {
+            const provider = this.dnsService.getProvider();
+            if (!provider) {
+                return settings;
+            }
+
+            const ingressHost = this.dnsService.ingressHostFor(work.slug);
+
+            // Provision asynchronously — DNS propagation runs in parallel with
+            // the workflow dispatch. Errors are logged inside the service so
+            // they never abort the deploy.
+            void this.dnsService.ensureWorkSubdomain(work.slug);
+
+            return {
+                ...(settings ?? {}),
+                ingressHost,
+            };
         }
-        const provider = this.dnsService.getProvider();
-        if (!provider) {
-            return settings;
+
+        // k8s deploys: the per-Work Ingress host MUST come from the Work's own
+        // primary domain, not the k8s plugin's shared `settings.ingressHost`.
+        // That setting is a single user-scoped value (last-write-wins), so
+        // without this every Work would claim the same host and the Ingress
+        // admission webhook rejects the collision. Derive it from `work.website`.
+        if (work.deployProvider === 'k8s') {
+            const websiteHost = this.deriveIngressHostFromWebsite(work);
+            if (websiteHost) {
+                return {
+                    ...(settings ?? {}),
+                    ingressHost: websiteHost,
+                };
+            }
         }
 
-        const ingressHost = this.dnsService.ingressHostFor(work.slug);
+        return settings;
+    }
 
-        // Provision asynchronously — DNS propagation runs in parallel with
-        // the workflow dispatch. Errors are logged inside the service so
-        // they never abort the deploy.
-        void this.dnsService.ensureWorkSubdomain(work.slug);
-
-        return {
-            ...(settings ?? {}),
-            ingressHost,
-        };
+    /**
+     * Parse the routable Ingress host from a Work's `website` URL. Returns
+     * `null` for empty/unparseable values or provider placeholder hosts
+     * (`*.vercel.app`) that aren't real custom domains, so the caller falls
+     * back to the plugin's configured host.
+     */
+    private deriveIngressHostFromWebsite(work: Work): string | null {
+        const raw = work.website?.trim();
+        if (!raw) {
+            return null;
+        }
+        try {
+            const host = new URL(raw.includes('://') ? raw : `https://${raw}`).host.toLowerCase();
+            if (!host || host.endsWith('.vercel.app')) {
+                return null;
+            }
+            return host;
+        } catch {
+            return null;
+        }
     }
 
     private async setRequiredSecrets(
