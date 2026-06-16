@@ -226,6 +226,27 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         expect(workflows).toEqual(['deploy_k8s.yaml']);
     });
 
+    it('normalizes a Promise-returning getWorkflowFilenames (EW-693 lazy plugin proxy)', async () => {
+        // The lazy plugin proxy wraps method calls to return Promises so it can
+        // materialize the real plugin on first use. getWorkflowFilenames is
+        // declared synchronous, so a raw `for…of` over that Promise previously
+        // threw "workflowFiles is not iterable" and blocked every k8s deploy.
+        const { service, githubPlugin } = buildService({
+            plugin: {
+                id: 'k8s',
+                getWorkflowFilenames: (() =>
+                    Promise.resolve(['deploy_k8s.yaml'])) as unknown as () => string[],
+                getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+            },
+        });
+
+        await service.deploy('work-1', 'user-1', {});
+
+        const { dispatches } = captureCalls(githubPlugin);
+        const workflows = dispatches.map((d: any) => d.workflow);
+        expect(workflows).toEqual(['deploy_k8s.yaml']);
+    });
+
     it('syncs the website template before dispatch when the required workflow is missing', async () => {
         const notFound = Object.assign(new Error('Not found'), { status: 404 });
         const getFileContent = jest

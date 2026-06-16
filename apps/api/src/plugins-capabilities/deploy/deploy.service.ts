@@ -961,9 +961,23 @@ export class DeployService {
         prNumber?: number,
         commitSha?: string,
     ): Promise<boolean> {
-        const workflowFilesToTry = plugin?.getWorkflowFilenames
-            ? plugin.getWorkflowFilenames()
+        // The plugin may be a lazy proxy (EW-693 dynamic distribution) that
+        // wraps every method call to return a Promise so it can materialize
+        // the real plugin on first use. `getWorkflowFilenames` is declared
+        // synchronous, so without normalizing here the value reaching the
+        // `for…of` in findMissingWorkflowFiles would be a Promise (or
+        // `undefined` when the proxy over-reports a method the underlying
+        // plugin lacks) — which threw `TypeError: workflowFiles is not
+        // iterable` and blocked every k8s deploy. `Promise.resolve` collapses
+        // both the sync-array and proxied-Promise cases; the Array guard falls
+        // back to the defaults if the result is still not a usable list.
+        const rawWorkflowFiles = plugin?.getWorkflowFilenames
+            ? await Promise.resolve(plugin.getWorkflowFilenames())
             : [...DEFAULT_WORKFLOW_FILES];
+        const workflowFilesToTry =
+            Array.isArray(rawWorkflowFiles) && rawWorkflowFiles.length > 0
+                ? rawWorkflowFiles
+                : [...DEFAULT_WORKFLOW_FILES];
         const owner = work.getRepoOwner('website');
         const repo = work.getWebsiteRepo();
         const template = await this.websiteTemplateResolver.resolveForWork(work);
