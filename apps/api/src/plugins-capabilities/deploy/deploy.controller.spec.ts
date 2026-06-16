@@ -79,6 +79,7 @@ describe('DeployController', () => {
         findByWork: jest.Mock;
     };
     let activityLogService: { log: jest.Mock };
+    let workRuntimeEnvService: { getDatabaseUrl: jest.Mock; setDatabaseUrl: jest.Mock };
     let controller: DeployController;
 
     const buildWork = (overrides: Record<string, unknown> = {}) => ({
@@ -125,6 +126,11 @@ describe('DeployController', () => {
         };
         activityLogService = { log: jest.fn().mockResolvedValue(undefined) };
 
+        workRuntimeEnvService = {
+            getDatabaseUrl: jest.fn().mockResolvedValue(null),
+            setDatabaseUrl: jest.fn().mockResolvedValue(undefined),
+        };
+
         controller = new DeployController(
             deployService as unknown as DeployService,
             deployFacade as unknown as DeployFacadeService,
@@ -132,7 +138,53 @@ describe('DeployController', () => {
             deploymentVerifier as unknown as DeploymentVerifierService,
             deploymentRepository as unknown as WorkDeploymentRepository,
             activityLogService as unknown as ActivityLogService,
+            workRuntimeEnvService as never,
         );
+    });
+
+    describe('runtime-env (per-Work DATABASE_URL)', () => {
+        it('getRuntimeEnv returns masked DATABASE_URL (no password) when configured', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
+                'postgresql://neondb_owner:supersecret@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
+            );
+
+            const res: any = await controller.getRuntimeEnv({ userId: 'user-1' } as never, 'work-1');
+
+            expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
+            expect(res.databaseUrl.configured).toBe(true);
+            expect(res.databaseUrl.masked).toContain('neondb_owner:***@');
+            expect(res.databaseUrl.masked).not.toContain('supersecret');
+            expect(res.managed).toEqual(expect.arrayContaining(['AUTH_SECRET', 'COOKIE_SECRET']));
+        });
+
+        it('getRuntimeEnv reports not-configured when unset', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(null);
+
+            const res: any = await controller.getRuntimeEnv({ userId: 'user-1' } as never, 'work-1');
+
+            expect(res.databaseUrl).toEqual({ configured: false, masked: null });
+        });
+
+        it('setRuntimeEnv persists via setDatabaseUrl and returns masked state', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
+                'postgresql://u:p@host.neon.tech/db',
+            );
+
+            const res: any = await controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
+                databaseUrl: 'postgresql://u:p@host.neon.tech/db',
+            });
+
+            expect(workRuntimeEnvService.setDatabaseUrl).toHaveBeenCalledWith(
+                'work-1',
+                'postgresql://u:p@host.neon.tech/db',
+            );
+            expect(res.status).toBe('success');
+            expect(res.databaseUrl.configured).toBe(true);
+            expect(res.databaseUrl.masked).not.toContain(':p@'); // password masked
+        });
     });
 
     afterEach(() => {
