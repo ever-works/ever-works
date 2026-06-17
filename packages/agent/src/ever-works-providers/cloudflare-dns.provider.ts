@@ -1,4 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type {
+    DnsEnsureRecordInput,
+    DnsRecordSnapshot as DnsRecordSnapshotContract,
+    DnsRecordType,
+    DnsRemoveRecordInput,
+    IDnsOperations,
+} from '@ever-works/plugin';
 
 /**
  * EW-617 G5 — Cloudflare DNS provider for `*.ever.works`.
@@ -34,7 +41,13 @@ export interface CloudflareDnsConfig {
 
 export interface DnsRecordSnapshot {
     id: string;
-    type: 'CNAME';
+    /**
+     * Historically `'CNAME'`-only (the original EW-617 G5 managed flow
+     * only ever created CNAMEs). Widened to A/CNAME in EW-735 so the
+     * new `IDnsOperations.ensureRecord` path can return the same shape
+     * for k8s A-record targets without forking the snapshot type.
+     */
+    type: 'CNAME' | 'A';
     name: string;
     content: string;
 }
@@ -54,7 +67,7 @@ export class CloudflareDnsError extends Error {
  * Pure (testable) Cloudflare client. Construct with a config; tests pass
  * a custom `fetch` impl via the second arg.
  */
-export class CloudflareDnsProvider {
+export class CloudflareDnsProvider implements IDnsOperations {
     private readonly logger = new Logger(CloudflareDnsProvider.name);
     private readonly baseUrl: string;
 
@@ -123,6 +136,86 @@ export class CloudflareDnsProvider {
         this.logger.log(`CloudflareDns CNAME deleted ${fqdn}`);
     }
 
+    // EW-735 — IDnsOperations contract ---------------------------------------
+    //
+    // Thin host-keyed surface that `SubdomainAllocator` + future code paths
+    // talk to. ADDITIVE — the legacy `ensureWorkSubdomain` / `removeWorkSubdomain`
+    // methods above stay unchanged and the existing call sites
+    // (`EverWorksDnsService.ensureWorkSubdomain` → `applyEverWorksSubdomain`)
+    // keep behaving bit-for-bit.
+
+    /**
+     * Idempotent create-or-update for any host the caller specifies.
+     * Generalizes `ensureWorkSubdomain` (which is restricted to slug-shaped
+     * hosts under the managed `rootDomain`) to arbitrary hosts + A/CNAME.
+     */
+    async ensureRecord(input: DnsEnsureRecordInput): Promise<DnsRecordSnapshotContract> {
+        this.assertHost(input.host);
+        const proxied = input.proxied ?? false;
+        const ttl = input.ttl ?? 1;
+        const existing = await this.findRecord(input.host, input.type);
+        if (existing) {
+            if (existing.content === input.target && existing.type === input.type) {
+                this.logger.log(
+                    `CloudflareDns ${input.type} already in sync ${input.host} -> ${input.target}`,
+                );
+                return existing as DnsRecordSnapshotContract;
+            }
+            const updated = await this.patchAnyRecord(existing.id, {
+                type: input.type,
+                name: input.host,
+                content: input.target,
+                proxied,
+                ttl,
+            });
+            this.logger.log(
+                `CloudflareDns ${input.type} updated ${input.host}: was ${existing.content} now ${input.target}`,
+            );
+            return updated;
+        }
+        const created = await this.createAnyRecord({
+            type: input.type,
+            name: input.host,
+            content: input.target,
+            proxied,
+            ttl,
+        });
+        this.logger.log(`CloudflareDns ${input.type} created ${input.host} -> ${input.target}`);
+        return created;
+    }
+
+    /** Idempotent delete for any host. No-op when the record does not exist. */
+    async removeRecord(input: DnsRemoveRecordInput): Promise<void> {
+        this.assertHost(input.host);
+        const existing = await this.findRecord(input.host, input.type);
+        if (!existing) {
+            return;
+        }
+        await this.deleteRecord(existing.id);
+        this.logger.log(
+            `CloudflareDns ${existing.type} deleted ${input.host} (id=${existing.id})`,
+        );
+    }
+
+    /**
+     * Uniqueness probe — `true` iff any A/CNAME record exists for `host` in
+     * the managed zone, regardless of who owns it. Used by
+     * `SubdomainAllocator` to detect collisions before persisting a claim.
+     */
+    async recordExists(host: string): Promise<boolean> {
+        this.assertHost(host);
+        // Probe CNAME first (the common case for managed subdomains), then A.
+        const cname = await this.findRecord(host, 'CNAME');
+        if (cname) return true;
+        const a = await this.findRecord(host, 'A');
+        return a !== null;
+    }
+
+    /** Zone root domain managed by this provider (e.g. `'ever.works'`). */
+    rootDomain(): string {
+        return this.config.rootDomain;
+    }
+
     // Internal helpers ------------------------------------------------------
 
     private assertSlug(slug: string): void {
@@ -131,14 +224,67 @@ export class CloudflareDnsProvider {
         }
     }
 
-    private async findRecord(name: string): Promise<DnsRecordSnapshot | null> {
+    /**
+     * EW-735 — validate an arbitrary FQDN. Stricter than `assertSlug`
+     * because the host may contain dots (label.label.tld). Each label
+     * follows the same slug-shaped rule as `assertSlug`.
+     */
+    private assertHost(host: string): void {
+        const trimmed = host.trim().toLowerCase();
+        if (trimmed.length === 0 || trimmed.length > 253) {
+            throw new Error(`Invalid host for Cloudflare DNS: ${host}`);
+        }
+        const labelRe = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+        for (const label of trimmed.split('.')) {
+            if (!labelRe.test(label) || label.length > 63) {
+                throw new Error(`Invalid host for Cloudflare DNS: ${host}`);
+            }
+        }
+    }
+
+    private async findRecord(
+        name: string,
+        type: DnsRecordType = 'CNAME',
+    ): Promise<DnsRecordSnapshot | null> {
         const url = new URL(`${this.baseUrl}/zones/${this.config.zoneId}/dns_records`);
         url.searchParams.set('name', name);
-        url.searchParams.set('type', 'CNAME');
-        const json = await this.request<{ result: DnsRecordSnapshot[] }>(url.toString(), {
-            method: 'GET',
-        });
-        return json.result[0] ?? null;
+        url.searchParams.set('type', type);
+        const json = await this.request<{ result: (DnsRecordSnapshot & { type: DnsRecordType })[] }>(
+            url.toString(),
+            { method: 'GET' },
+        );
+        return (json.result[0] ?? null) as DnsRecordSnapshot | null;
+    }
+
+    private async createAnyRecord(payload: {
+        type: DnsRecordType;
+        name: string;
+        content: string;
+        proxied: boolean;
+        ttl: number;
+    }): Promise<DnsRecordSnapshotContract> {
+        const json = await this.request<{ result: DnsRecordSnapshotContract }>(
+            `${this.baseUrl}/zones/${this.config.zoneId}/dns_records`,
+            { method: 'POST', body: JSON.stringify(payload) },
+        );
+        return json.result;
+    }
+
+    private async patchAnyRecord(
+        id: string,
+        payload: {
+            type: DnsRecordType;
+            name: string;
+            content: string;
+            proxied: boolean;
+            ttl: number;
+        },
+    ): Promise<DnsRecordSnapshotContract> {
+        const json = await this.request<{ result: DnsRecordSnapshotContract }>(
+            `${this.baseUrl}/zones/${this.config.zoneId}/dns_records/${id}`,
+            { method: 'PUT', body: JSON.stringify(payload) },
+        );
+        return json.result;
     }
 
     private async createRecord(payload: {

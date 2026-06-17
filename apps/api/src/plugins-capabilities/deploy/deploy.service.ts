@@ -25,7 +25,10 @@ import {
     WorkRuntimeEnvService,
     ZeroFrictionFunnelService,
 } from '@ever-works/agent/services';
-import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
+import {
+    EverWorksDnsService,
+    SubdomainAllocator,
+} from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -118,8 +121,24 @@ export class DeployService {
         private readonly webhookSecretService: WebhookSecretService,
         private readonly workRuntimeEnvService: WorkRuntimeEnvService,
         private readonly dnsService: EverWorksDnsService,
+        private readonly subdomainAllocator: SubdomainAllocator,
         private readonly funnel: ZeroFrictionFunnelService,
     ) {}
+
+    /**
+     * EW-734 — feature flag gating the collision-safe managed-subdomain
+     * extension to the k8s deploy path. When OFF (default), the legacy
+     * `applyEverWorksSubdomain` runs as today and the 7 already-deployed
+     * k8s Works see zero behavior change. When ON, the deploy path ALSO
+     * allocates+persists a unique `*.ever.works` for `deployProvider='k8s'`
+     * via `SubdomainAllocator` and uses it as the Ingress host.
+     *
+     * Read once via the getter — `process.env` mutations between calls
+     * (test setups) are respected without touching DI.
+     */
+    private get isManagedSubdomainForK8sEnabled(): boolean {
+        return process.env.EW734_K8S_MANAGED_SUBDOMAIN === 'true';
+    }
 
     /**
      * Optional fields that target a preview or scheduled deploy. When all are
@@ -204,7 +223,7 @@ export class DeployService {
         // the user's directory is reachable at that subdomain without any
         // manual DNS. If env vars are missing the DNS service no-ops; the
         // k8s plugin's default LB hostname remains the fallback.
-        const deploySettings = await this.applyEverWorksSubdomain(work, settings);
+        const deploySettings = await this.applyManagedSubdomain(work, settings);
         await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
@@ -464,6 +483,78 @@ export class DeployService {
 
     private async setVariable(ctx: RepoContext, key: string, value: string) {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
+    }
+
+    /**
+     * EW-734 — additive wrapper around the legacy `applyEverWorksSubdomain`.
+     *
+     * Always runs the legacy path FIRST (zero behavior change for the
+     * `'ever-works'` provider and for `'k8s'` deploys whose `work.website`
+     * is set). Then, when the `EW734_K8S_MANAGED_SUBDOMAIN` env flag is ON,
+     * runs the collision-safe `SubdomainAllocator` extension for k8s
+     * Works that do NOT already have a derived ingress host. The flag is
+     * OFF by default so the 7 already-deployed k8s Works (`dir`,
+     * `mcpserver`, `vectordb`, `timetrack`, `chairs`, `startup-books`,
+     * `compliance-automation`) see exactly today's behavior; operators opt
+     * in per environment.
+     *
+     * Returns the merged settings (with `ingressHost` set when applicable).
+     * Never throws — DNS / allocator failures are logged and the deploy
+     * proceeds with the legacy fallback.
+     */
+    private async applyManagedSubdomain(
+        work: Work,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | undefined> {
+        // (1) Legacy behavior — unchanged. This handles ever-works deploys
+        // (CNAME + ingressHost) and k8s deploys with an explicit website.
+        const legacy = await this.applyEverWorksSubdomain(work, settings);
+
+        // (2) Gated extension — only fires for k8s + flag ON + no host
+        // already resolved by the legacy path. When OFF, this is a no-op
+        // and the legacy result is returned unchanged.
+        if (!this.isManagedSubdomainForK8sEnabled) {
+            return legacy;
+        }
+        if (work.deployProvider !== 'k8s') {
+            return legacy;
+        }
+        if (legacy && typeof legacy === 'object' && 'ingressHost' in legacy) {
+            // The legacy path already resolved a host from `work.website`.
+            // Respect it (spec §4.4: an explicit user-set host wins).
+            return legacy;
+        }
+
+        try {
+            const allocation = await this.subdomainAllocator.allocate(work);
+            // Fire-and-forget DNS record creation, matching the legacy
+            // ever-works path's behavior (errors log but never abort).
+            const provider = this.dnsService.getProvider();
+            if (provider) {
+                void provider
+                    .ensureRecord({
+                        host: allocation.fqdn,
+                        type: 'CNAME',
+                        target: process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME?.trim() ?? '',
+                        proxied: false,
+                        ttl: 1,
+                    })
+                    .catch((cause) => {
+                        this.logger.error(
+                            `EW-734 k8s managed-subdomain ensureRecord failed for ${allocation.fqdn}: ${(cause as Error).message}`,
+                        );
+                    });
+            }
+            return {
+                ...(legacy ?? {}),
+                ingressHost: allocation.fqdn,
+            };
+        } catch (cause) {
+            this.logger.error(
+                `EW-734 k8s managed-subdomain allocation failed for work ${work.id}: ${(cause as Error).message}`,
+            );
+            return legacy;
+        }
     }
 
     /**
