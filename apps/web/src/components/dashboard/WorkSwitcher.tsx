@@ -1,6 +1,13 @@
 'use client';
 
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, {
+    useDeferredValue,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+} from 'react';
 import {
     Combobox,
     ComboboxButton,
@@ -385,7 +392,9 @@ export function WorkSwitcher() {
                                                         label={displayLabel}
                                                         badgeClassName={statusStyle.badge}
                                                         isGenerating={isItemGenerating}
-                                                        showWarningIcon={isItemGeneratedWithWarnings}
+                                                        showWarningIcon={
+                                                            isItemGeneratedWithWarnings
+                                                        }
                                                         work={work}
                                                     />
 

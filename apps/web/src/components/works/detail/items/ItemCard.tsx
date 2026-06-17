@@ -274,7 +274,7 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
 
     return (
         <HoverPopup
-trigger={(ref, props) => (
+            trigger={(ref, props) => (
                 <span
                     ref={ref as RefObject<HTMLSpanElement>}
                     {...props}
@@ -297,7 +297,9 @@ trigger={(ref, props) => (
                 {/* Title row */}
                 <div className="flex items-center gap-2 px-3 py-2">
                     <AlertTriangle className="h-3.5 w-3.5 text-text-secondary dark:text-zinc-400 shrink-0" />
-                    <span className="text-xs font-semibold text-text dark:text-zinc-200">{label}</span>
+                    <span className="text-xs font-semibold text-text dark:text-zinc-200">
+                        {label}
+                    </span>
                 </div>
 
                 {/* Divider */}

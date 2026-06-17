@@ -40,7 +40,6 @@ const formatDate = (date: string, locale: string) => {
     });
 };
 
-
 interface StatusBadgeProps {
     work: Work;
     statusConfig: ReturnType<typeof getGenerationStatusConfig>;
@@ -49,7 +48,13 @@ interface StatusBadgeProps {
     baseStatusLabel: string;
 }
 
-function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLabel }: StatusBadgeProps) {
+function StatusBadge({
+    work,
+    statusConfig,
+    isOpening,
+    isGenerating,
+    baseStatusLabel,
+}: StatusBadgeProps) {
     const t = useTranslations('dashboard.workCard');
 
     const generationError = work.generateStatus?.error;
@@ -57,8 +62,13 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
     const errorMessage = generationError ?? syncError;
 
     const warnings = work.generateStatus?.warnings;
-    const isError = statusConfig.labelKey === 'error' && !!errorMessage && !isGenerating && !isOpening;
-    const isWarning = statusConfig.labelKey === 'generatedWithWarnings' && !!warnings?.length && !isGenerating && !isOpening;
+    const isError =
+        statusConfig.labelKey === 'error' && !!errorMessage && !isGenerating && !isOpening;
+    const isWarning =
+        statusConfig.labelKey === 'generatedWithWarnings' &&
+        !!warnings?.length &&
+        !isGenerating &&
+        !isOpening;
     const hasPopup = isError || isWarning;
 
     const showSyncErrorBadge =
@@ -80,14 +90,19 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
         </>
     );
 
-
     return (
         <>
             {hasPopup ? (
                 <HoverPopup
                     stopNavigation
                     trigger={(ref, props) => (
-                        <span ref={ref as RefObject<HTMLSpanElement>} {...props} role="button" tabIndex={0} className={badgeClasses}>
+                        <span
+                            ref={ref as RefObject<HTMLSpanElement>}
+                            {...props}
+                            role="button"
+                            tabIndex={0}
+                            className={badgeClasses}
+                        >
                             {badgeContent}
                         </span>
                     )}

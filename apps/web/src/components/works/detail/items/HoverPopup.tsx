@@ -35,7 +35,7 @@ interface TriggerProps {
 }
 
 const MARGIN = 8; // minimum gap from viewport edges
-const GAP = 6;    // gap between trigger and popup
+const GAP = 6; // gap between trigger and popup
 
 /**
  * Generic hover/touch popup that renders its content in a React portal so it
@@ -121,7 +121,9 @@ export function HoverPopup({
     }, [isOpen]);
 
     useEffect(() => {
-        return () => { if (closeTimer.current) clearTimeout(closeTimer.current); };
+        return () => {
+            if (closeTimer.current) clearTimeout(closeTimer.current);
+        };
     }, []);
 
     const openPopup = useCallback(() => {
@@ -137,11 +139,18 @@ export function HoverPopup({
         if (closeTimer.current) clearTimeout(closeTimer.current);
     }, []);
 
-    const handleToggle = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        e.stopPropagation();
-        if (stopNavigation) e.preventDefault();
-        if (isOpen) { setIsOpen(false); } else { openPopup(); }
-    }, [isOpen, openPopup, stopNavigation]);
+    const handleToggle = useCallback(
+        (e: React.MouseEvent | React.TouchEvent) => {
+            e.stopPropagation();
+            if (stopNavigation) e.preventDefault();
+            if (isOpen) {
+                setIsOpen(false);
+            } else {
+                openPopup();
+            }
+        },
+        [isOpen, openPopup, stopNavigation],
+    );
 
     const triggerProps: TriggerProps = {
         onMouseEnter: openPopup,
