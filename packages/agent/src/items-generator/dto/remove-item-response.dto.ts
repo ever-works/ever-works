@@ -1,3 +1,5 @@
+import type { ItemGenerationErrorCode } from './submit-item-response.dto';
+
 export interface RemoveItemResponseDto {
     status: 'success' | 'error' | 'pending';
     slug: string;
@@ -9,4 +11,6 @@ export interface RemoveItemResponseDto {
     pr_title?: string;
     pr_body?: string;
     pr_branch_name?: string;
+    /** Structured error code for client-side actionable messaging */
+    error_code?: ItemGenerationErrorCode;
 }
