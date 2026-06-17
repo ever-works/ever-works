@@ -39,23 +39,39 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
 
     useEffect(() => {
         let cancelled = false;
-        getWorkRuntimeEnv(work.id).then((result) => {
-            if (cancelled) return;
-            if (result.success) {
-                setDatabaseUrl(result.databaseUrl);
-                setManaged(result.managed);
-                setLoadError(null);
-            } else {
+        getWorkRuntimeEnv(work.id)
+            .then((result) => {
+                if (cancelled) return;
+                if (result.success) {
+                    setDatabaseUrl(result.databaseUrl);
+                    setManaged(result.managed);
+                    setLoadError(null);
+                } else {
+                    // Server-reported failure: mark databaseUrl as
+                    // "unknown-configured" (configured=false, masked=null) and
+                    // surface the error. We deliberately suppress the
+                    // "Not configured" copy + disable Save while `loadError`
+                    // is set so the user cannot accidentally overwrite an
+                    // existing DATABASE_URL when the load merely failed.
+                    setDatabaseUrl({ configured: false, masked: null });
+                    setLoadError(result.error ?? 'Failed to load runtime env');
+                }
+            })
+            .catch((err: unknown) => {
+                if (cancelled) return;
+                // Transport-level rejection (network, JSON parse, redirect).
+                // Without this catch the promise rejects unhandled and the
+                // component stays stuck on the loading spinner forever.
                 setDatabaseUrl({ configured: false, masked: null });
-                setLoadError(result.error ?? 'Failed to load runtime env');
-            }
-        });
+                setLoadError(err instanceof Error ? err.message : 'Failed to load runtime env');
+            });
         return () => {
             cancelled = true;
         };
     }, [work.id]);
 
     const isLoading = databaseUrl === null;
+    const hasLoadError = loadError !== null;
 
     const handleSave = () => {
         const next = value.trim();
@@ -96,6 +112,14 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                             <p className="break-all font-mono text-xs text-foreground">
                                 {databaseUrl.masked}
                             </p>
+                        ) : hasLoadError ? (
+                            // Don't claim "Not configured" when we never
+                            // successfully read the value — the server may
+                            // actually have a DATABASE_URL set; we just
+                            // failed to retrieve it.
+                            <p className="text-xs text-muted-foreground">
+                                Current value unavailable — retry to view or change it.
+                            </p>
                         ) : (
                             <p className="text-xs text-muted-foreground">
                                 Not configured — DB-backed features (logins, submissions, favorites)
@@ -108,10 +132,14 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                                 placeholder="postgresql://user:password@host/db"
                                 value={value}
                                 onChange={(e) => setValue(e.target.value)}
-                                disabled={isPending}
+                                disabled={isPending || hasLoadError}
                                 className="font-mono text-xs"
                             />
-                            <Button onClick={handleSave} disabled={isPending || !value.trim()} size="sm">
+                            <Button
+                                onClick={handleSave}
+                                disabled={isPending || hasLoadError || !value.trim()}
+                                size="sm"
+                            >
                                 {isPending ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
