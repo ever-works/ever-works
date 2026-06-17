@@ -9,7 +9,8 @@ import type {
     DeploymentDomain,
     AddDomainResult,
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, isDnsProvider } from '@ever-works/plugin';
+import type { IDnsProvider } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
@@ -578,7 +579,93 @@ export class DeployFacadeService implements IDeployFacade {
             await this.promoteVerifiedDomainWebsite(work, result.domain);
         }
 
+        // EW-741 — in BYO Cloudflare mode (user-scoped DNS plugin with the
+        // required settings present), also create the custom-domain DNS
+        // record in the user's zone. Best-effort: a failure here logs but
+        // never fails the request — matches the fire-and-forget pattern the
+        // managed subdomain uses today. When the user is on operator-managed
+        // DNS (no user-scoped plugin settings) this is a no-op so existing
+        // behavior is preserved (custom-domain DNS stays guidance-only).
+        void this.ensureCustomDomainRecordBestEffort(domain, options).catch((cause) => {
+            this.logger.warn(
+                `EW-741 BYO custom-domain ensureRecord failed for ${domain}: ${(cause as Error).message}`,
+            );
+        });
+
         return result;
+    }
+
+    /**
+     * EW-741 — best-effort: create a DNS record for a newly-added custom
+     * domain in the user's own DNS zone, when a user-scoped DNS plugin is
+     * resolvable for them. The plugin must:
+     *   - declare the four `dns-*` capabilities (full `IDnsProvider` shape),
+     *   - have user-scoped settings present for `(userId, workId)` — this is
+     *     the operator-managed → BYO discriminator. The operator-managed
+     *     `EverWorksDnsService` is wired at the agent level (not the plugin
+     *     registry) so it never enters this branch.
+     *
+     * The LB hostname is read from `EVER_WORKS_DEPLOY_LB_HOSTNAME` (same env
+     * the managed subdomain CNAME uses). When unset, this is a no-op — we'd
+     * have nothing meaningful to point the record at.
+     */
+    private async ensureCustomDomainRecordBestEffort(
+        domain: string,
+        options: DeployFacadeOptions,
+    ): Promise<void> {
+        const lbTarget = process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME?.trim() ?? '';
+        if (!lbTarget) {
+            return;
+        }
+        const dnsProviders = this.registry
+            .getByCapability('dns-ensure-record')
+            .filter((p) => p.state === 'loaded');
+        for (const registered of dnsProviders) {
+            const plugin = registered.plugin;
+            if (!isDnsProvider(plugin as IDnsProvider)) {
+                continue;
+            }
+            let userSettings: Record<string, unknown> = {};
+            try {
+                userSettings = await this.settingsService.getSettings(plugin.id, {
+                    userId: options.userId,
+                    workId: options.workId,
+                    includeSecrets: true,
+                });
+            } catch {
+                continue;
+            }
+            // BYO discriminator: the user must have actively configured this
+            // plugin (any non-empty setting). A plugin with no user-scoped
+            // settings is operator-managed only and must not be used for
+            // per-user custom-domain DNS.
+            const hasUserConfig = Object.values(userSettings).some(
+                (value) => value !== undefined && value !== null && value !== '',
+            );
+            if (!hasUserConfig) {
+                continue;
+            }
+            const proxied =
+                typeof userSettings.proxied === 'boolean' ? userSettings.proxied : false;
+            try {
+                await (plugin as IDnsProvider).ensureRecord({
+                    host: domain,
+                    type: 'CNAME',
+                    target: lbTarget,
+                    proxied,
+                });
+                this.logger.log(
+                    `EW-741 BYO custom-domain CNAME ensured for ${domain} via ${plugin.id}`,
+                );
+            } catch (cause) {
+                this.logger.warn(
+                    `EW-741 BYO custom-domain ensureRecord failed for ${domain} via ${plugin.id}: ${(cause as Error).message}`,
+                );
+            }
+            // Stop after the first resolvable user-scoped DNS plugin — we
+            // never fan-out across multiple zones for a single custom domain.
+            return;
+        }
     }
 
     private async findProviderDomain(

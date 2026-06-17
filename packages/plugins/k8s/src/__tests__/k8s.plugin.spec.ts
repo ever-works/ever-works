@@ -306,6 +306,49 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 			expect(v).not.toContain('kind: Config');
 		}
 	});
+
+	// EW-741 — additional Ingress hosts (custom domains) ride alongside the
+	// managed subdomain via `K8S_EXTRA_HOSTS`. The plugin dedupes against the
+	// primary, lowercases, drops blanks, and only emits the secret when there
+	// is something to say — so existing single-host Works see zero secret
+	// churn.
+	it('emits K8S_EXTRA_HOSTS (comma-separated, deduped against ingressHost) when extraHosts present', async () => {
+		const out = await plugin.getDeploymentSecrets({
+			ingressHost: 'managed.example.com',
+			extraHosts: ['foo.example.com', 'bar.example.com', 'managed.example.com', 'FOO.example.com']
+		});
+		expect(out.K8S_INGRESS_HOST).toBe('managed.example.com');
+		expect(out.K8S_EXTRA_HOSTS).toBe('foo.example.com,bar.example.com');
+	});
+
+	it('does NOT emit K8S_EXTRA_HOSTS when the array is empty or absent', async () => {
+		const noExtras = await plugin.getDeploymentSecrets({
+			ingressHost: 'managed.example.com'
+		});
+		expect(noExtras.K8S_EXTRA_HOSTS).toBeUndefined();
+		const emptyArray = await plugin.getDeploymentSecrets({
+			ingressHost: 'managed.example.com',
+			extraHosts: []
+		});
+		expect(emptyArray.K8S_EXTRA_HOSTS).toBeUndefined();
+	});
+
+	it('does NOT emit K8S_EXTRA_HOSTS when every extraHost duplicates the primary', async () => {
+		const out = await plugin.getDeploymentSecrets({
+			ingressHost: 'managed.example.com',
+			extraHosts: ['managed.example.com', '  MANAGED.example.com  ', '']
+		});
+		expect(out.K8S_EXTRA_HOSTS).toBeUndefined();
+	});
+
+	it('drops non-string entries in extraHosts silently', async () => {
+		const out = await plugin.getDeploymentSecrets({
+			ingressHost: 'managed.example.com',
+			// Simulates a malformed settings blob that slipped through.
+			extraHosts: ['ok.example.com', null as unknown as string, 42 as unknown as string]
+		});
+		expect(out.K8S_EXTRA_HOSTS).toBe('ok.example.com');
+	});
 });
 
 describe('KubernetesPlugin.getWorkflowFilenames', () => {
