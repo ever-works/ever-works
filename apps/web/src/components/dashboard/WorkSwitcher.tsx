@@ -427,29 +427,39 @@ function WorkStatusBadge({
     const isWarn = showWarningIcon && !errorMessage;
     const hasPopup = !isGenerating && work && (!!errorMessage || !!warnings?.length);
 
-    const badgeEl = (ref?: React.RefObject<HTMLElement | null>, props?: Record<string, unknown>) => (
-        <span
-            ref={ref as React.RefObject<HTMLSpanElement> | undefined}
-            {...props}
-            className={cn(
-                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
-                badgeClassName,
-                isGenerating && 'animate-pulse',
-                className,
-            )}
-        >
+    const badgeClassName_ = cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
+        badgeClassName,
+        isGenerating && 'animate-pulse',
+        className,
+    );
+
+    const badgeChildren = (
+        <>
             {isGenerating ? <ShinyText text={label} /> : label}
             {showWarningIcon && <AlertTriangle className="h-3 w-3" />}
-        </span>
+        </>
     );
 
     if (!hasPopup || !work) {
-        return badgeEl();
+        return <span className={badgeClassName_}>{badgeChildren}</span>;
     }
 
     return (
         <HoverPopup
-            trigger={(ref, props) => badgeEl(ref, props)}
+            trigger={(ref, props) => (
+                <span
+                    ref={ref as React.RefObject<HTMLSpanElement>}
+                    onMouseEnter={props.onMouseEnter}
+                    onMouseLeave={props.onMouseLeave}
+                    onClick={props.onClick}
+                    onTouchEnd={props.onTouchEnd}
+                    aria-expanded={props['aria-expanded']}
+                    className={badgeClassName_}
+                >
+                    {badgeChildren}
+                </span>
+            )}
         >
             <WorkErrorPopup
                 workId={work.id}
