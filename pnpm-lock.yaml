@@ -192,8 +192,8 @@ importers:
         specifier: ^5.10.1
         version: 5.10.1
       multer:
-        specifier: '>=2.1.1'
-        version: 2.1.1
+        specifier: ^2.2.0
+        version: 2.2.0
       mysql2:
         specifier: ^3.16.0
         version: 3.17.1
@@ -15510,6 +15510,10 @@ packages:
     resolution: {integrity: sha512-mo+QTzKlx8R7E5ylSXxWzGoXoZbOsRMpyitcht8By2KHvMbf3tjwosZ/Mu/XYU6UuJ3VZnODIrak5ZrPiPyB6A==}
     engines: {node: '>= 10.16.0'}
 
+  multer@2.2.0:
+    resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
+    engines: {node: '>= 10.16.0'}
+
   multicast-dns@7.2.5:
     resolution: {integrity: sha512-2eznPJP8z2BFLX50tf0LuODrpINqP1RVIm/CObbTcBRITQgmC/TjcREF1NeTBzIcR5XO/ukWo+YHOjBbFwIupg==}
     hasBin: true
@@ -27043,7 +27047,7 @@ snapshots:
       '@nestjs/passport': 11.0.5(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(passport@0.7.0)
       cookie-parser: 1.4.7
       express: 5.2.1
-      multer: 2.1.1
+      multer: 2.2.0
       passport: 0.7.0
       passport-azure-ad-oauth2: 0.0.4
       passport-github: 1.1.0
@@ -36031,6 +36035,13 @@ snapshots:
     optional: true
 
   multer@2.1.1:
+    dependencies:
+      append-field: 1.0.0
+      busboy: 1.6.0
+      concat-stream: 2.0.0
+      type-is: 1.6.18
+
+  multer@2.2.0:
     dependencies:
       append-field: 1.0.0
       busboy: 1.6.0
