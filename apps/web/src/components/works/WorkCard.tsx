@@ -97,6 +97,7 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
                         message={isError ? errorMessage : null}
                         warnings={isWarning ? warnings : undefined}
                         isWarn={isWarning}
+                        updatedAt={work.updatedAt}
                     />
                 </HoverPopup>
             ) : (
@@ -120,7 +121,11 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
                         </span>
                     )}
                 >
-                    <WorkErrorPopup workId={work.id} message={syncError} />
+                    <WorkErrorPopup
+                        workId={work.id}
+                        message={syncError}
+                        updatedAt={work.platformSyncLastErrorAt ?? work.updatedAt}
+                    />
                 </HoverPopup>
             )}
         </>

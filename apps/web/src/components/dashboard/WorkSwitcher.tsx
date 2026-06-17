@@ -466,6 +466,7 @@ function WorkStatusBadge({
                 message={errorMessage}
                 warnings={isWarn ? warnings : undefined}
                 isWarn={isWarn}
+                updatedAt={work.platformSyncLastErrorAt ?? work.updatedAt}
             />
         </HoverPopup>
     );
