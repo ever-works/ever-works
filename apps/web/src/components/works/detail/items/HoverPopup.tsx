@@ -18,6 +18,11 @@ interface HoverPopupProps {
     /** Extra classes on the popup wrapper */
     popupClassName?: string;
     /**
+     * Popup pixel width — must match the CSS width class on the popup so the
+     * collision-avoidance logic keeps it inside the viewport. Default 288 (w-72).
+     */
+    popupWidth?: number;
+    /**
      * When true, clicking the trigger also calls `e.preventDefault()`.
      * Use this when the trigger lives inside an `<a>` / `<Link>` to prevent
      * card navigation when the user clicks the badge.
@@ -47,7 +52,7 @@ interface TriggerProps {
  * </HoverPopup>
  * ```
  */
-export function HoverPopup({ trigger, children, popupClassName, stopNavigation = false }: HoverPopupProps) {
+export function HoverPopup({ trigger, children, popupClassName, popupWidth = 288, stopNavigation = false }: HoverPopupProps) {
     const triggerRef = useRef<HTMLElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
     const [isOpen, setIsOpen] = useState(false);
@@ -58,16 +63,15 @@ export function HoverPopup({ trigger, children, popupClassName, stopNavigation =
         const el = triggerRef.current;
         if (!el) return null;
         const rect = el.getBoundingClientRect();
-        const popupW = 280;
-        const popupH = 120;
+        const popupH = 160;
         const gap = 8;
-        const left = Math.min(rect.left, window.innerWidth - popupW - 8);
+        const left = Math.max(8, Math.min(rect.left, window.innerWidth - popupWidth - 8));
         const openAbove = rect.top >= popupH + gap;
         return {
             top: openAbove ? rect.top - popupH - gap : rect.bottom + gap,
             left,
         };
-    }, []);
+    }, [popupWidth]);
 
     const openPopup = useCallback(() => {
         if (closeTimer.current) clearTimeout(closeTimer.current);

@@ -8,7 +8,7 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api/work';
 import { WorkMemberRole, WorkScheduleStatus, WorkScheduleCadence } from '@/lib/api/enums';
-import { Github, Users, FolderClosed, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Github, Users, FolderClosed, AlertTriangle, AlertCircle, ArrowRight } from 'lucide-react';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
 import { ShinyText } from '../ui/ShinyText';
@@ -50,11 +50,8 @@ interface StatusBadgeProps {
 function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLabel }: StatusBadgeProps) {
     const t = useTranslations('dashboard.workCard');
 
-    // Primary error: generation failure. Secondary: config-sync failure from
-    // activity log (works_config.sync_failed → platformSyncLastErrorMessage).
     const generationError = work.generateStatus?.error;
     const syncError = work.platformSyncLastErrorMessage ?? null;
-    // Use whichever error is most recent / most specific.
     const errorMessage = generationError ?? syncError;
 
     const warnings = work.generateStatus?.warnings;
@@ -62,83 +59,84 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
     const isWarning = statusConfig.labelKey === 'generatedWithWarnings' && !!warnings?.length && !isGenerating && !isOpening;
     const hasPopup = isError || isWarning;
 
-    // Separate badge shown when generation looks fine but the config sync failed.
-    // This surfaces `works_config.sync_failed` errors even when the last
-    // generation succeeded (e.g. provider_changed mid-schedule).
     const showSyncErrorBadge =
-        !isError &&
-        !isGenerating &&
-        !isOpening &&
-        !!syncError &&
-        statusConfig.labelKey !== 'error';
+        !isError && !isGenerating && !isOpening && !!syncError && statusConfig.labelKey !== 'error';
 
+    // Badge classes match the original exactly — no cursor/underline changes
     const badgeClasses = cn(
         'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0',
         isOpening
             ? 'bg-primary/15 text-primary dark:bg-white/12 dark:text-white'
             : statusConfig.badge,
         isGenerating && 'animate-pulse bg-gray-100',
-        hasPopup && 'cursor-help underline decoration-dotted underline-offset-2',
     );
 
     const badgeContent = (
         <>
-            {isGenerating || isOpening ? (
-                <ShinyText text={baseStatusLabel} />
-            ) : (
-                baseStatusLabel
-            )}
-            {(isWarning || isError) && (
-                <AlertTriangle className="w-3 h-3" />
-            )}
+            {isGenerating || isOpening ? <ShinyText text={baseStatusLabel} /> : baseStatusLabel}
+            {(isWarning || isError) && <AlertTriangle className="w-3 h-3" />}
         </>
     );
 
-    const popupContent = (
-        <>
-            {/* Header */}
-            <div className="flex items-center gap-1.5">
-                {isError ? (
-                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                )}
+    const activityHref = ROUTES.DASHBOARD_WORK_ACTIVITY(work.id);
+
+    const ErrorPopup = ({ message, isWarn = false }: { message?: string | null; isWarn?: boolean }) => (
+        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-950 shadow-xl shadow-zinc-200/60 dark:shadow-zinc-950/80">
+            {/* Colored header band */}
+            <div className={cn(
+                'flex items-center gap-2 px-3.5 py-2.5 border-b',
+                isWarn
+                    ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-800/40'
+                    : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-800/40',
+            )}>
+                {isWarn
+                    ? <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    : <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                }
                 <span className={cn(
-                    'text-xs font-semibold',
-                    isError ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300',
+                    'text-[11px] font-semibold tracking-wide',
+                    isWarn ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300',
                 )}>
-                    {isError ? t('statusPopup.errorTitle') : t('statusPopup.warningsTitle')}
+                    {isWarn ? t('statusPopup.warningsTitle') : t('statusPopup.errorTitle')}
                 </span>
             </div>
 
-            {/* Error message (generation error or config-sync error) */}
-            {isError && errorMessage && (
-                <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed wrap-break-word">
-                    {errorMessage}
-                </p>
-            )}
+            {/* Body */}
+            <div className="px-3.5 py-3 flex flex-col gap-3">
+                {/* Message or warnings list */}
+                {message && !isWarn && (
+                    <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400 wrap-break-word">
+                        {message}
+                    </p>
+                )}
+                {isWarn && warnings && (
+                    <ul className="flex flex-col gap-1">
+                        {warnings.map((w, i) => (
+                            <li key={i} className="flex gap-2 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                                <span className={cn('shrink-0 mt-px', isWarn ? 'text-amber-400' : 'text-red-400')}>•</span>
+                                {w}
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
-            {/* Warnings list */}
-            {isWarning && warnings && (
-                <ul className="flex flex-col gap-1">
-                    {warnings.map((w, i) => (
-                        <li key={i} className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed flex gap-1.5">
-                            <span className="text-amber-500 shrink-0 mt-px">•</span>
-                            {w}
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {/* Activity log link */}
-            <a
-                href={ROUTES.DASHBOARD_WORK_ACTIVITY(work.id)}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline underline-offset-2 mt-0.5"
-            >
-                {t('statusPopup.viewDetails')}
-            </a>
-        </>
+                {/* CTA button */}
+                <a
+                    href={activityHref}
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                        'inline-flex items-center justify-between gap-2 w-full',
+                        'px-3 py-1.5 rounded-lg text-[11px] font-medium',
+                        'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300',
+                        'hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-white',
+                        'transition-colors duration-150',
+                    )}
+                >
+                    {t('statusPopup.viewDetails')}
+                    <ArrowRight className="w-3 h-3 shrink-0" />
+                </a>
+            </div>
+        </div>
     );
 
     return (
@@ -146,66 +144,40 @@ function StatusBadge({ work, statusConfig, isOpening, isGenerating, baseStatusLa
             {hasPopup ? (
                 <HoverPopup
                     stopNavigation
+                    popupWidth={300}
                     trigger={(ref, props) => (
-                        <span
-                            ref={ref as RefObject<HTMLSpanElement>}
-                            {...props}
-                            role="button"
-                            tabIndex={0}
-                            className={badgeClasses}
-                        >
+                        <span ref={ref as RefObject<HTMLSpanElement>} {...props} role="button" tabIndex={0} className={badgeClasses}>
                             {badgeContent}
                         </span>
                     )}
-                    popupClassName={cn(
-                        'w-72 rounded-lg shadow-xl p-3 flex flex-col gap-2',
-                        'bg-white dark:bg-zinc-900',
-                        isError
-                            ? 'border border-red-200 dark:border-red-800'
-                            : 'border border-amber-200 dark:border-amber-800',
-                    )}
+                    popupClassName="w-[300px]"
                 >
-                    {popupContent}
+                    <ErrorPopup message={isError ? errorMessage : null} isWarn={isWarning} />
                 </HoverPopup>
             ) : (
                 <span className={badgeClasses}>{badgeContent}</span>
             )}
 
-            {/* Config-sync error badge — visible when generation is OK but
-                works_config.sync_failed fired (e.g. provider_changed). */}
+            {/* Config-sync error badge — when generation is OK but works_config.sync_failed */}
             {showSyncErrorBadge && (
                 <HoverPopup
                     stopNavigation
+                    popupWidth={300}
                     trigger={(ref, props) => (
                         <span
                             ref={ref as RefObject<HTMLSpanElement>}
                             {...props}
                             role="button"
                             tabIndex={0}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0 cursor-help underline decoration-dotted underline-offset-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                         >
                             <AlertCircle className="w-3 h-3" />
                             {t('statusPopup.syncErrorLabel')}
                         </span>
                     )}
-                    popupClassName="w-72 rounded-lg shadow-xl p-3 flex flex-col gap-2 bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-800"
+                    popupClassName="w-[300px]"
                 >
-                    <div className="flex items-center gap-1.5">
-                        <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-                        <span className="text-xs font-semibold text-red-700 dark:text-red-300">
-                            {t('statusPopup.syncErrorTitle')}
-                        </span>
-                    </div>
-                    <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed wrap-break-word">
-                        {syncError}
-                    </p>
-                    <a
-                        href={ROUTES.DASHBOARD_WORK_ACTIVITY(work.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline underline-offset-2 mt-0.5"
-                    >
-                        {t('statusPopup.viewDetails')}
-                    </a>
+                    <ErrorPopup message={syncError} />
                 </HoverPopup>
             )}
         </>
