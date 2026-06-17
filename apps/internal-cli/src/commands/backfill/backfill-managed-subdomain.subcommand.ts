@@ -24,7 +24,7 @@
  * When to run
  * -----------
  *  - One-off after migration `1780800000000-AddWorkManagedSubdomain` has
- *    deployed and BEFORE flipping `EW734_K8S_MANAGED_SUBDOMAIN=true` in
+ *    deployed and BEFORE flipping `K8S_MANAGED_SUBDOMAIN=true` in
  *    production. Idempotent + safe to re-run.
  *
  * Required env (read via the same channel as the API/agent providers):

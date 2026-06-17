@@ -147,7 +147,7 @@ export class DeployService {
      * (test setups) are respected without touching DI.
      */
     private get isManagedSubdomainForK8sEnabled(): boolean {
-        return process.env.EW734_K8S_MANAGED_SUBDOMAIN === 'true';
+        return process.env.K8S_MANAGED_SUBDOMAIN === 'true';
     }
 
     /**
@@ -500,7 +500,7 @@ export class DeployService {
      *
      * Always runs the legacy path FIRST (zero behavior change for the
      * `'ever-works'` provider and for `'k8s'` deploys whose `work.website`
-     * is set). Then, when the `EW734_K8S_MANAGED_SUBDOMAIN` env flag is ON,
+     * is set). Then, when the `K8S_MANAGED_SUBDOMAIN` env flag is ON,
      * runs the collision-safe `SubdomainAllocator` extension for k8s
      * Works that do NOT already have a derived ingress host. The flag is
      * OFF by default so the 7 already-deployed k8s Works (`dir`,

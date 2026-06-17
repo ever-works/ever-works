@@ -49,7 +49,7 @@ describe('ManagedSubdomainService', () => {
         process.env = {
             ...originalEnv,
             EVER_WORKS_DEPLOY_LB_HOSTNAME: 'lb.ever.works',
-            EW734_K8S_MANAGED_SUBDOMAIN: 'false',
+            K8S_MANAGED_SUBDOMAIN: 'false',
             EVER_WORKS_DOMAIN: 'ever.works',
         };
         workRepository = {
@@ -132,15 +132,15 @@ describe('ManagedSubdomainService', () => {
             expect(result.editable).toBe(false);
         });
 
-        it('sets editable=true for k8s only when EW734_K8S_MANAGED_SUBDOMAIN=true', async () => {
+        it('sets editable=true for k8s only when K8S_MANAGED_SUBDOMAIN=true', async () => {
             workRepository.findById.mockResolvedValue(
                 buildWork({ deployProvider: 'k8s', managedSubdomain: 'my-site' }),
             );
 
-            process.env.EW734_K8S_MANAGED_SUBDOMAIN = 'false';
+            process.env.K8S_MANAGED_SUBDOMAIN = 'false';
             expect((await service.getState('work-1')).editable).toBe(false);
 
-            process.env.EW734_K8S_MANAGED_SUBDOMAIN = 'true';
+            process.env.K8S_MANAGED_SUBDOMAIN = 'true';
             expect((await service.getState('work-1')).editable).toBe(true);
         });
 

@@ -176,7 +176,7 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         // typeless stub is fine.
         const workRuntimeEnvService = {};
         // 13th DI arg added by EW-737 — collision-safe subdomain allocator.
-        // The k8s managed-subdomain path is gated by EW734_K8S_MANAGED_SUBDOMAIN
+        // The k8s managed-subdomain path is gated by K8S_MANAGED_SUBDOMAIN
         // (default OFF), and these tests don't enable it, so a typeless stub
         // is fine.
         const subdomainAllocator = {};

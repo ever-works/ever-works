@@ -1290,7 +1290,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         });
 
         it('preserves extraHosts when the EW-734 allocator runs (flag ON)', async () => {
-            process.env.EW734_K8S_MANAGED_SUBDOMAIN = 'true';
+            process.env.K8S_MANAGED_SUBDOMAIN = 'true';
             process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
             try {
                 const ensureRecord = jest.fn().mockResolvedValue(undefined);
@@ -1328,7 +1328,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 expect(byKey.K8S_INGRESS_HOST).toBe('fresh.ever.works');
                 expect(byKey.K8S_EXTRA_HOSTS).toBe('tools.example.com');
             } finally {
-                delete process.env.EW734_K8S_MANAGED_SUBDOMAIN;
+                delete process.env.K8S_MANAGED_SUBDOMAIN;
                 delete process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME;
             }
         });

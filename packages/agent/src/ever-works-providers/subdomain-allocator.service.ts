@@ -17,7 +17,7 @@ import type { IDnsOperations } from '@ever-works/plugin';
  * `SubdomainAllocator` is an **additive** service that fixes all three
  * without touching the existing path. It is consumed by the new
  * `applyManagedSubdomain` extension (gated behind the
- * `EW734_K8S_MANAGED_SUBDOMAIN` env flag — see `deploy.service.ts`). When
+ * `K8S_MANAGED_SUBDOMAIN` env flag — see `deploy.service.ts`). When
  * the flag is OFF — which it is by default in this PR — the legacy
  * `applyEverWorksSubdomain` runs untouched and this service is unused.
  *

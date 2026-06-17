@@ -15,7 +15,7 @@ import { ApiProperty } from '@nestjs/swagger';
  *   - `editable` — `true` when the caller can re-allocate; gated on
  *     `work.deployProvider ∈ {'ever-works','k8s'}` (the only providers that
  *     run through `applyManagedSubdomain`) AND, for k8s, on the
- *     `EW734_K8S_MANAGED_SUBDOMAIN` env flag being active so the operator
+ *     `K8S_MANAGED_SUBDOMAIN` env flag being active so the operator
  *     opt-in is respected.
  *
  * `PUT /api/deploy/works/:id/subdomain` validates `UpdateSubdomainDto` per

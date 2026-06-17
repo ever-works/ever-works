@@ -37,7 +37,7 @@ export interface SubdomainState {
     /**
      * `true` iff the caller can re-allocate via `PUT`. Gated on
      * `work.deployProvider ∈ {'ever-works','k8s'}` AND, for k8s, the
-     * `EW734_K8S_MANAGED_SUBDOMAIN` env flag being active so operator
+     * `K8S_MANAGED_SUBDOMAIN` env flag being active so operator
      * opt-in is respected.
      */
     readonly editable: boolean;
@@ -279,7 +279,7 @@ export class ManagedSubdomainService {
     /**
      * Editable iff the deploy provider is one that runs through
      * `applyManagedSubdomain`. For `'k8s'` we additionally require the
-     * `EW734_K8S_MANAGED_SUBDOMAIN` flag so operators opt-in per env —
+     * `K8S_MANAGED_SUBDOMAIN` flag so operators opt-in per env —
      * matches the gate in `DeployService.isManagedSubdomainForK8sEnabled`.
      * `'ever-works'` is always managed.
      */
@@ -289,7 +289,7 @@ export class ManagedSubdomainService {
             return true;
         }
         if (provider === 'k8s') {
-            return process.env.EW734_K8S_MANAGED_SUBDOMAIN === 'true';
+            return process.env.K8S_MANAGED_SUBDOMAIN === 'true';
         }
         return false;
     }
