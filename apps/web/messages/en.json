@@ -3140,6 +3140,26 @@
                     "dnsName": "Name:",
                     "dnsValue": "Value:",
                     "copyButton": "Copy"
+                },
+                "subdomain": {
+                    "title": "Site URL / Subdomain",
+                    "description": "Your default, managed address on ever.works. Custom domains can be added below.",
+                    "loading": "Loading subdomain…",
+                    "loadFailed": "Failed to load subdomain",
+                    "loadFailedHint": "Current subdomain unavailable — retry to view or change it.",
+                    "notAllocated": "No managed subdomain yet — it will be allocated on the next deploy.",
+                    "currentLabel": "Current address",
+                    "openLink": "Open {url}",
+                    "pendingDnsBadge": "DNS propagating",
+                    "liveBadge": "Live",
+                    "editLabel": "Change subdomain",
+                    "placeholder": "my-directory",
+                    "saveButton": "Save",
+                    "saveSuccess": "Subdomain updated.",
+                    "saveFailed": "Failed to update subdomain",
+                    "invalidFormat": "Use 3-63 lowercase letters, digits, or hyphens (cannot start or end with a hyphen).",
+                    "helperSuffix": ".ever.works",
+                    "readonlyHint": "Managed subdomain is read-only for this Work."
                 }
             },
             "kb": {

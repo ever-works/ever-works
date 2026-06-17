@@ -175,7 +175,12 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         // service. No deploy path under test reads/writes runtime env, so a
         // typeless stub is fine.
         const workRuntimeEnvService = {};
-        // 13th DI arg — zero-friction funnel telemetry. Stub emit() so
+        // 13th DI arg added by EW-737 — collision-safe subdomain allocator.
+        // The k8s managed-subdomain path is gated by K8S_MANAGED_SUBDOMAIN
+        // (default OFF), and these tests don't enable it, so a typeless stub
+        // is fine.
+        const subdomainAllocator = {};
+        // 14th DI arg — zero-friction funnel telemetry. Stub emit() so
         // calls during a successful deploy don't blow up.
         const funnel = { emit: jest.fn().mockResolvedValue(undefined) };
 
@@ -197,7 +202,10 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
             webhookSecretService as any,
             workRuntimeEnvService as any,
             dnsService as any,
+            subdomainAllocator as any,
             funnel as any,
+            // EW-741 customDomainRepository is optional — these e2e tests don't
+            // exercise custom-domain reconciliation, so leave it undefined.
         );
 
         const restoreEnv = () => {

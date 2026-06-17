@@ -445,6 +445,29 @@ export class Work {
     @Column({ type: 'text', nullable: true })
     deployDatabaseUrlEncrypted?: string | null;
 
+    /**
+     * EW-734 / EW-736 — globally-unique persisted managed subdomain claim.
+     *
+     * Stores the leftmost label (e.g. `'ai-coding'`) of the Work's
+     * `*.ever.works` hostname. The DB-level partial unique index (created
+     * by migration `1780800000000-AddWorkManagedSubdomain`,
+     * `WHERE "managedSubdomain" IS NOT NULL`) is the backstop that turns
+     * `SubdomainAllocator`'s collision-detect-and-suffix algorithm into a
+     * race-safe claim. NULL until a Work is allocated a managed subdomain
+     * (the default for existing rows — fully backward-compatible with the
+     * legacy `${slug}.ever.works` derivation, which keeps working).
+     *
+     * `type: 'varchar'` + explicit `nullable: true` are required for the
+     * `string | null` union — TypeORM's reflect-metadata fallback infers
+     * `Object` for unions, which the better-sqlite3 test adapter rejects
+     * with `DataTypeNotSupportedError`. Same pattern as
+     * `deployDatabaseUrlEncrypted` above.
+     *
+     * See `docs/specs/features/cloudflare-dns-plugin/spec.md` §4.3 / §5.
+     */
+    @Column({ type: 'varchar', length: 63, nullable: true })
+    managedSubdomain?: string | null;
+
     // Pull-mode observability — drives the degraded banner UX.
     @TimestampColumn({ nullable: true })
     platformSyncLastSuccessAt?: Date | null;

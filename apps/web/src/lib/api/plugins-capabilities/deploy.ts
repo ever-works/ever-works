@@ -106,6 +106,32 @@ export interface RuntimeEnvState {
 
 export type RuntimeEnvResponseDto = APIResponse<RuntimeEnvState>;
 
+/**
+ * EW-740 — per-Work managed subdomain ("Site URL / Subdomain") state surfaced
+ * by `GET /api/deploy/works/:id/subdomain`. See `docs/specs/features/cloudflare-dns-plugin/spec.md`
+ * section 4.5 ("Per-Work subdomain UI") for the contract.
+ *
+ * - `subdomain` — bare label (e.g. `acme`); `null` when no managed subdomain
+ *   has been allocated yet (Work hasn't deployed on a managed-subdomain provider).
+ * - `fqdn` — fully-qualified hostname (e.g. `acme.ever.works`); `null` when
+ *   `subdomain` is `null`.
+ * - `url` — full `https://${fqdn}` for direct linking; `null` when `fqdn` is `null`.
+ * - `recordOk` — DNS record exists and points at the expected target. When
+ *   `false` the UI should avoid presenting the URL as a verified live link.
+ * - `editable` — `true` when the user is allowed to change the subdomain
+ *   (owner/editor with a managed-subdomain provider). When `false` the UI
+ *   shows the value read-only.
+ */
+export interface SubdomainState {
+    subdomain: string | null;
+    fqdn: string | null;
+    url: string | null;
+    recordOk: boolean;
+    editable: boolean;
+}
+
+export type SubdomainResponseDto = APIResponse<SubdomainState>;
+
 export const deployAPI = {
     // Get available deployment providers
     getProviders: async () => {
@@ -225,6 +251,32 @@ export const deployAPI = {
             // Security: encode workId to prevent path-segment injection
             endpoint: `/deploy/works/${encodeURIComponent(workId)}/runtime-env`,
             data: { databaseUrl },
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * EW-740 — get the per-Work managed subdomain state (label, fqdn, url,
+     * recordOk, editable). Returns nullable fields when no managed subdomain
+     * has been allocated.
+     */
+    getSubdomain(workId: string) {
+        // Security: encode workId to prevent path-segment injection
+        return serverFetch<SubdomainResponseDto>(
+            `/deploy/works/${encodeURIComponent(workId)}/subdomain`,
+        );
+    },
+
+    /**
+     * EW-740 — set the per-Work managed subdomain. The API validates the
+     * subdomain format (`SLUG_RE`) and uniqueness, allocates a DNS record,
+     * and returns the updated `SubdomainState`.
+     */
+    setSubdomain(workId: string, subdomain: string) {
+        return serverMutation<SubdomainResponseDto>({
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/subdomain`,
+            data: { subdomain },
             method: 'PUT',
             wrapInData: false,
         });

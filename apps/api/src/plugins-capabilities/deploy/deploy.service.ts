@@ -11,7 +11,11 @@ import {
     GitFacadeService,
     PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
 } from '@ever-works/agent/facades';
-import { WorkRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
+import {
+    WorkRepository,
+    WorkDeploymentRepository,
+    WorkCustomDomainRepository,
+} from '@ever-works/agent/database';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
 import {
     Work,
@@ -25,7 +29,7 @@ import {
     WorkRuntimeEnvService,
     ZeroFrictionFunnelService,
 } from '@ever-works/agent/services';
-import { EverWorksDnsService } from '@ever-works/agent/ever-works-providers';
+import { EverWorksDnsService, SubdomainAllocator } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -118,8 +122,33 @@ export class DeployService {
         private readonly webhookSecretService: WebhookSecretService,
         private readonly workRuntimeEnvService: WorkRuntimeEnvService,
         private readonly dnsService: EverWorksDnsService,
+        private readonly subdomainAllocator: SubdomainAllocator,
         private readonly funnel: ZeroFrictionFunnelService,
+        // EW-741 — reconcile managed subdomain with `WorkCustomDomain` rows.
+        // Both must be served by the Ingress simultaneously: the managed
+        // subdomain stays as the primary host, and every active custom
+        // domain is appended as an additional Ingress rule via the
+        // `extraHosts` settings field. Optional in DI so legacy test
+        // fixtures that construct DeployService directly (without the
+        // custom-domain repo wired) keep working — the merge code treats
+        // a missing repo as "no extras".
+        private readonly customDomainRepository?: WorkCustomDomainRepository,
     ) {}
+
+    /**
+     * EW-734 — feature flag gating the collision-safe managed-subdomain
+     * extension to the k8s deploy path. When OFF (default), the legacy
+     * `applyEverWorksSubdomain` runs as today and the 7 already-deployed
+     * k8s Works see zero behavior change. When ON, the deploy path ALSO
+     * allocates+persists a unique `*.ever.works` for `deployProvider='k8s'`
+     * via `SubdomainAllocator` and uses it as the Ingress host.
+     *
+     * Read once via the getter — `process.env` mutations between calls
+     * (test setups) are respected without touching DI.
+     */
+    private get isManagedSubdomainForK8sEnabled(): boolean {
+        return process.env.K8S_MANAGED_SUBDOMAIN === 'true';
+    }
 
     /**
      * Optional fields that target a preview or scheduled deploy. When all are
@@ -204,7 +233,7 @@ export class DeployService {
         // the user's directory is reachable at that subdomain without any
         // manual DNS. If env vars are missing the DNS service no-ops; the
         // k8s plugin's default LB hostname remains the fallback.
-        const deploySettings = await this.applyEverWorksSubdomain(work, settings);
+        const deploySettings = await this.applyManagedSubdomain(work, settings);
         await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
@@ -464,6 +493,187 @@ export class DeployService {
 
     private async setVariable(ctx: RepoContext, key: string, value: string) {
         return this.setActionVariable({ key, value, owner: ctx.owner, repo: ctx.repo }, ctx.token);
+    }
+
+    /**
+     * EW-734 — additive wrapper around the legacy `applyEverWorksSubdomain`.
+     *
+     * Always runs the legacy path FIRST (zero behavior change for the
+     * `'ever-works'` provider and for `'k8s'` deploys whose `work.website`
+     * is set). Then, when the `K8S_MANAGED_SUBDOMAIN` env flag is ON,
+     * runs the collision-safe `SubdomainAllocator` extension for k8s
+     * Works that do NOT already have a derived ingress host. The flag is
+     * OFF by default so the 7 already-deployed k8s Works (`dir`,
+     * `mcpserver`, `vectordb`, `timetrack`, `chairs`, `startup-books`,
+     * `compliance-automation`) see exactly today's behavior; operators opt
+     * in per environment.
+     *
+     * Returns the merged settings (with `ingressHost` set when applicable).
+     * Never throws — DNS / allocator failures are logged and the deploy
+     * proceeds with the legacy fallback.
+     */
+    private async applyManagedSubdomain(
+        work: Work,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | undefined> {
+        // (1) Legacy behavior — unchanged. This handles ever-works deploys
+        // (CNAME + ingressHost) and k8s deploys with an explicit website.
+        const legacy = await this.applyEverWorksSubdomain(work, settings);
+
+        // (1a) EW-741 — reconcile with custom domains. The managed subdomain
+        // (whatever `applyEverWorksSubdomain` produced, or the persisted
+        // `work.managedSubdomain` resolved below) is the PRIMARY/default host.
+        // Every active `WorkCustomDomain` row is appended as an additional
+        // Ingress rule via `extraHosts`. The managed subdomain is never
+        // removed — adding a custom domain is purely additive (spec §4.6).
+        const mergedAfterLegacy = await this.mergeCustomDomainHosts(work, legacy);
+
+        // (2) Gated extension — only fires for k8s + flag ON + no host
+        // already resolved by the legacy path. When OFF, this is a no-op
+        // and the merged-with-custom-domains result is returned unchanged.
+        if (!this.isManagedSubdomainForK8sEnabled) {
+            return mergedAfterLegacy;
+        }
+        if (work.deployProvider !== 'k8s') {
+            return mergedAfterLegacy;
+        }
+        // A non-empty string `ingressHost` in the merged result means the
+        // legacy path resolved a host (today: from `work.website` for k8s).
+        // Respect it (spec §4.4: an explicit user-set host wins). An
+        // empty/whitespace value falls through — Greptile P2 / Augment medium:
+        // prior version would skip allocation on any presence of the key,
+        // including empty.
+        if (
+            mergedAfterLegacy &&
+            typeof mergedAfterLegacy === 'object' &&
+            'ingressHost' in mergedAfterLegacy
+        ) {
+            const existing = (mergedAfterLegacy as Record<string, unknown>).ingressHost;
+            if (typeof existing === 'string' && existing.trim().length > 0) {
+                return mergedAfterLegacy;
+            }
+        }
+
+        // Provider + LB target pre-checks. Greptile P1 + Augment medium:
+        // calling `ensureRecord` with an empty `content` left the Work with a
+        // persisted `managedSubdomain` and an Ingress pointing at a host that
+        // resolves to nothing. Bail BEFORE allocate() so we never persist a
+        // claim we can't back with a real CNAME.
+        const provider = this.dnsService.getProvider();
+        const lbTarget = process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME?.trim() ?? '';
+        if (!provider || !lbTarget) {
+            this.logger.debug(
+                `EW-734 k8s managed-subdomain skipped for work ${work.id}: ` +
+                    `provider=${provider ? 'ok' : 'missing'} lbTarget=${lbTarget ? 'ok' : 'missing'}; falling back to legacy host`,
+            );
+            return mergedAfterLegacy;
+        }
+
+        try {
+            const allocation = await this.subdomainAllocator.allocate(work);
+            // Fire-and-forget DNS record creation, matching the legacy
+            // ever-works path's behavior (errors log but never abort).
+            void provider
+                .ensureRecord({
+                    host: allocation.fqdn,
+                    type: 'CNAME',
+                    target: lbTarget,
+                    proxied: false,
+                    ttl: 1,
+                })
+                .catch((cause) => {
+                    this.logger.error(
+                        `EW-734 k8s managed-subdomain ensureRecord failed for ${allocation.fqdn}: ${(cause as Error).message}`,
+                    );
+                });
+            // EW-741 — when the allocator wins, the previously-merged
+            // `extraHosts` (custom domains) must still travel alongside the
+            // newly-allocated managed subdomain. We re-dedupe against the
+            // fresh ingressHost so the primary host never appears twice.
+            const next: Record<string, unknown> = {
+                ...(mergedAfterLegacy ?? {}),
+                ingressHost: allocation.fqdn,
+            };
+            const merged = mergedAfterLegacy as Record<string, unknown> | undefined;
+            const prior = Array.isArray(merged?.extraHosts) ? (merged.extraHosts as string[]) : [];
+            const deduped = this.dedupeExtraHosts(prior, allocation.fqdn);
+            if (deduped.length > 0) {
+                next.extraHosts = deduped;
+            } else {
+                delete next.extraHosts;
+            }
+            return next;
+        } catch (cause) {
+            this.logger.error(
+                `EW-734 k8s managed-subdomain allocation failed for work ${work.id}: ${(cause as Error).message}`,
+            );
+            return mergedAfterLegacy;
+        }
+    }
+
+    /**
+     * EW-741 — merge `WorkCustomDomain` rows for this Work into the deploy
+     * settings as `extraHosts`. The managed subdomain (current `ingressHost`)
+     * is always retained as the primary host; custom domains never replace it.
+     *
+     * Idempotent and side-effect free against the input — returns a shallow
+     * copy (or the original `settings` when there are no custom domains).
+     * Failures are logged and swallowed: a DB hiccup here must not block a
+     * deploy that would otherwise succeed with just the managed subdomain.
+     */
+    private async mergeCustomDomainHosts(
+        work: Work,
+        settings: Record<string, unknown> | undefined,
+    ): Promise<Record<string, unknown> | undefined> {
+        if (!this.customDomainRepository) {
+            return settings;
+        }
+        let domains;
+        try {
+            domains = await this.customDomainRepository.findByWork(work.id);
+        } catch (cause) {
+            this.logger.warn(
+                `EW-741 custom-domain lookup failed for work ${work.id}: ${(cause as Error).message}`,
+            );
+            return settings;
+        }
+        if (!domains || domains.length === 0) {
+            return settings;
+        }
+        const primary =
+            settings && typeof (settings as Record<string, unknown>).ingressHost === 'string'
+                ? ((settings as Record<string, unknown>).ingressHost as string)
+                : undefined;
+        const rawHosts = domains.map((row) => row.domain);
+        const extras = this.dedupeExtraHosts(rawHosts, primary);
+        if (extras.length === 0) {
+            return settings;
+        }
+        return {
+            ...(settings ?? {}),
+            extraHosts: extras,
+        };
+    }
+
+    /**
+     * Lowercase + trim + drop the primary host + dedupe. Shared by the merge
+     * step and the allocator-extension's re-dedupe so the rules stay in one
+     * place.
+     */
+    private dedupeExtraHosts(hosts: readonly string[], primary?: string): string[] {
+        const primaryNormalized = primary?.trim().toLowerCase();
+        const seen = new Set<string>();
+        const out: string[] = [];
+        for (const host of hosts) {
+            if (typeof host !== 'string') continue;
+            const normalized = host.trim().toLowerCase();
+            if (!normalized) continue;
+            if (primaryNormalized && normalized === primaryNormalized) continue;
+            if (seen.has(normalized)) continue;
+            seen.add(normalized);
+            out.push(normalized);
+        }
+        return out;
     }
 
     /**

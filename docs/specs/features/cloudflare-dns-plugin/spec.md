@@ -223,6 +223,26 @@ Subdomain"** card:
 6. Deploy-tab "Site URL / Subdomain" UI.
 7. Custom-domain reconciliation in BYO mode.
 
+### Feature flag
+
+The k8s managed-subdomain extension (step 3 above, for `deployProvider='k8s'`)
+is gated behind a single env flag — **`K8S_MANAGED_SUBDOMAIN`** (default `false`).
+When unset/`false`, the deploy path runs exactly as it does today and the 7
+already-deployed k8s Works see zero behavior change. The `ever-works` provider
+path (step 3 for `deployProvider='ever-works'`) is not gated — it keeps
+running, just goes through the same `applyManagedSubdomain` wrapper as before.
+
+Rollout order in production:
+
+1. Merge + cascade the platform PR with `K8S_MANAGED_SUBDOMAIN` unset.
+2. Run `cli backfill managed-subdomain --dry-run`, review the matched set.
+3. Run `cli backfill managed-subdomain --write` to persist `managedSubdomain`
+   for the existing k8s Works (so the allocator finds the existing claim and
+   doesn't try to re-allocate a new `*.ever.works` for them).
+4. Set `K8S_MANAGED_SUBDOMAIN=true` for the API deployment. New k8s Works
+   from this point on get a unique, persisted `*.ever.works` subdomain
+   end-to-end.
+
 ## 9. Acceptance criteria
 
 - Creating + deploying a new Work to k8s (either provider) yields a working

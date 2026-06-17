@@ -16,6 +16,7 @@ import {
     Mail,
     Bell,
     Boxes,
+    Globe,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -44,6 +45,8 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     'notification-channel': Bell,
     // EW-724 — vector store backends (pgvector, Qdrant, …) for KB embeddings
     'vector-store': Boxes,
+    // EW-735 — DNS plugin category (Cloudflare et al.)
+    dns: Globe,
 };
 
 /**
@@ -67,6 +70,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     'email-provider': 'Email Providers',
     'notification-channel': 'Notification Channels',
     'vector-store': 'Vector Stores',
+    dns: 'DNS Providers',
 };
 
 // Type-safe assertion that all categories are covered
@@ -158,6 +162,7 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'data-source',
     'storage',
     'vector-store',
+    'dns',
     'email-provider',
     'notification-channel',
     'form',
