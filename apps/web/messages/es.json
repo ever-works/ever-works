@@ -1634,14 +1634,7 @@
             "updated": "Actualizado {date}",
             "viewAction": "Ver →",
             "openingTitle": "Abriendo trabajo",
-            "openingMessage": "Preparando su trabajo. Los detalles se abrirán en breve. Permanezca en esta página.",
-            "statusPopup": {
-                "errorTitle": "Generación fallida",
-                "warningsTitle": "Completado con advertencias",
-                "viewDetails": "Ver detalles de generación",
-                "syncErrorLabel": "Error de sincronización",
-                "syncErrorTitle": "Error de sincronización de configuración"
-            }
+            "openingMessage": "Preparando tu trabajo. Los detalles se abrirán en breve. Permanece en esta página."
         },
         "workList": {
             "title": "Tus trabajos",

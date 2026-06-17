@@ -1634,14 +1634,7 @@
             "updated": "עודכן {date}",
             "viewAction": "צפה →",
             "openingTitle": "פותח עבודה",
-            "openingMessage": "מכין את העבודה שלך. הפרטים ייפתחו בקרוב. הישאר בדף זה.",
-            "statusPopup": {
-                "errorTitle": "היצירה נכשלה",
-                "warningsTitle": "הושלם עם אזהרות",
-                "viewDetails": "הצג פרטי יצירה",
-                "syncErrorLabel": "שגיאת סנכרון",
-                "syncErrorTitle": "סנכרון התצורה נכשל"
-            }
+            "openingMessage": "מכין את העבודה שלך. הפרטים ייפתחו בקרוב. נשאר בעמוד זה."
         },
         "workList": {
             "title": "העבודות שלך",

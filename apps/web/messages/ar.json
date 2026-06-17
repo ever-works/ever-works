@@ -1634,14 +1634,7 @@
             "updated": "تم التحديث {date}",
             "viewAction": "عرض →",
             "openingTitle": "فتح العمل",
-            "openingMessage": "جارٍ تحضير عملك. ستُفتح التفاصيل قريبًا. ابقَ في هذه الصفحة.",
-            "statusPopup": {
-                "errorTitle": "فشل الإنشاء",
-                "warningsTitle": "اكتمل مع تحذيرات",
-                "viewDetails": "عرض تفاصيل الإنشاء",
-                "syncErrorLabel": "خطأ في المزامنة",
-                "syncErrorTitle": "فشل مزامنة الإعدادات"
-            }
+            "openingMessage": "جاري إعداد عملك. سيفتح التفاصيل قريبًا. ابقَ على هذه الصفحة."
         },
         "workList": {
             "title": "أعمالك",
