@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, type RefObject } from 'react';
 import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
@@ -9,6 +9,7 @@ import { ExternalLink, Star, Eye, AlertTriangle } from 'lucide-react';
 import { getCategoryName } from '@/lib/utils/items';
 import { ItemActions } from './ItemActions';
 import { useItemsContext } from './ItemsContext';
+import { HoverPopup } from './HoverPopup';
 
 interface ItemCardProps {
     item: ItemData;
@@ -263,20 +264,69 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
 
     const isBroken = item.health.status === 'broken';
     const label = isBroken ? t('brokenLink') : t('needsReview');
+    const detail = item.health.message || label;
+    const checkedAt = item.health.checked_at
+        ? new Date(item.health.checked_at).toLocaleString(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+          })
+        : null;
 
     return (
-        <span
-            className={cn(
-                'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0',
-                isBroken
-                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+        <HoverPopup
+            trigger={(ref, props) => (
+                <span
+                    ref={ref as RefObject<HTMLSpanElement>}
+                    {...props}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                        'inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium shrink-0 cursor-help',
+                        isBroken
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+                    )}
+                >
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    {label}
+                </span>
             )}
-            title={item.health.message || label}
+            popupClassName={cn(
+                'w-64 rounded-lg shadow-xl p-3 flex flex-col gap-1.5',
+                'bg-white dark:bg-zinc-900',
+                isBroken
+                    ? 'border border-red-200 dark:border-red-800'
+                    : 'border border-amber-200 dark:border-amber-800',
+            )}
         >
-            <AlertTriangle className="h-2.5 w-2.5" />
-            {label}
-        </span>
+            {/* Popup header */}
+            <div className="flex items-center gap-1.5">
+                <AlertTriangle
+                    className={cn(
+                        'h-3.5 w-3.5 shrink-0',
+                        isBroken ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400',
+                    )}
+                />
+                <span
+                    className={cn(
+                        'text-xs font-semibold',
+                        isBroken ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300',
+                    )}
+                >
+                    {label}
+                </span>
+            </div>
+
+            {/* Health message */}
+            <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">{detail}</p>
+
+            {/* Last checked timestamp */}
+            {checkedAt && (
+                <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                    {t('sourceChecked')}: {checkedAt}
+                </p>
+            )}
+        </HoverPopup>
     );
 }
 
