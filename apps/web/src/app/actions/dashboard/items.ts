@@ -181,12 +181,14 @@ export async function addItem(workId: string, data: SubmitItemDto) {
             auto_merged: response.auto_merged,
             pr_url: response.pr_url,
             pr_number: response.pr_number,
+            error_code: response.error_code,
         };
     } catch (error) {
         console.error('Add item error:', error);
         return {
             status: 'error' as const,
             message: error instanceof Error ? error.message : t('error'),
+            error_code: 'GENERIC_ERROR' as const,
         };
     }
 }
@@ -220,12 +222,14 @@ export async function removeItem(
             message:
                 response.message ||
                 (response.status === 'success' ? t('deleteSuccess') : t('deleteFailed')),
+            error_code: response.error_code,
         };
     } catch (error) {
         console.error('Remove item error:', error);
         return {
             status: 'error',
             message: error instanceof Error ? error.message : t('deleteError'),
+            error_code: 'GENERIC_ERROR' as const,
         };
     }
 }
@@ -320,12 +324,14 @@ export async function updateItem(workId: string, data: UpdateItemDto) {
                 response.message ||
                 (response.status === 'success' ? t('updateSuccess') : t('updateFailed')),
             item: response,
+            error_code: response.error_code,
         };
     } catch (error) {
         console.error('Update item error:', error);
         return {
             status: 'error',
             message: error instanceof Error ? error.message : t('updateError'),
+            error_code: 'GENERIC_ERROR' as const,
         };
     }
 }
