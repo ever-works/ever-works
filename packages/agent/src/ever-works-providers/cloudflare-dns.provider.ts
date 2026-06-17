@@ -262,10 +262,9 @@ export class CloudflareDnsProvider implements IDnsOperations {
         const url = new URL(`${this.baseUrl}/zones/${this.config.zoneId}/dns_records`);
         url.searchParams.set('name', name);
         url.searchParams.set('type', type);
-        const json = await this.request<{ result: (DnsRecordSnapshot & { type: DnsRecordType })[] }>(
-            url.toString(),
-            { method: 'GET' },
-        );
+        const json = await this.request<{
+            result: (DnsRecordSnapshot & { type: DnsRecordType })[];
+        }>(url.toString(), { method: 'GET' });
         return (json.result[0] ?? null) as DnsRecordSnapshot | null;
     }
 

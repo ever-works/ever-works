@@ -98,9 +98,7 @@ describe('ManagedSubdomainService', () => {
         });
 
         it('returns the allocated shape with recordOk=true when the probe succeeds', async () => {
-            workRepository.findById.mockResolvedValue(
-                buildWork({ managedSubdomain: 'my-site' }),
-            );
+            workRepository.findById.mockResolvedValue(buildWork({ managedSubdomain: 'my-site' }));
 
             const result = await service.getState('work-1');
 
@@ -115,9 +113,7 @@ describe('ManagedSubdomainService', () => {
         });
 
         it('returns recordOk=false (and no throw) when the probe fails', async () => {
-            workRepository.findById.mockResolvedValue(
-                buildWork({ managedSubdomain: 'my-site' }),
-            );
+            workRepository.findById.mockResolvedValue(buildWork({ managedSubdomain: 'my-site' }));
             provider.recordExists.mockRejectedValue(new Error('Cloudflare down'));
 
             const result = await service.getState('work-1');
@@ -150,9 +146,7 @@ describe('ManagedSubdomainService', () => {
 
         it('falls back to env EVER_WORKS_DOMAIN when DNS is not configured', async () => {
             dnsService.getProvider.mockReturnValue(null);
-            workRepository.findById.mockResolvedValue(
-                buildWork({ managedSubdomain: 'my-site' }),
-            );
+            workRepository.findById.mockResolvedValue(buildWork({ managedSubdomain: 'my-site' }));
 
             const result = await service.getState('work-1');
 
@@ -198,9 +192,7 @@ describe('ManagedSubdomainService', () => {
         });
 
         it('rejects blocklisted labels (www, api, app, admin, mail)', async () => {
-            workRepository.findById.mockResolvedValue(
-                buildWork({ deployProvider: 'ever-works' }),
-            );
+            workRepository.findById.mockResolvedValue(buildWork({ deployProvider: 'ever-works' }));
             for (const reserved of ['www', 'api', 'app', 'admin', 'mail']) {
                 await expect(service.update('work-1', reserved)).rejects.toMatchObject({
                     response: {
@@ -219,9 +211,7 @@ describe('ManagedSubdomainService', () => {
         });
 
         it('short-circuits when requested matches current (idempotent rename)', async () => {
-            workRepository.findById.mockResolvedValue(
-                buildWork({ managedSubdomain: 'my-site' }),
-            );
+            workRepository.findById.mockResolvedValue(buildWork({ managedSubdomain: 'my-site' }));
 
             await service.update('work-1', 'my-site');
 

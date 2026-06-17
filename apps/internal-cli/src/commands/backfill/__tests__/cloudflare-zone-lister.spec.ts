@@ -46,7 +46,10 @@ describe('CloudflareApiZoneLister', () => {
             return jsonResponse({ success: false }, 500);
         });
 
-        const lister = new CloudflareApiZoneLister(baseConfig, fetchImpl as unknown as typeof fetch);
+        const lister = new CloudflareApiZoneLister(
+            baseConfig,
+            fetchImpl as unknown as typeof fetch,
+        );
         const records = await lister.listAllRecords();
         expect(records).toHaveLength(3);
         expect(records.map((r) => r.id)).toEqual(['r1', 'r2', 'r3']);
@@ -63,7 +66,10 @@ describe('CloudflareApiZoneLister', () => {
         const fetchImpl = vi.fn(async () =>
             jsonResponse({ success: false, errors: [{ code: 9999, message: 'nope' }] }, 401),
         );
-        const lister = new CloudflareApiZoneLister(baseConfig, fetchImpl as unknown as typeof fetch);
+        const lister = new CloudflareApiZoneLister(
+            baseConfig,
+            fetchImpl as unknown as typeof fetch,
+        );
         await expect(lister.listAllRecords()).rejects.toThrow(/Cloudflare API GET/);
     });
 
@@ -75,7 +81,10 @@ describe('CloudflareApiZoneLister', () => {
                 result_info: { total_pages: 99, page: 1 },
             }),
         );
-        const lister = new CloudflareApiZoneLister(baseConfig, fetchImpl as unknown as typeof fetch);
+        const lister = new CloudflareApiZoneLister(
+            baseConfig,
+            fetchImpl as unknown as typeof fetch,
+        );
         const records = await lister.listAllRecords();
         expect(records).toEqual([]);
         expect(fetchImpl).toHaveBeenCalledTimes(1);

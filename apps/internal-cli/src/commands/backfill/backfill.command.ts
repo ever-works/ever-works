@@ -15,7 +15,9 @@ import { BackfillManagedSubdomainSubCommand } from './backfill-managed-subdomain
 export class BackfillCommand extends CommandRunner {
     async run(): Promise<void> {
         console.log('Available backfill commands:');
-        console.log('  managed-subdomain   - Backfill works.managedSubdomain from Cloudflare (EW-736)');
+        console.log(
+            '  managed-subdomain   - Backfill works.managedSubdomain from Cloudflare (EW-736)',
+        );
         console.log('\nUse "backfill <command> --help" for more information about a command.');
     }
 }

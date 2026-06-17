@@ -242,9 +242,7 @@ describe('CloudflareDnsPlugin', () => {
 		) as unknown as typeof fetch;
 		const plugin = new CloudflareDnsPlugin(failingFetch);
 		await plugin.onLoad(createMockContext(BASE_SETTINGS));
-		await expect(plugin.recordExists('whatever.ever.works')).rejects.toBeInstanceOf(
-			CloudflareDnsPluginError
-		);
+		await expect(plugin.recordExists('whatever.ever.works')).rejects.toBeInstanceOf(CloudflareDnsPluginError);
 	});
 
 	it('rejects invalid host names', async () => {

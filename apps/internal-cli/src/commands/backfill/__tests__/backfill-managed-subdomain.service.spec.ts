@@ -30,7 +30,10 @@ function makeRecord(name: string, type: 'CNAME' | 'A' = 'CNAME'): CloudflareDnsR
     };
 }
 
-function makeLister(records: CloudflareDnsRecord[], rootDomain = 'ever.works'): CloudflareZoneLister {
+function makeLister(
+    records: CloudflareDnsRecord[],
+    rootDomain = 'ever.works',
+): CloudflareZoneLister {
     return {
         listAllRecords: vi.fn(async () => records),
         rootDomain: () => rootDomain,
@@ -234,10 +237,7 @@ describe('BackfillManagedSubdomainService', () => {
     });
 
     it('ignores zone records under a different root domain', async () => {
-        const records = [
-            makeRecord('dir.example.com'),
-            makeRecord('dir.ever.works'),
-        ];
+        const records = [makeRecord('dir.example.com'), makeRecord('dir.ever.works')];
         const works = [makeWork({ id: '11111111-aaaa-bbbb-cccc-dddddddddddd', slug: 'dir' })];
         const cloudflare = makeLister(records, 'ever.works');
         const adapter = makeWorksAdapter(works);

@@ -196,9 +196,7 @@ function SubdomainManagementContent({ work }: SubdomainManagementProps) {
                                                 onChange={(e) =>
                                                     setValue(e.target.value.toLowerCase())
                                                 }
-                                                placeholder={
-                                                    state.subdomain ?? t('placeholder')
-                                                }
+                                                placeholder={state.subdomain ?? t('placeholder')}
                                                 variant="form"
                                                 disabled={isPending}
                                                 autoComplete="off"

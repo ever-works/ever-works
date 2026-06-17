@@ -29,10 +29,7 @@ import {
     WorkRuntimeEnvService,
     ZeroFrictionFunnelService,
 } from '@ever-works/agent/services';
-import {
-    EverWorksDnsService,
-    SubdomainAllocator,
-} from '@ever-works/agent/ever-works-providers';
+import { EverWorksDnsService, SubdomainAllocator } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -546,7 +543,11 @@ export class DeployService {
         // empty/whitespace value falls through — Greptile P2 / Augment medium:
         // prior version would skip allocation on any presence of the key,
         // including empty.
-        if (mergedAfterLegacy && typeof mergedAfterLegacy === 'object' && 'ingressHost' in mergedAfterLegacy) {
+        if (
+            mergedAfterLegacy &&
+            typeof mergedAfterLegacy === 'object' &&
+            'ingressHost' in mergedAfterLegacy
+        ) {
             const existing = (mergedAfterLegacy as Record<string, unknown>).ingressHost;
             if (typeof existing === 'string' && existing.trim().length > 0) {
                 return mergedAfterLegacy;

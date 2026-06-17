@@ -37,7 +37,6 @@ import type { Logger } from '@nestjs/common';
 // pre-built when running unit tests against this service.
 import type { Work } from '@ever-works/agent/entities';
 
-
 /**
  * Minimal Cloudflare DNS record shape returned by
  * `GET /zones/{id}/dns_records`. We only consume the fields needed for

@@ -744,7 +744,11 @@ export class DeployController {
         description: 'Returns the managed *.ever.works subdomain attached to a Work.',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
-    @ApiResponse({ status: 200, description: 'Managed subdomain state', type: SubdomainResponseDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Managed subdomain state',
+        type: SubdomainResponseDto,
+    })
     async getManagedSubdomain(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) id: string,
@@ -770,7 +774,10 @@ export class DeployController {
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Subdomain updated', type: SubdomainResponseDto })
-    @ApiResponse({ status: 400, description: 'Invalid subdomain format / blocklisted / not editable' })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid subdomain format / blocklisted / not editable',
+    })
     @ApiResponse({ status: 409, description: 'Subdomain already claimed by another work' })
     async updateManagedSubdomain(
         @CurrentUser() auth: AuthenticatedUser,

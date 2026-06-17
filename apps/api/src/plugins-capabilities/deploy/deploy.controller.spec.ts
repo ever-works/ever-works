@@ -1449,7 +1449,8 @@ describe('DeployController', () => {
                 managedSubdomainService.update.mockRejectedValue(
                     new BadRequestException({
                         status: 'error',
-                        message: 'Subdomain "www" is reserved by the platform and cannot be claimed.',
+                        message:
+                            'Subdomain "www" is reserved by the platform and cannot be claimed.',
                     }),
                 );
 

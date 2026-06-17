@@ -136,9 +136,7 @@ export class CloudflareDnsPlugin implements IPlugin, IDnsProvider {
 				proxied,
 				ttl
 			});
-			this.log(
-				`Cloudflare DNS ${input.type} updated ${host}: was ${existing.content} now ${input.target}`
-			);
+			this.log(`Cloudflare DNS ${input.type} updated ${host}: was ${existing.content} now ${input.target}`);
 			return updated;
 		}
 		const created = await this.createRecord(settings, {
@@ -197,11 +195,7 @@ export class CloudflareDnsPlugin implements IPlugin, IDnsProvider {
 		const apiToken = (fromContext.apiToken ?? process.env.CLOUDFLARE_API_TOKEN ?? '').trim();
 		const zoneId = (fromContext.zoneId ?? process.env.CLOUDFLARE_ZONE_ID ?? '').trim();
 		const rootDomain = (fromContext.rootDomain ?? process.env.EVER_WORKS_DOMAIN ?? 'ever.works').trim();
-		const targetHostname = (
-			fromContext.targetHostname ??
-			process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME ??
-			''
-		).trim();
+		const targetHostname = (fromContext.targetHostname ?? process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME ?? '').trim();
 		const proxied = fromContext.proxied ?? true;
 
 		if (!apiToken) {
@@ -238,7 +232,9 @@ export class CloudflareDnsPlugin implements IPlugin, IDnsProvider {
 		}
 	}
 
-	private coerceSettings(bag: PluginSettings | Record<string, unknown> | null | undefined): Partial<CloudflareDnsSettings> {
+	private coerceSettings(
+		bag: PluginSettings | Record<string, unknown> | null | undefined
+	): Partial<CloudflareDnsSettings> {
 		if (!bag || typeof bag !== 'object') return {};
 		const record = bag as Record<string, unknown>;
 		const out: Partial<CloudflareDnsSettings> = {};
@@ -308,18 +304,12 @@ export class CloudflareDnsPlugin implements IPlugin, IDnsProvider {
 	}
 
 	private async deleteRecord(settings: CloudflareDnsSettings, id: string): Promise<void> {
-		await this.request(
-			settings,
-			`${this.baseUrlFor(settings)}/zones/${settings.zoneId}/dns_records/${id}`,
-			{ method: 'DELETE' }
-		);
+		await this.request(settings, `${this.baseUrlFor(settings)}/zones/${settings.zoneId}/dns_records/${id}`, {
+			method: 'DELETE'
+		});
 	}
 
-	private async request<T = unknown>(
-		settings: CloudflareDnsSettings,
-		url: string,
-		init: RequestInit
-	): Promise<T> {
+	private async request<T = unknown>(settings: CloudflareDnsSettings, url: string, init: RequestInit): Promise<T> {
 		const response = await this.fetchImpl(url, {
 			...init,
 			headers: {

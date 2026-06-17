@@ -33,50 +33,50 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * Postgres pattern used by other partial-unique indexes in this codebase.
  */
 export class AddWorkManagedSubdomain1780800000000 implements MigrationInterface {
-	name = 'AddWorkManagedSubdomain1780800000000';
+    name = 'AddWorkManagedSubdomain1780800000000';
 
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		if (!(await queryRunner.hasColumn('works', 'managedSubdomain'))) {
-			await queryRunner.addColumn(
-				'works',
-				new TableColumn({
-					name: 'managedSubdomain',
-					type: 'varchar',
-					length: '63',
-					isNullable: true,
-				}),
-			);
-		}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        if (!(await queryRunner.hasColumn('works', 'managedSubdomain'))) {
+            await queryRunner.addColumn(
+                'works',
+                new TableColumn({
+                    name: 'managedSubdomain',
+                    type: 'varchar',
+                    length: '63',
+                    isNullable: true,
+                }),
+            );
+        }
 
-		// Partial unique index — Postgres-style `WHERE` clause. Guarded so
-		// re-runs (idempotency / down-then-up) don't double-create.
-		const driver = queryRunner.connection.options.type;
-		if (driver === 'postgres') {
-			await queryRunner.query(
-				`CREATE UNIQUE INDEX IF NOT EXISTS "UQ_works_managedSubdomain_notnull" ` +
-					`ON "works" ("managedSubdomain") WHERE "managedSubdomain" IS NOT NULL`,
-			);
-		} else {
-			// SQLite (test/CLI adapter) — partial indexes are supported via
-			// the same `WHERE` syntax. Other drivers: skip (the application
-			// layer's `SubdomainAllocator` still does a collision probe before
-			// insert).
-			try {
-				await queryRunner.query(
-					`CREATE UNIQUE INDEX IF NOT EXISTS "UQ_works_managedSubdomain_notnull" ` +
-						`ON "works" ("managedSubdomain") WHERE "managedSubdomain" IS NOT NULL`,
-				);
-			} catch {
-				// Best-effort on non-supporting drivers. The allocator still
-				// guards against races by re-checking after insert.
-			}
-		}
-	}
+        // Partial unique index — Postgres-style `WHERE` clause. Guarded so
+        // re-runs (idempotency / down-then-up) don't double-create.
+        const driver = queryRunner.connection.options.type;
+        if (driver === 'postgres') {
+            await queryRunner.query(
+                `CREATE UNIQUE INDEX IF NOT EXISTS "UQ_works_managedSubdomain_notnull" ` +
+                    `ON "works" ("managedSubdomain") WHERE "managedSubdomain" IS NOT NULL`,
+            );
+        } else {
+            // SQLite (test/CLI adapter) — partial indexes are supported via
+            // the same `WHERE` syntax. Other drivers: skip (the application
+            // layer's `SubdomainAllocator` still does a collision probe before
+            // insert).
+            try {
+                await queryRunner.query(
+                    `CREATE UNIQUE INDEX IF NOT EXISTS "UQ_works_managedSubdomain_notnull" ` +
+                        `ON "works" ("managedSubdomain") WHERE "managedSubdomain" IS NOT NULL`,
+                );
+            } catch {
+                // Best-effort on non-supporting drivers. The allocator still
+                // guards against races by re-checking after insert.
+            }
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		await queryRunner.query(`DROP INDEX IF EXISTS "UQ_works_managedSubdomain_notnull"`);
-		if (await queryRunner.hasColumn('works', 'managedSubdomain')) {
-			await queryRunner.dropColumn('works', 'managedSubdomain');
-		}
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP INDEX IF EXISTS "UQ_works_managedSubdomain_notnull"`);
+        if (await queryRunner.hasColumn('works', 'managedSubdomain')) {
+            await queryRunner.dropColumn('works', 'managedSubdomain');
+        }
+    }
 }

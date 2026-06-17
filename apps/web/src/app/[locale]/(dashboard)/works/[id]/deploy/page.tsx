@@ -133,10 +133,9 @@ export default async function DeployPage({ params }: DeployPageParams) {
              * which the component handles, but we skip the card entirely
              * to avoid wasted requests + UI noise.
              */}
-            {work.id &&
-                (work.deployProvider === 'ever-works' || work.deployProvider === 'k8s') && (
-                    <SubdomainManagement work={work} />
-                )}
+            {work.id && (work.deployProvider === 'ever-works' || work.deployProvider === 'k8s') && (
+                <SubdomainManagement work={work} />
+            )}
             {work.website && <DomainManagement work={work} />}
             {work.website && <RuntimeEnvManagement work={work} />}
         </div>

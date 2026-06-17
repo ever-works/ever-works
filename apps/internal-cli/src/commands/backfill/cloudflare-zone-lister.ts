@@ -9,7 +9,10 @@
  * don't want a `list all` helper bloating its API surface for a one-off.
  */
 
-import type { CloudflareDnsRecord, CloudflareZoneLister } from './backfill-managed-subdomain.service';
+import type {
+    CloudflareDnsRecord,
+    CloudflareZoneLister,
+} from './backfill-managed-subdomain.service';
 
 /**
  * Local error class mirroring the shape of

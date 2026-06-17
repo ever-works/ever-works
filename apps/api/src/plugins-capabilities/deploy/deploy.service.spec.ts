@@ -1267,10 +1267,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             // any plugin that wants to render multi-host TLS directly can.
             const callSettings = getDeploymentSecrets.mock.calls[0][0];
             expect(callSettings.ingressHost).toBe('managed.example.com');
-            expect(callSettings.extraHosts).toEqual([
-                'foo.example.com',
-                'bar.example.com',
-            ]);
+            expect(callSettings.extraHosts).toEqual(['foo.example.com', 'bar.example.com']);
         });
 
         it('omits K8S_EXTRA_HOSTS when no custom domains exist', async () => {
