@@ -13,6 +13,7 @@ import {
     RemoveItemResponseDto,
     UpdateItemDto,
 } from './dto';
+import type { ItemGenerationErrorCode } from './dto/submit-item-response.dto';
 import { format } from 'date-fns';
 import { config as appConfig } from '../config';
 
@@ -24,6 +25,39 @@ export class ItemSubmissionService {
         private readonly gitFacade: GitFacadeService,
         private readonly screenshotFacade: ScreenshotFacadeService,
     ) {}
+
+    /** Infer a structured error code from a thrown exception's message. */
+    private classifyError(error: unknown): ItemGenerationErrorCode {
+        const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+        if (msg.includes('git provider') || msg.includes('git credentials') || msg.includes('no git provider')) {
+            return 'GIT_PROVIDER_NOT_CONFIGURED';
+        }
+        if (msg.includes('authentication') || msg.includes('unauthorized') || msg.includes('invalid token') || msg.includes('401') || msg.includes('403')) {
+            return 'GIT_AUTH_FAILED';
+        }
+        if (msg.includes('repository not found') || msg.includes('repo not found') || msg.includes('not found') && msg.includes('repository')) {
+            return 'GIT_REPO_NOT_CONFIGURED';
+        }
+        if (msg.includes('clone') || msg.includes('could not pull') || msg.includes('cloneorpull')) {
+            return 'GIT_CLONE_FAILED';
+        }
+        if (msg.includes('push')) {
+            return 'GIT_PUSH_FAILED';
+        }
+        if (msg.includes('branch') || msg.includes('switch to main')) {
+            return 'GIT_BRANCH_FAILED';
+        }
+        if (msg.includes('rate limit')) {
+            return 'RATE_LIMIT_EXCEEDED';
+        }
+        if (msg.includes('quota')) {
+            return 'QUOTA_EXCEEDED';
+        }
+        if (msg.includes('ai provider') || msg.includes('openai') || msg.includes('no ai')) {
+            return 'AI_PROVIDER_NOT_CONFIGURED';
+        }
+        return 'GENERIC_ERROR';
+    }
 
     /**
      * Submit a single item to a work's data repo.
@@ -297,6 +331,7 @@ export class ItemSubmissionService {
                 slug: work.slug,
                 item_name: submitItemDto.name,
                 message: error instanceof Error ? error.message : 'An unexpected error occurred',
+                error_code: this.classifyError(error),
             };
         }
     }
@@ -353,6 +388,7 @@ export class ItemSubmissionService {
                     item_name: 'Unknown',
                     item_slug: itemSlug,
                     message: `Item with slug '${itemSlug}' not found`,
+                    error_code: 'ITEM_NOT_FOUND' as const,
                 };
             }
 
@@ -366,6 +402,7 @@ export class ItemSubmissionService {
                     item_name: 'Unknown',
                     item_slug: itemSlug,
                     message: `Failed to retrieve item details for '${itemSlug}'`,
+                    error_code: 'ITEM_NOT_FOUND' as const,
                 };
             }
 
@@ -398,6 +435,7 @@ export class ItemSubmissionService {
                     item_name: itemData.name,
                     item_slug: itemSlug,
                     message: `Failed to remove item '${itemSlug}'`,
+                    error_code: 'GIT_PUSH_FAILED' as const,
                 };
             }
 
@@ -473,6 +511,7 @@ export class ItemSubmissionService {
                 item_name: 'Unknown',
                 item_slug: itemSlug,
                 message: error instanceof Error ? error.message : 'An unexpected error occurred',
+                error_code: this.classifyError(error),
             };
         }
     }
@@ -528,6 +567,7 @@ export class ItemSubmissionService {
                     item_name: 'Unknown',
                     item_slug: itemSlug,
                     message: `Item with slug '${itemSlug}' not found`,
+                    error_code: 'ITEM_NOT_FOUND' as const,
                 };
             }
 
@@ -603,6 +643,7 @@ export class ItemSubmissionService {
                     item_name: 'Unknown',
                     item_slug: itemSlug,
                     message: `Failed to update item '${itemSlug}'`,
+                    error_code: 'GENERIC_ERROR' as const,
                 };
             }
 
@@ -705,6 +746,7 @@ export class ItemSubmissionService {
                 item_name: 'Unknown',
                 item_slug: itemSlug,
                 message: error instanceof Error ? error.message : 'An unexpected error occurred',
+                error_code: this.classifyError(error),
             };
         }
     }
