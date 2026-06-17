@@ -8,6 +8,7 @@ import { DeployTokenAlert } from '@/components/works/detail/deploy/DeployTokenAl
 import { DeployProviderSelector } from '@/components/works/detail/deploy/DeployProviderSelector';
 import { SharedWorkNoTokenAlert } from '@/components/works/detail/deploy/SharedWorkNoTokenAlert';
 import { DomainManagement } from '@/components/works/detail/deploy/DomainManagement';
+import { RuntimeEnvManagement } from '@/components/works/detail/deploy/RuntimeEnvManagement';
 import { DeployProgressPanel } from '@/components/works/detail/deploy/DeployProgressPanel';
 import { canDeploy } from '@/lib/permissions';
 
@@ -122,6 +123,7 @@ export default async function DeployPage({ params }: DeployPageParams) {
             />
             <DeployProgressPanel workId={work.id} isDeploying={isDeploying(work)} />
             {work.website && <DomainManagement work={work} />}
+            {work.website && <RuntimeEnvManagement work={work} />}
         </div>
     );
 }
