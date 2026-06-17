@@ -171,7 +171,11 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         // 10th DI arg added on develop post-EW-616 — Ever Works DNS service.
         // No deploy path under test reaches it, so a typeless stub is fine.
         const dnsService = {};
-        // 10th DI arg — zero-friction funnel telemetry. Stub emit() so
+        // 11th DI arg added on develop post-#1315 — per-Work runtime-env
+        // service. No deploy path under test reads/writes runtime env, so a
+        // typeless stub is fine.
+        const workRuntimeEnvService = {};
+        // 13th DI arg — zero-friction funnel telemetry. Stub emit() so
         // calls during a successful deploy don't blow up.
         const funnel = { emit: jest.fn().mockResolvedValue(undefined) };
 
@@ -191,6 +195,7 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
             eventEmitter,
             platformSyncSecretService as any,
             webhookSecretService as any,
+            workRuntimeEnvService as any,
             dnsService as any,
             funnel as any,
         );
