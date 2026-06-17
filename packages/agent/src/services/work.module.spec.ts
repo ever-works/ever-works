@@ -148,6 +148,7 @@ import { PluginOperationsService } from '../plugins/services/plugin-operations.s
 import { SettingsSchemaValidatorService } from '../plugins/services/settings-schema-validator.service';
 import { PlatformSyncSecretService } from './platform-sync-secret.service';
 import { WebhookSecretService } from './webhook-secret.service';
+import { WorkRuntimeEnvService } from './work-runtime-env.service';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
 import { DeployReadyPollerService } from './deploy-ready-poller.service';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
@@ -224,6 +225,7 @@ describe('WorkModule', () => {
             EverWorksDeployQuotaService,
             PlatformSyncSecretService,
             WebhookSecretService,
+            WorkRuntimeEnvService,
             EverWorksGitProvider,
             EverWorksDnsService,
             ZeroFrictionFunnelService,
@@ -314,7 +316,9 @@ describe('WorkModule', () => {
             // Bumped to 31 with the EW-617 G8 DeployReadyPollerService.
             // Bumped to 32 with WebhookSecretService for per-Work persistent
             // WEBHOOK_SECRET (mirrors PlatformSyncSecretService pattern).
-            expect(meta('exports')).toHaveLength(32);
+            // Bumped to 33 with WorkRuntimeEnvService for the per-Work runtime
+            // DATABASE_URL surface (#1315).
+            expect(meta('exports')).toHaveLength(33);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {
