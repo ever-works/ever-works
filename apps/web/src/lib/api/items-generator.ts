@@ -63,8 +63,6 @@ export interface ItemResponse {
     auto_merged?: boolean;
     /** The created/updated item data (available on success) */
     item?: ItemData;
-    /** Structured error code for client-side actionable error messaging */
-    error_code?: string;
 }
 
 export interface ExtractItemDetailsResponse {

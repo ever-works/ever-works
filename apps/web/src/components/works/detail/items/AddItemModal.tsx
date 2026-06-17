@@ -9,8 +9,6 @@ import { addItem } from '@/app/actions/dashboard/items';
 import { Loader2, Plus } from 'lucide-react';
 import { AddItemForm, ItemFormData } from './AddItemForm';
 import { ItemData } from '@/lib/api/types-only';
-import { GenerationErrorTooltip } from './GenerationErrorTooltip';
-import { resolveErrorCode, type GenerationErrorCode } from '@/lib/items/generation-error-codes';
 
 interface AddItemModalProps {
     workId: string;
@@ -30,10 +28,6 @@ export const AddItemModal = memo(function AddItemModal({
     const t = useTranslations('dashboard.workDetail.items.addModal');
     const [isPending, startTransition] = useTransition();
     const [updateWithPR, setUpdateWithPR] = useState(false);
-    const [inlineError, setInlineError] = useState<{
-        message: string;
-        code: GenerationErrorCode;
-    } | null>(null);
 
     const [formData, setFormData] = useState<ItemFormData>({
         name: '',
@@ -64,8 +58,6 @@ export const AddItemModal = memo(function AddItemModal({
                 return;
             }
 
-            setInlineError(null);
-
             startTransition(async () => {
                 try {
                     const submitData = {
@@ -93,7 +85,6 @@ export const AddItemModal = memo(function AddItemModal({
 
                     if (result.status === 'success') {
                         toast.success(result.message || t('success'));
-                        setInlineError(null);
 
                         // If we have the item data, add it to the list immediately
                         if (result.item && onItemAdded) {
@@ -118,15 +109,10 @@ export const AddItemModal = memo(function AddItemModal({
                             markdown: '',
                         });
                     } else {
-                        const errorMessage = result.message || t('failed');
-                        const code = resolveErrorCode(result.error_code, errorMessage);
-                        setInlineError({ message: errorMessage, code });
-                        toast.error(errorMessage);
+                        toast.error(result.message || t('failed'));
                     }
                 } catch (error) {
-                    const errorMessage = t('error');
-                    setInlineError({ message: errorMessage, code: 'GENERIC_ERROR' });
-                    toast.error(errorMessage);
+                    toast.error(t('error'));
                 }
             });
         },
@@ -149,19 +135,6 @@ export const AddItemModal = memo(function AddItemModal({
                         setUpdateWithPR={setUpdateWithPR}
                         isPending={isPending}
                     />
-
-                    {/* Inline error with hover popup */}
-                    {inlineError && (
-                        <div className="mt-3 flex items-start gap-2 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
-                            <p className="text-sm text-red-700 dark:text-red-300 leading-snug flex-1">
-                                {inlineError.message}
-                            </p>
-                            <GenerationErrorTooltip
-                                errorCode={inlineError.code}
-                                workId={workId}
-                            />
-                        </div>
-                    )}
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3 pt-4 mt-4 border-t border-border dark:border-border-dark">
