@@ -1634,7 +1634,14 @@
             "updated": "Mis à jour {date}",
             "viewAction": "Voir →",
             "openingTitle": "Ouverture du travail",
-            "openingMessage": "Préparation de votre travail. Les détails s’ouvriront sous peu. Restez sur cette page."
+            "openingMessage": "Préparation de votre travail. Les détails s’ouvriront bientôt. Restez sur cette page.",
+            "statusPopup": {
+                "errorTitle": "Génération échouée",
+                "warningsTitle": "Terminé avec des avertissements",
+                "viewDetails": "Voir les détails de génération",
+                "syncErrorLabel": "Erreur de synchronisation",
+                "syncErrorTitle": "Échec de la synchronisation de la configuration"
+            }
         },
         "workList": {
             "title": "Vos travaux",
