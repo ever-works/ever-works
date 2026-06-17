@@ -1523,7 +1523,14 @@
             "updated": "更新于 {date}",
             "viewAction": "查看 →",
             "openingTitle": "正在打开作品",
-            "openingMessage": "正在准备您的作品。详细信息即将打开。请留在此页面。"
+            "openingMessage": "正在准备您的工作。详情即将打开。请留在此页面。",
+            "statusPopup": {
+                "errorTitle": "生成失败",
+                "warningsTitle": "已完成，但有警告",
+                "viewDetails": "查看生成详情",
+                "syncErrorLabel": "同步错误",
+                "syncErrorTitle": "配置同步失败"
+            }
         },
         "workList": {
             "title": "您的作品",

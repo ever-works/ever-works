@@ -1523,7 +1523,14 @@
             "updated": "Bijgewerkt {date}",
             "viewAction": "Bekijken →",
             "openingTitle": "Werk openen",
-            "openingMessage": "Je werk wordt voorbereid. Details openen binnenkort. Blijf op deze pagina."
+            "openingMessage": "Uw werk wordt voorbereid. Details worden binnenkort geopend. Blijf op deze pagina.",
+            "statusPopup": {
+                "errorTitle": "Generatie mislukt",
+                "warningsTitle": "Voltooid met waarschuwingen",
+                "viewDetails": "Generatiedetails bekijken",
+                "syncErrorLabel": "Synchronisatiefout",
+                "syncErrorTitle": "Configuratiesynchronisatie mislukt"
+            }
         },
         "workList": {
             "title": "Jouw werken",

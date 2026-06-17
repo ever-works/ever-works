@@ -1523,7 +1523,14 @@
             "updated": "{date} に更新",
             "viewAction": "表示 →",
             "openingTitle": "ワークを開いています",
-            "openingMessage": "ワークを準備中です。詳細がまもなく開きます。このページに留まってください。"
+            "openingMessage": "作業を準備しています。詳細はまもなく開きます。このページに留まってください。",
+            "statusPopup": {
+                "errorTitle": "生成に失敗しました",
+                "warningsTitle": "警告付きで完了",
+                "viewDetails": "生成の詳細を表示",
+                "syncErrorLabel": "同期エラー",
+                "syncErrorTitle": "設定の同期に失敗しました"
+            }
         },
         "workList": {
             "title": "ワーク",
