@@ -21,3 +21,7 @@ export * from './notification-channel.interface.js';
 export * from './agent-memory.interface.js';
 // EW-642 — pluggable vector-store backends.
 export * from './vector-store.interface.js';
+// EW-734 / EW-735 — pluggable DNS providers (Cloudflare today; BYO Cloudflare
+// + future Route53/etc. via the plugin registry). Additive — does NOT replace
+// the existing `CloudflareDnsProvider` concrete class in @ever-works/agent.
+export * from './dns.interface.js';
