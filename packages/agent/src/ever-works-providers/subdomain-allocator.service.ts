@@ -122,9 +122,24 @@ export class SubdomainAllocator {
 		}
 
 		const probe = dnsOps ?? this.resolveProbe();
-		let candidate = base;
+		const shortId = work.id.replace(/-/g, '').slice(0, 4);
 		for (let attempt = 0; attempt < SubdomainAllocator.MAX_TRIES; attempt++) {
-			if (await this.isCandidateFree(candidate, work.id, rootDomain, probe)) {
+			// Explicit candidate sequence (Greptile P2): the previous version
+			// reused `attempt` as both loop counter and suffix index, which
+			// produced the right strings but was hard to reason about.
+			//   attempt 0 → base
+			//   attempt 1 → base-<shortId>            (mirrors buildRepoName)
+			//   attempt n>1 → base-<shortId>-<n-1 in base36>
+			const candidate =
+				attempt === 0
+					? base
+					: attempt === 1
+						? `${base}-${shortId}`
+						: `${base}-${shortId}-${(attempt - 1).toString(36)}`;
+			if (!(await this.isCandidateFree(candidate, work.id, rootDomain, probe))) {
+				continue;
+			}
+			try {
 				await this.workRepository.update(work.id, { managedSubdomain: candidate });
 				this.logger.log(
 					`SubdomainAllocator allocated ${candidate} for work ${work.id} (attempt ${attempt + 1})`,
@@ -135,20 +150,38 @@ export class SubdomainAllocator {
 					rootDomain,
 					allocated: true,
 				};
-			}
-			// suffix the deterministic shortId — mirrors EverWorksGitProvider.buildRepoName
-			const suffix = `-${work.id.replace(/-/g, '').slice(0, 4)}`;
-			candidate = `${base}${suffix}`;
-			// After the first collision-suffixed candidate, future retries
-			// extend the suffix by re-base36-ing the attempt index, so we
-			// don't loop on the same string.
-			if (attempt >= 1) {
-				candidate = `${base}${suffix}-${attempt.toString(36)}`;
+			} catch (cause) {
+				// Augment medium: concurrent first-deploys can race past the
+				// in-process probe and only collide at the DB partial-unique
+				// index. Retry with the next candidate instead of failing.
+				if (this.isUniqueViolation(cause)) {
+					this.logger.warn(
+						`SubdomainAllocator unique-index race for ${candidate} on work ${work.id}: retrying`,
+					);
+					continue;
+				}
+				throw cause;
 			}
 		}
 		throw new Error(
 			`SubdomainAllocator exhausted ${SubdomainAllocator.MAX_TRIES} candidates for work ${work.id} (base=${base})`,
 		);
+	}
+
+	/**
+	 * Postgres unique-violation detection. Matches TypeORM's `QueryFailedError`
+	 * shape (`driverError.code === '23505'`) and the standard `code` field on
+	 * raw pg errors. SQLite (test adapter) surfaces unique violations with
+	 * `SQLITE_CONSTRAINT_UNIQUE`, also covered.
+	 */
+	private isUniqueViolation(cause: unknown): boolean {
+		if (!cause || typeof cause !== 'object') return false;
+		const err = cause as { code?: string; driverError?: { code?: string }; message?: string };
+		if (err.code === '23505') return true;
+		if (err.driverError?.code === '23505') return true;
+		if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return true;
+		const msg = (err.message ?? '').toLowerCase();
+		return msg.includes('unique constraint') || msg.includes('uq_works_managedsubdomain');
 	}
 
 	// --- helpers --------------------------------------------------------------
@@ -160,11 +193,12 @@ export class SubdomainAllocator {
 	}
 
 	private resolveProbe(): IDnsOperations | null {
-		const provider = this.dnsService.getProvider();
 		// The legacy `CloudflareDnsProvider` implements `IDnsOperations` after
 		// EW-735 (see `cloudflare-dns.provider.ts`). When env vars are missing
 		// (dev / preview), `getProvider()` returns null and we skip the probe.
-		return provider as unknown as IDnsOperations | null;
+		// No type assertion needed — the structural implements relationship
+		// is enforced by `CloudflareDnsProvider implements IDnsOperations`.
+		return this.dnsService.getProvider();
 	}
 
 	private async isCandidateFree(

@@ -150,51 +150,60 @@ export class CloudflareDnsProvider implements IDnsOperations {
      * hosts under the managed `rootDomain`) to arbitrary hosts + A/CNAME.
      */
     async ensureRecord(input: DnsEnsureRecordInput): Promise<DnsRecordSnapshotContract> {
-        this.assertHost(input.host);
+        // Augment low: normalize once and use the normalized form everywhere
+        // so a host that passes validation only after trim/lowercase doesn't
+        // miss an existing record (lookup) or get sent verbatim to Cloudflare.
+        const host = this.normalizeHost(input.host);
         const proxied = input.proxied ?? false;
         const ttl = input.ttl ?? 1;
-        const existing = await this.findRecord(input.host, input.type);
+        const existing = await this.findRecord(host, input.type);
         if (existing) {
             if (existing.content === input.target && existing.type === input.type) {
                 this.logger.log(
-                    `CloudflareDns ${input.type} already in sync ${input.host} -> ${input.target}`,
+                    `CloudflareDns ${input.type} already in sync ${host} -> ${input.target}`,
                 );
                 return existing as DnsRecordSnapshotContract;
             }
             const updated = await this.patchAnyRecord(existing.id, {
                 type: input.type,
-                name: input.host,
+                name: host,
                 content: input.target,
                 proxied,
                 ttl,
             });
             this.logger.log(
-                `CloudflareDns ${input.type} updated ${input.host}: was ${existing.content} now ${input.target}`,
+                `CloudflareDns ${input.type} updated ${host}: was ${existing.content} now ${input.target}`,
             );
             return updated;
         }
         const created = await this.createAnyRecord({
             type: input.type,
-            name: input.host,
+            name: host,
             content: input.target,
             proxied,
             ttl,
         });
-        this.logger.log(`CloudflareDns ${input.type} created ${input.host} -> ${input.target}`);
+        this.logger.log(`CloudflareDns ${input.type} created ${host} -> ${input.target}`);
         return created;
     }
 
-    /** Idempotent delete for any host. No-op when the record does not exist. */
+    /**
+     * Idempotent delete for any host. No-op when the record does not exist.
+     * When `input.type` is omitted, probes BOTH CNAME and A so a caller that
+     * doesn't know the original record type still removes it (Augment low).
+     */
     async removeRecord(input: DnsRemoveRecordInput): Promise<void> {
-        this.assertHost(input.host);
-        const existing = await this.findRecord(input.host, input.type);
-        if (!existing) {
-            return;
+        const host = this.normalizeHost(input.host);
+        const typesToProbe: DnsRecordType[] = input.type ? [input.type] : ['CNAME', 'A'];
+        for (const type of typesToProbe) {
+            const existing = await this.findRecord(host, type);
+            if (existing) {
+                await this.deleteRecord(existing.id);
+                this.logger.log(
+                    `CloudflareDns ${existing.type} deleted ${host} (id=${existing.id})`,
+                );
+            }
         }
-        await this.deleteRecord(existing.id);
-        this.logger.log(
-            `CloudflareDns ${existing.type} deleted ${input.host} (id=${existing.id})`,
-        );
     }
 
     /**
@@ -203,11 +212,11 @@ export class CloudflareDnsProvider implements IDnsOperations {
      * `SubdomainAllocator` to detect collisions before persisting a claim.
      */
     async recordExists(host: string): Promise<boolean> {
-        this.assertHost(host);
+        const normalized = this.normalizeHost(host);
         // Probe CNAME first (the common case for managed subdomains), then A.
-        const cname = await this.findRecord(host, 'CNAME');
+        const cname = await this.findRecord(normalized, 'CNAME');
         if (cname) return true;
-        const a = await this.findRecord(host, 'A');
+        const a = await this.findRecord(normalized, 'A');
         return a !== null;
     }
 
@@ -225,12 +234,15 @@ export class CloudflareDnsProvider implements IDnsOperations {
     }
 
     /**
-     * EW-735 — validate an arbitrary FQDN. Stricter than `assertSlug`
-     * because the host may contain dots (label.label.tld). Each label
-     * follows the same slug-shaped rule as `assertSlug`.
+     * EW-735 — validate + normalize an arbitrary FQDN. Stricter than
+     * `assertSlug` because the host may contain dots (label.label.tld). Each
+     * label follows the same slug-shaped rule as `assertSlug`. Returns the
+     * trim/lowercased form so callers can use it verbatim in Cloudflare
+     * API payloads and lookups (Augment low — previously the validator
+     * normalized but the caller used the raw input).
      */
-    private assertHost(host: string): void {
-        const trimmed = host.trim().toLowerCase();
+    private normalizeHost(host: string): string {
+        const trimmed = (host ?? '').trim().toLowerCase();
         if (trimmed.length === 0 || trimmed.length > 253) {
             throw new Error(`Invalid host for Cloudflare DNS: ${host}`);
         }
@@ -240,6 +252,7 @@ export class CloudflareDnsProvider implements IDnsOperations {
                 throw new Error(`Invalid host for Cloudflare DNS: ${host}`);
             }
         }
+        return trimmed;
     }
 
     private async findRecord(

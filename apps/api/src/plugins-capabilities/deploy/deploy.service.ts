@@ -519,9 +519,30 @@ export class DeployService {
         if (work.deployProvider !== 'k8s') {
             return legacy;
         }
+        // A non-empty string `ingressHost` in `legacy` means the legacy path
+        // resolved a host (today: from `work.website` for k8s). Respect it
+        // (spec §4.4: an explicit user-set host wins). An empty/whitespace
+        // value falls through — Greptile P2 / Augment medium: prior version
+        // would skip allocation on any presence of the key, including empty.
         if (legacy && typeof legacy === 'object' && 'ingressHost' in legacy) {
-            // The legacy path already resolved a host from `work.website`.
-            // Respect it (spec §4.4: an explicit user-set host wins).
+            const existing = (legacy as Record<string, unknown>).ingressHost;
+            if (typeof existing === 'string' && existing.trim().length > 0) {
+                return legacy;
+            }
+        }
+
+        // Provider + LB target pre-checks. Greptile P1 + Augment medium:
+        // calling `ensureRecord` with an empty `content` left the Work with a
+        // persisted `managedSubdomain` and an Ingress pointing at a host that
+        // resolves to nothing. Bail BEFORE allocate() so we never persist a
+        // claim we can't back with a real CNAME.
+        const provider = this.dnsService.getProvider();
+        const lbTarget = process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME?.trim() ?? '';
+        if (!provider || !lbTarget) {
+            this.logger.debug(
+                `EW-734 k8s managed-subdomain skipped for work ${work.id}: ` +
+                    `provider=${provider ? 'ok' : 'missing'} lbTarget=${lbTarget ? 'ok' : 'missing'}; falling back to legacy host`,
+            );
             return legacy;
         }
 
@@ -529,22 +550,19 @@ export class DeployService {
             const allocation = await this.subdomainAllocator.allocate(work);
             // Fire-and-forget DNS record creation, matching the legacy
             // ever-works path's behavior (errors log but never abort).
-            const provider = this.dnsService.getProvider();
-            if (provider) {
-                void provider
-                    .ensureRecord({
-                        host: allocation.fqdn,
-                        type: 'CNAME',
-                        target: process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME?.trim() ?? '',
-                        proxied: false,
-                        ttl: 1,
-                    })
-                    .catch((cause) => {
-                        this.logger.error(
-                            `EW-734 k8s managed-subdomain ensureRecord failed for ${allocation.fqdn}: ${(cause as Error).message}`,
-                        );
-                    });
-            }
+            void provider
+                .ensureRecord({
+                    host: allocation.fqdn,
+                    type: 'CNAME',
+                    target: lbTarget,
+                    proxied: false,
+                    ttl: 1,
+                })
+                .catch((cause) => {
+                    this.logger.error(
+                        `EW-734 k8s managed-subdomain ensureRecord failed for ${allocation.fqdn}: ${(cause as Error).message}`,
+                    );
+                });
             return {
                 ...(legacy ?? {}),
                 ingressHost: allocation.fqdn,

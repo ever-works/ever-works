@@ -118,11 +118,17 @@ export interface IDnsProvider extends IPlugin, IDnsOperations {
 
 /**
  * Type guard for full DNS plugins. Capability strings mirror the storage /
- * vector-store precedent (`put-object`/`get-object`, etc.).
+ * vector-store precedent (`put-object`/`get-object`, etc.). Checks ALL four
+ * required capability strings — a plugin that only declares the upsert/delete
+ * pair without the probe + root-domain ops would still satisfy a 2-key check
+ * but break at runtime in `SubdomainAllocator` (Augment low).
  */
 export function isDnsProvider(plugin: IPlugin): plugin is IDnsProvider {
+	const caps = plugin.capabilities;
 	return (
-		plugin.capabilities.includes('dns-ensure-record') &&
-		plugin.capabilities.includes('dns-remove-record')
+		caps.includes('dns-ensure-record') &&
+		caps.includes('dns-remove-record') &&
+		caps.includes('dns-record-exists') &&
+		caps.includes('dns-root-domain')
 	);
 }

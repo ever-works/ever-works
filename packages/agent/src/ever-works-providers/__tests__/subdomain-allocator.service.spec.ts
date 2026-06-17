@@ -152,6 +152,49 @@ describe('SubdomainAllocator', () => {
 		expect(result.allocated).toBe(true);
 	});
 
+	it('retries on a DB partial-unique-index race (23505) and falls through to the suffixed candidate', async () => {
+		// Simulates: two concurrent first-deploys for slug `ai-coding`. The
+		// in-process DB probe says free, but `update()` raises a Postgres
+		// 23505 unique violation because the other deploy won the race.
+		let firstUpdate = true;
+		const repo = makeRepo({
+			updateImpl: async (id: string, patch: Partial<Work>) => {
+				if (firstUpdate && patch.managedSubdomain === 'ai-coding') {
+					firstUpdate = false;
+					const err = new Error(
+						'duplicate key value violates unique constraint "UQ_works_managedSubdomain_notnull"',
+					) as Error & { code?: string };
+					err.code = '23505';
+					throw err;
+				}
+				return null;
+			},
+		});
+		const probe = makeProbe(async () => false);
+		const dns = makeDnsService(probe);
+		const alloc = new SubdomainAllocator(repo, dns);
+
+		const work = makeWork({ id: 'deadbeef-1111-2222-3333-444444444444' });
+		const result = await alloc.allocate(work, probe);
+
+		expect(result.subdomain).toBe('ai-coding-dead');
+		expect(repo.update).toHaveBeenCalledTimes(2);
+	});
+
+	it('rethrows non-unique-violation update errors', async () => {
+		const repo = makeRepo({
+			updateImpl: async () => {
+				throw new Error('connection refused');
+			},
+		});
+		const probe = makeProbe(async () => false);
+		const dns = makeDnsService(probe);
+		const alloc = new SubdomainAllocator(repo, dns);
+
+		const work = makeWork();
+		await expect(alloc.allocate(work, probe)).rejects.toThrow(/connection refused/);
+	});
+
 	it('throws when the slug is unusable', async () => {
 		const repo = makeRepo();
 		const probe = makeProbe(async () => false);
