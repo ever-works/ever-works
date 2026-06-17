@@ -1634,7 +1634,14 @@
             "updated": "Updated {date}",
             "viewAction": "View →",
             "openingTitle": "Opening work",
-            "openingMessage": "Preparing your work. Details will open shortly. Stay on this page."
+            "openingMessage": "Preparing your work. Details will open shortly. Stay on this page.",
+            "statusPopup": {
+                "errorTitle": "Generation Failed",
+                "warningsTitle": "Completed with Warnings",
+                "viewDetails": "View generation details",
+                "syncErrorLabel": "Sync error",
+                "syncErrorTitle": "Config Sync Failed"
+            }
         },
         "workList": {
             "title": "Your Works",
@@ -2450,6 +2457,69 @@
                     "saving": "Saving...",
                     "saveSuccess": "Source validation settings saved",
                     "saveFailed": "Failed to save source validation settings"
+                },
+                "generationErrors": {
+                    "GIT_PROVIDER_NOT_CONFIGURED": {
+                        "title": "Git Provider Not Configured",
+                        "message": "No Git provider plugin is configured. Set up GitHub or another provider to enable item operations.",
+                        "settingsLabel": "Configure Git Provider"
+                    },
+                    "GIT_AUTH_FAILED": {
+                        "title": "Git Authentication Failed",
+                        "message": "Your Git provider token may be expired or invalid. Reconnect to restore access.",
+                        "settingsLabel": "Update Git Settings"
+                    },
+                    "GIT_REPO_NOT_CONFIGURED": {
+                        "title": "Repository Not Found",
+                        "message": "The data repository for this Work could not be found. Verify your Work settings.",
+                        "settingsLabel": "Open Work Settings"
+                    },
+                    "GIT_CLONE_FAILED": {
+                        "title": "Repository Access Failed",
+                        "message": "Could not clone or pull the data repository. Check your repository URL and Git provider settings.",
+                        "settingsLabel": "Open Work Settings"
+                    },
+                    "GIT_PUSH_FAILED": {
+                        "title": "Push Failed",
+                        "message": "Changes could not be pushed to the repository. This may be a permissions or branch-protection issue.",
+                        "settingsLabel": "Open Work Settings"
+                    },
+                    "GIT_BRANCH_FAILED": {
+                        "title": "Branch Operation Failed",
+                        "message": "Could not create or switch to the required branch. Check repository branch protection rules.",
+                        "settingsLabel": "Open Work Settings"
+                    },
+                    "ITEM_NOT_FOUND": {
+                        "title": "Item Not Found",
+                        "message": "The item could not be found in the repository. It may have been removed or renamed externally."
+                    },
+                    "ITEM_ALREADY_EXISTS": {
+                        "title": "Item Already Exists",
+                        "message": "An item with this slug already exists. Use a different name or slug."
+                    },
+                    "AI_PROVIDER_NOT_CONFIGURED": {
+                        "title": "AI Provider Not Configured",
+                        "message": "Your AI provider settings are incomplete. Configure an AI provider plugin to enable AI-powered operations.",
+                        "settingsLabel": "Configure AI Provider"
+                    },
+                    "SCREENSHOT_NOT_CONFIGURED": {
+                        "title": "Screenshot Provider Not Configured",
+                        "message": "No screenshot provider plugin is configured. Set one up to enable automatic screenshot capture.",
+                        "settingsLabel": "Configure Screenshot Provider"
+                    },
+                    "RATE_LIMIT_EXCEEDED": {
+                        "title": "Rate Limit Reached",
+                        "message": "The API rate limit was reached. Please wait a moment before trying again."
+                    },
+                    "QUOTA_EXCEEDED": {
+                        "title": "Account Quota Exceeded",
+                        "message": "Your account quota has been reached. Review your usage limits in Settings.",
+                        "settingsLabel": "View Usage & Budgets"
+                    },
+                    "GENERIC_ERROR": {
+                        "title": "Generation Failed",
+                        "message": "An unexpected error occurred. Please try again or contact support if the problem persists."
+                    }
                 }
             },
             "generator": {
