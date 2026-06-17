@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { Link, usePathname } from '@/i18n/navigation';
@@ -97,7 +97,7 @@ function StatusBadge({
                     stopNavigation
                     trigger={(ref, props) => (
                         <span
-                            ref={ref as RefObject<HTMLSpanElement>}
+                            ref={ref}
                             {...props}
                             role="button"
                             tabIndex={0}
@@ -125,7 +125,7 @@ function StatusBadge({
                     stopNavigation
                     trigger={(ref, props) => (
                         <span
-                            ref={ref as RefObject<HTMLSpanElement>}
+                            ref={ref}
                             {...props}
                             role="button"
                             tabIndex={0}

@@ -458,12 +458,14 @@ function WorkStatusBadge({
         <HoverPopup
             trigger={(ref, props) => (
                 <span
-                    ref={ref as React.RefObject<HTMLSpanElement>}
+                    ref={ref}
                     onMouseEnter={props.onMouseEnter}
                     onMouseLeave={props.onMouseLeave}
                     onClick={props.onClick}
                     onTouchEnd={props.onTouchEnd}
+                    onKeyDown={props.onKeyDown}
                     aria-expanded={props['aria-expanded']}
+                    aria-haspopup={props['aria-haspopup']}
                     className={badgeClassName_}
                 >
                     {badgeChildren}

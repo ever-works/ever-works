@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, type RefObject } from 'react';
+import { memo } from 'react';
 import { ItemData, ItemBadges } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
@@ -276,7 +276,7 @@ function ItemHealthBadge({ item }: { item: ItemData }) {
         <HoverPopup
             trigger={(ref, props) => (
                 <span
-                    ref={ref as RefObject<HTMLSpanElement>}
+                    ref={ref}
                     {...props}
                     role="button"
                     tabIndex={0}
