@@ -30,9 +30,10 @@ export function RuntimeEnvManagement({ work }: RuntimeEnvManagementProps) {
 function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
-    const [databaseUrl, setDatabaseUrl] = useState<{ configured: boolean; masked: string | null } | null>(
-        null,
-    );
+    const [databaseUrl, setDatabaseUrl] = useState<{
+        configured: boolean;
+        masked: string | null;
+    } | null>(null);
     const [managed, setManaged] = useState<string[]>([]);
     const [value, setValue] = useState('');
     const [loadError, setLoadError] = useState<string | null>(null);

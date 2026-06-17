@@ -18,30 +18,30 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * seeded out-of-band for the existing Vercel→k8s migration Works).
  */
 export class AddWorkDeployRuntimeEnv1780700000000 implements MigrationInterface {
-	name = 'AddWorkDeployRuntimeEnv1780700000000';
+    name = 'AddWorkDeployRuntimeEnv1780700000000';
 
-	private readonly columns = [
-		'deployAuthSecretEncrypted',
-		'deployCookieSecretEncrypted',
-		'deployDatabaseUrlEncrypted',
-	];
+    private readonly columns = [
+        'deployAuthSecretEncrypted',
+        'deployCookieSecretEncrypted',
+        'deployDatabaseUrlEncrypted',
+    ];
 
-	public async up(queryRunner: QueryRunner): Promise<void> {
-		for (const name of this.columns) {
-			if (!(await queryRunner.hasColumn('works', name))) {
-				await queryRunner.addColumn(
-					'works',
-					new TableColumn({ name, type: 'text', isNullable: true }),
-				);
-			}
-		}
-	}
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        for (const name of this.columns) {
+            if (!(await queryRunner.hasColumn('works', name))) {
+                await queryRunner.addColumn(
+                    'works',
+                    new TableColumn({ name, type: 'text', isNullable: true }),
+                );
+            }
+        }
+    }
 
-	public async down(queryRunner: QueryRunner): Promise<void> {
-		for (const name of this.columns) {
-			if (await queryRunner.hasColumn('works', name)) {
-				await queryRunner.dropColumn('works', name);
-			}
-		}
-	}
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        for (const name of this.columns) {
+            if (await queryRunner.hasColumn('works', name)) {
+                await queryRunner.dropColumn('works', name);
+            }
+        }
+    }
 }
