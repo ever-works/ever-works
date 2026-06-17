@@ -80,6 +80,7 @@ describe('DeployController', () => {
     };
     let activityLogService: { log: jest.Mock };
     let workRuntimeEnvService: { getDatabaseUrl: jest.Mock; setDatabaseUrl: jest.Mock };
+    let managedSubdomainService: { getState: jest.Mock; update: jest.Mock };
     let controller: DeployController;
 
     const buildWork = (overrides: Record<string, unknown> = {}) => ({
@@ -131,6 +132,11 @@ describe('DeployController', () => {
             setDatabaseUrl: jest.fn().mockResolvedValue(undefined),
         };
 
+        managedSubdomainService = {
+            getState: jest.fn(),
+            update: jest.fn(),
+        };
+
         controller = new DeployController(
             deployService as unknown as DeployService,
             deployFacade as unknown as DeployFacadeService,
@@ -139,6 +145,7 @@ describe('DeployController', () => {
             deploymentRepository as unknown as WorkDeploymentRepository,
             activityLogService as unknown as ActivityLogService,
             workRuntimeEnvService as never,
+            managedSubdomainService as never,
         );
     });
 
@@ -1317,6 +1324,154 @@ describe('DeployController', () => {
                 controller.verifyDomain(auth, 'work-1', 'example.com'),
             ).rejects.toMatchObject({
                 response: { message: 'Failed to verify domain' },
+            });
+        });
+    });
+
+    // EW-739 — GET/PUT /works/:id/subdomain
+    describe('managed subdomain', () => {
+        const stateOk = {
+            subdomain: 'my-site',
+            fqdn: 'my-site.ever.works',
+            url: 'https://my-site.ever.works',
+            recordOk: true,
+            editable: true,
+        };
+
+        describe('getManagedSubdomain', () => {
+            it('gates on ensureCanView before delegating to the service', async () => {
+                ownershipService.ensureCanView.mockResolvedValue({
+                    work: buildWork({ deployProvider: 'ever-works' }),
+                    isCreator: true,
+                });
+                managedSubdomainService.getState.mockResolvedValue(stateOk);
+
+                const result = await controller.getManagedSubdomain(auth, 'work-1');
+
+                expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-1', 'caller-1');
+                expect(managedSubdomainService.getState).toHaveBeenCalledWith('work-1');
+                expect(result).toEqual(stateOk);
+            });
+
+            it('propagates an ownership 404 verbatim without touching the service', async () => {
+                ownershipService.ensureCanView.mockRejectedValue(
+                    new BadRequestException('Work not found'),
+                );
+
+                await expect(controller.getManagedSubdomain(auth, 'work-1')).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                expect(managedSubdomainService.getState).not.toHaveBeenCalled();
+            });
+
+            it('returns the unallocated shape verbatim (null fields, recordOk=false)', async () => {
+                ownershipService.ensureCanView.mockResolvedValue({
+                    work: buildWork({ deployProvider: 'ever-works' }),
+                    isCreator: true,
+                });
+                managedSubdomainService.getState.mockResolvedValue({
+                    subdomain: null,
+                    fqdn: null,
+                    url: null,
+                    recordOk: false,
+                    editable: true,
+                });
+
+                const result = await controller.getManagedSubdomain(auth, 'work-1');
+
+                expect(result).toEqual({
+                    subdomain: null,
+                    fqdn: null,
+                    url: null,
+                    recordOk: false,
+                    editable: true,
+                });
+            });
+        });
+
+        describe('updateManagedSubdomain', () => {
+            it('gates on ensureCanEdit, delegates to service, then activity-logs the rename', async () => {
+                const work = buildWork({ deployProvider: 'ever-works' });
+                ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+                managedSubdomainService.update.mockResolvedValue(stateOk);
+
+                const result = await controller.updateManagedSubdomain(auth, 'work-1', {
+                    subdomain: 'my-site',
+                });
+
+                expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('work-1', 'caller-1');
+                expect(managedSubdomainService.update).toHaveBeenCalledWith('work-1', 'my-site');
+                expect(activityLogService.log).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        userId: 'caller-1',
+                        workId: 'work-1',
+                        action: 'work.managed-subdomain.updated',
+                        details: { subdomain: 'my-site', fqdn: 'my-site.ever.works' },
+                    }),
+                );
+                expect(result).toEqual(stateOk);
+            });
+
+            it('does not call the service when ensureCanEdit rejects', async () => {
+                ownershipService.ensureCanEdit.mockRejectedValue(
+                    new BadRequestException('forbidden'),
+                );
+
+                await expect(
+                    controller.updateManagedSubdomain(auth, 'work-1', { subdomain: 'my-site' }),
+                ).rejects.toBeInstanceOf(BadRequestException);
+
+                expect(managedSubdomainService.update).not.toHaveBeenCalled();
+                expect(activityLogService.log).not.toHaveBeenCalled();
+            });
+
+            it('propagates uniqueness rejection from the service (409 Conflict)', async () => {
+                const work = buildWork({ deployProvider: 'ever-works' });
+                ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+                managedSubdomainService.update.mockRejectedValue(
+                    new BadRequestException({
+                        status: 'error',
+                        message: 'Subdomain "my-site" is already claimed by another work.',
+                    }),
+                );
+
+                await expect(
+                    controller.updateManagedSubdomain(auth, 'work-1', { subdomain: 'my-site' }),
+                ).rejects.toMatchObject({
+                    response: { message: expect.stringContaining('already claimed') },
+                });
+                expect(activityLogService.log).not.toHaveBeenCalled();
+            });
+
+            it('propagates blocklist rejection from the service', async () => {
+                const work = buildWork({ deployProvider: 'ever-works' });
+                ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+                managedSubdomainService.update.mockRejectedValue(
+                    new BadRequestException({
+                        status: 'error',
+                        message: 'Subdomain "www" is reserved by the platform and cannot be claimed.',
+                    }),
+                );
+
+                await expect(
+                    controller.updateManagedSubdomain(auth, 'work-1', { subdomain: 'www' }),
+                ).rejects.toMatchObject({
+                    response: { message: expect.stringContaining('reserved by the platform') },
+                });
+                expect(activityLogService.log).not.toHaveBeenCalled();
+            });
+
+            it('swallows fire-and-forget activity-log rejection without breaking the response', async () => {
+                const work = buildWork({ deployProvider: 'ever-works' });
+                ownershipService.ensureCanEdit.mockResolvedValue({ work, isCreator: true });
+                managedSubdomainService.update.mockResolvedValue(stateOk);
+                activityLogService.log.mockRejectedValue(new Error('log down'));
+
+                const result = await controller.updateManagedSubdomain(auth, 'work-1', {
+                    subdomain: 'my-site',
+                });
+
+                expect(result).toEqual(stateOk);
             });
         });
     });

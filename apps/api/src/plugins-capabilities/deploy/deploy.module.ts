@@ -12,6 +12,7 @@ import {
 import { DeployController } from './deploy.controller';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
+import { ManagedSubdomainService } from './managed-subdomain.service';
 
 @Module({
     imports: [
@@ -28,7 +29,8 @@ import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
         DeploymentVerifierService,
         EverWorksDnsService,
         SubdomainAllocator,
+        ManagedSubdomainService,
     ],
-    exports: [DeployService, DeploymentVerifierService],
+    exports: [DeployService, DeploymentVerifierService, ManagedSubdomainService],
 })
 export class DeployModule {}
