@@ -20,3 +20,4 @@ export {
     type CloudflareDnsConfig,
     type DnsRecordSnapshot,
 } from './cloudflare-dns.provider';
+export { SubdomainAllocator, type SubdomainAllocationResult } from './subdomain-allocator.service';

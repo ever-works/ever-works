@@ -18,6 +18,7 @@ import { LocalEventEmitterModule } from './local-event-emitter.module';
 import { ConfigCommands } from './commands/config';
 import { WorkCommands } from './commands/work';
 import { ServeCommands } from './commands/serve';
+import { BackfillCommands } from './commands/backfill';
 import { CacheFactory } from '@ever-works/agent/cache';
 
 @Module({
@@ -43,6 +44,7 @@ import { CacheFactory } from '@ever-works/agent/cache';
         ...ConfigCommands,
         ...WorkCommands,
         ...ServeCommands,
+        ...BackfillCommands,
     ],
 })
 export class CLIModule implements OnApplicationBootstrap {

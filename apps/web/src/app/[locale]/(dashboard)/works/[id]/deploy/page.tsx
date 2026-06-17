@@ -9,6 +9,7 @@ import { DeployProviderSelector } from '@/components/works/detail/deploy/DeployP
 import { SharedWorkNoTokenAlert } from '@/components/works/detail/deploy/SharedWorkNoTokenAlert';
 import { DomainManagement } from '@/components/works/detail/deploy/DomainManagement';
 import { RuntimeEnvManagement } from '@/components/works/detail/deploy/RuntimeEnvManagement';
+import { SubdomainManagement } from '@/components/works/detail/deploy/SubdomainManagement';
 import { DeployProgressPanel } from '@/components/works/detail/deploy/DeployProgressPanel';
 import { canDeploy } from '@/lib/permissions';
 
@@ -122,6 +123,19 @@ export default async function DeployPage({ params }: DeployPageParams) {
                 websiteTemplates={websiteTemplates}
             />
             <DeployProgressPanel workId={work.id} isDeploying={isDeploying(work)} />
+            {/*
+             * EW-740 — Managed subdomain card. Per spec section 4.6 the
+             * managed `*.ever.works` subdomain is the primary/default
+             * address, so it renders ABOVE `DomainManagement` (which lists
+             * additional custom domains). Only relevant for the
+             * managed-subdomain providers (`ever-works`, `k8s`); for
+             * Vercel/etc the API returns `editable=false` + null state,
+             * which the component handles, but we skip the card entirely
+             * to avoid wasted requests + UI noise.
+             */}
+            {work.id && (work.deployProvider === 'ever-works' || work.deployProvider === 'k8s') && (
+                <SubdomainManagement work={work} />
+            )}
             {work.website && <DomainManagement work={work} />}
             {work.website && <RuntimeEnvManagement work={work} />}
         </div>

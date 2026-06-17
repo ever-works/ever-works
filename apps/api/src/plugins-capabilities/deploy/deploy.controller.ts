@@ -29,6 +29,8 @@ import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
 import { SetRuntimeEnvDto } from './dto/runtime-env.dto';
+import { SubdomainResponseDto, UpdateSubdomainDto } from './dto/subdomain.dto';
+import { ManagedSubdomainService } from './managed-subdomain.service';
 
 /**
  * Mask a Postgres connection string for display — keep scheme/host/db, hide the
@@ -74,6 +76,7 @@ export class DeployController {
         private readonly deploymentRepository: WorkDeploymentRepository,
         private readonly activityLogService: ActivityLogService,
         private readonly workRuntimeEnvService: WorkRuntimeEnvService,
+        private readonly managedSubdomainService: ManagedSubdomainService,
     ) {}
 
     private getProviderName(deployProvider: string | undefined): string {
@@ -725,6 +728,79 @@ export class DeployController {
                 message: 'Failed to verify domain',
             });
         }
+    }
+
+    /**
+     * EW-739 — read the managed subdomain attached to a Work.
+     *
+     * Returns the persisted `work.managedSubdomain`, the derived FQDN/URL,
+     * a live DNS health probe (`recordOk`), and an `editable` flag so the
+     * UI can hide the "Rename" affordance for providers that don't run
+     * through `applyManagedSubdomain`.
+     */
+    @Get('/works/:id/subdomain')
+    @ApiOperation({
+        summary: 'Get managed subdomain',
+        description: 'Returns the managed *.ever.works subdomain attached to a Work.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Managed subdomain state',
+        type: SubdomainResponseDto,
+    })
+    async getManagedSubdomain(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+    ): Promise<SubdomainResponseDto> {
+        await this.ownershipService.ensureCanView(id, auth.userId);
+        return this.managedSubdomainService.getState(id);
+    }
+
+    /**
+     * EW-739 — re-allocate the managed subdomain to a caller-chosen label.
+     *
+     * Format + blocklist are enforced by the DTO and the service (defence-in-depth).
+     * Global uniqueness is checked before persisting; the DB-level partial
+     * unique index `UQ_works_managedSubdomain_notnull` is the backstop for
+     * concurrent renames. The old CNAME is removed (best-effort) and a new
+     * CNAME is created against the managed zone before the response returns.
+     */
+    @Put('/works/:id/subdomain')
+    @ApiOperation({
+        summary: 'Update managed subdomain',
+        description:
+            'Re-allocates the managed *.ever.works subdomain for a Work. Frees the old DNS record and creates the new one.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Subdomain updated', type: SubdomainResponseDto })
+    @ApiResponse({
+        status: 400,
+        description: 'Invalid subdomain format / blocklisted / not editable',
+    })
+    @ApiResponse({ status: 409, description: 'Subdomain already claimed by another work' })
+    async updateManagedSubdomain(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: UpdateSubdomainDto,
+    ): Promise<SubdomainResponseDto> {
+        const { work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
+
+        const result = await this.managedSubdomainService.update(id, dto.subdomain);
+
+        this.activityLogService
+            .log({
+                userId: auth.userId,
+                workId: id,
+                actionType: ActivityActionType.DEPLOYMENT,
+                action: 'work.managed-subdomain.updated',
+                status: ActivityStatus.COMPLETED,
+                summary: `Updated managed subdomain for ${work.name} to ${result.subdomain}`,
+                details: { subdomain: result.subdomain, fqdn: result.fqdn },
+            })
+            .catch(() => {});
+
+        return result;
     }
 
     @Get('/works/:id/deployments')

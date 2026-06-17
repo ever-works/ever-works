@@ -95,6 +95,24 @@ export class WorkRepository {
             .getOne();
     }
 
+    /**
+     * EW-734 / EW-737 — `SubdomainAllocator` lookup. Returns the Work that
+     * already claims a managed `${subdomain}.ever.works` host (case-insensitive
+     * on the leftmost label, which is the value stored in
+     * `works.managedSubdomain`), or `null` when the label is free. Used to
+     * detect collisions BEFORE inserting/updating — the partial unique index
+     * `UQ_works_managedSubdomain_notnull` is the DB-level backstop.
+     */
+    async findByManagedSubdomain(subdomain: string): Promise<Work | null> {
+        const normalized = (subdomain ?? '').trim().toLowerCase();
+        if (!normalized) {
+            return null;
+        }
+        return this.repository.findOne({
+            where: { managedSubdomain: normalized },
+        });
+    }
+
     async findByIds(ids: string[]): Promise<Work[]> {
         const uniqueIds = [...new Set(ids.filter(Boolean))];
 
