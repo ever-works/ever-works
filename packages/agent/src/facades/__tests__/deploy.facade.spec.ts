@@ -254,4 +254,255 @@ describe('DeployFacadeService', () => {
             ).resolves.toBeNull();
         });
     });
+
+    /**
+     * EW-741 — BYO Cloudflare custom-domain reconciliation.
+     *
+     * When the user has saved settings for a `dns` plugin (full
+     * `IDnsProvider` shape — declares all four `dns-*` capabilities) AND
+     * the LB hostname env is configured, addDomain MUST call `ensureRecord`
+     * on the user-scoped DNS plugin so the custom domain's DNS record is
+     * created in the user's own Cloudflare zone. Failures are best-effort —
+     * the request must still succeed when the plugin throws.
+     *
+     * The operator-managed mode (no user-scoped DNS plugin settings) must
+     * stay guidance-only — `ensureRecord` is NOT called.
+     */
+    describe('EW-741 — addDomain BYO Cloudflare reconciliation', () => {
+        const ORIGINAL_LB = process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME;
+
+        afterEach(() => {
+            if (ORIGINAL_LB === undefined) {
+                delete process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME;
+            } else {
+                process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = ORIGINAL_LB;
+            }
+        });
+
+        // Build a deploy plugin + dns plugin pair, with the domain repository
+        // and a settings service whose `getSettings` returns different values
+        // per plugin id (the deploy plugin's settings vs. the DNS plugin's).
+        const buildAddDomainFixture = (args: {
+            dnsUserSettings?: Record<string, unknown>;
+            ensureRecord?: jest.Mock;
+            includeDnsPlugin?: boolean;
+        }) => {
+            const ensureRecord =
+                args.ensureRecord ??
+                jest.fn().mockResolvedValue({
+                    id: 'rec-1',
+                    type: 'CNAME',
+                    name: 'tools.example.com',
+                    content: 'lb.ever.works',
+                });
+            const deployPlugin = {
+                id: 'k8s',
+                name: 'Kubernetes',
+                providerName: 'kubernetes',
+                capabilities: ['deployment'],
+                addDomain: jest.fn().mockResolvedValue({
+                    domain: { name: 'tools.example.com', verified: false },
+                    verified: false,
+                }),
+            };
+            const dnsPlugin = {
+                id: 'cloudflare-dns',
+                name: 'Cloudflare DNS',
+                providerName: 'cloudflare',
+                capabilities: [
+                    'dns',
+                    'dns-ensure-record',
+                    'dns-remove-record',
+                    'dns-record-exists',
+                    'dns-root-domain',
+                ],
+                ensureRecord,
+                removeRecord: jest.fn(),
+                recordExists: jest.fn().mockResolvedValue(false),
+                rootDomain: () => 'example.com',
+            };
+            const deployRegistered = {
+                plugin: deployPlugin,
+                manifest: {
+                    id: 'k8s',
+                    name: 'Kubernetes',
+                    category: 'deployment',
+                    capabilities: ['deployment'],
+                    description: '',
+                    icon: { type: 'lucide', value: 'Container' },
+                },
+                state: 'loaded',
+            };
+            const dnsRegistered = {
+                plugin: dnsPlugin,
+                manifest: {
+                    id: 'cloudflare-dns',
+                    name: 'Cloudflare DNS',
+                    category: 'dns',
+                    capabilities: dnsPlugin.capabilities,
+                    description: '',
+                    icon: { type: 'lucide', value: 'Cloud' },
+                },
+                state: 'loaded',
+            };
+            const includeDns = args.includeDnsPlugin ?? true;
+            const registry = {
+                get: jest.fn((id: string) => {
+                    if (id === 'k8s') return deployRegistered;
+                    if (id === 'cloudflare-dns' && includeDns) return dnsRegistered;
+                    return undefined;
+                }),
+                getByCapability: jest.fn((cap: string) => {
+                    if (cap === 'deployment') return [deployRegistered];
+                    if (cap === 'dns-ensure-record' && includeDns) return [dnsRegistered];
+                    return [];
+                }),
+            };
+            const settingsService = {
+                getResolvedSettings: jest
+                    .fn()
+                    .mockResolvedValue({ kubeconfig: { value: 'apiVersion: v1' } }),
+                getSettings: jest.fn(async (pluginId: string) => {
+                    if (pluginId === 'cloudflare-dns') {
+                        return args.dnsUserSettings ?? {};
+                    }
+                    return {};
+                }),
+            };
+            const work = {
+                id: 'work-1',
+                slug: 'site',
+                deployProvider: 'k8s',
+                user: { id: 'user-1' },
+                website: 'https://site.ever.works',
+                // Short-circuit `resolveProjectId` — the BYO custom-domain
+                // path doesn't care what projectId resolves to; we just need
+                // the addDomain pipeline to reach the DB persist + DNS hook.
+                deployProjectId: 'project-1',
+            };
+            const workRepository = {
+                findById: jest.fn().mockResolvedValue(work),
+                update: jest.fn(),
+            };
+            const domainRepository = {
+                findByWork: jest.fn().mockResolvedValue([]),
+                findOne: jest.fn().mockResolvedValue(null),
+                addDomain: jest.fn().mockResolvedValue({
+                    workId: 'work-1',
+                    domain: 'tools.example.com',
+                    verified: false,
+                }),
+                updateVerified: jest.fn(),
+                updateProvider: jest.fn(),
+            };
+            const service = new DeployFacadeService(
+                registry as any,
+                settingsService as any,
+                workRepository as any,
+                {} as any,
+                domainRepository as any,
+            );
+            return { service, deployPlugin, dnsPlugin, ensureRecord, domainRepository };
+        };
+
+        it('calls ensureRecord on the user-scoped DNS plugin when BYO settings are present', async () => {
+            process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
+            const { service, ensureRecord, domainRepository } = buildAddDomainFixture({
+                dnsUserSettings: { apiToken: 'cf-tok', zoneId: 'zone-1', proxied: true },
+            });
+
+            await service.addDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            // Wait one microtask for the void-chained fire-and-forget.
+            await new Promise((r) => setImmediate(r));
+
+            // The custom-domain row is persisted unconditionally — BYO
+            // ensureRecord is purely additive.
+            expect(domainRepository.addDomain).toHaveBeenCalledWith(
+                'work-1',
+                'tools.example.com',
+                'k8s',
+            );
+            expect(ensureRecord).toHaveBeenCalledTimes(1);
+            expect(ensureRecord).toHaveBeenCalledWith({
+                host: 'tools.example.com',
+                type: 'CNAME',
+                target: 'lb.ever.works',
+                proxied: true,
+            });
+        });
+
+        it('does NOT call ensureRecord when the user has no DNS plugin settings (operator-managed)', async () => {
+            process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
+            const { service, ensureRecord, domainRepository } = buildAddDomainFixture({
+                // Empty user settings = operator-managed only.
+                dnsUserSettings: {},
+            });
+
+            await service.addDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            await new Promise((r) => setImmediate(r));
+
+            expect(domainRepository.addDomain).toHaveBeenCalled();
+            expect(ensureRecord).not.toHaveBeenCalled();
+        });
+
+        it('does NOT call ensureRecord when no DNS plugin is loaded', async () => {
+            process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
+            const { service, ensureRecord, domainRepository } = buildAddDomainFixture({
+                includeDnsPlugin: false,
+                dnsUserSettings: { apiToken: 'cf-tok' },
+            });
+
+            await service.addDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            await new Promise((r) => setImmediate(r));
+
+            expect(domainRepository.addDomain).toHaveBeenCalled();
+            expect(ensureRecord).not.toHaveBeenCalled();
+        });
+
+        it('does NOT call ensureRecord when EVER_WORKS_DEPLOY_LB_HOSTNAME is unset', async () => {
+            delete process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME;
+            const { service, ensureRecord, domainRepository } = buildAddDomainFixture({
+                dnsUserSettings: { apiToken: 'cf-tok' },
+            });
+
+            await service.addDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            await new Promise((r) => setImmediate(r));
+
+            expect(domainRepository.addDomain).toHaveBeenCalled();
+            expect(ensureRecord).not.toHaveBeenCalled();
+        });
+
+        it('swallows ensureRecord failures (the request still succeeds)', async () => {
+            process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
+            const failing = jest.fn().mockRejectedValue(new Error('cf api 5xx'));
+            const { service, domainRepository } = buildAddDomainFixture({
+                dnsUserSettings: { apiToken: 'cf-tok' },
+                ensureRecord: failing,
+            });
+
+            await expect(
+                service.addDomain('tools.example.com', {
+                    userId: 'user-1',
+                    workId: 'work-1',
+                }),
+            ).resolves.toMatchObject({ verified: false });
+            await new Promise((r) => setImmediate(r));
+
+            expect(domainRepository.addDomain).toHaveBeenCalled();
+            expect(failing).toHaveBeenCalled();
+        });
+    });
 });

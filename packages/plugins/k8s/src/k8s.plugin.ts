@@ -683,6 +683,25 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		if (cfg.kubeContext) out.K8S_KUBE_CONTEXT = cfg.kubeContext;
 		if (cfg.ingressClass) out.K8S_INGRESS_CLASS = cfg.ingressClass;
 		if (cfg.ingressHost) out.K8S_INGRESS_HOST = cfg.ingressHost;
+		// EW-741 — additional Ingress hosts (custom domains). Deduped against
+		// `ingressHost`; comma-separated for the workflow renderer. Skipped
+		// when the list is empty so the secret is only written for Works that
+		// actually have custom domains attached.
+		if (Array.isArray(cfg.extraHosts) && cfg.extraHosts.length > 0) {
+			const primary = cfg.ingressHost?.trim().toLowerCase();
+			const seen = new Set<string>();
+			const extras: string[] = [];
+			for (const host of cfg.extraHosts) {
+				if (typeof host !== 'string') continue;
+				const normalized = host.trim().toLowerCase();
+				if (!normalized) continue;
+				if (primary && normalized === primary) continue;
+				if (seen.has(normalized)) continue;
+				seen.add(normalized);
+				extras.push(normalized);
+			}
+			if (extras.length > 0) out.K8S_EXTRA_HOSTS = extras.join(',');
+		}
 		if (cfg.tlsIssuer) out.K8S_TLS_ISSUER = cfg.tlsIssuer;
 		if (cfg.replicas) out.K8S_REPLICAS = String(clampReplicas(cfg.replicas));
 
@@ -728,6 +747,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		}
 		if (typeof raw.ingressClass === 'string') out.ingressClass = raw.ingressClass;
 		if (typeof raw.ingressHost === 'string') out.ingressHost = raw.ingressHost;
+		// EW-741 — additional hosts injected by the deploy orchestrator. Only
+		// string entries are accepted; non-string elements are silently dropped
+		// so a malformed setting can't surface a TypeError downstream.
+		if (Array.isArray(raw.extraHosts)) {
+			out.extraHosts = raw.extraHosts.filter((h): h is string => typeof h === 'string');
+		}
 		if (typeof raw.tlsIssuer === 'string') out.tlsIssuer = raw.tlsIssuer;
 		if (typeof raw.replicas === 'number') out.replicas = raw.replicas;
 

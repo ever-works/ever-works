@@ -96,6 +96,18 @@ export interface KubernetesSettings {
 	ingressClass?: string;
 	/** Default ingress host when a work has no custom domain. */
 	ingressHost?: string;
+	/**
+	 * Additional Ingress hosts (EW-741). Combined with `ingressHost` so the
+	 * Ingress serves the managed subdomain AND every active custom domain
+	 * simultaneously. The deploy orchestrator (`applyManagedSubdomain`) is
+	 * the source of truth — it merges `[managedSubdomain] ++ [custom domains]`
+	 * here so the k8s plugin's `getDeploymentSecrets` can surface a
+	 * comma-separated `K8S_EXTRA_HOSTS` secret for the workflow renderer.
+	 *
+	 * Empty / missing means "no additional hosts" — the Ingress has a single
+	 * rule for `ingressHost`. Never replaces the managed subdomain.
+	 */
+	extraHosts?: string[];
 	/** cert-manager `ClusterIssuer` name. */
 	tlsIssuer?: string;
 	/** Pod replicas (default 1, max 10 in v1). */

@@ -241,6 +241,107 @@ export async function setWorkRuntimeEnv(workId: string, databaseUrl: string) {
     }
 }
 
+/**
+ * EW-740 — read the per-Work managed subdomain ("Site URL / Subdomain"
+ * card) state. Mirrors `getWorkRuntimeEnv` shape: always returns the
+ * `subdomain` payload (filled with nulls on failure) plus an optional
+ * `error` string so the UI can gate Save and avoid claiming "Not
+ * configured" when the load merely failed.
+ */
+export async function getWorkSubdomain(workId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await deployAPI.getSubdomain(workId);
+        return {
+            success: response.status === 'success',
+            subdomain: {
+                subdomain: response.subdomain ?? null,
+                fqdn: response.fqdn ?? null,
+                url: response.url ?? null,
+                recordOk: response.recordOk ?? false,
+                editable: response.editable ?? false,
+            },
+        };
+    } catch (error) {
+        console.error('Get subdomain error:', error);
+        return {
+            success: false,
+            subdomain: {
+                subdomain: null as string | null,
+                fqdn: null as string | null,
+                url: null as string | null,
+                recordOk: false,
+                editable: false,
+            },
+            error: error instanceof Error ? error.message : 'Failed to get subdomain',
+        };
+    }
+}
+
+/**
+ * EW-740 — set the per-Work managed subdomain. Validates the bare label
+ * against the same regex the API uses (`SLUG_RE` from
+ * `packages/agent/src/services/works-manifest.service.ts`) so the UI
+ * surfaces the format error before round-tripping. Length bounds (3..63)
+ * also mirror the API contract / RFC 1035 label rules.
+ */
+export async function setWorkSubdomain(workId: string, subdomain: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const trimmed = subdomain.trim().toLowerCase();
+    const SUBDOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+    if (trimmed.length < 3 || trimmed.length > 63 || !SUBDOMAIN_RE.test(trimmed)) {
+        return {
+            success: false,
+            subdomain: {
+                subdomain: null as string | null,
+                fqdn: null as string | null,
+                url: null as string | null,
+                recordOk: false,
+                editable: true,
+            },
+            error: 'Subdomain must be 3-63 characters of lowercase letters, digits, or hyphens, and cannot start or end with a hyphen.',
+        };
+    }
+
+    try {
+        const response = await deployAPI.setSubdomain(workId, trimmed);
+        if (response.status === 'success') {
+            revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
+        }
+        return {
+            success: response.status === 'success',
+            subdomain: {
+                subdomain: response.subdomain ?? null,
+                fqdn: response.fqdn ?? null,
+                url: response.url ?? null,
+                recordOk: response.recordOk ?? false,
+                editable: response.editable ?? false,
+            },
+        };
+    } catch (error) {
+        console.error('Set subdomain error:', error);
+        return {
+            success: false,
+            subdomain: {
+                subdomain: null as string | null,
+                fqdn: null as string | null,
+                url: null as string | null,
+                recordOk: false,
+                editable: true,
+            },
+            error: error instanceof Error ? error.message : 'Failed to set subdomain',
+        };
+    }
+}
+
 export async function addDomain(workId: string, domain: string) {
     const user = await getAuthFromCookie();
     if (!user) {

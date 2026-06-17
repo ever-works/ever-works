@@ -26,7 +26,15 @@ export const PLUGIN_CATEGORIES = [
 	// EW-642 — pluggable vector-store backends (pgvector, Qdrant, Pinecone, …).
 	// See `capabilities/vector-store.interface.ts` and the RFC at
 	// `docs/specs/features/knowledge-base/phase-2-vector-plugin-design.md`.
-	'vector-store'
+	'vector-store',
+	// EW-734 / EW-735 — pluggable DNS providers. The managed Cloudflare DNS
+	// provider lives at `packages/agent/src/ever-works-providers/
+	// cloudflare-dns.provider.ts` today and continues to operate as-is; the
+	// future first-class `@ever-works/cloudflare-dns` plugin (EW-738) will
+	// declare itself with this category for both managed + BYO modes.
+	// See `capabilities/dns.interface.ts` and
+	// `docs/specs/features/cloudflare-dns-plugin/spec.md`.
+	'dns'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];

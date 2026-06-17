@@ -1,4 +1,7 @@
-jest.mock('@ever-works/agent/database', () => ({ WorkRepository: class {} }));
+jest.mock('@ever-works/agent/database', () => ({
+    WorkRepository: class {},
+    WorkCustomDomainRepository: class {},
+}));
 jest.mock('@ever-works/agent/entities', () => ({
     Work: class {},
     User: class {},
@@ -168,6 +171,26 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         // EW-617 G8: funnel emit sink — no-op stub by default.
         const funnel = { emit: jest.fn() };
 
+        // EW-734 / EW-737 — collision-safe allocator. Tests that exercise the
+        // gated managed-subdomain path stub `allocate`; the default no-op
+        // keeps the legacy + EW-741 paths working without forcing every test
+        // to wire it explicitly.
+        const subdomainAllocator = {
+            allocate: jest.fn().mockResolvedValue({
+                subdomain: 'allocated',
+                fqdn: 'allocated.ever.works',
+                rootDomain: 'ever.works',
+                allocated: true,
+            }),
+        };
+
+        // EW-741 — `WorkCustomDomain` rows for this Work. Default = none, so
+        // most tests see no `extraHosts` in the merged settings. Tests that
+        // exercise reconciliation override `findByWork` to return rows.
+        const customDomainRepository = {
+            findByWork: jest.fn().mockResolvedValue([]),
+        };
+
         const service = new DeployService(
             deployFacade as any,
             gitFacade as any,
@@ -181,7 +204,9 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             webhookSecretService as any,
             workRuntimeEnvService as any,
             dnsService as any,
+            subdomainAllocator as any,
             funnel as any,
+            customDomainRepository as any,
         );
 
         return {
@@ -197,6 +222,8 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             webhookSecretService,
             dnsService,
             funnel,
+            subdomainAllocator,
+            customDomainRepository,
         };
     };
 
@@ -1173,6 +1200,159 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             expect(secrets.find((s: any) => s.key === 'VERCEL_TOKEN')?.value).toBe(
                 'vercel-deploy-token',
             );
+        });
+    });
+
+    /**
+     * EW-741 — reconcile the managed subdomain with `WorkCustomDomain` rows.
+     *
+     * Spec §4.6 mandates that the managed subdomain stays as the primary
+     * Ingress host whenever the platform allocated one, and that every active
+     * custom domain rides alongside it as an additional Ingress rule. Adding
+     * or removing a custom domain must never mutate `managedSubdomain`, and
+     * `extraHosts` must be deduped + normalized so the workflow secret stays
+     * stable across deploys.
+     */
+    describe('EW-741 — managed subdomain ↔ custom domain reconciliation', () => {
+        const getDeploymentSecrets = jest
+            .fn()
+            // Mirror the real k8s plugin's behavior: forward the orchestrator's
+            // ingressHost / extraHosts into the K8S_* secrets surface so the
+            // workflow gets both. Anything the orchestrator omits stays
+            // omitted — this is what the test assertions key off.
+            .mockImplementation(async (settings: Record<string, unknown>) => {
+                const out: Record<string, string> = { K8S_NAMESPACE: 'apps' };
+                if (typeof settings.ingressHost === 'string' && settings.ingressHost) {
+                    out.K8S_INGRESS_HOST = settings.ingressHost;
+                }
+                if (Array.isArray(settings.extraHosts) && settings.extraHosts.length > 0) {
+                    out.K8S_EXTRA_HOSTS = (settings.extraHosts as string[]).join(',');
+                }
+                return out;
+            });
+
+        beforeEach(() => {
+            getDeploymentSecrets.mockClear();
+        });
+
+        it('combines managed subdomain + custom domains into Ingress hosts (k8s)', async () => {
+            const { service, githubPlugin, customDomainRepository } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                deployProvider: 'k8s',
+                // Persisted managed ingress host (k8s legacy path derives this
+                // from `work.website`). Acts as the primary Ingress rule.
+                website: 'https://managed.example.com',
+            });
+            customDomainRepository.findByWork.mockResolvedValueOnce([
+                { domain: 'foo.example.com' },
+                { domain: 'bar.example.com' },
+                // Already-present primary — must be deduped out of extraHosts.
+                { domain: 'MANAGED.example.com' },
+            ]);
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+            expect(byKey.K8S_INGRESS_HOST).toBe('managed.example.com');
+            // Both custom domains travel as extraHosts; the duplicate of the
+            // primary is dropped. Lowercased + comma-separated.
+            expect(byKey.K8S_EXTRA_HOSTS).toBe('foo.example.com,bar.example.com');
+
+            // Settings passed to the k8s plugin carry the combined shape so
+            // any plugin that wants to render multi-host TLS directly can.
+            const callSettings = getDeploymentSecrets.mock.calls[0][0];
+            expect(callSettings.ingressHost).toBe('managed.example.com');
+            expect(callSettings.extraHosts).toEqual(['foo.example.com', 'bar.example.com']);
+        });
+
+        it('omits K8S_EXTRA_HOSTS when no custom domains exist', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                deployProvider: 'k8s',
+                website: 'https://managed.example.com',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            const keys = secrets.map((s: any) => s.key);
+            expect(keys).toContain('K8S_INGRESS_HOST');
+            expect(keys).not.toContain('K8S_EXTRA_HOSTS');
+        });
+
+        it('preserves extraHosts when the EW-734 allocator runs (flag ON)', async () => {
+            process.env.K8S_MANAGED_SUBDOMAIN = 'true';
+            process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME = 'lb.ever.works';
+            try {
+                const ensureRecord = jest.fn().mockResolvedValue(undefined);
+                const {
+                    service,
+                    githubPlugin,
+                    customDomainRepository,
+                    dnsService,
+                    subdomainAllocator,
+                } = buildService({
+                    plugin: {
+                        id: 'k8s',
+                        getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                        getDeploymentSecrets,
+                    },
+                    deployProvider: 'k8s',
+                    // No `website` so the legacy path leaves `ingressHost`
+                    // unset and the EW-734 allocator wins.
+                });
+                dnsService.getProvider.mockReturnValue({ ensureRecord });
+                subdomainAllocator.allocate.mockResolvedValueOnce({
+                    subdomain: 'fresh',
+                    fqdn: 'fresh.ever.works',
+                    rootDomain: 'ever.works',
+                    allocated: true,
+                });
+                customDomainRepository.findByWork.mockResolvedValueOnce([
+                    { domain: 'tools.example.com' },
+                ]);
+
+                await service.deploy('work-1', 'user-1', {});
+
+                const { secrets } = captureCalls(githubPlugin);
+                const byKey = Object.fromEntries(secrets.map((s: any) => [s.key, s.value]));
+                expect(byKey.K8S_INGRESS_HOST).toBe('fresh.ever.works');
+                expect(byKey.K8S_EXTRA_HOSTS).toBe('tools.example.com');
+            } finally {
+                delete process.env.K8S_MANAGED_SUBDOMAIN;
+                delete process.env.EVER_WORKS_DEPLOY_LB_HOSTNAME;
+            }
+        });
+
+        it('falls back gracefully when the custom-domain lookup fails', async () => {
+            const { service, githubPlugin, customDomainRepository } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets,
+                },
+                deployProvider: 'k8s',
+                website: 'https://managed.example.com',
+            });
+            customDomainRepository.findByWork.mockRejectedValueOnce(new Error('db down'));
+
+            // The deploy must still dispatch with just the managed subdomain.
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
+            const { secrets } = captureCalls(githubPlugin);
+            const keys = secrets.map((s: any) => s.key);
+            expect(keys).toContain('K8S_INGRESS_HOST');
+            expect(keys).not.toContain('K8S_EXTRA_HOSTS');
         });
     });
 });
