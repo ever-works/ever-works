@@ -144,12 +144,18 @@ describe('DeployController', () => {
 
     describe('runtime-env (per-Work DATABASE_URL)', () => {
         it('getRuntimeEnv returns masked DATABASE_URL (no password) when configured', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
             workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
                 'postgresql://neondb_owner:supersecret@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
             );
 
-            const res: any = await controller.getRuntimeEnv({ userId: 'user-1' } as never, 'work-1');
+            const res: any = await controller.getRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+            );
 
             expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
             expect(res.databaseUrl.configured).toBe(true);
@@ -159,23 +165,36 @@ describe('DeployController', () => {
         });
 
         it('getRuntimeEnv reports not-configured when unset', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
             workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(null);
 
-            const res: any = await controller.getRuntimeEnv({ userId: 'user-1' } as never, 'work-1');
+            const res: any = await controller.getRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+            );
 
             expect(res.databaseUrl).toEqual({ configured: false, masked: null });
         });
 
         it('setRuntimeEnv persists via setDatabaseUrl and returns masked state', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: buildWork(), isCreator: true });
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
             workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
                 'postgresql://u:p@host.neon.tech/db',
             );
 
-            const res: any = await controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
-                databaseUrl: 'postgresql://u:p@host.neon.tech/db',
-            });
+            const res: any = await controller.setRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+                {
+                    databaseUrl: 'postgresql://u:p@host.neon.tech/db',
+                },
+            );
 
             expect(workRuntimeEnvService.setDatabaseUrl).toHaveBeenCalledWith(
                 'work-1',
