@@ -1,6 +1,6 @@
 'use client';
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
     Combobox,
     ComboboxButton,
@@ -9,6 +9,8 @@ import {
     ComboboxOptions,
 } from '@headlessui/react';
 import { AlertTriangle, Check, ChevronDown, FolderOpen, LoaderCircle, Search } from 'lucide-react';
+import { HoverPopup } from '@/components/works/detail/items/HoverPopup';
+import { WorkErrorPopup } from '@/components/works/WorkErrorPopup';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter as useTopLoaderRouter } from 'nextjs-toploader/app';
@@ -299,6 +301,7 @@ export function WorkSwitcher() {
                                 badgeClassName={currentWorkStatus.badge}
                                 isGenerating={currentWorkStatus.isGenerating}
                                 showWarningIcon={currentWorkStatus.isGeneratedWithWarnings}
+                                work={currentWork ?? undefined}
                             />
                         )}
 
@@ -382,9 +385,8 @@ export function WorkSwitcher() {
                                                         label={displayLabel}
                                                         badgeClassName={statusStyle.badge}
                                                         isGenerating={isItemGenerating}
-                                                        showWarningIcon={
-                                                            isItemGeneratedWithWarnings
-                                                        }
+                                                        showWarningIcon={isItemGeneratedWithWarnings}
+                                                        work={work}
                                                     />
 
                                                     {isCurrentWork && (
@@ -410,15 +412,25 @@ function WorkStatusBadge({
     isGenerating,
     showWarningIcon,
     className,
+    work,
 }: {
     label: string;
     badgeClassName: string;
     isGenerating: boolean;
     showWarningIcon: boolean;
     className?: string;
+    /** When provided, shows an error/warning popup on hover */
+    work?: Work;
 }) {
-    return (
+    const errorMessage = work?.generateStatus?.error ?? work?.platformSyncLastErrorMessage ?? null;
+    const warnings = work?.generateStatus?.warnings;
+    const isWarn = showWarningIcon && !errorMessage;
+    const hasPopup = !isGenerating && work && (!!errorMessage || !!warnings?.length);
+
+    const badgeEl = (ref?: React.RefObject<HTMLElement | null>, props?: Record<string, unknown>) => (
         <span
+            ref={ref as React.RefObject<HTMLSpanElement> | undefined}
+            {...props}
             className={cn(
                 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
                 badgeClassName,
@@ -429,5 +441,22 @@ function WorkStatusBadge({
             {isGenerating ? <ShinyText text={label} /> : label}
             {showWarningIcon && <AlertTriangle className="h-3 w-3" />}
         </span>
+    );
+
+    if (!hasPopup || !work) {
+        return badgeEl();
+    }
+
+    return (
+        <HoverPopup
+            trigger={(ref, props) => badgeEl(ref, props)}
+        >
+            <WorkErrorPopup
+                workId={work.id}
+                message={errorMessage}
+                warnings={isWarn ? warnings : undefined}
+                isWarn={isWarn}
+            />
+        </HoverPopup>
     );
 }
