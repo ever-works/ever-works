@@ -10,6 +10,8 @@ import {
     captureScreenshot,
     checkItemHealth,
 } from '@/app/actions/dashboard/items';
+import { GenerationErrorTooltip } from './GenerationErrorTooltip';
+import { resolveErrorCode, type GenerationErrorCode } from '@/lib/items/generation-error-codes';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -340,8 +342,13 @@ const DisplayDialog = ({ open, onOpenChange, item, workId, onUpdate }: DisplayDi
     );
     const [createPr, setCreatePr] = useState<boolean>(false);
     const [isSubmitting, startTransition] = useTransition();
+    const [inlineError, setInlineError] = useState<{
+        message: string;
+        code: GenerationErrorCode;
+    } | null>(null);
 
     const handleSubmit = () => {
+        setInlineError(null);
         startTransition(async () => {
             try {
                 const parsedOrder =
@@ -360,16 +367,22 @@ const DisplayDialog = ({ open, onOpenChange, item, workId, onUpdate }: DisplayDi
 
                 if (result.status === 'success') {
                     toast.success(result.message || t('updateSuccess'));
+                    setInlineError(null);
                     onUpdate?.({
                         featured,
                         order: parsedOrder,
                     });
                     onOpenChange(false);
                 } else {
-                    toast.error(result.message || t('updateFailed'));
+                    const errorMessage = result.message || t('updateFailed');
+                    const code = resolveErrorCode(result.error_code, errorMessage);
+                    setInlineError({ message: errorMessage, code });
+                    toast.error(errorMessage);
                 }
             } catch (error) {
-                toast.error(t('updateError'));
+                const errorMessage = t('updateError');
+                setInlineError({ message: errorMessage, code: 'GENERIC_ERROR' });
+                toast.error(errorMessage);
             }
         });
     };
@@ -426,6 +439,15 @@ const DisplayDialog = ({ open, onOpenChange, item, workId, onUpdate }: DisplayDi
                     />
                 </div>
 
+                {inlineError && (
+                    <div className="flex items-start gap-2 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+                        <p className="text-sm text-red-700 dark:text-red-300 leading-snug flex-1">
+                            {inlineError.message}
+                        </p>
+                        <GenerationErrorTooltip errorCode={inlineError.code} workId={workId} />
+                    </div>
+                )}
+
                 <DialogFooter>
                     <Button
                         variant="secondary"
@@ -469,6 +491,10 @@ const EditContentDialogInner = ({
     const [markdown, setMarkdown] = useState<string>(item.markdown ?? '');
     const [createPr, setCreatePr] = useState<boolean>(false);
     const [isSubmitting, startTransition] = useTransition();
+    const [inlineError, setInlineError] = useState<{
+        message: string;
+        code: GenerationErrorCode;
+    } | null>(null);
 
     const handleSubmit = () => {
         if (markdown === (item.markdown ?? '')) {
@@ -477,6 +503,7 @@ const EditContentDialogInner = ({
             return;
         }
 
+        setInlineError(null);
         startTransition(async () => {
             try {
                 const result = await updateItem(workId, {
@@ -490,22 +517,23 @@ const EditContentDialogInner = ({
                         result.message ||
                             t('editContentSuccess', { defaultValue: 'Item content updated.' }),
                     );
+                    setInlineError(null);
                     onUpdate?.({ markdown });
                     onOpenChange(false);
                 } else {
-                    toast.error(
+                    const errorMessage =
                         result.message ||
-                            t('editContentFailed', {
-                                defaultValue: 'Failed to update item content.',
-                            }),
-                    );
+                        t('editContentFailed', { defaultValue: 'Failed to update item content.' });
+                    const code = resolveErrorCode(result.error_code, errorMessage);
+                    setInlineError({ message: errorMessage, code });
+                    toast.error(errorMessage);
                 }
             } catch (error) {
-                toast.error(
-                    t('editContentError', {
-                        defaultValue: 'An error occurred while updating item content.',
-                    }),
-                );
+                const errorMessage = t('editContentError', {
+                    defaultValue: 'An error occurred while updating item content.',
+                });
+                setInlineError({ message: errorMessage, code: 'GENERIC_ERROR' });
+                toast.error(errorMessage);
             }
         });
     };
@@ -544,6 +572,15 @@ const EditContentDialogInner = ({
                     />
                 </div>
 
+                {inlineError && (
+                    <div className="flex items-start gap-2 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+                        <p className="text-sm text-red-700 dark:text-red-300 leading-snug flex-1">
+                            {inlineError.message}
+                        </p>
+                        <GenerationErrorTooltip errorCode={inlineError.code} workId={workId} />
+                    </div>
+                )}
+
                 <DialogFooter>
                     <Button
                         variant="secondary"
@@ -574,8 +611,13 @@ const DeleteDialog = ({ open, onOpenChange, item, workId, onDeleted }: DeleteDia
     const [reason, setReason] = useState('');
     const [createPr, setCreatePr] = useState(false);
     const [isDeleting, startTransition] = useTransition();
+    const [inlineError, setInlineError] = useState<{
+        message: string;
+        code: GenerationErrorCode;
+    } | null>(null);
 
     const handleDelete = () => {
+        setInlineError(null);
         startTransition(async () => {
             try {
                 const result = await removeItem(workId, item.slug!, {
@@ -585,13 +627,19 @@ const DeleteDialog = ({ open, onOpenChange, item, workId, onDeleted }: DeleteDia
 
                 if (result.status === 'success') {
                     toast.success(result.message || t('deleteSuccess'));
+                    setInlineError(null);
                     onDeleted?.();
                     onOpenChange(false);
                 } else {
-                    toast.error(result.message || t('deleteFailed'));
+                    const errorMessage = result.message || t('deleteFailed');
+                    const code = resolveErrorCode(result.error_code, errorMessage);
+                    setInlineError({ message: errorMessage, code });
+                    toast.error(errorMessage);
                 }
             } catch (error) {
-                toast.error(t('deleteError'));
+                const errorMessage = t('deleteError');
+                setInlineError({ message: errorMessage, code: 'GENERIC_ERROR' });
+                toast.error(errorMessage);
             }
         });
     };
@@ -635,6 +683,15 @@ const DeleteDialog = ({ open, onOpenChange, item, workId, onDeleted }: DeleteDia
                         />
                     </div>
                 </div>
+
+                {inlineError && (
+                    <div className="flex items-start gap-2 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-3 py-2">
+                        <p className="text-sm text-red-700 dark:text-red-300 leading-snug flex-1">
+                            {inlineError.message}
+                        </p>
+                        <GenerationErrorTooltip errorCode={inlineError.code} workId={workId} />
+                    </div>
+                )}
 
                 <DialogFooter>
                     <Button
