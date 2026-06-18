@@ -104,12 +104,17 @@ export interface JobRuntimeProviderRegistry {
 /**
  * Default in-memory {@link JobRuntimeProviderRegistry} implementation.
  *
- * Module-local mutable singleton because the binding factory in P0 is
- * declared but not wired into a NestJS module — tests instantiate this
- * class directly and the future `TasksModule` wiring will provide a
- * DI-managed instance. Keeping the implementation a plain class (not a
- * `@Injectable()` service) avoids importing the NestJS runtime into
- * `@ever-works/agent/tasks` ahead of need.
+ * Plain instantiable class — NOT a singleton at the class level. The
+ * single-active-runtime invariant (EW-683 §4) is enforced at the DI
+ * layer: the future `TasksModule` wiring registers exactly one
+ * instance as a NestJS provider, and call sites resolve through DI.
+ * Tests freely create fresh `new InMemoryJobRuntimeProviderRegistry()`
+ * instances for isolation; nothing in the class itself guards against
+ * multiple constructions.
+ *
+ * Kept as a plain class (not a `@Injectable()` service) so the binding
+ * factory in P0 — declared but not yet wired — doesn't drag the NestJS
+ * runtime into `@ever-works/agent/tasks` ahead of need.
  */
 export class InMemoryJobRuntimeProviderRegistry implements JobRuntimeProviderRegistry {
     private active: IJobRuntimeProvider | null = null;
