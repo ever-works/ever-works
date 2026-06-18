@@ -30,6 +30,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
+    // EW-685 P0 T4 — default in-memory implementation of
+    // `JobRuntimeProviderRegistry`, exposed via the barrel so DI modules
+    // can bind it as the `JOB_RUNTIME_PROVIDER_REGISTRY` useClass.
+    'InMemoryJobRuntimeProviderRegistry',
     // EW-685 P0 T4 — DI token for the in-memory job-runtime provider
     // registry consumed by the binding factory `buildJobRuntimeProviders()`.
     // Declared but not wired into any NestJS module yet; see
@@ -43,9 +47,14 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
     'TEMPLATE_CUSTOMIZATION_DISPATCHER',
+    // EW-742 P3 / EW-747 (T20 + T23) — tenant-aware resolver wrapping
+    // the EW-685 binding factory registry. See
+    // `tenant-aware-runtime.resolver.ts` header for the P3 stopgap +
+    // T21 / T22 deferral notes.
+    'TenantAwareRuntimeResolver',
     // Tenant-scoped job-runtime overlay (EW-742 P3.1 / T21) — in-process
     // LRU+TTL credential snapshot cache. Standalone class; the P3
-    // resolver follow-up and P4 worker host layer it in independently.
+    // resolver and P4 worker host layer it in independently.
     'TenantCredentialCache',
     'WEBHOOK_DELIVERY_DISPATCHER',
     'WORK_GENERATION_DISPATCHER',
