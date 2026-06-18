@@ -55,7 +55,7 @@ P2.0 (REST API) ✅ Done in [#1341](https://github.com/ever-works/ever-works/pul
 - [ ] **T28.** Per-tenant queue polling for BullMQ in `packages/plugins/job-runtime-bullmq/src/tenant-worker-host.ts` — one worker per `(tenantId, queueName)` with BullMQ `prefix` set to the tenant id; reuses `lockDuration`/`lockRenewTime` from EW-683's host config.
 - [ ] **T29.** Per-tenant schema polling for pg-boss in `packages/plugins/job-runtime-pgboss/src/tenant-worker-host.ts` — one `boss` instance per `(tenantId, schema)` (Q2: schema-per-tenant), reusing the platform `DATABASE_URL` by default.
 - [ ] **T30.** Multiplexing worker option (config flag) in each provider's worker host — one worker process polls all tenants and routes per `tenant_id` in job metadata; selected via `EVER_WORKS_JOB_RUNTIME_HOSTING={per-tenant|shared|tiered}` matching Q5's operator-gated platform-default.
-- [ ] **T31.** Tenant-id propagation in run metadata for all providers — extend `JobEnqueueOptions` in `packages/plugin/src/job-runtime/job-runtime.contract.ts` with a `tenantId` field and ensure every provider's dispatcher stamps it (Trigger `metadata`, Inngest `data`, Temporal `searchAttributes`, BullMQ `opts.tenantId`, pg-boss payload field).
+- [ ] **T31.** Tenant-id propagation in run metadata for all providers — extend `JobEnqueueOptions` in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (shipped EW-685 P0) with a `tenantId` field and ensure every provider's dispatcher stamps it (Trigger `metadata`, Inngest `data`, Temporal `searchAttributes`, BullMQ `opts.tenantId`, pg-boss payload field).
 - [ ] **T32.** Integration tests per provider × per-tenant scenario under each plugin's `__tests__/tenant-isolation.spec.ts` — two tenants on the same provider, verify no cross-tenant run leakage and that webhook/poller routing lands on the correct tenant.
 
 ## Phase 5 — Plugin gating · `[EW-742 P5]` ✅ Done in [#1350](https://github.com/ever-works/ever-works/pull/1350) (pending cascade)
@@ -71,11 +71,11 @@ P2.0 (REST API) ✅ Done in [#1341](https://github.com/ever-works/ever-works/pul
 
 ## Phase 6 — Conformance · `[EW-742 P6]`
 
-- [ ] **T36.** Per-tenant test harness extending EW-683's conformance suite under `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — parameterised by `(providerId, tenantA, tenantB)`, reuses the base contract suite then layers tenant-isolation, rotation, and force-invalidate assertions.
+- [ ] **T36.** Per-tenant test harness extending EW-683's conformance suite under `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — parameterised by `(providerId, tenantA, tenantB)`, reuses the base contract suite then layers tenant-isolation, rotation, and force-invalidate assertions.
 - [ ] **T37.** Parameterised per-tenant conformance run per provider in CI — extend the existing `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}` matrix in `.github/workflows/` with a `TENANT_OVERLAY={off|on}` axis; both axes must be green per provider.
-- [ ] **T38.** Graceful drain test (Q4) in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — enqueue run with credential version N, rotate to N+1 mid-run, verify the in-flight run completes with N's credential snapshot and a newly enqueued run uses N+1.
-- [ ] **T39.** Force-invalidate test in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — invoke the admin `POST /api/account/job-runtime/force-invalidate` action, verify in-flight runs are marked `FAILED` (with `reason='credential_force_invalidated'`) and new enqueues are blocked until a new credential is saved.
-- [ ] **T40.** Cross-provider isolation test in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — tenant A on `pgboss`, tenant B on `temporal`; concurrent enqueues, verify zero cross-talk in run records, webhooks, and worker logs.
+- [ ] **T38.** Graceful drain test (Q4) in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — enqueue run with credential version N, rotate to N+1 mid-run, verify the in-flight run completes with N's credential snapshot and a newly enqueued run uses N+1.
+- [ ] **T39.** Force-invalidate test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — invoke the admin `POST /api/account/job-runtime/force-invalidate` action, verify in-flight runs are marked `FAILED` (with `reason='credential_force_invalidated'`) and new enqueues are blocked until a new credential is saved.
+- [ ] **T40.** Cross-provider isolation test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — tenant A on `pgboss`, tenant B on `temporal`; concurrent enqueues, verify zero cross-talk in run records, webhooks, and worker logs.
 
 ## Phase 7 — Docs · `[EW-742 P7]`
 
