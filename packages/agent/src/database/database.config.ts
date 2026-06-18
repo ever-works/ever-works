@@ -86,6 +86,9 @@ import {
     UserNotificationCategoryMute,
     OrganizationNotificationDefault,
     ComposioTriggerSubscription,
+    // Tenant-scoped job-runtime overlay (EW-742 P1)
+    TenantJobRuntimeConfig,
+    TenantJobRuntimeAudit,
 } from '../entities';
 import {
     PluginEntity,
@@ -223,6 +226,9 @@ export const ENTITIES = [
     UserNotificationPreference,
     UserNotificationCategoryMute,
     OrganizationNotificationDefault,
+    // Tenant-scoped job-runtime overlay (EW-742 P1)
+    TenantJobRuntimeConfig,
+    TenantJobRuntimeAudit,
 ];
 
 /**
