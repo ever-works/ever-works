@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { configDotenv } from 'dotenv';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -13,6 +13,7 @@ import * as path from 'path';
 import { json, urlencoded } from 'express';
 import { assertProductionCorsConfig } from './cors-validation';
 import { config as appConfig } from './config/constants';
+import { config as agentConfig } from '@ever-works/agent/config';
 import { resolveTrustProxyHops } from './config/trust-proxy';
 
 async function bootstrap() {
@@ -39,6 +40,36 @@ async function bootstrap() {
     // Initialize Sentry and PostHog
     initSentry();
     initPostHog();
+
+    // EW-683 / EW-685 P0 T6 — surface the active job-runtime provider at
+    // boot so operators can verify their EVER_WORKS_JOB_RUNTIME selector
+    // landed (or notice typos that silently fall back to `trigger`).
+    // Until EW-686 P1 lands the binding factory + IJobRuntimeProvider
+    // implementations, the value is informational only — every dispatcher
+    // symbol still routes through TriggerService directly. We log it now
+    // so the env var is observable from the moment the variable starts
+    // being deployed; the bound-but-experimental warning becomes accurate
+    // automatically once T4 wires it.
+    const bootLogger = new Logger('JobRuntime');
+    const activeRuntime = agentConfig.jobRuntime.getActiveProviderId();
+    const requestedRaw = (process.env.EVER_WORKS_JOB_RUNTIME ?? '').trim();
+    if (requestedRaw && requestedRaw.toLowerCase() !== activeRuntime) {
+        bootLogger.warn(
+            `EVER_WORKS_JOB_RUNTIME='${requestedRaw}' is not a recognised provider id; ` +
+                `falling back to the default ('${activeRuntime}'). ` +
+                `Valid ids: trigger | temporal | bullmq | pgboss | inngest. ` +
+                `See docs/specs/architecture/job-runtime-providers.md §4.`,
+        );
+    }
+    if (agentConfig.jobRuntime.isExperimentalProvider()) {
+        bootLogger.warn(
+            `Active job-runtime provider: '${activeRuntime}' (experimental). ` +
+                `Non-default providers ship behind the EW-683 conformance suite — ` +
+                `green-on-suite providers will drop this warning in a future release.`,
+        );
+    } else {
+        bootLogger.log(`Active job-runtime provider: '${activeRuntime}' (default).`);
+    }
 
     const app = await NestFactory.create<NestExpressApplication>(ApiModule);
 
