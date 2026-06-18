@@ -25,3 +25,8 @@ export * from './vector-store.interface.js';
 // + future Route53/etc. via the plugin registry). Additive — does NOT replace
 // the existing `CloudflareDnsProvider` concrete class in @ever-works/agent.
 export * from './dns.interface.js';
+// EW-683 / EW-685 P0 — pluggable job-runtime providers (Trigger.dev today;
+// Temporal / BullMQ / pg-boss / Inngest via plugin packages once EW-686+
+// land). Additive contract-only — no call site is bound through this yet.
+// See docs/specs/architecture/job-runtime-providers.md §2 (seam) + §3 (contract).
+export * from './job-runtime.interface.js';
