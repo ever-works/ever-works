@@ -1,7 +1,7 @@
 # Architecture: Job-Runtime Providers (pluggable background-job runtime)
 
-**Status**: `Proposed` (tracking [EW-683](https://evertech.atlassian.net/browse/EW-683))
-**Last updated**: 2026-05-28
+**Status**: `In progress` — EW-685 P0 contract shipped (no behaviour change). EW-686 P1 (rehouse Trigger.dev as the `trigger` plugin) + binding factory + per-provider plugins remain.
+**Last updated**: 2026-06-18
 **Audience**: AI agents and engineers who need to understand how the platform's long-running work is dispatched, scheduled, cancelled, and executed — and how that runtime becomes a **swappable provider** (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest optional).
 
 > This spec describes the **target architecture**. Nothing here is built yet. It generalises the existing [`trigger-integration`](./trigger-integration.md) and [`trigger-worker`](./trigger-worker.md) specs into a provider-neutral form. Read those two first — this spec assumes them. Decision rationale: [ADR-015](../decisions/015-job-runtime-provider-pluggability.md). Per-provider detail: [`features/job-runtime-providers/providers.md`](../features/job-runtime-providers/providers.md).
@@ -54,10 +54,10 @@ The API depends only on these symbols; it has **no** `@trigger.dev/sdk` import. 
 
 ## 3. The `IJobRuntimeProvider` contract
 
-A new capability `job-runtime` is registered in `packages/plugin/src/job-runtime/`. A provider plugin extends `BasePlugin` (category `job-runtime`, `configurationMode: 'admin-only'`) and exposes:
+A new capability `job-runtime` is registered in `packages/plugin/src/contracts/capabilities/`. A provider plugin extends `BasePlugin` (category `job-runtime`, `configurationMode: 'admin-only'`) and exposes:
 
 ```ts
-// packages/plugin/src/job-runtime/job-runtime.contract.ts (proposed)
+// packages/plugin/src/contracts/capabilities/job-runtime.interface.ts (shipped in EW-685 P0)
 export interface IJobRuntimeProvider {
 	/** Stable provider id: 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' */
 	readonly runtimeId: JobRuntimeId;
