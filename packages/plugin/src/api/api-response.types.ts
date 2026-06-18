@@ -19,8 +19,12 @@ import type { ProviderModelSummary } from '../contracts/capabilities/form-schema
 
 /**
  * Setting scope determines where the setting value is stored and who can configure it.
+ * The `tenant` scope was added by EW-742 (tenant-scoped job-runtime overlay) for
+ * settings that one tenant on a multi-tenant deployment configures separately from
+ * the global / per-user / per-work tiers. For single-tenant deployments, `tenant`
+ * resolves identically to `global`.
  */
-export type SettingScopeApi = 'global' | 'user' | 'work';
+export type SettingScopeApi = 'global' | 'tenant' | 'user' | 'work';
 
 /**
  * Plugin settings schema property for API responses.
@@ -44,7 +48,7 @@ export interface PluginSettingsSchemaProperty {
 	adminOnly?: boolean;
 	/** Environment variable name if field is env-only (from JsonSchema x-envVar) */
 	envVar?: string;
-	/** Setting scope: global, user, or work (from JsonSchema x-scope) */
+	/** Setting scope: global, tenant, user, or work (from JsonSchema x-scope) */
 	scope?: SettingScopeApi;
 	/** Enumerated allowed values */
 	enum?: readonly unknown[];
