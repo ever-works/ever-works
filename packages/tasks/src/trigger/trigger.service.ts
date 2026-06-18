@@ -23,6 +23,14 @@ import {
     KbTranscribePayload,
     KbTranscribeDispatcher,
 } from '@ever-works/agent/tasks';
+import type {
+    JobRunStatus,
+    JobRuntimeDispatchers,
+    JobRuntimeId,
+    ScheduleSpec,
+    WorkerHostHandle,
+    WorkerHostOptions,
+} from '@ever-works/plugin';
 import { workGenerationTask } from '../tasks/trigger/work-generation.task';
 import { workImportTask } from '../tasks/trigger/work-import.task';
 import { templateCustomizationTask } from '../tasks/trigger/template-customization.task';
@@ -54,6 +62,49 @@ export class TriggerService
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
 
+    /**
+     * EW-686 P1 (first sub-step) — structural conformance with
+     * `IJobRuntimeProvider` from
+     * `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`.
+     *
+     * Deliberately NOT `implements IJobRuntimeProvider` yet — that
+     * interface extends `IPlugin`, which would force `TriggerService` to
+     * also expose `id` / `name` / `version` / `category` / `capabilities` /
+     * `settingsSchema` / `onLoad` / `onUnload`. Adding the full `IPlugin`
+     * surface to this concrete class belongs in a follow-up sub-PR (either
+     * via `implements IJobRuntimeProvider` once a manifest stub is in
+     * place, or via a thin adapter class that wraps this service). For
+     * now the `*_DISPATCHER` symbols keep their existing `useExisting:
+     * TriggerService` bindings — no call sites change — and the binding
+     * factory landing in a later sub-PR can already consume the structural
+     * `IJobRuntimeProvider` shape via duck typing.
+     *
+     * The 6 fields/methods below mirror §3 of
+     * `docs/specs/architecture/job-runtime-providers.md` exactly:
+     *   - `runtimeId`            (selector match)
+     *   - `dispatchers`          (the `*_DISPATCHER` bag)
+     *   - `isEnabled()`          (reachability gate)
+     *   - `cancel()`             (provider-side abort)
+     *   - `getRunStatus()`       (lifecycle read)
+     *   - `registerSchedules()`  (cron registration)
+     *   - `startWorkerHost?()`   (push-model no-op for Trigger.dev)
+     */
+    readonly runtimeId: JobRuntimeId = 'trigger';
+
+    /**
+     * `TriggerService` IS the dispatcher bag — it already implements
+     * every `*Dispatcher` interface exported from `@ever-works/agent/tasks`
+     * (WorkGeneration, WorkImport, TemplateCustomization, WebhookDelivery,
+     * KbMirrorDocument, KbBackfillSkeleton, KbEmbedDocument,
+     * KbOrgOverlayFanout, KbNormalizeMedia, KbTranscribe + notification
+     * channel delivery). The cast through `unknown` is required because
+     * the contract's {@link JobRuntimeDispatchers} type is intentionally
+     * the opaque `Readonly<Record<string, unknown>>` shape — see the
+     * JSDoc on `JobRuntimeDispatchers` in the contract file for the
+     * `plugin → agent → plugin` cycle-avoidance rationale.
+     */
+    readonly dispatchers: JobRuntimeDispatchers = this as unknown as JobRuntimeDispatchers;
+
     private supportedMachines = [
         'medium-1x',
         'micro',
@@ -84,6 +135,175 @@ export class TriggerService
         configure({ accessToken, baseURL });
         this.configured = true;
         return true;
+    }
+
+    /**
+     * EW-686 P1 — public `IJobRuntimeProvider.isEnabled()` view of the
+     * existing `ensureConfigured()` gate. Returns `true` when
+     * `shouldUseTrigger()` is true AND a `TRIGGER_SECRET_KEY` is present
+     * (the same gate every `dispatchXxx` method already uses internally).
+     *
+     * Side-effects are intentional and harmless: the first call lazily
+     * runs `configure({ accessToken, baseURL })` against `@trigger.dev/sdk`,
+     * identical to what the first dispatch would have done; subsequent
+     * calls are a cheap boolean read.
+     */
+    isEnabled(): boolean {
+        return this.ensureConfigured();
+    }
+
+    /**
+     * EW-686 P1 — provider-side cancellation of an in-flight Trigger.dev
+     * run by run id. Mirrors the existing {@link cancelWorkGeneration}
+     * shape (single `runs.cancel(runId)` SDK call, errors swallowed and
+     * logged, `false` on failure).
+     *
+     * Returns `true` when Trigger.dev accepted the cancel request — not
+     * necessarily when the orchestrator has observed the abort signal
+     * (worker-side abort is a separate concern, unchanged here). Returns
+     * `false` when the runtime is disabled OR the SDK call threw
+     * (typically unknown / already-terminal run ids).
+     */
+    async cancel(runId: string): Promise<boolean> {
+        if (!this.ensureConfigured()) {
+            return false;
+        }
+
+        try {
+            await runs.cancel(runId);
+            return true;
+        } catch (error) {
+            this.logger.warn(`Failed to cancel Trigger.dev run ${runId}: ${error}`);
+            return false;
+        }
+    }
+
+    /**
+     * EW-686 P1 — look up live lifecycle of a Trigger.dev run. Returns
+     * `'unknown'` when the runtime is disabled OR the run id can't be
+     * resolved (pruned past retention, cross-provider run id, network
+     * error) — per the contract, callers treat `'unknown'` as "stale,
+     * try DB instead" rather than as a hard failure.
+     *
+     * Mapping is driven by the actual `@trigger.dev/sdk` v4 status enum
+     * observed at `@trigger.dev/sdk/dist/.../v3/runs.d.ts`:
+     *   `PENDING_VERSION | QUEUED | DEQUEUED | EXECUTING | WAITING |
+     *    COMPLETED | CANCELED | FAILED | CRASHED | SYSTEM_FAILURE |
+     *    DELAYED | EXPIRED | TIMED_OUT`.
+     *
+     * Note Trigger.dev uses single-L `CANCELED` (US spelling); the
+     * contract uses double-L `cancelled` (matches the DB enums in
+     * `@ever-works/agent`). All terminal-failure states collapse into
+     * `'failed'` — the contract intentionally does not distinguish
+     * user-failure vs system-failure vs timeout (that detail belongs in
+     * provider-specific telemetry, not in the cross-provider surface).
+     */
+    async getRunStatus(runId: string): Promise<JobRunStatus> {
+        if (!this.ensureConfigured()) {
+            return 'unknown';
+        }
+
+        try {
+            const run = await runs.retrieve(runId);
+            return this.mapTriggerStatus(run.status);
+        } catch (error) {
+            this.logger.debug(`getRunStatus(${runId}) failed: ${error}`);
+            return 'unknown';
+        }
+    }
+
+    /**
+     * EW-686 P1 — schedule registration is currently a no-op for the
+     * Trigger.dev provider.
+     *
+     * Trigger.dev tasks self-register their cron at deploy time via the
+     * `schedules.task()` SDK call inside the per-task files under
+     * `packages/tasks/src/tasks/trigger/` — the `pnpm deploy:trigger`
+     * pipeline is what actually wires cron up against Trigger.dev's
+     * Schedules service. The platform-level `ScheduleSpec[]` list this
+     * contract method accepts is therefore unused for Trigger.dev;
+     * pull-model providers landing later (Temporal, BullMQ, pg-boss)
+     * will translate the list into their native cron mechanism.
+     *
+     * Logged at debug so an operator inspecting logs sees the no-op
+     * was intentional, not a missed hookup.
+     */
+    async registerSchedules(schedules: readonly ScheduleSpec[]): Promise<void> {
+        if (schedules.length > 0) {
+            this.logger.debug(
+                `EW-686 P1: schedule registration stub; cron jobs still ship via the ` +
+                    `per-task schedule files in packages/tasks/src/tasks/trigger/ ` +
+                    `(received ${schedules.length} ScheduleSpec entries, ignored).`,
+            );
+        }
+    }
+
+    /**
+     * EW-686 P1 — worker hosting is a no-op for the Trigger.dev provider.
+     *
+     * Trigger.dev is a **push-model** runtime: Trigger.dev's cloud
+     * invokes our deployed task package on its own machines — we don't
+     * stand up or poll a worker process from the API. The optional
+     * `startWorkerHost` exists on the contract for **pull-model**
+     * providers (Temporal worker, BullMQ Worker, pg-boss subscribe) that
+     * land in later sub-PRs. For Trigger.dev we return a no-op handle so
+     * a generic "start worker host if the provider supports it" caller
+     * Just Works without per-provider branching.
+     */
+    async startWorkerHost(_opts: WorkerHostOptions): Promise<WorkerHostHandle> {
+        this.logger.debug(
+            'EW-686 P1: startWorkerHost() is a no-op for Trigger.dev (push-model runtime; ' +
+                "Trigger.dev's cloud invokes the deployed task package directly).",
+        );
+        return {
+            stop: async () => {
+                // No-op; nothing to drain.
+            },
+        };
+    }
+
+    /**
+     * EW-686 P1 — translate a Trigger.dev v4 SDK status string into the
+     * 6-value {@link JobRunStatus} union the contract exposes. Unknown
+     * values fall back to `'unknown'` rather than throwing so a future
+     * Trigger.dev SDK widening doesn't break callers — operators get
+     * the `'unknown'` fallback (which they already handle for
+     * cross-provider run ids) and the spec/code drift is caught by the
+     * conformance suite landing per EW-685 T6 / EW-750.
+     */
+    private mapTriggerStatus(status: string): JobRunStatus {
+        switch (status) {
+            // Pre-execution: still in Trigger.dev's queue, waiting for
+            // capacity / a deployed worker version / a delay timer.
+            case 'PENDING_VERSION':
+            case 'QUEUED':
+            case 'DEQUEUED':
+            case 'WAITING':
+            case 'DELAYED':
+                return 'queued';
+
+            case 'EXECUTING':
+                return 'running';
+
+            case 'COMPLETED':
+                return 'completed';
+
+            // Trigger.dev SDK v4 uses single-L `CANCELED`; the contract
+            // uses double-L `cancelled` (matches the DB enums).
+            case 'CANCELED':
+                return 'cancelled';
+
+            // All terminal-failure states collapse into `'failed'`.
+            case 'FAILED':
+            case 'CRASHED':
+            case 'SYSTEM_FAILURE':
+            case 'TIMED_OUT':
+            case 'EXPIRED':
+                return 'failed';
+
+            default:
+                return 'unknown';
+        }
     }
 
     private machine() {
