@@ -43,6 +43,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
     'TEMPLATE_CUSTOMIZATION_DISPATCHER',
+    // Tenant-scoped job-runtime overlay (EW-742 P3.1 / T21) — in-process
+    // LRU+TTL credential snapshot cache. Standalone class; the P3
+    // resolver follow-up and P4 worker host layer it in independently.
+    'TenantCredentialCache',
     'WEBHOOK_DELIVERY_DISPATCHER',
     'WORK_GENERATION_DISPATCHER',
     'WORK_GENERATION_MODE',
