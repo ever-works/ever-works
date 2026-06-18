@@ -2744,6 +2744,9 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../agent
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../plugin
       '@nestjs/cache-manager':
         specifier: ^3.1.0
         version: 3.1.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(cache-manager@7.2.8)(keyv@5.6.0)(rxjs@7.8.2)
