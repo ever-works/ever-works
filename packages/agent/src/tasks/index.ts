@@ -36,3 +36,14 @@ export * from './kb-reembed-work-dispatcher';
 // Tenant-scoped job-runtime overlay (EW-742 P1) — credential versioning
 // for graceful drain on rotation. See ADR-017 §3 + spec.md FR-5.
 export * from './credential-version.service';
+
+// EW-685 P0 T4 — job-runtime binding factory + registry token.
+//
+// Only the DI token surfaces through the barrel here so the
+// `TASKS_BARREL_RUNTIME_SYMBOLS` pin stays minimal — consumers that need
+// the registry class or `buildJobRuntimeProviders()` import them directly
+// from `./job-runtime.providers`. The factory is declared but not wired
+// into any NestJS module yet; see the file header for the deferred-wiring
+// rationale.
+export { JOB_RUNTIME_PROVIDER_REGISTRY } from './job-runtime.providers';
+export type { JobRuntimeProviderRegistry } from './job-runtime.providers';
