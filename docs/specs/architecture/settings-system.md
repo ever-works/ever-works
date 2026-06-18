@@ -23,12 +23,12 @@ settings safe to use across admin, user, and per-work contexts.
 
 Plugin settings can be set at four scopes (three originally; `tenant` was added by [EW-742](https://evertech.atlassian.net/browse/EW-742) for multi-tenant deployments):
 
-| Scope    | Storage table              | Configured by    | Lifetime                                              |
-| -------- | -------------------------- | ---------------- | ----------------------------------------------------- |
-| `global` | `plugin_settings`          | Admin            | Survives all sessions                                 |
-| `tenant` | `tenant_plugin_settings`   | Tenant admin     | Per-tenant; overrides `global` for tenant-scoped keys |
-| `user`   | `user_plugins`             | The user         | Per-user; overrides `tenant`/`global`                 |
-| `work`   | `work_plugins`             | Work editor      | Per-work (overrides user)                             |
+| Scope    | Storage table            | Configured by | Lifetime                                              |
+| -------- | ------------------------ | ------------- | ----------------------------------------------------- |
+| `global` | `plugin_settings`        | Admin         | Survives all sessions                                 |
+| `tenant` | `tenant_plugin_settings` | Tenant admin  | Per-tenant; overrides `global` for tenant-scoped keys |
+| `user`   | `user_plugins`           | The user      | Per-user; overrides `tenant`/`global`                 |
+| `work`   | `work_plugins`           | Work editor   | Per-work (overrides user)                             |
 
 > **`tenant` scope status (2026-06):** the `x-scope: 'tenant'` JSON-Schema value
 > is recognised by the plugin contracts (see `packages/plugin/src/settings/json-schema.types.ts`).
