@@ -19,8 +19,14 @@ export interface PluginSchemaExtensions {
 	readonly 'x-secret'?: boolean;
 	/** Environment variable fallback (checked when no other setting is found) */
 	readonly 'x-envVar'?: string;
-	/** Setting scope: global, user, or work */
-	readonly 'x-scope'?: 'global' | 'user' | 'work';
+	/**
+	 * Setting scope: global, tenant, user, or work.
+	 * Hint to the UI; actual scope is inferred from where the user clicks. The
+	 * `tenant` value is consumed by the multi-tenant overlay introduced in EW-742
+	 * (see docs/specs/features/tenant-job-runtime-overlay/spec.md). For non-tenant
+	 * deployments, `tenant` behaves identically to `global` at resolution time.
+	 */
+	readonly 'x-scope'?: 'global' | 'tenant' | 'user' | 'work';
 	/** Whether field is admin-only (not visible to regular users) */
 	readonly 'x-adminOnly'?: boolean;
 	/** Whether field should be hidden from the settings UI entirely */
