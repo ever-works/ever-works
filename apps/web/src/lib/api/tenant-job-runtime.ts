@@ -44,11 +44,27 @@ export interface UpsertTenantJobRuntimeConfigPayload {
     enabled?: boolean;
 }
 
+/**
+ * EW-742 P5 (T34) — shape of `GET /api/account/job-runtime/available-providers`.
+ * The picker fetches this server-side to know which provider ids the
+ * operator allow-list permits. Empty / unset env returns ALL bundled
+ * providers (fail-open default).
+ */
+export interface TenantJobRuntimeAvailableProvidersResponse {
+    providers: TenantJobRuntimeProviderId[];
+}
+
 const BASE = '/api/account/job-runtime';
 
 export const tenantJobRuntimeAPI = {
     getConfig: async () => {
         return serverFetch<TenantJobRuntimeConfigResponse>(`${BASE}/config`);
+    },
+
+    getAvailableProviders: async () => {
+        return serverFetch<TenantJobRuntimeAvailableProvidersResponse>(
+            `${BASE}/available-providers`,
+        );
     },
 
     upsertConfig: async (payload: UpsertTenantJobRuntimeConfigPayload) => {
@@ -95,6 +111,7 @@ export const tenantJobRuntimeAPI = {
  * '@/lib/api/tenant-job-runtime'`.
  */
 export const getJobRuntimeConfig = () => tenantJobRuntimeAPI.getConfig();
+export const getAvailableJobRuntimeProviders = () => tenantJobRuntimeAPI.getAvailableProviders();
 export const upsertJobRuntimeConfig = (payload: UpsertTenantJobRuntimeConfigPayload) =>
     tenantJobRuntimeAPI.upsertConfig(payload);
 export const rotateJobRuntimeConfig = () => tenantJobRuntimeAPI.rotate();

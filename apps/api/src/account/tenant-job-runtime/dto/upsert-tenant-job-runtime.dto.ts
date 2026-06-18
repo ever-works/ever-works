@@ -12,10 +12,12 @@ import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'cl
  * Validation contract:
  *   - `providerId` MUST be in the static instance-default allow-list
  *     (per [`providers.md`](../../../../../docs/specs/features/tenant-job-runtime-overlay/providers.md)
- *     availability matrix). The dynamic per-tenant operator allow-list
- *     filtering (FR-9 / T34) lives in the service layer and is deferred
- *     to P5; the static enum here is the floor-level gate that 400s
- *     unknown provider ids before they touch the database.
+ *     availability matrix). The dynamic operator allow-list filtering
+ *     (FR-9 / T34) lives in the service layer (`upsertConfig` →
+ *     `getAvailableProviders()`); the static enum here is the
+ *     floor-level gate that 400s unknown provider ids before they
+ *     touch the database. Per-tenant whitelist behind a flag stays
+ *     deferred (P5.1 follow-up).
  *   - `mode` MUST be one of `inherit` | `byo` | `override` per ADR-017 §1.
  *   - `credentialsSecretRef` MUST be present when `mode != 'inherit'`.
  *     When `mode = 'inherit'` it is forbidden (the row is reverted to

@@ -32,16 +32,26 @@ import {
 
 interface JobRuntimeSettingsProps {
     initialConfig: TenantJobRuntimeConfigResponse;
+    /**
+     * EW-742 P5 (T34) — provider ids the operator allow-list permits
+     * (server fetched via `/api/account/job-runtime/available-providers`).
+     * The picker filters its options against this list; when the
+     * tenant's currently saved `providerId` is no longer in the list
+     * (operator disabled it after the tenant configured it), the form
+     * shows a warning banner pointing the user at an inherit / switch
+     * recovery path.
+     */
+    availableProviders: TenantJobRuntimeProviderId[];
     loadError: string | null;
 }
 
-const PROVIDER_OPTIONS: { value: TenantJobRuntimeProviderId; label: string }[] = [
-    { value: 'trigger', label: 'Trigger.dev' },
-    { value: 'temporal', label: 'Temporal' },
-    { value: 'bullmq', label: 'BullMQ' },
-    { value: 'pgboss', label: 'pg-boss' },
-    { value: 'inngest', label: 'Inngest' },
-];
+const PROVIDER_LABELS: Record<TenantJobRuntimeProviderId, string> = {
+    trigger: 'Trigger.dev',
+    temporal: 'Temporal',
+    bullmq: 'BullMQ',
+    pgboss: 'pg-boss',
+    inngest: 'Inngest',
+};
 
 const MODE_OPTIONS: { value: TenantJobRuntimeMode; labelKey: string }[] = [
     { value: 'inherit', labelKey: 'mode.inherit' },
@@ -83,17 +93,33 @@ function formatTimestamp(value: string | null): string {
  * JSON Schemas) are explicitly deferred to a follow-up sub-story per
  * the implementing prompt.
  */
-export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSettingsProps) {
+export function JobRuntimeSettings({
+    initialConfig,
+    availableProviders,
+    loadError,
+}: JobRuntimeSettingsProps) {
     const t = useTranslations('dashboard.settings.jobRuntime');
     const [config, setConfig] = useState<TenantJobRuntimeConfigResponse>(initialConfig);
+
+    // EW-742 P5 (T34) — derive picker options from the operator
+    // allow-list. Order follows the operator declaration (the server
+    // preserves it). Memoised against the prop so toggling unrelated
+    // form state doesn't re-build the array.
+    const providerOptions = useMemo(
+        () => availableProviders.map((value) => ({ value, label: PROVIDER_LABELS[value] })),
+        [availableProviders],
+    );
 
     // Form-local state mirrors the editable shape of the upsert payload.
     // We initialise providerId with a sane default when the row is the
     // synthetic inherit (providerId = null) — the dropdown can't render
-    // null so we pre-select trigger; the value only ships if the user
-    // also flips mode away from inherit.
+    // null so we pre-select the first operator-allowed provider (falling
+    // back to `trigger` if the allow-list is empty, which shouldn't
+    // happen given the server fail-open default but keeps the UI from
+    // rendering an empty Select).
+    const defaultPickerValue: TenantJobRuntimeProviderId = availableProviders[0] ?? 'trigger';
     const [providerId, setProviderId] = useState<TenantJobRuntimeProviderId>(
-        (initialConfig.providerId ?? 'trigger') as TenantJobRuntimeProviderId,
+        (initialConfig.providerId ?? defaultPickerValue) as TenantJobRuntimeProviderId,
     );
     const [mode, setMode] = useState<TenantJobRuntimeMode>(initialConfig.mode);
     const [enabled, setEnabled] = useState<boolean>(initialConfig.enabled);
@@ -119,10 +145,21 @@ export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSetti
 
     const applyConfig = (next: TenantJobRuntimeConfigResponse) => {
         setConfig(next);
-        setProviderId((next.providerId ?? 'trigger') as TenantJobRuntimeProviderId);
+        setProviderId((next.providerId ?? defaultPickerValue) as TenantJobRuntimeProviderId);
         setMode(next.mode);
         setEnabled(next.enabled);
     };
+
+    // EW-742 P5 (T34) — currently-saved provider is no longer in the
+    // operator allow-list. Show a warning banner so the user knows the
+    // overlay needs to be reconfigured (revert to inherit or switch to
+    // an allowed provider). We only flag this for non-inherit rows;
+    // inherit-mode rows ignore providerId entirely.
+    const savedProviderDisallowed =
+        config.mode !== 'inherit' &&
+        config.providerId !== null &&
+        !availableProviders.includes(config.providerId);
+    const noProvidersAvailable = availableProviders.length === 0;
 
     const handleSave = () => {
         if (credentialsJsonError) {
@@ -223,6 +260,26 @@ export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSetti
                 </div>
             )}
 
+            {savedProviderDisallowed && config.providerId && (
+                <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-text dark:text-text-dark">
+                        {t('messages.providerNoLongerAllowed', {
+                            provider: PROVIDER_LABELS[config.providerId] ?? config.providerId,
+                        })}
+                    </p>
+                </div>
+            )}
+
+            {noProvidersAvailable && (
+                <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-text dark:text-text-dark">
+                        {t('messages.noProvidersAvailable')}
+                    </p>
+                </div>
+            )}
+
             <div className="grid grid-cols-1 @lg/main:grid-cols-2 gap-4 p-4 rounded-lg border border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40">
                 <Readout label={t('readout.mode')} value={t(`mode.${config.mode}` as never)} />
                 <Readout
@@ -262,8 +319,9 @@ export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSetti
                         onValueChange={(value) =>
                             setProviderId(value as TenantJobRuntimeProviderId)
                         }
+                        disabled={noProvidersAvailable}
                     >
-                        {PROVIDER_OPTIONS.map((opt) => (
+                        {providerOptions.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                                 {opt.label}
                             </option>

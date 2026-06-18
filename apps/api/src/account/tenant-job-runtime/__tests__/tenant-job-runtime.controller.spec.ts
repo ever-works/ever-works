@@ -26,6 +26,8 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import type { CredentialVersionService } from '@ever-works/agent/tasks';
 import type { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import type { AuthenticatedUser } from '../../../auth/types/auth.types';
+import { BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS } from '../../../config/constants';
+import { TENANT_JOB_RUNTIME_PROVIDER_IDS } from '../dto/upsert-tenant-job-runtime.dto';
 import { TenantJobRuntimeController } from '../tenant-job-runtime.controller';
 import { TenantJobRuntimeService } from '../tenant-job-runtime.service';
 
@@ -330,6 +332,198 @@ describe('TenantJobRuntimeController', () => {
             // No mutation when there's nothing to revert.
             expect(configRepo.save).not.toHaveBeenCalled();
             expect(auditRepo.save).not.toHaveBeenCalled();
+        });
+    });
+
+    // ─── EW-742 P5 (T33-T35) ─ available providers + allow-list gating ──
+
+    describe('GET /api/account/job-runtime/available-providers (P5 T34)', () => {
+        const ENV_KEY = 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS';
+        const ORIGINAL_VALUE = process.env[ENV_KEY];
+
+        afterEach(() => {
+            if (ORIGINAL_VALUE === undefined) {
+                delete process.env[ENV_KEY];
+            } else {
+                process.env[ENV_KEY] = ORIGINAL_VALUE;
+            }
+        });
+
+        it('returns ALL bundled providers when env is unset (fail-open default)', () => {
+            delete process.env[ENV_KEY];
+            const result = controller.getAvailableProviders(buildAuth());
+            expect(result.providers).toEqual([
+                'trigger',
+                'temporal',
+                'bullmq',
+                'pgboss',
+                'inngest',
+            ]);
+        });
+
+        it('returns the operator-restricted subset, preserving order', () => {
+            process.env[ENV_KEY] = 'temporal,trigger';
+            const result = controller.getAvailableProviders(buildAuth());
+            expect(result.providers).toEqual(['temporal', 'trigger']);
+        });
+
+        it('refuses with 403 when caller has no Tenant', () => {
+            delete process.env[ENV_KEY];
+            expect(() => controller.getAvailableProviders(buildAuth({ tenantId: null }))).toThrow(
+                ForbiddenException,
+            );
+        });
+    });
+
+    describe('PUT /api/account/job-runtime/config — operator allow-list gating (P5 T34)', () => {
+        const ENV_KEY = 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS';
+        const ORIGINAL_VALUE = process.env[ENV_KEY];
+
+        afterEach(() => {
+            if (ORIGINAL_VALUE === undefined) {
+                delete process.env[ENV_KEY];
+            } else {
+                process.env[ENV_KEY] = ORIGINAL_VALUE;
+            }
+        });
+
+        it('400s when the submitted provider is excluded by the operator allow-list', async () => {
+            process.env[ENV_KEY] = 'trigger,temporal';
+            configRepo.findOne.mockResolvedValue(null);
+            await expect(
+                controller.upsertConfig(buildAuth(), {
+                    providerId: 'inngest',
+                    mode: 'byo',
+                    credentialsSecretRef: 'tenant-job-runtime:abc:inngest:v1',
+                } as any),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(configRepo.save).not.toHaveBeenCalled();
+            expect(auditRepo.save).not.toHaveBeenCalled();
+        });
+
+        it('error message names the offending provider', async () => {
+            process.env[ENV_KEY] = 'trigger';
+            configRepo.findOne.mockResolvedValue(null);
+            try {
+                await controller.upsertConfig(buildAuth(), {
+                    providerId: 'inngest',
+                    mode: 'byo',
+                    credentialsSecretRef: 'tenant-job-runtime:abc:inngest:v1',
+                } as any);
+                fail('expected BadRequestException');
+            } catch (err) {
+                expect(err).toBeInstanceOf(BadRequestException);
+                const response = (err as BadRequestException).getResponse() as { message: string };
+                expect(response.message).toMatch(/inngest/);
+                expect(response.message).toMatch(/disabled/i);
+            }
+        });
+
+        it('allows allowed providers through to upsert', async () => {
+            process.env[ENV_KEY] = 'trigger,temporal';
+            configRepo.findOne.mockResolvedValue(null);
+            configRepo.save.mockImplementation(async (row) => ({ ...row }));
+            const result = await controller.upsertConfig(buildAuth(), {
+                providerId: 'temporal',
+                mode: 'byo',
+                credentialsSecretRef: 'tenant-job-runtime:abc:temporal:v1',
+            } as any);
+            expect(result.providerId).toBe('temporal');
+        });
+
+        it('skips the allow-list check when mode = inherit (provider is irrelevant)', async () => {
+            // Operator restricted to `trigger` but caller submits `inngest` +
+            // mode=inherit. Inherit mode disregards providerId; the gate should
+            // not block this submission.
+            process.env[ENV_KEY] = 'trigger';
+            configRepo.findOne.mockResolvedValue(null);
+            configRepo.save.mockImplementation(async (row) => ({ ...row }));
+            const result = await controller.upsertConfig(buildAuth(), {
+                providerId: 'inngest',
+                mode: 'inherit',
+            } as any);
+            expect(result.mode).toBe('inherit');
+        });
+    });
+
+    describe('drift gate (P5)', () => {
+        it('BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS matches TENANT_JOB_RUNTIME_PROVIDER_IDS', () => {
+            // Two source-of-truth lists by design (apps/api/src/config keeps
+            // zero feature imports); this test prevents silent divergence
+            // when a new provider is added to one but not the other.
+            expect([...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS]).toEqual([
+                ...TENANT_JOB_RUNTIME_PROVIDER_IDS,
+            ]);
+        });
+    });
+
+    describe('Audit operatorAllowedProviders snapshot (P5 T35)', () => {
+        const ENV_KEY = 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS';
+        const ORIGINAL_VALUE = process.env[ENV_KEY];
+
+        afterEach(() => {
+            if (ORIGINAL_VALUE === undefined) {
+                delete process.env[ENV_KEY];
+            } else {
+                process.env[ENV_KEY] = ORIGINAL_VALUE;
+            }
+        });
+
+        it('attaches operatorAllowedProviders to the after snapshot on create', async () => {
+            process.env[ENV_KEY] = 'trigger,temporal';
+            configRepo.findOne.mockResolvedValue(null);
+            configRepo.save.mockImplementation(async (row) => ({ ...row }));
+
+            await controller.upsertConfig(buildAuth(), {
+                providerId: 'trigger',
+                mode: 'byo',
+                credentialsSecretRef: 'tenant-job-runtime:new-ref-abcd',
+            } as any);
+
+            const auditPayload = auditRepo.create.mock.calls[0][0];
+            expect(auditPayload.before).toBeNull();
+            expect(auditPayload.after.operatorAllowedProviders).toEqual(['trigger', 'temporal']);
+        });
+
+        it('attaches operatorAllowedProviders to BOTH before and after on update', async () => {
+            process.env[ENV_KEY] = 'trigger,bullmq';
+            const existing = buildConfigRow({
+                credentialsSecretRef: 'old-ref-xxxx',
+                credentialVersion: 3,
+            });
+            configRepo.findOne.mockResolvedValue(existing);
+            configRepo.save.mockImplementation(async (row) => ({ ...row }));
+
+            await controller.upsertConfig(buildAuth(), {
+                providerId: 'trigger',
+                mode: 'byo',
+                credentialsSecretRef: 'new-ref-yyyy',
+            } as any);
+
+            const auditPayload = auditRepo.create.mock.calls[0][0];
+            expect(auditPayload.before.operatorAllowedProviders).toEqual(['trigger', 'bullmq']);
+            expect(auditPayload.after.operatorAllowedProviders).toEqual(['trigger', 'bullmq']);
+        });
+
+        it('attaches the full bundled list when env is unset', async () => {
+            delete process.env[ENV_KEY];
+            configRepo.findOne.mockResolvedValue(null);
+            configRepo.save.mockImplementation(async (row) => ({ ...row }));
+
+            await controller.upsertConfig(buildAuth(), {
+                providerId: 'trigger',
+                mode: 'byo',
+                credentialsSecretRef: 'tenant-job-runtime:new-ref-abcd',
+            } as any);
+
+            const auditPayload = auditRepo.create.mock.calls[0][0];
+            expect(auditPayload.after.operatorAllowedProviders).toEqual([
+                'trigger',
+                'temporal',
+                'bullmq',
+                'pgboss',
+                'inngest',
+            ]);
         });
     });
 });
