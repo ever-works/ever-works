@@ -245,19 +245,20 @@ Before deploying a change that touches `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVID
 - [ ] Diff the new value against the previous: any provider being
       removed?
 - [ ] If yes — query the audit DB for tenants currently on the
-      removed provider:
-
-          ```sql
-          SELECT tenant_id, provider_id, updated_at
-          FROM tenant_job_runtime_config
-          WHERE provider_id = '<removing>' AND mode != 'inherit';
-          ```
-
+      removed provider (see SQL snippet below).
 - [ ] Notify any tenants found before rolling out, or accept they'll
       hit the picker-side warning banner on next visit.
 - [ ] Verify the new allow-list parses correctly post-deploy via the
-      API: `curl https://<api>/api/account/job-runtime/available-providers`
+      API call `curl https://<api>/api/account/job-runtime/available-providers`
       (auth required; use any tenant's token).
+
+Removed-provider lookup snippet:
+
+```sql
+SELECT tenant_id, provider_id, updated_at
+FROM tenant_job_runtime_config
+WHERE provider_id = '<removing>' AND mode != 'inherit';
+```
 
 ## Glossary
 
