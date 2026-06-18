@@ -59,7 +59,12 @@ export class AddTenantJobRuntimeConfig1780900000000 implements MigrationInterfac
                         isPrimary: true,
                     },
                     { name: 'providerId', type: 'varchar', length: '64' },
-                    { name: 'credentialsSecretRef', type: 'varchar', length: '128', isNullable: true },
+                    {
+                        name: 'credentialsSecretRef',
+                        type: 'varchar',
+                        length: '128',
+                        isNullable: true,
+                    },
                     { name: 'credentialVersion', type: 'int', default: 1 },
                     { name: 'mode', type: 'varchar', length: '16' },
                     { name: 'enabled', type: 'boolean', default: true },

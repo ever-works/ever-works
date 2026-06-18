@@ -250,7 +250,7 @@ packages/tasks/                      # remains the trigger provider's worker pac
 
 ## 11. Tenant-Scoped Overlay (multi-tenant extension)
 
-This document defines the **instance-global** runtime selection (`EVER_WORKS_JOB_RUNTIME` chooses one provider per deployment). For multi-tenant deployments — Ever Works Cloud and any operator hosting multiple tenants on one instance — that single selection is the **fallback**; each tenant can layer an overlay on top to inherit, BYO credentials for the same provider, or override to a different *enabled* provider. The overlay reuses the dispatcher seam from this doc unchanged — it plugs in via a `TenantAwareRuntimeResolver` placed in front of the EW-685 binding factory.
+This document defines the **instance-global** runtime selection (`EVER_WORKS_JOB_RUNTIME` chooses one provider per deployment). For multi-tenant deployments — Ever Works Cloud and any operator hosting multiple tenants on one instance — that single selection is the **fallback**; each tenant can layer an overlay on top to inherit, BYO credentials for the same provider, or override to a different _enabled_ provider. The overlay reuses the dispatcher seam from this doc unchanged — it plugs in via a `TenantAwareRuntimeResolver` placed in front of the EW-685 binding factory.
 
 See the dedicated feature set for the overlay design:
 

@@ -17,13 +17,13 @@ The three resolution modes referenced throughout this doc are:
 
 ## Availability matrix (tenant scope)
 
-| Provider     | inherit / shared | inherit / per-tenant                | inherit / tiered | BYO  | override | Notes                                                                          |
-| ------------ | ---------------- | ----------------------------------- | ---------------- | ---- | -------- | ------------------------------------------------------------------------------ |
-| Trigger.dev  | yes              | yes (PAT-provisioned, see gotcha)   | yes              | yes  | yes      | `per-tenant` cannot fully auto-provision prod key (dashboard-only); see below  |
-| Temporal     | yes              | yes (control-plane call)            | yes              | yes  | yes      | Per-tenant namespace creation adds ~5-10s to tenant signup                     |
-| BullMQ       | yes              | yes (DB or instance per tenant)     | yes              | yes  | yes      | >16 tenants in DB-per-tenant mode requires Redis Cluster (flag)                |
-| pg-boss      | yes              | yes (DB or instance per tenant)     | yes              | yes  | yes      | `shared` policy still uses per-tenant **schemas** (Q2); tenant_id column forbidden |
-| Inngest      | yes (tenant tag) | manual (no project-create REST)     | yes              | yes  | yes      | `per-tenant` mode needs operator hand-provisioning today (flag)                |
+| Provider    | inherit / shared | inherit / per-tenant              | inherit / tiered | BYO | override | Notes                                                                              |
+| ----------- | ---------------- | --------------------------------- | ---------------- | --- | -------- | ---------------------------------------------------------------------------------- |
+| Trigger.dev | yes              | yes (PAT-provisioned, see gotcha) | yes              | yes | yes      | `per-tenant` cannot fully auto-provision prod key (dashboard-only); see below      |
+| Temporal    | yes              | yes (control-plane call)          | yes              | yes | yes      | Per-tenant namespace creation adds ~5-10s to tenant signup                         |
+| BullMQ      | yes              | yes (DB or instance per tenant)   | yes              | yes | yes      | >16 tenants in DB-per-tenant mode requires Redis Cluster (flag)                    |
+| pg-boss     | yes              | yes (DB or instance per tenant)   | yes              | yes | yes      | `shared` policy still uses per-tenant **schemas** (Q2); tenant_id column forbidden |
+| Inngest     | yes (tenant tag) | manual (no project-create REST)   | yes              | yes | yes      | `per-tenant` mode needs operator hand-provisioning today (flag)                    |
 
 ---
 
@@ -102,8 +102,8 @@ Trigger.dev is push-model. Workers are hosted by Trigger.dev; the operator does 
 ### Per-provider gotchas at tenant scope
 
 - The operator PAT (`tr_pat_*`) can **create** projects via `POST /api/v1/orgs/{orgId}/projects` but **cannot** read the resulting `tr_prod_*` secret key, and cannot delete or rename projects via REST (all dashboard-only as of 2026-06). This breaks the zero-touch promise of `inherit / per-tenant`. Workarounds:
-	1. **Worker self-registration (preferred)** — the deployed worker registers itself against an internal Ever Works callback and reports the prod key back. Requires a worker-side patch and a one-time bootstrap token.
-	2. **Manual paste** — after auto-provision, surface the project URL in the admin UI and prompt the tenant operator to copy the prod key from the Trigger.dev dashboard. Degrades the `per-tenant` UX to a two-step flow.
+    1.  **Worker self-registration (preferred)** — the deployed worker registers itself against an internal Ever Works callback and reports the prod key back. Requires a worker-side patch and a one-time bootstrap token.
+    2.  **Manual paste** — after auto-provision, surface the project URL in the admin UI and prompt the tenant operator to copy the prod key from the Trigger.dev dashboard. Degrades the `per-tenant` UX to a two-step flow.
 - Per-project rate limits apply at the Trigger.dev account level; large `inherit / per-tenant` deployments must monitor org-wide project counts against Trigger.dev plan limits.
 
 ### Conformance scope at tenant level
