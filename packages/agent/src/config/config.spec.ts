@@ -149,6 +149,66 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.jobRuntime (EW-683 / EW-685 P0 T3 — pluggable runtime selector)', () => {
+        describe('getActiveProviderId', () => {
+            it("defaults to 'trigger' when EVER_WORKS_JOB_RUNTIME is unset", () => {
+                expect(config.jobRuntime.getActiveProviderId()).toBe('trigger');
+            });
+
+            it("defaults to 'trigger' when EVER_WORKS_JOB_RUNTIME is empty string", () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = '';
+                expect(config.jobRuntime.getActiveProviderId()).toBe('trigger');
+            });
+
+            it("defaults to 'trigger' when EVER_WORKS_JOB_RUNTIME is whitespace only", () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = '   ';
+                expect(config.jobRuntime.getActiveProviderId()).toBe('trigger');
+            });
+
+            it.each(['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest'] as const)(
+                "returns '%s' when set verbatim",
+                (id) => {
+                    process.env.EVER_WORKS_JOB_RUNTIME = id;
+                    expect(config.jobRuntime.getActiveProviderId()).toBe(id);
+                },
+            );
+
+            it('trims surrounding whitespace before matching', () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = '  temporal  ';
+                expect(config.jobRuntime.getActiveProviderId()).toBe('temporal');
+            });
+
+            it("normalises case to lowercase ('TEMPORAL' → 'temporal')", () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = 'TEMPORAL';
+                expect(config.jobRuntime.getActiveProviderId()).toBe('temporal');
+            });
+
+            it("falls back to 'trigger' (fail-open) on unknown id — typo safety", () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = 'sidekiq';
+                expect(config.jobRuntime.getActiveProviderId()).toBe('trigger');
+            });
+        });
+
+        describe('isExperimentalProvider', () => {
+            it("returns false when active provider is the default 'trigger'", () => {
+                expect(config.jobRuntime.isExperimentalProvider()).toBe(false);
+            });
+
+            it.each(['temporal', 'bullmq', 'pgboss', 'inngest'] as const)(
+                "returns true for non-default provider '%s'",
+                (id) => {
+                    process.env.EVER_WORKS_JOB_RUNTIME = id;
+                    expect(config.jobRuntime.isExperimentalProvider()).toBe(true);
+                },
+            );
+
+            it("returns false when an unknown id falls back to 'trigger'", () => {
+                process.env.EVER_WORKS_JOB_RUNTIME = 'sidekiq';
+                expect(config.jobRuntime.isExperimentalProvider()).toBe(false);
+            });
+        });
+    });
+
     describe('config.database', () => {
         describe('getType', () => {
             it("defaults to 'better-sqlite3' when DATABASE_TYPE is unset", () => {
@@ -704,6 +764,12 @@ describe('agent/config', () => {
                 'github',
                 'githubApp',
                 'isCli',
+                // EW-683 / EW-685 P0 T3 — `jobRuntime.*` group adds the
+                // `EVER_WORKS_JOB_RUNTIME` selector for the pluggable
+                // background-job runtime (Trigger.dev default; Temporal /
+                // BullMQ / pg-boss / Inngest behind feature plugins).
+                // Pinned alphabetically.
+                'jobRuntime',
                 // EW-643 Phase 3 slice 2b — `kb.*` group adds ffmpeg
                 // + transcribe operator knobs (KB_FFMPEG_BIN,
                 // KB_MEDIA_NORMALIZE, KB_VIDEO_OUTPUT_CODEC/EXT,
