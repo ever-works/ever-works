@@ -37,6 +37,54 @@ export const config = {
         },
     },
 
+    /**
+     * EW-683 / EW-685 P0 T3 — selector for the active job-runtime provider.
+     *
+     * Single instance-global knob per
+     * [`docs/specs/architecture/job-runtime-providers.md`](../../../../docs/specs/architecture/job-runtime-providers.md)
+     * §4. The shape of the contract lives in
+     * `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`
+     * (`JobRuntimeId` literal-union shipped EW-685 P0); the binding factory
+     * that consumes this selector (`packages/agent/src/tasks/job-runtime.providers.ts`)
+     * lands with EW-686 P1, alongside the rehoused `TriggerService` as the
+     * first concrete provider.
+     *
+     * Until then this getter is **read but not bound** — every dispatcher
+     * symbol still routes through `TriggerService` directly. Adding it
+     * here ahead of the binding factory means:
+     *   - Operators can set the env var in deploy manifests without
+     *     waiting for the binding to land (the value sits inert).
+     *   - The startup-log line that surfaces "active runtime id =
+     *     `<id>`" (EW-685 P0 T6) has somewhere to read from.
+     *   - The unknown-value fail-open path is exercised by tests today.
+     */
+    jobRuntime: {
+        /**
+         * Returns the active job-runtime provider id. Unknown / unset / empty
+         * → falls back to `'trigger'` (the default per ADR-015) and emits a
+         * startup-log warning when the value was set but unrecognised (T6
+         * lands the log emitter). Lowercased + trimmed for resilience to
+         * deploy-manifest typos (`Trigger ` → `trigger`).
+         */
+        getActiveProviderId(): 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' {
+            const raw = (process.env.EVER_WORKS_JOB_RUNTIME ?? '').trim().toLowerCase();
+            if (raw === 'temporal' || raw === 'bullmq' || raw === 'pgboss' || raw === 'inngest') {
+                return raw;
+            }
+            return 'trigger';
+        },
+        /**
+         * True when the env var was set to a value other than `'trigger'`.
+         * Surfaces "experimental runtime active" warnings until every
+         * provider passes the conformance suite (per
+         * [ADR-015](../../../../docs/specs/decisions/015-job-runtime-provider-pluggability.md)
+         * §"All providers pass one shared conformance suite").
+         */
+        isExperimentalProvider(): boolean {
+            return this.getActiveProviderId() !== 'trigger';
+        },
+    },
+
     // Database configuration
     database: {
         getType() {
