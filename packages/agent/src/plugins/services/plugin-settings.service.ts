@@ -108,6 +108,22 @@ export class PluginSettingsService {
      * 3. Admin settings
      * 4. Environment variables
      * 5. Plugin defaults
+     *
+     * EW-742 P1 — the spec adds a `tenant` tier between `user` and
+     * `admin (global)` in the cascade (see
+     * [`docs/specs/architecture/settings-system.md` §2](../../../../../docs/specs/architecture/settings-system.md)
+     * + [ADR-017](../../../../../docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md)).
+     * The `x-scope: 'tenant'` grammar shipped in P1.0 (PR #1335) and the
+     * storage tier for the FIRST tenant-scoped use case (job-runtime
+     * overlay) lands in this P1 sub-story as
+     * `TenantJobRuntimeConfig` + migration `1780900000000`. A GENERIC
+     * tenant-plugins table parallel to `user_plugins` / `work_plugins`
+     * (and the corresponding repository injection here) is intentionally
+     * NOT in P1 scope — it would touch every plugin's hot path. The
+     * tenant tier will plug in via a `TenantPluginRepository` in EW-742
+     * P2/P3 (or a dedicated P1.1 follow-up); until then a tenant-scoped
+     * setting resolves identically to a `global` one, which is the
+     * documented zero-behaviour-change posture from PR #1335.
      */
     async getResolvedSettings(
         pluginId: string,

@@ -20,3 +20,6 @@ export * from './kb-transcribe.types';
 export * from './kb-transcribe-dispatcher';
 export * from './kb-reembed-work.types';
 export * from './kb-reembed-work-dispatcher';
+// Tenant-scoped job-runtime overlay (EW-742 P1) — credential versioning
+// for graceful drain on rotation. See ADR-017 §3 + spec.md FR-5.
+export * from './credential-version.service';
