@@ -63,4 +63,24 @@ describe('toPluginSettingsSchemaProperty', () => {
 		const out = toPluginSettingsSchemaProperty(schema);
 		expect(out.oneOf).toBeUndefined();
 	});
+
+	it('passes through x-scope: tenant for fields scoped to a tenant overlay (EW-742)', () => {
+		const schema: JsonSchema = {
+			type: 'object',
+			title: 'Job-runtime tenant overlay',
+			properties: {
+				apiKey: {
+					type: 'string',
+					title: 'Tenant Trigger.dev secret key',
+					'x-secret': true,
+					'x-scope': 'tenant'
+				}
+			}
+		};
+
+		const out = toPluginSettingsSchemaProperty(schema);
+
+		expect(out.properties?.apiKey?.scope).toBe('tenant');
+		expect(out.properties?.apiKey?.secret).toBe(true);
+	});
 });
