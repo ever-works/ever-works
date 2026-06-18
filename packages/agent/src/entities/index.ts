@@ -89,3 +89,7 @@ export * from './organization-notification-default.entity';
 
 // Composio triggers (EW-684 PR-D)
 export * from './composio-trigger-subscription.entity';
+
+// Tenant-scoped job-runtime overlay (EW-742 P1) — see ADR-017 + spec.md
+export * from './tenant-job-runtime-config.entity';
+export * from './tenant-job-runtime-audit.entity';
