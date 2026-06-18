@@ -224,7 +224,7 @@ export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSetti
             )}
 
             <div className="grid grid-cols-1 @lg/main:grid-cols-2 gap-4 p-4 rounded-lg border border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40">
-                <Readout label={t('readout.mode')} value={t(`mode.${config.mode}`)} />
+                <Readout label={t('readout.mode')} value={t(`mode.${config.mode}` as never)} />
                 <Readout
                     label={t('readout.provider')}
                     value={config.providerId ?? t('readout.providerNone')}
@@ -284,12 +284,12 @@ export function JobRuntimeSettings({ initialConfig, loadError }: JobRuntimeSetti
                     >
                         {MODE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
-                                {t(opt.labelKey)}
+                                {t(opt.labelKey as never)}
                             </option>
                         ))}
                     </Select>
                     <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-                        {t(`fields.modeHelper.${mode}`)}
+                        {t(`fields.modeHelper.${mode}` as never)}
                     </p>
                 </div>
 
