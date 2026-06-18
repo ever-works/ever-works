@@ -11,7 +11,7 @@
 
 ## Phase 0 — Contract & seam (no behaviour change) · `[EW-683 P0]`
 
-T1 + T2 ✅ Done in [#1354](https://github.com/ever-works/ever-works/pull/1354) (cascaded [#1360](https://github.com/ever-works/ever-works/pull/1360) -> [#1362](https://github.com/ever-works/ever-works/pull/1362)). T3 + T4 remain (factory + selector env var). T5 + T6 trail.
+T1 + T2 ✅ Done in [#1354](https://github.com/ever-works/ever-works/pull/1354) (cascaded [#1360](https://github.com/ever-works/ever-works/pull/1360) -> [#1362](https://github.com/ever-works/ever-works/pull/1362)). T3 ✅ Done in [#1369](https://github.com/ever-works/ever-works/pull/1369). T4 binding factory, T5 Constitution amendment, T6 startup log in progress.
 
 - [x] **T1.** Define the `job-runtime` capability via `IJobRuntimeProvider` exported from `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (the existing capabilities barrel was the natural home alongside the other 25+ capability contracts; no separate `job-runtime.category.ts` file needed since capability strings are declared in JSDoc on the interface itself, matching how `dns.interface.ts` handles it).
 - [x] **T2.** Defined `IJobRuntimeProvider`, `JobRunStatus`, `ScheduleSpec`, `JobEnqueueOptions`, `JobRuntimeDispatchers` (plus `JobRuntimeId`, `WorkerHostOptions`, `WorkerHostHandle`) in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`. Run id naming: kept opaque `string` (was originally going to decide `triggerRunId` vs `runtimeRunId` — punted, both shipping providers will produce strings that fit the existing `triggerRunId` column without rename).

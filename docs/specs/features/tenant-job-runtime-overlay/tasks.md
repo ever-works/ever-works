@@ -71,11 +71,11 @@ P2.0 (REST API) ✅ Done in [#1341](https://github.com/ever-works/ever-works/pul
 
 ## Phase 6 — Conformance · `[EW-742 P6]`
 
-- [ ] **T36.** Per-tenant test harness extending EW-683's conformance suite under `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — parameterised by `(providerId, tenantA, tenantB)`, reuses the base contract suite then layers tenant-isolation, rotation, and force-invalidate assertions.
+- [ ] **T36.** Per-tenant test harness extending EW-683's conformance suite under `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — parameterised by `(providerId, tenantA, tenantB)`, reuses the base contract suite then layers tenant-isolation, rotation, and force-invalidate assertions.
 - [ ] **T37.** Parameterised per-tenant conformance run per provider in CI — extend the existing `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}` matrix in `.github/workflows/` with a `TENANT_OVERLAY={off|on}` axis; both axes must be green per provider.
-- [ ] **T38.** Graceful drain test (Q4) in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — enqueue run with credential version N, rotate to N+1 mid-run, verify the in-flight run completes with N's credential snapshot and a newly enqueued run uses N+1.
-- [ ] **T39.** Force-invalidate test in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — invoke the admin `POST /api/account/job-runtime/force-invalidate` action, verify in-flight runs are marked `FAILED` (with `reason='credential_force_invalidated'`) and new enqueues are blocked until a new credential is saved.
-- [ ] **T40.** Cross-provider isolation test in `packages/plugin/src/job-runtime/testing/tenant-conformance.ts` — tenant A on `pgboss`, tenant B on `temporal`; concurrent enqueues, verify zero cross-talk in run records, webhooks, and worker logs.
+- [ ] **T38.** Graceful drain test (Q4) in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — enqueue run with credential version N, rotate to N+1 mid-run, verify the in-flight run completes with N's credential snapshot and a newly enqueued run uses N+1.
+- [ ] **T39.** Force-invalidate test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — invoke the admin `POST /api/account/job-runtime/force-invalidate` action, verify in-flight runs are marked `FAILED` (with `reason='credential_force_invalidated'`) and new enqueues are blocked until a new credential is saved.
+- [ ] **T40.** Cross-provider isolation test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — tenant A on `pgboss`, tenant B on `temporal`; concurrent enqueues, verify zero cross-talk in run records, webhooks, and worker logs.
 
 ## Phase 7 — Docs · `[EW-742 P7]`
 
