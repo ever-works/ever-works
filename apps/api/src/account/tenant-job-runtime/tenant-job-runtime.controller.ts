@@ -91,7 +91,10 @@ export class TenantJobRuntimeController {
             'when `credentialsSecretRef` changes (graceful drain — ADR-017 §3).',
     })
     @ApiResponse({ status: 200, type: TenantJobRuntimeConfigResponseDto })
-    @ApiResponse({ status: 400, description: 'Validation failed (invalid provider or mode/ref combination)' })
+    @ApiResponse({
+        status: 400,
+        description: 'Validation failed (invalid provider or mode/ref combination)',
+    })
     @ApiResponse({ status: 403, description: 'Caller has no Tenant (user not yet upgraded)' })
     async upsertConfig(
         @CurrentUser() auth: AuthenticatedUser,
@@ -136,7 +139,8 @@ export class TenantJobRuntimeController {
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 1, ttl: 60_000 } })
     @ApiOperation({
-        summary: 'Force-invalidate the tenant credential — hard kill (P2.0: audit + version bump only)',
+        summary:
+            'Force-invalidate the tenant credential — hard kill (P2.0: audit + version bump only)',
         description:
             'Rate-limited to 1 call / 60s. P2.0 implementation bumps `credentialVersion` ' +
             'and emits a `force_invalidate` audit row. The actual in-flight run kill ' +

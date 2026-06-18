@@ -76,17 +76,17 @@ The "user" splits three ways: the **operator** configuring the instance, the **t
 
 ## 5. Key Entities & Domain Concepts
 
-| Entity / concept                | Description                                                                                                                                                |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tenant_job_runtime_config`     | The per-tenant overlay row: `(tenantId, mode, providerId, credentialBlob, credentialVersion, status, createdAt, updatedAt)`.                               |
-| Mode                            | Enum `inherit | byo | override` — the three resolution paths a tenant can take against the instance default.                                              |
-| Plugin allow-list               | Operator-controlled list of provider IDs that are pickable by tenant admins; subset of the providers actually installed on the instance.                   |
-| Platform-default policy         | Operator-chosen policy for inherit-mode tenants: `shared` (one platform cred set, default) / `per-tenant` (auto-provision per tenant) / `tiered` (by sub). |
-| `credential_version`            | Monotonic per-tenant integer bumped on every credential write; captured at enqueue and used for the run's lifetime (graceful drain — Q4).                  |
-| Credential status               | Enum `active | draining | revoked` — `revoked` is set by the operator-only `force-invalidate` action and blocks new enqueues until re-saved.               |
-| Per-tenant isolation primitive  | The provider-owned unit of isolation: Temporal namespace per tenant (Q1), Postgres schema per tenant for pg-boss (Q2), separate project for Trigger.dev.   |
-| Tenant lifecycle hook           | Provider-plugin callback (`onTenantCreated`, `onTenantOffboarded`, `onCredentialRotated`, `onCredentialForceInvalidated`) the platform invokes uniformly.  |
-| Run tenant tags                 | `tenantId` + `tenantSlug` attached to every run's native metadata so provider dashboards stay tenant-filterable under the `shared` policy.                 |
+| Entity / concept               | Description                                                                                                                                                |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `tenant_job_runtime_config`    | The per-tenant overlay row: `(tenantId, mode, providerId, credentialBlob, credentialVersion, status, createdAt, updatedAt)`.                               |
+| Mode                           | Enum `inherit                                                                                                                                              | byo      | override` — the three resolution paths a tenant can take against the instance default.                         |
+| Plugin allow-list              | Operator-controlled list of provider IDs that are pickable by tenant admins; subset of the providers actually installed on the instance.                   |
+| Platform-default policy        | Operator-chosen policy for inherit-mode tenants: `shared` (one platform cred set, default) / `per-tenant` (auto-provision per tenant) / `tiered` (by sub). |
+| `credential_version`           | Monotonic per-tenant integer bumped on every credential write; captured at enqueue and used for the run's lifetime (graceful drain — Q4).                  |
+| Credential status              | Enum `active                                                                                                                                               | draining | revoked`—`revoked`is set by the operator-only`force-invalidate` action and blocks new enqueues until re-saved. |
+| Per-tenant isolation primitive | The provider-owned unit of isolation: Temporal namespace per tenant (Q1), Postgres schema per tenant for pg-boss (Q2), separate project for Trigger.dev.   |
+| Tenant lifecycle hook          | Provider-plugin callback (`onTenantCreated`, `onTenantOffboarded`, `onCredentialRotated`, `onCredentialForceInvalidated`) the platform invokes uniformly.  |
+| Run tenant tags                | `tenantId` + `tenantSlug` attached to every run's native metadata so provider dashboards stay tenant-filterable under the `shared` policy.                 |
 
 ## 6. Out of Scope
 
