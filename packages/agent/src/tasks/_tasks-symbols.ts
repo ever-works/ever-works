@@ -30,6 +30,11 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
+    // EW-685 P0 T4 — DI token for the in-memory job-runtime provider
+    // registry consumed by the binding factory `buildJobRuntimeProviders()`.
+    // Declared but not wired into any NestJS module yet; see
+    // `job-runtime.providers.ts` header "Critical constraint" for rationale.
+    'JOB_RUNTIME_PROVIDER_REGISTRY',
     'KB_BACKFILL_SKELETON_DISPATCHER',
     'KB_EMBED_DOCUMENT_DISPATCHER',
     'KB_MIRROR_DOCUMENT_DISPATCHER',
