@@ -2,7 +2,7 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, Key, AlertTriangle, HardDrive, Github, Bot } from 'lucide-react';
+import { User, Lock, Key, AlertTriangle, HardDrive, Github, Bot, Cpu } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -60,6 +60,12 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.workAgent'),
                 icon: Bot,
                 href: `${baseSettingsPath}/work-agent`,
+            },
+            {
+                id: 'job-runtime',
+                label: t('tabs.jobRuntime'),
+                icon: Cpu,
+                href: `${baseSettingsPath}/job-runtime`,
             },
         ],
         [t],

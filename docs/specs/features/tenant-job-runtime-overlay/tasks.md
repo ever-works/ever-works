@@ -1,0 +1,104 @@
+# Task Breakdown: Tenant-Scoped Job-Runtime Overlay
+
+**Feature ID**: `tenant-job-runtime-overlay`
+**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache) + P5 + P7 (T41+T42) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 enqueue capture), P4 (worker host, blocked on EW-686 P2), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs T43/T44) remain.
+**Last updated**: 2026-06-18
+**Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md) · **Providers**: [`./providers.md`](./providers.md) · **Epic**: [EW-742](https://evertech.atlassian.net/browse/EW-742) · **Story**: [EW-743](https://evertech.atlassian.net/browse/EW-743) · **ADR**: [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md)
+
+> Ordered, granular tasks with explicit paths. Phases map to `plan.md` §10. Each phase is a candidate sub-PR. Mark `[x]` as landed. Suggested Jira child-issue grouping noted per phase (e.g. `[EW-742 P1]`). Builds on EW-683's instance-level job-runtime contract; nothing here re-opens [ADR-017 Q1–Q5](../../decisions/017-tenant-scoped-job-runtime-overlay.md) (Temporal namespace-per-tenant, pg-boss schema-per-tenant, Inngest inherit/BYO uniform with Trigger.dev, credential rotation via graceful drain + separate `force-invalidate`, hybrid operator-gated platform-default `shared`/`per-tenant`/`tiered`).
+
+---
+
+## Phase 0 — Spec-Kit (EW-743) · `[EW-743 P0]` ✅ Done in [#1332](https://github.com/ever-works/ever-works/pull/1332) (cascaded [#1333](https://github.com/ever-works/ever-works/pull/1333), [#1334](https://github.com/ever-works/ever-works/pull/1334))
+
+- [x] **T1.** Write [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md) at `docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md` capturing Q1–Q5 locked decisions and the inherit/BYO overlay rationale on top of EW-683.
+- [x] **T2.** Write `docs/specs/features/tenant-job-runtime-overlay/spec.md` — behaviour-first user stories (tenant picks provider, operator gates allow-list, graceful drain on rotation, force-invalidate path) with no implementation detail.
+- [x] **T3.** Write `docs/specs/features/tenant-job-runtime-overlay/plan.md` — architecture, data model, API surface, phased rollout, constitution reconciliation; mirrors structure of [`job-runtime-providers/plan.md`](../job-runtime-providers/plan.md).
+- [x] **T4.** Write `docs/specs/features/tenant-job-runtime-overlay/tasks.md` (this file) — numbered T1..TN per phase with file paths.
+- [x] **T5.** Write `docs/specs/features/tenant-job-runtime-overlay/providers.md` — per-provider tenant-isolation matrix (Temporal namespace, pg-boss schema, BullMQ prefix, Trigger.dev project, Inngest app) and inherit-vs-BYO knob per provider.
+- [x] **T6.** Cross-link from `docs/specs/architecture/job-runtime-providers.md` to the tenant-overlay docs by adding a "Tenant-scoped overlay" see-also section pointing at `spec.md`, `plan.md`, and [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md).
+- [x] **T7.** Verify constitution gates against `.specify/memory/constitution.md` — confirm Principle IV ("via the configured job-runtime provider") already covers tenant overlay; no new amendment required, document the verification in `plan.md` §Constitution Reconciliation.
+
+## Phase 1 — Data model + migration · `[EW-742 P1]` ✅ Done in [#1338](https://github.com/ever-works/ever-works/pull/1338) (cascaded [#1339](https://github.com/ever-works/ever-works/pull/1339), [#1340](https://github.com/ever-works/ever-works/pull/1340)). P1.0 (`x-scope: tenant`) shipped in [#1335](https://github.com/ever-works/ever-works/pull/1335) (cascaded [#1336](https://github.com/ever-works/ever-works/pull/1336), [#1337](https://github.com/ever-works/ever-works/pull/1337)).
+
+- [x] **T8.** Audit `docs/specs/architecture/settings-system.md` for `x-scope: tenant`; if missing, add it to the scope taxonomy alongside `x-scope: global` (verify in worktree before writing — this is a prerequisite for tenant-scoped credentials).
+- [x] **T9.** Define TypeORM entity `TenantJobRuntimeConfig` in `packages/agent/src/entities/tenant-job-runtime-config.entity.ts` — columns: `tenantId` (PK), `providerId`, `mode` (`inherit` | `byo` | `override`), `credentialsSecretRef`, `credentialVersion`, `enabled`, `createdBy`, `createdAt`, `updatedAt`. (Entity moved to `@ever-works/agent/entities` per EW-654/655 cycle-avoidance — no `@ManyToOne` back-refs, FK enforced only at the DB layer.)
+- [x] **T10.** Write TypeORM migration `apps/api/src/migrations/1780900000000-AddTenantJobRuntimeConfig.ts` for the new table plus partial index on `(providerId) WHERE enabled` (PK already covers `tenantId`); forward-only + idempotent `hasTable` guards per `docs/specs/architecture/database-migrations.md`.
+- [x] **T11.** Implement `CredentialVersionService` for graceful drain (Q4) in `packages/agent/src/tasks/credential-version.service.ts` — issues monotonic per-tenant version ids and resolves a snapshot for a given `(tenantId, version)` tuple so in-flight runs keep their original credentials. (P1 `resolveSnapshot` returns `null` when `version != current`; full snapshot history table is a P3+ follow-up — TODO marker in the service.)
+- [x] **T12.** Add audit-log table + entity for tenant runtime config changes in `packages/agent/src/entities/tenant-job-runtime-audit.entity.ts` plus matching migration `apps/api/src/migrations/1781000000000-AddTenantJobRuntimeAudit.ts`; records `(tenantId, actorUserId, action, before, after, credentialVersion, occurredAt)`.
+- [x] **T13.** Repository + unit tests under `apps/api/src/works/__tests__/tenant-job-runtime-config.repository.spec.ts` covering insert, update, version bump, audit-row emission, and tenant isolation (one tenant cannot read another's row).
+
+## Phase 2 — Admin UI · `[EW-742 P2]`
+
+P2.0 (REST API) ✅ Done in [#1341](https://github.com/ever-works/ever-works/pull/1341) (cascaded [#1342](https://github.com/ever-works/ever-works/pull/1342), [#1343](https://github.com/ever-works/ever-works/pull/1343)). P2.1 (UI) ✅ Done in [#1347](https://github.com/ever-works/ever-works/pull/1347) (cascaded [#1348](https://github.com/ever-works/ever-works/pull/1348), [#1349](https://github.com/ever-works/ever-works/pull/1349)). P2.2 (schema-driven form + e2e) remains.
+
+- [x] **T14.** API endpoints `GET /api/account/job-runtime/config` and `PUT /api/account/job-runtime/config` in `apps/api/src/account/tenant-job-runtime/tenant-job-runtime.controller.ts` — guarded by `requireTenant()` (1 User : 1 Tenant model, no `:tenantId` path param), returns redacted credentials on GET, accepts `{ providerId, mode, credentials }` on PUT and writes through the service + audit log. Also added: `POST rotate`, `POST force-invalidate`, `DELETE config` (revert to inherit).
+- [x] **T15.** Tenant settings page in `apps/web/src/app/[locale]/(dashboard)/settings/job-runtime/page.tsx` — server component that loads current config and renders the picker + credentials form.
+- [x] **T16.** Provider picker component in `apps/web/src/components/settings/JobRuntimeSettings.tsx` — `Select` of operator-enabled providers (P5 wired via `availableProviders` prop) with `inherit` vs `BYO` vs `override` mode toggle. (Filed under `components/settings/` not `components/job-runtime/` per the dashboard's existing settings layout.)
+- [ ] **T17.** Schema-driven credentials form component in `apps/web/src/components/job-runtime/credentials-form.tsx` reusing the existing settings-system JSON-Schema renderer (`x-secret`, `x-widget`, `x-envVar`) so no per-provider bespoke form is needed. (Deferred to P2.2 — P2.1 ships an opaque `credentialsSecretRef` textarea; per-provider JSON-Schema-driven form lands once we wire each provider's schema export.)
+- [x] **T18.** Validation + error surfacing — "provider disabled by operator" surfaces via the P5 allow-list `BadRequestException` + warning banner; "credentials rejected by provider reachability probe" deferred to P4 (the probe itself doesn't exist yet); "force-invalidate in progress" surfaces via the controller's rate-limit response + button-disabled state.
+- [ ] **T19.** Playwright e2e test for the tenant config flow at `apps/web/e2e/tenant-job-runtime.spec.ts` — covers picker selection, BYO credential save, inherit fallback, validation error surfacing, and audit-row verification via API. (Deferred to P2.2 alongside T17.)
+
+## Phase 3 — Dispatcher routing · `[EW-742 P3]`
+
+T20 + T23 + T24 ✅ Done in this PR (#1380, EW-747 — minimal viable resolver, byo/override modes return instance default with `Logger.debug` deferral note until per-provider credential-binding API lands). T21 (cache) ✅ shipped in [#1381](https://github.com/ever-works/ever-works/pull/1381). T22 (enqueue capture) deferred to Phase 3.1.
+
+- [x] **T20.** Tenant-aware resolver at `packages/agent/src/tasks/tenant-aware-runtime.resolver.ts` (`TenantAwareRuntimeResolver`) wraps the EW-685 P0 T4 binding-factory registry: `resolve(tenantId)` returns the instance default for `null` / no-row / inherit / disabled; for `byo` + `override` + `enabled` it logs the deferral and still returns the instance default until EW-686 P2 lands the per-provider credential-binding hook. `getEffectiveBinding(tenantId)` returns the metadata T22 will stamp onto the run record.
+- [x] **T21.** Credential cache with 15–60s TTL in `packages/agent/src/tasks/tenant-credential.cache.ts` — keyed by `(tenantId, providerId, credentialVersion)`, in-process LRU with explicit invalidate on version bump or force-invalidate. Standalone `@Injectable()` class with no DI dependencies (defaults: `maxEntries=1024`, `ttlMs=30_000`); insertion-order LRU (no promotion-on-read so an in-flight runs snapshot does not get kept alive past its rotation window — see ADR-017 §3 / Q4). Provided + exported via `TenantJobRuntimeModule`. PR: [#1381](https://github.com/ever-works/ever-works/pull/1381).
+- [ ] **T22.** Credential version capture at every enqueue (Q4) — extend dispatch call sites to read the current `(tenantId, providerId)` version from `CredentialVersionService` and stamp `credentialVersion` into the run record so the worker host resolves the same snapshot when the job runs. **(Deferred to P3.1.)**
+- [x] **T23.** Fallback path to instance-global default when a tenant has no overlay row — resolver returns the EW-683 instance binding unchanged; the `getActive() = null` semantic propagates as `null` (in-process dev fallback preserved). Tests in T24 prove the zero-overhead path for tenants that never opt in.
+- [x] **T24.** Unit tests for the resolver under `packages/agent/src/tasks/__tests__/tenant-aware-runtime.resolver.spec.ts` — 12 cases covering inherit fallback, no-row fallback, kill switch, byo/override stopgap + log emission, `getEffectiveBinding` metadata, and the `getActive() = null` propagation.
+
+### Phase 3.1 — Enqueue capture (deferred)
+
+- [ ] **T22** (above) ships once a follow-up PR walks the enqueue call sites to stamp `credentialVersion` into each run record. The T21 cache is already in place to serve the snapshot lookup at run time.
+
+## Phase 4 — Worker host · `[EW-742 P4]`
+
+- [ ] **T25.** Per-tenant webhook routing for Trigger.dev in `packages/tasks/src/trigger/tenant-webhook.handler.ts` — dispatches incoming Trigger.dev webhook events to the tenant whose `triggerRunId` matches the run, validating signing key against the tenant's BYO credential snapshot.
+- [ ] **T26.** Per-tenant webhook routing for Inngest in `packages/plugins/job-runtime-inngest/src/tenant-webhook.handler.ts` — analogous to T25, validates Inngest signing key per tenant; doc cross-link to [`./providers.md`](./providers.md) for the SaaS-only constraint.
+- [ ] **T27.** Per-tenant namespace polling for Temporal in `packages/plugins/job-runtime-temporal/src/tenant-worker-host.ts` — one worker per `(tenantId, namespace)` (Q1: namespace-per-tenant) bound to the task queue resolved from the tenant overlay.
+- [ ] **T28.** Per-tenant queue polling for BullMQ in `packages/plugins/job-runtime-bullmq/src/tenant-worker-host.ts` — one worker per `(tenantId, queueName)` with BullMQ `prefix` set to the tenant id; reuses `lockDuration`/`lockRenewTime` from EW-683's host config.
+- [ ] **T29.** Per-tenant schema polling for pg-boss in `packages/plugins/job-runtime-pgboss/src/tenant-worker-host.ts` — one `boss` instance per `(tenantId, schema)` (Q2: schema-per-tenant), reusing the platform `DATABASE_URL` by default.
+- [ ] **T30.** Multiplexing worker option (config flag) in each provider's worker host — one worker process polls all tenants and routes per `tenant_id` in job metadata; selected via `EVER_WORKS_JOB_RUNTIME_HOSTING={per-tenant|shared|tiered}` matching Q5's operator-gated platform-default.
+- [ ] **T31.** Tenant-id propagation in run metadata for all providers — extend `JobEnqueueOptions` in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (shipped EW-685 P0) with a `tenantId` field and ensure every provider's dispatcher stamps it (Trigger `metadata`, Inngest `data`, Temporal `searchAttributes`, BullMQ `opts.tenantId`, pg-boss payload field).
+- [ ] **T32.** Integration tests per provider × per-tenant scenario under each plugin's `__tests__/tenant-isolation.spec.ts` — two tenants on the same provider, verify no cross-tenant run leakage and that webhook/poller routing lands on the correct tenant.
+
+## Phase 5 — Plugin gating · `[EW-742 P5]` ✅ Done in [#1350](https://github.com/ever-works/ever-works/pull/1350) (pending cascade)
+
+- [x] **T33.** Instance plugin allow-list config in `apps/api/src/config/constants.ts` (under `config.tenantJobRuntime.getAllowedProviders()`) — operator-controlled list of bundled `job-runtime` provider ids exposed to tenants via the `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS` env var (comma-separated). Empty/unset = all 5 bundled providers (fail-open). Q5 platform-default mode (`shared`/`per-tenant`/`tiered`) is a P4 worker-host concern; this gate only controls picker visibility.
+- [x] **T34.** Picker filter in tenant admin UI — `apps/web/src/components/settings/JobRuntimeSettings.tsx` only renders providers that appear in the operator allow-list resolved from the new `GET /api/account/job-runtime/available-providers` endpoint. Warning banner shows when the tenant's currently-saved `providerId` is no longer in the list.
+- [x] **T35.** Audit decoration on every overlay mutation — `emitAudit` decorates `before` / `after` snapshots with `operatorAllowedProviders: string[]` captured at write time so future audit-log reads can correlate a mutation with the active allow-list. (Per-tenant `action='operator_allowlist_change'` startup row is a P5.1 follow-up.)
+
+### Phase 5.1 — Per-tenant whitelist (deferred)
+
+- [ ] **T35a.** Per-tenant whitelist behind `EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING` flag — `instance_plugin_allowlist` table keyed by `(tenantId, providerId)` that further restricts the global allow-list. Resolver merges global ∩ tenant-specific.
+- [ ] **T35b.** Startup audit row capturing the active allow-list at API boot — dedupe by hash so identical restarts don't spam the audit table.
+
+## Phase 6 — Conformance · `[EW-742 P6]`
+
+- [ ] **T36.** Per-tenant test harness extending EW-683's conformance suite under `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — parameterised by `(providerId, tenantA, tenantB)`, reuses the base contract suite then layers tenant-isolation, rotation, and force-invalidate assertions.
+- [ ] **T37.** Parameterised per-tenant conformance run per provider in CI — extend the existing `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}` matrix in `.github/workflows/` with a `TENANT_OVERLAY={off|on}` axis; both axes must be green per provider.
+- [ ] **T38.** Graceful drain test (Q4) in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — enqueue run with credential version N, rotate to N+1 mid-run, verify the in-flight run completes with N's credential snapshot and a newly enqueued run uses N+1.
+- [ ] **T39.** Force-invalidate test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — invoke the admin `POST /api/account/job-runtime/force-invalidate` action, verify in-flight runs are marked `FAILED` (with `reason='credential_force_invalidated'`) and new enqueues are blocked until a new credential is saved.
+- [ ] **T40.** Cross-provider isolation test in `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` — tenant A on `pgboss`, tenant B on `temporal`; concurrent enqueues, verify zero cross-talk in run records, webhooks, and worker logs.
+
+## Phase 7 — Docs · `[EW-742 P7]`
+
+T41 + T42 ✅ Done in [#1352](https://github.com/ever-works/ever-works/pull/1352) (pending cascade). T43 + T44 deferred until P3/P4 + provider plugins exist.
+
+- [x] **T41.** Tenant admin runbook in `docs/runbooks/TENANT_JOB_RUNTIME.md` — how to pick a provider, enter BYO credentials, rotate, force-invalidate, revert to inherit, and read the audit log; cross-link `spec.md` and `providers.md`. (Filed under `docs/runbooks/` UPPERCASE per the existing `EVER_WORKS_ZERO_FRICTION_FLOW.md` convention.)
+- [x] **T42.** Operator runbook in `docs/runbooks/OPERATOR_JOB_RUNTIME_OVERLAY.md` — covers allow-list gating, force-invalidate procedure with on-call checklist, operator-driven rollback to inherit, removing a provider from the bundled set, pre-deploy checklist. (Q5 hosting modes deferred to a follow-up edit once P4 worker-host wiring is in place; doc calls this out explicitly so operators don't expect the env var to do anything yet.)
+- [ ] **T43.** Per-provider tenant-config docs — add a "Tenant overlay" section to each provider plugin README (`packages/plugins/job-runtime-{trigger,temporal,bullmq,pgboss,inngest}/README.md`) and cross-link [`./providers.md`](./providers.md). (Deferred — the per-provider plugin packages don't exist yet; they ship with EW-686 P1 / EW-683 P2-P5.)
+- [ ] **T44.** Migration guide for existing tenants in `docs/runbooks/tenant-job-runtime-migration.md` — how to opt into BYO without losing in-flight work (graceful drain procedure, version-pinning checklist, fallback to inherit if BYO probe fails). (Deferred — the migration story needs the P3 dispatcher + P4 worker host to exist before the drain procedure is a real thing to document.)
+
+## Dependency notes
+
+- T1–T7 (spec-kit) block everything else; this PR ships only Phase 0.
+- T8 (`x-scope: tenant`) blocks T9–T13 (data model needs the scope token).
+- T9–T13 (data model) block T14–T19 (admin UI writes through the repository) and T20–T24 (resolver reads from the repository).
+- T20–T24 (dispatcher) block T25–T32 (worker host needs the tenant-aware resolver to know which credentials a run belongs to).
+- T31 (`tenantId` in `JobEnqueueOptions`) blocks T25–T30 (all per-tenant routing depends on the metadata field).
+- T33–T35 (gating) can land in parallel with Phase 4 but must precede T19 going green (e2e validates the operator-gated picker).
+- T36–T40 (conformance) trail each provider's worker-host task (T27/T28/T29 for self-host, T25/T26 for SaaS).
+- T41–T44 (docs) trail each phase as it lands.

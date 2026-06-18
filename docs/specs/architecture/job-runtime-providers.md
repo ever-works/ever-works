@@ -1,7 +1,7 @@
 # Architecture: Job-Runtime Providers (pluggable background-job runtime)
 
-**Status**: `Proposed` (tracking [EW-683](https://evertech.atlassian.net/browse/EW-683))
-**Last updated**: 2026-05-28
+**Status**: `In progress` — EW-685 P0 contract shipped (no behaviour change). EW-686 P1 (rehouse Trigger.dev as the `trigger` plugin) + binding factory + per-provider plugins remain.
+**Last updated**: 2026-06-18
 **Audience**: AI agents and engineers who need to understand how the platform's long-running work is dispatched, scheduled, cancelled, and executed — and how that runtime becomes a **swappable provider** (Trigger.dev default; Temporal / BullMQ / pg-boss / Inngest optional).
 
 > This spec describes the **target architecture**. Nothing here is built yet. It generalises the existing [`trigger-integration`](./trigger-integration.md) and [`trigger-worker`](./trigger-worker.md) specs into a provider-neutral form. Read those two first — this spec assumes them. Decision rationale: [ADR-015](../decisions/015-job-runtime-provider-pluggability.md). Per-provider detail: [`features/job-runtime-providers/providers.md`](../features/job-runtime-providers/providers.md).
@@ -54,10 +54,10 @@ The API depends only on these symbols; it has **no** `@trigger.dev/sdk` import. 
 
 ## 3. The `IJobRuntimeProvider` contract
 
-A new capability `job-runtime` is registered in `packages/plugin/src/job-runtime/`. A provider plugin extends `BasePlugin` (category `job-runtime`, `configurationMode: 'admin-only'`) and exposes:
+A new capability `job-runtime` is registered in `packages/plugin/src/contracts/capabilities/`. A provider plugin extends `BasePlugin` (category `job-runtime`, `configurationMode: 'admin-only'`) and exposes:
 
 ```ts
-// packages/plugin/src/job-runtime/job-runtime.contract.ts (proposed)
+// packages/plugin/src/contracts/capabilities/job-runtime.interface.ts (shipped in EW-685 P0)
 export interface IJobRuntimeProvider {
 	/** Stable provider id: 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' */
 	readonly runtimeId: JobRuntimeId;
@@ -177,7 +177,7 @@ Today the worker writes terminal state itself (orchestrator + `onFailure`/`onCan
 
 ## 7. Conformance suite (parity guarantee)
 
-A provider-agnostic contract test in `packages/plugin/src/job-runtime/testing/` exercises every provider identically (mirrors ADR-005's `LockProvider` contract suite):
+A provider-agnostic contract test in `packages/plugin/src/contracts/__tests__/` (type-level shape spec in `job-runtime.spec.ts` shipped EW-685 P0; runtime conformance `job-runtime.conformance.spec.ts` lands with the first concrete provider) exercises every provider identically (mirrors ADR-005's `LockProvider` contract suite):
 
 - enqueue returns an id; the worker runs and writes terminal state
 - idempotency: same `idempotencyKey` → one logical run, retries reuse the history row
@@ -224,18 +224,19 @@ The internal SuperJSON callback channel (`TRIGGER_INTERNAL_SECRET`, internal bas
 - **Switching runtimes is a deploy-time action**, not a live migration. In-flight runs drain on the old runtime (or are re-enqueued idempotently). Documented in the per-provider deploy guide.
 - **Self-hosted Trigger.dev** ([EW-592](https://evertech.atlassian.net/browse/EW-592)) = `trigger` provider with `TRIGGER_API_URL` pointed at the self-hosted instance. No new provider needed for that case.
 
-## 10. File index (proposed)
+## 10. File index
 
 ```
-packages/plugin/src/job-runtime/
-├── job-runtime.contract.ts          # IJobRuntimeProvider, JobRunStatus, ScheduleSpec, options
-├── job-runtime.category.ts          # capability registration ('job-runtime')
-└── testing/
-    └── job-runtime.contract.spec.ts # provider-agnostic conformance suite
+packages/plugin/src/contracts/capabilities/
+└── job-runtime.interface.ts         # IJobRuntimeProvider, JobRunStatus, ScheduleSpec, options (shipped EW-685 P0)
+
+packages/plugin/src/contracts/__tests__/
+├── job-runtime.spec.ts              # type-level shape assertions (shipped EW-685 P0)
+└── job-runtime.conformance.spec.ts  # runtime conformance suite (lands with first provider, EW-686 P1)
 
 packages/agent/src/tasks/
 ├── *.dispatcher.ts                  # EXISTING dispatcher interfaces (unchanged)
-└── job-runtime.providers.ts         # NEW factory: EVER_WORKS_JOB_RUNTIME → bind symbols
+└── job-runtime.providers.ts         # NEW factory: EVER_WORKS_JOB_RUNTIME → bind symbols (EW-685 P0 seam half, lands with EW-686 P1)
 
 packages/plugins/
 ├── job-runtime-trigger/             # re-housed TriggerService (default)
@@ -248,7 +249,17 @@ packages/tasks/                      # remains the trigger provider's worker pac
                                      # (other pull providers get sibling worker entrypoints)
 ```
 
-## 11. See Also
+## 11. Tenant-Scoped Overlay (multi-tenant extension)
+
+This document defines the **instance-global** runtime selection (`EVER_WORKS_JOB_RUNTIME` chooses one provider per deployment). For multi-tenant deployments — Ever Works Cloud and any operator hosting multiple tenants on one instance — that single selection is the **fallback**; each tenant can layer an overlay on top to inherit, BYO credentials for the same provider, or override to a different _enabled_ provider. The overlay reuses the dispatcher seam from this doc unchanged — it plugs in via a `TenantAwareRuntimeResolver` placed in front of the EW-685 binding factory.
+
+See the dedicated feature set for the overlay design:
+
+- [ADR-017](../decisions/017-tenant-scoped-job-runtime-overlay.md) — decision + rationale.
+- [`features/tenant-job-runtime-overlay/spec.md`](../features/tenant-job-runtime-overlay/spec.md) · [`plan.md`](../features/tenant-job-runtime-overlay/plan.md) · [`tasks.md`](../features/tenant-job-runtime-overlay/tasks.md) · [`providers.md`](../features/tenant-job-runtime-overlay/providers.md)
+- Jira: [EW-742](https://evertech.atlassian.net/browse/EW-742) (epic) · [EW-743](https://evertech.atlassian.net/browse/EW-743) (P0 spec-kit story).
+
+## 12. See Also
 
 - [ADR-015](../decisions/015-job-runtime-provider-pluggability.md) — decision + rationale.
 - [`features/job-runtime-providers/spec.md`](../features/job-runtime-providers/spec.md) · [`plan.md`](../features/job-runtime-providers/plan.md) · [`tasks.md`](../features/job-runtime-providers/tasks.md) · [`providers.md`](../features/job-runtime-providers/providers.md)

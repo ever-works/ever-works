@@ -19,15 +19,24 @@ This spec covers the **resolution algorithm**, **scope model**, **secret
 hygiene**, and **environment-variable fallback** that make plugin
 settings safe to use across admin, user, and per-work contexts.
 
-## 2. The Three Tiers
+## 2. The Tiers
 
-Plugin settings can be set at three scopes:
+Plugin settings can be set at four scopes (three originally; `tenant` was added by [EW-742](https://evertech.atlassian.net/browse/EW-742) for multi-tenant deployments):
 
-| Scope    | Storage table     | Configured by | Lifetime                  |
-| -------- | ----------------- | ------------- | ------------------------- |
-| `global` | `plugin_settings` | Admin         | Survives all sessions     |
-| `user`   | `user_plugins`    | The user      | Per-user                  |
-| `work`   | `work_plugins`    | Work editor   | Per-work (overrides user) |
+| Scope    | Storage table            | Configured by | Lifetime                                              |
+| -------- | ------------------------ | ------------- | ----------------------------------------------------- |
+| `global` | `plugin_settings`        | Admin         | Survives all sessions                                 |
+| `tenant` | `tenant_plugin_settings` | Tenant admin  | Per-tenant; overrides `global` for tenant-scoped keys |
+| `user`   | `user_plugins`           | The user      | Per-user; overrides `tenant`/`global`                 |
+| `work`   | `work_plugins`           | Work editor   | Per-work (overrides user)                             |
+
+> **`tenant` scope status (2026-06):** the `x-scope: 'tenant'` JSON-Schema value
+> is recognised by the plugin contracts (see `packages/plugin/src/settings/json-schema.types.ts`).
+> Storage tier `tenant_plugin_settings` and the corresponding cascade step are
+> introduced by [EW-742](https://evertech.atlassian.net/browse/EW-742) P1
+> (data model + migration). For single-tenant or pre-overlay deployments, a
+> `tenant` value resolves identically to `global` — adding the scope is a
+> grammar-only change (P1.0) and ships ahead of the storage tier.
 
 The **resolution cascade** for a key is, in order of precedence:
 
@@ -35,11 +44,14 @@ The **resolution cascade** for a key is, in order of precedence:
    has its own value for the key.
 2. **User** — if the call carries a `userId` and the user has their own
    value.
-3. **Admin (global)** — the platform-wide default an admin set.
-4. **Environment variable** — the value of `x-envVar` from the schema,
+3. **Tenant** — if the call carries a `tenantId` and the tenant has its
+   own value for a `x-scope: 'tenant'` key (EW-742 P1+; pre-P1 deployments
+   skip this step and fall through to `global`).
+4. **Admin (global)** — the platform-wide default an admin set.
+5. **Environment variable** — the value of `x-envVar` from the schema,
    if defined and present in the process env.
-5. **Schema default** — the JSON Schema `default` value.
-6. **Undefined** — caller must handle the missing value.
+6. **Schema default** — the JSON Schema `default` value.
+7. **Undefined** — caller must handle the missing value.
 
 The cascade is implemented in `PluginSettingsService.resolve(...)`. It's
 the same code path for plugin enablement, settings UI rendering, and

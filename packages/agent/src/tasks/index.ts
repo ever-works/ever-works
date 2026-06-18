@@ -1,3 +1,16 @@
+/**
+ * EW-683 / EW-685 — the `*_DISPATCHER` symbols re-exported below ARE
+ * the seam that makes the job runtime pluggable. The API depends only
+ * on these symbols; today `TriggerService` (`packages/tasks/src/trigger/trigger.service.ts`)
+ * implements every one of them. EW-686 P1 will refactor `TriggerService`
+ * to implement the `IJobRuntimeProvider` contract
+ * (`packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`,
+ * shipped EW-685 P0) and a binding factory at
+ * `packages/agent/src/tasks/job-runtime.providers.ts` will bind whichever
+ * provider is active (env: `EVER_WORKS_JOB_RUNTIME`) to all of these symbols.
+ * Call sites do not change. See `docs/specs/architecture/job-runtime-providers.md`
+ * §2 (seam) and §3 (contract) for the full picture.
+ */
 export * from './work-generation.types';
 export * from './work-generation-dispatcher';
 export * from './work-import.types';
@@ -20,3 +33,36 @@ export * from './kb-transcribe.types';
 export * from './kb-transcribe-dispatcher';
 export * from './kb-reembed-work.types';
 export * from './kb-reembed-work-dispatcher';
+// Tenant-scoped job-runtime overlay (EW-742 P1) — credential versioning
+// for graceful drain on rotation. See ADR-017 §3 + spec.md FR-5.
+export * from './credential-version.service';
+// Tenant-scoped job-runtime overlay (EW-742 P3.1 / T21) — in-process
+// LRU+TTL cache for resolved credential snapshots, keyed by
+// `(tenantId, providerId, credentialVersion)`. Standalone class — the
+// P3 resolver (#1380 follow-up) and P4 worker host wire it in
+// separately. See the class JSDoc for the no-promotion-on-read
+// rationale (graceful drain per ADR-017 §3 / Q4).
+export * from './tenant-credential.cache';
+
+// EW-685 P0 T4 — job-runtime binding factory + registry token.
+//
+// The DI token + the default in-memory registry surface through the
+// barrel so DI modules (e.g. `TenantJobRuntimeModule` for EW-742 P3 /
+// EW-747) can bind `{ provide: JOB_RUNTIME_PROVIDER_REGISTRY, useClass:
+// InMemoryJobRuntimeProviderRegistry }` without reaching into
+// `./job-runtime.providers` directly. `buildJobRuntimeProviders()` stays
+// behind the file boundary because it's a one-shot module-wiring helper,
+// not a DI consumer entry point.
+export {
+    InMemoryJobRuntimeProviderRegistry,
+    JOB_RUNTIME_PROVIDER_REGISTRY,
+} from './job-runtime.providers';
+export type { JobRuntimeProviderRegistry } from './job-runtime.providers';
+
+// EW-742 P3 / EW-747 (T20 + T23) — tenant-aware job-runtime resolver.
+// Wraps the EW-685 binding factory registry so callers can resolve the
+// active provider for a specific tenant; non-overridden tenants pass
+// through to `registry.getActive()`. See the file header on the
+// resolver for the P3 stopgap behaviour and the P3.1 / T21 / T22
+// deferral notes.
+export { TenantAwareRuntimeResolver } from './tenant-aware-runtime.resolver';
