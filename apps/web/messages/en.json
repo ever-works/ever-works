@@ -1199,6 +1199,7 @@
                 "data": "Data",
                 "githubApp": "GitHub App",
                 "workAgent": "Work Agent",
+                "jobRuntime": "Job Runtime",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone"
             },
@@ -1567,6 +1568,79 @@
                     "revokeSuccess": "API key revoked successfully",
                     "revokeError": "Failed to revoke API key",
                     "copyError": "Failed to copy to clipboard"
+                }
+            },
+            "jobRuntime": {
+                "title": "Job Runtime",
+                "subtitle": "Override the platform-default job-runtime provider with your own credentials. Inherit falls back to the platform default; BYO keeps the same provider with tenant credentials; Override switches both provider and credentials.",
+                "mode": {
+                    "inherit": "Inherit (platform default)",
+                    "byo": "Bring your own credentials",
+                    "override": "Override provider and credentials"
+                },
+                "readout": {
+                    "mode": "Active mode",
+                    "provider": "Active provider",
+                    "providerNone": "Platform default",
+                    "credentialVersion": "Credential version",
+                    "credentialsRef": "Credential pointer",
+                    "noCredentials": "None",
+                    "noOverlay": "No overlay row",
+                    "updatedAt": "Last updated",
+                    "enabled": "Enabled",
+                    "yes": "Yes",
+                    "no": "No"
+                },
+                "fields": {
+                    "providerLabel": "Provider",
+                    "providerHelper": "Picks the worker runtime used to dispatch background jobs for this tenant.",
+                    "modeLabel": "Mode",
+                    "modeHelper": {
+                        "inherit": "Use the platform-default credentials. The dispatcher resolves this tenant to the same runtime as everyone else.",
+                        "byo": "Keep the same provider as the platform default but use your own credentials.",
+                        "override": "Switch to a different provider and supply your own credentials."
+                    },
+                    "enabledLabel": "Enabled",
+                    "enabledHelper": "Soft-disable without dropping the credential pointer. When off, the dispatcher treats this tenant as inherit so operators can quickly fall back."
+                },
+                "credentials": {
+                    "title": "Credentials",
+                    "subtitle": "Provide an opaque pointer into the encrypted secrets store. Plaintext credentials never round-trip through this UI — paste the JSON blob to record what was provisioned; the secret pointer is what the dispatcher resolves.",
+                    "secretRefLabel": "Secret pointer",
+                    "secretRefPlaceholder": "tenant-job-runtime:42a1b8de:trigger:v3",
+                    "jsonLabel": "Credentials JSON (reference only)",
+                    "jsonPlaceholder": "{\n    \"token\": \"...\"\n}",
+                    "jsonHelper": "Per-provider schema-driven forms land in a follow-up sub-story. For now, paste the JSON shape from providers.md as a free-form reference."
+                },
+                "actions": {
+                    "save": "Save",
+                    "rotate": "Rotate credential",
+                    "forceInvalidate": "Force invalidate",
+                    "revert": "Revert to inherit"
+                },
+                "forceInvalidate": {
+                    "title": "Force-invalidate credential",
+                    "description": "Bumps the credential version and emits an audit row. Rate-limited to once per minute. In-flight runs keep their captured version and drain gracefully; new enqueues see the bumped version.",
+                    "cancel": "Cancel",
+                    "confirm": "Force invalidate"
+                },
+                "revert": {
+                    "title": "Revert to inherit",
+                    "description": "Clears the credential pointer, bumps the credential version, and routes future jobs through the platform default. Idempotent — a tenant already in inherit mode is unchanged.",
+                    "cancel": "Cancel",
+                    "confirm": "Revert to inherit"
+                },
+                "messages": {
+                    "saveSuccess": "Job-runtime configuration saved",
+                    "saveError": "Failed to save job-runtime configuration",
+                    "rotateSuccess": "Credential rotated (now v{version})",
+                    "rotateError": "Failed to rotate credential",
+                    "invalidateSuccess": "Credential invalidated (now v{version})",
+                    "invalidateError": "Failed to force-invalidate credential",
+                    "revertSuccess": "Reverted to inherit",
+                    "revertError": "Failed to revert to inherit",
+                    "invalidJson": "Credentials JSON is not valid JSON",
+                    "secretRefRequired": "Secret pointer is required when mode is not inherit"
                 }
             }
         },
@@ -4726,6 +4800,7 @@
             "profile": "Profile",
             "security": "Security",
             "apiKeys": "API Keys",
+            "jobRuntime": "Job Runtime",
             "dangerZone": "Danger Zone",
             "pluginSettings": "Plugin Settings"
         }
