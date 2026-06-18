@@ -4,6 +4,21 @@ export const authConstants = {
     refreshTokenCleanupDays: 30,
 };
 
+/**
+ * EW-742 P5 — canonical list of bundled job-runtime provider ids.
+ * Duplicates `TENANT_JOB_RUNTIME_PROVIDER_IDS` from
+ * `apps/api/src/account/tenant-job-runtime/dto/upsert-tenant-job-runtime.dto.ts`
+ * to keep this config module free of feature-level imports. The drift
+ * test in `tenant-job-runtime.service.spec.ts` enforces equality.
+ */
+export const BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS = [
+    'trigger',
+    'temporal',
+    'bullmq',
+    'pgboss',
+    'inngest',
+] as const;
+
 export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
@@ -192,6 +207,55 @@ export const config = {
 
     work: {
         staleTimeoutHours: () => parseInt(process.env.WORK_STALE_TIMEOUT_HOURS || '2', 10),
+    },
+
+    /**
+     * EW-742 P5 — operator allow-list gating for tenant job-runtime
+     * providers. The instance operator declares which of the five
+     * bundled providers (`trigger | temporal | bullmq | pgboss |
+     * inngest`) are exposed to tenants via the
+     * `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS` env var (comma
+     * separated). Empty / unset = ALL bundled providers allowed
+     * (default fail-open posture matches the plan.md §10 P5 wording
+     * — "reuse existing instance operator allow-list" — and avoids
+     * locking existing tenants out on the upgrade that ships this
+     * gate).
+     *
+     * The full list of bundled provider ids lives in
+     * `apps/api/src/account/tenant-job-runtime/dto/upsert-tenant-job-runtime.dto.ts`
+     * (`TENANT_JOB_RUNTIME_PROVIDER_IDS`). We DO NOT import it here
+     * to keep `config/constants.ts` free of any account-feature
+     * dependency — the canonical list is duplicated as
+     * `BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS` and a drift test in
+     * `tenant-job-runtime.service.spec.ts` asserts the two stay in
+     * sync. Adding a new provider therefore requires touching this
+     * file too (single drift point).
+     *
+     * Spec: [`docs/specs/features/tenant-job-runtime-overlay/spec.md`](../../../../docs/specs/features/tenant-job-runtime-overlay/spec.md)
+     * Plan: [`plan.md` §10 P5](../../../../docs/specs/features/tenant-job-runtime-overlay/plan.md)
+     */
+    tenantJobRuntime: {
+        getAllowedProviders: (): string[] => {
+            const raw = (process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS ?? '').trim();
+            if (raw === '') {
+                return [...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS];
+            }
+            const known = new Set<string>(BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS);
+            const parsed = raw
+                .split(',')
+                .map((value) => value.trim().toLowerCase())
+                .filter((value) => value.length > 0 && known.has(value));
+            // Deduplicate while preserving operator-declared order. An empty
+            // result after parsing (operator listed only unknown ids) falls
+            // back to the bundled default rather than locking the picker —
+            // a typo should not silently strand every tenant. The operator
+            // sees a startup log line warning about the unrecognised values.
+            const deduped = Array.from(new Set(parsed));
+            if (deduped.length === 0) {
+                return [...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS];
+            }
+            return deduped;
+        },
     },
 
     features: {

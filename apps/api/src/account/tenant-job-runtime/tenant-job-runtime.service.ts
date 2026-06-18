@@ -9,11 +9,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TenantJobRuntimeAudit, TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
+import { config } from '../../config/constants';
 import {
     TenantJobRuntimeConfigResponseDto,
     TenantJobRuntimeRotateResponseDto,
 } from './dto/tenant-job-runtime-response.dto';
-import { UpsertTenantJobRuntimeConfigDto } from './dto/upsert-tenant-job-runtime.dto';
+import {
+    TENANT_JOB_RUNTIME_PROVIDER_IDS,
+    TenantJobRuntimeProviderId,
+    UpsertTenantJobRuntimeConfigDto,
+} from './dto/upsert-tenant-job-runtime.dto';
 
 /**
  * EW-742 / EW-746 (P2.0 — tenant-job-runtime overlay admin API) —
@@ -39,9 +44,24 @@ import { UpsertTenantJobRuntimeConfigDto } from './dto/upsert-tenant-job-runtime
  *     credentialsSecretRef, keeps the row, bumps credentialVersion, emits
  *     audit row).
  *
+ * **EW-742 P5 additions (T33-T35):**
+ *   - `getAvailableProviders()` reads the operator allow-list env var
+ *     (`EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS`) via
+ *     `config.tenantJobRuntime` and returns the filtered list the UI
+ *     picker should render.
+ *   - `upsertConfig` rejects with `BadRequestException` when the
+ *     submitted `providerId` is excluded by the operator allow-list
+ *     (FR-9). The static enum check on the DTO still runs first; this
+ *     guard is the dynamic, env-driven layer.
+ *   - Audit rows now capture `operatorAllowedProviders` snapshot in
+ *     the `before` / `after` JSON blobs so future readers can correlate
+ *     a mutation with the allow-list active at that moment. No new
+ *     entity — extends the existing redacted snapshot helper.
+ *
  * **Out of scope here (deferred PRs):**
  *   - Reachability probe against the provider's `provisionTenant` — P4.
- *   - Per-tenant operator allow-list filtering (FR-9) — P5.
+ *   - Per-tenant whitelist behind a flag (P5.1 follow-up per plan.md
+ *     §10 P5 "deferred to v2 behind a flag").
  *   - In-flight run kill on force-invalidate (FR-6 hard kill) — P3+.
  */
 @Injectable()
@@ -55,6 +75,25 @@ export class TenantJobRuntimeService {
         private readonly auditRepository: Repository<TenantJobRuntimeAudit>,
         private readonly credentialVersionService: CredentialVersionService,
     ) {}
+
+    /**
+     * EW-742 P5 (T34) — return the operator-allowed provider ids the
+     * tenant picker should render. Reads the
+     * `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS` env var through the
+     * shared config layer; empty / unset → all 5 bundled providers.
+     *
+     * Defensive narrow: the config layer is the canonical filter and
+     * already drops unknown ids, but it returns `string[]` (no
+     * agent/feature import in `apps/api/src/config`). We re-narrow
+     * against the DTO-side allow-list so the returned type matches the
+     * existing wire enum without a downstream cast.
+     */
+    getAvailableProviders(): TenantJobRuntimeProviderId[] {
+        const known = new Set<string>(TENANT_JOB_RUNTIME_PROVIDER_IDS);
+        return config.tenantJobRuntime
+            .getAllowedProviders()
+            .filter((id): id is TenantJobRuntimeProviderId => known.has(id));
+    }
 
     /**
      * GET — returns the tenant's overlay row or a synthetic `mode: inherit`
@@ -88,6 +127,19 @@ export class TenantJobRuntimeService {
         if (dto.mode === 'inherit' && dto.credentialsSecretRef) {
             throw new BadRequestException(
                 'credentialsSecretRef must be omitted when mode = inherit',
+            );
+        }
+
+        // EW-742 P5 (T34) — operator allow-list gate. Static DTO enum
+        // catches unknown ids; this guard catches ids the operator has
+        // restricted via EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS.
+        // Skipped for `mode = inherit` because inherit uses the
+        // platform-default credentials regardless of providerId.
+        const allowedProviders = this.getAvailableProviders();
+        if (dto.mode !== 'inherit' && !allowedProviders.includes(dto.providerId)) {
+            throw new BadRequestException(
+                `provider '${dto.providerId}' is disabled by the operator. ` +
+                    `Allowed providers: ${allowedProviders.join(', ') || '(none)'}`,
             );
         }
 
@@ -332,6 +384,15 @@ export class TenantJobRuntimeService {
      * surfaced (NOT swallowed) — if the audit row can't land we treat the
      * mutation as failed so the operator never sees a divergent state
      * (overlay row updated without an audit trail).
+     *
+     * EW-742 P5 (T35) — every `before` / `after` snapshot is decorated
+     * with `operatorAllowedProviders: string[]` so future audit-log
+     * reads can correlate a mutation with the operator's active
+     * allow-list at the time. There's no runtime "disable" event we
+     * could capture separately — operators change the env var and
+     * redeploy — so we snapshot per-mutation. Null `before` / `after`
+     * (e.g. fresh row → `before = null`) is left as-is to preserve the
+     * existing semantic ("no previous state recorded").
      */
     private async emitAudit(payload: {
         tenantId: string;
@@ -341,11 +402,24 @@ export class TenantJobRuntimeService {
         after: Record<string, unknown> | null;
         credentialVersion: number | null;
     }): Promise<void> {
-        const audit = this.auditRepository.create(payload);
+        const operatorAllowedProviders = this.getAvailableProviders();
+        const decorate = (
+            snapshot: Record<string, unknown> | null,
+        ): Record<string, unknown> | null => {
+            if (snapshot === null) return null;
+            return { ...snapshot, operatorAllowedProviders };
+        };
+
+        const audit = this.auditRepository.create({
+            ...payload,
+            before: decorate(payload.before),
+            after: decorate(payload.after),
+        });
         await this.auditRepository.save(audit);
         this.logger.debug(
             `Audit: tenant=${payload.tenantId} action=${payload.action} ` +
-                `version=${payload.credentialVersion ?? 'null'}`,
+                `version=${payload.credentialVersion ?? 'null'} ` +
+                `allow-list=[${operatorAllowedProviders.join(',')}]`,
         );
     }
 }

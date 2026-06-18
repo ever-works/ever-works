@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import {
+    TenantJobRuntimeAvailableProvidersResponseDto,
     TenantJobRuntimeConfigResponseDto,
     TenantJobRuntimeRotateResponseDto,
 } from './dto/tenant-job-runtime-response.dto';
@@ -63,6 +64,34 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 @Controller('api/account/job-runtime')
 export class TenantJobRuntimeController {
     constructor(private readonly service: TenantJobRuntimeService) {}
+
+    /**
+     * EW-742 P5 (T34) — operator allow-list for the UI picker. Reads the
+     * `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS` env var. Empty /
+     * unset returns all 5 bundled providers (fail-open default per
+     * plan.md §10 P5). No per-tenant whitelisting in P5 — that's
+     * deferred to P5.1 behind a flag.
+     *
+     * Auth: same tenant-gate as the rest of the controller. There's no
+     * tenant-state read here, but we still refuse callers without a
+     * tenant so the picker isn't exposed before lazy-bootstrap.
+     */
+    @Get('available-providers')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List job-runtime providers the operator allows for tenant overlays',
+        description:
+            'Operator-controlled allow-list (env: EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS). ' +
+            'Empty / unset returns the full bundled list (fail-open default).',
+    })
+    @ApiResponse({ status: 200, type: TenantJobRuntimeAvailableProvidersResponseDto })
+    @ApiResponse({ status: 403, description: 'Caller has no Tenant (user not yet upgraded)' })
+    getAvailableProviders(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): TenantJobRuntimeAvailableProvidersResponseDto {
+        this.requireTenant(auth);
+        return { providers: this.service.getAvailableProviders() };
+    }
 
     @Get('config')
     @HttpCode(HttpStatus.OK)

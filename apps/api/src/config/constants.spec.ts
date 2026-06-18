@@ -1,4 +1,9 @@
-import { authConstants, AuthProvider, config } from './constants';
+import {
+    authConstants,
+    AuthProvider,
+    BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
+    config,
+} from './constants';
 
 describe('config/constants', () => {
     const ORIGINAL_ENV = { ...process.env };
@@ -25,7 +30,8 @@ describe('config/constants', () => {
                 key === 'WEB_URL' ||
                 key === 'HTTP_DEBUG' ||
                 key === 'MAILER_PROVIDER' ||
-                key === 'WORK_STALE_TIMEOUT_HOURS'
+                key === 'WORK_STALE_TIMEOUT_HOURS' ||
+                key === 'EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS'
             ) {
                 delete process.env[key];
             }
@@ -621,6 +627,79 @@ describe('config/constants', () => {
                 process.env.PLUGIN_REGISTRY_GITHUB_URL = '\t';
                 expect(() => config.plugins.validate()).toThrow();
             });
+        });
+    });
+
+    describe('config.tenantJobRuntime.getAllowedProviders (EW-742 P5)', () => {
+        it('returns ALL bundled providers when EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS is unset', () => {
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual([
+                ...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
+            ]);
+        });
+
+        it('returns ALL bundled providers when the env var is an empty string', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS = '';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual([
+                ...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
+            ]);
+        });
+
+        it('returns ALL bundled providers when the env var is whitespace only', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS = '   \t  ';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual([
+                ...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
+            ]);
+        });
+
+        it('parses comma-separated allow-list and preserves operator order', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS = 'temporal,trigger';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual(['temporal', 'trigger']);
+        });
+
+        it('trims whitespace and lowercases entries', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS =
+                ' Trigger ,  TEMPORAL ,  bullmq  ';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual([
+                'trigger',
+                'temporal',
+                'bullmq',
+            ]);
+        });
+
+        it('filters out unknown provider ids silently', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS = 'trigger,bogus,temporal';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual(['trigger', 'temporal']);
+        });
+
+        it('falls back to ALL bundled providers when every entry is unknown (typo guard)', () => {
+            // An all-unknown allow-list would lock every tenant out of the
+            // picker. Treat that as misconfiguration and fail-open rather
+            // than fail-shut.
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS = 'bogus,still-bogus';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual([
+                ...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS,
+            ]);
+        });
+
+        it('deduplicates repeated entries while keeping first-seen order', () => {
+            process.env.EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS =
+                'inngest,trigger,inngest,trigger';
+            expect(config.tenantJobRuntime.getAllowedProviders()).toEqual(['inngest', 'trigger']);
+        });
+    });
+
+    describe('BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS (drift gate)', () => {
+        it('lists the 5 documented bundled provider ids in the canonical order', () => {
+            // Source of truth: dto/upsert-tenant-job-runtime.dto.ts
+            // TENANT_JOB_RUNTIME_PROVIDER_IDS. The service layer asserts the
+            // two lists stay in sync; this test pins the local copy.
+            expect([...BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS]).toEqual([
+                'trigger',
+                'temporal',
+                'bullmq',
+                'pgboss',
+                'inngest',
+            ]);
         });
     });
 });

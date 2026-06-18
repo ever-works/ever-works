@@ -118,3 +118,23 @@ export class TenantJobRuntimeRotateResponseDto {
     })
     readonly credentialVersion!: number;
 }
+
+/**
+ * EW-742 P5 (T34) — response shape for `GET /api/account/job-runtime/available-providers`.
+ * Wraps the operator allow-list so the picker can render the dynamic
+ * subset of providers the instance operator has enabled via the
+ * `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS` env var. Empty / unset
+ * env returns ALL bundled providers (fail-open default per plan.md §10
+ * P5).
+ */
+export class TenantJobRuntimeAvailableProvidersResponseDto {
+    @ApiProperty({
+        description:
+            'Provider ids the operator allows for tenant overlays. Subset (or full ' +
+            'copy) of TENANT_JOB_RUNTIME_PROVIDER_IDS. Order matches the operator ' +
+            'declaration (or the canonical bundled order when the env is unset).',
+        enum: TENANT_JOB_RUNTIME_PROVIDER_IDS,
+        isArray: true,
+    })
+    readonly providers!: TenantJobRuntimeProviderId[];
+}
