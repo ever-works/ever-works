@@ -60,7 +60,7 @@ Optional (later): a small `job_runtime_runs` mirror table if we want a provider-
 
 ### DTOs / contracts
 
-`@ever-works/contracts` unchanged for external API consumers. New internal types (`JobRunStatus`, `ScheduleSpec`, `JobEnqueueOptions`) live in `packages/plugin/src/job-runtime/`.
+`@ever-works/contracts` unchanged for external API consumers. New internal types (`JobRunStatus`, `ScheduleSpec`, `JobEnqueueOptions`, `JobRuntimeId`, `IJobRuntimeProvider`) live in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (shipped EW-685 P0; re-exported from `@ever-works/plugin` via the capabilities barrel).
 
 ## 4. API Surface
 
@@ -73,7 +73,7 @@ No new public endpoints. The internal callback controller (`/internal/trigger/*`
 
 ## 5. Plugin Surface
 
-- **New capability** `job-runtime` → declare in `packages/plugin/src/job-runtime/job-runtime.category.ts` + `IJobRuntimeProvider` contract.
+- **Capability `job-runtime`** → contract at `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (shipped EW-685 P0). No separate `job-runtime.category.ts` registration file — capability strings (`job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-worker-host`) live in JSDoc on the interface itself, mirroring how `dns.interface.ts` (EW-734/735) declares its capability strings.
 - **New plugins** under `packages/plugins/`: `job-runtime-trigger` (re-house), `job-runtime-temporal`, `job-runtime-bullmq`, `job-runtime-pgboss`, `job-runtime-inngest`. Each: `package.json` with `everworks.plugin` (category `job-runtime`, `configurationMode: 'admin-only'`), tsup build, vitest, settings JSON-Schema with `x-secret`/`x-envVar`/`x-scope: global`.
 - **Binding factory** `packages/agent/src/tasks/job-runtime.providers.ts` resolves the active provider and binds all `*_DISPATCHER` symbols to it.
 
