@@ -71,28 +71,45 @@ keep their work running. They can edit content via PRs. Governance
 - Database rows for items/categories/tags are derived state, not the source
   of truth.
 
-## IV. Background Work Goes Through Trigger.dev
+## IV. Background Work Goes Through the Configured Job-Runtime Provider
 
-Long-running, retryable, scheduled, or fan-out work runs as a **Trigger.dev
-task**, not as an in-process async function. Cron schedules use the
-`schedules.task()` API; one-shot fan-out uses regular `task()`. In-process
-execution remains an option only as a fallback when Trigger.dev is not
-configured.
+Long-running, retryable, scheduled, or fan-out work runs as a task on the
+**configured job-runtime provider** (Trigger.dev default), not as an in-process
+async function. The provider abstraction lives in
+`packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`
+([`IJobRuntimeProvider`](../../packages/plugin/src/contracts/capabilities/job-runtime.interface.ts), shipped EW-685 P0); the active runtime is selected
+by `EVER_WORKS_JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}` (default
+`trigger`). Cron schedules use the provider's native cron mechanism
+(Trigger.dev `schedules.task()` today; Temporal Schedules, BullMQ repeatable
+jobs, pg-boss `schedule()`, Inngest cron functions for the alternative
+providers). One-shot fan-out uses the provider's enqueue primitive.
+In-process execution remains an option only as a fallback when the active
+provider is not configured / unreachable. Tenant-scoped overlay on top of the
+instance-global selection is the EW-742 epic.
 
 **Why**: Generation runs are long (minutes), use heavy resources, and must
-survive worker restarts. Trigger.dev gives us idempotent retries, durable
-state, observability, cancellation, and concurrency control out of the box.
-Re-implementing those primitives in the API process is busywork.
+survive worker restarts. A job runtime — whichever provider — gives us
+idempotent retries, durable state, observability, cancellation, and
+concurrency control out of the box. Re-implementing those primitives in the
+API process is busywork. Making it pluggable (per
+[ADR-015](../../docs/specs/decisions/015-job-runtime-provider-pluggability.md)
+and [ADR-017](../../docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md))
+lets operators pick the runtime that fits their deployment (SaaS, Temporal
+self-host, Redis+BullMQ, Postgres-native pg-boss, Inngest Cloud) without
+touching call sites.
 
 **Implications**:
 
-- New "I need to run X every N minutes" → Trigger.dev cron task.
-- New "I need to fan out work for each work in a batch" → Trigger.dev
-  task triggered by a parent.
+- New "I need to run X every N minutes" → register a `ScheduleSpec` with the
+  active provider (today: Trigger.dev cron task).
+- New "I need to fan out work for each work in a batch" → enqueue via a
+  `*_DISPATCHER` symbol; the binding factory routes it to the active provider.
 - Mutual exclusion across overlapping ticks → atomic SQL `UPDATE … WHERE` if
   you have an owning row, else `DistributedTaskLockService`.
 - API endpoints that kick off work return `202 Accepted` immediately; they
   must not block on the worker.
+- Call sites depend ONLY on the agent-package `*_DISPATCHER` DI symbols; they
+  never `import` `@trigger.dev/sdk` (or any other vendor SDK) directly.
 
 ## V. Database Migrations Are Forward-Only
 
@@ -228,7 +245,8 @@ For any feature spec or plan, run through these gates before merging:
       (Principle I).
 - [ ] No hardcoded plugin id outside the plugin package itself (Principle II).
 - [ ] Content lives in user repos, not the database (Principle III).
-- [ ] Long-running work uses Trigger.dev (Principle IV).
+- [ ] Long-running work uses the configured job-runtime provider via the
+      `*_DISPATCHER` DI symbols (Principle IV, [ADR-015](../../docs/specs/decisions/015-job-runtime-provider-pluggability.md)).
 - [ ] Schema changes ship as forward-only migrations (Principle V).
 - [ ] Tests accompany the change (Principle VI).
 - [ ] Secrets carry `x-secret: true` and are never logged (Principle VII).
