@@ -275,6 +275,10 @@ export class TriggerService
         switch (status) {
             // Pre-execution: still in Trigger.dev's queue, waiting for
             // capacity / a deployed worker version / a delay timer.
+            // NB Trigger.dev's `WAITING` is a pre-execution state (the
+            // task is waiting for a slot), NOT a within-execution wait
+            // (e.g. a `wait.for(...)` inside a running task). Hence the
+            // mapping to the cross-provider `'queued'`, not `'running'`.
             case 'PENDING_VERSION':
             case 'QUEUED':
             case 'DEQUEUED':
