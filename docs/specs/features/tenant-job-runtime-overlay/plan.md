@@ -83,7 +83,7 @@ Indexes: PK on `tenant_id`; partial index `WHERE enabled = true` on `(provider_i
 
 ### DTOs / contracts
 
-New types in `packages/plugin/src/job-runtime/tenant-overlay.contract.ts`:
+New types in `packages/plugin/src/contracts/capabilities/job-runtime-tenant.interface.ts` (sibling to the EW-685 P0 `job-runtime.interface.ts`; lands with P3 alongside the tenant-aware resolver):
 
 ```ts
 export type TenantRuntimeMode = 'inherit' | 'byo' | 'override';
@@ -186,7 +186,7 @@ Phases map to the EW-742 description. Each phase is a candidate sub-PR (or sub-P
     - `apps/api/src/works/services/tenant-job-runtime-config.service.ts`
     - `apps/api/src/migrations/<timestamp>-TenantJobRuntimeOverlay.ts`
     - `packages/plugin/src/settings/extensions.ts` (add `tenant` to `x-scope`)
-    - `packages/plugin/src/job-runtime/tenant-overlay.contract.ts`
+    - `packages/plugin/src/contracts/capabilities/job-runtime-tenant.interface.ts` (sibling to the EW-685 P0 `job-runtime.interface.ts`)
     - `apps/api/src/plugins/services/plugin-settings.service.ts` (extend cascade with `tenant` tier)
 - **Tech choices**: TypeORM entity with `@PrimaryColumn('uuid')`, `@Column({type: 'enum'})` for `mode`; AES-256-GCM secret envelope reused via existing `SecretsService`.
 - **Test plan**:
@@ -273,8 +273,8 @@ Phases map to the EW-742 description. Each phase is a candidate sub-PR (or sub-P
 
 - **Scope**: extend EW-683's shared conformance suite with a per-tenant variant parameterised across N tenants × M providers. Add graceful-drain + force-invalidate cases.
 - **Files touched**:
-    - `packages/plugin/src/job-runtime/testing/job-runtime.contract.spec.ts` (parameterise existing cases over `tenantId`)
-    - `packages/plugin/src/job-runtime/testing/tenant-overlay.contract.spec.ts` (NEW — drain + force-invalidate + version capture)
+    - `packages/plugin/src/contracts/__tests__/job-runtime.conformance.spec.ts` (parameterise existing cases over `tenantId`; the runtime conformance suite — sibling of the type-level `job-runtime.spec.ts` shipped in EW-685 P0 — lands with EW-686 P1 once there's a provider to run it against)
+    - `packages/plugin/src/contracts/__tests__/job-runtime-tenant.conformance.spec.ts` (NEW — drain + force-invalidate + version capture)
     - CI matrix in `.github/workflows/ci.yml` — add axis `TENANT_COUNT={1,3}` against existing `JOB_RUNTIME={trigger,pgboss,bullmq,temporal,inngest}`.
 - **Tech choices**: Vitest parameterised `describe.each`; per-tenant fixtures created in `beforeAll` via the provider's `provisionTenant()` hook; teardown via `deprovisionTenant()`.
 - **Test plan**:

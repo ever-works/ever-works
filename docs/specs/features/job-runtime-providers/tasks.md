@@ -11,8 +11,10 @@
 
 ## Phase 0 — Contract & seam (no behaviour change) · `[EW-683 P0]`
 
-- [ ] **T1.** Define the `job-runtime` capability: `packages/plugin/src/job-runtime/job-runtime.category.ts` (register capability) + export from `packages/plugin` entrypoint.
-- [ ] **T2.** Define `IJobRuntimeProvider`, `JobRunStatus`, `ScheduleSpec`, `JobEnqueueOptions`, `JobRuntimeDispatchers` in `packages/plugin/src/job-runtime/job-runtime.contract.ts`. Decide `triggerRunId` (keep) vs `runtimeRunId` (rename, two-phase migration) — default: keep `triggerRunId` as the opaque run id.
+T1 + T2 ✅ Done in [#1354](https://github.com/ever-works/ever-works/pull/1354) (cascaded [#1360](https://github.com/ever-works/ever-works/pull/1360) -> [#1362](https://github.com/ever-works/ever-works/pull/1362)). T3 + T4 remain (factory + selector env var). T5 + T6 trail.
+
+- [x] **T1.** Define the `job-runtime` capability via `IJobRuntimeProvider` exported from `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (the existing capabilities barrel was the natural home alongside the other 25+ capability contracts; no separate `job-runtime.category.ts` file needed since capability strings are declared in JSDoc on the interface itself, matching how `dns.interface.ts` handles it).
+- [x] **T2.** Defined `IJobRuntimeProvider`, `JobRunStatus`, `ScheduleSpec`, `JobEnqueueOptions`, `JobRuntimeDispatchers` (plus `JobRuntimeId`, `WorkerHostOptions`, `WorkerHostHandle`) in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`. Run id naming: kept opaque `string` (was originally going to decide `triggerRunId` vs `runtimeRunId` — punted, both shipping providers will produce strings that fit the existing `triggerRunId` column without rename).
 - [ ] **T3.** Add `EVER_WORKS_JOB_RUNTIME` to config (`packages/agent/src/config/index.ts`): `getJobRuntime()` default `'trigger'`, validated enum.
 - [ ] **T4.** Binding factory `packages/agent/src/tasks/job-runtime.providers.ts`: resolve active provider from registry by `EVER_WORKS_JOB_RUNTIME`, bind all `*_DISPATCHER` symbols to `provider.dispatchers`. Bound to `trigger` by default.
 - [ ] **T5.** Amend Constitution Principle IV (`.specify/memory/constitution.md`) → "via the configured job-runtime provider (Trigger.dev default)"; cross-link [ADR-015](../../decisions/015-job-runtime-provider-pluggability.md). (Lands in this phase's PR.)
@@ -27,7 +29,7 @@
 
 ## Phase 2 — Conformance harness · `[EW-683 P2]`
 
-- [ ] **T11.** Provider-agnostic suite `packages/plugin/src/job-runtime/testing/job-runtime.contract.spec.ts`: enqueue→run→status, idempotency (same key → one logical run), concurrency (same key serialises), cancel (in-flight aborts → `CANCELLED`), schedule fires, disabled→`null`+in-process fallback.
+- [ ] **T11.** Provider-agnostic runtime conformance suite, e.g. at `packages/plugin/src/contracts/__tests__/job-runtime.conformance.spec.ts` (parallel to the type-level shape spec at `job-runtime.spec.ts` already shipped in EW-685 P0): enqueue→run→status, idempotency (same key → one logical run), concurrency (same key serialises), cancel (in-flight aborts → `CANCELLED`), schedule fires, disabled→`null`+in-process fallback.
 - [ ] **T12.** Run harness green against `trigger`. Add a CI matrix axis `JOB_RUNTIME={trigger}` (extend per provider in later phases).
 
 ## Phase 3 — pg-boss provider (Postgres-native, GA-track) · `[EW-683 P3]`
