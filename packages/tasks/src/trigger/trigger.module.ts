@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { TriggerService } from './trigger.service';
+import { TriggerJobRuntimeProvider } from './trigger-job-runtime.provider';
 import {
     WORK_GENERATION_DISPATCHER,
     WORK_IMPORT_DISPATCHER,
@@ -20,6 +21,16 @@ import {
 @Module({
     providers: [
         TriggerService,
+        // EW-686 P1 — adapter exposing TriggerService through the new
+        // pluggable IJobRuntimeProvider contract. Registered here so the
+        // EW-685 T4 binding factory (a follow-up PR introducing
+        // `packages/agent/src/tasks/job-runtime.providers.ts`) can inject
+        // it by class. The existing `*_DISPATCHER` direct bindings below
+        // stay untouched — the factory replaces them in a later PR; until
+        // then the synthetic adapter and the direct bindings coexist
+        // without conflict (the adapter delegates back into the same
+        // TriggerService instance).
+        TriggerJobRuntimeProvider,
         {
             provide: WORK_GENERATION_DISPATCHER,
             useExisting: TriggerService,
@@ -69,6 +80,7 @@ import {
     ],
     exports: [
         TriggerService,
+        TriggerJobRuntimeProvider,
         WORK_GENERATION_DISPATCHER,
         WORK_IMPORT_DISPATCHER,
         TEMPLATE_CUSTOMIZATION_DISPATCHER,
