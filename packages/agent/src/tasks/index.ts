@@ -46,11 +46,23 @@ export * from './tenant-credential.cache';
 
 // EW-685 P0 T4 — job-runtime binding factory + registry token.
 //
-// Only the DI token surfaces through the barrel here so the
-// `TASKS_BARREL_RUNTIME_SYMBOLS` pin stays minimal — consumers that need
-// the registry class or `buildJobRuntimeProviders()` import them directly
-// from `./job-runtime.providers`. The factory is declared but not wired
-// into any NestJS module yet; see the file header for the deferred-wiring
-// rationale.
-export { JOB_RUNTIME_PROVIDER_REGISTRY } from './job-runtime.providers';
+// The DI token + the default in-memory registry surface through the
+// barrel so DI modules (e.g. `TenantJobRuntimeModule` for EW-742 P3 /
+// EW-747) can bind `{ provide: JOB_RUNTIME_PROVIDER_REGISTRY, useClass:
+// InMemoryJobRuntimeProviderRegistry }` without reaching into
+// `./job-runtime.providers` directly. `buildJobRuntimeProviders()` stays
+// behind the file boundary because it's a one-shot module-wiring helper,
+// not a DI consumer entry point.
+export {
+    InMemoryJobRuntimeProviderRegistry,
+    JOB_RUNTIME_PROVIDER_REGISTRY,
+} from './job-runtime.providers';
 export type { JobRuntimeProviderRegistry } from './job-runtime.providers';
+
+// EW-742 P3 / EW-747 (T20 + T23) — tenant-aware job-runtime resolver.
+// Wraps the EW-685 binding factory registry so callers can resolve the
+// active provider for a specific tenant; non-overridden tenants pass
+// through to `registry.getActive()`. See the file header on the
+// resolver for the P3 stopgap behaviour and the P3.1 / T21 / T22
+// deferral notes.
+export { TenantAwareRuntimeResolver } from './tenant-aware-runtime.resolver';

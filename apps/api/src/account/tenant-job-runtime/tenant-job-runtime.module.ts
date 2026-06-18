@@ -2,7 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { TenantJobRuntimeAudit, TenantJobRuntimeConfig } from '@ever-works/agent/entities';
-import { CredentialVersionService, TenantCredentialCache } from '@ever-works/agent/tasks';
+import {
+    CredentialVersionService,
+    InMemoryJobRuntimeProviderRegistry,
+    JOB_RUNTIME_PROVIDER_REGISTRY,
+    TenantAwareRuntimeResolver,
+    TenantCredentialCache,
+} from '@ever-works/agent/tasks';
 import { TenantJobRuntimeController } from './tenant-job-runtime.controller';
 import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 
@@ -13,35 +19,47 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
  *
  * Spec: [`docs/specs/features/tenant-job-runtime-overlay/spec.md`](../../../../docs/specs/features/tenant-job-runtime-overlay/spec.md)
  * Plan: [`plan.md` §4 API surface](../../../../docs/specs/features/tenant-job-runtime-overlay/plan.md#4-api-surface)
- * Tasks: [`tasks.md` T14](../../../../docs/specs/features/tenant-job-runtime-overlay/tasks.md)
+ * Tasks: [`tasks.md` T14 + T20 + T21](../../../../docs/specs/features/tenant-job-runtime-overlay/tasks.md)
  *
  * Imports the global `DatabaseModule` (provides the TypeORM connection)
  * plus `TypeOrmModule.forFeature([...])` so the service can inject the
  * scoped `Repository<TenantJobRuntimeConfig>` and
- * `Repository<TenantJobRuntimeAudit>`. `CredentialVersionService` is
- * provided locally rather than imported via a separate module — it lives
- * in `@ever-works/agent/tasks` and needs the same forFeature
- * registration to resolve its own `@InjectRepository(TenantJobRuntimeConfig)`.
- * Co-providing it here keeps the DI graph flat; if another module ever
- * needs the same service, hoist it into a dedicated providers module
- * and import.
+ * `Repository<TenantJobRuntimeAudit>`. `CredentialVersionService`,
+ * `TenantAwareRuntimeResolver` (EW-742 P3 / EW-747 T20), and
+ * `TenantCredentialCache` (EW-742 P3.1 / T21) are provided locally rather
+ * than imported via a separate module — they live in
+ * `@ever-works/agent/tasks` and need the same forFeature registration
+ * to resolve their own `@InjectRepository(TenantJobRuntimeConfig)`.
+ * Co-providing here keeps the DI graph flat; if another module ever
+ * needs the same services, hoist them into a dedicated providers
+ * module and import.
  *
- * `TenantCredentialCache` (EW-742 P3.1 / T21) is also provided + exported
- * here. It has zero DI dependencies (a dumb in-memory LRU+TTL bag) but
- * lives in `@ever-works/agent/tasks` alongside `CredentialVersionService`
- * for the same packaging reasons, so co-providing it here keeps the wiring
- * symmetric. Consumers (the P3 tenant-aware resolver and the future P4
- * worker host) inject it directly — this module is not their entry point
- * yet, the cache simply needs SOMEONE to register it as a NestJS provider
- * so it shows up in the app's DI container as a singleton.
+ * The `JOB_RUNTIME_PROVIDER_REGISTRY` provider binds the in-memory
+ * default implementation per EW-685 P0 T4 — same single-active-runtime
+ * semantic as before. The resolver wraps it without changing the
+ * registry contract; non-overridden tenants still resolve to whatever
+ * the registry returns from `getActive()`.
+ *
+ * `TenantCredentialCache` is a dumb in-memory LRU+TTL bag (zero DI deps)
+ * exposed via `exports` so the P3 resolver and future P4 worker host
+ * can inject it. This module is its registration point.
  */
 @Module({
     imports: [
         DatabaseModule,
         TypeOrmModule.forFeature([TenantJobRuntimeConfig, TenantJobRuntimeAudit]),
     ],
-    providers: [TenantJobRuntimeService, CredentialVersionService, TenantCredentialCache],
+    providers: [
+        TenantJobRuntimeService,
+        CredentialVersionService,
+        TenantAwareRuntimeResolver,
+        TenantCredentialCache,
+        {
+            provide: JOB_RUNTIME_PROVIDER_REGISTRY,
+            useClass: InMemoryJobRuntimeProviderRegistry,
+        },
+    ],
     controllers: [TenantJobRuntimeController],
-    exports: [TenantCredentialCache],
+    exports: [TenantCredentialCache, TenantAwareRuntimeResolver],
 })
 export class TenantJobRuntimeModule {}

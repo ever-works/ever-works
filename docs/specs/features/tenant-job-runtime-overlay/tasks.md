@@ -1,7 +1,7 @@
 # Task Breakdown: Tenant-Scoped Job-Runtime Overlay
 
 **Feature ID**: `tenant-job-runtime-overlay`
-**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3.1 (credential cache only) + P5 landed on `main`. P2.2 (schema-driven form + e2e), the rest of P3 (T20/T22/T23/T24 — resolver + version-capture + tests, paired with #1380), P4 (worker host, blocked on EW-685/EW-686), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs) remain.
+**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache) + P5 + P7 (T41+T42) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 enqueue capture), P4 (worker host, blocked on EW-686 P2), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs T43/T44) remain.
 **Last updated**: 2026-06-18
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md) · **Providers**: [`./providers.md`](./providers.md) · **Epic**: [EW-742](https://evertech.atlassian.net/browse/EW-742) · **Story**: [EW-743](https://evertech.atlassian.net/browse/EW-743) · **ADR**: [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md)
 
@@ -41,13 +41,17 @@ P2.0 (REST API) ✅ Done in [#1341](https://github.com/ever-works/ever-works/pul
 
 ## Phase 3 — Dispatcher routing · `[EW-742 P3]`
 
-P3.1 (T21 credential cache) ships as a standalone class so it can be layered into both the P3 resolver (paired with #1380) and the future P4 worker host without coupling those PRs. T20 / T22 / T23 / T24 remain.
+T20 + T23 + T24 ✅ Done in this PR (#1380, EW-747 — minimal viable resolver, byo/override modes return instance default with `Logger.debug` deferral note until per-provider credential-binding API lands). T21 (cache) ✅ shipped in [#1381](https://github.com/ever-works/ever-works/pull/1381). T22 (enqueue capture) deferred to Phase 3.1.
 
-- [ ] **T20.** Extend EW-685's binding factory (`packages/agent/src/tasks/job-runtime.providers.ts`) with a tenant-aware resolver that takes `(tenantId, jobName)` and returns the active `IJobRuntimeProvider` bound to that tenant's overlay credentials (or the inherited instance default).
-- [x] **T21.** Credential cache with 15–60s TTL in `packages/agent/src/tasks/tenant-credential.cache.ts` — keyed by `(tenantId, providerId, credentialVersion)`, in-process LRU with explicit invalidate on version bump or force-invalidate. Standalone `@Injectable()` class with no DI dependencies (defaults: `maxEntries=1024`, `ttlMs=30_000`); insertion-order LRU (no promotion-on-read so an in-flight run's snapshot does not get kept alive past its rotation window — see ADR-017 §3 / Q4). Provided + exported via `TenantJobRuntimeModule`. Consumer wiring (P3 resolver + P4 worker host) lands in their respective PRs. PR: [#1381](https://github.com/ever-works/ever-works/pull/1381).
-- [ ] **T22.** Credential version capture at every enqueue (Q4) — extend dispatch call sites to read the current `(tenantId, providerId)` version from `CredentialVersionService` and stamp `credentialVersion` into the run record so the worker host resolves the same snapshot when the job runs.
-- [ ] **T23.** Fallback path to instance-global default when a tenant has no overlay row — resolver returns the EW-683 instance binding unchanged; tests in T24 prove zero-overhead for tenants that never opt in.
-- [ ] **T24.** Unit tests for the resolver under `packages/agent/src/tasks/__tests__/tenant-job-runtime.resolver.spec.ts` covering inherit fallback, BYO overlay, cache hit/miss, version-snapshot resolution, and cache invalidation on rotation.
+- [x] **T20.** Tenant-aware resolver at `packages/agent/src/tasks/tenant-aware-runtime.resolver.ts` (`TenantAwareRuntimeResolver`) wraps the EW-685 P0 T4 binding-factory registry: `resolve(tenantId)` returns the instance default for `null` / no-row / inherit / disabled; for `byo` + `override` + `enabled` it logs the deferral and still returns the instance default until EW-686 P2 lands the per-provider credential-binding hook. `getEffectiveBinding(tenantId)` returns the metadata T22 will stamp onto the run record.
+- [x] **T21.** Credential cache with 15–60s TTL in `packages/agent/src/tasks/tenant-credential.cache.ts` — keyed by `(tenantId, providerId, credentialVersion)`, in-process LRU with explicit invalidate on version bump or force-invalidate. Standalone `@Injectable()` class with no DI dependencies (defaults: `maxEntries=1024`, `ttlMs=30_000`); insertion-order LRU (no promotion-on-read so an in-flight runs snapshot does not get kept alive past its rotation window — see ADR-017 §3 / Q4). Provided + exported via `TenantJobRuntimeModule`. PR: [#1381](https://github.com/ever-works/ever-works/pull/1381).
+- [ ] **T22.** Credential version capture at every enqueue (Q4) — extend dispatch call sites to read the current `(tenantId, providerId)` version from `CredentialVersionService` and stamp `credentialVersion` into the run record so the worker host resolves the same snapshot when the job runs. **(Deferred to P3.1.)**
+- [x] **T23.** Fallback path to instance-global default when a tenant has no overlay row — resolver returns the EW-683 instance binding unchanged; the `getActive() = null` semantic propagates as `null` (in-process dev fallback preserved). Tests in T24 prove the zero-overhead path for tenants that never opt in.
+- [x] **T24.** Unit tests for the resolver under `packages/agent/src/tasks/__tests__/tenant-aware-runtime.resolver.spec.ts` — 12 cases covering inherit fallback, no-row fallback, kill switch, byo/override stopgap + log emission, `getEffectiveBinding` metadata, and the `getActive() = null` propagation.
+
+### Phase 3.1 — Enqueue capture (deferred)
+
+- [ ] **T22** (above) ships once a follow-up PR walks the enqueue call sites to stamp `credentialVersion` into each run record. The T21 cache is already in place to serve the snapshot lookup at run time.
 
 ## Phase 4 — Worker host · `[EW-742 P4]`
 
