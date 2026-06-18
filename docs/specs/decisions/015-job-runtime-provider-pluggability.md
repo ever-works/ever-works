@@ -88,10 +88,10 @@ The background-job runtime becomes a **pluggable provider** selected at deployme
 
 Tracked in [EW-683](https://evertech.atlassian.net/browse/EW-683). Full detail in the feature spec set under [`features/job-runtime-providers/`](../features/job-runtime-providers/spec.md). High-level shape:
 
-1. Define the `job-runtime` capability + `IJobRuntimeProvider` contract in `packages/plugin/src/job-runtime/`.
+1. Define the `job-runtime` capability + `IJobRuntimeProvider` contract in `packages/plugin/src/contracts/capabilities/job-runtime.interface.ts` (shipped EW-685 P0).
 2. Generalise the dispatcher wiring so the active provider is bound to all `*_DISPATCHER` symbols via a factory that reads `EVER_WORKS_JOB_RUNTIME`.
 3. Re-house the current Trigger.dev integration as the `trigger` provider (no behaviour change) and prove the conformance suite green against it.
-4. Build the provider conformance test harness (`packages/plugin/src/job-runtime/testing/`).
+4. Build the provider conformance test harness — type-level shape in `packages/plugin/src/contracts/__tests__/job-runtime.spec.ts` (shipped EW-685 P0); runtime conformance suite alongside lands with the first concrete provider.
 5. Implement Temporal, BullMQ, pg-boss, Inngest providers behind experimental flags, each green on the conformance suite.
 6. Worker-hosting: define how each provider hosts the worker that runs `@ever-works/agent` orchestrators (Docker/compose + k8s manifests + `pnpm` scripts per provider).
 7. Docs: provider matrix, per-provider deploy guides, `EVER_WORKS_JOB_RUNTIME` env, and amend Principle IV in the constitution.
