@@ -1,3 +1,16 @@
+/**
+ * EW-683 / EW-685 — the `*_DISPATCHER` symbols re-exported below ARE
+ * the seam that makes the job runtime pluggable. The API depends only
+ * on these symbols; today `TriggerService` (`packages/tasks/src/trigger/trigger.service.ts`)
+ * implements every one of them. EW-686 P1 will refactor `TriggerService`
+ * to implement the `IJobRuntimeProvider` contract
+ * (`packages/plugin/src/contracts/capabilities/job-runtime.interface.ts`,
+ * shipped EW-685 P0) and a binding factory at
+ * `packages/agent/src/tasks/job-runtime.providers.ts` will bind whichever
+ * provider is active (env: `EVER_WORKS_JOB_RUNTIME`) to all of these symbols.
+ * Call sites do not change. See `docs/specs/architecture/job-runtime-providers.md`
+ * §2 (seam) and §3 (contract) for the full picture.
+ */
 export * from './work-generation.types';
 export * from './work-generation-dispatcher';
 export * from './work-import.types';
