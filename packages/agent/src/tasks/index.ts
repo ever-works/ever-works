@@ -36,6 +36,13 @@ export * from './kb-reembed-work-dispatcher';
 // Tenant-scoped job-runtime overlay (EW-742 P1) — credential versioning
 // for graceful drain on rotation. See ADR-017 §3 + spec.md FR-5.
 export * from './credential-version.service';
+// Tenant-scoped job-runtime overlay (EW-742 P3.1 / T21) — in-process
+// LRU+TTL cache for resolved credential snapshots, keyed by
+// `(tenantId, providerId, credentialVersion)`. Standalone class — the
+// P3 resolver (#1380 follow-up) and P4 worker host wire it in
+// separately. See the class JSDoc for the no-promotion-on-read
+// rationale (graceful drain per ADR-017 §3 / Q4).
+export * from './tenant-credential.cache';
 
 // EW-685 P0 T4 — job-runtime binding factory + registry token.
 //
