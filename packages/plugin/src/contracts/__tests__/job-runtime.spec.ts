@@ -39,6 +39,7 @@ import type {
 	JobRuntimeDispatchers,
 	JobRuntimeId,
 	ScheduleSpec,
+	TenantCredentialSnapshot,
 	WorkerHostHandle,
 	WorkerHostOptions
 } from '../capabilities/job-runtime.interface.js';
@@ -118,6 +119,31 @@ describe('IJobRuntimeProvider — contract surface', () => {
 
 	it('WorkerHostHandle exposes only a stop() — graceful shutdown coordination', () => {
 		expectTypeOf<WorkerHostHandle['stop']>().toEqualTypeOf<() => Promise<void>>();
+	});
+
+	it('bindToTenant is optional (provider may not support BYO)', () => {
+		// EW-686 P2 / EW-742 — providers that don't support per-tenant
+		// credential binding return undefined; the resolver falls back to
+		// the instance default.
+		type Provider = IJobRuntimeProvider;
+		type BindFn = Provider['bindToTenant'];
+
+		expectTypeOf<BindFn>().toEqualTypeOf<
+			((snapshot: TenantCredentialSnapshot) => IJobRuntimeProvider | undefined) | undefined
+		>();
+	});
+
+	it('TenantCredentialSnapshot carries tenantId + providerId + credentialVersion + opaque credentials', () => {
+		const snapshot: TenantCredentialSnapshot = {
+			tenantId: '00000000-0000-0000-0000-000000000001',
+			providerId: 'trigger',
+			credentialVersion: 1,
+			credentials: { accessToken: 'tr_dev_xxx' }
+		};
+		expectTypeOf(snapshot.tenantId).toEqualTypeOf<string>();
+		expectTypeOf(snapshot.providerId).toEqualTypeOf<JobRuntimeId>();
+		expectTypeOf(snapshot.credentialVersion).toEqualTypeOf<number>();
+		expectTypeOf(snapshot.credentials).toEqualTypeOf<Readonly<Record<string, unknown>>>();
 	});
 });
 
