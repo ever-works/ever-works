@@ -72,10 +72,12 @@
 
 ## Phase 7 — Docs · `[EW-742 P7]`
 
-- [ ] **T41.** Tenant admin runbook in `docs/runbooks/tenant-job-runtime.md` — how to pick a provider, enter BYO credentials, rotate, and read the audit log; cross-link `spec.md` and `providers.md`.
-- [ ] **T42.** Operator runbook in `docs/runbooks/operator-job-runtime-overlay.md` — covers Q5 modes (`shared` / `per-tenant` / `tiered`), allow-list gating, force-invalidate procedure with on-call checklist, and rollback to inherit-only.
-- [ ] **T43.** Per-provider tenant-config docs — add a "Tenant overlay" section to each provider plugin README (`packages/plugins/job-runtime-{trigger,temporal,bullmq,pgboss,inngest}/README.md`) and cross-link [`./providers.md`](./providers.md).
-- [ ] **T44.** Migration guide for existing tenants in `docs/runbooks/tenant-job-runtime-migration.md` — how to opt into BYO without losing in-flight work (graceful drain procedure, version-pinning checklist, fallback to inherit if BYO probe fails).
+T41 + T42 ✅ Done in [#1352](https://github.com/ever-works/ever-works/pull/1352) (pending cascade). T43 + T44 deferred until P3/P4 + provider plugins exist.
+
+- [x] **T41.** Tenant admin runbook in `docs/runbooks/TENANT_JOB_RUNTIME.md` — how to pick a provider, enter BYO credentials, rotate, force-invalidate, revert to inherit, and read the audit log; cross-link `spec.md` and `providers.md`. (Filed under `docs/runbooks/` UPPERCASE per the existing `EVER_WORKS_ZERO_FRICTION_FLOW.md` convention.)
+- [x] **T42.** Operator runbook in `docs/runbooks/OPERATOR_JOB_RUNTIME_OVERLAY.md` — covers allow-list gating, force-invalidate procedure with on-call checklist, operator-driven rollback to inherit, removing a provider from the bundled set, pre-deploy checklist. (Q5 hosting modes deferred to a follow-up edit once P4 worker-host wiring is in place; doc calls this out explicitly so operators don't expect the env var to do anything yet.)
+- [ ] **T43.** Per-provider tenant-config docs — add a "Tenant overlay" section to each provider plugin README (`packages/plugins/job-runtime-{trigger,temporal,bullmq,pgboss,inngest}/README.md`) and cross-link [`./providers.md`](./providers.md). (Deferred — the per-provider plugin packages don't exist yet; they ship with EW-686 P1 / EW-683 P2-P5.)
+- [ ] **T44.** Migration guide for existing tenants in `docs/runbooks/tenant-job-runtime-migration.md` — how to opt into BYO without losing in-flight work (graceful drain procedure, version-pinning checklist, fallback to inherit if BYO probe fails). (Deferred — the migration story needs the P3 dispatcher + P4 worker host to exist before the drain procedure is a real thing to document.)
 
 ## Dependency notes
 
