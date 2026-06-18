@@ -325,20 +325,18 @@ describe('TenantJobRuntimeConfig storage tier (EW-742 P1)', () => {
             // Same contract for the audit log — operator dashboards MUST
             // scope by tenantId. The compound index
             // (tenantId, occurredAt) enforces this efficiently.
-            repo.find.mockImplementation(
-                async ({ where }: { where: { tenantId: string } }) => {
-                    if (where.tenantId === 'tenant-a') {
-                        return [
-                            {
-                                tenantId: 'tenant-a',
-                                action: 'create',
-                                actorUserId: 'user-1',
-                            } as Partial<TenantJobRuntimeAudit>,
-                        ];
-                    }
-                    return [];
-                },
-            );
+            repo.find.mockImplementation(async ({ where }: { where: { tenantId: string } }) => {
+                if (where.tenantId === 'tenant-a') {
+                    return [
+                        {
+                            tenantId: 'tenant-a',
+                            action: 'create',
+                            actorUserId: 'user-1',
+                        } as Partial<TenantJobRuntimeAudit>,
+                    ];
+                }
+                return [];
+            });
 
             const auditsA = await repo.find({ where: { tenantId: 'tenant-a' } });
             const auditsB = await repo.find({ where: { tenantId: 'tenant-b' } });

@@ -98,6 +98,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TemplateCustomization',
     'Tenant',
     'TenantEmailAddress',
+    // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) ──
+    'TenantJobRuntimeAudit',
+    'TenantJobRuntimeConfig',
+    // ──────────────────────────────────────────────────────────
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',
