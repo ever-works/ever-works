@@ -1,0 +1,70 @@
+{
+	"name": "@ever-works/secret-store-doppler-plugin",
+	"version": "1.0.0",
+	"description": "Doppler SecretStoreResolver plugin for Ever Works — resolves doppler:<project>/<config> pointers via the Doppler REST API. Freemium SaaS secrets-management platform.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "secret-store-doppler",
+			"name": "Doppler Secret Store",
+			"version": "1.0.0",
+			"category": "secret-store-resolver",
+			"capabilities": [
+				"secret-store-resolve"
+			],
+			"description": "Resolves doppler:<project>/<config> pointers via the Doppler REST API. Fetches all secrets in the named config and returns them as a flat credential bag (prefers .raw, falls back to .computed).",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"distribution": "core",
+			"builtIn": true,
+			"visibility": "operator",
+			"envVars": [
+				{
+					"name": "DOPPLER_TOKEN",
+					"required": true,
+					"secret": true,
+					"description": "Doppler Service Token or Service Account token with read access to the project/config."
+				}
+			]
+		}
+	}
+}
