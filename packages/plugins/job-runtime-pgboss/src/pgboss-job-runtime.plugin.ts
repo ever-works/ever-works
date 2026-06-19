@@ -11,6 +11,8 @@ import type {
 	WorkerHostHandle,
 	WorkerHostOptions
 } from '@ever-works/plugin';
+import { PgBossDispatcherFactory } from './pgboss-dispatcher-factory.js';
+import { PgBossWorkerHostFactory } from './pgboss-worker-host-factory.js';
 
 /**
  * EW-742 P3.2 follow-up — pg-boss `IJobRuntimeProvider` plugin.
@@ -18,19 +20,28 @@ import type {
  * Per ADR-017 Q2 (schema-per-tenant), `bindToTenant` extracts a
  * per-tenant Postgres schema from `snapshot.credentials.schema` (and
  * optionally a separate `connectionString` if the tenant runs against
- * a dedicated database). Stub dispatchers throw until an operator
- * wires per-payload-type publish/work handlers. See the class JSDoc on
- * {@link TemporalJobRuntimePlugin} for the rationale that applies
- * identically here.
+ * a dedicated database).
+ *
+ * Operators wire real publish/work pairs via:
+ *   - `useDispatchers(map)` — replace throwing-stub Proxy.
+ *   - `useWorkerHostFactory(factory)` — `startWorkerHost()` registers
+ *     `boss.work(...)` for every registration.
+ *   - `useDispatcherFactory(factory)` — `cancel(runId)` /
+ *     `getRunStatus(runId)` delegate to `boss.cancel` / `boss.getJobById`.
+ *   - `dispatchersBuilder` ctor option — per-tenant routing for the
+ *     schema-per-tenant pattern.
+ *
+ * See `PgBossDispatcherFactory` and `PgBossWorkerHostFactory` for the
+ * pg-boss glue (the plugin package itself does NOT depend on `pg-boss`).
  */
 
 export class PgBossDispatcherNotConfiguredError extends Error {
 	constructor(dispatcherName: string) {
 		super(
 			`@ever-works/job-runtime-pgboss-plugin: ${dispatcherName} is not configured. ` +
-				'Subclass PgBossJobRuntimePlugin (or wrap it with a delegating provider) and ' +
-				'override the dispatchers field with operator-defined pg-boss publish/work handlers ' +
-				'per `docs/specs/features/tenant-job-runtime-overlay/providers.md`.'
+				'Call plugin.useDispatchers({ ... }) with operator-supplied pg-boss dispatchers ' +
+				'built via PgBossDispatcherFactory (see plugin header for an example), ' +
+				'or pass dispatchersBuilder when constructing the plugin for per-tenant routing.'
 		);
 		this.name = 'PgBossDispatcherNotConfiguredError';
 	}
@@ -49,6 +60,21 @@ export interface PgBossTenantBindingView extends IJobRuntimeProvider {
 	 */
 	readonly tenantConnectionString: string | null;
 }
+
+export interface PgBossJobRuntimePluginOptions {
+	/** Per-tenant dispatcher builder — see plugin header. */
+	readonly dispatchersBuilder?: (snapshot: TenantCredentialSnapshot) => JobRuntimeDispatchers;
+}
+
+const PGBOSS_STATE_TO_RUN_STATUS: Readonly<Record<string, JobRunStatus>> = {
+	created: 'queued',
+	retry: 'queued',
+	active: 'running',
+	completed: 'completed',
+	expired: 'failed',
+	cancelled: 'cancelled',
+	failed: 'failed'
+};
 
 export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 	readonly id = 'job-runtime-pgboss';
@@ -83,7 +109,7 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	};
 
-	readonly dispatchers: JobRuntimeDispatchers = new Proxy(
+	private readonly stubDispatchers: JobRuntimeDispatchers = new Proxy(
 		{},
 		{
 			get(_target, prop: string): unknown {
@@ -97,8 +123,34 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	);
 
+	private dispatchersImpl: JobRuntimeDispatchers = this.stubDispatchers;
+	private workerHostFactory: PgBossWorkerHostFactory | null = null;
+	private dispatcherFactory: PgBossDispatcherFactory | null = null;
+
 	private context?: PluginContext;
 	private readonly tenantViews = new Map<string, PgBossTenantBindingView>();
+
+	constructor(private readonly opts: PgBossJobRuntimePluginOptions = {}) {}
+
+	get dispatchers(): JobRuntimeDispatchers {
+		return this.dispatchersImpl;
+	}
+
+	useDispatchers(map: JobRuntimeDispatchers): this {
+		this.dispatchersImpl = Object.freeze({ ...map });
+		this.tenantViews.clear();
+		return this;
+	}
+
+	useWorkerHostFactory(factory: PgBossWorkerHostFactory): this {
+		this.workerHostFactory = factory;
+		return this;
+	}
+
+	useDispatcherFactory(factory: PgBossDispatcherFactory): this {
+		this.dispatcherFactory = factory;
+		return this;
+	}
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -109,19 +161,33 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 		this.tenantViews.clear();
 	}
 
-	async registerSchedules(_schedules: readonly ScheduleSpec[]): Promise<void> {}
-	async cancel(_runId: string): Promise<boolean> {
+	async registerSchedules(schedules: readonly ScheduleSpec[]): Promise<void> {
+		if (!this.dispatcherFactory) return;
+		const boss = this.dispatcherFactory.boss;
+		if (!boss.schedule) return;
+		for (const spec of schedules) {
+			await boss.schedule(spec.id, spec.cron, spec.payload);
+		}
+	}
+
+	async cancel(runId: string): Promise<boolean> {
+		if (this.dispatcherFactory) return this.dispatcherFactory.cancel(runId);
 		return false;
 	}
-	async getRunStatus(_runId: string): Promise<JobRunStatus> {
-		return 'unknown';
+
+	async getRunStatus(runId: string): Promise<JobRunStatus> {
+		if (!this.dispatcherFactory) return 'unknown';
+		const job = await this.dispatcherFactory.getJob(runId);
+		if (!job) return 'unknown';
+		return PGBOSS_STATE_TO_RUN_STATUS[job.state] ?? 'unknown';
 	}
 
 	isEnabled(): boolean {
 		return Boolean(process.env.PGBOSS_CONNECTION_STRING);
 	}
 
-	async startWorkerHost(_opts: WorkerHostOptions): Promise<WorkerHostHandle> {
+	async startWorkerHost(opts: WorkerHostOptions = {}): Promise<WorkerHostHandle> {
+		if (this.workerHostFactory) return this.workerHostFactory.start(opts);
 		return { stop: async () => undefined };
 	}
 
@@ -140,6 +206,10 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 				? snapshot.credentials.connectionString
 				: null;
 
+		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
+			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
+			: base.dispatchersImpl;
+
 		const view: PgBossTenantBindingView = Object.freeze({
 			id: base.id,
 			name: base.name,
@@ -149,7 +219,7 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 			settingsSchema: base.settingsSchema,
 			runtimeId: base.runtimeId,
 			get dispatchers(): JobRuntimeDispatchers {
-				return base.dispatchers;
+				return dispatchersForView;
 			},
 			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
 				base.registerSchedules(schedules),
