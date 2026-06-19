@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { WorkRepository } from '@ever-works/agent/database';
+import type {
+    OrganizationRepository,
+    TemplateCustomizationRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import type { CredentialVersionService } from '@ever-works/agent/tasks';
 import type { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { TenantRuntimeBindingResolverService } from '../tenant-runtime-binding-resolver.service';
@@ -194,6 +198,146 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
         it('passes through the pre-T22 no-binding when payload lacks the pair', async () => {
             const r = buildResolver({ workTenantId: TENANT_ID });
             const out = await r.resolveForWork({}, WORK_ID);
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+    });
+
+    // EW-742 P3.2 T22 — non-workId convenience wrappers.
+    describe('resolveForOrganization()', () => {
+        const ORG_ID = '22222222-2222-2222-2222-222222222222';
+        const SNAPSHOT = {
+            tenantId: TENANT_ID,
+            providerId: 'trigger',
+            credentialVersion: 5,
+            mode: 'byo',
+            enabled: true,
+        } as TenantJobRuntimeConfig;
+
+        function build(opts: {
+            orgTenantId?: string | null;
+            orgFindThrows?: boolean;
+            omitOrgRepository?: boolean;
+            snapshot?: TenantJobRuntimeConfig | null;
+        }) {
+            const credentialVersionService = {
+                resolveSnapshot: vi.fn().mockResolvedValue(opts.snapshot ?? null),
+            } as unknown as CredentialVersionService;
+            const orgRepository = {
+                findById: opts.orgFindThrows
+                    ? vi.fn().mockRejectedValue(new Error('db boom'))
+                    : vi.fn().mockResolvedValue(
+                          opts.orgTenantId === undefined
+                              ? null
+                              : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
+                      ),
+            } as unknown as OrganizationRepository;
+            return new TenantRuntimeBindingResolverService(
+                credentialVersionService,
+                undefined,
+                opts.omitOrgRepository ? undefined : orgRepository,
+                undefined,
+            );
+        }
+
+        it('resolves snapshot via org → tenantId', async () => {
+            const r = build({ orgTenantId: TENANT_ID, snapshot: SNAPSHOT });
+            const out = await r.resolveForOrganization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                ORG_ID,
+            );
+            expect(out.status).toBe('resolved');
+            expect(out.tenantId).toBe(TENANT_ID);
+        });
+
+        it('returns "no-binding" when OrganizationRepository is not wired', async () => {
+            const r = build({ omitOrgRepository: true });
+            const out = await r.resolveForOrganization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                ORG_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+
+        it('returns "no-binding" when OrganizationRepository.findById throws', async () => {
+            const r = build({ orgFindThrows: true });
+            const out = await r.resolveForOrganization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                ORG_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+
+        it('returns "no-binding" when org has no tenantId', async () => {
+            const r = build({ orgTenantId: null });
+            const out = await r.resolveForOrganization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                ORG_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+    });
+
+    describe('resolveForCustomization()', () => {
+        const CUST_ID = '33333333-3333-3333-3333-333333333333';
+        const SNAPSHOT = {
+            tenantId: TENANT_ID,
+            providerId: 'trigger',
+            credentialVersion: 5,
+            mode: 'override',
+            enabled: true,
+        } as TenantJobRuntimeConfig;
+
+        function build(opts: {
+            rowTenantId?: string | null;
+            rowFindThrows?: boolean;
+            omitRepository?: boolean;
+            snapshot?: TenantJobRuntimeConfig | null;
+        }) {
+            const credentialVersionService = {
+                resolveSnapshot: vi.fn().mockResolvedValue(opts.snapshot ?? null),
+            } as unknown as CredentialVersionService;
+            const repo = {
+                findById: opts.rowFindThrows
+                    ? vi.fn().mockRejectedValue(new Error('db boom'))
+                    : vi.fn().mockResolvedValue(
+                          opts.rowTenantId === undefined
+                              ? null
+                              : ({ id: CUST_ID, tenantId: opts.rowTenantId } as any),
+                      ),
+            } as unknown as TemplateCustomizationRepository;
+            return new TenantRuntimeBindingResolverService(
+                credentialVersionService,
+                undefined,
+                undefined,
+                opts.omitRepository ? undefined : repo,
+            );
+        }
+
+        it('resolves snapshot via customization row → tenantId', async () => {
+            const r = build({ rowTenantId: TENANT_ID, snapshot: SNAPSHOT });
+            const out = await r.resolveForCustomization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                CUST_ID,
+            );
+            expect(out.status).toBe('resolved');
+            expect(out.tenantId).toBe(TENANT_ID);
+        });
+
+        it('returns "no-binding" when TemplateCustomizationRepository is not wired', async () => {
+            const r = build({ omitRepository: true });
+            const out = await r.resolveForCustomization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                CUST_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+
+        it('returns "no-binding" when findById throws', async () => {
+            const r = build({ rowFindThrows: true });
+            const out = await r.resolveForCustomization(
+                { providerId: 'trigger', credentialVersion: 5 },
+                CUST_ID,
+            );
             expect(out).toEqual({ status: 'no-binding' });
         });
     });
