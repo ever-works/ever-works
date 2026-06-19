@@ -45,6 +45,7 @@ import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '
 import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '../tasks';
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } from '../tasks';
 import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '../tasks';
+import { RuntimeBindingStamperService } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { sanitizeDescription } from '../utils/sanitize.util';
 import type {
@@ -279,6 +280,17 @@ export class KnowledgeBaseService {
         @Optional()
         @Inject(KB_NORMALIZE_MEDIA_DISPATCHER)
         private readonly normalizeMediaDispatcher?: KbNormalizeMediaDispatcher,
+        // EW-742 P3.2 T22 — KB-embed is the proof-of-concept dispatcher
+        // for enqueue-site tenant-runtime binding capture (see
+        // {@link RuntimeBindingStamperService} JSDoc "Scope of THIS PR"
+        // note for why it's adopted one dispatcher at a time). Optional
+        // so isolated unit tests and pre-overlay deployments keep
+        // constructing — when absent, the enqueue degrades to the
+        // pre-overlay (EW-683) byte-identical path: payload ships
+        // without `providerId`/`credentialVersion`, worker host uses the
+        // instance default.
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
     ) {}
 
     /**
@@ -334,8 +346,36 @@ export class KnowledgeBaseService {
         if (!this.embedDispatcher) {
             return;
         }
+        // EW-742 P3.2 T22 — capture the tenant runtime binding at
+        // enqueue time so the worker host can resolve the exact
+        // credential snapshot that was active when the run was
+        // scheduled (ADR-017 §3 graceful drain). The lookup is
+        // best-effort: a missing WorkRepository, missing tenantId, or
+        // missing stamper all mean we ship the legacy 2-field payload
+        // and the worker uses the instance default — that's the same
+        // byte-identical path that ran pre-T22.
+        let binding: { providerId: string | null; credentialVersion: number | null } = {
+            providerId: null,
+            credentialVersion: null,
+        };
+        if (this.runtimeBindingStamper && this.workRepository) {
+            try {
+                const work = await this.workRepository.findById(workId);
+                binding = await this.runtimeBindingStamper.stamp(work?.tenantId ?? null);
+            } catch (err) {
+                this.logger.debug(
+                    `enqueueEmbed: stamper lookup failed for work=${workId} ` +
+                        `(${(err as Error).message}); falling back to instance default.`,
+                );
+            }
+        }
         try {
-            await this.embedDispatcher.dispatchKbEmbedDocument({ workId, documentId });
+            await this.embedDispatcher.dispatchKbEmbedDocument({
+                workId,
+                documentId,
+                providerId: binding.providerId,
+                credentialVersion: binding.credentialVersion,
+            });
         } catch (error) {
             this.logger.warn(
                 `Failed to enqueue KB embed for doc ${documentId} (work=${workId}): ${(error as Error).message}`,
