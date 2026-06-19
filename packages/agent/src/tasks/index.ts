@@ -91,11 +91,10 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // Operators using Vault override the SECRET_STORE_RESOLVER DI binding to
 // the plugin's exported VaultSecretStorePlugin class.
 
-// EW-742 P3.2 follow-up — K8sSecretStoreResolver. In-cluster API
-// implementation; operators using Kubernetes Secrets override the
-// SECRET_STORE_RESOLVER binding. Default deployment keeps
-// InProcessSecretStoreResolver.
-export { K8sSecretStoreResolver } from './k8s-secret-store-resolver.service';
+// EW-742 P3.2 — K8s SecretStoreResolver now lives at
+// @ever-works/secret-store-k8s-plugin (packages/plugins/secret-store-k8s/).
+// Operators using Kubernetes Secrets override the SECRET_STORE_RESOLVER
+// DI binding to the plugin's exported K8sSecretStorePlugin class.
 
 // EW-742 P3.2 follow-up — InfisicalSecretStoreResolver. HTTP against
 // Infisical REST API (`/api/v3/secrets/raw`); OSS-friendly secrets
