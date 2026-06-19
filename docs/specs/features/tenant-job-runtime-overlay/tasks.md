@@ -1,7 +1,7 @@
 # Task Breakdown: Tenant-Scoped Job-Runtime Overlay
 
 **Feature ID**: `tenant-job-runtime-overlay`
-**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache + T22 stamper helper) + P4 (T31 contract — `tenantId` on JobEnqueueOptions) + P5 + P7 (T41+T42+T44) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 per-dispatcher wiring), P3.2 (resolver bindToTenant wiring), P4 (per-provider worker hosts T25–T30 + T31 per-provider stamping + T32 isolation tests), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs T43) remain.
+**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache + T22 stamper helper) + P3.2 (resolver bindToTenant wiring + SecretStoreResolver contract + InProcessSecretStoreResolver default) + P4 (T31 contract — `tenantId` on JobEnqueueOptions) + P5 + P7 (T41+T42+T44) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 per-dispatcher wiring), P4 (per-provider worker hosts T25–T30 + T31 per-provider stamping + T32 isolation tests + per-provider bindToTenant implementations), P5.1 (per-tenant whitelist), P6 (conformance), P7 (docs T43), and non-`inline:` SecretStoreResolver implementations (vault:, k8s:, op:) remain.
 **Last updated**: 2026-06-19
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md) · **Providers**: [`./providers.md`](./providers.md) · **Epic**: [EW-742](https://evertech.atlassian.net/browse/EW-742) · **Story**: [EW-743](https://evertech.atlassian.net/browse/EW-743) · **ADR**: [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md)
 
@@ -53,6 +53,15 @@ T20 + T23 + T24 ✅ Done in [#1380](https://github.com/ever-works/ever-works/pul
 ### Phase 3.1 — Enqueue capture (deferred)
 
 - [ ] **T22** (above) ships once a follow-up PR walks the enqueue call sites to stamp `credentialVersion` into each run record. The T21 cache is already in place to serve the snapshot lookup at run time.
+
+### Phase 3.2 — Resolver `bindToTenant` wiring · `[EW-742 P3.2]`
+
+✅ Done in this PR. The resolver's byo/override branch now actively binds the active provider to per-tenant credentials:
+
+- [x] **T20.1.** `SecretStoreResolver` contract at `packages/agent/src/tasks/secret-store-resolver.interface.ts` — operator-pluggable credential-pointer resolution. `SECRET_STORE_RESOLVER` DI token + `resolve(pointer): Promise<Record<string, unknown> | null>` interface. Contract is fail-open: implementations MUST NOT throw on missing / malformed pointers — return `null` + log at warn instead.
+- [x] **T20.2.** `InProcessSecretStoreResolver` default at `packages/agent/src/tasks/in-process-secret-store-resolver.service.ts` — supports only `inline:<base64-of-json-object>` for dev/test. Every other scheme (`vault:`, `k8s:`, `op:`) returns `null` + `Logger.warn` telling the operator to wire a real implementation for that scheme.
+- [x] **T20.3.** `TenantAwareRuntimeResolver.resolve()` byo/override branch now does the full bind path: (a) check `TenantCredentialCache` keyed by `(tenantId, providerId, credentialVersion)`; (b) on miss, resolve credentials via `SecretStoreResolver`; (c) call `provider.bindToTenant(snapshot)` (EW-686 P2 contract); (d) cache + return the bound provider. Any null/undefined/throw anywhere in the chain falls back to the instance default with a `Logger.warn` carrying enough tenant context for operators to diagnose. 20+ tests cover happy path + 5 fallback paths + cache-hit behaviour.
+- [ ] **T20.4.** Non-`inline:` `SecretStoreResolver` implementations — one PR per scheme (`VaultSecretStoreResolver`, `K8sSecretStoreResolver`, `OnePasswordSecretStoreResolver`, etc.). Each plugin package opt-in; default deployment keeps `InProcessSecretStoreResolver` so `inline:` works for dev/test out of the box.
 
 ## Phase 4 — Worker host · `[EW-742 P4]`
 
