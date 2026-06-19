@@ -85,3 +85,9 @@ export { RuntimeBindingStamperService } from './runtime-binding-stamper.service'
 export { SECRET_STORE_RESOLVER } from './secret-store-resolver.interface';
 export type { SecretStoreResolver } from './secret-store-resolver.interface';
 export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver.service';
+
+// EW-742 P3.2 follow-up — VaultSecretStoreResolver. HTTP-based KV v1/v2
+// implementation; operators using HashiCorp Vault override the
+// SECRET_STORE_RESOLVER binding to this class. Default deployment keeps
+// InProcessSecretStoreResolver so `inline:` works out of the box.
+export { VaultSecretStoreResolver } from './vault-secret-store-resolver.service';
