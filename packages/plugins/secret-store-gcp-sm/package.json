@@ -1,0 +1,70 @@
+{
+	"name": "@ever-works/secret-store-gcp-sm-plugin",
+	"version": "1.0.0",
+	"description": "GCP Secret Manager SecretStoreResolver plugin for Ever Works — resolves gcp-sm:<project>/<secretName> pointers via the GCP Secret Manager REST API.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "secret-store-gcp-sm",
+			"name": "GCP Secret Manager Secret Store",
+			"version": "1.0.0",
+			"category": "secret-store-resolver",
+			"capabilities": [
+				"secret-store-resolve"
+			],
+			"description": "Resolves gcp-sm:<project>/<secretName> pointers via the GCP Secret Manager REST API. Uses a pre-fetched bearer token from GCP_ACCESS_TOKEN env var (operators provision via Workload Identity, gcloud auth print-access-token, or sidecar token-refresher).",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"distribution": "core",
+			"builtIn": true,
+			"visibility": "operator",
+			"envVars": [
+				{
+					"name": "GCP_ACCESS_TOKEN",
+					"required": true,
+					"secret": true,
+					"description": "OAuth2 access token with secretmanager.secretAccessor role on the requested secrets. Operators refresh out-of-band (Workload Identity sidecar, gcloud, etc.)."
+				}
+			]
+		}
+	}
+}
