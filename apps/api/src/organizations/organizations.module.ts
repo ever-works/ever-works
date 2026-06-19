@@ -67,6 +67,10 @@ import { WorkRegisteredListener } from './work-registered.listener';
         OrganizationMembershipService,
         OrganizationOwnershipGuard,
         TenantBootstrapService,
+        // EW-742 P3.2 T22 — exported so TriggerInternalModule can
+        // expose findById through the remote-proxy controller for
+        // the worker-host resolveForOrganization path.
+        OrganizationRepository,
     ],
 })
 export class OrganizationsModule {}

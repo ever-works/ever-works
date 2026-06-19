@@ -10,6 +10,7 @@ import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
     imports: [
@@ -22,6 +23,9 @@ import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job
         // remote-proxy controller so the Trigger.dev worker can verify
         // the (providerId, credentialVersion) pair stamped at enqueue time.
         TenantJobRuntimeModule,
+        // EW-742 P3.2 T22 — exposes OrganizationRepository for the
+        // resolveForOrganization path on the worker-host resolver.
+        OrganizationsModule,
         // EW-628 G7 — exposes DataSyncDispatcherService through the
         // remote-proxy controller so the Trigger.dev worker can call it
         // each cron tick without importing the full API stack.
