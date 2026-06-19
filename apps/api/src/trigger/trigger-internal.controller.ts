@@ -21,6 +21,7 @@ import { config } from '@ever-works/agent/config';
 import {
     WorkRepository,
     AuthAccountRepository,
+    OrganizationRepository,
     TemplateRepository,
     TemplateCustomizationRepository,
     UserTemplatePreferenceRepository,
@@ -222,6 +223,11 @@ export class TriggerInternalController implements OnModuleInit {
         // enqueue time and decide whether to run, fail with
         // CREDENTIAL_DRAINED, or fall back to the instance default.
         private readonly credentialVersionService: CredentialVersionService,
+        // EW-742 P3.2 T22 — exposes OrganizationRepository so the
+        // worker-side TenantRuntimeBindingResolverService can resolve
+        // an org's tenantId for kb-org-overlay-fanout (the only org-
+        // scoped dispatcher today).
+        private readonly organizationRepository: OrganizationRepository,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -268,6 +274,9 @@ export class TriggerInternalController implements OnModuleInit {
             // consumption (see TenantRuntimeBindingResolverService in
             // packages/tasks/src/trigger/worker/services/).
             CredentialVersionService: this.credentialVersionService,
+            // EW-742 P3.2 T22 — exposed for resolveForOrganization on
+            // the worker-host resolver (kb-org-overlay-fanout task).
+            OrganizationRepository: this.organizationRepository,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
