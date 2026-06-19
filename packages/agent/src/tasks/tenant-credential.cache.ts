@@ -56,28 +56,56 @@ import { Injectable } from '@nestjs/common';
  * are atomic from the JS-engine's perspective. The cache is safe to
  * share across concurrent dispatcher calls without external locking.
  */
+/**
+ * Defaults for the cache sizing. Inlined as class-level constants
+ * because making them DI-injected primitives breaks NestJS — SWC emits
+ * `Number` as the constructor design-time metadata, which NestJS tries
+ * to resolve as a DI token and fails with
+ * `UnknownDependenciesException: Nest can't resolve dependencies of the
+ * TenantCredentialCache (?, Number)`. Cache sizing is a process-level
+ * concern anyway (not per-tenant), so a class constant is the right shape.
+ */
+const DEFAULT_MAX_ENTRIES = 1024;
+const DEFAULT_TTL_MS = 30_000;
+
 @Injectable()
 export class TenantCredentialCache {
+    /**
+     * Maximum number of `(tenantId, providerId, version)` snapshots held
+     * in memory before the oldest-by-insertion-order entry is evicted.
+     * Sized for a small fleet of tenants × providers × a handful of
+     * in-flight rotation snapshots per pair.
+     *
+     * Override at construction time in tests via `new TenantCredentialCache(
+     * { maxEntries, ttlMs })`. Production never overrides — the values
+     * are sized for hosting capacity, not tuned at runtime.
+     */
     private readonly maxEntries: number;
+    /**
+     * Entry lifetime in milliseconds. Default sits in the middle of the
+     * spec's 15–60s band. After the TTL elapses, {@link get} returns
+     * `null` even if the entry is still in the map; the entry is removed
+     * on the next access.
+     */
     private readonly ttlMs: number;
 
     private readonly entries = new Map<string, CacheEntry>();
     private insertCounter = 0;
 
     /**
-     * @param maxEntries maximum number of `(tenantId, providerId, version)`
-     *   snapshots held in memory before the oldest-by-insertion-order
-     *   entry is evicted. Default `1024` — sized for a small fleet of
-     *   tenants × providers × a handful of in-flight rotation snapshots
-     *   per pair.
-     * @param ttlMs entry lifetime in milliseconds. Default `30_000` (30s),
-     *   sitting in the middle of the spec's 15–60s band. After the TTL
-     *   elapses, {@link get} returns `null` even if the entry is still
-     *   in the map; the entry is removed on the next access.
+     * Construct the cache. The options object pattern is required — a
+     * positional `(maxEntries: number, ttlMs: number)` constructor would
+     * crash NestJS bootstrap because SWC emits the parameter design-time
+     * metadata as `Number`, and NestJS attempts to resolve `Number` as
+     * a DI token (which fails with `UnknownDependenciesException`).
+     *
+     * NestJS instantiates this service with zero args; the options
+     * object only exists so tests can override the defaults without
+     * tripping the same DI metadata trap.
      */
-    constructor(maxEntries: number = 1024, ttlMs: number = 30_000) {
-        this.maxEntries = maxEntries;
-        this.ttlMs = ttlMs;
+    constructor(opts?: { maxEntries?: number; ttlMs?: number }) {
+        this.maxEntries = opts?.maxEntries ?? DEFAULT_MAX_ENTRIES;
+        this.ttlMs = opts?.ttlMs ?? DEFAULT_TTL_MS;
     }
 
     /**
