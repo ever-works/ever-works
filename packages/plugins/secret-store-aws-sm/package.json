@@ -1,0 +1,82 @@
+{
+	"name": "@ever-works/secret-store-aws-sm-plugin",
+	"version": "1.0.0",
+	"description": "AWS Secrets Manager SecretStoreResolver plugin for Ever Works — resolves aws-sm:<region>/<secretName> pointers via the AWS Secrets Manager REST API.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "secret-store-aws-sm",
+			"name": "AWS Secrets Manager Secret Store",
+			"version": "1.0.0",
+			"category": "secret-store-resolver",
+			"capabilities": [
+				"secret-store-resolve"
+			],
+			"description": "Resolves aws-sm:<region>/<secretName> pointers via the AWS Secrets Manager REST API. Uses AWS Signature v4 from AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY env vars (optionally AWS_SESSION_TOKEN).",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"distribution": "core",
+			"builtIn": true,
+			"visibility": "operator",
+			"envVars": [
+				{
+					"name": "AWS_ACCESS_KEY_ID",
+					"required": true,
+					"secret": false,
+					"description": "AWS access key id."
+				},
+				{
+					"name": "AWS_SECRET_ACCESS_KEY",
+					"required": true,
+					"secret": true,
+					"description": "AWS secret access key."
+				},
+				{
+					"name": "AWS_SESSION_TOKEN",
+					"required": false,
+					"secret": true,
+					"description": "Optional STS session token (e.g. when assuming a role / IRSA)."
+				}
+			]
+		}
+	}
+}
