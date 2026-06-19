@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { TriggerInternalController } from './trigger-internal.controller';
 import { WorkOperationsModule } from '@ever-works/agent/work-operations';
 import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
@@ -14,6 +15,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
     imports: [
+        // EW-742 P3.2 T22 — DatabaseModule exports
+        // WebhookSubscriptionRepository (proxied through the
+        // remote-proxy controller for the webhook-delivery task's
+        // resolveForSubscription path).
+        DatabaseModule,
         WorkOperationsModule,
         WorkModule,
         NotificationsModule,

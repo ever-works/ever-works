@@ -2,6 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
     OrganizationRepository,
     TemplateCustomizationRepository,
+    WebhookSubscriptionRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
@@ -82,6 +83,8 @@ export class TenantRuntimeBindingResolverService {
         @Optional() private readonly organizationRepository?: OrganizationRepository,
         @Optional()
         private readonly templateCustomizationRepository?: TemplateCustomizationRepository,
+        @Optional()
+        private readonly webhookSubscriptionRepository?: WebhookSubscriptionRepository,
     ) {}
 
     /**
@@ -225,6 +228,33 @@ export class TenantRuntimeBindingResolverService {
             this.logger.debug(
                 `TenantRuntimeBindingResolver.resolveForOrganization: organizationRepository.findById ` +
                     `threw for org=${organizationId} (${(err as Error).message}); treating as no-binding.`,
+            );
+            return { status: 'no-binding' };
+        }
+        return this.resolve(payload, tenantId);
+    }
+
+    /**
+     * Convenience wrapper for subscriptionId-scoped tasks (webhook-
+     * delivery). The WebhookSubscription row carries `tenantId`
+     * directly; look it up and delegate.
+     */
+    async resolveForSubscription(
+        payload: { providerId?: string | null; credentialVersion?: number | null },
+        subscriptionId: string,
+    ): Promise<Awaited<ReturnType<TenantRuntimeBindingResolverService['resolve']>>> {
+        if (!this.webhookSubscriptionRepository) {
+            return { status: 'no-binding' };
+        }
+        let tenantId: string | null = null;
+        try {
+            const sub = await this.webhookSubscriptionRepository.findById(subscriptionId);
+            tenantId = sub?.tenantId ?? null;
+        } catch (err) {
+            this.logger.debug(
+                `TenantRuntimeBindingResolver.resolveForSubscription: webhookSubscriptionRepository.findById ` +
+                    `threw for subscription=${subscriptionId} (${(err as Error).message}); ` +
+                    `treating as no-binding.`,
             );
             return { status: 'no-binding' };
         }
