@@ -6,6 +6,7 @@ import {
     TemplateCustomizationRepository,
     UserRepository,
     UserTemplatePreferenceRepository,
+    WebhookSubscriptionRepository,
     WorkKnowledgeDocumentRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
@@ -113,6 +114,14 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
             provide: OrganizationRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'OrganizationRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // EW-742 P3.2 T22 — WebhookSubscriptionRepository proxied for
+        // resolveForSubscription (webhook-delivery task).
+        {
+            provide: WebhookSubscriptionRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WebhookSubscriptionRepository'),
             inject: [TriggerInternalApiClient],
         },
         CategoryIconService,

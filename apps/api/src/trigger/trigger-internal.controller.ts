@@ -26,6 +26,7 @@ import {
     TemplateCustomizationRepository,
     UserTemplatePreferenceRepository,
     UserRepository,
+    WebhookSubscriptionRepository,
     WorkKnowledgeDocumentRepository,
 } from '@ever-works/agent/database';
 import { Work, User } from '@ever-works/agent/entities';
@@ -228,6 +229,10 @@ export class TriggerInternalController implements OnModuleInit {
         // an org's tenantId for kb-org-overlay-fanout (the only org-
         // scoped dispatcher today).
         private readonly organizationRepository: OrganizationRepository,
+        // EW-742 P3.2 T22 — exposes WebhookSubscriptionRepository so
+        // the worker-side resolver can derive tenantId for the
+        // webhook-delivery task.
+        private readonly webhookSubscriptionRepository: WebhookSubscriptionRepository,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -277,6 +282,9 @@ export class TriggerInternalController implements OnModuleInit {
             // EW-742 P3.2 T22 — exposed for resolveForOrganization on
             // the worker-host resolver (kb-org-overlay-fanout task).
             OrganizationRepository: this.organizationRepository,
+            // EW-742 P3.2 T22 — exposed for resolveForSubscription on
+            // the worker-host resolver (webhook-delivery task).
+            WebhookSubscriptionRepository: this.webhookSubscriptionRepository,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

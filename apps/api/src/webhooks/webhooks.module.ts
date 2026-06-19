@@ -15,6 +15,7 @@ import { WebhooksService } from './webhooks.service';
 import { WebhookSecretService } from './webhook-secret.service';
 import { WebhookEventDispatcherService } from './webhook-event-dispatcher.service';
 import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
+import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 
 /**
  * `/api/webhooks` surface — subscriptions CRUD, delivery test-fire,
@@ -33,7 +34,15 @@ import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
  *    delivery when Trigger.dev is unconfigured.
  */
 @Module({
-    imports: [DatabaseModule, AuthModule, TasksTriggerModule, WorkModule],
+    imports: [
+        DatabaseModule,
+        AuthModule,
+        TasksTriggerModule,
+        WorkModule,
+        // EW-742 P3.2 T22 — RuntimeBindingStamperService for the
+        // WebhookEventDispatcherService enqueue-site stamping.
+        TenantJobRuntimeModule,
+    ],
     controllers: [WebhooksController],
     providers: [
         WebhooksService,
