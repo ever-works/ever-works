@@ -102,6 +102,7 @@ describe('WorkGenerationService', () => {
     ): WorkGenerationService => {
         const withDispatcher = opts.withDispatcher ?? false;
         const withNotifications = opts.withNotifications ?? true;
+        const withStamper = (opts as { withStamper?: unknown }).withStamper;
         return new WorkGenerationService(
             dataGenerator,
             markdownGenerator,
@@ -123,6 +124,8 @@ describe('WorkGenerationService', () => {
             pluginRegistryService,
             withDispatcher ? generationDispatcher : undefined,
             withNotifications ? notificationService : undefined,
+            // EW-742 P3.2 T22 — Optional() stamper, undefined by default.
+            withStamper as never,
         );
     };
 
@@ -3913,6 +3916,88 @@ describe('WorkGenerationService', () => {
             await service.processGeneration(work, buildUser(), {} as any);
 
             expect(service['generationAbortControllers'].has('work-9')).toBe(false);
+        });
+    });
+
+    // EW-742 P3.2 T22 — Tier 2 dispatcher wiring. WorkGenerationService
+    // resolves tenantId directly from `work.tenantId` (no extra lookup
+    // needed) and stamps the payload via the optional stamper.
+    describe('dispatchGenerationTask — T22 tenant runtime binding capture', () => {
+        const TENANT_ID = '00000000-0000-0000-0000-00000000aaaa';
+
+        async function dispatchOnce(opts: {
+            stamperResult?: { providerId: string | null; credentialVersion: number | null };
+            stamperThrows?: boolean;
+            workTenantId?: string | null;
+        }) {
+            const stamperMock = {
+                stamp: opts.stamperThrows
+                    ? jest.fn().mockRejectedValue(new Error('stamper boom'))
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.stamperResult ?? {
+                                  providerId: null,
+                                  credentialVersion: null,
+                              },
+                          ),
+            };
+            const service = buildService({
+                withDispatcher: true,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                withStamper: stamperMock as any,
+            } as any) as any;
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-t22');
+            const work = buildWork({
+                id: 'work-t22',
+                tenantId: opts.workTenantId ?? null,
+            });
+            const user = buildUser();
+            await service.dispatchGenerationTask(
+                'create' as any,
+                work,
+                user,
+                {} as any,
+                'h-1',
+                { startedAt: new Date() } as any,
+                { triggeredBy: 'user' } as any,
+            );
+            return {
+                payload: generationDispatcher.dispatchWorkGeneration.mock.calls.at(-1)?.[0],
+                stamperMock,
+            };
+        }
+
+        it('stamps payload with stamper result when overlay is active', async () => {
+            const { payload, stamperMock } = await dispatchOnce({
+                workTenantId: TENANT_ID,
+                stamperResult: { providerId: 'trigger', credentialVersion: 12 },
+            });
+            expect(stamperMock.stamp).toHaveBeenCalledWith(TENANT_ID);
+            expect(payload).toMatchObject({
+                workId: 'work-t22',
+                providerId: 'trigger',
+                credentialVersion: 12,
+            });
+        });
+
+        it('ships null/null when work has no tenantId', async () => {
+            const { payload, stamperMock } = await dispatchOnce({
+                workTenantId: null,
+                stamperResult: { providerId: null, credentialVersion: null },
+            });
+            expect(stamperMock.stamp).toHaveBeenCalledWith(null);
+            expect(payload.providerId).toBeNull();
+            expect(payload.credentialVersion).toBeNull();
+        });
+
+        it('fails open on stamper throw', async () => {
+            const { payload } = await dispatchOnce({
+                workTenantId: TENANT_ID,
+                stamperThrows: true,
+            });
+            expect(payload.providerId).toBeNull();
+            expect(payload.credentialVersion).toBeNull();
         });
     });
 });

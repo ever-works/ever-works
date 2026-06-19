@@ -742,3 +742,117 @@ describe('WorkImportService.syncWork', () => {
         );
     });
 });
+
+// EW-742 P3.2 T22 — WorkImportService is the second Tier 2 dispatcher
+// site (after WorkGen). Work entity has tenantId directly so we call
+// `stamper.stamp(work.tenantId ?? null)` without an extra Work lookup.
+describe('WorkImportService.dispatchImportTask — T22 tenant runtime binding capture', () => {
+    const TENANT_ID = '00000000-0000-0000-0000-00000000aaaa';
+
+    async function dispatchOnce(opts: {
+        stamperResult?: { providerId: string | null; credentialVersion: number | null };
+        stamperThrows?: boolean;
+        workTenantId?: string | null;
+    }) {
+        const workRepository = {
+            recordGenerationStartTime: jest.fn().mockResolvedValue(undefined),
+            updateGenerateStatus: jest.fn().mockResolvedValue(undefined),
+        };
+        const generationHistoryRepository = {
+            updateEntry: jest.fn().mockResolvedValue(undefined),
+        };
+        const importDispatcher = {
+            dispatchWorkImport: jest.fn().mockResolvedValue('import-run-t22'),
+        };
+        const stamperMock = {
+            stamp: opts.stamperThrows
+                ? jest.fn().mockRejectedValue(new Error('stamper boom'))
+                : jest
+                      .fn()
+                      .mockResolvedValue(
+                          opts.stamperResult ?? {
+                              providerId: null,
+                              credentialVersion: null,
+                          },
+                      ),
+        };
+
+        const service = new WorkImportService(
+            workRepository as any,
+            generationHistoryRepository as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            { emit: jest.fn() } as any,
+            importDispatcher as any,
+            stamperMock as any,
+        );
+
+        const work: any = {
+            id: 'work-t22',
+            tenantId: opts.workTenantId ?? null,
+        };
+        const user: any = { id: 'user-1' };
+        const dto: any = {
+            sourceUrl: 'https://github.com/ever-works/foo',
+            sourceType: ImportSourceTypeEnum.DATA_REPO,
+        };
+        const parsed = { owner: 'ever-works', repo: 'foo' };
+        const history: any = { id: 'h-1', startedAt: new Date() };
+        const context: any = { triggeredBy: 'user' };
+
+        await (service as any).dispatchImportTask(
+            work,
+            user,
+            dto,
+            parsed,
+            history,
+            context,
+            null,
+        );
+
+        return {
+            payload: importDispatcher.dispatchWorkImport.mock.calls.at(-1)?.[0] as any,
+            stamperMock,
+        };
+    }
+
+    it('stamps payload with stamper result when overlay is active', async () => {
+        const { payload, stamperMock } = await dispatchOnce({
+            workTenantId: TENANT_ID,
+            stamperResult: { providerId: 'trigger', credentialVersion: 14 },
+        });
+        expect(stamperMock.stamp).toHaveBeenCalledWith(TENANT_ID);
+        expect(payload).toMatchObject({
+            workId: 'work-t22',
+            providerId: 'trigger',
+            credentialVersion: 14,
+        });
+    });
+
+    it('ships null/null when work has no tenantId', async () => {
+        const { payload, stamperMock } = await dispatchOnce({
+            workTenantId: null,
+            stamperResult: { providerId: null, credentialVersion: null },
+        });
+        expect(stamperMock.stamp).toHaveBeenCalledWith(null);
+        expect(payload.providerId).toBeNull();
+        expect(payload.credentialVersion).toBeNull();
+    });
+
+    it('fails open on stamper throw', async () => {
+        const { payload } = await dispatchOnce({
+            workTenantId: TENANT_ID,
+            stamperThrows: true,
+        });
+        expect(payload.providerId).toBeNull();
+        expect(payload.credentialVersion).toBeNull();
+    });
+});
