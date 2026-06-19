@@ -30,3 +30,9 @@ export * from './dns.interface.js';
 // land). Additive contract-only — no call site is bound through this yet.
 // See docs/specs/architecture/job-runtime-providers.md §2 (seam) + §3 (contract).
 export * from './job-runtime.interface.js';
+// EW-742 P3.2 follow-up — pluggable secret-store-resolver backends.
+// `ISecretStoreProvider` plugin contract for Vault / k8s / Infisical /
+// Doppler / future cloud-vendor resolvers. The `inline:` + `env:`
+// default lives in @ever-works/agent (zero external deps); every other
+// scheme ships as a plugin package under packages/plugins/secret-store-*/.
+export * from './secret-store.interface.js';
