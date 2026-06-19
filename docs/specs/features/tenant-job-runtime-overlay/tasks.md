@@ -1,8 +1,8 @@
 # Task Breakdown: Tenant-Scoped Job-Runtime Overlay
 
 **Feature ID**: `tenant-job-runtime-overlay`
-**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache) + P5 + P7 (T41+T42) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 enqueue capture), P4 (worker host, blocked on EW-686 P2), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs T43/T44) remain.
-**Last updated**: 2026-06-18
+**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache) + P5 + P7 (T41+T42+T44) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 per-dispatcher wiring), P4 (worker host — bindToTenant contract landed in EW-686 P2 #1387, implementations TBD), P5.1 (per-tenant whitelist), P6 (conformance), and P7 (docs T43) remain.
+**Last updated**: 2026-06-19
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md) · **Providers**: [`./providers.md`](./providers.md) · **Epic**: [EW-742](https://evertech.atlassian.net/browse/EW-742) · **Story**: [EW-743](https://evertech.atlassian.net/browse/EW-743) · **ADR**: [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md)
 
 > Ordered, granular tasks with explicit paths. Phases map to `plan.md` §10. Each phase is a candidate sub-PR. Mark `[x]` as landed. Suggested Jira child-issue grouping noted per phase (e.g. `[EW-742 P1]`). Builds on EW-683's instance-level job-runtime contract; nothing here re-opens [ADR-017 Q1–Q5](../../decisions/017-tenant-scoped-job-runtime-overlay.md) (Temporal namespace-per-tenant, pg-boss schema-per-tenant, Inngest inherit/BYO uniform with Trigger.dev, credential rotation via graceful drain + separate `force-invalidate`, hybrid operator-gated platform-default `shared`/`per-tenant`/`tiered`).
@@ -85,12 +85,12 @@ T20 + T23 + T24 ✅ Done in this PR (#1380, EW-747 — minimal viable resolver, 
 
 ## Phase 7 — Docs · `[EW-742 P7]`
 
-T41 + T42 ✅ Done in [#1352](https://github.com/ever-works/ever-works/pull/1352) (pending cascade). T43 + T44 deferred until P3/P4 + provider plugins exist.
+T41 + T42 ✅ Done in [#1352](https://github.com/ever-works/ever-works/pull/1352) (cascaded). T44 ✅ Done in this PR (migration guide writeable now that P3 resolver + P3.1 cache + EW-686 P2 bindToTenant are on `main` — the drain procedure is a real thing to document). T43 still deferred until per-provider plugin packages exist.
 
 - [x] **T41.** Tenant admin runbook in `docs/runbooks/TENANT_JOB_RUNTIME.md` — how to pick a provider, enter BYO credentials, rotate, force-invalidate, revert to inherit, and read the audit log; cross-link `spec.md` and `providers.md`. (Filed under `docs/runbooks/` UPPERCASE per the existing `EVER_WORKS_ZERO_FRICTION_FLOW.md` convention.)
 - [x] **T42.** Operator runbook in `docs/runbooks/OPERATOR_JOB_RUNTIME_OVERLAY.md` — covers allow-list gating, force-invalidate procedure with on-call checklist, operator-driven rollback to inherit, removing a provider from the bundled set, pre-deploy checklist. (Q5 hosting modes deferred to a follow-up edit once P4 worker-host wiring is in place; doc calls this out explicitly so operators don't expect the env var to do anything yet.)
 - [ ] **T43.** Per-provider tenant-config docs — add a "Tenant overlay" section to each provider plugin README (`packages/plugins/job-runtime-{trigger,temporal,bullmq,pgboss,inngest}/README.md`) and cross-link [`./providers.md`](./providers.md). (Deferred — the per-provider plugin packages don't exist yet; they ship with EW-686 P1 / EW-683 P2-P5.)
-- [ ] **T44.** Migration guide for existing tenants in `docs/runbooks/tenant-job-runtime-migration.md` — how to opt into BYO without losing in-flight work (graceful drain procedure, version-pinning checklist, fallback to inherit if BYO probe fails). (Deferred — the migration story needs the P3 dispatcher + P4 worker host to exist before the drain procedure is a real thing to document.)
+- [x] **T44.** Migration guide for existing tenants in `docs/runbooks/TENANT_JOB_RUNTIME_MIGRATION.md` — four scenarios (inherit → BYO opt-in, BYO rotate with graceful drain, BYO → inherit rollback, force-invalidate emergency), failure-mode table, verification queries (curl + SQL). Cross-links the canonical tenant + operator runbooks + ADR-017 Q4. (Filed under `docs/runbooks/` UPPERCASE per convention; original deferral note assumed the docs needed P4 worker host to be real — P3 resolver + P3.1 cache + EW-686 P2 are enough for the drain procedure to be documented honestly.)
 
 ## Dependency notes
 
