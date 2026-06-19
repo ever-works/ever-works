@@ -99,7 +99,8 @@ describe('IJobRuntimeProvider — contract surface', () => {
 
 	it('JobEnqueueOptions are all optional (sensible per-provider defaults)', () => {
 		// Every field optional — call sites that don't care about
-		// idempotency/concurrency/tags can omit the argument entirely.
+		// idempotency/concurrency/tags/tenant can omit the argument
+		// entirely (matches the EW-683 pre-tenancy path byte-identically).
 		const minimal: JobEnqueueOptions = {};
 		expectTypeOf(minimal).toEqualTypeOf<JobEnqueueOptions>();
 
@@ -108,13 +109,27 @@ describe('IJobRuntimeProvider — contract surface', () => {
 			idempotencyKey: 'work-42-doc-7',
 			concurrencyKey: 'work-42',
 			maxDurationSeconds: 300,
-			machineHint: 'medium-1x'
+			machineHint: 'medium-1x',
+			tenantId: '00000000-0000-0000-0000-000000000001'
 		};
 		expectTypeOf(full.tags).toEqualTypeOf<readonly string[] | undefined>();
 		expectTypeOf(full.idempotencyKey).toEqualTypeOf<string | undefined>();
 		expectTypeOf(full.concurrencyKey).toEqualTypeOf<string | undefined>();
 		expectTypeOf(full.maxDurationSeconds).toEqualTypeOf<number | undefined>();
 		expectTypeOf(full.machineHint).toEqualTypeOf<string | undefined>();
+		expectTypeOf(full.tenantId).toEqualTypeOf<string | undefined>();
+	});
+
+	it('JobEnqueueOptions.tenantId is optional — EW-742 P4 / T31 tenant-routing knob', () => {
+		// Owning tenant id for tenant-aware worker host routing. When
+		// set, the worker host MUST route this run against the tenant's
+		// overlay binding (per `providers.md` per-provider semantic:
+		// Trigger.dev metadata, Inngest data, Temporal searchAttributes,
+		// BullMQ opts.tenantId, pg-boss payload field). When unset, the
+		// run executes against the instance default — byte-identical to
+		// the EW-683 pre-tenancy path.
+		type EnqueueOpts = JobEnqueueOptions;
+		expectTypeOf<EnqueueOpts['tenantId']>().toEqualTypeOf<string | undefined>();
 	});
 
 	it('WorkerHostHandle exposes only a stop() — graceful shutdown coordination', () => {
