@@ -29,4 +29,30 @@ export interface KbEmbedDocumentPayload {
     readonly workId: string;
     /** UUID of the `work_knowledge_documents` row whose body to (re)embed. */
     readonly documentId: string;
+
+    /**
+     * EW-742 P3.2 T22 — enqueue-site tenant-runtime binding capture
+     * (PoC; KB-embed is the proof-of-concept dispatcher, the other 11
+     * `*_DISPATCHER` symbols adopt the same pair incrementally — see
+     * {@link RuntimeBindingStamperService} JSDoc "Scope of THIS PR"
+     * note).
+     *
+     * When present, identifies the tenant-overlay job-runtime that was
+     * active at enqueue time. The worker host uses these to resolve
+     * THAT exact credential snapshot via
+     * {@link CredentialVersionService.resolveSnapshot} even if the
+     * tenant rotates the overlay mid-run (ADR-017 §3 graceful drain).
+     *
+     * Both fields are absent when:
+     *   - the KnowledgeBaseService doesn't have RuntimeBindingStamperService
+     *     wired (older deployments, isolated unit tests);
+     *   - the Work has no tenant context (pre-EW-655 row);
+     *   - the tenant has no overlay row, or it's `inherit` / disabled.
+     *
+     * In every "absent" case the worker host MUST fall back to the
+     * instance default (the pre-overlay EW-683 path) — same byte-for-byte
+     * code path that existed before T22.
+     */
+    readonly providerId?: string | null;
+    readonly credentialVersion?: number | null;
 }

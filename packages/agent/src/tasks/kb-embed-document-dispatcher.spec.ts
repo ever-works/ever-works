@@ -60,4 +60,40 @@ describe('KbEmbedDocumentDispatcher contract', () => {
             impl.dispatchKbEmbedDocument({ workId: 'work-1', documentId: 'doc-1' }),
         ).resolves.toBeNull();
     });
+
+    // EW-742 P3.2 T22 — KB-embed is the PoC dispatcher for enqueue-site
+    // (providerId, credentialVersion) capture. The fields are optional
+    // so existing payload sites stay compiling.
+    it('accepts the optional T22 tenant runtime binding fields', async () => {
+        const dispatchMock = jest.fn(async (_p: KbEmbedDocumentPayload) => 'run-99');
+        const impl: KbEmbedDocumentDispatcher = { dispatchKbEmbedDocument: dispatchMock };
+
+        const payload: KbEmbedDocumentPayload = {
+            workId: 'work-1',
+            documentId: 'doc-1',
+            providerId: 'trigger',
+            credentialVersion: 7,
+        };
+
+        await expect(impl.dispatchKbEmbedDocument(payload)).resolves.toBe('run-99');
+        expect(dispatchMock).toHaveBeenCalledWith(payload);
+    });
+
+    it('accepts explicit null T22 fields (no overlay = legacy default path)', async () => {
+        const dispatchMock = jest.fn(async (_p: KbEmbedDocumentPayload) => 'run-100');
+        const impl: KbEmbedDocumentDispatcher = { dispatchKbEmbedDocument: dispatchMock };
+
+        // Per stamper contract: both null means "no tenant overlay was
+        // active when this was enqueued"; worker host runs against the
+        // instance default — byte-identical to the pre-overlay code path.
+        const payload: KbEmbedDocumentPayload = {
+            workId: 'work-1',
+            documentId: 'doc-1',
+            providerId: null,
+            credentialVersion: null,
+        };
+
+        await expect(impl.dispatchKbEmbedDocument(payload)).resolves.toBe('run-100');
+        expect(dispatchMock).toHaveBeenCalledWith(payload);
+    });
 });
