@@ -1,8 +1,9 @@
-import { task } from '@trigger.dev/sdk';
+import { logger, task } from '@trigger.dev/sdk';
 import { WorkGenerationPayload } from '@ever-works/agent/tasks';
 import { GenerateStatusType } from '@ever-works/agent/entities';
 import { WorkScheduleService, normalizeGeneratorError } from '@ever-works/agent/services';
 import { TriggerGenerationOrchestrator } from '../../trigger/worker/orchestrators/trigger-generation.orchestrator';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { createTaskContext } from '../../trigger/worker/utils/task-context.utils';
 
@@ -93,6 +94,39 @@ export const workGenerationTask = task<'work-generation', WorkGenerationPayload>
     },
     run: async (payload: WorkGenerationPayload, { signal }) => {
         return withWorkerContext('WorkGeneration', async (appContext) => {
+            // EW-742 P3.2 T22 — see kb-embed-document.task.ts for the
+            // pattern. WorkGeneration is idempotent at the run-history
+            // grain (failure modes are recorded via the schedule service
+            // and the entry re-runs cleanly on the next enqueue), so a
+            // drained skip-and-ack is the right move.
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForWork(payload, payload.workId);
+            if (binding.status === 'drained') {
+                logger.warn('work-generation: credentials drained, skipping run', {
+                    workId: payload.workId,
+                    historyId: payload.historyId,
+                    triggerSource: payload.triggerSource,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                // Mark the schedule run failed with a distinctive reason
+                // so an operator can spot drained runs at a glance.
+                if (payload.triggerSource === 'schedule' && payload.scheduleId) {
+                    const scheduleService = appContext.get(WorkScheduleService);
+                    await scheduleService.markRunFailed(
+                        payload.scheduleId,
+                        'credentials-drained',
+                    );
+                }
+                return {
+                    status: 'skipped' as const,
+                    reason: 'credentials-drained' as const,
+                    workId: payload.workId,
+                };
+            }
+
             const { orchestrator, work, user } = await createTaskContext(
                 appContext,
                 payload,

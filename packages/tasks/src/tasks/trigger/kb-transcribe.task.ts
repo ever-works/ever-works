@@ -2,6 +2,7 @@ import { logger, task } from '@trigger.dev/sdk';
 import { KbTranscribePayload } from '@ever-works/agent/tasks';
 import { KnowledgeBaseTranscribeService } from '@ever-works/agent/services';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 
 /**
@@ -33,6 +34,27 @@ export const kbTranscribeTask = task<'kb-transcribe', KbTranscribePayload>({
     run: async (payload) => {
         return withWorkerContext('KbTranscribe', async (appContext) => {
             await appContext.get(TriggerPluginHydratorService).initialize();
+
+            // EW-742 P3.2 T22 — see kb-embed-document.task.ts for pattern.
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForWork(payload, payload.workId);
+            if (binding.status === 'drained') {
+                logger.warn('kb-transcribe: credentials drained, skipping run', {
+                    workId: payload.workId,
+                    uploadId: payload.uploadId,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                return {
+                    status: 'skipped' as const,
+                    reason: 'credentials-drained' as const,
+                    workId: payload.workId,
+                    uploadId: payload.uploadId,
+                };
+            }
+
             const svc = appContext.get(KnowledgeBaseTranscribeService);
             logger.info('kb-transcribe starting', {
                 workId: payload.workId,
