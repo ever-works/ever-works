@@ -9,6 +9,7 @@ import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.servi
 import { KB_EMBED_DOCUMENT_DISPATCHER } from '../../tasks/kb-embed-document-dispatcher';
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../../tasks/kb-org-overlay-fanout-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from '../../tasks/kb-mirror-document-dispatcher';
+import { RuntimeBindingStamperService } from '../../tasks/runtime-binding-stamper.service';
 import { WorkRepository } from '../../database/repositories/work.repository';
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
@@ -683,9 +684,16 @@ describe('KnowledgeBaseService', () => {
                 body: 'hi',
             });
 
+            // EW-742 P3.2 T22 — payload now always includes the
+            // (providerId, credentialVersion) pair. When the stamper +
+            // workRepository aren't wired (this test fixture), both are
+            // null and the worker falls back to the instance default
+            // (byte-identical to the pre-overlay path).
             expect(embedDispatcher.dispatchKbEmbedDocument).toHaveBeenCalledWith({
                 workId: WORK_ID,
                 documentId: 'doc-99',
+                providerId: null,
+                credentialVersion: null,
             });
         });
     });
@@ -732,6 +740,8 @@ describe('KnowledgeBaseService', () => {
             expect(embedDispatcher.dispatchKbEmbedDocument).toHaveBeenCalledWith({
                 workId: WORK_ID,
                 documentId: 'doc-50',
+                providerId: null,
+                credentialVersion: null,
             });
         });
 
@@ -1701,6 +1711,209 @@ describe('KnowledgeBaseService', () => {
             await expect(
                 service.restoreDocumentFromHistory(WORK_ID, 'docId', USER_ID, 'abc1234'),
             ).rejects.toBeInstanceOf(ServiceUnavailableException);
+        });
+    });
+
+    // EW-742 P3.2 T22 — KB-embed is the proof-of-concept dispatcher
+    // for enqueue-site tenant-runtime binding capture. These tests
+    // build a fresh service with WorkRepository + RuntimeBindingStamperService
+    // wired and assert that the (providerId, credentialVersion) pair
+    // gets threaded onto the dispatch payload.
+    describe('enqueueEmbed — T22 tenant runtime binding capture (KB-embed PoC)', () => {
+        async function buildWithStamper(opts: {
+            stamperResult?: { providerId: string | null; credentialVersion: number | null };
+            stamperThrows?: boolean;
+            workTenantId?: string | null;
+            workFindThrows?: boolean;
+        }) {
+            const embedDispatcherMock = {
+                dispatchKbEmbedDocument: jest.fn().mockResolvedValue('run-id'),
+            };
+            const mirrorDispatcherMock = {
+                dispatchKbMirrorDocument: jest.fn().mockResolvedValue('mirror-run-id'),
+            };
+            const workRepoMock = {
+                findById: opts.workFindThrows
+                    ? jest.fn().mockRejectedValue(new Error('db boom'))
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.workTenantId === undefined
+                                  ? null
+                                  : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                          ),
+            };
+            const stamperMock = {
+                stamp: opts.stamperThrows
+                    ? jest.fn().mockRejectedValue(new Error('stamper boom'))
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.stamperResult ?? {
+                                  providerId: null,
+                                  credentialVersion: null,
+                              },
+                          ),
+            };
+
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    { provide: KB_EMBED_DOCUMENT_DISPATCHER, useValue: embedDispatcherMock },
+                    { provide: KB_MIRROR_DOCUMENT_DISPATCHER, useValue: mirrorDispatcherMock },
+                    { provide: WorkRepository, useValue: workRepoMock },
+                    { provide: RuntimeBindingStamperService, useValue: stamperMock },
+                ],
+            }).compile();
+
+            return {
+                service: module.get(KnowledgeBaseService),
+                embedDispatcherMock,
+                workRepoMock,
+                stamperMock,
+            };
+        }
+
+        it('stamps payload with stamper result when overlay is active', async () => {
+            const {
+                service: svc,
+                embedDispatcherMock,
+                workRepoMock,
+                stamperMock,
+            } = await buildWithStamper({
+                workTenantId: '00000000-0000-0000-0000-00000000aaaa',
+                stamperResult: { providerId: 'trigger', credentialVersion: 7 },
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'doc-t22-a' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/v.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            expect(workRepoMock.findById).toHaveBeenCalledWith(WORK_ID);
+            expect(stamperMock.stamp).toHaveBeenCalledWith(
+                '00000000-0000-0000-0000-00000000aaaa',
+            );
+            expect(embedDispatcherMock.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-t22-a',
+                providerId: 'trigger',
+                credentialVersion: 7,
+            });
+        });
+
+        it('passes null/null when work has no tenantId (pre-EW-655 row)', async () => {
+            const {
+                service: svc,
+                embedDispatcherMock,
+                stamperMock,
+            } = await buildWithStamper({
+                workTenantId: null,
+                stamperResult: { providerId: null, credentialVersion: null },
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'doc-t22-b' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/v.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            // Stamper still called (it's the contract entry point) but
+            // with `null` tenantId so it short-circuits to null/null.
+            expect(stamperMock.stamp).toHaveBeenCalledWith(null);
+            expect(embedDispatcherMock.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-t22-b',
+                providerId: null,
+                credentialVersion: null,
+            });
+        });
+
+        it('fails open on stamper throw — payload ships with null/null, embed still enqueues', async () => {
+            const {
+                service: svc,
+                embedDispatcherMock,
+            } = await buildWithStamper({
+                workTenantId: '00000000-0000-0000-0000-00000000aaaa',
+                stamperThrows: true,
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'doc-t22-c' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/v.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            // FR-5 fail-open: stamper failure MUST NOT block the
+            // enqueue — payload ships with null/null so the worker host
+            // falls back to the instance default.
+            expect(embedDispatcherMock.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-t22-c',
+                providerId: null,
+                credentialVersion: null,
+            });
+        });
+
+        it('fails open on workRepository.findById throw', async () => {
+            const {
+                service: svc,
+                embedDispatcherMock,
+                stamperMock,
+            } = await buildWithStamper({
+                workFindThrows: true,
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'doc-t22-d' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/v.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            // The workRepository lookup failed — stamper was never
+            // called (no tenantId available) and payload ships null/null.
+            expect(stamperMock.stamp).not.toHaveBeenCalled();
+            expect(embedDispatcherMock.dispatchKbEmbedDocument).toHaveBeenCalledWith({
+                workId: WORK_ID,
+                documentId: 'doc-t22-d',
+                providerId: null,
+                credentialVersion: null,
+            });
         });
     });
 });
