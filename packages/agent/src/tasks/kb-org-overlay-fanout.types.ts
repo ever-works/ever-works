@@ -54,4 +54,15 @@ export interface KbOrgOverlayFanoutPayload {
     /** `kbDocumentClass` value (`brand`, `legal`, ...). Required on
      *  delete for symmetry with `path`. */
     readonly class: string;
+
+    /**
+     * EW-742 P3.2 T22 — enqueue-site tenant-runtime binding capture.
+     * Resolved from the OWNING ORGANIZATION's `tenantId` (an org belongs
+     * to exactly one tenant, so the org-overlay fanout has a single
+     * unambiguous tenant scope even though its targets are multiple
+     * Works). See `KbEmbedDocumentPayload` (the PoC dispatcher) for
+     * the full contract; the same null/null fail-open semantics apply.
+     */
+    readonly providerId?: string | null;
+    readonly credentialVersion?: number | null;
 }

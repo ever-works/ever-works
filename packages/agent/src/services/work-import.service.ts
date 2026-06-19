@@ -47,6 +47,7 @@ import {
     WorkImportErrorCode,
     WorkImportDispatcher,
     WORK_IMPORT_DISPATCHER,
+    RuntimeBindingStamperService,
 } from '@src/tasks';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleCadence, GenerateStatusType } from '@src/entities/types';
@@ -101,6 +102,12 @@ export class WorkImportService {
         @Optional()
         @Inject(WORK_IMPORT_DISPATCHER)
         private readonly importDispatcher?: WorkImportDispatcher,
+        // EW-742 P3.2 T22 — enqueue-site tenant runtime binding capture.
+        // Optional so isolated unit tests and pre-overlay deployments
+        // keep constructing — when absent, payload ships null/null and
+        // the worker falls back to the instance default.
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
     ) {}
 
     /**
@@ -546,6 +553,29 @@ export class WorkImportService {
         );
     }
 
+    /**
+     * EW-742 P3.2 T22 — resolve `(providerId, credentialVersion)` for
+     * the worker host's `resolveSnapshot` lookup. Returns null/null
+     * when stamper isn't wired, tenantId is null, or stamper throws
+     * (fail-open per FR-5; worker uses instance default).
+     */
+    private async stampForTenant(
+        tenantId: string | null,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            return await this.runtimeBindingStamper.stamp(tenantId);
+        } catch (err) {
+            this.logger.debug(
+                `dispatchImportTask: stamper lookup failed for tenant=${tenantId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
+    }
+
     private async dispatchImportTask(
         work: Work,
         user: User,
@@ -561,6 +591,10 @@ export class WorkImportService {
                 status: GenerateStatusType.GENERATING,
             }),
         ]);
+
+        // EW-742 P3.2 T22 — stamp `(providerId, credentialVersion)` for
+        // the worker host. Fail-open per FR-5.
+        const binding = await this.stampForTenant(work.tenantId ?? null);
 
         const payload: WorkImportPayload = {
             workId: work.id,
@@ -583,6 +617,8 @@ export class WorkImportService {
             providers: dto.providers,
             enrichmentConfig: dto.enrichmentConfig,
             worksConfig: worksConfig ?? null,
+            providerId: binding.providerId,
+            credentialVersion: binding.credentialVersion,
         };
 
         const dispatchedId = this.importDispatcher

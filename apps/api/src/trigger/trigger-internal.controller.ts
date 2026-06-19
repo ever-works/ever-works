@@ -45,6 +45,7 @@ import {
     TaskRecurrenceDispatcherService,
     TasksService,
 } from '@ever-works/agent/tasks-domain';
+import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -215,6 +216,12 @@ export class TriggerInternalController implements OnModuleInit {
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
         private readonly notificationChannelFacade: NotificationChannelFacadeService,
+        // EW-742 P3.2 T22 — exposes CredentialVersionService.resolveSnapshot
+        // through the remote-proxy controller so Trigger.dev worker tasks
+        // can verify the (providerId, credentialVersion) pair stamped at
+        // enqueue time and decide whether to run, fail with
+        // CREDENTIAL_DRAINED, or fall back to the instance default.
+        private readonly credentialVersionService: CredentialVersionService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -257,6 +264,10 @@ export class TriggerInternalController implements OnModuleInit {
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,
+            // EW-742 P3.2 T22 — exposed for the worker-host resolveSnapshot
+            // consumption (see TenantRuntimeBindingResolverService in
+            // packages/tasks/src/trigger/worker/services/).
+            CredentialVersionService: this.credentialVersionService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

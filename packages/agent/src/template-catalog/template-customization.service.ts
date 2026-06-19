@@ -19,6 +19,7 @@ import { AiFacadeService } from '@src/facades/ai.facade';
 import {
     TEMPLATE_CUSTOMIZATION_DISPATCHER,
     type TemplateCustomizationDispatcher,
+    RuntimeBindingStamperService,
 } from '@src/tasks';
 import {
     findWebsiteTemplateConfig,
@@ -118,6 +119,12 @@ export class TemplateCustomizationService {
         @Optional()
         @Inject(TEMPLATE_CUSTOMIZATION_DISPATCHER)
         private readonly dispatcher?: TemplateCustomizationDispatcher,
+        // EW-742 P3.2 T22 — enqueue-site tenant runtime binding capture.
+        // Optional so isolated unit tests and pre-overlay deployments
+        // keep constructing — when absent, payload ships null/null and
+        // the worker falls back to the instance default.
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
     ) {}
 
     async createAndStart(
@@ -312,8 +319,32 @@ export class TemplateCustomizationService {
         };
     }
     private async start(customizationId: string): Promise<void> {
+        // EW-742 P3.2 T22 — resolve `(providerId, credentialVersion)`
+        // for the worker host. TemplateCustomization has tenantId
+        // directly on the row; look it up if the stamper is wired.
+        // Fail-open per FR-5: any failure ships null/null.
+        let binding: { providerId: string | null; credentialVersion: number | null } = {
+            providerId: null,
+            credentialVersion: null,
+        };
+        if (this.runtimeBindingStamper) {
+            try {
+                const row = await this.customizationRepository.findById(customizationId);
+                binding = await this.runtimeBindingStamper.stamp(row?.tenantId ?? null);
+            } catch (err) {
+                this.logger.debug(
+                    `start: stamper lookup failed for customization=${customizationId} ` +
+                        `(${(err as Error).message}); falling back to instance default.`,
+                );
+            }
+        }
+
         const dispatchedId = this.dispatcher
-            ? await this.dispatcher.dispatchTemplateCustomization({ customizationId })
+            ? await this.dispatcher.dispatchTemplateCustomization({
+                  customizationId,
+                  providerId: binding.providerId,
+                  credentialVersion: binding.credentialVersion,
+              })
             : null;
 
         if (dispatchedId) {
