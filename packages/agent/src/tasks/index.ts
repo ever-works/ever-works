@@ -96,10 +96,9 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // Operators using Kubernetes Secrets override the SECRET_STORE_RESOLVER
 // DI binding to the plugin's exported K8sSecretStorePlugin class.
 
-// EW-742 P3.2 follow-up — InfisicalSecretStoreResolver. HTTP against
-// Infisical REST API (`/api/v3/secrets/raw`); OSS-friendly secrets
-// platform with self-hostable backend. Opt-in via DI binding override.
-export { InfisicalSecretStoreResolver } from './infisical-secret-store-resolver.service';
+// EW-742 P3.2 — Infisical SecretStoreResolver now lives at
+// @ever-works/secret-store-infisical-plugin
+// (packages/plugins/secret-store-infisical/).
 
 // EW-742 P3.2 follow-up — DopplerSecretStoreResolver. HTTP against
 // Doppler REST API (`/v3/configs/config/secrets`); freemium SaaS
