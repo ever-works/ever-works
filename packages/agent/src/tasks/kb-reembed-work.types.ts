@@ -39,4 +39,12 @@ export interface KbReembedWorkPayload {
      * is still detected by a future sweep).
      */
     readonly newDims: number;
+
+    /**
+     * EW-742 P3.2 T22 — enqueue-site tenant-runtime binding capture.
+     * See `KbEmbedDocumentPayload` (the PoC dispatcher) for the full
+     * contract; the same null/null fail-open semantics apply.
+     */
+    readonly providerId?: string | null;
+    readonly credentialVersion?: number | null;
 }
