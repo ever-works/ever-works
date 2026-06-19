@@ -11,29 +11,40 @@ import type {
 	WorkerHostHandle,
 	WorkerHostOptions
 } from '@ever-works/plugin';
+import { InngestDispatcherFactory } from './inngest-dispatcher-factory.js';
 
 /**
  * EW-742 P3.2 follow-up — Inngest `IJobRuntimeProvider` plugin.
  *
- * Per [`providers.md`](../../../../docs/specs/features/tenant-job-runtime-overlay/providers.md)
- * (Inngest section), per-tenant BYO is **SaaS only**; self-host is
- * blocked at the `available-providers` admin gate because self-host
- * Inngest's signing-key isolation model isn't multi-tenant by design.
+ * Per `providers.md` (Inngest section), per-tenant BYO is **SaaS
+ * only**; self-host Inngest's signing-key isolation model isn't
+ * multi-tenant by design, so this plugin's `bindToTenant` view
+ * surfaces the per-tenant eventKey/signingKey but operators must
+ * build per-tenant `Inngest` clients themselves.
  *
- * `bindToTenant` extracts the per-tenant signing keys from
- * `snapshot.credentials.eventKey` + `snapshot.credentials.signingKey`
- * and exposes them on the view so a future dispatcher can route to
- * the right Inngest project. Stub dispatchers throw until an operator
- * wires per-payload-type Inngest functions.
+ * Operators wire real send/function pairs via:
+ *   - `useDispatchers(map)` — replace throwing-stub Proxy.
+ *   - `useDispatcherFactory(factory)` — surface the registered
+ *     Inngest functions through `plugin.functions` for the
+ *     operator's `serve({ functions })` mount.
+ *   - `dispatchersBuilder` ctor option — per-tenant routing.
+ *
+ * # No worker host
+ *
+ * Inngest invokes operator-defined functions over HTTP via the
+ * `serve()` handler the operator mounts. There is no separate worker
+ * process. `startWorkerHost` therefore stays a no-op even when
+ * operator hooks are wired — the operator's HTTP route IS the worker
+ * host.
  */
 
 export class InngestDispatcherNotConfiguredError extends Error {
 	constructor(dispatcherName: string) {
 		super(
 			`@ever-works/job-runtime-inngest-plugin: ${dispatcherName} is not configured. ` +
-				'Subclass InngestJobRuntimePlugin (or wrap it with a delegating provider) and ' +
-				'override the dispatchers field with operator-defined Inngest functions ' +
-				'per `docs/specs/features/tenant-job-runtime-overlay/providers.md`.'
+				'Call plugin.useDispatchers({ ... }) with operator-supplied Inngest dispatchers ' +
+				'built via InngestDispatcherFactory (see plugin header for an example), ' +
+				'or pass dispatchersBuilder when constructing the plugin for per-tenant routing.'
 		);
 		this.name = 'InngestDispatcherNotConfiguredError';
 	}
@@ -45,6 +56,11 @@ export interface InngestTenantBindingView extends IJobRuntimeProvider {
 	readonly tenantEventKey: string | null;
 	/** Per-tenant Inngest signing key (for inbound webhook verification). */
 	readonly tenantSigningKey: string | null;
+}
+
+export interface InngestJobRuntimePluginOptions {
+	/** Per-tenant dispatcher builder — see plugin header. */
+	readonly dispatchersBuilder?: (snapshot: TenantCredentialSnapshot) => JobRuntimeDispatchers;
 }
 
 export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
@@ -81,7 +97,7 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	};
 
-	readonly dispatchers: JobRuntimeDispatchers = new Proxy(
+	private readonly stubDispatchers: JobRuntimeDispatchers = new Proxy(
 		{},
 		{
 			get(_target, prop: string): unknown {
@@ -95,8 +111,37 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	);
 
+	private dispatchersImpl: JobRuntimeDispatchers = this.stubDispatchers;
+	private dispatcherFactory: InngestDispatcherFactory | null = null;
+
 	private context?: PluginContext;
 	private readonly tenantViews = new Map<string, InngestTenantBindingView>();
+
+	constructor(private readonly opts: InngestJobRuntimePluginOptions = {}) {}
+
+	get dispatchers(): JobRuntimeDispatchers {
+		return this.dispatchersImpl;
+	}
+
+	/**
+	 * Inngest functions registered through the bound factory. Operator
+	 * passes these to `serve({ client, functions })` at their HTTP
+	 * mount point.
+	 */
+	get functions(): readonly unknown[] {
+		return this.dispatcherFactory?.functions ?? [];
+	}
+
+	useDispatchers(map: JobRuntimeDispatchers): this {
+		this.dispatchersImpl = Object.freeze({ ...map });
+		this.tenantViews.clear();
+		return this;
+	}
+
+	useDispatcherFactory(factory: InngestDispatcherFactory): this {
+		this.dispatcherFactory = factory;
+		return this;
+	}
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -107,10 +152,22 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 		this.tenantViews.clear();
 	}
 
-	async registerSchedules(_schedules: readonly ScheduleSpec[]): Promise<void> {}
+	async registerSchedules(_schedules: readonly ScheduleSpec[]): Promise<void> {
+		// Inngest cron schedules live on individual function defs
+		// (`{ cron: '...' }` triggers). Operators wire them via
+		// `factory.defineFunction(...)` directly. No-op here so the
+		// binding factory's boot path doesn't throw.
+	}
+
 	async cancel(_runId: string): Promise<boolean> {
+		// Inngest exposes cancellation via REST API
+		// (`https://api.inngest.com/v1/runs/{id}/cancel`). The plugin
+		// package doesn't ship a REST client — operators that need
+		// cancellation can override this method via a thin wrapper
+		// provider in their app code.
 		return false;
 	}
+
 	async getRunStatus(_runId: string): Promise<JobRunStatus> {
 		return 'unknown';
 	}
@@ -120,6 +177,8 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 	}
 
 	async startWorkerHost(_opts: WorkerHostOptions): Promise<WorkerHostHandle> {
+		// Inngest is a serverless dispatch model — the operator's
+		// `serve()` HTTP route IS the worker host. No process to start.
 		return { stop: async () => undefined };
 	}
 
@@ -140,6 +199,10 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 				? snapshot.credentials.signingKey
 				: null;
 
+		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
+			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
+			: base.dispatchersImpl;
+
 		const view: InngestTenantBindingView = Object.freeze({
 			id: base.id,
 			name: base.name,
@@ -149,7 +212,7 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 			settingsSchema: base.settingsSchema,
 			runtimeId: base.runtimeId,
 			get dispatchers(): JobRuntimeDispatchers {
-				return base.dispatchers;
+				return dispatchersForView;
 			},
 			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
 				base.registerSchedules(schedules),
