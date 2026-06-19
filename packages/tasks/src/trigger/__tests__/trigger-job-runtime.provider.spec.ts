@@ -222,4 +222,80 @@ describe('TriggerJobRuntimeProvider', () => {
             expect(triggerServiceMock.startWorkerHost).toHaveBeenCalledWith(opts);
         });
     });
+
+    describe('bindToTenant (EW-742 P3.2 T21.1)', () => {
+        const snapshot = {
+            tenantId: '00000000-0000-0000-0000-00000000aaaa',
+            providerId: 'trigger' as const,
+            credentialVersion: 1,
+            credentials: { accessToken: 'tr_dev_abc' },
+        };
+
+        it('returns a per-tenant view exposing the snapshot', () => {
+            const view = provider.bindToTenant(snapshot);
+            // The contract requires the returned object to satisfy
+            // IJobRuntimeProvider; the snapshot is exposed off-spec on
+            // the view so the T22 stamper can read it without a separate
+            // lookup.
+            expect(view.runtimeId).toBe('trigger');
+            expect((view as { tenantSnapshot: typeof snapshot }).tenantSnapshot).toBe(snapshot);
+        });
+
+        it('memoises on (tenantId, credentialVersion) — same snapshot returns same view', () => {
+            // Per IJobRuntimeProvider.bindToTenant idempotency clause.
+            const a = provider.bindToTenant(snapshot);
+            const b = provider.bindToTenant(snapshot);
+            expect(b).toBe(a);
+        });
+
+        it('evicts the older view when credentialVersion bumps for the same tenant', () => {
+            // Cache stays bounded by tenant count, not version count —
+            // a rotate replaces the old view in place.
+            const v1 = provider.bindToTenant(snapshot);
+            const v2 = provider.bindToTenant({ ...snapshot, credentialVersion: 2 });
+            expect(v2).not.toBe(v1);
+            // Asking again for the v1 snapshot now returns a fresh view
+            // (the v1 entry was evicted by the v2 cache-replace).
+            const v1Again = provider.bindToTenant(snapshot);
+            expect(v1Again).not.toBe(v1);
+        });
+
+        it('view methods delegate back to the singleton TriggerService', async () => {
+            const view = provider.bindToTenant(snapshot);
+            triggerServiceMock.cancel.mockResolvedValue(true);
+            triggerServiceMock.isEnabled.mockReturnValue(true);
+
+            expect(view.isEnabled()).toBe(true);
+            expect(triggerServiceMock.isEnabled).toHaveBeenCalled();
+
+            await view.cancel('run_xyz');
+            expect(triggerServiceMock.cancel).toHaveBeenCalledWith('run_xyz');
+
+            // The dispatchers getter on the view passes through the
+            // singleton's dispatchers identity-equal — that's how the
+            // current "BYO with inherit (inherit only)" path keeps
+            // working in this PR; per-tenant Trigger.dev project
+            // switching is the T22 follow-up.
+            expect(view.dispatchers).toBe(dispatchersSentinel);
+        });
+
+        it('the view is frozen', () => {
+            const view = provider.bindToTenant(snapshot);
+            expect(Object.isFrozen(view)).toBe(true);
+        });
+
+        it('view.bindToTenant(self) returns self', () => {
+            const view = provider.bindToTenant(snapshot);
+            expect(view.bindToTenant?.(snapshot)).toBe(view);
+        });
+
+        it('view.bindToTenant(other) delegates back to the root provider', () => {
+            const view = provider.bindToTenant(snapshot);
+            const other = { ...snapshot, tenantId: '00000000-0000-0000-0000-00000000bbbb' };
+            const otherView = view.bindToTenant?.(other);
+            // Root produced this view, so a second call with the same
+            // `other` snapshot should hit the root's cache.
+            expect(otherView).toBe(provider.bindToTenant(other));
+        });
+    });
 });
