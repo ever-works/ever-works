@@ -2,6 +2,7 @@ import { logger, task } from '@trigger.dev/sdk';
 import { KbReembedWorkPayload } from '@ever-works/agent/tasks';
 import { KnowledgeBaseReembedService } from '@ever-works/agent/services';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 
 /**
@@ -43,6 +44,34 @@ export const kbReembedWorkTask = task<'kb-reembed-work', KbReembedWorkPayload>({
     run: async (payload) => {
         return withWorkerContext('KbReembedWork', async (appContext) => {
             await appContext.get(TriggerPluginHydratorService).initialize();
+
+            // EW-742 P3.2 T22 — see kb-embed-document.task.ts for the
+            // pattern. The kb-reembed-work sweep is idempotent at the
+            // (work, model-pair) grain (the service already skips
+            // coordinate rows already on `newModel`), so a drained
+            // skip-and-ack is safe — the operator can re-fire the
+            // model flip from the pgvector settings UI against fresh
+            // credentials, or the reconciliation cron (slice 5)
+            // catches the drift.
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForWork(payload, payload.workId);
+            if (binding.status === 'drained') {
+                logger.warn('kb-reembed-work: credentials drained, skipping run', {
+                    workId: payload.workId,
+                    previousModel: payload.previousModel,
+                    newModel: payload.newModel,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                return {
+                    status: 'skipped' as const,
+                    reason: 'credentials-drained' as const,
+                    workId: payload.workId,
+                };
+            }
+
             const svc = appContext.get(KnowledgeBaseReembedService);
             logger.info('kb-reembed-work starting', {
                 workId: payload.workId,

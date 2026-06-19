@@ -16,6 +16,7 @@ import {
     KB_NORMALIZE_MEDIA_DISPATCHER,
     KB_REEMBED_WORK_DISPATCHER,
     KB_TRANSCRIBE_DISPATCHER,
+    RuntimeBindingStamperService,
     type KbNormalizeMediaDispatcher,
     type KbNormalizeMediaPayload,
     type KbReembedWorkDispatcher,
@@ -23,6 +24,8 @@ import {
     type KbTranscribeDispatcher,
     type KbTranscribePayload,
 } from '@ever-works/agent/tasks';
+import { WorkRepository } from '@ever-works/agent/database';
+import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -58,6 +61,9 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // tenant-ownership guard OrgKbController uses to authorize its
         // raw `/api/organizations/:orgId/...` routes.
         OrganizationsModule,
+        // EW-742 P3.2 T22 — RuntimeBindingStamperService for the
+        // KB_REEMBED_WORK_DISPATCHER factory's enqueue-site stamping.
+        TenantJobRuntimeModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -157,11 +163,42 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // can surface them as a workbench banner.
         {
             provide: KB_REEMBED_WORK_DISPATCHER,
-            useFactory: (): KbReembedWorkDispatcher => {
+            // EW-742 P3.2 T22 — stamp `(providerId, credentialVersion)`
+            // onto the payload before forwarding to Trigger.dev. The
+            // pgvector plugin call site has no tenant context (it's a
+            // vendor-agnostic vector store), so the stamping happens
+            // here in the host adapter where the WorkRepository +
+            // stamper are reachable. Fail-open per FR-5.
+            inject: [WorkRepository, RuntimeBindingStamperService],
+            useFactory: (
+                workRepository: WorkRepository,
+                stamper: RuntimeBindingStamperService,
+            ): KbReembedWorkDispatcher => {
+                const factoryLogger = new Logger('KbReembedWorkDispatcher');
                 return {
                     async dispatchKbReembedWork(payload: KbReembedWorkPayload): Promise<string> {
+                        let providerId = payload.providerId ?? null;
+                        let credentialVersion = payload.credentialVersion ?? null;
+                        if (providerId === null && credentialVersion === null) {
+                            try {
+                                const work = await workRepository.findById(payload.workId);
+                                const binding = await stamper.stamp(work?.tenantId ?? null);
+                                providerId = binding.providerId;
+                                credentialVersion = binding.credentialVersion;
+                            } catch (err) {
+                                factoryLogger.debug(
+                                    `dispatchKbReembedWork: stamper lookup failed for work=${payload.workId} ` +
+                                        `(${(err as Error).message}); falling back to instance default.`,
+                                );
+                            }
+                        }
+                        const stamped: KbReembedWorkPayload = {
+                            ...payload,
+                            providerId,
+                            credentialVersion,
+                        };
                         const { tasks } = await import('@trigger.dev/sdk');
-                        const handle = await tasks.trigger('kb-reembed-work', payload);
+                        const handle = await tasks.trigger('kb-reembed-work', stamped);
                         return handle.id;
                     },
                 };
