@@ -27,4 +27,13 @@ export interface WebhookDeliveryPayload {
 
     /** Raw JSON payload that will be signed and POSTed verbatim. */
     readonly payload: Record<string, unknown>;
+
+    /**
+     * EW-742 P3.2 T22 — enqueue-site tenant-runtime binding capture.
+     * Resolved from the owning `WebhookSubscription.tenantId`. See
+     * `KbEmbedDocumentPayload` (the PoC dispatcher) for the full
+     * contract; the same null/null fail-open semantics apply.
+     */
+    readonly providerId?: string | null;
+    readonly credentialVersion?: number | null;
 }

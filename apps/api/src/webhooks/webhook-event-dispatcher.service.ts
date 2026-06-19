@@ -9,6 +9,7 @@ import {
     WebhookDeliveryPayload,
     WebhookDeliveryDispatcher,
     WEBHOOK_DELIVERY_DISPATCHER,
+    RuntimeBindingStamperService,
 } from '@ever-works/agent/tasks';
 import {
     WorkCreatedEvent,
@@ -51,7 +52,38 @@ export class WebhookEventDispatcherService {
         @Optional()
         @Inject(WEBHOOK_DELIVERY_DISPATCHER)
         private readonly remoteDispatcher: WebhookDeliveryDispatcher | null = null,
+        // EW-742 P3.2 T22 — enqueue-site tenant runtime binding capture.
+        // Optional so isolated unit tests and pre-overlay deployments
+        // keep constructing — when absent, payload ships null/null and
+        // the worker falls back to the instance default.
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
     ) {}
+
+    /**
+     * EW-742 P3.2 T22 — resolve `(providerId, credentialVersion)` for
+     * the worker host via the owning subscription's `tenantId`. Fail-
+     * open per FR-5: any missing dep / lookup error ships null/null
+     * and the worker falls back to the instance default (byte-identical
+     * pre-T22 path).
+     */
+    private async stampForSubscription(
+        subscriptionId: string,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            const sub = await this.subscriptions.findById(subscriptionId);
+            return await this.runtimeBindingStamper.stamp(sub?.tenantId ?? null);
+        } catch (err) {
+            this.logger.debug(
+                `webhook-delivery: stamper lookup failed for subscription=${subscriptionId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
+    }
 
     @OnEvent(WorkCreatedEvent.EVENT_NAME)
     async onWorkCreated(event: WorkCreatedEvent): Promise<void> {
@@ -251,8 +283,20 @@ export class WebhookEventDispatcherService {
      * configured (or the dispatch threw).
      */
     private async enqueue(payload: WebhookDeliveryPayload): Promise<string | null> {
+        // EW-742 P3.2 T22 — stamp `(providerId, credentialVersion)` for
+        // the worker host's resolveSnapshot lookup. Resolved from the
+        // owning subscription's `tenantId`. Threaded only into the
+        // remote-dispatcher path (the in-process fallback runs in the
+        // API process and uses the instance default credentials by
+        // construction; no payload-borne hint needed).
+        const binding = await this.stampForSubscription(payload.subscriptionId);
+        const stampedPayload: WebhookDeliveryPayload = {
+            ...payload,
+            providerId: binding.providerId,
+            credentialVersion: binding.credentialVersion,
+        };
         if (this.remoteDispatcher) {
-            const runId = await this.remoteDispatcher.dispatchWebhookDelivery(payload);
+            const runId = await this.remoteDispatcher.dispatchWebhookDelivery(stampedPayload);
             if (runId) {
                 // EW-634 Codex P2 follow-up: persist the Trigger run id
                 // on the pending delivery row immediately so the

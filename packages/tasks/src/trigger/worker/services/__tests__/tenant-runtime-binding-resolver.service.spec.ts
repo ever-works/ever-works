@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type {
     OrganizationRepository,
     TemplateCustomizationRepository,
+    WebhookSubscriptionRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
 import type { CredentialVersionService } from '@ever-works/agent/tasks';
@@ -272,6 +273,81 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
             const out = await r.resolveForOrganization(
                 { providerId: 'trigger', credentialVersion: 5 },
                 ORG_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+    });
+
+    describe('resolveForSubscription()', () => {
+        const SUB_ID = '44444444-4444-4444-4444-444444444444';
+        const SNAPSHOT = {
+            tenantId: TENANT_ID,
+            providerId: 'trigger',
+            credentialVersion: 5,
+            mode: 'byo',
+            enabled: true,
+        } as TenantJobRuntimeConfig;
+
+        function build(opts: {
+            subTenantId?: string | null;
+            subFindThrows?: boolean;
+            omitRepository?: boolean;
+            snapshot?: TenantJobRuntimeConfig | null;
+        }) {
+            const credentialVersionService = {
+                resolveSnapshot: vi.fn().mockResolvedValue(opts.snapshot ?? null),
+            } as unknown as CredentialVersionService;
+            const subRepository = {
+                findById: opts.subFindThrows
+                    ? vi.fn().mockRejectedValue(new Error('db boom'))
+                    : vi.fn().mockResolvedValue(
+                          opts.subTenantId === undefined
+                              ? null
+                              : ({ id: SUB_ID, tenantId: opts.subTenantId } as any),
+                      ),
+            } as unknown as WebhookSubscriptionRepository;
+            return new TenantRuntimeBindingResolverService(
+                credentialVersionService,
+                undefined,
+                undefined,
+                undefined,
+                opts.omitRepository ? undefined : subRepository,
+            );
+        }
+
+        it('resolves snapshot via subscription → tenantId', async () => {
+            const r = build({ subTenantId: TENANT_ID, snapshot: SNAPSHOT });
+            const out = await r.resolveForSubscription(
+                { providerId: 'trigger', credentialVersion: 5 },
+                SUB_ID,
+            );
+            expect(out.status).toBe('resolved');
+            expect(out.tenantId).toBe(TENANT_ID);
+        });
+
+        it('returns "no-binding" when WebhookSubscriptionRepository is not wired', async () => {
+            const r = build({ omitRepository: true });
+            const out = await r.resolveForSubscription(
+                { providerId: 'trigger', credentialVersion: 5 },
+                SUB_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+
+        it('returns "no-binding" when findById throws', async () => {
+            const r = build({ subFindThrows: true });
+            const out = await r.resolveForSubscription(
+                { providerId: 'trigger', credentialVersion: 5 },
+                SUB_ID,
+            );
+            expect(out).toEqual({ status: 'no-binding' });
+        });
+
+        it('returns "no-binding" when subscription has no tenantId', async () => {
+            const r = build({ subTenantId: null });
+            const out = await r.resolveForSubscription(
+                { providerId: 'trigger', credentialVersion: 5 },
+                SUB_ID,
             );
             expect(out).toEqual({ status: 'no-binding' });
         });
