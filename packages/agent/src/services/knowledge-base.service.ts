@@ -47,6 +47,7 @@ import { KB_ORG_OVERLAY_FANOUT_DISPATCHER, type KbOrgOverlayFanoutDispatcher } f
 import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '../tasks';
 import { RuntimeBindingStamperService } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { OrganizationRepository } from '../database/repositories/organization.repository';
 import { sanitizeDescription } from '../utils/sanitize.util';
 import type {
     CitationDto,
@@ -280,17 +281,23 @@ export class KnowledgeBaseService {
         @Optional()
         @Inject(KB_NORMALIZE_MEDIA_DISPATCHER)
         private readonly normalizeMediaDispatcher?: KbNormalizeMediaDispatcher,
-        // EW-742 P3.2 T22 — KB-embed is the proof-of-concept dispatcher
-        // for enqueue-site tenant-runtime binding capture (see
-        // {@link RuntimeBindingStamperService} JSDoc "Scope of THIS PR"
-        // note for why it's adopted one dispatcher at a time). Optional
-        // so isolated unit tests and pre-overlay deployments keep
-        // constructing — when absent, the enqueue degrades to the
-        // pre-overlay (EW-683) byte-identical path: payload ships
-        // without `providerId`/`credentialVersion`, worker host uses the
-        // instance default.
+        // EW-742 P3.2 T22 — KB-embed shipped the proof-of-concept in
+        // PR #1427; this binding is now used by every workId-bound KB
+        // dispatcher in this service via the {@link stampForWork}
+        // helper. Optional so isolated unit tests and pre-overlay
+        // deployments keep constructing — when absent, the enqueue
+        // degrades to the pre-overlay (EW-683) byte-identical path:
+        // payload ships without `providerId`/`credentialVersion`,
+        // worker host uses the instance default.
         @Optional()
         private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
+        // EW-742 P3.2 T22 (org-overlay branch) — used by
+        // {@link stampForOrganization} to resolve a tenantId from an
+        // organizationId. Optional so the same code path runs in
+        // deployments that don't have organizations wired (per-Work
+        // dispatchers still get stamped via WorkRepository above).
+        @Optional()
+        private readonly organizationRepository?: OrganizationRepository,
     ) {}
 
     /**
@@ -312,6 +319,8 @@ export class KnowledgeBaseService {
         if (!this.mirrorDispatcher) {
             return;
         }
+        // EW-742 P3.2 T22 — see stampForWork JSDoc.
+        const binding = await this.stampForWork(workId, 'enqueueMirror');
         try {
             await this.mirrorDispatcher.dispatchKbMirrorDocument({
                 workId,
@@ -319,6 +328,8 @@ export class KnowledgeBaseService {
                 operation,
                 path: docPath,
                 class: docClass,
+                providerId: binding.providerId,
+                credentialVersion: binding.credentialVersion,
             });
         } catch (error) {
             this.logger.warn(
@@ -342,6 +353,64 @@ export class KnowledgeBaseService {
      * (work-knowledge-chunk.entity.ts) clears chunk rows when the
      * parent document row is dropped — no separate enqueue needed.
      */
+    /**
+     * EW-742 P3.2 T22 — shared per-Work tenant runtime binding helper.
+     *
+     * Resolves the Work's tenantId via WorkRepository.findById, then
+     * delegates to RuntimeBindingStamperService.stamp(tenantId). Returns
+     * `{ providerId: null, credentialVersion: null }` when any link in
+     * the chain is missing or throws — the worker host treats that as
+     * "no overlay was active" and runs against the instance default
+     * (byte-identical pre-overlay path).
+     *
+     * Called by every workId-bound dispatch site in this service
+     * (enqueueEmbed / enqueueMirror / maybeDispatchMediaNormalize). The
+     * org-overlay fanout uses {@link stampForOrganization} instead.
+     */
+    private async stampForWork(
+        workId: string,
+        callSite: string,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper || !this.workRepository) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            const work = await this.workRepository.findById(workId);
+            return await this.runtimeBindingStamper.stamp(work?.tenantId ?? null);
+        } catch (err) {
+            this.logger.debug(
+                `${callSite}: stamper lookup failed for work=${workId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
+    }
+
+    /**
+     * EW-742 P3.2 T22 — shared per-Organization tenant runtime binding
+     * helper. An org belongs to exactly one tenant, so the org-overlay
+     * fanout (which targets multiple Works in that org) still has a
+     * single unambiguous tenant scope.
+     */
+    private async stampForOrganization(
+        organizationId: string,
+        callSite: string,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper || !this.organizationRepository) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            const org = await this.organizationRepository.findById(organizationId);
+            return await this.runtimeBindingStamper.stamp(org?.tenantId ?? null);
+        } catch (err) {
+            this.logger.debug(
+                `${callSite}: stamper lookup failed for org=${organizationId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
+    }
+
     private async enqueueEmbed(workId: string, documentId: string): Promise<void> {
         if (!this.embedDispatcher) {
             return;
@@ -349,26 +418,10 @@ export class KnowledgeBaseService {
         // EW-742 P3.2 T22 — capture the tenant runtime binding at
         // enqueue time so the worker host can resolve the exact
         // credential snapshot that was active when the run was
-        // scheduled (ADR-017 §3 graceful drain). The lookup is
-        // best-effort: a missing WorkRepository, missing tenantId, or
-        // missing stamper all mean we ship the legacy 2-field payload
-        // and the worker uses the instance default — that's the same
-        // byte-identical path that ran pre-T22.
-        let binding: { providerId: string | null; credentialVersion: number | null } = {
-            providerId: null,
-            credentialVersion: null,
-        };
-        if (this.runtimeBindingStamper && this.workRepository) {
-            try {
-                const work = await this.workRepository.findById(workId);
-                binding = await this.runtimeBindingStamper.stamp(work?.tenantId ?? null);
-            } catch (err) {
-                this.logger.debug(
-                    `enqueueEmbed: stamper lookup failed for work=${workId} ` +
-                        `(${(err as Error).message}); falling back to instance default.`,
-                );
-            }
-        }
+        // scheduled (ADR-017 §3 graceful drain). Fail-open per FR-5:
+        // any missing dep / lookup error ships null/null and the
+        // worker uses the instance default (byte-identical pre-T22 path).
+        const binding = await this.stampForWork(workId, 'enqueueEmbed');
         try {
             await this.embedDispatcher.dispatchKbEmbedDocument({
                 workId,
@@ -428,6 +481,11 @@ export class KnowledgeBaseService {
                 );
                 return;
             }
+            // EW-742 P3.2 T22 — see stampForOrganization JSDoc.
+            const binding = await this.stampForOrganization(
+                organizationId,
+                'enqueueOrgOverlayFanout',
+            );
             await this.orgOverlayDispatcher.dispatchKbOrgOverlayFanout({
                 organizationId,
                 documentId,
@@ -435,6 +493,8 @@ export class KnowledgeBaseService {
                 operation,
                 path: docPath,
                 class: docClass,
+                providerId: binding.providerId,
+                credentialVersion: binding.credentialVersion,
             });
         } catch (error) {
             this.logger.warn(
@@ -475,6 +535,8 @@ export class KnowledgeBaseService {
         if (!mediaKind) {
             return;
         }
+        // EW-742 P3.2 T22 — see stampForWork JSDoc.
+        const binding = await this.stampForWork(upload.workId, 'maybeDispatchMediaNormalize');
         try {
             await this.normalizeMediaDispatcher.dispatchKbNormalizeMedia({
                 workId: upload.workId,
@@ -482,6 +544,8 @@ export class KnowledgeBaseService {
                 mediaKind,
                 originalSha256: sha256,
                 originalMimeType: bare,
+                providerId: binding.providerId,
+                credentialVersion: binding.credentialVersion,
             });
         } catch (error) {
             this.logger.warn(
