@@ -155,6 +155,18 @@ export interface PgVectorReembedDispatcher {
 		readonly previousModel: string;
 		readonly newModel: string;
 		readonly newDims: number;
+		/**
+		 * EW-742 P3.2 T22 — optional enqueue-site tenant runtime
+		 * binding capture. The pgvector plugin itself has no tenant
+		 * context (it's a vendor-agnostic vector store) — it forwards
+		 * `null/null` and lets the host's `KbReembedWorkDispatcher`
+		 * adapter stamp the real values via `RuntimeBindingStamper-
+		 * Service.stamp(work.tenantId)` before passing to Trigger.dev.
+		 *
+		 * Same null/null fail-open semantics as every other T22 site.
+		 */
+		readonly providerId?: string | null;
+		readonly credentialVersion?: number | null;
 	}): Promise<string>;
 }
 
