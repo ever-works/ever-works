@@ -43,6 +43,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // Declared but not wired into any NestJS module yet; see
     // `job-runtime.providers.ts` header "Critical constraint" for rationale.
     'JOB_RUNTIME_PROVIDER_REGISTRY',
+    // EW-742 P3.2 follow-up — Kubernetes Secret SecretStoreResolver. Opt-in
+    // — operators using k8s Secrets override the SECRET_STORE_RESOLVER
+    // binding; default deployment keeps InProcessSecretStoreResolver.
+    'K8sSecretStoreResolver',
     'KB_BACKFILL_SKELETON_DISPATCHER',
     'KB_EMBED_DOCUMENT_DISPATCHER',
     'KB_MIRROR_DOCUMENT_DISPATCHER',

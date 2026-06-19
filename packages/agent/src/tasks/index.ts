@@ -91,3 +91,9 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // SECRET_STORE_RESOLVER binding to this class. Default deployment keeps
 // InProcessSecretStoreResolver so `inline:` works out of the box.
 export { VaultSecretStoreResolver } from './vault-secret-store-resolver.service';
+
+// EW-742 P3.2 follow-up — K8sSecretStoreResolver. In-cluster API
+// implementation; operators using Kubernetes Secrets override the
+// SECRET_STORE_RESOLVER binding. Default deployment keeps
+// InProcessSecretStoreResolver.
+export { K8sSecretStoreResolver } from './k8s-secret-store-resolver.service';
