@@ -24,8 +24,10 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import {
     KB_NORMALIZE_MEDIA_DISPATCHER,
     KB_TRANSCRIBE_DISPATCHER,
+    RuntimeBindingStamperService,
     type KbNormalizeMediaPayload,
 } from '../tasks';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { KbUploadExtractionStatus } from '../entities/kb-types';
 
@@ -270,5 +272,137 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
 
         expect(result.transcribeRunId).toBeNull();
         expect(transcribeDispatcher.dispatchKbTranscribe).not.toHaveBeenCalled();
+    });
+
+    // EW-742 P3.2 T22 — KB-transcribe dispatcher stamping. Builds a
+    // fresh service with WorkRepository + RuntimeBindingStamperService
+    // wired and asserts that the (providerId, credentialVersion) pair
+    // gets threaded onto the transcribe dispatch payload.
+    describe('T22 — KB-transcribe enqueue-site tenant binding capture', () => {
+        const TENANT_ID = '00000000-0000-0000-0000-00000000aaaa';
+
+        async function buildWithStamper(opts: {
+            stamperResult?: { providerId: string | null; credentialVersion: number | null };
+            stamperThrows?: boolean;
+            workTenantId?: string | null;
+            workFindThrows?: boolean;
+        }) {
+            const workRepoMock = {
+                findById: opts.workFindThrows
+                    ? jest.fn().mockRejectedValue(new Error('db boom'))
+                    : jest.fn().mockResolvedValue(
+                          opts.workTenantId === undefined
+                              ? null
+                              : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                      ),
+            };
+            const stamperMock = {
+                stamp: opts.stamperThrows
+                    ? jest.fn().mockRejectedValue(new Error('stamper boom'))
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.stamperResult ?? {
+                                  providerId: null,
+                                  credentialVersion: null,
+                              },
+                          ),
+            };
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseMediaNormalizeService,
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: KB_TRANSCRIBE_DISPATCHER, useValue: transcribeDispatcher },
+                    { provide: KB_NORMALIZE_MEDIA_DISPATCHER, useValue: normalizeDispatcher },
+                    {
+                        provide: RuntimeBindingStamperService,
+                        useValue: stamperMock,
+                    },
+                    { provide: WorkRepository, useValue: workRepoMock },
+                ],
+            }).compile();
+            return {
+                service: module.get(KnowledgeBaseMediaNormalizeService),
+                workRepoMock,
+                stamperMock,
+            };
+        }
+
+        it('stamps transcribe payload with stamper result when overlay is active', async () => {
+            const { service: svc, workRepoMock, stamperMock } = await buildWithStamper({
+                workTenantId: TENANT_ID,
+                stamperResult: { providerId: 'trigger', credentialVersion: 17 },
+            });
+            uploadRepo.findById.mockResolvedValue(buildUpload());
+            stubSpawn(0);
+
+            await svc.normalizeVideo(videoPayload);
+
+            expect(workRepoMock.findById).toHaveBeenCalledWith(WORK_ID);
+            expect(stamperMock.stamp).toHaveBeenCalledWith(TENANT_ID);
+            expect(transcribeDispatcher.dispatchKbTranscribe).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: WORK_ID,
+                    providerId: 'trigger',
+                    credentialVersion: 17,
+                }),
+            );
+        });
+
+        it('ships null/null when work has no tenantId', async () => {
+            const { service: svc, stamperMock } = await buildWithStamper({
+                workTenantId: null,
+                stamperResult: { providerId: null, credentialVersion: null },
+            });
+            uploadRepo.findById.mockResolvedValue(buildUpload());
+            stubSpawn(0);
+
+            await svc.normalizeVideo(videoPayload);
+
+            expect(stamperMock.stamp).toHaveBeenCalledWith(null);
+            expect(transcribeDispatcher.dispatchKbTranscribe).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    providerId: null,
+                    credentialVersion: null,
+                }),
+            );
+        });
+
+        it('fails open on stamper throw', async () => {
+            const { service: svc } = await buildWithStamper({
+                workTenantId: TENANT_ID,
+                stamperThrows: true,
+            });
+            uploadRepo.findById.mockResolvedValue(buildUpload());
+            stubSpawn(0);
+
+            await svc.normalizeVideo(videoPayload);
+
+            expect(transcribeDispatcher.dispatchKbTranscribe).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    providerId: null,
+                    credentialVersion: null,
+                }),
+            );
+        });
+
+        it('fails open on workRepository.findById throw', async () => {
+            const { service: svc, stamperMock } = await buildWithStamper({
+                workFindThrows: true,
+            });
+            uploadRepo.findById.mockResolvedValue(buildUpload());
+            stubSpawn(0);
+
+            await svc.normalizeVideo(videoPayload);
+
+            expect(stamperMock.stamp).not.toHaveBeenCalled();
+            expect(transcribeDispatcher.dispatchKbTranscribe).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    providerId: null,
+                    credentialVersion: null,
+                }),
+            );
+        });
     });
 });
