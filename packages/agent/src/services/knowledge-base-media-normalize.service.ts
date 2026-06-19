@@ -11,8 +11,10 @@ import {
     type KbNormalizeMediaDispatcher,
     type KbNormalizeMediaPayload,
     type KbTranscribeDispatcher,
+    RuntimeBindingStamperService,
 } from '../tasks';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { KB_STORAGE_PLUGIN } from './knowledge-base.service';
 import type { IStoragePlugin } from '@ever-works/plugin';
 
@@ -88,8 +90,45 @@ export class KnowledgeBaseMediaNormalizeService {
         @Optional()
         @Inject(KB_NORMALIZE_MEDIA_DISPATCHER)
         _normalizeDispatcher?: KbNormalizeMediaDispatcher,
+        // EW-742 P3.2 T22 — enqueue-site tenant runtime binding capture
+        // for the kb-transcribe dispatch. Optional so isolated unit tests
+        // and pre-overlay deployments keep constructing — when absent,
+        // payload ships null/null and the worker falls back to the
+        // instance default (byte-identical pre-T22 path).
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
+        // EW-742 P3.2 T22 — used to resolve Work.tenantId for the
+        // stamper lookup. Optional same as the stamper.
+        @Optional()
+        private readonly workRepository?: WorkRepository,
     ) {
         void _normalizeDispatcher;
+    }
+
+    /**
+     * EW-742 P3.2 T22 — stamp `(providerId, credentialVersion)` for the
+     * worker host. Mirrors KnowledgeBaseService.stampForWork (same
+     * helper pattern intentionally not extracted to a shared utility:
+     * the two services have orthogonal DI graphs and a 12-line private
+     * helper is cheaper to read than another `@ever-works/agent/tasks`
+     * indirection). Fail-open per FR-5.
+     */
+    private async stampForWork(
+        workId: string,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper || !this.workRepository) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            const work = await this.workRepository.findById(workId);
+            return await this.runtimeBindingStamper.stamp(work?.tenantId ?? null);
+        } catch (err) {
+            this.logger.debug(
+                `kb-normalize-media: stamper lookup failed for work=${workId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
     }
 
     async normalizeVideo(payload: KbNormalizeMediaPayload): Promise<KbNormalizeResult> {
@@ -166,6 +205,9 @@ export class KnowledgeBaseMediaNormalizeService {
         };
         await this.uploads.updateById(payload.workId, payload.uploadId, { metadata: nextMetadata });
 
+        // EW-742 P3.2 T22 — stamp the transcribe enqueue with the
+        // tenant runtime binding so the worker host can resolveSnapshot.
+        const binding = await this.stampForWork(payload.workId);
         const transcribeRunId =
             (await this.transcribeDispatcher?.dispatchKbTranscribe({
                 workId: payload.workId,
@@ -173,6 +215,8 @@ export class KnowledgeBaseMediaNormalizeService {
                 sourceStoragePath: putResult.key,
                 sourceMimeType: normalizedMimeType,
                 language: config.kb.getTranscriptionLanguage(),
+                providerId: binding.providerId,
+                credentialVersion: binding.credentialVersion,
             })) ?? null;
 
         return {
