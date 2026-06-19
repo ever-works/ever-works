@@ -95,8 +95,9 @@ export interface ScheduleSpec {
 /**
  * Per-enqueue knobs the call site can supply. All optional — sensible
  * defaults applied per-provider when absent. Anything that affects
- * idempotency / concurrency / cost belongs here; payload shape itself
- * stays in the typed per-job `*_DISPATCHER` interface.
+ * idempotency / concurrency / cost / tenant routing belongs here;
+ * payload shape itself stays in the typed per-job `*_DISPATCHER`
+ * interface.
  */
 export interface JobEnqueueOptions {
 	/** Arbitrary tags for observability / filtering in the provider UI. */
@@ -109,6 +110,35 @@ export interface JobEnqueueOptions {
 	readonly maxDurationSeconds?: number;
 	/** Provider-specific sizing hint (Trigger.dev machine preset, BullMQ priority lane, …). */
 	readonly machineHint?: string;
+	/**
+	 * EW-742 P4 / T31 — owning tenant id. When set, the worker host MUST
+	 * route this run against the tenant's overlay binding (the
+	 * `(providerId, credentialVersion)` snapshot resolved by
+	 * `TenantAwareRuntimeResolver` + stamped by
+	 * `RuntimeBindingStamperService` at enqueue time). When unset, the
+	 * run executes against the instance default — byte-identical to the
+	 * EW-683 pre-tenancy path.
+	 *
+	 * Per-provider routing semantic (per [`providers.md`](../../../../../docs/specs/features/tenant-job-runtime-overlay/providers.md)):
+	 *   - Trigger.dev: `metadata.tenantId` → tenant webhook handler
+	 *     dispatches against the right BYO project.
+	 *   - Inngest: `data.tenantId` → tenant webhook handler with the
+	 *     right signing key (SaaS only — self-host blocked at
+	 *     `available-providers`).
+	 *   - Temporal: `searchAttributes.tenantId` (also encoded into the
+	 *     namespace selection at start-workflow time — Q1
+	 *     namespace-per-tenant).
+	 *   - BullMQ: `opts.tenantId` (writeable via `JobsOptions`); used
+	 *     for Redis prefix isolation per tenant worker.
+	 *   - pg-boss: payload field; the per-tenant schema lookup happens
+	 *     before publish (Q2 schema-per-tenant).
+	 *
+	 * Type stays `string` (uuid in practice) rather than a branded type
+	 * to avoid forcing every dispatcher caller to import a contracts
+	 * package; the API resolves it from the auth session and passes it
+	 * through.
+	 */
+	readonly tenantId?: string;
 }
 
 /**
