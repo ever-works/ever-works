@@ -1,8 +1,9 @@
-import { task } from '@trigger.dev/sdk';
+import { logger, task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import type { WebhookDeliveryPayload } from '@ever-works/agent/tasks';
 import { WebhookSubscriptionDeliveryService } from '@ever-works/agent/services';
 import { TriggerWebhookDeliveryModule } from '../../trigger/worker/modules/trigger-webhook-delivery.module';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 
 /**
@@ -54,6 +55,34 @@ export const webhookDeliveryTask = task<'webhook-delivery', WebhookDeliveryPaylo
         appContext.useLogger(createTriggerLogger('WebhookDelivery'));
 
         try {
+            // EW-742 P3.2 T22 — see kb-embed-document.task.ts for the
+            // pattern. Subscription-scoped variant: resolves tenantId
+            // via the owning WebhookSubscription row. Webhook delivery
+            // is idempotent at the (delivery_id, attempt) grain — a
+            // drained skip-and-ack is safe; the operator can issue a
+            // redeliver against fresh credentials via the deliveries
+            // API once the rotation completes.
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForSubscription(payload, payload.subscriptionId);
+            if (binding.status === 'drained') {
+                logger.warn('webhook-delivery: credentials drained, skipping run', {
+                    deliveryId: payload.deliveryId,
+                    subscriptionId: payload.subscriptionId,
+                    eventName: payload.eventName,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                return {
+                    status: 'skipped' as const,
+                    reason: 'credentials-drained' as const,
+                    deliveryId: payload.deliveryId,
+                    subscriptionId: payload.subscriptionId,
+                    event: payload.eventName,
+                };
+            }
+
             const orchestrator = appContext.get(WebhookSubscriptionDeliveryService);
             // EW-634 Codex P2 follow-up: pass the Trigger run id through
             // to the orchestrator so the `webhook_deliveries.triggerRunId`
