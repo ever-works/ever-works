@@ -133,6 +133,32 @@ export interface WorkerHostHandle {
 }
 
 /**
+ * EW-686 P2 / EW-742 — opaque per-tenant credential snapshot handed to a
+ * provider's `bindToTenant` hook. The platform resolves the snapshot from
+ * `tenant_job_runtime_config` + the secrets store; the provider treats the
+ * `credentials` bag as opaque material to thread into its own client
+ * constructor (Trigger.dev access token, Temporal mTLS cert, BullMQ Redis
+ * URL, pg-boss connection string, Inngest signing key — shape is
+ * per-provider).
+ *
+ * The `credentialVersion` field is monotonic per `(tenantId, providerId)`
+ * — it bumps on every rotate / force-invalidate (see ADR-017 §3 / Q4).
+ * Providers use it as a memoisation key on the returned binding so a
+ * repeated `bindToTenant` call with the same snapshot returns the same
+ * provider instance.
+ */
+export interface TenantCredentialSnapshot {
+	/** Tenant id (uuid). */
+	readonly tenantId: string;
+	/** Provider id this snapshot is for (matches IJobRuntimeProvider.runtimeId). */
+	readonly providerId: JobRuntimeId;
+	/** Monotonic per-tenant version — bumps on rotate / force-invalidate. */
+	readonly credentialVersion: number;
+	/** Opaque credential bag — shape is per-provider. */
+	readonly credentials: Readonly<Record<string, unknown>>;
+}
+
+/**
  * Union of the existing dispatcher interfaces a `job-runtime` provider
  * must implement to bind into the `*_DISPATCHER` symbols.
  *
@@ -221,4 +247,31 @@ export interface IJobRuntimeProvider extends IPlugin {
 	 * don't need it.
 	 */
 	startWorkerHost?(opts: WorkerHostOptions): Promise<WorkerHostHandle>;
+
+	/**
+	 * EW-686 P2 / EW-742 P3 — return a provider instance bound to the
+	 * given tenant's credential snapshot. The default
+	 * `IJobRuntimeProvider` implementation uses the operator-supplied
+	 * platform credentials; when a tenant opts into BYO/override mode
+	 * (EW-742), the tenant-aware resolver calls this method to swap in
+	 * a tenant-scoped client without mutating the shared singleton.
+	 *
+	 * Optional: a provider that doesn't support BYO returns `undefined`
+	 * and the resolver falls back to the instance default with a
+	 * `Logger.warn`. Push-model providers (Trigger.dev, Inngest)
+	 * implement this by returning a copy with the credential client
+	 * re-configured against the tenant secret. Pull-model providers
+	 * (Temporal, BullMQ, pg-boss) implement it by returning a copy
+	 * bound to the per-tenant namespace/queue/schema.
+	 *
+	 * Idempotency: calling `bindToTenant` with the same snapshot twice
+	 * MUST return equivalent providers (same `dispatchers`, same
+	 * `runtimeId`); implementations should memoise behind a
+	 * `credentialVersion` key.
+	 *
+	 * The returned `IJobRuntimeProvider` is a TRANSIENT VIEW — callers
+	 * must NOT register it in the provider registry. The original
+	 * singleton is the only thing the registry holds.
+	 */
+	bindToTenant?(snapshot: TenantCredentialSnapshot): IJobRuntimeProvider | undefined;
 }
