@@ -5,8 +5,10 @@ import { TenantJobRuntimeAudit, TenantJobRuntimeConfig } from '@ever-works/agent
 import {
     CredentialVersionService,
     InMemoryJobRuntimeProviderRegistry,
+    InProcessSecretStoreResolver,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     RuntimeBindingStamperService,
+    SECRET_STORE_RESOLVER,
     TenantAwareRuntimeResolver,
     TenantCredentialCache,
 } from '@ever-works/agent/tasks';
@@ -59,6 +61,14 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         {
             provide: JOB_RUNTIME_PROVIDER_REGISTRY,
             useClass: InMemoryJobRuntimeProviderRegistry,
+        },
+        {
+            // EW-742 P3.2 — default in-process SecretStoreResolver.
+            // Supports `inline:` only; production deployments override
+            // this binding with a scheme-specific resolver via a module
+            // override or environment-keyed factory.
+            provide: SECRET_STORE_RESOLVER,
+            useClass: InProcessSecretStoreResolver,
         },
     ],
     controllers: [TenantJobRuntimeController],

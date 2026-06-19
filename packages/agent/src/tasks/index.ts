@@ -75,3 +75,13 @@ export { TenantAwareRuntimeResolver } from './tenant-aware-runtime.resolver';
 // lands incrementally on top — see the file header for the
 // deliberate-seam rationale.
 export { RuntimeBindingStamperService } from './runtime-binding-stamper.service';
+
+// EW-742 P3.2 — SecretStoreResolver contract + default in-process
+// implementation. The resolver wires it into the byo/override branch
+// to construct TenantCredentialSnapshot before calling
+// provider.bindToTenant(). Default impl only supports `inline:` scheme
+// — production deployments swap the SECRET_STORE_RESOLVER binding to
+// a scheme-specific implementation (vault:, k8s:, op:, etc.).
+export { SECRET_STORE_RESOLVER } from './secret-store-resolver.interface';
+export type { SecretStoreResolver } from './secret-store-resolver.interface';
+export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver.service';
