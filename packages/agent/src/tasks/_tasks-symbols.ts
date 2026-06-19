@@ -30,6 +30,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
+    // EW-742 P3.2 follow-up — Doppler SecretStoreResolver. Opt-in;
+    // operators using Doppler override the SECRET_STORE_RESOLVER
+    // binding. Default deployment keeps InProcessSecretStoreResolver.
+    'DopplerSecretStoreResolver',
     // EW-685 P0 T4 — default in-memory implementation of
     // `JobRuntimeProviderRegistry`, exposed via the barrel so DI modules
     // can bind it as the `JOB_RUNTIME_PROVIDER_REGISTRY` useClass.
@@ -38,6 +42,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // SECRET_STORE_RESOLVER DI token. Only supports `inline:` scheme;
     // other schemes (vault:, k8s:, op:) require a non-default binding.
     'InProcessSecretStoreResolver',
+    // EW-742 P3.2 follow-up — Infisical SecretStoreResolver. Opt-in;
+    // operators using Infisical override the SECRET_STORE_RESOLVER
+    // binding. Default deployment keeps InProcessSecretStoreResolver.
+    'InfisicalSecretStoreResolver',
     // EW-685 P0 T4 — DI token for the in-memory job-runtime provider
     // registry consumed by the binding factory `buildJobRuntimeProviders()`.
     // Declared but not wired into any NestJS module yet; see

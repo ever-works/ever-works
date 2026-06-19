@@ -2,32 +2,37 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { SecretStoreResolver } from './secret-store-resolver.interface';
 
 /**
- * EW-742 P3.2 — default {@link SecretStoreResolver} implementation.
+ * EW-742 P3.2 — default zero-dependency {@link SecretStoreResolver}
+ * implementation.
  *
- * Supports ONE scheme, `inline:`, which carries a base64-encoded JSON
- * object directly in the pointer string. Useful for:
- *   - dev / preview deployments that don't have a real secret store;
- *   - integration tests that need a deterministic credential without
- *     standing up Vault / k8s Secrets / 1Password;
- *   - operators evaluating the tenant overlay before wiring a
- *     production secret store.
+ * Supports two schemes — both zero-dep, both safe to ship as the
+ * out-of-the-box default:
  *
- * Every other scheme (`vault:`, `k8s:`, `op:`, etc.) returns `null` +
- * `Logger.warn` so operators see a load-bearing log line on every
- * unresolved enqueue: "we received a pointer we don't know how to
- * resolve — the run is falling back to the instance default and you
- * need to bind a real {@link SecretStoreResolver} for this scheme."
+ *   - `inline:<base64-of-json>` — credential bag carried in the pointer
+ *     itself. Useful for dev / preview / integration tests that need a
+ *     deterministic credential without standing up a real secret store.
+ *   - `env:<VAR_NAME>` — credential bag stored as the value of
+ *     `process.env.<VAR_NAME>` (parsed as JSON). The canonical
+ *     production-friendly path for self-hosters who already inject
+ *     credentials via env vars (`.env`, Docker `--env`, k8s `env:`).
  *
- * # Why this is the bundled default
+ * Every other scheme (`vault:`, `k8s:`, `infisical:`, `doppler:`, etc.)
+ * returns `null` + `Logger.warn` so operators see a load-bearing log
+ * line on every unresolved enqueue: "we received a pointer we don't
+ * know how to resolve — bind a real {@link SecretStoreResolver} for
+ * this scheme."
+ *
+ * # Why these two are the bundled default
  *
  *   - Zero runtime dependencies (no Vault SDK, no kubectl, no
- *     1Password CLI in the build).
- *   - Lets the contract land + the resolver wire-up land on `main`
- *     without committing the platform to a specific secret-store
- *     vendor.
- *   - Bundled implementations for the four major schemes ship as
- *     follow-up PRs (one per scheme) so a deployment can opt in by
- *     swapping the DI binding — no rip-and-replace.
+ *     vendor-specific client in the build).
+ *   - Cover the two universal "I just want credentials in this
+ *     process" cases (carry-with-the-pointer + read-from-env).
+ *   - Lets the resolver wire-up land on `main` without committing the
+ *     platform to a specific secret-store vendor.
+ *   - Vendor-specific resolvers (Vault, k8s, Infisical, Doppler, etc.)
+ *     ship as separate `@Injectable()` classes operators opt into by
+ *     overriding the `SECRET_STORE_RESOLVER` DI binding.
  *
  * # `inline:` format
  *
@@ -41,38 +46,62 @@ import type { SecretStoreResolver } from './secret-store-resolver.interface';
  *   // → 'inline:eyJhY2Nlc3NUb2tlbiI6InRyX2Rldl94eHgiLCJyZWdpb24iOiJ1cy1lYXN0LTEifQ=='
  *   ```
  *
- * The resolver decodes the base64, parses as JSON, and returns the
- * resulting object if it's a non-null record. Anything else (invalid
- * base64, non-JSON, non-object, array, null) returns `null` + a
- * specific `Logger.warn` so operators can fix the pointer.
- *
  * **Security note:** `inline:` pointers carry the plaintext credential
- * IN THE POINTER ITSELF. The platform's `tenant_job_runtime_config`
- * table is operator-readable; using `inline:` in production leaks the
- * credential to anyone with DB read access. The default implementation
- * tolerates it for dev convenience — production deployments should
- * use Vault / k8s / 1Password schemes via a non-default resolver.
+ * IN THE POINTER ITSELF. The `tenant_job_runtime_config` table is
+ * operator-readable; using `inline:` in production leaks the credential
+ * to anyone with DB read access. Prefer `env:` for self-hosters or a
+ * dedicated secret-store resolver (Vault / k8s / Infisical / Doppler)
+ * for multi-tenant deployments.
+ *
+ * # `env:` format
+ *
+ *   `env:<VAR_NAME>` — `VAR_NAME` is the name of an env var whose value
+ *   is a JSON-encoded object. Example:
+ *
+ *   ```bash
+ *   # operator sets:
+ *   export TENANT_ACME_TRIGGER='{"accessToken":"tr_dev_xxx","region":"us-east-1"}'
+ *   ```
+ *
+ *   ```
+ *   # tenant pointer:
+ *   env:TENANT_ACME_TRIGGER
+ *   ```
+ *
+ * The resolver reads `process.env[VAR_NAME]` and parses it as JSON. The
+ * env var name is the only thing stored in the DB; the actual credential
+ * value never leaves the operator's `.env` / Docker / k8s injection
+ * pipeline. This is the recommended path for self-hosters who manage
+ * credentials with the standard 12-factor env-var pattern.
+ *
+ * **Note:** `env:` is read at every `resolve()` call so operators can
+ * rotate the value at runtime by re-injecting the env var (e.g. via a
+ * pod rolling restart). The platform's per-tenant `credentialVersion`
+ * still bumps explicitly via the rotate endpoint.
  */
 @Injectable()
 export class InProcessSecretStoreResolver implements SecretStoreResolver {
     private readonly logger = new Logger(InProcessSecretStoreResolver.name);
 
     async resolve(pointer: string): Promise<Record<string, unknown> | null> {
-        if (!pointer.startsWith('inline:')) {
-            // Operator wired a non-inline scheme but no concrete resolver
-            // for it. Fail-open: log + null so resolver falls back to
-            // instance default.
-            const scheme = pointer.split(':', 1)[0] ?? 'unknown';
-            this.logger.warn(
-                `InProcessSecretStoreResolver: pointer scheme "${scheme}:" is not ` +
-                    `supported by the default resolver. Bind a concrete SecretStoreResolver ` +
-                    `for this scheme via the SECRET_STORE_RESOLVER DI token. Returning null ` +
-                    `(fail-open — resolver falls back to instance default).`,
-            );
-            return null;
+        if (pointer.startsWith('inline:')) {
+            return this.resolveInline(pointer.slice('inline:'.length));
+        }
+        if (pointer.startsWith('env:')) {
+            return this.resolveEnv(pointer.slice('env:'.length));
         }
 
-        const encoded = pointer.slice('inline:'.length);
+        const scheme = pointer.split(':', 1)[0] ?? 'unknown';
+        this.logger.warn(
+            `InProcessSecretStoreResolver: pointer scheme "${scheme}:" is not ` +
+                `supported by the default resolver. Bind a concrete SecretStoreResolver ` +
+                `for this scheme via the SECRET_STORE_RESOLVER DI token. Returning null ` +
+                `(fail-open — resolver falls back to instance default).`,
+        );
+        return null;
+    }
+
+    private resolveInline(encoded: string): Record<string, unknown> | null {
         if (!encoded) {
             this.logger.warn(
                 `InProcessSecretStoreResolver: inline: pointer carries empty payload. ` +
@@ -92,22 +121,55 @@ export class InProcessSecretStoreResolver implements SecretStoreResolver {
             return null;
         }
 
+        return this.parseJsonObject(decoded, 'inline:');
+    }
+
+    private resolveEnv(varName: string): Record<string, unknown> | null {
+        if (!varName) {
+            this.logger.warn(
+                `InProcessSecretStoreResolver: env: pointer carries empty var name. ` +
+                    `Returning null (fail-open).`,
+            );
+            return null;
+        }
+
+        const raw = process.env[varName];
+        if (raw === undefined) {
+            this.logger.warn(
+                `InProcessSecretStoreResolver: env: pointer references undefined env var ` +
+                    `"${varName}". Ensure the operator has injected it (e.g. via .env, Docker ` +
+                    `--env, k8s env:). Returning null (fail-open).`,
+            );
+            return null;
+        }
+        if (raw === '') {
+            this.logger.warn(
+                `InProcessSecretStoreResolver: env: pointer references empty env var ` +
+                    `"${varName}". Returning null (fail-open).`,
+            );
+            return null;
+        }
+
+        return this.parseJsonObject(raw, `env:${varName}`);
+    }
+
+    private parseJsonObject(source: string, label: string): Record<string, unknown> | null {
         let parsed: unknown;
         try {
-            parsed = JSON.parse(decoded);
+            parsed = JSON.parse(source);
         } catch (err) {
             this.logger.warn(
-                `InProcessSecretStoreResolver: inline: payload is not valid JSON ` +
+                `InProcessSecretStoreResolver: ${label} payload is not valid JSON ` +
                     `(${err instanceof Error ? err.message : String(err)}). Returning null (fail-open).`,
             );
             return null;
         }
 
         if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            const got = parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed;
             this.logger.warn(
-                `InProcessSecretStoreResolver: inline: payload must be a JSON object ` +
-                    `(got ${parsed === null ? 'null' : Array.isArray(parsed) ? 'array' : typeof parsed}). ` +
-                    `Returning null (fail-open).`,
+                `InProcessSecretStoreResolver: ${label} payload must be a JSON object ` +
+                    `(got ${got}). Returning null (fail-open).`,
             );
             return null;
         }
