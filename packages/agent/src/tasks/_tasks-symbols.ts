@@ -34,6 +34,10 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // `JobRuntimeProviderRegistry`, exposed via the barrel so DI modules
     // can bind it as the `JOB_RUNTIME_PROVIDER_REGISTRY` useClass.
     'InMemoryJobRuntimeProviderRegistry',
+    // EW-742 P3.2 — default in-process SecretStoreResolver bound at the
+    // SECRET_STORE_RESOLVER DI token. Only supports `inline:` scheme;
+    // other schemes (vault:, k8s:, op:) require a non-default binding.
+    'InProcessSecretStoreResolver',
     // EW-685 P0 T4 — DI token for the in-memory job-runtime provider
     // registry consumed by the binding factory `buildJobRuntimeProviders()`.
     // Declared but not wired into any NestJS module yet; see
@@ -53,6 +57,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // `runtime-binding-stamper.service.ts` header for the per-dispatcher
     // wiring deferral.
     'RuntimeBindingStamperService',
+    // EW-742 P3.2 — DI token for SecretStoreResolver implementations.
+    // Symbol, not string — the value's reference is the unique identity.
+    'SECRET_STORE_RESOLVER',
     'TEMPLATE_CUSTOMIZATION_DISPATCHER',
     // EW-742 P3 / EW-747 (T20 + T23) — tenant-aware resolver wrapping
     // the EW-685 binding factory registry. See

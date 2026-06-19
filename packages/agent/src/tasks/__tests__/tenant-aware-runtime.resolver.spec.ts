@@ -4,37 +4,50 @@ import type { Repository } from 'typeorm';
 import { CredentialVersionService } from '../credential-version.service';
 import { TenantJobRuntimeConfig } from '../../entities/tenant-job-runtime-config.entity';
 import { InMemoryJobRuntimeProviderRegistry } from '../job-runtime.providers';
+import type { SecretStoreResolver } from '../secret-store-resolver.interface';
+import { TenantCredentialCache } from '../tenant-credential.cache';
 import { TenantAwareRuntimeResolver } from '../tenant-aware-runtime.resolver';
 
 /**
- * EW-742 P3 / EW-747 (T24) — tenant-aware resolver unit tests.
+ * EW-742 P3 / EW-747 (T24) + P3.2 — tenant-aware resolver unit tests.
  *
- * Covers the minimal-viable subset of T20 + T23 that ships this PR:
+ * Covers:
  *
  *   - null / undefined / no-row / inherit / disabled → instance default
  *     (T23 fallback, plus the kill switch path);
- *   - byo + override modes with `enabled = true` → instance default
- *     (P3.1 honest stopgap — see resolver class JSDoc), with
- *     `Logger.debug` proving the deferral was logged;
- *   - `getEffectiveBinding` returns the metadata T22 will need to stamp
- *     onto the run record at enqueue time;
+ *   - byo + override modes with `enabled = true`:
+ *     - happy path: resolver builds the snapshot, calls
+ *       `provider.bindToTenant()`, caches the binding, returns the
+ *       bound provider;
+ *     - fallback 1: provider doesn't expose `bindToTenant?` →
+ *       instance default + `Logger.warn`;
+ *     - fallback 2: `SecretStoreResolver.resolve` returns `null` →
+ *       instance default + `Logger.warn`;
+ *     - fallback 3: `provider.bindToTenant` returns `undefined` →
+ *       instance default + `Logger.warn`;
+ *     - fallback 4: throws anywhere → instance default + `Logger.warn`
+ *       (defence-in-depth, contract says implementations don't throw);
+ *     - cache hit: second resolve for the same
+ *       `(tenantId, providerId, credentialVersion)` skips the secret
+ *       store + bind call entirely;
+ *   - `getEffectiveBinding` returns the metadata T22 / stamper uses;
  *   - `registry.getActive()` returning `null` propagates as `null` (the
  *     EW-683 in-process dev fallback semantic — preserved).
- *
- * Deliberately NOT covered here (deferred PRs own these):
- *   - T21 (cache hit/miss + invalidation on rotation)
- *   - T22 (enqueue-site `credentialVersion` capture)
- *   - per-provider credential injection (EW-686 P2)
  */
-describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () => {
+describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24 + P3.2)', () => {
     /**
      * Build a minimal {@link IJobRuntimeProvider} test double. We only
      * exercise identity here — the resolver hands the registry's
-     * provider back as-is — so the `dispatchers` payload is just a
-     * sentinel string keyed by `which`.
+     * provider back as-is (or the bound result of `bindToTenant`) — so
+     * the `dispatchers` payload is just a sentinel string keyed by
+     * `which`.
+     *
+     * `bindToTenant` is optional in the type; pass it explicitly when a
+     * test needs to exercise the new P3.2 bind path.
      */
     function mockProvider(
         dispatchers: JobRuntimeDispatchers = { sentinel: 'instance-default' },
+        bindToTenant?: IJobRuntimeProvider['bindToTenant'],
     ): IJobRuntimeProvider {
         return {
             id: 'mock',
@@ -63,6 +76,7 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
             async onUnload() {
                 /* no-op */
             },
+            bindToTenant,
         } satisfies IJobRuntimeProvider;
     }
 
@@ -73,7 +87,7 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
         return {
             tenantId: 'tenant-1',
             providerId: 'trigger',
-            credentialsSecretRef: 'tenant-job-runtime:abc123:trigger:v1',
+            credentialsSecretRef: 'inline:eyJhY2Nlc3NUb2tlbiI6InRyX2Rldl94eHgifQ==',
             credentialVersion: 7,
             mode: 'byo',
             enabled: true,
@@ -92,17 +106,26 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
         getCurrentVersion: jest.Mock;
     };
 
+    type SecretStoreResolverMock = SecretStoreResolver & {
+        resolve: jest.Mock;
+    };
+
     function buildResolver(
         opts: {
             registry?: InMemoryJobRuntimeProviderRegistry;
             repoFindOneReturn?: TenantJobRuntimeConfig | null;
             credentialVersion?: number | null;
+            secretStoreResolve?: Record<string, unknown> | null;
+            secretStoreThrows?: Error;
+            cache?: TenantCredentialCache;
         } = {},
     ): {
         resolver: TenantAwareRuntimeResolver;
         registry: InMemoryJobRuntimeProviderRegistry;
         configRepo: ConfigRepoMock;
         credentialVersionService: CredentialVersionServiceMock;
+        secretStoreResolver: SecretStoreResolverMock;
+        cache: TenantCredentialCache;
     } {
         const registry = opts.registry ?? new InMemoryJobRuntimeProviderRegistry();
         const configRepo: ConfigRepoMock = {
@@ -111,12 +134,33 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
         const credentialVersionService: CredentialVersionServiceMock = {
             getCurrentVersion: jest.fn().mockResolvedValue(opts.credentialVersion ?? null),
         };
+        const secretStoreResolver: SecretStoreResolverMock = {
+            resolve: opts.secretStoreThrows
+                ? jest.fn().mockRejectedValue(opts.secretStoreThrows)
+                : jest
+                      .fn()
+                      .mockResolvedValue(
+                          'secretStoreResolve' in opts
+                              ? opts.secretStoreResolve
+                              : { accessToken: 'tr_dev_xxx' },
+                      ),
+        };
+        const cache = opts.cache ?? new TenantCredentialCache();
         const resolver = new TenantAwareRuntimeResolver(
             registry,
             configRepo as unknown as Repository<TenantJobRuntimeConfig>,
             credentialVersionService as unknown as CredentialVersionService,
+            secretStoreResolver,
+            cache,
         );
-        return { resolver, registry, configRepo, credentialVersionService };
+        return {
+            resolver,
+            registry,
+            configRepo,
+            credentialVersionService,
+            secretStoreResolver,
+            cache,
+        };
     }
 
     describe('resolve(tenantId)', () => {
@@ -166,9 +210,12 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
             await expect(resolver.resolve('tenant-1')).resolves.toBe(provider);
         });
 
-        it("returns the instance default when overlay row mode = 'byo' + enabled (P3 stopgap), and logs the deferral", async () => {
-            const debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+        it('returns the instance default + warn when byo + enabled but provider has no bindToTenant', async () => {
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
+                // mockProvider() with no bindToTenant arg ⇒ undefined
                 const provider = mockProvider({ which: 'instance-default' });
                 const registry = new InMemoryJobRuntimeProviderRegistry();
                 registry.register(provider);
@@ -178,37 +225,163 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
                 });
 
                 await expect(resolver.resolve('tenant-1')).resolves.toBe(provider);
-                expect(debugSpy).toHaveBeenCalledTimes(1);
-                const message = debugSpy.mock.calls[0][0] as string;
-                expect(message).toContain('tenant tenant-1 overlay mode=byo');
-                expect(message).toContain('tenant override deferred to P3.1');
+                expect(warnSpy).toHaveBeenCalledTimes(1);
+                expect(warnSpy.mock.calls[0]?.[0]).toMatch(/does not implement bindToTenant/);
             } finally {
-                debugSpy.mockRestore();
+                warnSpy.mockRestore();
             }
         });
 
-        it("returns the instance default when overlay row mode = 'override' + enabled (P3 stopgap), and logs the deferral", async () => {
-            const debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
+        it('returns the bound provider when byo + enabled and bindToTenant is wired (happy path)', async () => {
+            const boundProvider = mockProvider({ which: 'tenant-bound' });
+            const bindToTenant = jest.fn().mockReturnValue(boundProvider);
+            const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+            const registry = new InMemoryJobRuntimeProviderRegistry();
+            registry.register(instanceProvider);
+            const { resolver, secretStoreResolver, cache } = buildResolver({
+                registry,
+                repoFindOneReturn: buildConfigRow({
+                    mode: 'byo',
+                    enabled: true,
+                    providerId: 'trigger',
+                    credentialVersion: 7,
+                }),
+                secretStoreResolve: { accessToken: 'tr_dev_xxx' },
+            });
+
+            const result = await resolver.resolve('tenant-1');
+            expect(result).toBe(boundProvider);
+            expect(secretStoreResolver.resolve).toHaveBeenCalledWith(
+                'inline:eyJhY2Nlc3NUb2tlbiI6InRyX2Rldl94eHgifQ==',
+            );
+            expect(bindToTenant).toHaveBeenCalledWith({
+                tenantId: 'tenant-1',
+                providerId: 'trigger',
+                credentialVersion: 7,
+                credentials: { accessToken: 'tr_dev_xxx' },
+            });
+            // Cache is populated against (tenantId, providerId, version)
+            // for the next call to skip the secret resolution + bind.
+            expect(cache.get('tenant-1', 'trigger', 7)).toBe(boundProvider);
+        });
+
+        it('hits the cache on a repeat resolve for the same (tenantId, providerId, credentialVersion)', async () => {
+            const boundProvider = mockProvider({ which: 'tenant-bound' });
+            const bindToTenant = jest.fn().mockReturnValue(boundProvider);
+            const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+            const registry = new InMemoryJobRuntimeProviderRegistry();
+            registry.register(instanceProvider);
+            const { resolver, secretStoreResolver } = buildResolver({
+                registry,
+                repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: true }),
+            });
+
+            await resolver.resolve('tenant-1');
+            await resolver.resolve('tenant-1');
+
+            // First call resolves + binds; second call short-circuits
+            // on cache hit. Both calls still read the DB row (the cache
+            // is keyed by version, which the row carries).
+            expect(secretStoreResolver.resolve).toHaveBeenCalledTimes(1);
+            expect(bindToTenant).toHaveBeenCalledTimes(1);
+        });
+
+        it('falls back to instance default + warn when SecretStoreResolver returns null', async () => {
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
-                const provider = mockProvider({ which: 'instance-default' });
+                const bindToTenant = jest.fn();
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
                 const registry = new InMemoryJobRuntimeProviderRegistry();
-                registry.register(provider);
+                registry.register(instanceProvider);
                 const { resolver } = buildResolver({
                     registry,
-                    repoFindOneReturn: buildConfigRow({
-                        mode: 'override',
-                        enabled: true,
-                        providerId: 'temporal',
-                    }),
+                    repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: true }),
+                    secretStoreResolve: null,
                 });
 
-                await expect(resolver.resolve('tenant-1')).resolves.toBe(provider);
-                expect(debugSpy).toHaveBeenCalledTimes(1);
-                const message = debugSpy.mock.calls[0][0] as string;
-                expect(message).toContain('overlay mode=override');
-                expect(message).toContain('providerId=temporal');
+                await expect(resolver.resolve('tenant-1')).resolves.toBe(instanceProvider);
+                expect(bindToTenant).not.toHaveBeenCalled();
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringMatching(/SecretStoreResolver returned null/),
+                );
             } finally {
-                debugSpy.mockRestore();
+                warnSpy.mockRestore();
+            }
+        });
+
+        it('falls back to instance default + warn when SecretStoreResolver throws', async () => {
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
+            try {
+                const bindToTenant = jest.fn();
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+                const registry = new InMemoryJobRuntimeProviderRegistry();
+                registry.register(instanceProvider);
+                const { resolver } = buildResolver({
+                    registry,
+                    repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: true }),
+                    secretStoreThrows: new Error('vault timeout'),
+                });
+
+                await expect(resolver.resolve('tenant-1')).resolves.toBe(instanceProvider);
+                expect(bindToTenant).not.toHaveBeenCalled();
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringMatching(/SecretStoreResolver threw.*vault timeout/),
+                );
+            } finally {
+                warnSpy.mockRestore();
+            }
+        });
+
+        it('falls back to instance default + warn when bindToTenant returns undefined', async () => {
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
+            try {
+                const bindToTenant = jest.fn().mockReturnValue(undefined);
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+                const registry = new InMemoryJobRuntimeProviderRegistry();
+                registry.register(instanceProvider);
+                const { resolver } = buildResolver({
+                    registry,
+                    repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: true }),
+                });
+
+                await expect(resolver.resolve('tenant-1')).resolves.toBe(instanceProvider);
+                expect(bindToTenant).toHaveBeenCalledTimes(1);
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringMatching(/bindToTenant returned undefined/),
+                );
+            } finally {
+                warnSpy.mockRestore();
+            }
+        });
+
+        it('falls back to instance default + warn when bindToTenant throws', async () => {
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
+            try {
+                const bindToTenant = jest.fn().mockImplementation(() => {
+                    throw new Error('provider misconfigured');
+                });
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+                const registry = new InMemoryJobRuntimeProviderRegistry();
+                registry.register(instanceProvider);
+                const { resolver } = buildResolver({
+                    registry,
+                    repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: true }),
+                });
+
+                await expect(resolver.resolve('tenant-1')).resolves.toBe(instanceProvider);
+                expect(warnSpy).toHaveBeenCalledWith(
+                    expect.stringMatching(/bindToTenant threw.*provider misconfigured/),
+                );
+            } finally {
+                warnSpy.mockRestore();
             }
         });
 
@@ -218,20 +391,15 @@ describe('TenantAwareRuntimeResolver (EW-742 P3 / EW-747 T20 + T23 + T24)', () =
             const provider = mockProvider({ which: 'instance-default' });
             const registry = new InMemoryJobRuntimeProviderRegistry();
             registry.register(provider);
-            const debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
-            try {
-                const { resolver } = buildResolver({
-                    registry,
-                    repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: false }),
-                });
+            const { resolver, secretStoreResolver } = buildResolver({
+                registry,
+                repoFindOneReturn: buildConfigRow({ mode: 'byo', enabled: false }),
+            });
 
-                await expect(resolver.resolve('tenant-1')).resolves.toBe(provider);
-                // Kill switch is silent — no "deferred to P3.1" log because
-                // the resolver short-circuits before the byo/override branch.
-                expect(debugSpy).not.toHaveBeenCalled();
-            } finally {
-                debugSpy.mockRestore();
-            }
+            await expect(resolver.resolve('tenant-1')).resolves.toBe(provider);
+            // Kill switch short-circuits BEFORE the bind path — neither
+            // the resolver nor bindToTenant should be called.
+            expect(secretStoreResolver.resolve).not.toHaveBeenCalled();
         });
 
         it('returns null when no provider is registered (preserves EW-683 in-process dev fallback)', async () => {
