@@ -7,6 +7,7 @@ import type {
     PluginCategory,
     PluginContext,
     ScheduleSpec,
+    TenantCredentialSnapshot,
     WorkerHostHandle,
     WorkerHostOptions,
 } from '@ever-works/plugin';
@@ -168,5 +169,119 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
      */
     async onUnload(): Promise<void> {
         // Intentional no-op — see class JSDoc on synthetic plugin status.
+    }
+
+    /**
+     * Memoisation cache for `bindToTenant` — keyed by
+     * `${tenantId}:${credentialVersion}`. Holds the last frozen tenant
+     * view per tenant so the same snapshot returns the same instance
+     * (per the {@link IJobRuntimeProvider.bindToTenant} idempotency
+     * contract). A new `credentialVersion` evicts and replaces the
+     * previous entry — the cache size is bounded by tenant count.
+     */
+    private readonly tenantViews = new Map<string, IJobRuntimeProvider>();
+
+    /**
+     * EW-742 P3.2 T21.1 — minimal `bindToTenant` impl.
+     *
+     * Returns a per-tenant frozen view of THIS provider with the
+     * snapshot captured. Trigger.dev's underlying SDK client is a
+     * push-model singleton (their cloud invokes our tasks), so no
+     * runtime per-tenant rebinding of the actual Trigger.dev access
+     * token happens in this PR — the view's dispatchers still
+     * delegate to the singleton `TriggerService`.
+     *
+     * What this PR DOES wire up:
+     *   - Returns a fresh wrapper per `credentialVersion` so callers
+     *     get a stable instance identity to memoise on.
+     *   - Exposes the snapshot via `(view as any).tenantSnapshot` so
+     *     T22 per-dispatcher wiring can stamp `(providerId,
+     *     credentialVersion)` onto run records without needing a
+     *     separate stamper service.
+     *
+     * What this PR DOES NOT do (TODO for the next PR):
+     *   - Per-tenant Trigger.dev project switching. Today every
+     *     tenant ships through the same Trigger.dev project the API
+     *     boots against; the platform overlay is "BYO with inherit"
+     *     and the inherit path is the only one wired. BYO Trigger.dev
+     *     project per tenant requires the dispatcher layer to swap
+     *     the underlying `TriggerService` SDK client per call — that's
+     *     the T22 PR.
+     *   - Dispatcher stamping. That's the T22 per-dispatcher PoC
+     *     (KB-embed first).
+     */
+    bindToTenant(snapshot: TenantCredentialSnapshot): IJobRuntimeProvider {
+        const cacheKey = `${snapshot.tenantId}:${snapshot.credentialVersion}`;
+        const cached = this.tenantViews.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const base = this;
+        // Build a frozen tenant view. Every method delegates back to
+        // the singleton `TriggerService` (via `base`), but the view
+        // carries the snapshot for downstream stamping.
+        const view: IJobRuntimeProvider & {
+            readonly tenantSnapshot: TenantCredentialSnapshot;
+        } = Object.freeze({
+            // -- IPlugin metadata, copied verbatim ---------------------
+            id: base.id,
+            name: base.name,
+            version: base.version,
+            category: base.category,
+            capabilities: base.capabilities,
+            settingsSchema: base.settingsSchema,
+            // -- IJobRuntimeProvider, delegating ----------------------
+            runtimeId: base.runtimeId,
+            get dispatchers(): JobRuntimeDispatchers {
+                return base.dispatchers;
+            },
+            registerSchedules(schedules: readonly ScheduleSpec[]): Promise<void> {
+                return base.registerSchedules(schedules);
+            },
+            cancel(runId: string): Promise<boolean> {
+                return base.cancel(runId);
+            },
+            getRunStatus(runId: string): Promise<JobRunStatus> {
+                return base.getRunStatus(runId);
+            },
+            isEnabled(): boolean {
+                return base.isEnabled();
+            },
+            startWorkerHost(opts: WorkerHostOptions): Promise<WorkerHostHandle> {
+                return base.startWorkerHost(opts);
+            },
+            onLoad(context: PluginContext): Promise<void> {
+                return base.onLoad(context);
+            },
+            onUnload(): Promise<void> {
+                return base.onUnload();
+            },
+            // The tenant view does NOT re-bind further — calling
+            // `bindToTenant` on a tenant view returns itself for
+            // matching snapshots; mismatched snapshots return the
+            // root provider's bind result (cache-replace semantics).
+            bindToTenant(other: TenantCredentialSnapshot): IJobRuntimeProvider {
+                if (
+                    other.tenantId === snapshot.tenantId &&
+                    other.credentialVersion === snapshot.credentialVersion
+                ) {
+                    return view;
+                }
+                return base.bindToTenant(other);
+            },
+            // -- snapshot exposed for downstream stampers --------------
+            tenantSnapshot: snapshot,
+        });
+
+        // Cache-replace: evict any older version for this tenant so
+        // the cache stays bounded.
+        for (const key of this.tenantViews.keys()) {
+            if (key.startsWith(`${snapshot.tenantId}:`)) {
+                this.tenantViews.delete(key);
+            }
+        }
+        this.tenantViews.set(cacheKey, view);
+        return view;
     }
 }
