@@ -82,10 +82,6 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // LRU+TTL credential snapshot cache. Standalone class; the P3
     // resolver and P4 worker host layer it in independently.
     'TenantCredentialCache',
-    // EW-742 P3.2 follow-up — HashiCorp Vault SecretStoreResolver. Opt-in
-    // — operators using Vault override the SECRET_STORE_RESOLVER binding
-    // to this class; default deployment keeps InProcessSecretStoreResolver.
-    'VaultSecretStoreResolver',
     'WEBHOOK_DELIVERY_DISPATCHER',
     'WORK_GENERATION_DISPATCHER',
     'WORK_GENERATION_MODE',
