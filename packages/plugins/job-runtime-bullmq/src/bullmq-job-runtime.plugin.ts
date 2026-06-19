@@ -11,6 +11,8 @@ import type {
 	WorkerHostHandle,
 	WorkerHostOptions
 } from '@ever-works/plugin';
+import { BullMqDispatcherFactory } from './bullmq-dispatcher-factory.js';
+import { BullMqWorkerHostFactory } from './bullmq-worker-host-factory.js';
 
 /**
  * EW-742 P3.2 follow-up — BullMQ `IJobRuntimeProvider` plugin.
@@ -29,20 +31,17 @@ import type {
  *     `redisUrl` if the tenant uses a dedicated Redis) and exposes
  *     them on the view so future dispatcher impls can route to a
  *     per-tenant queue namespace.
- *
- * # What this plugin DOES NOT ship (gated on operator demand)
- *
- *   - **Per-task queue + worker pairs**. Every `dispatchXxx` method
- *     throws `BullMqDispatcherNotConfiguredError`. Wiring real queues
- *     requires defining each `*_DISPATCHER` payload as a BullMQ Queue
- *     + Worker pair against the operator's own Redis — that's a
- *     per-deployment design decision (queue concurrency, retry
- *     policy, dead-letter strategy) that we deliberately defer to
- *     operator-owned PRs.
- *   - **`startWorkerHost`**. BullMQ is a pull-model runtime; the
- *     operator stands up their own worker process(es). The method
- *     returns a no-op handle so callers that generically "start the
- *     worker host if the provider supports it" don't branch.
+ *   - **Operator-pluggable real dispatchers** via `useDispatchers(map)`
+ *     and operator-pluggable real worker host via
+ *     `useWorkerHostFactory(factory)`. See `BullMqDispatcherFactory`
+ *     and `BullMqWorkerHostFactory` for the Queue/Worker glue. Until
+ *     the operator wires them, every `dispatchXxx` throws
+ *     `BullMqDispatcherNotConfiguredError` and `startWorkerHost`
+ *     returns a no-op handle.
+ *   - **Per-tenant dispatcher routing** via the `dispatchersBuilder`
+ *     hook: pass a `(snapshot) => JobRuntimeDispatchers` callback and
+ *     `bindToTenant` views serve dispatchers built for that tenant's
+ *     prefix.
  *
  * # Operator setup
  *
@@ -52,17 +51,19 @@ import type {
  *   3. For per-tenant BYO: provision tenant credentials with
  *      `{ queuePrefix: 'tenant-acme', redisUrl?: '...' }` and store
  *      via the `SECRET_STORE_RESOLVER` binding.
- *   4. Implement the per-payload-type Queue + Worker pairs in your
- *      own worker process(es).
+ *   4. In the operator's worker process: build a `BullMqDispatcherFactory`
+ *      + `BullMqWorkerHostFactory` against `bullmq` (operator pins the
+ *      version), register one worker per dispatcher symbol, and pass
+ *      both to the plugin via `useDispatchers` / `useWorkerHostFactory`.
  */
 
 export class BullMqDispatcherNotConfiguredError extends Error {
 	constructor(dispatcherName: string) {
 		super(
 			`@ever-works/job-runtime-bullmq-plugin: ${dispatcherName} is not configured. ` +
-				'Subclass BullMqJobRuntimePlugin (or wrap it with a delegating provider) and ' +
-				'override the dispatchers field with operator-defined BullMQ Queue + Worker pairs ' +
-				'per `docs/specs/features/tenant-job-runtime-overlay/providers.md`.'
+				'Call plugin.useDispatchers({ ... }) with operator-supplied BullMQ dispatchers ' +
+				'built via BullMqDispatcherFactory (see plugin header for an example), ' +
+				'or pass dispatchersBuilder when constructing the plugin for per-tenant routing.'
 		);
 		this.name = 'BullMqDispatcherNotConfiguredError';
 	}
@@ -81,6 +82,18 @@ export interface BullMqTenantBindingView extends IJobRuntimeProvider {
 	 * shared instance Redis when omitted).
 	 */
 	readonly tenantRedisUrl: string | null;
+}
+
+export interface BullMqJobRuntimePluginOptions {
+	/**
+	 * Optional per-tenant dispatcher builder. When set,
+	 * `bindToTenant(snapshot)` returns a view whose `dispatchers` are
+	 * built via this callback (typically against a tenant-prefixed
+	 * `BullMqDispatcherFactory`). When unset, all tenant views share
+	 * the base dispatchers — fine for inherit-mode where the operator
+	 * uses one shared Redis namespace per platform.
+	 */
+	readonly dispatchersBuilder?: (snapshot: TenantCredentialSnapshot) => JobRuntimeDispatchers;
 }
 
 export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
@@ -116,7 +129,7 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	};
 
-	readonly dispatchers: JobRuntimeDispatchers = new Proxy(
+	private readonly stubDispatchers: JobRuntimeDispatchers = new Proxy(
 		{},
 		{
 			get(_target, prop: string): unknown {
@@ -130,8 +143,52 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	);
 
+	private dispatchersImpl: JobRuntimeDispatchers = this.stubDispatchers;
+	private workerHostFactory: BullMqWorkerHostFactory | null = null;
+	private dispatcherFactory: BullMqDispatcherFactory | null = null;
+
 	private context?: PluginContext;
 	private readonly tenantViews = new Map<string, BullMqTenantBindingView>();
+
+	constructor(private readonly opts: BullMqJobRuntimePluginOptions = {}) {}
+
+	get dispatchers(): JobRuntimeDispatchers {
+		return this.dispatchersImpl;
+	}
+
+	/**
+	 * Operator entry point — replace the throwing stub dispatchers with
+	 * a real map built (typically) via `BullMqDispatcherFactory`.
+	 * Returns `this` for chaining.
+	 */
+	useDispatchers(map: JobRuntimeDispatchers): this {
+		this.dispatchersImpl = Object.freeze({ ...map });
+		this.tenantViews.clear();
+		return this;
+	}
+
+	/**
+	 * Operator entry point — bind a `BullMqWorkerHostFactory` so the
+	 * plugin's `startWorkerHost` actually starts BullMQ workers. The
+	 * factory must have had every worker registered via
+	 * `factory.register(queueName, handler)` BEFORE
+	 * `plugin.startWorkerHost` is called.
+	 */
+	useWorkerHostFactory(factory: BullMqWorkerHostFactory): this {
+		this.workerHostFactory = factory;
+		return this;
+	}
+
+	/**
+	 * Optional — let the plugin own a `BullMqDispatcherFactory` so
+	 * `cancel(runId)` can delegate to it. Operators that build their
+	 * own dispatchers without a shared factory can skip this; cancel
+	 * will then return `false` for every runId.
+	 */
+	useDispatcherFactory(factory: BullMqDispatcherFactory): this {
+		this.dispatcherFactory = factory;
+		return this;
+	}
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -140,13 +197,20 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 	async onUnload(): Promise<void> {
 		this.context = undefined;
 		this.tenantViews.clear();
+		if (this.dispatcherFactory) {
+			await this.dispatcherFactory.close();
+			this.dispatcherFactory = null;
+		}
 	}
 
 	async registerSchedules(_schedules: readonly ScheduleSpec[]): Promise<void> {
 		// Stub — BullMQ has its own repeat-job DSL; operator wires it.
 	}
 
-	async cancel(_runId: string): Promise<boolean> {
+	async cancel(runId: string): Promise<boolean> {
+		if (this.dispatcherFactory) {
+			return this.dispatcherFactory.cancel(runId);
+		}
 		return false;
 	}
 
@@ -158,7 +222,10 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 		return Boolean(process.env.BULLMQ_REDIS_URL);
 	}
 
-	async startWorkerHost(_opts: WorkerHostOptions): Promise<WorkerHostHandle> {
+	async startWorkerHost(opts: WorkerHostOptions = {}): Promise<WorkerHostHandle> {
+		if (this.workerHostFactory) {
+			return this.workerHostFactory.start(opts);
+		}
 		return { stop: async () => undefined };
 	}
 
@@ -179,6 +246,10 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 				? snapshot.credentials.redisUrl
 				: null;
 
+		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
+			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
+			: base.dispatchersImpl;
+
 		const view: BullMqTenantBindingView = Object.freeze({
 			id: base.id,
 			name: base.name,
@@ -188,7 +259,7 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 			settingsSchema: base.settingsSchema,
 			runtimeId: base.runtimeId,
 			get dispatchers(): JobRuntimeDispatchers {
-				return base.dispatchers;
+				return dispatchersForView;
 			},
 			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
 				base.registerSchedules(schedules),
