@@ -72,6 +72,14 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         },
     ],
     controllers: [TenantJobRuntimeController],
-    exports: [TenantCredentialCache, TenantAwareRuntimeResolver, RuntimeBindingStamperService],
+    exports: [
+        TenantCredentialCache,
+        TenantAwareRuntimeResolver,
+        RuntimeBindingStamperService,
+        // EW-742 P3.2 T22 — exported so TriggerInternalModule can expose
+        // resolveSnapshot through the remote-proxy controller for the
+        // worker-host consumption path.
+        CredentialVersionService,
+    ],
 })
 export class TenantJobRuntimeModule {}
