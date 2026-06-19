@@ -262,8 +262,14 @@ describe('TemplateCustomizationService.createAndStart', () => {
 
         const result = await service.createAndStart('user-1', baseInput);
 
+        // EW-742 P3.2 T22 — payload now always includes the
+        // (providerId, credentialVersion) pair. Stamper isn't wired in
+        // this test fixture, so both are null and the worker falls
+        // back to the instance default (byte-identical pre-T22 path).
         expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
             customizationId: result.customization.id,
+            providerId: null,
+            credentialVersion: null,
         });
         expect(mocks.customizationRepository.updateById).toHaveBeenCalledWith(
             result.customization.id,
@@ -629,5 +635,121 @@ describe('TemplateCustomizationService.syncFromBase', () => {
         );
         expect(result.method).toBe('duplicate');
         expect(result.changed).toBe(true);
+    });
+});
+
+// EW-742 P3.2 T22 — TemplateCustomizationService is the third Tier 2
+// dispatcher site (after WorkGen + WorkImport). Customization rows
+// carry `tenantId` directly so we resolve via
+// `customizationRepository.findById(customizationId)` and stamp.
+describe('TemplateCustomizationService.start — T22 tenant runtime binding capture', () => {
+    function buildWithStamper(opts: {
+        stamperResult?: { providerId: string | null; credentialVersion: number | null };
+        stamperThrows?: boolean;
+        rowTenantId?: string | null;
+        rowFindThrows?: boolean;
+    }) {
+        const { service, mocks } = makeService();
+        // Patch dispatcher to resolve to a non-null runId so the start()
+        // happy path runs.
+        (mocks.dispatcher.dispatchTemplateCustomization as jest.Mock).mockResolvedValue(
+            'run-tpl-t22',
+        );
+        // Patch the customization repo `findById` for the stamper lookup.
+        (mocks.customizationRepository as any).findById = opts.rowFindThrows
+            ? jest.fn().mockRejectedValue(new Error('db boom'))
+            : jest.fn().mockResolvedValue(
+                  opts.rowTenantId === undefined
+                      ? null
+                      : ({ id: 'cust-1', tenantId: opts.rowTenantId } as any),
+              );
+        const stamperMock = {
+            stamp: opts.stamperThrows
+                ? jest.fn().mockRejectedValue(new Error('stamper boom'))
+                : jest
+                      .fn()
+                      .mockResolvedValue(
+                          opts.stamperResult ?? {
+                              providerId: null,
+                              credentialVersion: null,
+                          },
+                      ),
+        };
+        // Replace the service with one wired to the stamper.
+        const TenantService = service.constructor as new (
+            ...args: unknown[]
+        ) => typeof service;
+        const wired = new TenantService(
+            mocks.templateRepository as any,
+            mocks.customizationRepository as any,
+            mocks.userRepository as any,
+            mocks.gitFacade as any,
+            mocks.codeEditFacade as any,
+            mocks.aiFacade as any,
+            mocks.dispatcher as any,
+            stamperMock as any,
+        );
+        return { service: wired, mocks, stamperMock };
+    }
+
+    it('stamps payload with stamper result when overlay is active', async () => {
+        const { service: svc, mocks, stamperMock } = buildWithStamper({
+            rowTenantId: '00000000-0000-0000-0000-00000000aaaa',
+            stamperResult: { providerId: 'trigger', credentialVersion: 9 },
+        });
+        // The dispatch site lives inside `start(customizationId)` — invoke
+        // it via the public createAndStart path so we exercise the same
+        // call shape as production.
+        const result = await svc.createAndStart('user-1', baseInput);
+
+        expect(stamperMock.stamp).toHaveBeenCalledWith('00000000-0000-0000-0000-00000000aaaa');
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+            providerId: 'trigger',
+            credentialVersion: 9,
+        });
+    });
+
+    it('ships null/null when customization row has no tenantId', async () => {
+        const { service: svc, mocks, stamperMock } = buildWithStamper({
+            rowTenantId: null,
+            stamperResult: { providerId: null, credentialVersion: null },
+        });
+        const result = await svc.createAndStart('user-1', baseInput);
+
+        expect(stamperMock.stamp).toHaveBeenCalledWith(null);
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+            providerId: null,
+            credentialVersion: null,
+        });
+    });
+
+    it('fails open on customizationRepository.findById throw', async () => {
+        const { service: svc, mocks, stamperMock } = buildWithStamper({
+            rowFindThrows: true,
+        });
+        const result = await svc.createAndStart('user-1', baseInput);
+
+        expect(stamperMock.stamp).not.toHaveBeenCalled();
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+            providerId: null,
+            credentialVersion: null,
+        });
+    });
+
+    it('fails open on stamper throw', async () => {
+        const { service: svc, mocks } = buildWithStamper({
+            rowTenantId: '00000000-0000-0000-0000-00000000aaaa',
+            stamperThrows: true,
+        });
+        const result = await svc.createAndStart('user-1', baseInput);
+
+        expect(mocks.dispatcher.dispatchTemplateCustomization).toHaveBeenCalledWith({
+            customizationId: result.customization.id,
+            providerId: null,
+            credentialVersion: null,
+        });
     });
 });

@@ -9,7 +9,9 @@ import { KB_STORAGE_PLUGIN, KnowledgeBaseService } from '../knowledge-base.servi
 import { KB_EMBED_DOCUMENT_DISPATCHER } from '../../tasks/kb-embed-document-dispatcher';
 import { KB_ORG_OVERLAY_FANOUT_DISPATCHER } from '../../tasks/kb-org-overlay-fanout-dispatcher';
 import { KB_MIRROR_DOCUMENT_DISPATCHER } from '../../tasks/kb-mirror-document-dispatcher';
+import { KB_NORMALIZE_MEDIA_DISPATCHER } from '../../tasks/kb-normalize-media-dispatcher';
 import { RuntimeBindingStamperService } from '../../tasks/runtime-binding-stamper.service';
+import { OrganizationRepository } from '../../database/repositories/organization.repository';
 import { WorkRepository } from '../../database/repositories/work.repository';
 import { KnowledgeBaseBufferExtractorService } from '../knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeDocumentRepository } from '../../database/repositories/work-knowledge-document.repository';
@@ -1914,6 +1916,205 @@ describe('KnowledgeBaseService', () => {
                 providerId: null,
                 credentialVersion: null,
             });
+        });
+    });
+
+    // EW-742 P3.2 T22 (KB Tier 1 rollout) — same stamping path as the
+    // KB-embed PoC, applied to the three other KB dispatchers that
+    // share KnowledgeBaseService: KB_MIRROR_DOCUMENT_DISPATCHER,
+    // KB_NORMALIZE_MEDIA_DISPATCHER, KB_ORG_OVERLAY_FANOUT_DISPATCHER.
+    describe('KB Tier 1 — T22 stamping for the other KnowledgeBaseService dispatchers', () => {
+        const TENANT_ID = '00000000-0000-0000-0000-00000000aaaa';
+
+        async function buildWithAllDispatchers(opts: {
+            stamperResult?: { providerId: string | null; credentialVersion: number | null };
+            workTenantId?: string | null;
+            orgTenantId?: string | null;
+            orgFindThrows?: boolean;
+        }) {
+            const embedDispatcherMock = {
+                dispatchKbEmbedDocument: jest.fn().mockResolvedValue('embed-run-id'),
+            };
+            const mirrorDispatcherMock = {
+                dispatchKbMirrorDocument: jest.fn().mockResolvedValue('mirror-run-id'),
+            };
+            const normalizeMediaDispatcherMock = {
+                dispatchKbNormalizeMedia: jest.fn().mockResolvedValue('normalize-run-id'),
+            };
+            const orgOverlayFanoutDispatcherMock = {
+                dispatchKbOrgOverlayFanout: jest.fn().mockResolvedValue('fanout-run-id'),
+            };
+            const workRepoMock = {
+                findById: jest.fn().mockResolvedValue(
+                    opts.workTenantId === undefined
+                        ? null
+                        : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                ),
+                findIdsByOrganization: jest.fn().mockResolvedValue(['work-a', 'work-b']),
+            };
+            const orgRepoMock = {
+                findById: opts.orgFindThrows
+                    ? jest.fn().mockRejectedValue(new Error('db boom'))
+                    : jest.fn().mockResolvedValue(
+                          opts.orgTenantId === undefined
+                              ? null
+                              : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
+                      ),
+            };
+            const stamperMock = {
+                stamp: jest
+                    .fn()
+                    .mockResolvedValue(
+                        opts.stamperResult ?? {
+                            providerId: null,
+                            credentialVersion: null,
+                        },
+                    ),
+            };
+
+            const module: TestingModule = await Test.createTestingModule({
+                providers: [
+                    KnowledgeBaseService,
+                    { provide: WorkKnowledgeDocumentRepository, useValue: docRepo },
+                    { provide: WorkKnowledgeUploadRepository, useValue: uploadRepo },
+                    { provide: WorkKnowledgeTagRepository, useValue: tagRepo },
+                    {
+                        provide: WorkKnowledgeCitationRepository,
+                        useValue: { listForDocument: jest.fn().mockResolvedValue([]) },
+                    },
+                    { provide: WorkOwnershipService, useValue: ownership },
+                    { provide: KB_STORAGE_PLUGIN, useValue: storage },
+                    { provide: ActivityLogService, useValue: activityLog },
+                    { provide: KB_EMBED_DOCUMENT_DISPATCHER, useValue: embedDispatcherMock },
+                    { provide: KB_MIRROR_DOCUMENT_DISPATCHER, useValue: mirrorDispatcherMock },
+                    {
+                        provide: KB_NORMALIZE_MEDIA_DISPATCHER,
+                        useValue: normalizeMediaDispatcherMock,
+                    },
+                    {
+                        provide: KB_ORG_OVERLAY_FANOUT_DISPATCHER,
+                        useValue: orgOverlayFanoutDispatcherMock,
+                    },
+                    { provide: WorkRepository, useValue: workRepoMock },
+                    { provide: RuntimeBindingStamperService, useValue: stamperMock },
+                    { provide: OrganizationRepository, useValue: orgRepoMock },
+                ],
+            }).compile();
+
+            return {
+                service: module.get(KnowledgeBaseService),
+                embedDispatcherMock,
+                mirrorDispatcherMock,
+                normalizeMediaDispatcherMock,
+                orgOverlayFanoutDispatcherMock,
+                workRepoMock,
+                orgRepoMock,
+                stamperMock,
+            };
+        }
+
+        it('enqueueMirror — stamps payload via stampForWork', async () => {
+            const { service: svc, mirrorDispatcherMock } = await buildWithAllDispatchers({
+                workTenantId: TENANT_ID,
+                stamperResult: { providerId: 'trigger', credentialVersion: 11 },
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({ ...data, id: 'doc-mirror-1' }),
+            );
+
+            await svc.createDocument({
+                workId: WORK_ID,
+                userId: USER_ID,
+                path: 'brand/voice.md',
+                title: 'v',
+                class: 'brand' as KbDocumentClass,
+                body: 'hi',
+            });
+
+            expect(mirrorDispatcherMock.dispatchKbMirrorDocument).toHaveBeenCalledTimes(1);
+            const payload = mirrorDispatcherMock.dispatchKbMirrorDocument.mock.calls[0][0];
+            expect(payload).toMatchObject({
+                workId: WORK_ID,
+                documentId: 'doc-mirror-1',
+                operation: 'upsert',
+                providerId: 'trigger',
+                credentialVersion: 11,
+            });
+        });
+
+        it('enqueueOrgOverlayFanout — stamps payload via stampForOrganization', async () => {
+            const {
+                service: svc,
+                orgOverlayFanoutDispatcherMock,
+                orgRepoMock,
+                stamperMock,
+            } = await buildWithAllDispatchers({
+                orgTenantId: TENANT_ID,
+                stamperResult: { providerId: 'trigger', credentialVersion: 13 },
+            });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({
+                    ...data,
+                    id: 'org-doc-1',
+                    workId: null,
+                    organizationId: ORG_ID,
+                }),
+            );
+
+            await svc.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/privacy.md',
+                title: 'Privacy policy',
+                class: 'legal' as KbDocumentClass,
+                body: 'verbatim',
+            });
+
+            expect(orgRepoMock.findById).toHaveBeenCalledWith(ORG_ID);
+            expect(stamperMock.stamp).toHaveBeenCalledWith(TENANT_ID);
+            expect(orgOverlayFanoutDispatcherMock.dispatchKbOrgOverlayFanout).toHaveBeenCalledTimes(
+                1,
+            );
+            const payload =
+                orgOverlayFanoutDispatcherMock.dispatchKbOrgOverlayFanout.mock.calls[0][0];
+            expect(payload).toMatchObject({
+                organizationId: ORG_ID,
+                documentId: 'org-doc-1',
+                workIds: ['work-a', 'work-b'],
+                providerId: 'trigger',
+                credentialVersion: 13,
+            });
+        });
+
+        it('enqueueOrgOverlayFanout — fails open when OrganizationRepository.findById throws', async () => {
+            const {
+                service: svc,
+                orgOverlayFanoutDispatcherMock,
+                stamperMock,
+            } = await buildWithAllDispatchers({ orgFindThrows: true });
+            docRepo.create.mockImplementation(async (data) =>
+                buildDocument({
+                    ...data,
+                    id: 'org-doc-2',
+                    workId: null,
+                    organizationId: ORG_ID,
+                }),
+            );
+
+            await svc.createOrgDocument(ORG_ID, USER_ID, {
+                path: 'legal/privacy.md',
+                title: 'Privacy policy',
+                class: 'legal' as KbDocumentClass,
+                body: 'verbatim',
+            });
+
+            // Org lookup failed → stamper never called → payload ships null/null.
+            expect(stamperMock.stamp).not.toHaveBeenCalled();
+            expect(orgOverlayFanoutDispatcherMock.dispatchKbOrgOverlayFanout).toHaveBeenCalledTimes(
+                1,
+            );
+            const payload =
+                orgOverlayFanoutDispatcherMock.dispatchKbOrgOverlayFanout.mock.calls[0][0];
+            expect(payload.providerId).toBeNull();
+            expect(payload.credentialVersion).toBeNull();
         });
     });
 });

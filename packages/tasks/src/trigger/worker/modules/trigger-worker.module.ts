@@ -8,7 +8,9 @@ import {
     WorkKnowledgeDocumentRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
+import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { NotificationService } from '@ever-works/agent/notifications';
+import { TenantRuntimeBindingResolverService } from '../services/tenant-runtime-binding-resolver.service';
 import { DataGeneratorService } from '@ever-works/agent/generators';
 import { MarkdownGeneratorService } from '@ever-works/agent/generators';
 import {
@@ -95,6 +97,15 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         // DataGeneratorService consumes CategoryIconService for icon enrichment (EW-357).
         // CACHE_MANAGER is provided globally via TriggerRemoteCacheModule; AiFacadeService
         // comes from TriggerFacadesModule — both deps reachable in worker scope.
+        // EW-742 P3.2 T22 — CredentialVersionService is proxied to the
+        // API so the worker-host TenantRuntimeBindingResolverService
+        // can call resolveSnapshot through the existing RPC channel.
+        {
+            provide: CredentialVersionService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'CredentialVersionService'),
+            inject: [TriggerInternalApiClient],
+        },
         CategoryIconService,
         DataGeneratorService,
         MarkdownGeneratorService,
@@ -109,12 +120,18 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
         TriggerImportOrchestrator,
         TemplateCustomizationService,
         KnowledgeBaseGitMirrorService,
+        // EW-742 P3.2 T22 — consumes (providerId, credentialVersion) from
+        // dispatcher payloads + WorkRepository.findById for tenantId, and
+        // reports the binding state for observability + per-tenant
+        // routing decisions.
+        TenantRuntimeBindingResolverService,
     ],
     exports: [
         TriggerGenerationOrchestrator,
         TriggerImportOrchestrator,
         TemplateCustomizationService,
         KnowledgeBaseGitMirrorService,
+        TenantRuntimeBindingResolverService,
         TriggerInternalModule,
     ],
 })
