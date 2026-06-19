@@ -67,10 +67,13 @@ Below the badges, an editable form:
 - **Credentials block** (only when `mode != inherit`):
     - `credentialsSecretRef` — opaque pointer (string ≤ 128 chars) into
       the operator's secret store. Examples: `vault:secret/tenants/acme/temporal`,
-      `k8s:tenant-acme-temporal-credentials`, `op://Vault/Temporal-acme/cert`.
-      The platform never stores plaintext credentials — only this
-      pointer + the encrypted version stamped against the resolved
-      snapshot when a run is enqueued.
+      `k8s:tenant-acme-temporal-credentials`, `env:TENANT_ACME_TEMPORAL`,
+      `infisical:<workspaceId>/prod/tenants/acme`,
+      `doppler:ever-works/prod/TENANT_ACME_TEMPORAL`. The platform never
+      stores plaintext credentials — only this pointer + the encrypted
+      version stamped against the resolved snapshot when a run is enqueued.
+      Which schemes work depends on which `SecretStoreResolver` your
+      operator has wired (the default ships with `inline:` + `env:`).
     - `credentialsJson` (textarea) — collected by the UI today but **not
       yet POSTed** to the API. P2.2 will replace this with per-provider
       schema-driven fields (Temporal namespace + address, Inngest event

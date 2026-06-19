@@ -4,18 +4,22 @@ import { InProcessSecretStoreResolver } from '../in-process-secret-store-resolve
 /**
  * EW-742 P3.2 — default `InProcessSecretStoreResolver` unit tests.
  *
- * Covers the seven branches the default resolver supports:
+ * Covers both supported schemes (`inline:` + `env:`) and the fail-open
+ * fallback for unknown schemes:
  *   - unknown scheme → null + Logger.warn
- *   - inline: empty payload → null + Logger.warn
- *   - inline: base64-decode error → null + Logger.warn
- *   - inline: not JSON → null + Logger.warn
- *   - inline: JSON null → null + Logger.warn
- *   - inline: JSON array → null + Logger.warn (must be object)
- *   - inline: JSON object → returns the parsed bag
+ *   - inline: empty payload / base64-decode error / not JSON / null /
+ *     array → null + Logger.warn
+ *   - inline: valid JSON object → returns the parsed bag
+ *   - env: empty var name → null + Logger.warn
+ *   - env: undefined env var → null + Logger.warn
+ *   - env: empty-string env var → null + Logger.warn
+ *   - env: not JSON / null / array → null + Logger.warn
+ *   - env: valid JSON object → returns the parsed bag
  */
 describe('InProcessSecretStoreResolver (EW-742 P3.2)', () => {
     let resolver: InProcessSecretStoreResolver;
     let warnSpy: jest.SpyInstance;
+    const savedEnv: Record<string, string | undefined> = {};
 
     beforeEach(() => {
         resolver = new InProcessSecretStoreResolver();
@@ -24,7 +28,18 @@ describe('InProcessSecretStoreResolver (EW-742 P3.2)', () => {
 
     afterEach(() => {
         warnSpy.mockRestore();
+        for (const [k, v] of Object.entries(savedEnv)) {
+            if (v === undefined) delete process.env[k];
+            else process.env[k] = v;
+        }
+        for (const k of Object.keys(savedEnv)) delete savedEnv[k];
     });
+
+    function setEnv(name: string, value: string | undefined): void {
+        savedEnv[name] = process.env[name];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+    }
 
     function inline(obj: unknown): string {
         return `inline:${Buffer.from(JSON.stringify(obj), 'utf8').toString('base64')}`;
@@ -36,6 +51,70 @@ describe('InProcessSecretStoreResolver (EW-742 P3.2)', () => {
         expect(warnSpy).toHaveBeenCalledTimes(1);
         expect(warnSpy.mock.calls[0]?.[0]).toMatch(/pointer scheme "vault:"/);
         expect(warnSpy.mock.calls[0]?.[0]).toMatch(/fail-open/);
+    });
+
+    describe('env: scheme', () => {
+        it('returns null + warn when var name is empty (env:)', async () => {
+            const result = await resolver.resolve('env:');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/empty var name/);
+        });
+
+        it('returns null + warn when env var is undefined', async () => {
+            setEnv('NEVER_DEFINED_VAR_FOR_TESTS', undefined);
+            const result = await resolver.resolve('env:NEVER_DEFINED_VAR_FOR_TESTS');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/undefined env var/);
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/NEVER_DEFINED_VAR_FOR_TESTS/);
+        });
+
+        it('returns null + warn when env var is empty string', async () => {
+            setEnv('EMPTY_VAR_FOR_TESTS', '');
+            const result = await resolver.resolve('env:EMPTY_VAR_FOR_TESTS');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/empty env var/);
+        });
+
+        it('returns null + warn when env var value is not JSON', async () => {
+            setEnv('NOT_JSON_VAR', 'plain string, not json');
+            const result = await resolver.resolve('env:NOT_JSON_VAR');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/not valid JSON/);
+        });
+
+        it('returns null + warn when env var value is JSON null', async () => {
+            setEnv('NULL_VAR', 'null');
+            const result = await resolver.resolve('env:NULL_VAR');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/got null/);
+        });
+
+        it('returns null + warn when env var value is JSON array', async () => {
+            setEnv('ARRAY_VAR', '[1, 2, 3]');
+            const result = await resolver.resolve('env:ARRAY_VAR');
+            expect(result).toBeNull();
+            expect(warnSpy.mock.calls[0]?.[0]).toMatch(/got array/);
+        });
+
+        it('returns the parsed bag for a well-formed env: object', async () => {
+            const credentials = { accessToken: 'tr_dev_xxx', region: 'us-east-1' };
+            setEnv('TENANT_ACME_TRIGGER', JSON.stringify(credentials));
+            const result = await resolver.resolve('env:TENANT_ACME_TRIGGER');
+            expect(result).toEqual(credentials);
+            expect(warnSpy).not.toHaveBeenCalled();
+        });
+
+        it('re-reads env var on every call (rotation-friendly)', async () => {
+            setEnv('ROTATING_VAR', JSON.stringify({ v: 1 }));
+            const before = await resolver.resolve('env:ROTATING_VAR');
+            expect(before).toEqual({ v: 1 });
+
+            // Operator rotates the value in-place (e.g. via pod rolling
+            // restart). Next resolve picks it up.
+            process.env.ROTATING_VAR = JSON.stringify({ v: 2 });
+            const after = await resolver.resolve('env:ROTATING_VAR');
+            expect(after).toEqual({ v: 2 });
+        });
     });
 
     it('returns null + warn for empty inline: payload', async () => {

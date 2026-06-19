@@ -97,3 +97,13 @@ export { VaultSecretStoreResolver } from './vault-secret-store-resolver.service'
 // SECRET_STORE_RESOLVER binding. Default deployment keeps
 // InProcessSecretStoreResolver.
 export { K8sSecretStoreResolver } from './k8s-secret-store-resolver.service';
+
+// EW-742 P3.2 follow-up — InfisicalSecretStoreResolver. HTTP against
+// Infisical REST API (`/api/v3/secrets/raw`); OSS-friendly secrets
+// platform with self-hostable backend. Opt-in via DI binding override.
+export { InfisicalSecretStoreResolver } from './infisical-secret-store-resolver.service';
+
+// EW-742 P3.2 follow-up — DopplerSecretStoreResolver. HTTP against
+// Doppler REST API (`/v3/configs/config/secrets`); freemium SaaS
+// secrets-management platform. Opt-in via DI binding override.
+export { DopplerSecretStoreResolver } from './doppler-secret-store-resolver.service';
