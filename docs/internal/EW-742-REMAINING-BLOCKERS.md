@@ -264,22 +264,36 @@ extend; each needs a small schema decision.
 **Estimated size**: ~12 PRs, each ~100–200 LoC. Largest single in-flight
 shippable batch on EW-742.
 
-### Non-`inline:` SecretStoreResolvers beyond vault/k8s
+### Additional `SecretStoreResolver` schemes
 
-**What**: implementations for additional secret-store schemes —
-1Password (Connect / CLI), AWS Secrets Manager, Azure Key Vault, GCP
-Secret Manager, etc. Each is a separate scheme on top of the
-`SecretStoreResolver` contract.
+**What**: implementations for additional secret-store schemes on top of
+the `SecretStoreResolver` contract.
 
-**Status**: Vault (T20.4a) + K8s (T20.4b) shipped (#1400, #1401). T20.4c
-(1Password) needs vendor decision: Connect SDK vs CLI vs Connect REST
-(operator deployment-shape).
+**Status on `main` today**:
+
+| Scheme       | Class                          | Where it ships                                     |
+| ------------ | ------------------------------ | -------------------------------------------------- |
+| `inline:`    | `InProcessSecretStoreResolver` | Default (no DI override needed)                    |
+| `env:`       | `InProcessSecretStoreResolver` | Default (no DI override needed)                    |
+| `vault:`     | `VaultSecretStoreResolver`     | Opt-in via `SECRET_STORE_RESOLVER` binding (#1400) |
+| `k8s:`       | `K8sSecretStoreResolver`       | Opt-in via `SECRET_STORE_RESOLVER` binding (#1401) |
+| `infisical:` | (planned)                      | Opt-in; OSS-friendly secrets platform              |
+| `doppler:`   | (planned)                      | Opt-in; freemium                                   |
+| `aws-sm:`    | (planned)                      | Opt-in; AWS deployers                              |
+| `gcp-sm:`    | (planned)                      | Opt-in; GCP deployers                              |
+| `azure-kv:`  | (planned)                      | Opt-in; Azure deployers                            |
+
+**Deliberately not on the roadmap**: 1Password (`op://`). Closed-source
+vendor SDK + commercial licence makes it a poor fit for an OSS project;
+operators who need it can ship a private `OnePasswordSecretStoreResolver`
+in their own DI module without us bundling it.
 
 **Acceptance criteria (per resolver)**:
 
 - Implements `SecretStoreResolver.resolve` for the chosen scheme.
 - Fail-open per contract (null + `Logger.warn` on every failure path).
-- Opt-in via DI binding override; not registered in the default module.
+- Opt-in via DI binding override; not registered in the default module
+  (the `inline:` + `env:` defaults stay zero-dep).
 - Test suite covers every failure branch + happy path.
 
 **Estimated size**: ~200–400 LoC each, single PR per scheme.

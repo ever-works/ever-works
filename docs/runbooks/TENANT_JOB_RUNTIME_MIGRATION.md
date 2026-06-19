@@ -50,12 +50,15 @@ runs were never tagged with a tenant credential version.
 **Procedure:**
 
 1. Provision the underlying credential in your secret store. The
-   pointer format depends on what the operator has wired:
+   pointer format depends on what the operator has wired. Examples:
    `vault:secret/tenants/acme/temporal`,
    `k8s:tenant-acme-trigger-credentials`,
-   `op://Vault/Trigger-acme/access-token`, etc. Ask the operator if
-   you don't know the format — the platform never stores plaintext, so
-   the pointer convention is operator-specific.
+   `env:TENANT_ACME_TRIGGER`,
+   `infisical:<workspaceId>/prod/tenants/acme`,
+   `doppler:ever-works/prod/TENANT_ACME_TRIGGER`. Ask the operator
+   which schemes are wired — the platform never stores plaintext, so
+   the pointer convention is operator-specific. The default ships with
+   `inline:` (dev only) + `env:` (self-hoster path).
 2. On **Settings → Job Runtime**, pick `mode: byo`, pick the provider
    from the picker (only operator-allow-listed providers appear —
    see the tenant runbook ["Why is provider X missing?"](TENANT_JOB_RUNTIME.md#why-is-provider-x-missing)),
