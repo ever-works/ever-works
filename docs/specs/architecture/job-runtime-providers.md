@@ -79,6 +79,23 @@ export interface IJobRuntimeProvider {
 
 	/** Optional: stand up / connect the worker host (see §5). */
 	startWorkerHost?(opts: WorkerHostOptions): Promise<WorkerHostHandle>;
+
+	/**
+	 * EW-686 P2 / EW-742 P3 — optional. Return a provider instance bound
+	 * to the given tenant's credential snapshot (BYO/override mode).
+	 * Returns `undefined` if the provider doesn't support BYO; the
+	 * resolver falls back to the instance default with a `Logger.warn`.
+	 * Implementations MUST memoise behind `credentialVersion` so repeat
+	 * calls with the same snapshot return equivalent providers.
+	 */
+	bindToTenant?(snapshot: TenantCredentialSnapshot): IJobRuntimeProvider | undefined;
+}
+
+export interface TenantCredentialSnapshot {
+	tenantId: string;
+	providerId: JobRuntimeId;
+	credentialVersion: number;
+	credentials: Readonly<Record<string, unknown>>; // opaque, per-provider
 }
 
 export type JobRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'unknown';
