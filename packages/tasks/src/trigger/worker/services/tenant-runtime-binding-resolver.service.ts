@@ -1,5 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { WorkRepository } from '@ever-works/agent/database';
+import {
+    OrganizationRepository,
+    TemplateCustomizationRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import type { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 
@@ -75,6 +79,9 @@ export class TenantRuntimeBindingResolverService {
     constructor(
         @Optional() private readonly credentialVersionService?: CredentialVersionService,
         @Optional() private readonly workRepository?: WorkRepository,
+        @Optional() private readonly organizationRepository?: OrganizationRepository,
+        @Optional()
+        private readonly templateCustomizationRepository?: TemplateCustomizationRepository,
     ) {}
 
     /**
@@ -190,6 +197,60 @@ export class TenantRuntimeBindingResolverService {
             this.logger.debug(
                 `TenantRuntimeBindingResolver.resolveForWork: workRepository.findById ` +
                     `threw for work=${workId} (${(err as Error).message}); treating as no-binding.`,
+            );
+            return { status: 'no-binding' };
+        }
+        return this.resolve(payload, tenantId);
+    }
+
+    /**
+     * Convenience wrapper for organizationId-scoped tasks (kb-org-overlay-
+     * fanout). An organization belongs to exactly one tenant, so the fanout
+     * (which targets multiple Works in that org) still has a single
+     * unambiguous tenant scope. Resolves the Org's `tenantId` via
+     * OrganizationRepository.findById, then delegates to {@link resolve}.
+     */
+    async resolveForOrganization(
+        payload: { providerId?: string | null; credentialVersion?: number | null },
+        organizationId: string,
+    ): Promise<Awaited<ReturnType<TenantRuntimeBindingResolverService['resolve']>>> {
+        if (!this.organizationRepository) {
+            return { status: 'no-binding' };
+        }
+        let tenantId: string | null = null;
+        try {
+            const org = await this.organizationRepository.findById(organizationId);
+            tenantId = org?.tenantId ?? null;
+        } catch (err) {
+            this.logger.debug(
+                `TenantRuntimeBindingResolver.resolveForOrganization: organizationRepository.findById ` +
+                    `threw for org=${organizationId} (${(err as Error).message}); treating as no-binding.`,
+            );
+            return { status: 'no-binding' };
+        }
+        return this.resolve(payload, tenantId);
+    }
+
+    /**
+     * Convenience wrapper for customizationId-scoped tasks (template-
+     * customization). The TemplateCustomization row carries `tenantId`
+     * directly; look it up and delegate.
+     */
+    async resolveForCustomization(
+        payload: { providerId?: string | null; credentialVersion?: number | null },
+        customizationId: string,
+    ): Promise<Awaited<ReturnType<TenantRuntimeBindingResolverService['resolve']>>> {
+        if (!this.templateCustomizationRepository) {
+            return { status: 'no-binding' };
+        }
+        let tenantId: string | null = null;
+        try {
+            const row = await this.templateCustomizationRepository.findById(customizationId);
+            tenantId = row?.tenantId ?? null;
+        } catch (err) {
+            this.logger.debug(
+                `TenantRuntimeBindingResolver.resolveForCustomization: templateCustomizationRepository.findById ` +
+                    `threw for customization=${customizationId} (${(err as Error).message}); treating as no-binding.`,
             );
             return { status: 'no-binding' };
         }

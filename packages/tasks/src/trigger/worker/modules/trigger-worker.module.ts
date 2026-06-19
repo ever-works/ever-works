@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import {
+    OrganizationRepository,
     TemplateRepository,
     TemplateCustomizationRepository,
     UserRepository,
@@ -104,6 +105,14 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
             provide: CredentialVersionService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'CredentialVersionService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // EW-742 P3.2 T22 — OrganizationRepository proxied for
+        // resolveForOrganization (kb-org-overlay-fanout task).
+        {
+            provide: OrganizationRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'OrganizationRepository'),
             inject: [TriggerInternalApiClient],
         },
         CategoryIconService,

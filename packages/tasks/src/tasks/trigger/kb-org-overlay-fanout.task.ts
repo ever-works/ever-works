@@ -1,7 +1,8 @@
-import { task } from '@trigger.dev/sdk';
+import { logger, task } from '@trigger.dev/sdk';
 import { KbOrgOverlayFanoutPayload } from '@ever-works/agent/tasks';
 import { KnowledgeBaseGitMirrorService } from '@ever-works/agent/services';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 
 /**
@@ -38,6 +39,33 @@ export const kbOrgOverlayFanoutTask = task<'kb-org-overlay-fanout', KbOrgOverlay
     run: async (payload) => {
         return withWorkerContext('KbOrgOverlayFanout', async (appContext) => {
             await appContext.get(TriggerPluginHydratorService).initialize();
+
+            // EW-742 P3.2 T22 — see kb-embed-document.task.ts for the
+            // pattern. Org-scope variant: resolves tenantId via the
+            // OWNING ORGANIZATION's tenantId (an org belongs to exactly
+            // one tenant so the fanout has a single unambiguous tenant
+            // scope even though it targets multiple Works).
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForOrganization(payload, payload.organizationId);
+            if (binding.status === 'drained') {
+                logger.warn('kb-org-overlay-fanout: credentials drained, skipping run', {
+                    organizationId: payload.organizationId,
+                    documentId: payload.documentId,
+                    operation: payload.operation,
+                    workCount: payload.workIds.length,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                return {
+                    status: 'skipped' as const,
+                    reason: 'credentials-drained' as const,
+                    organizationId: payload.organizationId,
+                    documentId: payload.documentId,
+                };
+            }
+
             const mirror = appContext.get(KnowledgeBaseGitMirrorService);
 
             let succeeded = 0;
