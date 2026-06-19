@@ -5,6 +5,7 @@ import { KnowledgeBaseService, chunkMarkdown } from '@ever-works/agent/services'
 import { WorkKnowledgeChunkRepository, type ChunkUpsertInput } from '@ever-works/agent/database';
 import { AiFacadeService } from '@ever-works/agent/facades';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
+import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 
 /**
@@ -29,6 +30,12 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * instead of throwing — Trigger.dev retries would otherwise loop on
  * payloads that legitimately have nothing to embed):
  *
+ *  - `credentials-drained` (EW-742 P3.2 T22) — the
+ *    `(providerId, credentialVersion)` pair stamped at enqueue time
+ *    no longer matches the current tenant overlay (rotated past).
+ *    Skip-and-ack rather than retry: KB embedding is idempotent and
+ *    the next enqueue (or the spec §17.7 reconciliation job) will
+ *    pick the doc up against the new credentials.
  *  - `document-not-found` — race-with-delete: the doc row was removed
  *    between enqueue and run. `replaceForDocument` is NOT called (the
  *    `onDelete: 'CASCADE'` FK already cleared any chunks).
@@ -63,6 +70,43 @@ export const kbEmbedDocumentTask = task<'kb-embed-document', KbEmbedDocumentPayl
     run: async (payload) => {
         return withWorkerContext('KbEmbedDocument', async (appContext) => {
             await appContext.get(TriggerPluginHydratorService).initialize();
+
+            // EW-742 P3.2 T22 (worker-host consumption) — kb-embed is
+            // the first task to adopt the resolver service shipped in
+            // #1432. The same 4-line pattern is the template every
+            // other Trigger.dev task will copy as it's wired up.
+            //
+            // Skip-and-ack on 'drained': the credentials this run was
+            // enqueued against have been rotated past the version we
+            // hold. KB embedding is idempotent — the next enqueue (or
+            // the reconciliation job per spec §17.7) will pick up the
+            // doc against the new credentials. Returning a skipped
+            // result here avoids burning Trigger.dev retry budget on a
+            // run that would just keep observing the same 'drained'
+            // state until the row hits the dead-letter queue.
+            //
+            // 'no-binding' / 'resolved' / 'error' all fall through to
+            // the legacy code path (instance default credentials) —
+            // byte-identical to the pre-T22 behaviour, no surprise
+            // change in production semantics.
+            const binding = await appContext
+                .get(TenantRuntimeBindingResolverService)
+                .resolveForWork(payload, payload.workId);
+            if (binding.status === 'drained') {
+                logger.warn('kb-embed-document: credentials drained, skipping run', {
+                    workId: payload.workId,
+                    documentId: payload.documentId,
+                    providerId: binding.providerId,
+                    credentialVersion: binding.credentialVersion,
+                    tenantId: binding.tenantId,
+                });
+                return {
+                    status: 'skipped',
+                    reason: 'credentials-drained',
+                    workId: payload.workId,
+                    documentId: payload.documentId,
+                };
+            }
 
             const kbService = appContext.get(KnowledgeBaseService);
             const aiFacade = appContext.get(AiFacadeService);
