@@ -70,7 +70,7 @@ describe('TenantCredentialCache (EW-742 P3.1 / T21)', () => {
     describe('TTL expiry', () => {
         it('returns null after ttlMs elapses without invalidation', () => {
             jest.useFakeTimers();
-            const cache = new TenantCredentialCache(1024, 30_000);
+            const cache = new TenantCredentialCache({ maxEntries: 1024, ttlMs: 30_000 });
             cache.set('tenant-a', 'trigger', 1, { token: 'a' });
             expect(cache.get('tenant-a', 'trigger', 1)).toEqual({ token: 'a' });
 
@@ -85,7 +85,7 @@ describe('TenantCredentialCache (EW-742 P3.1 / T21)', () => {
 
         it('a fresh set() refreshes the TTL deadline', () => {
             jest.useFakeTimers();
-            const cache = new TenantCredentialCache(1024, 30_000);
+            const cache = new TenantCredentialCache({ maxEntries: 1024, ttlMs: 30_000 });
             cache.set('tenant-a', 'trigger', 1, { token: 'first' });
 
             // 20s in — still alive, refresh with a new value.
@@ -152,7 +152,7 @@ describe('TenantCredentialCache (EW-742 P3.1 / T21)', () => {
 
     describe('LRU eviction at capacity', () => {
         it('evicts the oldest-by-insertion-order entry when at maxEntries', () => {
-            const cache = new TenantCredentialCache(3, 60_000);
+            const cache = new TenantCredentialCache({ maxEntries: 3, ttlMs: 60_000 });
             cache.set('tenant-a', 'trigger', 1, { tag: 'first' });
             cache.set('tenant-a', 'trigger', 2, { tag: 'second' });
             cache.set('tenant-a', 'trigger', 3, { tag: 'third' });
@@ -176,7 +176,7 @@ describe('TenantCredentialCache (EW-742 P3.1 / T21)', () => {
 
     describe('size()', () => {
         it('reflects entry count through inserts, evictions, and invalidations', () => {
-            const cache = new TenantCredentialCache(3, 60_000);
+            const cache = new TenantCredentialCache({ maxEntries: 3, ttlMs: 60_000 });
             expect(cache.size()).toBe(0);
 
             cache.set('tenant-a', 'trigger', 1, { v: 1 });
