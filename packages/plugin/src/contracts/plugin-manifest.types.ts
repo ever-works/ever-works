@@ -34,7 +34,19 @@ export const PLUGIN_CATEGORIES = [
 	// declare itself with this category for both managed + BYO modes.
 	// See `capabilities/dns.interface.ts` and
 	// `docs/specs/features/cloudflare-dns-plugin/spec.md`.
-	'dns'
+	'dns',
+	// EW-742 P3.2 follow-up — pluggable secret-store-resolver backends.
+	// Resolves an opaque `credentialsSecretRef` pointer (e.g.
+	// `vault:secret/tenants/acme/temporal`, `k8s:tenant-acme-creds`,
+	// `env:TENANT_ACME_TRIGGER`, `infisical:ws-abc/prod/tenants/acme`)
+	// into a plaintext credential bag for the tenant-aware runtime resolver.
+	// See `capabilities/secret-store.interface.ts`. Bundled implementations:
+	// `@ever-works/secret-store-vault`, `@ever-works/secret-store-k8s`,
+	// `@ever-works/secret-store-infisical`, `@ever-works/secret-store-doppler`.
+	// Defaults (`inline:` + `env:`) live in
+	// `packages/agent/src/tasks/in-process-secret-store-resolver.service.ts`
+	// — no separate plugin package because they have zero external deps.
+	'secret-store-resolver'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
