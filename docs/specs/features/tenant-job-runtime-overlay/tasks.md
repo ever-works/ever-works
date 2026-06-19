@@ -1,7 +1,7 @@
 # Task Breakdown: Tenant-Scoped Job-Runtime Overlay
 
 **Feature ID**: `tenant-job-runtime-overlay`
-**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache + T22 stamper helper) + P3.2 (resolver bindToTenant wiring + SecretStoreResolver contract + InProcessSecretStoreResolver default) + P4 (T31 contract — `tenantId` on JobEnqueueOptions) + P5 + P7 (T41+T42+T44) landed on `main` or in this PR. P2.2 (schema-driven form + e2e), P3.1 (T22 per-dispatcher wiring), P4 (per-provider worker hosts T25–T30 + T31 per-provider stamping + T32 isolation tests + per-provider bindToTenant implementations), P5.1 (per-tenant whitelist), P6 (conformance), P7 (docs T43), and non-`inline:` SecretStoreResolver implementations (vault:, k8s:, op:) remain.
+**Status**: `In progress` — P0 + P1.0 + P1 + P2.0 + P2.1 + P3 (T20+T23+T24 resolver) + P3.1 (T21 cache + T22 stamper helper + **T22 per-dispatcher wiring across all 10 in-platform dispatchers, with worker-host `TenantRuntimeBindingResolverService` consumption**) + P3.2 (resolver bindToTenant wiring + SecretStoreResolver contract + InProcessSecretStoreResolver default + Trigger.dev `bindToTenant` minimal impl + non-`inline:` SecretStoreResolver plugin packages: Vault / K8s / Infisical / Doppler / AWS-SM / GCP-SM / Azure-KV) + P4 (T31 contract — `tenantId` on JobEnqueueOptions) + P5 + P7 (T41+T42+T44) landed on `main` (cascades through develop→stage→main where applicable, develop-only for the late-2026 batches). P2.2 (schema-driven form + e2e), P4 (per-provider worker hosts T25–T30 + T31 per-provider stamping + T32 isolation tests + per-provider real `bindToTenant` for Temporal/BullMQ/pg-boss/Inngest), P5.1 (per-tenant whitelist), P6 (conformance), P7 (docs T43), and per-tenant Trigger.dev BYO project switching (requires real per-tenant Trigger.dev infra to validate) remain.
 **Last updated**: 2026-06-19
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md) · **Providers**: [`./providers.md`](./providers.md) · **Epic**: [EW-742](https://evertech.atlassian.net/browse/EW-742) · **Story**: [EW-743](https://evertech.atlassian.net/browse/EW-743) · **ADR**: [ADR-017](../../decisions/017-tenant-scoped-job-runtime-overlay.md)
 
@@ -46,13 +46,36 @@ T20 + T23 + T24 ✅ Done in [#1380](https://github.com/ever-works/ever-works/pul
 - [x] **T20.** Tenant-aware resolver at `packages/agent/src/tasks/tenant-aware-runtime.resolver.ts` (`TenantAwareRuntimeResolver`) wraps the EW-685 P0 T4 binding-factory registry: `resolve(tenantId)` returns the instance default for `null` / no-row / inherit / disabled; for `byo` + `override` + `enabled` it logs the deferral and still returns the instance default until EW-686 P2 lands the per-provider credential-binding hook. `getEffectiveBinding(tenantId)` returns the metadata T22 will stamp onto the run record.
 - [x] **T21.** Credential cache with 15–60s TTL in `packages/agent/src/tasks/tenant-credential.cache.ts` — keyed by `(tenantId, providerId, credentialVersion)`, in-process LRU with explicit invalidate on version bump or force-invalidate. Standalone `@Injectable()` class with no DI dependencies (defaults: `maxEntries=1024`, `ttlMs=30_000`); insertion-order LRU (no promotion-on-read so an in-flight runs snapshot does not get kept alive past its rotation window — see ADR-017 §3 / Q4). Provided + exported via `TenantJobRuntimeModule`. PR: [#1381](https://github.com/ever-works/ever-works/pull/1381).
 - [x] **T22 (helper).** `RuntimeBindingStamperService` at `packages/agent/src/tasks/runtime-binding-stamper.service.ts` — standalone `@Injectable()` whose `stamp(tenantId)` returns `{ providerId, credentialVersion }` for byo/override+enabled tenants and `{ null, null }` for inherit/no-row/disabled/no-tenant (fail-open on DB hiccup with `Logger.warn`). Provided + exported via `TenantJobRuntimeModule`. The dispatcher call sites adopt this helper incrementally — each enqueue payload type adds a `credentialVersion?: number` field on its own PR, no big-bang bus stop. The actual per-call-site wiring (the `await stamper.stamp(tenantId)` inside each of the twelve dispatchers + the run-record schema column it writes into) remains open below.
-- [ ] **T22 (per-dispatcher wiring).** Walk the twelve dispatcher call sites in `packages/agent/src/tasks/_tasks-symbols.ts` and call `await stamper.stamp(tenantId)` inside each enqueue path; persist `credentialVersion` onto the matching run / history row so the P4 worker host can later resolve the pinned snapshot via `CredentialVersionService.resolveSnapshot`. Each dispatcher migration is its own PR — no coordinated bus stop.
+- [x] **T22 (per-dispatcher wiring).** Walk the dispatcher call sites in `packages/agent/src/tasks/_tasks-symbols.ts` (plus `KB_REEMBED_WORK_DISPATCHER` wired in `apps/api/src/works/works.module.ts` and `WEBHOOK_DELIVERY_DISPATCHER` in `apps/api/src/webhooks/`), call `await stamper.stamp(tenantId)` inside each enqueue path, and persist `(providerId, credentialVersion)` on the payload so the P4 worker host can later resolve the pinned snapshot via `CredentialVersionService.resolveSnapshot`. Each dispatcher migration shipped as its own PR — no coordinated bus stop.
+
+    **10 stamped + consumed dispatchers (producer ↔ task):**
+
+    | # | Dispatcher | Resolver helper | Producer PR | Worker PR |
+    |---|---|---|---|---|
+    | 1 | `KB_EMBED_DOCUMENT_DISPATCHER` | `resolveForWork` | #1427 (PoC) | #1435 |
+    | 2 | `KB_MIRROR_DOCUMENT_DISPATCHER` | `resolveForWork` | #1430 (Tier 1) | #1439 |
+    | 3 | `KB_NORMALIZE_MEDIA_DISPATCHER` (video+audio) | `resolveForWork` | #1430 (Tier 1) | #1439 |
+    | 4 | `KB_TRANSCRIBE_DISPATCHER` | `resolveForWork` | #1436 | #1439 |
+    | 5 | `WORK_GENERATION_DISPATCHER` | `resolveForWork` | #1431 (Tier 2) | #1439 |
+    | 6 | `WORK_IMPORT_DISPATCHER` | `resolveForWork` | #1431 (Tier 2) | #1439 |
+    | 7 | `KB_ORG_OVERLAY_FANOUT_DISPATCHER` | `resolveForOrganization` | #1430 (Tier 1) | #1442 |
+    | 8 | `TEMPLATE_CUSTOMIZATION_DISPATCHER` | `resolveForCustomization` | #1431 (Tier 2) | #1442 |
+    | 9 | `WEBHOOK_DELIVERY_DISPATCHER` (apps/api) | `resolveForSubscription` | #1445 | #1445 |
+    | 10 | `KB_REEMBED_WORK_DISPATCHER` (pgvector→apps/api) | `resolveForWork` | #1448 | #1448 |
+
+    **Worker-host infrastructure shipped in #1432**: `TenantRuntimeBindingResolverService` at `packages/tasks/src/trigger/worker/services/tenant-runtime-binding-resolver.service.ts` exposes `resolve(payload, tenantId)` + 4 convenience wrappers (`resolveForWork`/`Organization`/`Customization`/`Subscription`) returning a 4-state status (`no-binding` / `resolved` / `drained` / `error`, fail-open per FR-5). `CredentialVersionService` proxied through `TriggerInternalController.remoteMap` so worker tasks can call `resolveSnapshot` via the existing RPC channel. The webhook-delivery task uses **direct** providers in `TriggerWebhookDeliveryModule` (avoids a pointless RPC hop since that module already has direct DB access).
+
+    **Intentionally out-of-scope dispatchers** (do NOT need T22 stamping):
+
+    - `KB_BACKFILL_SKELETON_DISPATCHER` — fleet-wide operator bootstrap script. Runs as the instance-default credentials by design (no tenant scope; the caller enumerates `workIds` that may span tenants). Adding T22 stamping here would be semantically incorrect.
+
+    **Per-tenant credential application (deferred to a future PR with real BYO infra):** the resolved `snapshot.credentials` is logged + threaded through the worker but the Trigger.dev SDK is still configured globally at boot. Per-tenant Trigger.dev BYO project switching (calling `configure({ accessToken: snapshot.credentials.accessToken })` per dispatch) needs an actual operator with per-tenant Trigger.dev projects to validate; building speculatively risks getting the design wrong. Today the `'resolved'` status is observability-only — the worker still runs against the instance default credentials.
 - [x] **T23.** Fallback path to instance-global default when a tenant has no overlay row — resolver returns the EW-683 instance binding unchanged; the `getActive() = null` semantic propagates as `null` (in-process dev fallback preserved). Tests in T24 prove the zero-overhead path for tenants that never opt in.
 - [x] **T24.** Unit tests for the resolver under `packages/agent/src/tasks/__tests__/tenant-aware-runtime.resolver.spec.ts` — 12 cases covering inherit fallback, no-row fallback, kill switch, byo/override stopgap + log emission, `getEffectiveBinding` metadata, and the `getActive() = null` propagation.
 
-### Phase 3.1 — Enqueue capture (deferred)
+### Phase 3.1 — Enqueue capture · `[EW-742 P3.1]` ✅ DONE
 
-- [ ] **T22** (above) ships once a follow-up PR walks the enqueue call sites to stamp `credentialVersion` into each run record. The T21 cache is already in place to serve the snapshot lookup at run time.
+- [x] **T22** (above) — per-dispatcher wiring shipped across PRs #1427 / #1430 / #1431 / #1436 / #1442 / #1445 / #1448 (producer side) and #1432 / #1435 / #1439 / #1442 / #1445 / #1448 (worker side). The T21 cache is in place to serve the snapshot lookup at run time; today the worker-host resolver consumes `(providerId, credentialVersion)` from the payload and classifies as `no-binding` / `resolved` / `drained` / `error` (skip-and-ack on drained, fall-through otherwise).
 
 ### Phase 3.2 — Resolver `bindToTenant` wiring · `[EW-742 P3.2]`
 
