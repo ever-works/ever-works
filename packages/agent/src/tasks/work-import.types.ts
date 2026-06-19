@@ -21,6 +21,13 @@ export type WorkImportPayload = {
     providers?: ProvidersDto;
     enrichmentConfig?: ImportEnrichmentConfigDto;
     worksConfig?: ResolvedWorksConfig | null;
+    /**
+     * EW-742 P3.2 T22 — enqueue-site tenant-runtime binding capture.
+     * See `KbEmbedDocumentPayload` (the PoC dispatcher) for the full
+     * contract; the same null/null fail-open semantics apply.
+     */
+    providerId?: string | null;
+    credentialVersion?: number | null;
 };
 
 export type WorkImportMetrics = {

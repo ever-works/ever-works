@@ -47,6 +47,7 @@ import {
     WorkGenerationPayload,
     WORK_GENERATION_DISPATCHER,
     WorkGenerationDispatcher,
+    RuntimeBindingStamperService,
 } from '@src/tasks';
 import { WorkScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { WorkOwnershipService } from './work-ownership.service';
@@ -151,6 +152,14 @@ export class WorkGenerationService {
         private readonly generationDispatcher?: WorkGenerationDispatcher,
         @Optional()
         private readonly notificationService?: NotificationService,
+        // EW-742 P3.2 T22 — enqueue-site tenant runtime binding capture.
+        // Optional so isolated unit tests and pre-overlay deployments
+        // keep constructing — when absent, payload ships null/null and
+        // the worker falls back to the instance default (byte-identical
+        // pre-T22 path). See `KnowledgeBaseService.stampForWork` for the
+        // shared pattern.
+        @Optional()
+        private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
     ) {}
 
     async generateItems(
@@ -1313,6 +1322,29 @@ Only include image URLs that are absolute URLs (starting with http).`;
         });
     }
 
+    /**
+     * EW-742 P3.2 T22 — resolve `(providerId, credentialVersion)` for
+     * the worker host's `resolveSnapshot` lookup. Returns null/null
+     * when stamper isn't wired, tenantId is null, or stamper throws
+     * (fail-open per FR-5; worker uses instance default).
+     */
+    private async stampForWork(
+        tenantId: string | null,
+    ): Promise<{ providerId: string | null; credentialVersion: number | null }> {
+        if (!this.runtimeBindingStamper) {
+            return { providerId: null, credentialVersion: null };
+        }
+        try {
+            return await this.runtimeBindingStamper.stamp(tenantId);
+        } catch (err) {
+            this.logger.debug(
+                `dispatchGenerationTask: stamper lookup failed for tenant=${tenantId} ` +
+                    `(${(err as Error).message}); falling back to instance default.`,
+            );
+            return { providerId: null, credentialVersion: null };
+        }
+    }
+
     private async dispatchGenerationTask(
         mode: WorkGenerationMode,
         work: Work,
@@ -1331,6 +1363,12 @@ Only include image URLs that are absolute URLs (starting with http).`;
             }),
         ]);
 
+        // EW-742 P3.2 T22 — stamp `(providerId, credentialVersion)` for
+        // the worker host. Work entity has `tenantId` already on hand
+        // (passed in by the caller) so we skip the redundant Work
+        // lookup and call the stamper directly. Fail-open per FR-5.
+        const binding = await this.stampForWork(work.tenantId ?? null);
+
         const payload: WorkGenerationPayload = {
             workId: work.id,
             userId: user.id,
@@ -1343,6 +1381,8 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 new Date().toISOString(),
             triggerSource: context.triggeredBy,
             scheduleId: context.scheduleId,
+            providerId: binding.providerId,
+            credentialVersion: binding.credentialVersion,
         };
 
         const dispatchedId = this.generationDispatcher
