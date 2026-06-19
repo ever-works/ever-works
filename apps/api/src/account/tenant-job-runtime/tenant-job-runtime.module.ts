@@ -6,6 +6,7 @@ import {
     CredentialVersionService,
     InMemoryJobRuntimeProviderRegistry,
     JOB_RUNTIME_PROVIDER_REGISTRY,
+    RuntimeBindingStamperService,
     TenantAwareRuntimeResolver,
     TenantCredentialCache,
 } from '@ever-works/agent/tasks';
@@ -52,6 +53,7 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
     providers: [
         TenantJobRuntimeService,
         CredentialVersionService,
+        RuntimeBindingStamperService,
         TenantAwareRuntimeResolver,
         TenantCredentialCache,
         {
@@ -60,6 +62,6 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         },
     ],
     controllers: [TenantJobRuntimeController],
-    exports: [TenantCredentialCache, TenantAwareRuntimeResolver],
+    exports: [TenantCredentialCache, TenantAwareRuntimeResolver, RuntimeBindingStamperService],
 })
 export class TenantJobRuntimeModule {}
