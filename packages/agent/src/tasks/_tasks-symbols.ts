@@ -30,10 +30,6 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) — credential
     // versioning service for graceful drain on rotation. See ADR-017 §3.
     'CredentialVersionService',
-    // EW-742 P3.2 follow-up — Doppler SecretStoreResolver. Opt-in;
-    // operators using Doppler override the SECRET_STORE_RESOLVER
-    // binding. Default deployment keeps InProcessSecretStoreResolver.
-    'DopplerSecretStoreResolver',
     // EW-685 P0 T4 — default in-memory implementation of
     // `JobRuntimeProviderRegistry`, exposed via the barrel so DI modules
     // can bind it as the `JOB_RUNTIME_PROVIDER_REGISTRY` useClass.

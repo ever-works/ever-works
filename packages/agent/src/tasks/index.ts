@@ -100,7 +100,6 @@ export { InProcessSecretStoreResolver } from './in-process-secret-store-resolver
 // @ever-works/secret-store-infisical-plugin
 // (packages/plugins/secret-store-infisical/).
 
-// EW-742 P3.2 follow-up — DopplerSecretStoreResolver. HTTP against
-// Doppler REST API (`/v3/configs/config/secrets`); freemium SaaS
-// secrets-management platform. Opt-in via DI binding override.
-export { DopplerSecretStoreResolver } from './doppler-secret-store-resolver.service';
+// EW-742 P3.2 — Doppler SecretStoreResolver now lives at
+// @ever-works/secret-store-doppler-plugin
+// (packages/plugins/secret-store-doppler/).

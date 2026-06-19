@@ -70,7 +70,7 @@ T20 + T23 + T24 ✅ Done in [#1380](https://github.com/ever-works/ever-works/pul
 - [x] **T20.6.** `VaultSecretStorePlugin` at `packages/plugins/secret-store-vault/` — true plugin package with everworks.plugin manifest (category: `secret-store-resolver`, capabilities: `[secret-store-resolve]`), tsup build, vitest tests (13/13 pass). Implements `IPlugin + ISecretStoreProvider`. Old `@Injectable()` class at `packages/agent/src/tasks/vault-secret-store-resolver.service.ts` deleted (no consumer was registering it).
 - [x] **T20.7.** `K8sSecretStorePlugin` at `packages/plugins/secret-store-k8s/` — true plugin package; old `@Injectable()` class deleted from `packages/agent/src/tasks/`. 13/13 plugin vitest pass.
 - [x] **T20.8.** `InfisicalSecretStorePlugin` at `packages/plugins/secret-store-infisical/` — true plugin package; old `@Injectable()` class deleted. 12/12 plugin vitest pass.
-- [ ] **T20.9.** Same migration for `DopplerSecretStoreResolver` → `packages/plugins/secret-store-doppler/`.
+- [x] **T20.9.** `DopplerSecretStorePlugin` at `packages/plugins/secret-store-doppler/` — true plugin package; old `@Injectable()` class deleted. 13/13 plugin vitest pass.
 - [ ] **T20.10.** New cloud-vendor plugin packages: `secret-store-aws-sm` (AWS Secrets Manager), `secret-store-gcp-sm` (GCP Secret Manager), `secret-store-azure-kv` (Azure Key Vault). Each is a separate PR from the start as a plugin package — no `@Injectable()` shim intermediate.
 
 ## Phase 4 — Worker host · `[EW-742 P4]`
