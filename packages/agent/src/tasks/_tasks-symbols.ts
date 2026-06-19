@@ -46,6 +46,13 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_ORG_OVERLAY_FANOUT_DISPATCHER',
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
+    // EW-742 P3.1 / T22 — enqueue-site `credentialVersion` capture helper.
+    // Dispatchers `await stamper.stamp(tenantId)` and write the result into
+    // the run record so the worker host can later resolve THAT snapshot
+    // via CredentialVersionService.resolveSnapshot. See
+    // `runtime-binding-stamper.service.ts` header for the per-dispatcher
+    // wiring deferral.
+    'RuntimeBindingStamperService',
     'TEMPLATE_CUSTOMIZATION_DISPATCHER',
     // EW-742 P3 / EW-747 (T20 + T23) — tenant-aware resolver wrapping
     // the EW-685 binding factory registry. See
