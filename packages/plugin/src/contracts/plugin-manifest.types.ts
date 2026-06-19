@@ -46,7 +46,23 @@ export const PLUGIN_CATEGORIES = [
 	// Defaults (`inline:` + `env:`) live in
 	// `packages/agent/src/tasks/in-process-secret-store-resolver.service.ts`
 	// — no separate plugin package because they have zero external deps.
-	'secret-store-resolver'
+	'secret-store-resolver',
+	// EW-683 / EW-685 / EW-742 P3.2 follow-up — pluggable job-runtime
+	// backends. Each implements `IJobRuntimeProvider` (see
+	// `capabilities/job-runtime.interface.ts`). The selector
+	// `EVER_WORKS_JOB_RUNTIME` picks one registered provider per instance;
+	// the rest stay inert but loaded so a hot-swap stays cheap. Bundled
+	// implementations: `@ever-works/trigger-tasks` (in-tree, the default
+	// for managed deployments), `@ever-works/job-runtime-temporal-plugin`,
+	// `@ever-works/job-runtime-bullmq-plugin`,
+	// `@ever-works/job-runtime-pgboss-plugin`,
+	// `@ever-works/job-runtime-inngest-plugin`. The four standalone
+	// plugin packages ship `bindToTenant` for per-tenant BYO routing
+	// (EW-686 P2 / EW-742 P3.2) — actual per-task dispatching is gated
+	// on real customer demand because each runtime's operational model
+	// differs significantly (push vs pull, namespace vs prefix vs schema
+	// isolation, retry/backoff semantics).
+	'job-runtime'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
