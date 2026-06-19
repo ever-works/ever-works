@@ -11,87 +11,68 @@ import type {
 	WorkerHostHandle,
 	WorkerHostOptions
 } from '@ever-works/plugin';
+import { TemporalDispatcherFactory } from './temporal-dispatcher-factory.js';
+import { TemporalWorkerHostFactory } from './temporal-worker-host-factory.js';
 
 /**
  * EW-742 P3.2 follow-up — Temporal `IJobRuntimeProvider` plugin.
  *
- * # What this plugin ships TODAY
+ * # Operator-side wiring
  *
- *   - Full `IPlugin` + `IJobRuntimeProvider` contract surface so the
- *     binding factory in `packages/agent/src/tasks/job-runtime.providers.ts`
- *     can register it alongside the Trigger.dev provider.
- *   - **Real `bindToTenant` implementation** with per-`(tenantId,
- *     credentialVersion)` memoisation, matching the pattern of
- *     {@link TriggerJobRuntimeProvider.bindToTenant} (#1426). The
- *     resolved snapshot is exposed off-spec as `view.tenantSnapshot`
- *     so the T22 stamper can stamp `(providerId, credentialVersion)`
- *     onto run records.
- *   - `bindToTenant` extracts the per-tenant Temporal **namespace**
- *     from `snapshot.credentials.namespace` (per ADR-017 Q1 —
- *     namespace-per-tenant) and exposes it on the view as
- *     `tenantNamespace` so a future dispatcher impl can route to it.
+ *   - `useDispatchers(map)` — replace throwing stub Proxy with a real
+ *     `JobRuntimeDispatchers` map (typically built via
+ *     `TemporalDispatcherFactory`).
+ *   - `useDispatcherFactory(factory)` — `cancel(runId)` and
+ *     `getRunStatus(runId)` delegate to it (cancel + describe).
+ *   - `useWorkerHostFactory(factory)` — `startWorkerHost()` actually
+ *     calls `Worker.run()` on every operator-supplied Worker spec.
+ *   - `dispatchersBuilder` ctor option — per-tenant routing for
+ *     namespace-per-tenant (ADR-017 Q1).
  *
- * # What this plugin DOES NOT ship (gated on operator demand)
+ * # bindToTenant
  *
- *   - **Per-task workflow dispatchers**. Every `dispatchXxx` method
- *     throws a typed `TemporalDispatcherNotConfiguredError` with a
- *     clear operator-facing message. Wiring real workflows requires
- *     defining each `*_DISPATCHER` payload as a Temporal Workflow
- *     under the operator's own Temporal Cluster — that's a per-
- *     deployment design decision (workflow versioning, signal/query
- *     shape, activity decomposition) that we deliberately defer to
- *     operator-owned PRs.
- *   - **`startWorkerHost`**. Temporal is a pull-model runtime; the
- *     operator stands up their own worker process(es) against their
- *     cluster + namespace. The method returns a no-op handle so
- *     callers that generically "start the worker host if the
- *     provider supports it" don't branch.
- *
- * # Operator setup
- *
- *   1. Set `EVER_WORKS_JOB_RUNTIME=temporal` in the API env.
- *   2. Configure `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE` (the
- *      instance default — used when no tenant overlay applies), and
- *      mTLS via `TEMPORAL_TLS_CERT` + `TEMPORAL_TLS_KEY`.
- *   3. For per-tenant BYO: provision tenant credentials with
- *      `{ namespace: 'tenant-acme', address?, tlsCert?, tlsKey? }`
- *      and store via the `SECRET_STORE_RESOLVER` binding (Vault,
- *      K8s, Infisical, Doppler, AWS-SM, GCP-SM, Azure-KV — all
- *      shipped as plugins).
- *   4. Implement the per-payload-type Workflows in your own worker
- *      process and either subclass this plugin to override the
- *      stub dispatchers, or wrap it with a delegating provider that
- *      ships your dispatchers.
- *
- * Spec: [`docs/specs/features/tenant-job-runtime-overlay/providers.md`](../../../../docs/specs/features/tenant-job-runtime-overlay/providers.md) (Temporal section, ADR-017 Q1).
+ * Extracts the per-tenant Temporal namespace from
+ * `snapshot.credentials.namespace`. Memoised on `(tenantId,
+ * credentialVersion)` per the `IJobRuntimeProvider.bindToTenant`
+ * idempotency clause.
  */
 
 export class TemporalDispatcherNotConfiguredError extends Error {
 	constructor(dispatcherName: string) {
 		super(
 			`@ever-works/job-runtime-temporal-plugin: ${dispatcherName} is not configured. ` +
-				'Subclass TemporalJobRuntimePlugin (or wrap it with a delegating provider) and ' +
-				'override the dispatchers field with operator-defined Temporal workflow handlers ' +
-				'per `docs/specs/features/tenant-job-runtime-overlay/providers.md`.'
+				'Call plugin.useDispatchers({ ... }) with operator-supplied Temporal dispatchers ' +
+				'built via TemporalDispatcherFactory (see plugin header for an example), ' +
+				'or pass dispatchersBuilder when constructing the plugin for per-tenant routing.'
 		);
 		this.name = 'TemporalDispatcherNotConfiguredError';
 	}
 }
 
-/**
- * View extension on top of the standard {@link IJobRuntimeProvider}
- * shape for Temporal-specific binding fields.
- */
 export interface TemporalTenantBindingView extends IJobRuntimeProvider {
 	readonly tenantSnapshot: TenantCredentialSnapshot;
 	/**
 	 * Per-tenant Temporal namespace (per ADR-017 Q1
-	 * namespace-per-tenant). When the operator's per-payload-type
-	 * dispatchers are wired they should call `namespaces.connect()`
-	 * (or equivalent) against this namespace for every dispatch.
+	 * namespace-per-tenant). The operator's per-tenant `WorkflowClient`
+	 * is configured against this namespace.
 	 */
 	readonly tenantNamespace: string | null;
 }
+
+export interface TemporalJobRuntimePluginOptions {
+	/** Per-tenant dispatcher builder — see plugin header. */
+	readonly dispatchersBuilder?: (snapshot: TenantCredentialSnapshot) => JobRuntimeDispatchers;
+}
+
+const TEMPORAL_STATUS_TO_RUN_STATUS: Readonly<Record<string, JobRunStatus>> = {
+	RUNNING: 'running',
+	COMPLETED: 'completed',
+	FAILED: 'failed',
+	CANCELED: 'cancelled',
+	TERMINATED: 'cancelled',
+	TIMED_OUT: 'failed',
+	CONTINUED_AS_NEW: 'running'
+};
 
 export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 	readonly id = 'job-runtime-temporal';
@@ -137,12 +118,7 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	};
 
-	/**
-	 * Stub dispatchers — every method throws
-	 * {@link TemporalDispatcherNotConfiguredError}. Operators override
-	 * by subclassing or wrapping (see class JSDoc "Operator setup").
-	 */
-	readonly dispatchers: JobRuntimeDispatchers = new Proxy(
+	private readonly stubDispatchers: JobRuntimeDispatchers = new Proxy(
 		{},
 		{
 			get(_target, prop: string): unknown {
@@ -156,8 +132,34 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 	);
 
+	private dispatchersImpl: JobRuntimeDispatchers = this.stubDispatchers;
+	private workerHostFactory: TemporalWorkerHostFactory | null = null;
+	private dispatcherFactory: TemporalDispatcherFactory | null = null;
+
 	private context?: PluginContext;
 	private readonly tenantViews = new Map<string, TemporalTenantBindingView>();
+
+	constructor(private readonly opts: TemporalJobRuntimePluginOptions = {}) {}
+
+	get dispatchers(): JobRuntimeDispatchers {
+		return this.dispatchersImpl;
+	}
+
+	useDispatchers(map: JobRuntimeDispatchers): this {
+		this.dispatchersImpl = Object.freeze({ ...map });
+		this.tenantViews.clear();
+		return this;
+	}
+
+	useWorkerHostFactory(factory: TemporalWorkerHostFactory): this {
+		this.workerHostFactory = factory;
+		return this;
+	}
+
+	useDispatcherFactory(factory: TemporalDispatcherFactory): this {
+		this.dispatcherFactory = factory;
+		return this;
+	}
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
@@ -169,47 +171,36 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 	}
 
 	async registerSchedules(_schedules: readonly ScheduleSpec[]): Promise<void> {
-		// Stub — Temporal Schedules require workflow definitions which
-		// only the operator can supply. No-op so the binding factory
-		// can call this at boot without throwing.
+		// Temporal Schedules require workflow definitions which only
+		// the operator can supply. Operators that need scheduled
+		// workflows wire `client.schedule.create(...)` themselves and
+		// call it from their bootstrap. Left as no-op here so the
+		// binding factory can call it at boot without throwing.
 	}
 
-	async cancel(_runId: string): Promise<boolean> {
-		// Stub — operator-overridden via subclass / wrapper. Return
-		// `false` so callers don't assume cancellation succeeded.
+	async cancel(runId: string): Promise<boolean> {
+		if (this.dispatcherFactory) return this.dispatcherFactory.cancel(runId);
 		return false;
 	}
 
-	async getRunStatus(_runId: string): Promise<JobRunStatus> {
-		return 'unknown';
+	async getRunStatus(runId: string): Promise<JobRunStatus> {
+		if (!this.dispatcherFactory) return 'unknown';
+		const status = await this.dispatcherFactory.describe(runId);
+		if (!status) return 'unknown';
+		return TEMPORAL_STATUS_TO_RUN_STATUS[status] ?? 'unknown';
 	}
 
 	isEnabled(): boolean {
-		// Temporal is enabled when an operator has wired the address +
-		// namespace env vars. We don't actually attempt a connection
-		// here — `isEnabled()` is called at boot; a failed connection
-		// surfaces at first-dispatch time.
 		const address = process.env.TEMPORAL_ADDRESS;
 		const namespace = process.env.TEMPORAL_NAMESPACE;
 		return Boolean(address && namespace);
 	}
 
-	async startWorkerHost(_opts: WorkerHostOptions): Promise<WorkerHostHandle> {
-		// Pull-model runtime — operator runs their own worker
-		// process(es). No-op handle so generic callers don't branch.
+	async startWorkerHost(opts: WorkerHostOptions = {}): Promise<WorkerHostHandle> {
+		if (this.workerHostFactory) return this.workerHostFactory.start(opts);
 		return { stop: async () => undefined };
 	}
 
-	/**
-	 * EW-742 P3.2 — per-tenant binding for Temporal namespace-per-
-	 * tenant routing (ADR-017 Q1). Returns a frozen view with the
-	 * snapshot + tenant namespace exposed.
-	 *
-	 * Memoised on `(tenantId, credentialVersion)` per the
-	 * `IJobRuntimeProvider.bindToTenant` idempotency clause. On a
-	 * `credentialVersion` bump the older entry is evicted in place so
-	 * the cache stays bounded by tenant count.
-	 */
 	bindToTenant(snapshot: TenantCredentialSnapshot): TemporalTenantBindingView {
 		const cacheKey = `${snapshot.tenantId}:${snapshot.credentialVersion}`;
 		const cached = this.tenantViews.get(cacheKey);
@@ -223,6 +214,10 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 				? snapshot.credentials.namespace
 				: null;
 
+		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
+			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
+			: base.dispatchersImpl;
+
 		const view: TemporalTenantBindingView = Object.freeze({
 			id: base.id,
 			name: base.name,
@@ -232,7 +227,7 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 			settingsSchema: base.settingsSchema,
 			runtimeId: base.runtimeId,
 			get dispatchers(): JobRuntimeDispatchers {
-				return base.dispatchers;
+				return dispatchersForView;
 			},
 			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
 				base.registerSchedules(schedules),
@@ -255,8 +250,6 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 			tenantNamespace
 		});
 
-		// Evict any older entry for this tenant (cache stays bounded
-		// by tenant count, not version count).
 		for (const key of this.tenantViews.keys()) {
 			if (key.startsWith(`${snapshot.tenantId}:`)) {
 				this.tenantViews.delete(key);
