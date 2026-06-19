@@ -66,3 +66,12 @@ export type { JobRuntimeProviderRegistry } from './job-runtime.providers';
 // resolver for the P3 stopgap behaviour and the P3.1 / T21 / T22
 // deferral notes.
 export { TenantAwareRuntimeResolver } from './tenant-aware-runtime.resolver';
+
+// EW-742 P3.1 / T22 — enqueue-site credentialVersion capture helper.
+// Standalone @Injectable() that returns the `(providerId,
+// credentialVersion)` tuple a dispatcher should stamp onto a run
+// record so the worker host can resolve the same snapshot via
+// `CredentialVersionService.resolveSnapshot`. Per-dispatcher wiring
+// lands incrementally on top — see the file header for the
+// deliberate-seam rationale.
+export { RuntimeBindingStamperService } from './runtime-binding-stamper.service';
