@@ -10,38 +10,19 @@ import {
     KB_BACKFILL_SKELETON_DISPATCHER,
     KB_EMBED_DOCUMENT_DISPATCHER,
     KB_ORG_OVERLAY_FANOUT_DISPATCHER,
+    KB_NORMALIZE_MEDIA_DISPATCHER,
+    KB_TRANSCRIBE_DISPATCHER,
+    KB_REEMBED_WORK_DISPATCHER,
     JOB_RUNTIME_PROVIDER_REGISTRY,
     InMemoryJobRuntimeProviderRegistry,
     buildJobRuntimeProviders,
+    type JobRuntimeProviderRegistry,
 } from '@ever-works/agent/tasks';
 import {
     NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
     type NotificationChannelDeliveryDispatcher,
     type NotificationChannelDeliveryPayload,
 } from '@ever-works/agent/facades';
-
-/**
- * EW-685 T4 cutover — the 8 dispatcher symbols TriggerModule owns. The
- * remaining 3 (`KB_NORMALIZE_MEDIA_DISPATCHER`, `KB_TRANSCRIBE_DISPATCHER`,
- * `KB_REEMBED_WORK_DISPATCHER`) are bound separately in
- * `apps/api/src/works/works.module.ts` under custom Trigger.dev SDK
- * adapters with soft-error contracts (each call returns `null` on
- * dispatch failure → the slice-5 reconciliation cron catches the drift).
- * Consolidating those 3 onto TriggerService.dispatchers — and thus
- * routing them through this same factory — is a follow-up PR; the partial
- * cutover here proves the architecture without touching the
- * soft-error path.
- */
-const TRIGGER_OWNED_DISPATCHER_SYMBOLS = [
-    WORK_GENERATION_DISPATCHER,
-    WORK_IMPORT_DISPATCHER,
-    TEMPLATE_CUSTOMIZATION_DISPATCHER,
-    WEBHOOK_DELIVERY_DISPATCHER,
-    KB_MIRROR_DOCUMENT_DISPATCHER,
-    KB_BACKFILL_SKELETON_DISPATCHER,
-    KB_EMBED_DOCUMENT_DISPATCHER,
-    KB_ORG_OVERLAY_FANOUT_DISPATCHER,
-] as const;
 
 @Global()
 @Module({
@@ -77,30 +58,70 @@ const TRIGGER_OWNED_DISPATCHER_SYMBOLS = [
             },
             inject: [TriggerJobRuntimeProvider],
         },
-        // EW-685 T4 cutover — the 8 dispatcher symbols TriggerModule owns,
-        // now bound via the registry. See TRIGGER_OWNED_DISPATCHER_SYMBOLS
-        // header for the deferred 3.
-        ...buildJobRuntimeProviders({ symbols: TRIGGER_OWNED_DISPATCHER_SYMBOLS }),
+        // EW-685 T4 full cutover — every `*_DISPATCHER` symbol now
+        // flows through the registry. `buildJobRuntimeProviders()`
+        // with no `symbols:` filter binds all 11 tokens from the
+        // `@ever-works/agent/tasks` barrel. The previous 3-symbol
+        // carve-out (KB_NORMALIZE_MEDIA / KB_TRANSCRIBE /
+        // KB_REEMBED_WORK) was retired once their custom Trigger.dev
+        // SDK adapters in `apps/api/src/works/works.module.ts` were
+        // replaced by matching `TriggerService.dispatchXxx` methods —
+        // see the trio of `dispatchKbNormalizeMedia` /
+        // `dispatchKbTranscribe` / `dispatchKbReembedWork` impls on
+        // `TriggerService`. From this PR forward, an
+        // `EVER_WORKS_JOB_RUNTIME=bullmq` flip swaps all 11 the same
+        // way (no per-dispatcher special-casing).
+        ...buildJobRuntimeProviders(),
         // Notifications v2 (EW-663) — the facade's delivery dispatcher
-        // contract is `enqueue(payload) → { runId }`, so a thin adapter
-        // bridges to TriggerService.dispatchNotificationChannelDelivery
-        // (which returns the run id, or null when Trigger is disabled →
-        // the facade falls back to in-process delivery).
-        //
-        // NOT routed through the binding factory because its method
-        // shape (`enqueue` returning `{ runId }`) differs from the
-        // `JobRuntimeDispatchers` `dispatchXxx → string | null` shape
-        // every other `*_DISPATCHER` symbol exposes. Migrating it
-        // onto the registry would require either widening the contract
-        // or adding a wrapper layer — neither is in scope here.
+        // contract is `enqueue(payload) → { runId }`, which differs
+        // from the `JobRuntimeDispatchers` `dispatchXxx → string | null`
+        // method shape every other `*_DISPATCHER` symbol exposes. Per
+        // EW-685 T4 full cutover (Path 2 — picked over moving the
+        // symbol onto the registry's 11-symbol list because that would
+        // churn the facade consumer and cross the `@ever-works/agent/
+        // facades` ↔ `@ever-works/agent/tasks` symbol boundary): the
+        // binding stays a custom adapter, but it now resolves the
+        // active provider via the registry instead of the underlying
+        // `TriggerService` instance. The active provider's
+        // `dispatchers.dispatchNotificationChannelDelivery(payload)`
+        // returns a `string | null` run id (null when the runtime is
+        // disabled / no provider registered / the dispatch threw); the
+        // adapter wraps that into the `{ runId }` envelope the facade
+        // expects. When the operator flips
+        // `EVER_WORKS_JOB_RUNTIME=bullmq`, this adapter automatically
+        // routes through the BullMQ provider's dispatchers map — same
+        // single-source-of-truth as the other 11.
         {
             provide: NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
-            useFactory: (trigger: TriggerService): NotificationChannelDeliveryDispatcher => ({
+            useFactory: (
+                registry: JobRuntimeProviderRegistry,
+            ): NotificationChannelDeliveryDispatcher => ({
                 async enqueue(payload: NotificationChannelDeliveryPayload) {
-                    return { runId: await trigger.dispatchNotificationChannelDelivery(payload) };
+                    const provider = registry.getActive();
+                    if (!provider) {
+                        return { runId: null };
+                    }
+                    // The active provider's dispatchers bag is the
+                    // intentionally-untyped `JobRuntimeDispatchers`
+                    // shape (see IJobRuntimeProvider JSDoc); cast to
+                    // the concrete dispatcher to call through. The
+                    // `?.()` guard returns `null` if the runtime
+                    // doesn't implement notification delivery (future
+                    // pull-model providers can opt out).
+                    const dispatch = (
+                        provider.dispatchers as {
+                            dispatchNotificationChannelDelivery?: (
+                                p: NotificationChannelDeliveryPayload,
+                            ) => Promise<string | null>;
+                        }
+                    ).dispatchNotificationChannelDelivery?.bind(provider.dispatchers);
+                    if (!dispatch) {
+                        return { runId: null };
+                    }
+                    return { runId: await dispatch(payload) };
                 },
             }),
-            inject: [TriggerService],
+            inject: [JOB_RUNTIME_PROVIDER_REGISTRY],
         },
     ],
     exports: [
@@ -117,6 +138,11 @@ const TRIGGER_OWNED_DISPATCHER_SYMBOLS = [
         KB_BACKFILL_SKELETON_DISPATCHER,
         KB_EMBED_DOCUMENT_DISPATCHER,
         KB_ORG_OVERLAY_FANOUT_DISPATCHER,
+        // EW-685 T4 full cutover — the 3 KB tokens previously bound
+        // in apps/api/src/works/works.module.ts now ship through here.
+        KB_NORMALIZE_MEDIA_DISPATCHER,
+        KB_TRANSCRIBE_DISPATCHER,
+        KB_REEMBED_WORK_DISPATCHER,
         NOTIFICATION_CHANNEL_DELIVERY_DISPATCHER,
     ],
 })
