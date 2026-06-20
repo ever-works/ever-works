@@ -89,6 +89,8 @@ import {
     // Tenant-scoped job-runtime overlay (EW-742 P1)
     TenantJobRuntimeConfig,
     TenantJobRuntimeAudit,
+    // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
+    TenantRuntimeProviderAllowlist,
 } from '../entities';
 import {
     PluginEntity,
@@ -229,6 +231,8 @@ export const ENTITIES = [
     // Tenant-scoped job-runtime overlay (EW-742 P1)
     TenantJobRuntimeConfig,
     TenantJobRuntimeAudit,
+    // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
+    TenantRuntimeProviderAllowlist,
 ];
 
 /**

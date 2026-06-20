@@ -5,9 +5,13 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { TenantJobRuntimeAudit, TenantJobRuntimeConfig } from '@ever-works/agent/entities';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import {
+    TenantJobRuntimeAudit,
+    TenantJobRuntimeConfig,
+    TenantRuntimeProviderAllowlist,
+} from '@ever-works/agent/entities';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { config } from '../../config/constants';
 import {
@@ -74,6 +78,15 @@ export class TenantJobRuntimeService {
         @InjectRepository(TenantJobRuntimeAudit)
         private readonly auditRepository: Repository<TenantJobRuntimeAudit>,
         private readonly credentialVersionService: CredentialVersionService,
+        // EW-752 P5.1 (T35a + T35b) — per-tenant allow-list overlay repo
+        // and the DataSource for the atomic delete-then-insert of
+        // `replaceTenantAllowlist`. Both are injected via NestJS DI in
+        // production; unit specs that only exercise the EW-742 P5
+        // surface area may pass `undefined` for the new params.
+        @InjectRepository(TenantRuntimeProviderAllowlist)
+        private readonly allowlistRepo: Repository<TenantRuntimeProviderAllowlist>,
+        @InjectDataSource()
+        private readonly dataSource: DataSource,
     ) {}
 
     /**
@@ -420,6 +433,252 @@ export class TenantJobRuntimeService {
             `Audit: tenant=${payload.tenantId} action=${payload.action} ` +
                 `version=${payload.credentialVersion ?? 'null'} ` +
                 `allow-list=[${operatorAllowedProviders.join(',')}]`,
+        );
+    }
+
+    // ─── EW-752 P5.1 (T35a + T35b) — per-tenant allow-list overlay ─────
+
+    /**
+     * Return the per-tenant allow-list provider ids for `tenantId` in
+     * insertion order (`createdAt ASC`). Empty array when the tenant
+     * has no overlay rows — callers interpret that as "inherit the
+     * global list" (when the gating flag is on) or simply ignore the
+     * overlay (when the gating flag is off).
+     *
+     * The result is narrowed against `TENANT_JOB_RUNTIME_PROVIDER_IDS`
+     * so a legacy row with a now-removed provider id is silently
+     * dropped — matches the resolver's "global is the upper bound"
+     * semantic so the read surface stays consistent with what
+     * `getAvailableProvidersForTenant` returns.
+     */
+    async listTenantAllowlist(tenantId: string): Promise<TenantJobRuntimeProviderId[]> {
+        const rows = await this.allowlistRepo.find({
+            where: { tenantId },
+            order: { createdAt: 'ASC' },
+        });
+        const known = new Set<string>(TENANT_JOB_RUNTIME_PROVIDER_IDS);
+        return rows
+            .map((row) => row.providerId)
+            .filter((id): id is TenantJobRuntimeProviderId => known.has(id));
+    }
+
+    /**
+     * Atomically replace the whole per-tenant allow-list row set inside
+     * one transaction (delete-then-insert). An empty `providerIds[]`
+     * clears the overlay (tenant falls back to inheriting the global
+     * list when the gating flag is on).
+     *
+     * Defensive re-validation of each providerId against the static
+     * `TENANT_JOB_RUNTIME_PROVIDER_IDS` list mirrors the DTO-layer
+     * `IsIn` check — the controller already 400s unknown ids via the
+     * DTO, but we re-check here so a programmatic caller (tests, future
+     * internal callers) can never write a row with an unknown id.
+     *
+     * Emits one `operator_allowlist_change` audit row whose `before` /
+     * `after` snapshots are the providerId arrays. The audit write
+     * happens after the transaction commits — if the audit insert
+     * fails, the mutation is still reflected in the table. We accept
+     * that asymmetry because: (a) the per-tenant overlay is itself a
+     * forward-only artefact (the row set IS the latest state), so a
+     * missed audit row is recoverable from the table; (b) wrapping the
+     * audit insert in the same transaction would couple the operator
+     * surface to the audit repo's availability, which is worse.
+     */
+    async replaceTenantAllowlist(
+        tenantId: string,
+        providerIds: TenantJobRuntimeProviderId[] | readonly TenantJobRuntimeProviderId[],
+        createdBy: string | null,
+    ): Promise<TenantJobRuntimeProviderId[]> {
+        const known = new Set<string>(TENANT_JOB_RUNTIME_PROVIDER_IDS);
+        const validated: TenantJobRuntimeProviderId[] = [];
+        for (const id of providerIds) {
+            if (!known.has(id)) {
+                throw new BadRequestException(
+                    `provider '${id}' is not a known runtime — must be one of ` +
+                        `${TENANT_JOB_RUNTIME_PROVIDER_IDS.join(', ')}`,
+                );
+            }
+            validated.push(id);
+        }
+
+        const before = await this.listTenantAllowlist(tenantId);
+
+        await this.dataSource.transaction(async (manager) => {
+            const repo = manager.getRepository(TenantRuntimeProviderAllowlist);
+            await repo.delete({ tenantId });
+            if (validated.length > 0) {
+                const rows = validated.map((providerId) =>
+                    repo.create({
+                        tenantId,
+                        providerId,
+                        createdBy,
+                    }),
+                );
+                await repo.save(rows);
+            }
+        });
+
+        const after = await this.listTenantAllowlist(tenantId);
+        await this.emitAuditRaw({
+            tenantId,
+            actorUserId: createdBy,
+            action: 'operator_allowlist_change',
+            before: { providerIds: before },
+            after: { providerIds: after },
+            credentialVersion: null,
+        });
+
+        return after;
+    }
+
+    /**
+     * Remove a single (tenantId, providerId) row from the per-tenant
+     * allow-list. Returns true when a row was actually removed, false
+     * when none matched. Only emits an `operator_allowlist_change`
+     * audit row when a row was removed — a no-op delete should not
+     * pollute the audit trail.
+     */
+    async deleteTenantAllowlistEntry(
+        tenantId: string,
+        providerId: TenantJobRuntimeProviderId,
+        deletedBy: string | null,
+    ): Promise<boolean> {
+        const before = await this.listTenantAllowlist(tenantId);
+        const result = await this.allowlistRepo.delete({ tenantId, providerId });
+        const removed = (result.affected ?? 0) > 0;
+        if (!removed) {
+            return false;
+        }
+        const after = await this.listTenantAllowlist(tenantId);
+        await this.emitAuditRaw({
+            tenantId,
+            actorUserId: deletedBy,
+            action: 'operator_allowlist_change',
+            before: { providerIds: before },
+            after: { providerIds: after },
+            credentialVersion: null,
+        });
+        return true;
+    }
+
+    /**
+     * EW-752 P5.1 — resolver for the per-tenant intersection.
+     *
+     * Three states:
+     *   1. `isPerTenantGatingEnabled()` is OFF → return the global list.
+     *      The per-tenant table is ignored entirely; behaviour matches
+     *      the EW-742 P5 global-only allow-list byte-for-byte. The
+     *      table can be populated ahead of the flag flip safely.
+     *   2. Flag is ON + tenant has zero rows → return the global list.
+     *      Empty per-tenant row set is the INHERIT default, NOT "tenant
+     *      has nothing". Enabling the flag without populating the table
+     *      is a no-op for every existing tenant.
+     *   3. Flag is ON + tenant has rows → return `global ∩ per-tenant`,
+     *      preserving the global list's order. Entries in the per-tenant
+     *      set that are NOT in the global list are silently dropped —
+     *      the global env var is the upper bound (operators can shrink
+     *      the platform-wide list and any tenant overlay that
+     *      referenced a removed provider just stops resolving it).
+     */
+    async getAvailableProvidersForTenant(
+        tenantId: string,
+    ): Promise<TenantJobRuntimeProviderId[]> {
+        const global = this.getAvailableProviders();
+        if (!config.tenantJobRuntime.isPerTenantGatingEnabled()) {
+            return global;
+        }
+        const perTenant = await this.listTenantAllowlist(tenantId);
+        if (perTenant.length === 0) {
+            return global;
+        }
+        const perTenantSet = new Set<string>(perTenant);
+        return global.filter((id) => perTenantSet.has(id));
+    }
+
+    // ─── EW-752 P5.1 (T35b) — boot-time audit row helpers ──────────────
+
+    /**
+     * Return the most recent `operator_allowlist_boot` audit row
+     * regardless of tenantId (boot rows always carry `tenantId = NULL`
+     * but the query is intentionally tenant-agnostic — the boot audit
+     * is global state).
+     */
+    async findLatestBootAudit(): Promise<TenantJobRuntimeAudit | null> {
+        const row = await this.auditRepository.findOne({
+            where: { action: 'operator_allowlist_boot' },
+            order: { occurredAt: 'DESC' },
+        });
+        return row ?? null;
+    }
+
+    /**
+     * Insert a boot-time `operator_allowlist_boot` audit row with
+     * `tenantId = NULL`. Convenience wrapper used by
+     * `TenantJobRuntimeBootAuditService` so the boot writer doesn't need
+     * to know about the audit repo directly. Does NOT decorate `after`
+     * with `operatorAllowedProviders` (that wrapper is for tenant-scoped
+     * mutation rows where the allow-list is contextual; the boot row's
+     * `after` blob already captures the allow-list directly).
+     */
+    async writeBootAudit(snapshot: {
+        allowedProviders: string[];
+        perTenantGatingEnabled: boolean;
+        hash: string;
+    }): Promise<void> {
+        await this.emitAuditRaw({
+            tenantId: null,
+            actorUserId: null,
+            action: 'operator_allowlist_boot',
+            before: null,
+            after: { ...snapshot },
+            credentialVersion: null,
+        });
+    }
+
+    /**
+     * Append an audit row with full control over the payload (incl. a
+     * NULL `tenantId` for the boot-time row). Used by the boot writer
+     * and the per-tenant allow-list mutations. Skips the
+     * `operatorAllowedProviders` decoration that `emitAudit` applies
+     * to per-tenant mutations — the snapshots passed in here already
+     * capture exactly the state the caller wants persisted.
+     *
+     * Exposed publicly so `TenantJobRuntimeBootAuditService` can call
+     * it through its existing `service` reference; the boot service
+     * delegates via `appendAuditRow` rather than reaching into the
+     * audit repo so the test surface stays at the service boundary.
+     */
+    async appendAuditRow(payload: {
+        tenantId: string | null;
+        actorUserId: string | null;
+        action: string;
+        before: Record<string, unknown> | null;
+        after: Record<string, unknown> | null;
+        credentialVersion: number | null;
+    }): Promise<void> {
+        await this.emitAuditRaw(payload);
+    }
+
+    /**
+     * Internal raw audit insert — no `operatorAllowedProviders`
+     * decoration, supports nullable `tenantId`. Used by every code path
+     * that wants to write a row without the per-mutation snapshot
+     * decoration (boot row + per-tenant allow-list mutations whose
+     * before/after blobs are already the canonical state).
+     */
+    private async emitAuditRaw(payload: {
+        tenantId: string | null;
+        actorUserId: string | null;
+        action: string;
+        before: Record<string, unknown> | null;
+        after: Record<string, unknown> | null;
+        credentialVersion: number | null;
+    }): Promise<void> {
+        const audit = this.auditRepository.create(payload as Partial<TenantJobRuntimeAudit>);
+        await this.auditRepository.save(audit);
+        this.logger.debug(
+            `Audit: tenant=${payload.tenantId ?? 'NULL'} action=${payload.action} ` +
+                `version=${payload.credentialVersion ?? 'null'}`,
         );
     }
 }
