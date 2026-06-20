@@ -1,9 +1,11 @@
+import type { JobEnqueueOptions } from '@ever-works/plugin';
 import type {
 	InngestClient,
 	InngestDispatcherFactoryOptions,
 	InngestFunction,
 	InngestSendEvent
 } from './inngest-types.js';
+import { mapEnqueueOptions } from './inngest-enqueue-options.js';
 
 /**
  * EW-742 P3.2 follow-up — operator-facing factory that wraps an
@@ -69,6 +71,47 @@ export class InngestDispatcherFactory {
 			name: fullName,
 			data,
 			...(overrides ?? {})
+		};
+		const result = await this.opts.client.send(event);
+		return result.ids?.[0] ?? null;
+	}
+
+	/**
+	 * EW-742 P4 T31 — enqueue with platform-canonical
+	 * `JobEnqueueOptions`. Translates each field onto Inngest's
+	 * SendEvent carrier per `providers.md` § Inngest:
+	 *
+	 *   - `idempotencyKey`   → top-level `event.id` (Inngest dedup)
+	 *   - `tenantId`         → `event.data._ew.tenantId`
+	 *   - `concurrencyKey`   → `event.data._ew.concurrencyKey`
+	 *   - `tags`             → `event.data._ew.tags`
+	 *   - `maxDurationSeconds` / `machineHint` → `event.data._ew.*`
+	 *
+	 * Per-tenant Inngest CLIENT selection happens before this call —
+	 * the caller picks the right `Inngest` client via the plugin's
+	 * `dispatchersBuilder` hook (SaaS only per providers.md).
+	 *
+	 * `extraOverrides` is shallow-merged on top so operators can still
+	 * pass Inngest-native top-level event fields (`user`, custom v3
+	 * SDK fields) that have no `JobEnqueueOptions` equivalent.
+	 */
+	async enqueue(
+		eventName: string,
+		data: Readonly<Record<string, unknown>>,
+		enqueueOptions: JobEnqueueOptions,
+		extraOverrides?: Partial<Omit<InngestSendEvent, 'name' | 'data'>>
+	): Promise<string | null> {
+		const { topLevel, dataMeta } = mapEnqueueOptions(enqueueOptions);
+		const fullName = this.opts.eventNamespace
+			? `${this.opts.eventNamespace}/${eventName}`
+			: eventName;
+		const mergedData =
+			Object.keys(dataMeta).length > 0 ? { ...data, _ew: dataMeta } : data;
+		const event: InngestSendEvent = {
+			name: fullName,
+			data: mergedData,
+			...topLevel,
+			...(extraOverrides ?? {})
 		};
 		const result = await this.opts.client.send(event);
 		return result.ids?.[0] ?? null;
