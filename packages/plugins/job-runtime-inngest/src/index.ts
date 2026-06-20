@@ -18,4 +18,10 @@ export type {
 	InngestFunction,
 	InngestDispatcherFactoryOptions
 } from './inngest-types.js';
+export { tenantAwareInngestFunctionHandler } from './inngest-tenant-aware-handler.js';
+export type {
+	InngestFunctionContext,
+	TenantAwareInngestHandler,
+	TenantAwareInngestWrapperOptions
+} from './inngest-tenant-aware-handler.js';
 export { InngestJobRuntimePlugin as default } from './inngest-job-runtime.plugin.js';

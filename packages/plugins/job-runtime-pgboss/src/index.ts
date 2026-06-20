@@ -13,6 +13,11 @@ export {
 export type { MappedPgBossEnqueue } from './pgboss-enqueue-options.js';
 export { PgBossWorkerHostFactory } from './pgboss-worker-host-factory.js';
 export type { PgBossWorkerRegistration } from './pgboss-worker-host-factory.js';
+export { TenantAwarePgBossWorkerHostFactory } from './pgboss-tenant-aware-worker-host-factory.js';
+export type {
+	TenantAwarePgBossWorkerHostFactoryOptions,
+	PgBossTenantAwareHandler
+} from './pgboss-tenant-aware-worker-host-factory.js';
 export type {
 	PgBossInstance,
 	PgBossJobView,
