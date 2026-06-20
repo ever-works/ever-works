@@ -22,6 +22,8 @@ import {
     KbNormalizeMediaDispatcher,
     KbTranscribePayload,
     KbTranscribeDispatcher,
+    KbReembedWorkPayload,
+    KbReembedWorkDispatcher,
 } from '@ever-works/agent/tasks';
 import type {
     JobRunStatus,
@@ -42,6 +44,7 @@ import { kbOrgOverlayFanoutTask } from '../tasks/trigger/kb-org-overlay-fanout.t
 import { kbNormalizeVideoTask } from '../tasks/trigger/kb-normalize-video.task';
 import { kbNormalizeAudioTask } from '../tasks/trigger/kb-normalize-audio.task';
 import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
+import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -57,7 +60,8 @@ export class TriggerService
         KbEmbedDocumentDispatcher,
         KbOrgOverlayFanoutDispatcher,
         KbNormalizeMediaDispatcher,
-        KbTranscribeDispatcher
+        KbTranscribeDispatcher,
+        KbReembedWorkDispatcher
 {
     private readonly logger = new Logger(TriggerService.name);
     private configured = false;
@@ -96,8 +100,8 @@ export class TriggerService
      * every `*Dispatcher` interface exported from `@ever-works/agent/tasks`
      * (WorkGeneration, WorkImport, TemplateCustomization, WebhookDelivery,
      * KbMirrorDocument, KbBackfillSkeleton, KbEmbedDocument,
-     * KbOrgOverlayFanout, KbNormalizeMedia, KbTranscribe + notification
-     * channel delivery). The cast through `unknown` is required because
+     * KbOrgOverlayFanout, KbNormalizeMedia, KbTranscribe, KbReembedWork
+     * + notification channel delivery). The cast through `unknown` is required because
      * the contract's {@link JobRuntimeDispatchers} type is intentionally
      * the opaque `Readonly<Record<string, unknown>>` shape — see the
      * JSDoc on `JobRuntimeDispatchers` in the contract file for the
@@ -655,5 +659,64 @@ export class TriggerService
             this.logger.error('Failed to dispatch kb-transcribe task', error as Error);
             return null;
         }
+    }
+
+    /**
+     * EW-642 D7 / EW-685 T4 cutover — enqueue an on-demand re-embed sweep
+     * for one Work. Producer is the pgvector plugin's settings-change
+     * hook (see `packages/plugins/pgvector/src/pgvector.plugin.ts`); the
+     * worker task body (`kb-reembed-work.task.ts`) calls
+     * `KnowledgeBaseReembedService.reembedWork(payload)` to do the
+     * actual chunk-level re-embed.
+     *
+     * **No soft-error swallow.** Unlike the other KB dispatchers
+     * (`dispatchKbNormalizeMedia` / `dispatchKbTranscribe`) which return
+     * `null` on dispatch failure so the slice-5 reconciliation cron
+     * catches the drift, this dispatcher PROPAGATES errors per the
+     * {@link KbReembedWorkDispatcher} contract — a silent drop on the
+     * re-embed path leaves a Work pinned to a stale embedding model
+     * with no operator signal, which the pgvector plugin's settings-
+     * change handler explicitly forbids. The pgvector handler catches
+     * the error itself, names the failed Work in its rejection
+     * message, and lets the workbench banner surface the failure.
+     *
+     * Tenant-binding stamping note: the previous custom adapter in
+     * `apps/api/src/works/works.module.ts` looked up
+     * `(providerId, credentialVersion)` from
+     * {@link RuntimeBindingStamperService} at the enqueue site because
+     * the pgvector plugin call site has no tenant context. Routing
+     * through `TriggerService` drops that enqueue-side stamping; the
+     * worker task's `TenantRuntimeBindingResolverService.resolveForWork`
+     * still resolves the tenant from `payload.workId` via
+     * `WorkRepository.findById`, so a missing
+     * `(providerId, credentialVersion)` pair on the inbound payload
+     * resolves to `'no-binding'` and the worker falls back to the
+     * instance default — byte-identical to the pre-T22 path. The
+     * graceful-drain detection (ADR-017 §3) downgrades from "fail
+     * loudly on rotation past this run's version" to "run against
+     * current credentials"; the re-embed task is idempotent on
+     * `embedding_model` (skips coordinates already on `newModel`) so
+     * the operator can re-flip the model from the settings UI to
+     * pick up fresh credentials.
+     */
+    async dispatchKbReembedWork(payload: KbReembedWorkPayload): Promise<string> {
+        if (!this.ensureConfigured()) {
+            throw new Error(
+                'kb-reembed-work dispatch attempted while Trigger.dev is disabled — ' +
+                    'a silent drop would leave the Work pinned to the old embedding model.',
+            );
+        }
+
+        const handle = await kbReembedWorkTask.trigger(payload, {
+            tags: [
+                'kb-reembed-work',
+                `work:${payload.workId}`,
+                `from:${payload.previousModel}`,
+                `to:${payload.newModel}`,
+            ],
+            machine: this.machine() as any,
+            concurrencyKey: `kb-reembed:${payload.workId}`,
+        });
+        return handle.id;
     }
 }

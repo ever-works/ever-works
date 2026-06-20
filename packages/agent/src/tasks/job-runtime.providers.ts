@@ -26,29 +26,16 @@ import { WORK_IMPORT_DISPATCHER } from './work-import-dispatcher';
  * semantic when no provider is registered (the call site's in-process
  * dev fallback still kicks in on `null`).
  *
- * ## Critical constraint — declared but NOT wired in this PR
+ * ## EW-685 T4 full cutover — fully wired
  *
- * Today the `*_DISPATCHER` symbols are bound directly to `TriggerService`
- * inside `packages/tasks/src/trigger/trigger.module.ts` (via
- * `{ provide: <SYMBOL>, useExisting: TriggerService }`). **Those bindings
- * stay untouched.** This file exports `buildJobRuntimeProviders()` and
- * the in-memory `JOB_RUNTIME_PROVIDER_REGISTRY` registry, but no NestJS
- * module imports the result yet — the factory is a callable seam that:
- *
- *   - tests can exercise end-to-end (see `__tests__/job-runtime.providers.spec.ts`);
- *   - the EW-742 P3 / EW-747 tenant-aware resolver can extend
- *     (`getActive(tenantId?)`) without churning call sites;
- *   - a follow-up PR can wire into `TasksModule` to flip the cutover
- *     once the team is comfortable.
- *
- * ## TODO (follow-up cutover PR)
- *
- * Wire `buildJobRuntimeProviders()` into `TasksModule` (or the equivalent
- * provider-bootstrap module) + remove the direct `useExisting:
- * TriggerService` bindings in `packages/tasks/src/trigger/trigger.module.ts`
- * to complete the cutover. Today the factory is callable from tests + the
- * future tenant-aware resolver (EW-742 P3 / EW-747) but doesn't replace
- * the existing direct bindings yet.
+ * Every `*_DISPATCHER` symbol in `@ever-works/agent/tasks` is now bound
+ * through this factory in `packages/tasks/src/trigger/trigger.module.ts`
+ * (no `symbols:` filter — all 11 dispatchers flow through the registry).
+ * The previous 8-vs-3 split (with `KB_NORMALIZE_MEDIA_DISPATCHER` /
+ * `KB_TRANSCRIBE_DISPATCHER` / `KB_REEMBED_WORK_DISPATCHER` still bound
+ * as custom adapters in `apps/api/src/works/works.module.ts`) was
+ * retired when matching `TriggerService.dispatchXxx` methods landed —
+ * see the trio of impls on `TriggerService`.
  *
  * @see {@link IJobRuntimeProvider}
  * @see {@link JOB_RUNTIME_PROVIDER_REGISTRY}
@@ -60,12 +47,12 @@ import { WORK_IMPORT_DISPATCHER } from './work-import-dispatcher';
  * package uses (`Symbol.for(...)` would registry-share across worker
  * processes and silently collide on dynamic plugin reloads).
  *
- * The registry token is what a follow-up `TasksModule` wiring will inject
- * into the factory functions returned by {@link buildJobRuntimeProviders}.
- * Centralising the lookup behind a token (rather than a module-level
- * singleton) keeps the EW-742 P3 tenant-aware resolver swap surgical —
- * the resolver replaces the registry implementation, factory call sites
- * stay identical.
+ * The registry token is what {@link buildJobRuntimeProviders}'s factory
+ * functions inject — wired in `packages/tasks/src/trigger/trigger.module.ts`
+ * post-EW-685 T4 full cutover. Centralising the lookup behind a token
+ * (rather than a module-level singleton) keeps the EW-742 P3
+ * tenant-aware resolver swap surgical — the resolver replaces the
+ * registry implementation, factory call sites stay identical.
  */
 export const JOB_RUNTIME_PROVIDER_REGISTRY = Symbol('JOB_RUNTIME_PROVIDER_REGISTRY');
 
@@ -178,29 +165,24 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  *
  * @param opts Optional `symbols` filter — when supplied, only those
  *   tokens are bound (the rest stay wherever the operator's module
- *   tree binds them today). Used by the EW-685 T4 partial cutover in
- *   `packages/tasks/src/trigger/trigger.module.ts` to swap the 8
- *   TriggerService-owned dispatchers onto the registry while leaving
- *   `KB_NORMALIZE_MEDIA_DISPATCHER` / `KB_TRANSCRIBE_DISPATCHER` /
- *   `KB_REEMBED_WORK_DISPATCHER` in `apps/api/src/works/works.module.ts`
- *   under their existing soft-error custom adapters (each calls
- *   `@trigger.dev/sdk` directly + returns `null` on dispatch failure
- *   — a contract the binding-factory path doesn't yet model).
- *   Default is the full set (all 11 — used by tests + by a future
- *   PR that consolidates the 3 stragglers into TriggerService).
+ *   tree binds them today). The EW-685 T4 full cutover in
+ *   `packages/tasks/src/trigger/trigger.module.ts` now passes no
+ *   filter (all 11 dispatchers flow through the registry) — the
+ *   `symbols:` option is retained for tests and for future modules
+ *   that want to bind a subset (e.g. a pull-model worker host that
+ *   only owns a strict subset of the dispatcher surface).
  *
  * @returns A frozen NestJS `Provider[]` ready to be spread into a
- *   module's `providers` array. EW-685 T4 cutover landed in
- *   `trigger.module.ts` with the 8-symbol subset; the 3 remaining
- *   bindings are pending consolidation per the JSDoc on the `symbols`
- *   option above.
+ *   module's `providers` array. EW-685 T4 full cutover landed in
+ *   `trigger.module.ts`; every `*_DISPATCHER` symbol resolves through
+ *   the registry without per-dispatcher special-casing.
  */
 export interface BuildJobRuntimeProvidersOptions {
     /**
-     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 11 are
-     * bound (default — used by the conformance spec + by a future
-     * PR that consolidates the 3 currently-custom-adapter symbols
-     * under TriggerService).
+     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 11
+     * are bound (the default `trigger.module.ts` path post-EW-685 T4
+     * full cutover). Used by tests and by future modules that want
+     * to bind a strict subset.
      */
     readonly symbols?: readonly symbol[];
 }
