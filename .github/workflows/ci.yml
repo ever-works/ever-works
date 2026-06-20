@@ -97,3 +97,112 @@ jobs:
         env:
           NODE_ENV: test
         run: pnpm test:cli
+
+  # EW-742 P6 T37 — per-provider job-runtime plugin matrix.
+  #
+  # Why a separate job: the aggregate `pnpm test` step in `lint-and-test`
+  # passes/fails as a single signal. When a contract change in
+  # `@ever-works/plugin` ripples through the 4 plugin packages, the
+  # aggregate run hides WHICH plugin broke. This job fans each plugin's
+  # test suite into its own cell so the failure signal is per-provider.
+  #
+  # Scope: contract + bindToTenant + dispatcher/worker-host factories +
+  # T31 enqueue-options translators + T36-T40 tenant conformance suite
+  # — all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
+  # {off|on}` × `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
+  # matrix against live Redis/Postgres/Temporal/Inngest service
+  # containers) remains gated on CI infra availability — tracked in
+  # tasks.md and ADR-017.
+  #
+  # Independent of `lint-and-test`: this job re-installs and re-builds
+  # only the slice it needs, so a failing aggregate doesn't block this
+  # signal (and vice versa).
+  job-runtime-plugin-matrix:
+    runs-on: ubicloud-standard-8
+
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - bullmq
+          - pgboss
+          - temporal
+          - inngest
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # @ever-works/plugin ships the contract surface + the
+      # contracts-conformance subpath that each provider plugin imports
+      # via `runJobRuntimeContractSuite` / `runJobRuntimeTenantContractSuite`
+      # / `runSecretStoreContractSuite`. Build it first so the
+      # downstream plugin's vitest can resolve the subpath.
+      - name: Build @ever-works/plugin (contract + conformance subpath)
+        run: pnpm --filter @ever-works/plugin build
+
+      - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
+        run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
+
+  # Companion matrix for the secret-store-resolver provider family
+  # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
+  # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
+  # job-runtime matrix above: per-provider failure signal.
+  secret-store-plugin-matrix:
+    runs-on: ubicloud-standard-8
+
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - vault
+          - k8s
+          - infisical
+          - doppler
+          - aws-sm
+          - gcp-sm
+          - azure-kv
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @ever-works/plugin (contract + conformance subpath)
+        run: pnpm --filter @ever-works/plugin build
+
+      - name: Test @ever-works/secret-store-${{ matrix.provider }}-plugin
+        run: pnpm --filter @ever-works/secret-store-${{ matrix.provider }}-plugin test
