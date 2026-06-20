@@ -17,6 +17,8 @@ import {
     Bell,
     Boxes,
     Globe,
+    Cog,
+    KeyRound,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -47,6 +49,12 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     'vector-store': Boxes,
     // EW-735 — DNS plugin category (Cloudflare et al.)
     dns: Globe,
+    // EW-742 P3.2 — pluggable secret-store-resolver backends
+    // (Vault, K8s, Infisical, Doppler, AWS-SM, GCP-SM, Azure-KV).
+    'secret-store-resolver': KeyRound,
+    // EW-685 / EW-742 — pluggable job-runtime providers (BullMQ,
+    // pg-boss, Temporal, Inngest, Trigger.dev).
+    'job-runtime': Cog,
 };
 
 /**
@@ -71,6 +79,8 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     'notification-channel': 'Notification Channels',
     'vector-store': 'Vector Stores',
     dns: 'DNS Providers',
+    'secret-store-resolver': 'Secret Stores',
+    'job-runtime': 'Job Runtimes',
 };
 
 // Type-safe assertion that all categories are covered
@@ -165,6 +175,8 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'dns',
     'email-provider',
     'notification-channel',
+    'job-runtime',
+    'secret-store-resolver',
     'form',
     'integration',
     'utility',
