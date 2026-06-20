@@ -6,9 +6,13 @@ import { toast } from 'sonner';
 import { AlertTriangle, RotateCw, ShieldOff, Undo2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import {
+    JobRuntimeCredentialsForm,
+    validateCredentialFields,
+} from './JobRuntimeCredentialsForm';
+import { PROVIDERS_WITHOUT_CREDENTIALS } from './job-runtime-schemas';
 import {
     Dialog,
     DialogClose,
@@ -124,24 +128,26 @@ export function JobRuntimeSettings({
     const [mode, setMode] = useState<TenantJobRuntimeMode>(initialConfig.mode);
     const [enabled, setEnabled] = useState<boolean>(initialConfig.enabled);
     const [credentialsSecretRef, setCredentialsSecretRef] = useState<string>('');
-    const [credentialsJson, setCredentialsJson] = useState<string>('');
+    // EW-742 P2.2 T17 — schema-driven per-provider credential values.
+    // Each provider's field set comes from `job-runtime-schemas.ts`
+    // (mirror of the plugin's settingsSchema); values are stored as
+    // a flat string map and serialised to JSON on save.
+    const [credentialValues, setCredentialValues] = useState<Readonly<Record<string, string>>>({});
 
     const [confirmInvalidate, setConfirmInvalidate] = useState(false);
     const [confirmRevert, setConfirmRevert] = useState(false);
     const [isPending, startTransition] = useTransition();
 
     const needsCredentials = mode !== 'inherit';
+    const providerHasCredentials = !PROVIDERS_WITHOUT_CREDENTIALS.has(providerId);
 
-    const credentialsJsonError = useMemo(() => {
-        if (!needsCredentials) return null;
-        if (!credentialsJson.trim()) return null;
-        try {
-            JSON.parse(credentialsJson);
-            return null;
-        } catch (error) {
-            return error instanceof Error ? error.message : 'Invalid JSON';
-        }
-    }, [credentialsJson, needsCredentials]);
+    const missingRequiredFields = useMemo(
+        () =>
+            needsCredentials && providerHasCredentials
+                ? validateCredentialFields(providerId, credentialValues)
+                : [],
+        [needsCredentials, providerHasCredentials, providerId, credentialValues],
+    );
 
     const applyConfig = (next: TenantJobRuntimeConfigResponse) => {
         setConfig(next);
@@ -162,12 +168,14 @@ export function JobRuntimeSettings({
     const noProvidersAvailable = availableProviders.length === 0;
 
     const handleSave = () => {
-        if (credentialsJsonError) {
-            toast.error(t('messages.invalidJson'));
-            return;
-        }
         if (needsCredentials && !credentialsSecretRef.trim()) {
             toast.error(t('messages.secretRefRequired'));
+            return;
+        }
+        if (missingRequiredFields.length > 0) {
+            toast.error(
+                t('messages.requiredFieldsMissing', { fields: missingRequiredFields.join(', ') }),
+            );
             return;
         }
 
@@ -186,7 +194,7 @@ export function JobRuntimeSettings({
             if (result.success) {
                 applyConfig(result.data);
                 setCredentialsSecretRef('');
-                setCredentialsJson('');
+                setCredentialValues({});
                 toast.success(t('messages.saveSuccess'));
             } else {
                 toast.error(result.error || t('messages.saveError'));
@@ -234,7 +242,7 @@ export function JobRuntimeSettings({
             if (result.success) {
                 applyConfig(result.data);
                 setCredentialsSecretRef('');
-                setCredentialsJson('');
+                setCredentialValues({});
                 toast.success(t('messages.revertSuccess'));
             } else {
                 toast.error(result.error || t('messages.revertError'));
@@ -380,16 +388,19 @@ export function JobRuntimeSettings({
                             maxLength={128}
                         />
 
-                        <Textarea
-                            label={t('credentials.jsonLabel')}
-                            value={credentialsJson}
-                            onChange={(e) => setCredentialsJson(e.target.value)}
-                            placeholder={t('credentials.jsonPlaceholder')}
-                            rows={8}
-                            error={credentialsJsonError ?? undefined}
-                            helperText={t('credentials.jsonHelper')}
-                            className="font-mono text-xs"
-                        />
+                        {/*
+                          EW-742 P2.2 T17 — per-provider schema-driven form
+                          replaces the opaque credentialsJson textarea. Reset
+                          state on provider change via `key={providerId}`.
+                        */}
+                        <div className="pt-2 border-t border-border/40 dark:border-border-dark/40">
+                            <JobRuntimeCredentialsForm
+                                key={providerId}
+                                providerId={providerId}
+                                values={credentialValues}
+                                onChange={setCredentialValues}
+                            />
+                        </div>
                     </div>
                 )}
 
