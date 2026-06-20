@@ -256,6 +256,18 @@ export const config = {
             }
             return deduped;
         },
+        /**
+         * EW-752 P5.1 — feature flag for the per-tenant runtime provider
+         * allow-list overlay (`tenant_runtime_provider_allowlist`). Default
+         * `false`: when off the per-tenant table is ignored and behaviour
+         * is byte-identical to the EW-742 P5 global-only allow-list. When
+         * on, the resolver intersects the global env-driven list with the
+         * per-tenant rows (empty per-tenant rows → tenant inherits the
+         * global list as-is).
+         */
+        isPerTenantGatingEnabled: (): boolean =>
+            (process.env.EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING ?? 'false').toLowerCase() ===
+            'true',
     },
 
     features: {

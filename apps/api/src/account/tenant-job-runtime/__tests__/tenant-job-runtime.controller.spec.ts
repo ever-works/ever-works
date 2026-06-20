@@ -16,6 +16,9 @@ jest.mock('@ever-works/agent/entities', () => ({
     // TypeORM decorator graph at import time.
     TenantJobRuntimeConfig: class TenantJobRuntimeConfig {},
     TenantJobRuntimeAudit: class TenantJobRuntimeAudit {},
+    // EW-752 P5.1 — referenced by the service constructor for the
+    // allow-list overlay repo. Not exercised in this spec.
+    TenantRuntimeProviderAllowlist: class TenantRuntimeProviderAllowlist {},
 }));
 
 jest.mock('@ever-works/agent/tasks', () => ({
@@ -101,6 +104,15 @@ describe('TenantJobRuntimeController', () => {
             configRepo as any,
             auditRepo as any,
             credentialVersionService as unknown as CredentialVersionService,
+            // EW-752 P5.1 — these specs don't exercise the per-tenant
+            // allow-list overlay or the boot writer, so allowlistRepo +
+            // dataSource are stubbed as `undefined`. The new methods
+            // (`listTenantAllowlist`, `replaceTenantAllowlist`,
+            // `deleteTenantAllowlistEntry`,
+            // `getAvailableProvidersForTenant`) have their own dedicated
+            // spec at `tenant-job-runtime-allowlist.service.spec.ts`.
+            undefined as any,
+            undefined as any,
         );
         controller = new TenantJobRuntimeController(service);
     });
