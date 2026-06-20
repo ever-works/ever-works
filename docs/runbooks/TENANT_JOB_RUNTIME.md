@@ -13,14 +13,43 @@ credentials, or rotate them.
 
 What is _not_ here yet:
 
-- Worker-host wiring (P3/P4) — until it lands, BYO/override is a
-  configuration-only knob: the platform records the choice + version,
-  but every run still executes against the instance default. The
-  in-app banner says this explicitly when you opt in.
+- **Per-tenant credential injection** (EW-742 P3 byo/override modes).
+  The tenant-aware resolver (PR #1380, in flight) reads the overlay
+  row and returns the instance default as a conservative stopgap; the
+  credential-binding API needed to actually swap the active provider's
+  credentials per tenant is EW-686 P2 territory and lands separately.
+  Until then, BYO/override is a configuration-only knob: the platform
+  records the choice + version + audit row, but every run still
+  executes against the instance default. The in-app banner says this
+  explicitly when you opt in.
+- **Worker-host per-tenant routing** (P4) — webhooks, namespace
+  pollers, queue prefixing. Depends on P3 + EW-686 P2 landing first.
 - Schema-driven per-provider credentials form (P2.2). The current UI
   collects an opaque `credentialsSecretRef` pointer; per-provider
   fields (e.g. Temporal namespace + address + cert) come in the next
   UI sub-phase.
+
+What _has_ landed since this runbook was first written:
+
+- **EW-685 P0 — fully shipped** (T1–T6): `IJobRuntimeProvider`
+  capability contract, `EVER_WORKS_JOB_RUNTIME` env selector + the
+  `isExperimentalProvider()` config check, the binding factory at
+  `packages/agent/src/tasks/job-runtime.providers.ts`, the
+  Constitution Principle IV amendment, and the boot-time log line
+  that prints the active runtime id on API startup.
+- **EW-686 P1** — `TriggerService` now structurally implements
+  `IJobRuntimeProvider` (PR #1372 on main). The existing direct
+  `useExisting: TriggerService` DI bindings still ship, so call
+  sites haven't moved; the registry-driven factory is wired but
+  the cutover-PR to flip the bindings is a separate follow-up.
+- **EW-742 P3 minimal subset** (PR #1380, in flight) — the
+  `TenantAwareRuntimeResolver` reads the overlay row and resolves
+  to the active provider with the inherit / fallback path proven by
+  tests; the byo/override credential-injection part is the deferred
+  piece described above.
+- **EW-742 P3.1 T21** (PR #1381, in flight) — `TenantCredentialCache`
+  ships as a standalone class for the resolver and the future P4
+  worker host to layer in without coupling.
 
 ## When to use this
 
