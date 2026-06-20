@@ -208,6 +208,29 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             }
         });
 
+        it('symbols filter binds only the requested subset (EW-685 T4 partial cutover)', () => {
+            // The TriggerModule cutover passes 8 of the 11 symbols because
+            // the remaining 3 (KB_NORMALIZE_MEDIA / KB_TRANSCRIBE /
+            // KB_REEMBED_WORK) are bound in works.module.ts under custom
+            // Trigger.dev SDK adapters with their own soft-error contracts.
+            // The factory must honour the subset and return EXACTLY those
+            // providers — no fewer, no more.
+            const subset: readonly symbol[] = [
+                WORK_GENERATION_DISPATCHER,
+                WORK_IMPORT_DISPATCHER,
+                TEMPLATE_CUSTOMIZATION_DISPATCHER,
+            ];
+            const providers = buildJobRuntimeProviders({ symbols: subset });
+            expect(providers).toHaveLength(3);
+            const provideTokens = new Set(providers.map((p) => (p as { provide: symbol }).provide));
+            expect(provideTokens).toEqual(new Set(subset));
+        });
+
+        it('symbols filter with empty array binds nothing', () => {
+            const providers = buildJobRuntimeProviders({ symbols: [] });
+            expect(providers).toEqual([]);
+        });
+
         it('reflects later register() calls — providers are resolved per-call, not memoised', () => {
             // If the factory cached the active provider at module-init
             // time, the EW-742 P3 tenant-aware resolver (which dispatches
