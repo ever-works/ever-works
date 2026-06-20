@@ -21,6 +21,15 @@ export {
 	runJobRuntimeContractSuite
 } from '../contracts/__tests__/job-runtime-conformance.spec.js';
 export type { JobRuntimeContractOptions } from '../contracts/__tests__/job-runtime-conformance.spec.js';
+
+// EW-742 P6 T36-T40 — tenant-overlay layer on top of the base
+// job-runtime contract. Covers cross-tenant isolation, graceful drain
+// on credentialVersion bump, and force-invalidate eviction semantics
+// — all without requiring live Redis/Postgres/Temporal/Inngest.
+export {
+	runJobRuntimeTenantContractSuite
+} from '../contracts/__tests__/job-runtime-tenant-conformance.spec.js';
+export type { JobRuntimeTenantContractOptions } from '../contracts/__tests__/job-runtime-tenant-conformance.spec.js';
 export {
 	InMemoryJobRuntimeProvider,
 	createInMemoryJobRuntimeProvider
