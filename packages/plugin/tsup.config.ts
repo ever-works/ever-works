@@ -4,6 +4,12 @@ export default defineConfig({
 	entry: [
 		'src/index.ts',
 		'src/contracts/index.ts',
+		// Test-only conformance suite published so concrete plugin
+		// packages can `import { runJobRuntimeContractSuite } from
+		// '@ever-works/plugin/contracts-conformance'` and prove their
+		// implementation satisfies the IJobRuntimeProvider contract.
+		// `vitest` stays external — consumer's dev-dep provides it.
+		'src/contracts-conformance/index.ts',
 		'src/pipeline/index.ts',
 		'src/events/index.ts',
 		'src/settings/index.ts',
@@ -30,5 +36,9 @@ export default defineConfig({
 	splitting: false,
 	treeshake: true,
 	target: 'es2021',
-	outDir: 'dist'
+	outDir: 'dist',
+	// `vitest` is a peer-dep — keep it external so we don't ship the
+	// whole test runner inside the consumer-facing
+	// `contracts-conformance` bundle.
+	external: ['vitest']
 });
