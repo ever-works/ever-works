@@ -7,6 +7,10 @@ export type {
 	TemporalJobRuntimePluginOptions
 } from './temporal-job-runtime.plugin.js';
 export { TemporalDispatcherFactory } from './temporal-dispatcher-factory.js';
+export {
+	mapEnqueueOptions as mapTemporalEnqueueOptions
+} from './temporal-enqueue-options.js';
+export type { MappedTemporalEnqueue } from './temporal-enqueue-options.js';
 export { TemporalWorkerHostFactory } from './temporal-worker-host-factory.js';
 export type {
 	TemporalWorkflowClient,
