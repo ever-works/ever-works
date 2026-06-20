@@ -61,6 +61,26 @@ pnpm deploy:trigger
 
 Trigger.dev credentials and project configuration are read from the standard Trigger.dev environment variables. See [trigger.config.ts](./trigger.config.ts) and the [Trigger.dev docs](https://trigger.dev/docs).
 
+## Tenant overlay (EW-742)
+
+This package houses the `TriggerJobRuntimeProvider` adapter — the Trigger.dev arm of the tenant-scoped job-runtime overlay defined in [`docs/specs/features/tenant-job-runtime-overlay/`](../../docs/specs/features/tenant-job-runtime-overlay/spec.md). The adapter (`src/trigger/trigger-job-runtime.provider.ts`) wraps the existing `TriggerService` and exposes it through the full `IJobRuntimeProvider` contract so it slots into the binding factory alongside the four `packages/plugins/job-runtime-*` providers.
+
+| Mode       | Behaviour                                                                                                                                                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inherit`  | (default) Use the instance-default Trigger.dev project credentials. Byte-identical to the pre-overlay path.                                              |
+| `byo`      | Tenant supplies their own Trigger.dev project access token; `bindToTenant` returns a view configured to dispatch into the tenant's project.              |
+| `override` | Same data plane as BYO; differs only by intent.                                                                                                          |
+
+**Per-tenant routing constraint:** Trigger.dev's REST API can read prod secret keys but cannot create new projects programmatically. BYO mode therefore requires either operator-side worker self-registration or a tenant dashboard manual-paste workflow. See [`docs/specs/features/tenant-job-runtime-overlay/providers.md` § Trigger.dev](../../docs/specs/features/tenant-job-runtime-overlay/providers.md#triggerdev) for the operational details.
+
+**Conformance:** `src/trigger/__tests__/trigger-conformance.spec.ts` runs the shared `runJobRuntimeContractSuite` from `@ever-works/plugin/contracts-conformance` against `TriggerJobRuntimeProvider`. All 11 contract invariants pass.
+
+**Cross-references:**
+
+- Tenant overlay spec: [`docs/specs/features/tenant-job-runtime-overlay/spec.md`](../../docs/specs/features/tenant-job-runtime-overlay/spec.md)
+- Per-provider matrix: [`docs/specs/features/tenant-job-runtime-overlay/providers.md`](../../docs/specs/features/tenant-job-runtime-overlay/providers.md)
+- ADR-017: [`docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md`](../../docs/specs/decisions/017-tenant-scoped-job-runtime-overlay.md)
+
 ## Documentation
 
 - [Ever Works documentation](https://docs.ever.works)
