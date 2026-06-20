@@ -1,5 +1,9 @@
 import { CredentialVersionService } from '@ever-works/agent/tasks';
-import { TenantJobRuntimeConfig, TenantJobRuntimeAudit } from '@ever-works/agent/entities';
+import {
+    TenantCredentialSnapshot,
+    TenantJobRuntimeConfig,
+    TenantJobRuntimeAudit,
+} from '@ever-works/agent/entities';
 
 /**
  * EW-742 P1 (T13) — coverage for the per-tenant overlay storage tier:
@@ -100,14 +104,35 @@ describe('TenantJobRuntimeConfig storage tier (EW-742 P1)', () => {
 
     describe('CredentialVersionService.bumpVersion', () => {
         let repo: RepoMock;
+        let snapshotRepo: RepoMock;
         let service: CredentialVersionService;
 
         beforeEach(() => {
             repo = makeRepo();
+            // EW-742 P1 T11 follow-up — the service now also injects the
+            // snapshot history repo. These tests don't exercise the
+            // history path (covered by `credential-version-history.service.spec.ts`
+            // in `packages/agent`), so the mock just returns null from
+            // findOne and a no-op QB on insert.
+            snapshotRepo = makeRepo();
+            (snapshotRepo as any).createQueryBuilder = jest.fn(() => ({
+                insert: () => ({
+                    into: () => ({
+                        values: () => ({
+                            orIgnore: () => ({
+                                execute: jest.fn().mockResolvedValue(undefined),
+                            }),
+                        }),
+                    }),
+                }),
+            }));
             // CredentialVersionService takes the typed TypeORM Repository
             // via @InjectRepository; the test mock satisfies the duck-typed
             // surface (increment + findOne) the service actually calls.
-            service = new CredentialVersionService(repo as unknown as never);
+            service = new CredentialVersionService(
+                repo as unknown as never,
+                snapshotRepo as unknown as never,
+            );
         });
 
         it('increments monotonically and returns the new version', async () => {
@@ -175,18 +200,29 @@ describe('TenantJobRuntimeConfig storage tier (EW-742 P1)', () => {
             expect(snap).toBe(row);
         });
 
-        it('resolveSnapshot returns null when the requested version is stale (P1 limitation)', async () => {
-            // Documented limitation — without a history table, a request
-            // for an older version cannot be satisfied. Worker host treats
-            // the null as CREDENTIAL_DRAINED. Tracked as a P1 follow-up.
+        it('resolveSnapshot returns null when the requested version is stale and history has no row', async () => {
+            // T11 follow-up — the service now consults `tenant_credential_snapshot`
+            // for `version != current`. When the history table doesn't have
+            // the requested version either (snapshot pruning, or the bump
+            // landed before capture), the worker host still treats the
+            // null as CREDENTIAL_DRAINED.
             repo.findOne.mockResolvedValueOnce({
                 tenantId: 'tenant-a',
+                providerId: 'trigger',
                 credentialVersion: 7,
             } as TenantJobRuntimeConfig);
+            snapshotRepo.findOne.mockResolvedValueOnce(null);
 
             const snap = await service.resolveSnapshot('tenant-a', 3);
 
             expect(snap).toBeNull();
+            expect(snapshotRepo.findOne).toHaveBeenCalledWith({
+                where: {
+                    tenantId: 'tenant-a',
+                    providerId: 'trigger',
+                    credentialVersion: 3,
+                },
+            });
         });
 
         it('resolveSnapshot returns null when no overlay row exists', async () => {

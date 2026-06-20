@@ -99,8 +99,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'Tenant',
     'TenantEmailAddress',
     // Tenant-scoped job-runtime overlay (EW-742 P1 / EW-745) ──
+    'TenantCredentialSnapshot',
     'TenantJobRuntimeAudit',
     'TenantJobRuntimeConfig',
+    'TenantRuntimeProviderAllowlist',
     // ──────────────────────────────────────────────────────────
     'UsageLedgerEntry',
     'User',
