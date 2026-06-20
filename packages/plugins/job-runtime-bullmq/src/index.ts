@@ -11,6 +11,11 @@ export type { BullMqDispatcher } from './bullmq-dispatcher-factory.js';
 export { mapEnqueueOptions as mapBullMqEnqueueOptions } from './bullmq-enqueue-options.js';
 export { BullMqWorkerHostFactory } from './bullmq-worker-host-factory.js';
 export type { BullMqWorkerRegistration } from './bullmq-worker-host-factory.js';
+export { TenantAwareBullMqWorkerHostFactory } from './bullmq-tenant-aware-worker-host-factory.js';
+export type {
+	TenantAwareBullMqWorkerHostFactoryOptions,
+	TenantAwareHandler as BullMqTenantAwareHandler
+} from './bullmq-tenant-aware-worker-host-factory.js';
 export type {
 	BullMqDeps,
 	BullMqConnection,

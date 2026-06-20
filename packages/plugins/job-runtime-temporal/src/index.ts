@@ -12,6 +12,11 @@ export {
 } from './temporal-enqueue-options.js';
 export type { MappedTemporalEnqueue } from './temporal-enqueue-options.js';
 export { TemporalWorkerHostFactory } from './temporal-worker-host-factory.js';
+export { TenantAwareTemporalWorkerHostFactory } from './temporal-tenant-aware-worker-host-factory.js';
+export type {
+	TenantAwareTemporalWorkerHostFactoryOptions,
+	TenantWorkerBuilder
+} from './temporal-tenant-aware-worker-host-factory.js';
 export type {
 	TemporalWorkflowClient,
 	TemporalWorkflowHandle,
