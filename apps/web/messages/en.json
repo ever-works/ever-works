@@ -1641,6 +1641,7 @@
                     "revertError": "Failed to revert to inherit",
                     "invalidJson": "Credentials JSON is not valid JSON",
                     "secretRefRequired": "Secret pointer is required when mode is not inherit",
+                    "requiredFieldsMissing": "Required credential fields are empty: {fields}",
                     "providerNoLongerAllowed": "Provider {provider} is no longer enabled by the operator. Revert to inherit or pick an allowed provider before saving.",
                     "noProvidersAvailable": "The operator has not enabled any job-runtime providers for tenant overlays. Switch to inherit mode or contact your operator."
                 }
