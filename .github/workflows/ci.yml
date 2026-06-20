@@ -161,6 +161,61 @@ jobs:
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
 
+  # EW-742 P6 T32/T37 real-infra axis — BullMQ + pg-boss against
+  # live Redis + Postgres service containers. Temporal + Inngest skipped
+  # for now (heavier containerisation: Temporal needs auto-setup image,
+  # Inngest needs the dev-server CLI). Real-infra cells run as a SEPARATE
+  # job from the mocks-only matrix so an infra hiccup doesn't mask the
+  # mocks-only failure signal.
+  job-runtime-real-infra:
+    runs-on: ubicloud-standard-8
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @ever-works/plugin (contract + conformance subpath)
+        run: pnpm --filter @ever-works/plugin build
+
+      - name: BullMQ real-infra
+        env:
+          EW_TEST_REAL_REDIS_URL: redis://localhost:6379
+        run: pnpm --filter @ever-works/job-runtime-bullmq-plugin test
+
+      - name: pg-boss real-infra
+        env:
+          EW_TEST_REAL_PGBOSS_URL: postgres://test:test@localhost:5432/test
+        run: pnpm --filter @ever-works/job-runtime-pgboss-plugin test
+
   # Companion matrix for the secret-store-resolver provider family
   # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
