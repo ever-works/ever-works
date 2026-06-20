@@ -24,6 +24,11 @@
 			"import": "./dist/contracts/index.js",
 			"require": "./dist/contracts/index.cjs"
 		},
+		"./contracts-conformance": {
+			"types": "./dist/contracts-conformance/index.d.ts",
+			"import": "./dist/contracts-conformance/index.js",
+			"require": "./dist/contracts-conformance/index.cjs"
+		},
 		"./pipeline": {
 			"types": "./dist/pipeline/index.d.ts",
 			"import": "./dist/pipeline/index.js",
