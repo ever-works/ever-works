@@ -1,9 +1,11 @@
+import type { JobEnqueueOptions } from '@ever-works/plugin';
 import type {
 	TemporalDispatcherFactoryOptions,
 	TemporalStartWorkflowOptions,
 	TemporalWorkflowClient,
 	TemporalWorkflowHandle
 } from './temporal-types.js';
+import { mapEnqueueOptions } from './temporal-enqueue-options.js';
 
 /**
  * EW-742 P3.2 follow-up — operator-facing factory that turns a
@@ -63,6 +65,51 @@ export class TemporalDispatcherFactory {
 			taskQueue
 		};
 		return this.opts.client.start(workflowType, merged);
+	}
+
+	/**
+	 * EW-742 P4 T31 — enqueue with platform-canonical
+	 * `JobEnqueueOptions`. Translates each field onto Temporal's native
+	 * `WorkflowStartOptions` per `providers.md` § Temporal:
+	 *
+	 *   - `idempotencyKey`     → `workflowId` (per-call workflowId wins
+	 *                            if both are provided)
+	 *   - `tenantId`           → `searchAttributes.tenantId`
+	 *   - `concurrencyKey`     → `searchAttributes.concurrencyKey`
+	 *   - `tags`               → `searchAttributes.tags`
+	 *   - `maxDurationSeconds` → `workflowExecutionTimeout` (e.g. '900s')
+	 *   - `machineHint`        → `memo.machineHint`
+	 *
+	 * Per-tenant NAMESPACE selection happens before this call — the
+	 * caller picks the right `WorkflowClient` via the plugin's
+	 * `dispatchersBuilder` hook (one `WorkflowClient` per tenant
+	 * namespace, per ADR-017 Q1).
+	 *
+	 * `extraOpts` is shallow-merged on top so operators can still pass
+	 * Temporal-native fields (retry, workflowIdReusePolicy, etc.) that
+	 * have no `JobEnqueueOptions` equivalent.
+	 */
+	async enqueue(
+		workflowType: string,
+		args: readonly unknown[],
+		enqueueOptions: JobEnqueueOptions,
+		extraOpts?: Partial<TemporalStartWorkflowOptions>
+	): Promise<TemporalWorkflowHandle> {
+		const { workflowIdFromIdempotency, startOptions } = mapEnqueueOptions(enqueueOptions);
+		const workflowId = extraOpts?.workflowId ?? workflowIdFromIdempotency;
+		if (!workflowId) {
+			throw new Error(
+				`TemporalDispatcherFactory.enqueue: no workflowId available — provide either ` +
+					`enqueueOptions.idempotencyKey or extraOpts.workflowId for workflow '${workflowType}'.`
+			);
+		}
+		const startArgs: Partial<TemporalStartWorkflowOptions> & { workflowId: string } = {
+			...startOptions,
+			...(extraOpts ?? {}),
+			workflowId,
+			args
+		};
+		return this.start(workflowType, startArgs);
 	}
 
 	/**
