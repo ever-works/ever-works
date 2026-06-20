@@ -25,3 +25,16 @@ export {
 	InMemoryJobRuntimeProvider,
 	createInMemoryJobRuntimeProvider
 } from '../contracts/__tests__/fakes/in-memory-job-runtime-provider.js';
+
+// EW-742 P3.2 / P6 — secret-store contract suite, sibling of the
+// job-runtime one. See `secret-store-conformance.spec.ts` for the 6
+// fail-open invariants every ISecretStoreProvider must satisfy.
+export {
+	runSecretStoreContractSuite
+} from '../contracts/__tests__/secret-store-conformance.spec.js';
+export type { SecretStoreContractOptions } from '../contracts/__tests__/secret-store-conformance.spec.js';
+export {
+	InMemorySecretStoreProvider,
+	createInMemorySecretStoreProvider
+} from '../contracts/__tests__/fakes/in-memory-secret-store-provider.js';
+export type { InMemorySecretStoreSeed } from '../contracts/__tests__/fakes/in-memory-secret-store-provider.js';
