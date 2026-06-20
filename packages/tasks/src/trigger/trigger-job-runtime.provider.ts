@@ -72,6 +72,12 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         'job-runtime-cancel',
         'job-runtime-status',
         'job-runtime-schedule',
+        // EW-742 P3.2 T21.1 — the adapter implements bindToTenant
+        // (memoised view that swaps Trigger.dev project credentials
+        // per tenant). The capability flag was missing from the
+        // initial EW-686 P1 list; the shared P6 conformance suite
+        // caught it.
+        'job-runtime-bind-tenant',
     ];
     // Synthetic plugin — no operator-tunable settings (Trigger.dev creds
     // are read from `config.trigger.*` env vars, not from the plugin
