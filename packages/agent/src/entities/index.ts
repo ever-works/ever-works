@@ -93,3 +93,5 @@ export * from './composio-trigger-subscription.entity';
 // Tenant-scoped job-runtime overlay (EW-742 P1) — see ADR-017 + spec.md
 export * from './tenant-job-runtime-config.entity';
 export * from './tenant-job-runtime-audit.entity';
+// EW-752 P5.1 — per-tenant runtime provider allow-list overlay (T35a + T35b)
+export * from './tenant-runtime-provider-allowlist.entity';

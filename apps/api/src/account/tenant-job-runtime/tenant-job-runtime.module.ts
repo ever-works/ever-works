@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
-import { TenantJobRuntimeAudit, TenantJobRuntimeConfig } from '@ever-works/agent/entities';
+import {
+    TenantJobRuntimeAudit,
+    TenantJobRuntimeConfig,
+    TenantRuntimeProviderAllowlist,
+} from '@ever-works/agent/entities';
 import {
     CredentialVersionService,
     InMemoryJobRuntimeProviderRegistry,
@@ -12,6 +16,9 @@ import {
     TenantAwareRuntimeResolver,
     TenantCredentialCache,
 } from '@ever-works/agent/tasks';
+import { IsPlatformAdminGuard } from '../../auth/guards/platform-admin.guard';
+import { OperatorTenantRuntimeAllowlistController } from '../../operator/tenant-runtime-allowlist/operator-tenant-runtime-allowlist.controller';
+import { TenantJobRuntimeBootAuditService } from './tenant-job-runtime-boot-audit.service';
 import { TenantJobRuntimeController } from './tenant-job-runtime.controller';
 import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 
@@ -50,7 +57,15 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 @Module({
     imports: [
         DatabaseModule,
-        TypeOrmModule.forFeature([TenantJobRuntimeConfig, TenantJobRuntimeAudit]),
+        TypeOrmModule.forFeature([
+            TenantJobRuntimeConfig,
+            TenantJobRuntimeAudit,
+            // EW-752 P5.1 (T35a) — per-tenant runtime provider allow-list
+            // overlay. Registered here (not in a separate operator module)
+            // so the service can inject both the legacy audit repo and the
+            // new allow-list repo without duplicating the DI graph.
+            TenantRuntimeProviderAllowlist,
+        ]),
     ],
     providers: [
         TenantJobRuntimeService,
@@ -58,6 +73,18 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         RuntimeBindingStamperService,
         TenantAwareRuntimeResolver,
         TenantCredentialCache,
+        // EW-752 P5.1 (T35b) — boot-time writer for the
+        // `operator_allowlist_boot` audit row. Implements
+        // `OnApplicationBootstrap` so registering it here is enough for
+        // NestJS to call it on app start.
+        TenantJobRuntimeBootAuditService,
+        // EW-752 P5.1 (T35a) — `OperatorTenantRuntimeAllowlistController`
+        // is `@UseGuards(IsPlatformAdminGuard)` and the guard resolves
+        // `UserRepository` from the imported DatabaseModule. The guard
+        // must be a provider of the module that owns the controller
+        // (same wiring pattern as `BudgetsModule` for the EW-602
+        // AdminUsageController gate).
+        IsPlatformAdminGuard,
         {
             provide: JOB_RUNTIME_PROVIDER_REGISTRY,
             useClass: InMemoryJobRuntimeProviderRegistry,
@@ -71,7 +98,17 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
             useClass: InProcessSecretStoreResolver,
         },
     ],
-    controllers: [TenantJobRuntimeController],
+    controllers: [
+        TenantJobRuntimeController,
+        // EW-752 P5.1 (T35a) — operator-scoped CRUD for the per-tenant
+        // allow-list overlay. Co-mounted in this module rather than its
+        // own `OperatorModule` because the controller depends on
+        // `TenantJobRuntimeService` (which lives here) plus
+        // `IsPlatformAdminGuard`. A future broader `OperatorModule` can
+        // import this module to re-expose the controller; nothing
+        // precludes that hoist.
+        OperatorTenantRuntimeAllowlistController,
+    ],
     exports: [
         TenantCredentialCache,
         TenantAwareRuntimeResolver,
@@ -80,6 +117,10 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         // resolveSnapshot through the remote-proxy controller for the
         // worker-host consumption path.
         CredentialVersionService,
+        // EW-752 P5.1 (T35b) — exported so consumers wanting to trigger
+        // a boot-audit snapshot manually (e.g. a future ops endpoint)
+        // can inject it without re-registering.
+        TenantJobRuntimeBootAuditService,
     ],
 })
 export class TenantJobRuntimeModule {}
