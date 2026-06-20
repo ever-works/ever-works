@@ -176,12 +176,38 @@ const DISPATCHER_SYMBOLS: readonly symbol[] = [
  * Provider arity is pinned at 11 — one per entry in {@link DISPATCHER_SYMBOLS}
  * — and verified by `__tests__/job-runtime.providers.spec.ts`.
  *
- * @returns A frozen NestJS `Provider[]` ready to be spread into a module's
- *   `providers` array. Currently no module imports it; see the file
- *   header "Critical constraint — declared but NOT wired in this PR".
+ * @param opts Optional `symbols` filter — when supplied, only those
+ *   tokens are bound (the rest stay wherever the operator's module
+ *   tree binds them today). Used by the EW-685 T4 partial cutover in
+ *   `packages/tasks/src/trigger/trigger.module.ts` to swap the 8
+ *   TriggerService-owned dispatchers onto the registry while leaving
+ *   `KB_NORMALIZE_MEDIA_DISPATCHER` / `KB_TRANSCRIBE_DISPATCHER` /
+ *   `KB_REEMBED_WORK_DISPATCHER` in `apps/api/src/works/works.module.ts`
+ *   under their existing soft-error custom adapters (each calls
+ *   `@trigger.dev/sdk` directly + returns `null` on dispatch failure
+ *   — a contract the binding-factory path doesn't yet model).
+ *   Default is the full set (all 11 — used by tests + by a future
+ *   PR that consolidates the 3 stragglers into TriggerService).
+ *
+ * @returns A frozen NestJS `Provider[]` ready to be spread into a
+ *   module's `providers` array. EW-685 T4 cutover landed in
+ *   `trigger.module.ts` with the 8-symbol subset; the 3 remaining
+ *   bindings are pending consolidation per the JSDoc on the `symbols`
+ *   option above.
  */
-export function buildJobRuntimeProviders(): Provider[] {
-    return DISPATCHER_SYMBOLS.map((token) => ({
+export interface BuildJobRuntimeProvidersOptions {
+    /**
+     * Subset of `DISPATCHER_SYMBOLS` to bind. When omitted, all 11 are
+     * bound (default — used by the conformance spec + by a future
+     * PR that consolidates the 3 currently-custom-adapter symbols
+     * under TriggerService).
+     */
+    readonly symbols?: readonly symbol[];
+}
+
+export function buildJobRuntimeProviders(opts: BuildJobRuntimeProvidersOptions = {}): Provider[] {
+    const symbols = opts.symbols ?? DISPATCHER_SYMBOLS;
+    return symbols.map((token) => ({
         provide: token,
         // Cast through `unknown` because each `*_DISPATCHER` symbol expects
         // a concrete dispatcher shape but the registry hands back the

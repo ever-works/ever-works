@@ -50,14 +50,19 @@ export * from './tenant-credential.cache';
 // barrel so DI modules (e.g. `TenantJobRuntimeModule` for EW-742 P3 /
 // EW-747) can bind `{ provide: JOB_RUNTIME_PROVIDER_REGISTRY, useClass:
 // InMemoryJobRuntimeProviderRegistry }` without reaching into
-// `./job-runtime.providers` directly. `buildJobRuntimeProviders()` stays
-// behind the file boundary because it's a one-shot module-wiring helper,
-// not a DI consumer entry point.
+// `./job-runtime.providers` directly. EW-685 T4 cutover added
+// `buildJobRuntimeProviders` to the export set so TriggerModule can
+// replace its 8 direct `useExisting: TriggerService` dispatcher
+// bindings with the registry-backed factory output.
 export {
     InMemoryJobRuntimeProviderRegistry,
     JOB_RUNTIME_PROVIDER_REGISTRY,
+    buildJobRuntimeProviders,
 } from './job-runtime.providers';
-export type { JobRuntimeProviderRegistry } from './job-runtime.providers';
+export type {
+    JobRuntimeProviderRegistry,
+    BuildJobRuntimeProvidersOptions,
+} from './job-runtime.providers';
 
 // EW-742 P3 / EW-747 (T20 + T23) — tenant-aware job-runtime resolver.
 // Wraps the EW-685 binding factory registry so callers can resolve the
