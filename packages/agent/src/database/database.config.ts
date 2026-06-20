@@ -91,6 +91,8 @@ import {
     TenantJobRuntimeAudit,
     // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
     TenantRuntimeProviderAllowlist,
+    // Per-version credential snapshot history (EW-742 P1 T11 follow-up)
+    TenantCredentialSnapshot,
 } from '../entities';
 import {
     PluginEntity,
@@ -233,6 +235,11 @@ export const ENTITIES = [
     TenantJobRuntimeAudit,
     // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
     TenantRuntimeProviderAllowlist,
+    // Per-version credential snapshot history (EW-742 P1 T11 follow-up) —
+    // backs CredentialVersionService.resolveSnapshot for v < current so
+    // in-flight runs can bind to their captured credentials after a
+    // rotation (ADR-017 §3 Q4).
+    TenantCredentialSnapshot,
 ];
 
 /**
