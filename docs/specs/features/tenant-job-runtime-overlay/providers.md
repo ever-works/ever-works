@@ -460,6 +460,82 @@ Send (enqueue), run, status (Inngest run lookup), cancel (cancellation events), 
 
 ---
 
+## Operator wiring (per-task dispatchers + worker host bootstrap)
+
+The four non-Trigger.dev job-runtime plugin packages (`@ever-works/job-runtime-{bullmq,pgboss,temporal,inngest}-plugin`) ship the **contract surface + real `bindToTenant` memoisation**, but every `dispatchXxx` method on the default plugin throws a typed `{Provider}DispatcherNotConfiguredError`. This is deliberate — per-task dispatching is a per-deployment design decision (queue concurrency, retry policy, dead-letter strategy, workflow versioning, etc.) that we don't pick on the operator's behalf.
+
+Each plugin now exposes an **operator hook pattern** so the operator wires real dispatchers without subclassing or forking the plugin:
+
+| Hook | What it does | When to use |
+| ---- | ------------ | ----------- |
+| `plugin.useDispatchers(map)` | Replace the throwing-stub `JobRuntimeDispatchers` Proxy with a real map. | Always — required to make the plugin actually dispatch. |
+| `plugin.useDispatcherFactory(factory)` | Wire the factory so `cancel(runId)` / `getRunStatus(runId)` delegate to it. | When the operator wants the platform's `JobRuntimeProvider.cancel/getRunStatus` to work. |
+| `plugin.useWorkerHostFactory(factory)` (BullMQ / pg-boss / Temporal only) | Wire the worker host so `startWorkerHost(opts)` actually starts workers. | When the operator runs the platform's optional generic worker bootstrap. |
+| `new Plugin({ dispatchersBuilder: snap => ... })` | Per-tenant dispatcher routing — `bindToTenant(snap)` view's `dispatchers` come from the builder instead of the base map. | When tenant overlay mode is `byo` or `override` and dispatchers need per-tenant routing (per-tenant Redis prefix, per-tenant Postgres schema, per-tenant Temporal namespace, per-tenant Inngest project). |
+
+### Per-provider factory packages
+
+| Provider | Dispatcher factory | Worker host factory | Heavy deps the factory owns |
+| -------- | ------------------ | ------------------- | ---------------------------- |
+| BullMQ   | `BullMqDispatcherFactory({ Queue, Worker }, { connection, prefix? })` | `BullMqWorkerHostFactory({ Queue, Worker }, { connection, prefix? })` | `bullmq` (operator-pinned) + `ioredis` |
+| pg-boss  | `PgBossDispatcherFactory({ boss })` | `PgBossWorkerHostFactory({ boss })` | `pg-boss` (operator-pinned) |
+| Temporal | `TemporalDispatcherFactory({ client, defaultTaskQueue? })` | `TemporalWorkerHostFactory()` + `register({ taskQueue, build })` | `@temporalio/client`, `@temporalio/worker` (operator-pinned, native deps) |
+| Inngest  | `InngestDispatcherFactory({ client, eventNamespace? })` | **No worker host** — serverless model, operator's `serve()` HTTP route IS the worker host. | `inngest` (operator-pinned) |
+
+The plugin packages themselves **do not** depend on `bullmq`, `pg-boss`, `@temporalio/*`, or `inngest`. The operator installs those in their worker/serve app and injects fully-constructed clients (or — for BullMQ — the `Queue`/`Worker` constructors) through the factory's typed structural shape (`BullMqDeps`, `PgBossInstance`, `TemporalWorkflowClient`, `InngestClient`).
+
+### Example: BullMQ + per-tenant Redis prefix isolation
+
+```ts
+import { Queue, Worker } from 'bullmq';
+import IORedis from 'ioredis';
+import {
+  BullMqJobRuntimePlugin,
+  BullMqDispatcherFactory,
+  BullMqWorkerHostFactory
+} from '@ever-works/job-runtime-bullmq-plugin';
+
+const connection = new IORedis(process.env.BULLMQ_REDIS_URL!, { maxRetriesPerRequest: null });
+
+// One factory per *unique Redis prefix*. For per-tenant prefix isolation
+// the dispatchersBuilder receives the snapshot and the operator's code
+// decides which factory's queues to bind through.
+const tenantFactories = new Map<string, BullMqDispatcherFactory>();
+function factoryFor(tenantQueuePrefix: string): BullMqDispatcherFactory {
+  let f = tenantFactories.get(tenantQueuePrefix);
+  if (!f) {
+    f = new BullMqDispatcherFactory({ Queue, Worker }, {
+      connection,
+      prefix: tenantQueuePrefix
+    });
+    tenantFactories.set(tenantQueuePrefix, f);
+  }
+  return f;
+}
+
+const plugin = new BullMqJobRuntimePlugin({
+  dispatchersBuilder: (snap) => {
+    const prefix = (snap.credentials.queuePrefix as string) ?? `bull:tenant:${snap.tenantId}:`;
+    const f = factoryFor(prefix);
+    return {
+      dispatchKbEmbedDocument: (payload) =>
+        f.forQueue('kb-embed-document').dispatch('kb-embed-document', payload)
+      // ... rest of the dispatchXxx methods
+    };
+  }
+});
+
+// Operator also wires a separate worker host (or N hosts) per tenant
+// prefix. The plugin's `startWorkerHost` returns a no-op handle when
+// no host factory is bound at platform scope.
+```
+
+### Tests
+
+Each plugin's vitest suite covers (a) the factory's enqueue/cancel/lookup/lifecycle methods against an in-memory mock of the structural client shape, (b) the operator-hook integration (`useDispatchers` replacing the stub, `useWorkerHostFactory` starting/stopping workers, `dispatchersBuilder` per-tenant routing). Totals: BullMQ 32/32, pg-boss 28/28, Temporal 32/32, Inngest 25/25.
+
+---
+
 ## Cross-references
 
 - Instance-scope baseline: [`../job-runtime-providers/providers.md`](../job-runtime-providers/providers.md)

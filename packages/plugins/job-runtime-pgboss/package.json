@@ -1,0 +1,53 @@
+{
+	"name": "@ever-works/job-runtime-pgboss-plugin",
+	"version": "1.0.0",
+	"description": "pg-boss IJobRuntimeProvider plugin for Ever Works — implements the BYO/inherit tenant-overlay binding via per-tenant Postgres schema isolation (EW-742 P3.2, ADR-017 Q2). Per-task dispatching is operator-provisioned.",
+	"author": { "name": "Ever Co. LTD", "email": "ever@ever.co", "url": "https://ever.co" },
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": { "@ever-works/plugin": "workspace:*" },
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "job-runtime-pgboss",
+			"name": "pg-boss Job Runtime",
+			"version": "1.0.0",
+			"category": "job-runtime",
+			"capabilities": [
+				"job-runtime-enqueue",
+				"job-runtime-cancel",
+				"job-runtime-status",
+				"job-runtime-schedule",
+				"job-runtime-bind-tenant"
+			],
+			"description": "pg-boss (https://github.com/timgit/pg-boss) IJobRuntimeProvider for the EW-742 tenant overlay. Implements bindToTenant via per-tenant Postgres schema isolation (ADR-017 Q2 schema-per-tenant). Per-task dispatchers throw 'not implemented' until the operator wires the per-payload-type publish/work handlers.",
+			"author": { "name": "Ever Works Team" },
+			"license": "AGPL-3.0",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"distribution": "core",
+			"builtIn": true,
+			"visibility": "operator",
+			"envVars": ["PGBOSS_CONNECTION_STRING", "PGBOSS_SCHEMA"]
+		}
+	}
+}

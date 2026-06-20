@@ -63,9 +63,10 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
     readonly id = 'trigger';
     readonly name = 'Trigger.dev';
     readonly version = '1.0.0';
-    // See file header "Drift note" — `'job-runtime'` is not yet in
-    // `PLUGIN_CATEGORIES`; cast is deliberate.
-    readonly category = 'job-runtime' as PluginCategory;
+    // EW-742 P3.2 follow-up — `'job-runtime'` is now part of
+    // `PLUGIN_CATEGORIES` (alongside `'secret-store-resolver'`). The
+    // earlier `as PluginCategory` cast is no longer needed.
+    readonly category: PluginCategory = 'job-runtime';
     readonly capabilities: readonly string[] = [
         'job-runtime-enqueue',
         'job-runtime-cancel',
