@@ -116,8 +116,8 @@ T20 + T23 + T24 ✅ Done in [#1380](https://github.com/ever-works/ever-works/pul
 
 ### Phase 5.1 — Per-tenant whitelist (deferred)
 
-- [ ] **T35a.** Per-tenant whitelist behind `EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING` flag — `instance_plugin_allowlist` table keyed by `(tenantId, providerId)` that further restricts the global allow-list. Resolver merges global ∩ tenant-specific.
-- [ ] **T35b.** Startup audit row capturing the active allow-list at API boot — dedupe by hash so identical restarts don't spam the audit table.
+- [x] **T35a.** ✅ Done in [#1501](https://github.com/ever-works/ever-works/pull/1501). Ships `TenantRuntimeProviderAllowlist` entity (composite PK `(tenantId, providerId)` + createdBy + createdAt) + `AddTenantRuntimeProviderAllowlist` migration (FKs to tenants/users) + `OperatorTenantRuntimeAllowlistController` (GET/PUT/DELETE under `/api/operator/tenants/:tenantId/runtime-allowlist`, gated by `IsPlatformAdminGuard`) + `tenantJobRuntime.isPerTenantGatingEnabled()` config knob (default OFF — when off the table is ignored and behaviour is byte-identical to today). Service: `listTenantAllowlist` / `replaceTenantAllowlist` (atomic txn) / `deleteTenantAllowlistEntry` (each mutation emits `operator_allowlist_change` audit row) + `getAvailableProvidersForTenant(tenantId)` — 4-way resolver: flag OFF → global; flag ON + zero rows → global (inherit); flag ON + rows ⊆ global → intersection in global's order; flag ON + rows ⊄ global → intersection silently drops unknown (global = upper bound).
+- [x] **T35b.** ✅ Done in [#1501](https://github.com/ever-works/ever-works/pull/1501). Ships `TenantJobRuntimeBootAuditService` (`OnApplicationBootstrap`) that hashes the effective allow-list + gating flag, dedups by hash, writes one `operator_allowlist_boot` row per real change (five pods restarting on same config write ONE row, not five). `RelaxTenantJobRuntimeAuditTenantNullable` migration relaxes `tenantId` to nullable so boot rows write `tenantId=NULL`. Bootstrap failures swallowed + logged so a transient DB hiccup at boot doesn't fail liveness; next pod restart retries.
 
 ## Phase 6 — Conformance · `[EW-742 P6]`
 
