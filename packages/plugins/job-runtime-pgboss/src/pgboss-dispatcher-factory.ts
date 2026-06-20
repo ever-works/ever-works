@@ -1,4 +1,6 @@
+import type { JobEnqueueOptions } from '@ever-works/plugin';
 import type { PgBossFactoryOptions, PgBossInstance, PgBossJobRecord } from './pgboss-types.js';
+import { mapEnqueueOptions } from './pgboss-enqueue-options.js';
 
 /**
  * EW-742 P3.2 follow-up — operator-facing factory that wraps a
@@ -43,6 +45,46 @@ export class PgBossDispatcherFactory {
 			? { ...this.opts.defaultSendOptions, ...(callOpts ?? {}) }
 			: callOpts;
 		return this.opts.boss.send(name, payload, merged);
+	}
+
+	/**
+	 * EW-742 P4 T31 — enqueue with platform-canonical
+	 * `JobEnqueueOptions`. Translates each field onto the pg-boss
+	 * carrier per `providers.md` § pg-boss:
+	 *
+	 *   - `idempotencyKey`    → `sendOptions.singletonKey`
+	 *   - `maxDurationSeconds`→ `sendOptions.expireInSeconds`
+	 *   - `tenantId` / `concurrencyKey` / `tags` / `machineHint` →
+	 *     stamped onto the job payload under a reserved `_ew`
+	 *     namespace so the worker can route per-tenant without
+	 *     requiring custom pg-boss columns.
+	 *
+	 * Per-tenant schema selection happens BEFORE this call — the
+	 * caller picks the right `PgBoss` instance via the plugin's
+	 * `dispatchersBuilder` hook (one `PgBoss` per tenant schema, per
+	 * ADR-017 Q2).
+	 *
+	 * `extraOpts` is shallow-merged on top of the translated
+	 * sendOptions so operators can still pass pg-boss-native fields
+	 * (retryLimit, retryBackoff, startAfter, etc.) that have no
+	 * `JobEnqueueOptions` equivalent.
+	 */
+	async enqueue(
+		name: string,
+		payload: Readonly<Record<string, unknown>> | null,
+		enqueueOptions: JobEnqueueOptions,
+		extraOpts?: Readonly<Record<string, unknown>>
+	): Promise<string | null> {
+		const { sendOptions, metaForPayload } = mapEnqueueOptions(enqueueOptions);
+		const mergedPayload =
+			Object.keys(metaForPayload).length > 0
+				? { ...(payload ?? {}), ...metaForPayload }
+				: (payload ?? {});
+		const baseOpts = this.opts.defaultSendOptions
+			? { ...this.opts.defaultSendOptions, ...sendOptions }
+			: sendOptions;
+		const mergedOpts = extraOpts ? { ...baseOpts, ...extraOpts } : baseOpts;
+		return this.opts.boss.send(name, mergedPayload, mergedOpts);
 	}
 
 	/** Cancel an in-flight job by id. Returns true once the cancel call resolves. */

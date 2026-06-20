@@ -7,6 +7,10 @@ export type {
 	InngestJobRuntimePluginOptions
 } from './inngest-job-runtime.plugin.js';
 export { InngestDispatcherFactory } from './inngest-dispatcher-factory.js';
+export {
+	mapEnqueueOptions as mapInngestEnqueueOptions
+} from './inngest-enqueue-options.js';
+export type { MappedInngestEnqueue } from './inngest-enqueue-options.js';
 export type {
 	InngestClient,
 	InngestSendEvent,
