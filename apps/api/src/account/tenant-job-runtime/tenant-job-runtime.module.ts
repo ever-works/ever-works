@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
 import {
+    TenantCredentialSnapshot,
     TenantJobRuntimeAudit,
     TenantJobRuntimeConfig,
     TenantRuntimeProviderAllowlist,
@@ -65,6 +66,12 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
             // so the service can inject both the legacy audit repo and the
             // new allow-list repo without duplicating the DI graph.
             TenantRuntimeProviderAllowlist,
+            // EW-742 P1 T11 follow-up — per-version credential snapshot
+            // history. `CredentialVersionService` injects this repo to
+            // satisfy the graceful-drain contract (ADR-017 §3 Q4): an
+            // in-flight run pinned at v=N must still resolve its bag
+            // after the tenant rotates to N+1.
+            TenantCredentialSnapshot,
         ]),
     ],
     providers: [

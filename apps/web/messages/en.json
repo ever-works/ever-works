@@ -1674,6 +1674,28 @@
             "columnCost": "Cost",
             "loadFailed": "Could not load admin usage. You may not have platform-admin access."
         },
+        "adminTenantRuntimeAllowlist": {
+            "title": "Tenant runtime allow-list",
+            "subtitle": "Operator-scoped per-tenant overlay on the job-runtime provider allow-list. Empty means the tenant inherits the global allow-list. Changes take effect on the next dispatcher resolution and are audited.",
+            "gatingDisabledBanner": "Per-tenant gating is disabled. The list below is preserved but ignored until EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING=true.",
+            "emptyInheritBanner": "Tenant inherits the global allow-list (no per-tenant restriction).",
+            "restrictedBanner": "Tenant restricted to: {providers}.",
+            "pickerLabel": "Allowed providers",
+            "pickerHelper": "Select every job-runtime provider this tenant is allowed to choose. Save replaces the whole list atomically. Clear empties the overlay so the tenant falls back to the global allow-list.",
+            "savedListLabel": "Currently saved",
+            "actions": {
+                "save": "Save allow-list",
+                "clear": "Clear (inherit global)",
+                "removeProvider": "Remove {provider}"
+            },
+            "messages": {
+                "saveSuccess": "Tenant runtime allow-list saved",
+                "saveError": "Failed to save tenant runtime allow-list",
+                "deleteSuccess": "Provider removed from tenant allow-list",
+                "deleteError": "Failed to remove provider from tenant allow-list",
+                "noProviders": "No providers in the per-tenant allow-list."
+            }
+        },
         "budgets": {
             "overviewTitle": "Spend in {period}",
             "overviewProgressLabel": "{percent}% of {cap} cap",

@@ -40,8 +40,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'InProcessSecretStoreResolver',
     // EW-685 P0 T4 — DI token for the in-memory job-runtime provider
     // registry consumed by the binding factory `buildJobRuntimeProviders()`.
-    // Declared but not wired into any NestJS module yet; see
-    // `job-runtime.providers.ts` header "Critical constraint" for rationale.
+    // Wired into `packages/tasks/src/trigger/trigger.module.ts` per the
+    // EW-685 T4 full cutover (all 11 *_DISPATCHER symbols resolve
+    // through the registry, no per-dispatcher special-casing).
     'JOB_RUNTIME_PROVIDER_REGISTRY',
     'KB_BACKFILL_SKELETON_DISPATCHER',
     'KB_EMBED_DOCUMENT_DISPATCHER',
@@ -50,6 +51,11 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     'KB_ORG_OVERLAY_FANOUT_DISPATCHER',
     'KB_REEMBED_WORK_DISPATCHER',
     'KB_TRANSCRIBE_DISPATCHER',
+    // EW-685 P0 T4 — binding factory that wires every `*_DISPATCHER` symbol
+    // onto the active job-runtime provider's `dispatchers` view via the
+    // `JOB_RUNTIME_PROVIDER_REGISTRY`. Wired into TriggerModule per the
+    // EW-685 T4 full cutover.
+    'buildJobRuntimeProviders',
     // EW-742 P3.1 / T22 — enqueue-site `credentialVersion` capture helper.
     // Dispatchers `await stamper.stamp(tenantId)` and write the result into
     // the run record so the worker host can later resolve THAT snapshot
