@@ -87,6 +87,11 @@ describe('TriggerJobRuntimeProvider', () => {
                 'job-runtime-cancel',
                 'job-runtime-status',
                 'job-runtime-schedule',
+                // EW-742 P3.2 T21.1 — the adapter does implement
+                // bindToTenant; the capability flag was added when
+                // the shared P6 conformance suite (EW-685 §7) caught
+                // its absence.
+                'job-runtime-bind-tenant',
             ]);
             expect(provider.settingsSchema).toEqual({ type: 'object', properties: {} });
         });
