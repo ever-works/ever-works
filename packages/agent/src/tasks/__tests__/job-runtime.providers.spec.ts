@@ -208,11 +208,12 @@ describe('job-runtime.providers (EW-685 P0 T4 binding factory)', () => {
             }
         });
 
-        it('symbols filter binds only the requested subset (EW-685 T4 partial cutover)', () => {
-            // The TriggerModule cutover passes 8 of the 11 symbols because
-            // the remaining 3 (KB_NORMALIZE_MEDIA / KB_TRANSCRIBE /
-            // KB_REEMBED_WORK) are bound in works.module.ts under custom
-            // Trigger.dev SDK adapters with their own soft-error contracts.
+        it('symbols filter binds only the requested subset (pull-model provider partial bind)', () => {
+            // EW-685 T4 full cutover landed in trigger.module.ts with no
+            // `symbols:` filter (all 11 bind through the registry). The
+            // `symbols:` option remains for tests and for future modules
+            // that want to bind a strict subset (e.g. a pull-model worker
+            // host that only owns a subset of the dispatcher surface).
             // The factory must honour the subset and return EXACTLY those
             // providers — no fewer, no more.
             const subset: readonly symbol[] = [
