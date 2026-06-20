@@ -1,8 +1,10 @@
+import type { JobEnqueueOptions } from '@ever-works/plugin';
 import type {
 	BullMqDeps,
 	BullMqFactoryOptions,
 	BullMqQueueAdapter
 } from './bullmq-types.js';
+import { mapEnqueueOptions } from './bullmq-enqueue-options.js';
 
 /**
  * EW-742 P3.2 follow-up — operator-facing factory that turns a single
@@ -57,6 +59,27 @@ export interface BullMqDispatcher {
 	 * options shallow-merge over the factory's `defaultJobOptions`.
 	 */
 	dispatch(name: string, payload: unknown, opts?: Readonly<Record<string, unknown>>): Promise<string | null>;
+	/**
+	 * EW-742 P4 T31 — enqueue with platform-canonical `JobEnqueueOptions`.
+	 * The factory translates each field onto the BullMQ-native carrier
+	 * per `providers.md` § BullMQ:
+	 *
+	 *   - `idempotencyKey` → `JobsOptions.jobId`
+	 *   - `tenantId`       → custom `JobsOptions.tenantId`
+	 *   - `concurrencyKey` → custom `JobsOptions.concurrencyKey`
+	 *   - `tags`           → custom `JobsOptions.tags`
+	 *   - `maxDurationSeconds` / `machineHint` → custom passthroughs
+	 *
+	 * `extraOpts` is shallow-merged on top of the translation so the
+	 * operator can still pass bullmq-native options (priority, lifo,
+	 * attempts, backoff) that have no `JobEnqueueOptions` equivalent.
+	 */
+	enqueue(
+		name: string,
+		payload: unknown,
+		enqueueOptions: JobEnqueueOptions,
+		extraOpts?: Readonly<Record<string, unknown>>
+	): Promise<string | null>;
 	/** Underlying queue handle — exposed for advanced lifecycle (drain, pause). */
 	readonly queue: BullMqQueueAdapter;
 }
@@ -91,6 +114,12 @@ export class BullMqDispatcherFactory {
 			queue: q,
 			dispatch: async (name, payload, callOpts) => {
 				const merged = callOpts ? { ...callOpts } : undefined;
+				const job = await q.add(name, payload, merged);
+				return job?.id ?? null;
+			},
+			enqueue: async (name, payload, enqueueOptions, extraOpts) => {
+				const translated = mapEnqueueOptions(enqueueOptions);
+				const merged = extraOpts ? { ...translated, ...extraOpts } : translated;
 				const job = await q.add(name, payload, merged);
 				return job?.id ?? null;
 			}

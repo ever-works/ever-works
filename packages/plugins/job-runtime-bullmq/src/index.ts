@@ -8,6 +8,7 @@ export type {
 } from './bullmq-job-runtime.plugin.js';
 export { BullMqDispatcherFactory } from './bullmq-dispatcher-factory.js';
 export type { BullMqDispatcher } from './bullmq-dispatcher-factory.js';
+export { mapEnqueueOptions as mapBullMqEnqueueOptions } from './bullmq-enqueue-options.js';
 export { BullMqWorkerHostFactory } from './bullmq-worker-host-factory.js';
 export type { BullMqWorkerRegistration } from './bullmq-worker-host-factory.js';
 export type {
