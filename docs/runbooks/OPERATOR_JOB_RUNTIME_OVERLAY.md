@@ -234,6 +234,65 @@ is a soft disable — tenants stay on the snapshot and can revert.
 Removing it from the bundled set is a hard disable — the API enum
 itself rejects the value, so even existing rows can't be re-saved.
 
+## Trigger.dev — tenant BYO is supported; project provisioning remains a click action
+
+Quick reference for what the platform does and does not do for
+tenants who pick `trigger` as their job runtime:
+
+- **Tenant `inherit`** — tenant runs against the platform's shared
+  Trigger.dev project (the operator's). Per-tenant isolation inside
+  that shared project is provided by `concurrencyKey: tenantId` +
+  `externalId: tenantId` on every dispatch, per [Trigger.dev's
+  per-tenant queuing guide][trigger-concurrency] and [their
+  multi-tenant applications page][trigger-multitenant]. Operator
+  owns the Trigger.dev account, the billing, and the project ref.
+- **Tenant `byo` / `override`** — tenant supplies its own
+  Trigger.dev account credentials (`accessToken`, `secretKey`,
+  `projectRef`, optional `apiUrl` for self-host). The platform
+  routes that tenant's runs through the tenant's project. The
+  operator never sees the tenant's workload data plane on
+  Trigger.dev. Conformance probe runs on save before persisting.
+
+The previous "one Trigger.dev project per tenant" plan was rejected
+after [Trigger.dev's 10-project-per-org cap][trigger-limits] surfaced
+during EW-742 implementation review (2026-06). Trigger.dev's own
+vendor docs call per-tenant projects an anti-pattern; the runtime-
+scoping pattern (single project + `concurrencyKey` + `externalId`)
+is now the design across all three tenant modes.
+
+[trigger-limits]: https://trigger.dev/docs/limits#projects
+[trigger-multitenant]: https://trigger.dev/docs/deploy-environment-variables#multi-tenant-applications
+[trigger-concurrency]: https://trigger.dev/docs/queue-concurrency#concurrency-keys-and-per-tenant-queuing
+
+### Operator-side: Trigger.dev project creation is click-only
+
+There is **no programmatic project creation** exposed in our
+runtime. Trigger.dev's `create_project_in_org` capability exists only
+in Trigger.dev's own MCP server (`mcp__trigger__*`), not in the
+public REST/CLI surface that the platform's worker/dispatcher loops
+call. This is intentional and matches the vendor's tenancy
+guidance.
+
+Consequences for operators:
+
+- **Onboarding a new operator-owned Trigger.dev project** — log into
+  the Trigger.dev dashboard, click `Create new project`, copy the
+  resulting `projectRef` + secret key into the operator's runtime
+  config (env / k8s Secret). Same flow you'd run for any new
+  Trigger.dev account.
+- **Onboarding a tenant in `byo` / `override` mode** — there is
+  nothing for the operator to do on Trigger.dev itself. The tenant
+  does the dashboard click flow against their own account, pastes
+  the resulting values into the tenant settings form, and the save
+  triggers the conformance probe. The operator-side concern is
+  only: is the tenant on a tier where they're allowed to pick
+  `trigger` at all (see the allow-list gating section above)?
+- **Rotating the operator-owned Trigger.dev project secret** — same
+  flow as any operator secret rotation: regenerate in the
+  Trigger.dev dashboard, push the new value through the env / k8s
+  Secret pipeline, redeploy. Per-tenant `inherit` traffic picks up
+  the new secret at next pod rollover.
+
 ## Pre-deploy checklist
 
 Before deploying a change that touches `EVER_WORKS_TENANT_RUNTIME_ALLOWED_PROVIDERS`:

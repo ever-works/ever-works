@@ -66,6 +66,13 @@ When a tenant is in `inherit` mode and the deployment's instance-global provider
 
 The same trichotomy generalises naturally to `inngest` (shared event key vs per-tenant app) but is in scope here only for `trigger`, since that is the only provider where we already programmatically create top-level account objects today.
 
+**Q-followup (2026-06-21):** the `per-tenant` and `tiered` inherit-policy variants above were both premised on the platform auto-provisioning **one Trigger.dev project per tenant** via `POST /api/v1/orgs/{orgId}/projects`. That premise is **rejected** after EW-742 implementation review surfaced two countervailing facts:
+
+1. Trigger.dev hard-caps [10 projects per organization across every pricing tier](https://trigger.dev/docs/limits#projects). There is no tier we can buy our way out of.
+2. Trigger.dev's own [multi-tenant applications guide](https://trigger.dev/docs/deploy-environment-variables#multi-tenant-applications) explicitly calls per-tenant projects an anti-pattern and points operators at runtime-scoping inside a shared project instead.
+
+The replacement design — already on `main` via the EW-742 P3.2 + T22 stack — uses a **single Trigger.dev project per account** with per-tenant routing via [`concurrencyKey: tenantId`](https://trigger.dev/docs/queue-concurrency#concurrency-keys-and-per-tenant-queuing) + `externalId: tenantId` + `metadata.tenantId` on every `tasks.trigger(...)` call, plus per-tenant credential resolution through the existing `TenantAwareRuntimeResolver` → `SecretStoreResolver` → `provider.bindToTenant(snapshot)` plumbing. Full design rationale + credential bag shape live in [`../features/tenant-job-runtime-overlay/providers.md` § Trigger.dev](../features/tenant-job-runtime-overlay/providers.md#triggerdev); task-level reframe in [`../features/tenant-job-runtime-overlay/tasks.md` § T25](../features/tenant-job-runtime-overlay/tasks.md). The three modes (`inherit` / `byo` / `override`) are unchanged at the data-model layer — only the inherit-mode implementation collapses from `shared` / `per-tenant` / `tiered` (Trigger.dev-specific) into a single "shared project + concurrency-key routing" path. Per-tenant queue isolation, per-tenant concurrency budget, and per-tenant observability slicing are all preserved by the new pattern; what's lost is the (never-shipped) "per-tenant billing account, transparently provisioned by the platform" promise, which the cap made impossible anyway.
+
 ### 5. Storage — `tenant_job_runtime_config` row in DB; env stays the fallback
 
 The overlay lives in a new DB table:
