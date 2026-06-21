@@ -95,13 +95,17 @@ export function extractPipelineUsageMetrics(
     const extendedMetrics = metrics as PipelineMetricsWithTokenUsage;
     const explicitTotalTokens = extendedMetrics.tokenUsage?.total?.totalTokens;
     const explicitTotalCost = extendedMetrics.totalCost;
-    const stepMetrics = Object.values(metrics.steps ?? {});
+    // `metrics.steps ?? {}` widens to `Record<string, StepMetrics> | {}`, which
+    // makes `Object.values` infer `unknown[]` and poisons the reduce accumulators
+    // below with `unknown`. Pin the element type so each `step` stays a
+    // `StepMetrics` and the `sum + …` arithmetic stays `number + number`.
+    const stepMetrics: StepMetrics[] = Object.values(metrics.steps ?? {});
 
-    const totalTokensFromSteps = stepMetrics.reduce(
+    const totalTokensFromSteps = stepMetrics.reduce<number>(
         (sum, step) => sum + readStepMetricNumber(step, 'totalTokens'),
         0,
     );
-    const totalCost = stepMetrics.reduce(
+    const totalCost = stepMetrics.reduce<number>(
         (sum, step) => sum + readStepMetricNumber(step, 'totalCost'),
         0,
     );
