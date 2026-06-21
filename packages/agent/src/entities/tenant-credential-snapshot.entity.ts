@@ -91,12 +91,13 @@ export class TenantCredentialSnapshot {
 
     /**
      * The credential bag as stored — **already encrypted** by the
-     * secret-store resolver layer. Stored as JSONB so future schema
-     * evolution doesn't need a type-altering migration. Whether
-     * decryption happens at write or read time is operator-side; this
-     * column just persists the bag verbatim.
+     * secret-store resolver layer. `simple-json` so the column maps to
+     * Postgres `jsonb` in prod and sqlite TEXT in local dev (the rest of
+     * the codebase uses the same convention). Whether decryption happens
+     * at write or read time is operator-side; this column just persists
+     * the bag verbatim.
      */
-    @Column({ type: 'jsonb' })
+    @Column({ type: 'simple-json' })
     credentialsEncrypted: Record<string, unknown>;
 
     /**
