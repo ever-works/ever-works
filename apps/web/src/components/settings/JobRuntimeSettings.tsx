@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { AlertTriangle, RotateCw, ShieldOff, Undo2, Save } from 'lucide-react';
+import { AlertTriangle, Info, RotateCw, ShieldOff, Undo2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,10 @@ import {
     JobRuntimeCredentialsForm,
     validateCredentialFields,
 } from './JobRuntimeCredentialsForm';
-import { PROVIDERS_WITHOUT_CREDENTIALS } from './job-runtime-schemas';
+import {
+    JOB_RUNTIME_PROVIDER_MODE_BANNERS,
+    PROVIDERS_WITHOUT_CREDENTIALS,
+} from './job-runtime-schemas';
 import {
     Dialog,
     DialogClose,
@@ -144,9 +147,9 @@ export function JobRuntimeSettings({
     const missingRequiredFields = useMemo(
         () =>
             needsCredentials && providerHasCredentials
-                ? validateCredentialFields(providerId, credentialValues)
+                ? validateCredentialFields(providerId, mode, credentialValues)
                 : [],
-        [needsCredentials, providerHasCredentials, providerId, credentialValues],
+        [needsCredentials, providerHasCredentials, providerId, mode, credentialValues],
     );
 
     const applyConfig = (next: TenantJobRuntimeConfigResponse) => {
@@ -371,6 +374,30 @@ export function JobRuntimeSettings({
                     <Switch checked={enabled} onChange={setEnabled} />
                 </div>
 
+                {/*
+                  EW-743 — when mode is `inherit` we suppress the credentials
+                  block entirely, but the provider may still have a per-mode
+                  banner worth showing (e.g. Trigger.dev's "Using the
+                  platform's shared project" copy). Render it above so the
+                  operator sees what `inherit` means for the picked provider.
+                */}
+                {!needsCredentials &&
+                    providerHasCredentials &&
+                    JOB_RUNTIME_PROVIDER_MODE_BANNERS[providerId]?.[mode] && (
+                        <div
+                            className="flex items-start gap-2 p-3 bg-info/10 border border-info/20 rounded-lg"
+                            data-testid={`job-runtime-mode-banner-${providerId}-${mode}`}
+                        >
+                            <Info
+                                className="w-4 h-4 text-info flex-shrink-0 mt-0.5"
+                                aria-hidden
+                            />
+                            <p className="text-xs text-text dark:text-text-dark">
+                                {JOB_RUNTIME_PROVIDER_MODE_BANNERS[providerId]?.[mode]}
+                            </p>
+                        </div>
+                    )}
+
                 {needsCredentials && (
                     <div className="space-y-4 p-4 rounded-lg border border-border dark:border-border-dark">
                         <h3 className="text-sm font-semibold text-text dark:text-text-dark">
@@ -392,11 +419,18 @@ export function JobRuntimeSettings({
                           EW-742 P2.2 T17 — per-provider schema-driven form
                           replaces the opaque credentialsJson textarea. Reset
                           state on provider change via `key={providerId}`.
+                          EW-743 — pass `mode` so mode-discriminated fields
+                          (Trigger.dev's accessToken / secretKey / projectRef)
+                          render with mode-aware requiredness + per-mode banner.
+                          Values are intentionally NOT cleared on mode flip —
+                          parent owns lifecycle and only clears on successful
+                          save or explicit revert.
                         */}
                         <div className="pt-2 border-t border-border/40 dark:border-border-dark/40">
                             <JobRuntimeCredentialsForm
                                 key={providerId}
                                 providerId={providerId}
+                                mode={mode}
                                 values={credentialValues}
                                 onChange={setCredentialValues}
                             />

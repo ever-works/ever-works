@@ -1,14 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff, Lock, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, AlertCircle, Info } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import type { TenantJobRuntimeProviderId } from '@/lib/api/tenant-job-runtime';
+import type {
+	TenantJobRuntimeMode,
+	TenantJobRuntimeProviderId
+} from '@/lib/api/tenant-job-runtime';
 import {
 	JOB_RUNTIME_CREDENTIAL_SCHEMAS,
+	JOB_RUNTIME_PROVIDER_MODE_BANNERS,
 	PROVIDERS_WITHOUT_CREDENTIALS,
+	isFieldRequired,
+	isFieldVisibleForMode,
 	type JobRuntimeCredentialField
 } from './job-runtime-schemas';
 
@@ -35,6 +41,18 @@ import {
 interface JobRuntimeCredentialsFormProps {
 	/** Selected provider; drives which fields render. */
 	readonly providerId: TenantJobRuntimeProviderId;
+	/**
+	 * Current tenant overlay mode. Drives the per-mode helper banner
+	 * and mode-discriminated field visibility / requiredness (EW-743:
+	 * Trigger.dev's accessToken / secretKey / projectRef are only
+	 * required when mode is `byo` or `override`).
+	 *
+	 * IMPORTANT: when mode flips from byo→inherit we INTENTIONALLY
+	 * preserve `values` in parent state so the operator can flip back
+	 * without re-pasting credentials. The parent decides when to clear
+	 * (on successful save, or on explicit revert-to-inherit).
+	 */
+	readonly mode: TenantJobRuntimeMode;
 	/** Current field values, owned by the parent. */
 	readonly values: Readonly<Record<string, string>>;
 	readonly onChange: (next: Readonly<Record<string, string>>) => void;
@@ -47,14 +65,17 @@ interface JobRuntimeCredentialsFormProps {
 
 export function JobRuntimeCredentialsForm({
 	providerId,
+	mode,
 	values,
 	onChange,
 	compact = false
 }: JobRuntimeCredentialsFormProps) {
-	const fields = JOB_RUNTIME_CREDENTIAL_SCHEMAS[providerId] ?? [];
-	const hasSchema = fields.length > 0;
+	const allFields = JOB_RUNTIME_CREDENTIAL_SCHEMAS[providerId] ?? [];
+	const hasSchema = allFields.length > 0;
 	const isNoCredentialsProvider = PROVIDERS_WITHOUT_CREDENTIALS.has(providerId);
 	const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+
+	const banner = JOB_RUNTIME_PROVIDER_MODE_BANNERS[providerId]?.[mode];
 
 	if (isNoCredentialsProvider) {
 		return (
@@ -63,9 +84,8 @@ export function JobRuntimeCredentialsForm({
 				<div className="text-sm text-text dark:text-text-dark space-y-1">
 					<p className="font-medium">No tenant-supplied credentials</p>
 					<p className="text-text-muted dark:text-text-muted-dark text-xs">
-						Trigger.dev provider switching is handled operator-side. Per-tenant
-						Trigger.dev projects are configured via the worker self-registration flow —
-						see the tenant runbook for details.
+						This provider is operator-only — per-tenant credentials are not
+						accepted.
 					</p>
 				</div>
 			</div>
@@ -94,12 +114,27 @@ export function JobRuntimeCredentialsForm({
 	const toggleReveal = (name: string) =>
 		setRevealed((prev) => ({ ...prev, [name]: !prev[name] }));
 
+	// Filter to fields that are visible in the current mode. Hidden
+	// fields keep their values in `values` (parent state) so toggling
+	// modes is non-destructive (NN: state-preservation on mode flip).
+	const visibleFields = allFields.filter((f) => isFieldVisibleForMode(f, mode));
+
 	return (
-		<div className="space-y-4">
-			{fields.map((field) => (
+		<div className="space-y-4" data-testid="job-runtime-credentials-form">
+			{banner && (
+				<div
+					className="flex items-start gap-2 p-3 bg-info/10 border border-info/20 rounded-lg"
+					data-testid={`job-runtime-mode-banner-${providerId}-${mode}`}
+				>
+					<Info className="w-4 h-4 text-info flex-shrink-0 mt-0.5" aria-hidden />
+					<p className="text-xs text-text dark:text-text-dark">{banner}</p>
+				</div>
+			)}
+			{visibleFields.map((field) => (
 				<CredentialField
 					key={field.name}
 					field={field}
+					required={isFieldRequired(field, mode)}
 					value={values[field.name] ?? ''}
 					revealed={revealed[field.name] ?? false}
 					onToggleReveal={() => toggleReveal(field.name)}
@@ -113,6 +148,8 @@ export function JobRuntimeCredentialsForm({
 
 interface CredentialFieldProps {
 	readonly field: JobRuntimeCredentialField;
+	/** Mode-resolved requiredness (parent computes via `isFieldRequired`). */
+	readonly required: boolean;
 	readonly value: string;
 	readonly revealed: boolean;
 	readonly onToggleReveal: () => void;
@@ -122,6 +159,7 @@ interface CredentialFieldProps {
 
 function CredentialField({
 	field,
+	required,
 	value,
 	revealed,
 	onToggleReveal,
@@ -133,7 +171,7 @@ function CredentialField({
 			<label className="flex items-center gap-1.5 text-sm font-medium text-text dark:text-text-dark">
 				{field.secret && <Lock className="w-3.5 h-3.5 text-text-muted" aria-hidden />}
 				<span>{field.label}</span>
-				{field.required && (
+				{required && (
 					<span className="text-danger" aria-label="required">
 						*
 					</span>
@@ -201,16 +239,21 @@ function CredentialField({
 
 /**
  * Client-side validation: returns the names of fields that are
- * required-but-empty for the given provider. Parent uses this to
- * disable Save + show a per-field error.
+ * required-but-empty for the given provider in the given mode. Parent
+ * uses this to disable Save + show a per-field error.
+ *
+ * EW-743 — mode parameter is required so mode-discriminated
+ * requiredness (e.g. Trigger.dev's `accessToken` only required in
+ * `byo` / `override`) resolves correctly.
  */
 export function validateCredentialFields(
 	providerId: TenantJobRuntimeProviderId,
+	mode: TenantJobRuntimeMode,
 	values: Readonly<Record<string, string>>
 ): readonly string[] {
 	if (PROVIDERS_WITHOUT_CREDENTIALS.has(providerId)) return [];
 	const fields = JOB_RUNTIME_CREDENTIAL_SCHEMAS[providerId] ?? [];
 	return fields
-		.filter((f) => f.required && !values[f.name]?.trim())
+		.filter((f) => isFieldRequired(f, mode) && !values[f.name]?.trim())
 		.map((f) => f.name);
 }

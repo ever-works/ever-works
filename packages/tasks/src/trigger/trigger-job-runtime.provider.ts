@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type {
     IJobRuntimeProvider,
     JobRunStatus,
@@ -11,7 +11,16 @@ import type {
     WorkerHostHandle,
     WorkerHostOptions,
 } from '@ever-works/plugin';
+import {
+    mapTriggerStatus as mapTriggerStatusLocal,
+    type TriggerClient,
+    type TriggerTenantCredentials,
+} from '@ever-works/job-runtime-trigger-plugin';
 import { TriggerService, triggerTenantStampStorage } from './trigger.service';
+import {
+    createTenantTriggerClient,
+    dispatchersFromTenantClient,
+} from './trigger-tenant-client.factory';
 
 /**
  * EW-742 P3.2 T22 (stamping) — the subset of dispatcher method names on
@@ -105,7 +114,38 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
     // -- IJobRuntimeProvider ----------------------------------------------
     readonly runtimeId: JobRuntimeId = 'trigger';
 
-    constructor(private readonly triggerService: TriggerService) {}
+    private readonly logger = new Logger(TriggerJobRuntimeProvider.name);
+
+    /**
+     * EW-742 P3.2 T22 — operator-supplied per-tenant `TriggerClient`
+     * factory. Defaults to the `@trigger.dev/sdk`-v4-backed
+     * {@link createTenantTriggerClient} which uses
+     * `tasks.trigger(..., { clientConfig })` + `auth.withAuth(...)` so
+     * concurrent multi-tenant calls don't cross-pollute. Overridable
+     * for tests + alternate operator wiring (e.g. self-hosted
+     * Trigger.dev with a custom client class).
+     */
+    private readonly clientFactory: (credentials: TriggerTenantCredentials) => TriggerClient;
+
+    /**
+     * Builds the per-tenant dispatchers map from a per-tenant
+     * `TriggerClient`. Defaults to {@link dispatchersFromTenantClient}
+     * (mirrors {@link TriggerService}'s dispatchers via the BYO
+     * client). Overridable per the same reasoning as
+     * {@link clientFactory}.
+     */
+    private readonly dispatchersFromClient: (client: TriggerClient) => JobRuntimeDispatchers;
+
+    constructor(
+        private readonly triggerService: TriggerService,
+        opts: {
+            clientFactory?: (credentials: TriggerTenantCredentials) => TriggerClient;
+            dispatchersFromClient?: (client: TriggerClient) => JobRuntimeDispatchers;
+        } = {},
+    ) {
+        this.clientFactory = opts.clientFactory ?? createTenantTriggerClient;
+        this.dispatchersFromClient = opts.dispatchersFromClient ?? dispatchersFromTenantClient;
+    }
 
     /**
      * The dispatchers surface IS the underlying {@link TriggerService}
@@ -243,6 +283,24 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         }
 
         const base = this;
+
+        // EW-742 P3.2 T22 — BYO / override credential extraction.
+        //
+        // Snapshots that carry the full
+        // {@link TriggerTenantCredentials} bag (accessToken + secretKey
+        // + projectRef) route through a per-tenant Trigger.dev client
+        // built by {@link clientFactory}. The view's `dispatchers` then
+        // come from {@link dispatchersFromClient} so every
+        // `dispatchXxx` call hits the tenant's project, not the
+        // platform default. Inherit snapshots (empty bag, or only the
+        // legacy `projectAccessToken` key) skip this branch entirely
+        // and fall through to the singleton-Proxy stamping path —
+        // byte-identical to the pre-T22 wiring.
+        const tenantCredentials = this.extractTenantCredentials(snapshot);
+        const tenantClient: TriggerClient | null = tenantCredentials
+            ? this.safeBuildTenantClient(snapshot, tenantCredentials)
+            : null;
+
         // EW-742 P3.2 T22 (stamping) — per-tenant dispatcher Proxy.
         //
         // The bound view's `dispatchers` is a Proxy around the singleton
@@ -270,8 +328,15 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             if (stampedDispatchersCache) {
                 return stampedDispatchersCache;
             }
-            const target = base.dispatchers as Record<string, unknown>;
-            stampedDispatchersCache = new Proxy(target, {
+            // BYO branch — wrap the BYO dispatchers in the SAME stamp
+            // Proxy so tenant tags / concurrencyKey still get prefixed
+            // at the binding layer (the BYO dispatchers themselves
+            // intentionally don't stamp — stamping at both layers
+            // would double-prefix).
+            const dispatchersSource: Record<string, unknown> = tenantClient
+                ? (base.dispatchersFromClient(tenantClient) as Record<string, unknown>)
+                : (base.dispatchers as Record<string, unknown>);
+            stampedDispatchersCache = new Proxy(dispatchersSource, {
                 get(t, prop, receiver) {
                     const value = Reflect.get(t, prop, receiver);
                     if (typeof value !== 'function') {
@@ -301,6 +366,7 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         // carries the snapshot for downstream stamping.
         const view: IJobRuntimeProvider & {
             readonly tenantSnapshot: TenantCredentialSnapshot;
+            readonly tenantClient: TriggerClient | null;
         } = Object.freeze({
             // -- IPlugin metadata, copied verbatim ---------------------
             id: base.id,
@@ -317,12 +383,30 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             registerSchedules(schedules: readonly ScheduleSpec[]): Promise<void> {
                 return base.registerSchedules(schedules);
             },
-            cancel(runId: string): Promise<boolean> {
-                return base.cancel(runId);
-            },
-            getRunStatus(runId: string): Promise<JobRunStatus> {
-                return base.getRunStatus(runId);
-            },
+            cancel: tenantClient
+                ? async (runId: string): Promise<boolean> => {
+                      // BYO — cancel against the tenant's Trigger.dev
+                      // project; a singleton cancel would either no-op
+                      // (run id not in the platform project) or, worse,
+                      // hit the wrong project.
+                      try {
+                          await tenantClient.runs.cancel(runId);
+                          return true;
+                      } catch {
+                          return false;
+                      }
+                  }
+                : (runId: string) => base.cancel(runId),
+            getRunStatus: tenantClient
+                ? async (runId: string): Promise<JobRunStatus> => {
+                      try {
+                          const run = await tenantClient.runs.retrieve(runId);
+                          return mapTriggerStatusLocal(run.status);
+                      } catch {
+                          return 'unknown';
+                      }
+                  }
+                : (runId: string) => base.getRunStatus(runId),
             isEnabled(): boolean {
                 return base.isEnabled();
             },
@@ -350,6 +434,11 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             },
             // -- snapshot exposed for downstream stampers --------------
             tenantSnapshot: snapshot,
+            // -- BYO surface: exposed so callers / tests / introspection
+            //    can verify the BYO branch wired through. `null` for
+            //    inherit snapshots (or BYO snapshots where the factory
+            //    threw and we fell open to the singleton).
+            tenantClient,
         });
 
         // Cache-replace: evict any older version for this tenant so
@@ -361,5 +450,78 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         }
         this.tenantViews.set(cacheKey, view);
         return view;
+    }
+
+    /**
+     * EW-742 P3.2 T22 — validate the snapshot's `credentials` bag
+     * against the {@link TriggerTenantCredentials} shape (mirrors the
+     * `extractTenantCredentials` helper on
+     * `@ever-works/job-runtime-trigger-plugin`'s
+     * {@link TriggerJobRuntimePlugin}). Returns the typed bundle on
+     * success; `null` (with a fail-open warn) when ANY required field
+     * is missing or non-string.
+     *
+     * Inherit-shaped snapshots (empty `credentials`, or only the
+     * legacy `projectAccessToken` key from earlier T21 wiring)
+     * intentionally return `null` WITHOUT a warn — they're the
+     * dominant path and noise here would drown actually-actionable
+     * BYO misconfigurations. The warn fires only when there's at
+     * least one Trigger.dev-shaped key but the bundle is incomplete.
+     */
+    private extractTenantCredentials(
+        snapshot: TenantCredentialSnapshot,
+    ): TriggerTenantCredentials | null {
+        const bag = snapshot.credentials as Record<string, unknown>;
+        const accessToken = typeof bag.accessToken === 'string' ? bag.accessToken : null;
+        const secretKey = typeof bag.secretKey === 'string' ? bag.secretKey : null;
+        const projectRef = typeof bag.projectRef === 'string' ? bag.projectRef : null;
+        const apiUrl = typeof bag.apiUrl === 'string' ? bag.apiUrl : undefined;
+
+        if (!accessToken && !secretKey && !projectRef) {
+            return null;
+        }
+
+        if (!accessToken || !secretKey || !projectRef) {
+            const missing = [
+                !accessToken && 'accessToken',
+                !secretKey && 'secretKey',
+                !projectRef && 'projectRef',
+            ]
+                .filter(Boolean)
+                .join(', ');
+            this.logger.warn(
+                `bindToTenant(tenantId=${snapshot.tenantId}, v=${snapshot.credentialVersion}): ` +
+                    `malformed BYO credentials — missing ${missing}. Falling back to platform default.`,
+            );
+            return null;
+        }
+
+        return apiUrl !== undefined
+            ? { accessToken, secretKey, projectRef, apiUrl }
+            : { accessToken, secretKey, projectRef };
+    }
+
+    /**
+     * Wrap the per-tenant `clientFactory` call in try/catch so a
+     * misbehaving operator factory (throws on construction, returns
+     * wrong shape) doesn't crash the whole bind. On failure we fall
+     * open to the platform default and warn — same shape as the
+     * missing-field path. Mirrors `safeBuildClient` on
+     * `TriggerJobRuntimePlugin`.
+     */
+    private safeBuildTenantClient(
+        snapshot: TenantCredentialSnapshot,
+        credentials: TriggerTenantCredentials,
+    ): TriggerClient | null {
+        try {
+            return this.clientFactory(credentials);
+        } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+                `bindToTenant(tenantId=${snapshot.tenantId}, v=${snapshot.credentialVersion}): ` +
+                    `clientFactory threw — ${reason}. Falling back to platform default.`,
+            );
+            return null;
+        }
     }
 }

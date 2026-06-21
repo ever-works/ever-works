@@ -3001,6 +3001,9 @@ importers:
       '@ever-works/agent':
         specifier: workspace:*
         version: link:../agent
+      '@ever-works/job-runtime-trigger-plugin':
+        specifier: workspace:*
+        version: link:../plugins/job-runtime-trigger
       '@ever-works/plugin':
         specifier: workspace:*
         version: link:../plugin
