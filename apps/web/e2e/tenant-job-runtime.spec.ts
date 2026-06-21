@@ -136,4 +136,147 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
 		const secretCount = await secretInputs.count();
 		expect(secretCount, 'at least one secret credential field should render as password').toBeGreaterThan(0);
 	});
+
+	/**
+	 * EW-743 — Trigger.dev now exposes per-tenant BYO credentials
+	 * gated by the existing mode discriminator (PR #1548). The form
+	 * must:
+	 *   - Render the mode picker with all 3 options (inherit / byo / override)
+	 *   - Hide the credential trio in `inherit` and show it in `byo` / `override`
+	 *   - Preserve credential values when toggling byo→inherit→byo
+	 *     (non-destructive mode flip)
+	 *   - Show a per-mode helper banner whose copy differs per mode
+	 */
+	test.describe('Trigger.dev 3-mode picker (EW-743)', () => {
+		test('mode picker exposes all 3 options (inherit, byo, override)', async ({
+			page
+		}) => {
+			await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
+			await page.waitForTimeout(1_500);
+
+			const providerSelect = page.locator('select').first();
+			const providerOptions = await providerSelect
+				.locator('option')
+				.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+			test.skip(
+				!providerOptions.includes('trigger'),
+				'trigger provider not in operator allow-list for this env'
+			);
+			await providerSelect.selectOption('trigger');
+
+			const modeSelect = page.locator('select').nth(1);
+			const modeOptions = await modeSelect
+				.locator('option')
+				.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+			expect(modeOptions).toEqual(expect.arrayContaining(['inherit', 'byo', 'override']));
+		});
+
+		test('switching trigger from inherit→byo reveals the credential fields', async ({
+			page
+		}) => {
+			await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
+			await page.waitForTimeout(1_500);
+
+			const providerSelect = page.locator('select').first();
+			const providerOptions = await providerSelect
+				.locator('option')
+				.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+			test.skip(
+				!providerOptions.includes('trigger'),
+				'trigger provider not in operator allow-list for this env'
+			);
+			await providerSelect.selectOption('trigger');
+
+			const modeSelect = page.locator('select').nth(1);
+
+			// inherit: no credentials form, but per-mode banner is visible
+			await modeSelect.selectOption('inherit');
+			await page.waitForTimeout(500);
+			await expect(
+				page.locator('[data-testid="job-runtime-mode-banner-trigger-inherit"]')
+			).toBeVisible({ timeout: 5_000 });
+			await expect(
+				page.locator('[data-testid="job-runtime-credentials-form"]')
+			).toHaveCount(0);
+
+			// byo: credentials form appears + at least the access token + secret key fields
+			await modeSelect.selectOption('byo');
+			await page.waitForTimeout(500);
+			await expect(
+				page.locator('[data-testid="job-runtime-credentials-form"]')
+			).toBeVisible({ timeout: 5_000 });
+			const passwordCount = await page.locator('input[type="password"]').count();
+			expect(passwordCount, 'byo trigger should render at least PAT + secretKey as password').toBeGreaterThanOrEqual(2);
+		});
+
+		test('byo→inherit→byo preserves credential values (non-destructive mode flip)', async ({
+			page
+		}) => {
+			await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
+			await page.waitForTimeout(1_500);
+
+			const providerSelect = page.locator('select').first();
+			const providerOptions = await providerSelect
+				.locator('option')
+				.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+			test.skip(
+				!providerOptions.includes('trigger'),
+				'trigger provider not in operator allow-list for this env'
+			);
+			await providerSelect.selectOption('trigger');
+
+			const modeSelect = page.locator('select').nth(1);
+			await modeSelect.selectOption('byo');
+			await page.waitForTimeout(500);
+
+			// Fill the first password field (Trigger.dev PAT) with a marker
+			const SENTINEL = 'tr_pat_e2e_state_preservation_check';
+			const firstPassword = page.locator('input[type="password"]').first();
+			await firstPassword.fill(SENTINEL);
+			await expect(firstPassword).toHaveValue(SENTINEL);
+
+			// Flip to inherit — credentials block disappears
+			await modeSelect.selectOption('inherit');
+			await page.waitForTimeout(500);
+			await expect(
+				page.locator('[data-testid="job-runtime-credentials-form"]')
+			).toHaveCount(0);
+
+			// Flip back to byo — value should still be there (parent preserved it)
+			await modeSelect.selectOption('byo');
+			await page.waitForTimeout(500);
+			const firstPasswordAfter = page.locator('input[type="password"]').first();
+			await expect(firstPasswordAfter).toHaveValue(SENTINEL);
+		});
+
+		test('per-mode banner copy differs between inherit, byo, and override', async ({
+			page
+		}) => {
+			await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
+			await page.waitForTimeout(1_500);
+
+			const providerSelect = page.locator('select').first();
+			const providerOptions = await providerSelect
+				.locator('option')
+				.evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+			test.skip(
+				!providerOptions.includes('trigger'),
+				'trigger provider not in operator allow-list for this env'
+			);
+			await providerSelect.selectOption('trigger');
+			const modeSelect = page.locator('select').nth(1);
+
+			const banners: Record<string, string> = {};
+			for (const m of ['inherit', 'byo', 'override'] as const) {
+				await modeSelect.selectOption(m);
+				await page.waitForTimeout(400);
+				const banner = page.locator(`[data-testid="job-runtime-mode-banner-trigger-${m}"]`);
+				await expect(banner).toBeVisible({ timeout: 5_000 });
+				banners[m] = (await banner.innerText()).trim();
+				expect(banners[m].length).toBeGreaterThan(10);
+			}
+
+			expect(new Set(Object.values(banners)).size).toBe(3);
+		});
+	});
 });
