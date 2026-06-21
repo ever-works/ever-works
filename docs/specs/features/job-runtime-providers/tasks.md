@@ -7,6 +7,8 @@
 
 > Ordered, granular tasks with explicit paths. Phases map to `plan.md` §10. Each phase is a candidate sub-PR. Mark `[x]` as landed. Suggested Jira child-issue grouping noted per phase (e.g. `[EW-683 T1–T6]`).
 
+> **CI matrix note (EW-742 T37 cross-cutting):** the per-phase `JOB_RUNTIME={…}` matrix axes mentioned in T12 / T17 / T21 / T26 / T29 are already live for the 4 non-Trigger providers via EW-742 P6 — mocks-only matrix across `bullmq`/`pgboss`/`temporal`/`inngest` plus real-infra coverage shipped in [#1515](https://github.com/ever-works/ever-works/pull/1515) (BullMQ + pg-boss with Redis 7-alpine + Postgres 16-alpine service containers) and [#1522](https://github.com/ever-works/ever-works/pull/1522) (Temporal `auto-setup` + Inngest dev-server containers). The real-infra job is cost-gated to direct pushes to `main` only in [#1529](https://github.com/ever-works/ever-works/pull/1529) (PRs + cascade branches skip it). When the per-provider EW-683 phases land their own conformance-green gates (T17 / T21 / T26 / T29), they extend the same matrix — no separate CI infra build-out required.
+
 ---
 
 ## Phase 0 — Contract & seam (no behaviour change) · `[EW-683 P0]`
