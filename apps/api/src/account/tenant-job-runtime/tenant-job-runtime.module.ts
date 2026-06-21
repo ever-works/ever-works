@@ -79,7 +79,13 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
         CredentialVersionService,
         RuntimeBindingStamperService,
         TenantAwareRuntimeResolver,
-        TenantCredentialCache,
+        // SWC-Number-DI gotcha: TenantCredentialCache's optional `opts`
+        // constructor arg has a JS-object type that SWC's design-time
+        // metadata emits as `Number`, which NestJS then tries to inject
+        // → UnknownDependenciesException at boot. Wrap in useFactory so
+        // NestJS skips constructor introspection. Zero-dep class (see
+        // packages/agent/src/tasks/tenant-credential.cache.ts comments).
+        { provide: TenantCredentialCache, useFactory: () => new TenantCredentialCache() },
         // EW-752 P5.1 (T35b) — boot-time writer for the
         // `operator_allowlist_boot` audit row. Implements
         // `OnApplicationBootstrap` so registering it here is enough for
