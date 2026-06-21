@@ -14,6 +14,8 @@ jest.mock('@ever-works/agent/tasks', () => ({
 // eslint-disable-next-line import/first
 import { TriggerWebhookController } from '../trigger-webhook.controller';
 // eslint-disable-next-line import/first
+import { TriggerWebhookEventRouterService } from '../trigger-webhook-event-router.service';
+// eslint-disable-next-line import/first
 import type { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 // eslint-disable-next-line import/first
 import type { SecretStoreResolver } from '@ever-works/agent/tasks';
@@ -47,15 +49,18 @@ function buildOverlayRow(overrides: Partial<TenantJobRuntimeConfig> = {}): Tenan
 describe('TriggerWebhookController', () => {
     let tenantRepo: jest.Mocked<Pick<Repository<TenantJobRuntimeConfig>, 'findOne'>>;
     let secretStore: jest.Mocked<SecretStoreResolver>;
+    let eventRouter: jest.Mocked<Pick<TriggerWebhookEventRouterService, 'route'>>;
     let controller: TriggerWebhookController;
     let logSpy: jest.SpyInstance;
 
     beforeEach(() => {
         tenantRepo = { findOne: jest.fn() };
         secretStore = { resolve: jest.fn() } as jest.Mocked<SecretStoreResolver>;
+        eventRouter = { route: jest.fn().mockReturnValue(true) };
         controller = new TriggerWebhookController(
             tenantRepo as unknown as Repository<TenantJobRuntimeConfig>,
             secretStore,
+            eventRouter as unknown as TriggerWebhookEventRouterService,
         );
         logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
     });
@@ -85,6 +90,67 @@ describe('TriggerWebhookController', () => {
         expect(logged).toContain(TENANT_ID);
         expect(logged).toContain('evt_abc123');
         expect(logged).toContain('run.succeeded');
+    });
+
+    it('routes the verified payload to the event router with the route-param tenantId', async () => {
+        // EW-743 Phase 2 — controller must hand off the parsed body
+        // to the router AFTER signature verification. The router
+        // (not the controller) decides whether the payload is well
+        // formed enough to emit downstream.
+        const parsedBody = {
+            event_type: 'alert.run.failed',
+            tenant_id: TENANT_ID,
+            created_at: '2026-06-21T00:00:00.000Z',
+            payload: { run: { id: 'run_x' } },
+        };
+        const body = JSON.stringify(parsedBody);
+        tenantRepo.findOne.mockResolvedValue(buildOverlayRow());
+        secretStore.resolve.mockResolvedValue({ webhookSecret: SECRET });
+
+        await controller.receive(
+            TENANT_ID,
+            { rawBody: body },
+            { 'x-trigger-signature': signBody(body, SECRET) },
+        );
+
+        expect(eventRouter.route).toHaveBeenCalledTimes(1);
+        expect(eventRouter.route).toHaveBeenCalledWith(TENANT_ID, parsedBody);
+    });
+
+    it('still returns 200 when the router rejects the payload (malformed/unmapped)', async () => {
+        // Router contract: never throw, return false on drop. The
+        // controller still 200s so Trigger.dev does not redeliver a
+        // payload we will never accept.
+        const body = JSON.stringify({ not: 'an-envelope' });
+        tenantRepo.findOne.mockResolvedValue(buildOverlayRow());
+        secretStore.resolve.mockResolvedValue({ webhookSecret: SECRET });
+        eventRouter.route.mockReturnValue(false);
+
+        const result = await controller.receive(
+            TENANT_ID,
+            { rawBody: body },
+            { 'x-trigger-signature': signBody(body, SECRET) },
+        );
+
+        expect(result).toEqual({ ok: true });
+        expect(eventRouter.route).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT invoke the router when the signature check fails', async () => {
+        // Defence-in-depth: even if a future refactor reorders the
+        // controller, the router must not see un-verified payloads.
+        const body = JSON.stringify({ event_type: 'alert.run.failed' });
+        tenantRepo.findOne.mockResolvedValue(buildOverlayRow());
+        secretStore.resolve.mockResolvedValue({ webhookSecret: SECRET });
+
+        await expect(
+            controller.receive(
+                TENANT_ID,
+                { rawBody: body },
+                { 'x-trigger-signature': 'sha256=' + '0'.repeat(64) },
+            ),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+        expect(eventRouter.route).not.toHaveBeenCalled();
     });
 
     it('rejects a request with no X-Trigger-Signature header (400)', async () => {

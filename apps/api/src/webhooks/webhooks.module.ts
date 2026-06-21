@@ -23,6 +23,7 @@ import { WebhookEventDispatcherService } from './webhook-event-dispatcher.servic
 import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 import { TriggerWebhookController } from './trigger-webhook.controller';
+import { TriggerWebhookEventRouterService } from './trigger-webhook-event-router.service';
 
 /**
  * `/api/webhooks` surface — subscriptions CRUD, delivery test-fire,
@@ -70,6 +71,12 @@ import { TriggerWebhookController } from './trigger-webhook.controller';
         // deployments override this binding at the module level for
         // their secret-store scheme (Vault, k8s, etc.).
         { provide: SECRET_STORE_RESOLVER, useClass: InProcessSecretStoreResolver },
+        // EW-743 Phase 2 — verified-payload → internal-event router
+        // used by TriggerWebhookController after HMAC check. Not
+        // exported; subscribers live in their own modules and bind
+        // via @OnEvent on the constants from
+        // ./trigger-webhook-events.
+        TriggerWebhookEventRouterService,
     ],
     exports: [
         WebhooksService,
