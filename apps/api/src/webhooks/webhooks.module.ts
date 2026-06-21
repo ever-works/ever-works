@@ -1,5 +1,7 @@
 import { Module, OnModuleInit } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 // Security (EW-711 #14): WorkModule provides/exports WorkOwnershipService so
 // WebhooksService can authorize a supplied workId before binding a
 // subscription to that Work's event stream.
@@ -8,6 +10,10 @@ import {
     WebhookSubscriptionDeliveryService,
     WorkModule,
 } from '@ever-works/agent/services';
+import {
+    InProcessSecretStoreResolver,
+    SECRET_STORE_RESOLVER,
+} from '@ever-works/agent/tasks';
 import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { AuthModule } from '../auth/auth.module';
 import { WebhooksController } from './webhooks.controller';
@@ -16,6 +22,7 @@ import { WebhookSecretService } from './webhook-secret.service';
 import { WebhookEventDispatcherService } from './webhook-event-dispatcher.service';
 import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
+import { TriggerWebhookController } from './trigger-webhook.controller';
 
 /**
  * `/api/webhooks` surface — subscriptions CRUD, delivery test-fire,
@@ -42,8 +49,13 @@ import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job
         // EW-742 P3.2 T22 — RuntimeBindingStamperService for the
         // WebhookEventDispatcherService enqueue-site stamping.
         TenantJobRuntimeModule,
+        // EW-743 — the Trigger.dev webhook receiver injects the tenant
+        // overlay repo directly to resolve the per-tenant
+        // `credentials.webhookSecret`. `TenantJobRuntimeModule` does
+        // not export the bare repository, so register it locally.
+        TypeOrmModule.forFeature([TenantJobRuntimeConfig]),
     ],
-    controllers: [WebhooksController],
+    controllers: [WebhooksController, TriggerWebhookController],
     providers: [
         WebhooksService,
         WebhookSecretService,
@@ -51,6 +63,13 @@ import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job
         WebhookSubscriptionDeliveryService,
         WebhookEventDispatcherService,
         WebhooksDeliveriesService,
+        // EW-743 — SecretStoreResolver binding for the Trigger.dev
+        // webhook receiver. `TenantJobRuntimeModule` also binds this
+        // for its own use but does not export the token, so the same
+        // default implementation is provided locally. Production
+        // deployments override this binding at the module level for
+        // their secret-store scheme (Vault, k8s, etc.).
+        { provide: SECRET_STORE_RESOLVER, useClass: InProcessSecretStoreResolver },
     ],
     exports: [
         WebhooksService,

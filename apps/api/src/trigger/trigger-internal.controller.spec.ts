@@ -144,6 +144,14 @@ describe('TriggerInternalController', () => {
             tasksService,
             taskChatService,
             undefined, // notificationChannelFacade
+            // EW-742 P3.2 T22 — three new constructor args added by PRs
+            // bbc24309 / 5e4e2483 / 41906b71 to expose the worker-host
+            // tenant-resolver dependencies through the remote-proxy
+            // controller. None of the test cases below exercise these
+            // paths, so passing `undefined` is sufficient.
+            undefined, // credentialVersionService
+            undefined, // organizationRepository
+            undefined, // webhookSubscriptionRepository
             undefined, // workProposalsApiService (Optional trailing)
         );
         c.onModuleInit();
