@@ -1612,6 +1612,23 @@
                     "jsonPlaceholder": "{\n    \"token\": \"...\"\n}",
                     "jsonHelper": "Per-provider schema-driven forms land in a follow-up sub-story. For now, paste the JSON shape from providers.md as a free-form reference."
                 },
+                "trigger": {
+                    "banner": {
+                        "inherit": "Using the platform's shared Trigger.dev project. No tenant credentials are required — jobs dispatch through the operator-default project.",
+                        "byo": "Bring your own Trigger.dev account + project. Paste the PAT, project secret key, and project ref from your Trigger.dev dashboard.",
+                        "override": "Override the platform default with your own Trigger.dev project. Same credential shape as BYO — choose this when you're explicitly opting out of the platform default rather than supplementing it."
+                    },
+                    "fields": {
+                        "accessTokenLabel": "Personal Access Token (PAT)",
+                        "accessTokenHelper": "Trigger.dev management PAT (tr_pat_…) from your Trigger.dev account. Required for BYO / Override; unused in Inherit mode.",
+                        "secretKeyLabel": "Project Secret Key",
+                        "secretKeyHelper": "Project-scoped server secret (tr_dev_… or tr_prod_…) used by the SDK to authenticate tasks.trigger calls. Required for BYO / Override.",
+                        "projectRefLabel": "Project Ref",
+                        "projectRefHelper": "Trigger.dev project reference (e.g. proj_abc123). Required for BYO / Override.",
+                        "apiUrlLabel": "API URL (self-hosted only)",
+                        "apiUrlHelper": "Override the Trigger.dev API endpoint for a self-hosted instance. Leave blank to use https://api.trigger.dev."
+                    }
+                },
                 "actions": {
                     "save": "Save",
                     "rotate": "Rotate credential",
