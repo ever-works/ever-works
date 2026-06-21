@@ -20,6 +20,7 @@ import { Repository } from 'typeorm';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { SECRET_STORE_RESOLVER, type SecretStoreResolver } from '@ever-works/agent/tasks';
 import { Public } from '../auth/decorators/public.decorator';
+import { TriggerWebhookEventRouterService } from './trigger-webhook-event-router.service';
 
 /**
  * EW-743 — Trigger.dev webhook receiver.
@@ -81,6 +82,10 @@ export class TriggerWebhookController {
         private readonly tenantRuntimeRepo: Repository<TenantJobRuntimeConfig>,
         @Inject(SECRET_STORE_RESOLVER)
         private readonly secretStore: SecretStoreResolver,
+        // EW-743 Phase 2 — fan out verified deliveries to platform
+        // internal events via EventEmitter2. See router service for
+        // mapping and failure semantics.
+        private readonly eventRouter: TriggerWebhookEventRouterService,
     ) {}
 
     @Public()
@@ -150,7 +155,13 @@ export class TriggerWebhookController {
             } eventType=${payload?.type ?? '?'}`,
         );
 
-        // Downstream fan-out is a follow-up PR — see class header.
+        // EW-743 Phase 2 — fan out to platform-internal events. The
+        // router never throws (malformed / unmapped payloads are
+        // logged + dropped), so the receiver still returns 200 — a
+        // payload Trigger.dev cannot retry into success would
+        // otherwise cause an infinite redelivery storm.
+        this.eventRouter.route(tenantId, payload);
+
         return { ok: true };
     }
 
