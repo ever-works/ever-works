@@ -167,7 +167,17 @@ jobs:
   # namespaces its own tables), Inngest via the inngest/inngest dev
   # server. Real-infra cells run as a SEPARATE job from the mocks-only
   # matrix so an infra hiccup doesn't mask the mocks-only failure signal.
+  # Cost gate: this job is restricted to direct pushes to main (see the
+  # job-level `if:` below) because the four service containers burn
+  # Ubicloud minutes; per-PR signal stays covered by the mocks-only
+  # job-runtime-plugin-matrix above.
   job-runtime-real-infra:
+    # Cost gate: real-infra cells spin up 4 service containers (Redis,
+    # Postgres, Temporal auto-setup, Inngest dev-server) which burn
+    # Ubicloud minutes. Run on direct pushes to main only — PR signal
+    # stays covered by the mocks-only job-runtime-plugin-matrix above.
+    # Re-enable per-PR by removing this `if:` line.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubicloud-standard-8
     services:
       redis:
