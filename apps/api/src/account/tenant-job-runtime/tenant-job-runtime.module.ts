@@ -17,6 +17,7 @@ import {
     TenantAwareRuntimeResolver,
     TenantCredentialCache,
 } from '@ever-works/agent/tasks';
+import { AuthModule } from '../../auth/auth.module';
 import { IsPlatformAdminGuard } from '../../auth/guards/platform-admin.guard';
 import { OperatorTenantRuntimeAllowlistController } from '../../operator/tenant-runtime-allowlist/operator-tenant-runtime-allowlist.controller';
 import { TenantJobRuntimeBootAuditService } from './tenant-job-runtime-boot-audit.service';
@@ -58,6 +59,12 @@ import { TenantJobRuntimeService } from './tenant-job-runtime.service';
 @Module({
     imports: [
         DatabaseModule,
+        // EW-752 P5.1 dev-bootstrap fix: OperatorTenantRuntimeAllowlistController
+        // uses IsPlatformAdminGuard which extends AuthSessionGuard. AuthSessionGuard
+        // injects `Symbol(AUTH_PROVIDER)` — provided by AuthModule. Without this
+        // import, `pnpm dev:api` crashes at module init with
+        // UnknownDependenciesException(AuthSessionGuard.AUTH_PROVIDER).
+        AuthModule,
         TypeOrmModule.forFeature([
             TenantJobRuntimeConfig,
             TenantJobRuntimeAudit,
