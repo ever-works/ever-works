@@ -45,6 +45,19 @@ jest.mock('@ever-works/agent/agents', () => ({
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TasksDomainModule: class TasksDomainModule {},
 }));
+// EW-742 P3.2 T22 — trigger-internal.module imports TenantJobRuntimeModule
+// + OrganizationsModule (added by bbc24309 / 5e4e2483 / 41906b71). Loading
+// those modules pulls in real `@ever-works/agent/entities` + `@ever-works/agent/tasks`
+// barrels which transitively type-check the agent `utils/metrics.util.ts`
+// under the api tsconfig and report TS2365 errors there. Stub the modules
+// here so the trigger-internal-module wiring contract can be asserted in
+// isolation without the deep agent type-check chain.
+jest.mock('../account/tenant-job-runtime/tenant-job-runtime.module', () => ({
+    TenantJobRuntimeModule: class TenantJobRuntimeModule {},
+}));
+jest.mock('../organizations/organizations.module', () => ({
+    OrganizationsModule: class OrganizationsModule {},
+}));
 jest.mock('./trigger-internal.controller', () => ({
     TriggerInternalController: class TriggerInternalController {},
 }));
