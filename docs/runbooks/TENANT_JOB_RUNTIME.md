@@ -222,6 +222,96 @@ exactly one tenant (the 1 User : 1 Tenant model). There is no
 `:tenantId` path parameter — the tenant is resolved from the auth
 session. Cross-tenant reads / writes return `403 ForbiddenException`.
 
+## Trigger.dev modes
+
+Trigger.dev is the platform default, and it has its own quirks worth
+calling out because the provider's tenancy model is the inverse of
+what the runbook above implies.
+
+There are three modes you can pick when Trigger.dev is your runtime:
+
+1. **`inherit`** (default) — your tenant uses the platform's shared
+   Trigger.dev project. The platform handles billing + project
+   ownership. Per-tenant isolation inside the shared project is
+   provided by Trigger.dev's [concurrency-keys][trigger-concurrency]
+   (each tenant gets its own per-task concurrency budget) and the
+   `externalId: <tenantId>` tag (so dashboard / observability slices
+   cleanly by tenant). You see nothing — credentials are not stored
+   on your tenant row in this mode.
+
+2. **`byo`** — you bring your own Trigger.dev account and project,
+   and the platform routes all your runs through your project's
+   credentials. The platform never sees your workload data plane on
+   Trigger.dev (only the dispatch metadata + the webhook callback).
+   Use this when you want full billing isolation, geo locality, or
+   contractual data-residency control.
+
+3. **`override`** — mechanically identical to `byo` (same credential
+   bag, same routing). The difference is intent: `override` says
+   "the platform default is Trigger.dev too, and I'm switching to
+   my own infra anyway." Kept as a distinct mode so future operator
+   policy can gate `override` separately from `byo` (e.g. require
+   operator approval) without touching the BYO flow.
+
+### Why `byo` / `override` instead of "one project per tenant"
+
+The original design assumed the platform could provision one
+Trigger.dev project per tenant. It can't — Trigger.dev hard-caps
+[projects at 10 per organization][trigger-limits] across every
+pricing tier, and Trigger.dev's own
+[multi-tenant guidance][trigger-multitenant] explicitly tells
+operators not to use one project per tenant. The vendor pattern
+(and ours) is one Trigger.dev project per **account**, with
+per-tenant routing via `concurrencyKey` + `externalId` inside that
+project. `byo` / `override` then lets your tenant own its **own
+account**, which gives the strong-isolation outcome the per-project
+plan was originally chasing.
+
+[trigger-limits]: https://trigger.dev/docs/limits#projects
+[trigger-multitenant]: https://trigger.dev/docs/deploy-environment-variables#multi-tenant-applications
+[trigger-concurrency]: https://trigger.dev/docs/queue-concurrency#concurrency-keys-and-per-tenant-queuing
+
+### What the credential form asks for
+
+When you pick `byo` or `override`, the credentials form collects:
+
+| Field         | Required | Notes                                                                                                  |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `accessToken` | yes      | Trigger.dev personal/management access token (`tr_pat_*`); used by the SDK at dispatch.                |
+| `secretKey`   | yes      | Server-side env secret (`tr_prod_*` for prod env, `tr_dev_*` for dev); pairs with `projectRef`.        |
+| `projectRef`  | yes      | Trigger.dev project reference (`proj_*`) shown on the Trigger.dev dashboard's project settings page.   |
+| `apiUrl`      | optional | Defaults to `https://api.trigger.dev` (Trigger.dev Cloud). Override **only** for self-hosted instances. |
+
+All four values come from the Trigger.dev dashboard, not from a
+platform-side API call. There is no programmatic project creation
+exposed in our runtime — see the next section for the click flow.
+
+### How do I provision a project in my own Trigger.dev account?
+
+1. Sign in (or sign up) at [trigger.dev](https://trigger.dev/).
+2. Create an organization if you don't already have one.
+3. Inside the org, click **Create new project**. Pick a name; the
+   dashboard generates the `projectRef` (a `proj_*` string).
+4. Open the project's **API Keys** page in the Trigger.dev dashboard.
+   Copy the server-side **secret key** (`tr_prod_*` for the prod
+   environment, `tr_dev_*` for dev). Treat this like a password.
+5. Open your user settings in the Trigger.dev dashboard and create
+   (or reuse) a **personal access token** (`tr_pat_*`).
+6. In Ever Works, navigate to **Dashboard → Settings → Job Runtime**,
+   pick `trigger` as the provider, pick `byo` or `override` as the
+   mode, paste the three values (plus `apiUrl` if you're on a
+   self-hosted Trigger.dev), and **Save**.
+
+The platform runs a conformance probe (enqueue → status → cancel of
+a no-op task) against your credentials before persisting. If the
+probe fails, the form surfaces the error and your tenant row is not
+updated.
+
+> Note for self-hosters: if your Trigger.dev instance is behind an
+> auth proxy or a non-default port, set `apiUrl` to the full base
+> URL including the scheme + port. The default
+> `https://api.trigger.dev` is only correct for Trigger.dev Cloud.
+
 ## Audit log
 
 Every overlay-row mutation writes a row to `tenant_job_runtime_audit`

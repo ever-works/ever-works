@@ -14,6 +14,35 @@ import type {
 import type { TriggerClient } from './trigger-types.js';
 
 /**
+ * Default Trigger.dev SaaS API endpoint. Kept in sync with the schema
+ * default on {@link TriggerJobRuntimePlugin.settingsSchema}.`apiUrl`
+ * — change BOTH if the SaaS endpoint moves.
+ */
+export const DEFAULT_TRIGGER_API_URL = 'https://api.trigger.dev';
+
+/**
+ * Tenant-supplied Trigger.dev credentials, as they live inside
+ * {@link TenantCredentialSnapshot.credentials} for `byo` / `override`
+ * modes. The shape is data-only (jsonb at rest, no migration); the
+ * validator at `bindToTenant` enforces presence of the three required
+ * fields.
+ */
+export interface TriggerTenantCredentials {
+	/** Trigger.dev Personal Access Token (`tr_pat_*`). */
+	readonly accessToken: string;
+	/** Project-scoped secret (`tr_dev_*` / `tr_prod_*`). */
+	readonly secretKey: string;
+	/** Trigger.dev project ref (`proj_*`). */
+	readonly projectRef: string;
+	/**
+	 * Optional API endpoint override — defaults to
+	 * {@link DEFAULT_TRIGGER_API_URL}. Operators of self-hosted
+	 * Trigger.dev point this at their own deployment.
+	 */
+	readonly apiUrl?: string;
+}
+
+/**
  * EW-686 P2 — Trigger.dev `IJobRuntimeProvider` plugin (canonical
  * pluggable form).
  *
@@ -64,11 +93,33 @@ export interface TriggerTenantBindingView extends IJobRuntimeProvider {
 	readonly tenantSnapshot: TenantCredentialSnapshot;
 	/** Per-tenant Trigger.dev project access token (for the operator-built per-tenant client). */
 	readonly tenantProjectAccessToken: string | null;
+	/**
+	 * Per-tenant Trigger.dev SDK client when the snapshot carried a full
+	 * {@link TriggerTenantCredentials} bag AND the plugin was constructed
+	 * with a `clientFactory`. `null` for `inherit` mode (no credentials
+	 * present), malformed credentials, or when the operator didn't wire a
+	 * `clientFactory` — callers must then dispatch through the platform-
+	 * default `client` instead.
+	 */
+	readonly tenantClient: TriggerClient | null;
 }
 
 export interface TriggerJobRuntimePluginOptions {
-	/** Per-tenant dispatcher builder — see plugin header. */
-	readonly dispatchersBuilder?: (snapshot: TenantCredentialSnapshot) => JobRuntimeDispatchers;
+	/**
+	 * Per-tenant dispatcher builder — operator escape hatch when they
+	 * want to swap MORE than just the SDK client (e.g. per-tenant queues,
+	 * per-tenant tag prefixes). When present, this takes precedence over
+	 * the `clientFactory` auto-wiring below.
+	 *
+	 * Receives the bound `TriggerClient` (if `clientFactory` resolved
+	 * one) so the builder can reuse it instead of constructing yet
+	 * another client. Falls through to the platform default
+	 * `dispatchers` if the builder returns `undefined`.
+	 */
+	readonly dispatchersBuilder?: (
+		snapshot: TenantCredentialSnapshot,
+		tenantClient: TriggerClient | null
+	) => JobRuntimeDispatchers | undefined;
 	/**
 	 * Optional default Trigger.dev client used by the plugin's own
 	 * `cancel` / `getRunStatus` (so callers don't need to reach into
@@ -81,6 +132,40 @@ export interface TriggerJobRuntimePluginOptions {
 	 * shape as the Inngest plugin which has no SDK-side equivalents.
 	 */
 	readonly client?: TriggerClient;
+	/**
+	 * EW-742 P3.2 T22 — operator-supplied factory that turns a tenant's
+	 * credential bag into a per-tenant `TriggerClient`. Invoked by
+	 * `bindToTenant` when the snapshot carries a full
+	 * {@link TriggerTenantCredentials} payload (BYO / override modes).
+	 *
+	 * Operator implementation typically constructs a fresh Trigger.dev
+	 * SDK client against `credentials.apiUrl ?? DEFAULT_TRIGGER_API_URL`
+	 * with `credentials.accessToken` for management calls and
+	 * `credentials.secretKey` for the task dispatch path — same SDK
+	 * surface (`{ tasks, runs }`) the platform-default `client` exposes.
+	 *
+	 * When omitted, BYO / override snapshots fall through to the
+	 * platform-default behaviour and the plugin logs a warn — operators
+	 * who want true BYO MUST wire this hook (the plugin can't take a
+	 * hard dependency on `@trigger.dev/sdk` itself; see `trigger-types.ts`).
+	 */
+	readonly clientFactory?: (credentials: TriggerTenantCredentials) => TriggerClient;
+	/**
+	 * Optional per-credential-bundle dispatcher builder. Same role as
+	 * {@link dispatchersBuilder} but receives the per-tenant
+	 * `TriggerClient` directly — operators who only need to swap the
+	 * SDK client (not the dispatcher shape) wire `clientFactory` +
+	 * `dispatchersFromClient` instead of the more general
+	 * `dispatchersBuilder`.
+	 */
+	readonly dispatchersFromClient?: (client: TriggerClient) => JobRuntimeDispatchers;
+	/**
+	 * Optional logger sink for warnings about missing / malformed tenant
+	 * credentials. Defaults to `console.warn` so the plugin works without
+	 * a NestJS logger context, but operators inside the API typically
+	 * inject `Logger.warn.bind(new Logger('TriggerJobRuntimePlugin'))`.
+	 */
+	readonly logger?: { warn(message: string): void };
 }
 
 export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
@@ -97,29 +182,87 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 	];
 	readonly runtimeId: JobRuntimeId = 'trigger';
 
+	/**
+	 * Tenant-overlay settings schema (EW-742). Three modes:
+	 *
+	 *   - `inherit`  — use the platform's shared Trigger.dev project +
+	 *                  credentials (operator-supplied via env / global
+	 *                  plugin settings). The `accessToken` /
+	 *                  `secretKey` / `projectRef` fields are ignored.
+	 *                  Default for every tenant.
+	 *   - `byo`      — tenant brings their own Trigger.dev SaaS account.
+	 *                  All three credential fields below are REQUIRED.
+	 *   - `override` — same shape as `byo`; semantically "I am replacing
+	 *                  the platform default with my own". Validation is
+	 *                  identical.
+	 *
+	 * Credential fields are stamped `x-scope: 'tenant'` so the
+	 * tenant-overlay settings UI surfaces them per-tenant rather than
+	 * globally, and `x-secret: true` so they never appear in plaintext
+	 * read-back endpoints (the platform stores them via the encrypted
+	 * secrets envelope per `settings-system.md` §5).
+	 *
+	 * `apiUrl` default (`https://api.trigger.dev`) is encoded in the
+	 * schema AND in `DEFAULT_TRIGGER_API_URL` below — keep both in sync
+	 * if either changes.
+	 */
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
-			projectRef: {
+			mode: {
 				type: 'string',
-				title: 'Trigger.dev Project Ref',
-				description: 'Trigger.dev project reference (e.g. proj_abc123).',
-				'x-envVar': 'TRIGGER_PROJECT_REF'
+				enum: ['inherit', 'byo', 'override'],
+				default: 'inherit',
+				title: 'Tenant Mode',
+				description:
+					'Tenant overlay mode. `inherit` uses the platform default; `byo` / `override` use the tenant credentials below.'
+			},
+			accessToken: {
+				type: 'string',
+				title: 'Trigger.dev Personal Access Token (PAT)',
+				description:
+					'Tenant-supplied management PAT (tr_pat_*). Required when mode is `byo` or `override`.',
+				'x-secret': true,
+				'x-scope': 'tenant'
 			},
 			secretKey: {
 				type: 'string',
 				title: 'Trigger.dev Secret Key',
-				description: 'Server-side prod secret (tr_prod_*). Used by the SDK to authenticate tasks.trigger calls.',
+				description:
+					'Project-scoped server secret (tr_dev_* or tr_prod_*). Used by the SDK to authenticate tasks.trigger calls. Required when mode is `byo` or `override`; in `inherit` mode the operator default (TRIGGER_SECRET_KEY) is used.',
 				'x-secret': true,
+				'x-scope': 'tenant',
 				'x-envVar': 'TRIGGER_SECRET_KEY'
+			},
+			projectRef: {
+				type: 'string',
+				title: 'Trigger.dev Project Ref',
+				description:
+					'Trigger.dev project reference (e.g. proj_abc123). Required when mode is `byo` or `override`.',
+				'x-scope': 'tenant',
+				'x-envVar': 'TRIGGER_PROJECT_REF'
 			},
 			apiUrl: {
 				type: 'string',
 				title: 'Trigger.dev API URL',
-				description: 'Override for self-hosted Trigger.dev (default https://api.trigger.dev).',
+				description:
+					'Override for self-hosted Trigger.dev (default https://api.trigger.dev).',
+				default: 'https://api.trigger.dev',
+				'x-scope': 'tenant',
 				'x-envVar': 'TRIGGER_API_URL'
 			}
-		}
+		},
+		allOf: [
+			{
+				// When mode is `byo` or `override`, all three credential fields are
+				// REQUIRED. JSON Schema `if/then` keyed off the `mode` discriminator.
+				if: {
+					properties: { mode: { enum: ['byo', 'override'] } },
+					required: ['mode']
+				},
+				then: { required: ['accessToken', 'secretKey', 'projectRef'] }
+			}
+		]
 	};
 
 	private readonly stubDispatchers: JobRuntimeDispatchers = new Proxy(
@@ -227,6 +370,43 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 		return { stop: async () => undefined };
 	}
 
+	/**
+	 * EW-742 P3.2 T22 — per-tenant Trigger.dev binding (BYO / override
+	 * support).
+	 *
+	 * Three observable behaviours based on the snapshot's credential bag:
+	 *
+	 *   1. **Inherit semantic** (no `credentials` keys recognised) —
+	 *      returns a frozen view of THIS provider with the snapshot
+	 *      captured. The view's `dispatchers` delegate to the
+	 *      platform-default `dispatchersImpl`; `tenantClient` is `null`;
+	 *      `tenantProjectAccessToken` is `null`. Byte-identical to the
+	 *      pre-T22 path for any tenant that hasn't opted into BYO.
+	 *
+	 *   2. **BYO / override happy-path** (`accessToken` + `secretKey` +
+	 *      `projectRef` all present AND a `clientFactory` is wired) —
+	 *      builds a per-tenant `TriggerClient` via
+	 *      {@link TriggerJobRuntimePluginOptions.clientFactory}, surfaces
+	 *      it on `tenantClient`, and routes the view's `dispatchers`
+	 *      through it (via `dispatchersFromClient` if provided,
+	 *      `dispatchersBuilder` if provided, else the platform default).
+	 *      The platform-default `dispatchersImpl` is NEVER mutated —
+	 *      `inherit` mode for other tenants stays byte-identical.
+	 *
+	 *   3. **Malformed credentials / no factory** — logs a warn naming
+	 *      the missing field (or "no clientFactory wired") and returns
+	 *      the inherit-shaped view as a fail-open. Operators see the
+	 *      warn in stdout; in-flight runs keep working against the
+	 *      platform default rather than failing the dispatch loudly at
+	 *      bind time (network at bind-time is fragile — the first
+	 *      dispatch through wrong credentials is the right place for
+	 *      loud failure).
+	 *
+	 * Memoisation: cached by `(tenantId, credentialVersion)`; bumping
+	 * the version evicts and replaces the previous entry. Cache stays
+	 * bounded by tenant count per the {@link IJobRuntimeProvider}
+	 * contract idempotency guarantee.
+	 */
 	bindToTenant(snapshot: TenantCredentialSnapshot): TriggerTenantBindingView {
 		const cacheKey = `${snapshot.tenantId}:${snapshot.credentialVersion}`;
 		const cached = this.tenantViews.get(cacheKey);
@@ -235,14 +415,47 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 
 		const base = this;
-		const tenantProjectAccessToken =
-			typeof snapshot.credentials.projectAccessToken === 'string'
-				? snapshot.credentials.projectAccessToken
+
+		// EW-742 P3.2 T22 — resolve per-tenant Trigger.dev SDK client.
+		// `extractTenantCredentials` validates the bag shape; missing
+		// fields → null + a fail-open warn. `clientFactory` produces the
+		// actual `{ tasks, runs }` client; without it, we still surface
+		// the validated credentials on `tenantProjectAccessToken` so
+		// operators can build a client downstream.
+		const tenantCredentials = this.extractTenantCredentials(snapshot);
+		const tenantClient: TriggerClient | null =
+			tenantCredentials && this.opts.clientFactory
+				? this.safeBuildClient(snapshot, tenantCredentials)
 				: null;
 
-		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
-			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
-			: base.dispatchersImpl;
+		// The PAT we surface for the operator-built per-tenant client.
+		// Back-compat: snapshots that used the historical
+		// `projectAccessToken` key keep working — the conformance suite
+		// at `__tests__/trigger-tenant-conformance.spec.ts` exercises
+		// that path.
+		const tenantProjectAccessToken =
+			tenantCredentials?.accessToken ??
+			(typeof snapshot.credentials.projectAccessToken === 'string'
+				? snapshot.credentials.projectAccessToken
+				: null);
+
+		// Dispatcher selection precedence:
+		//   1. operator's full `dispatchersBuilder(snapshot, tenantClient)`
+		//      (most flexible — can swap queues, tags, etc.);
+		//   2. `dispatchersFromClient(tenantClient)` when a per-tenant
+		//      client was constructed;
+		//   3. platform-default `dispatchersImpl` (inherit semantic).
+		let dispatchersForView: JobRuntimeDispatchers = base.dispatchersImpl;
+		if (this.opts.dispatchersBuilder) {
+			const built = this.opts.dispatchersBuilder(snapshot, tenantClient);
+			if (built) {
+				dispatchersForView = Object.freeze({ ...built });
+			}
+		} else if (tenantClient && this.opts.dispatchersFromClient) {
+			dispatchersForView = Object.freeze({
+				...this.opts.dispatchersFromClient(tenantClient)
+			});
+		}
 
 		const view: TriggerTenantBindingView = Object.freeze({
 			id: base.id,
@@ -273,7 +486,8 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 				return base.bindToTenant(other);
 			},
 			tenantSnapshot: snapshot,
-			tenantProjectAccessToken
+			tenantProjectAccessToken,
+			tenantClient
 		});
 
 		for (const key of this.tenantViews.keys()) {
@@ -283,6 +497,92 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 		this.tenantViews.set(cacheKey, view);
 		return view;
+	}
+
+	/**
+	 * Validate the snapshot's `credentials` bag against the
+	 * {@link TriggerTenantCredentials} shape. Returns the typed bundle
+	 * on success; `null` (with a fail-open warn) when ANY required field
+	 * is missing or non-string.
+	 *
+	 * Inherit-shaped snapshots (empty `credentials`, or only the legacy
+	 * `projectAccessToken` key from earlier T21 wiring) intentionally
+	 * return `null` WITHOUT a warn — they're the dominant path and noise
+	 * here would drown the actually-actionable BYO misconfigurations.
+	 * The warn fires only when there's at least one Trigger.dev-shaped
+	 * key but the bundle is incomplete.
+	 */
+	private extractTenantCredentials(
+		snapshot: TenantCredentialSnapshot
+	): TriggerTenantCredentials | null {
+		const bag = snapshot.credentials;
+		const accessToken = typeof bag.accessToken === 'string' ? bag.accessToken : null;
+		const secretKey = typeof bag.secretKey === 'string' ? bag.secretKey : null;
+		const projectRef = typeof bag.projectRef === 'string' ? bag.projectRef : null;
+		const apiUrl = typeof bag.apiUrl === 'string' ? bag.apiUrl : undefined;
+
+		// Pure inherit case — no Trigger.dev-shaped keys at all. Silent.
+		if (!accessToken && !secretKey && !projectRef) {
+			return null;
+		}
+
+		// Partial bag — at least one field present but not all three.
+		// This is operator misconfiguration: warn loudly so it's visible,
+		// then fail-open to the platform default.
+		if (!accessToken || !secretKey || !projectRef) {
+			const missing = [
+				!accessToken && 'accessToken',
+				!secretKey && 'secretKey',
+				!projectRef && 'projectRef'
+			]
+				.filter(Boolean)
+				.join(', ');
+			this.warn(
+				`bindToTenant(tenantId=${snapshot.tenantId}, v=${snapshot.credentialVersion}): ` +
+					`malformed BYO credentials — missing ${missing}. Falling back to platform default.`
+			);
+			return null;
+		}
+
+		return apiUrl !== undefined
+			? { accessToken, secretKey, projectRef, apiUrl }
+			: { accessToken, secretKey, projectRef };
+	}
+
+	/**
+	 * Wrap the `clientFactory` call in a try/catch so a misbehaving
+	 * operator factory (throws on construction, returns wrong shape)
+	 * doesn't crash the whole bind. On failure we fall open to the
+	 * platform default and warn — same shape as the missing-field path.
+	 */
+	private safeBuildClient(
+		snapshot: TenantCredentialSnapshot,
+		credentials: TriggerTenantCredentials
+	): TriggerClient | null {
+		try {
+			return this.opts.clientFactory!(credentials);
+		} catch (err) {
+			const reason = err instanceof Error ? err.message : String(err);
+			this.warn(
+				`bindToTenant(tenantId=${snapshot.tenantId}, v=${snapshot.credentialVersion}): ` +
+					`clientFactory threw — ${reason}. Falling back to platform default.`
+			);
+			return null;
+		}
+	}
+
+	/**
+	 * Route warns through the operator-supplied logger when present,
+	 * otherwise `console.warn`. Kept private so the rest of the file
+	 * doesn't have to know about the optionality.
+	 */
+	private warn(message: string): void {
+		const target =
+			this.opts.logger ??
+			({
+				warn: (m: string) => console.warn(`[@ever-works/job-runtime-trigger-plugin] ${m}`)
+			} as const);
+		target.warn(message);
 	}
 }
 

@@ -11,7 +11,25 @@ import type {
     WorkerHostHandle,
     WorkerHostOptions,
 } from '@ever-works/plugin';
-import { TriggerService } from './trigger.service';
+import { TriggerService, triggerTenantStampStorage } from './trigger.service';
+
+/**
+ * EW-742 P3.2 T22 (stamping) — the subset of dispatcher method names on
+ * {@link TriggerService} that intentionally RUN OUTSIDE a tenant stamp,
+ * even when reached through a per-tenant bound view. Operator-bootstrap
+ * dispatchers (KB skeleton backfill) sweep work that may legitimately
+ * cross tenant boundaries — pinning them to one tenant would mis-bucket
+ * the queue and corrupt the concurrency partition for the rest of the
+ * fleet.
+ *
+ * Kept as a small explicit `Set` rather than a method-property naming
+ * convention (e.g. `dispatchFleet*`) so the carve-out is documented in
+ * one obvious place; the corresponding `dispatchKbBackfillSkeleton`
+ * JSDoc on `TriggerService` cross-references this list.
+ */
+const FLEET_WIDE_DISPATCH_METHODS: ReadonlySet<string> = new Set([
+    'dispatchKbBackfillSkeleton',
+]);
 
 /**
  * EW-686 P1 — adapter that exposes the existing {@link TriggerService}
@@ -225,6 +243,59 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         }
 
         const base = this;
+        // EW-742 P3.2 T22 (stamping) — per-tenant dispatcher Proxy.
+        //
+        // The bound view's `dispatchers` is a Proxy around the singleton
+        // TriggerService that wraps every `dispatchXxx` method in
+        // `triggerTenantStampStorage.run({ tenantId }, () => method.apply(...))`.
+        // Each `dispatchXxx` in TriggerService reads the stamp inside its
+        // `tasks.trigger(...)` call via `stampTenantOptions(...)`, which
+        // injects `concurrencyKey` + `tenant:<id>` tag into the SDK
+        // options. Fleet-wide dispatchers (FLEET_WIDE_DISPATCH_METHODS)
+        // bypass the wrapping and run with NO stamp on the stack — they
+        // behave identically to the pre-T22 path.
+        //
+        // Non-dispatch property reads (e.g. `dispatchers.machine`, or the
+        // future addition of a non-`dispatch*` member to the dispatcher
+        // bag) pass through unchanged so the view stays a structural
+        // superset of the underlying dispatchers map.
+        //
+        // The Proxy is constructed once per tenant view and memoised on
+        // the view itself; calling `boundView.dispatchers` twice returns
+        // the same Proxy instance (identity-equality matters for the
+        // EW-685 binding factory + the NestJS DI graph).
+        const stamp = { tenantId: snapshot.tenantId };
+        let stampedDispatchersCache: JobRuntimeDispatchers | undefined;
+        const buildStampedDispatchers = (): JobRuntimeDispatchers => {
+            if (stampedDispatchersCache) {
+                return stampedDispatchersCache;
+            }
+            const target = base.dispatchers as Record<string, unknown>;
+            stampedDispatchersCache = new Proxy(target, {
+                get(t, prop, receiver) {
+                    const value = Reflect.get(t, prop, receiver);
+                    if (typeof value !== 'function') {
+                        return value;
+                    }
+                    if (typeof prop !== 'string' || !prop.startsWith('dispatch')) {
+                        // Non-dispatcher methods (cancelWorkGeneration,
+                        // mapTriggerStatus, …) MUST NOT be wrapped — they
+                        // don't reach `stampTenantOptions` and the stamp
+                        // would be a dead store.
+                        return value.bind(t);
+                    }
+                    if (FLEET_WIDE_DISPATCH_METHODS.has(prop)) {
+                        // Operator bootstrap — no stamp on the stack.
+                        return value.bind(t);
+                    }
+                    return (...args: unknown[]) =>
+                        triggerTenantStampStorage.run(stamp, () =>
+                            (value as (...a: unknown[]) => unknown).apply(t, args),
+                        );
+                },
+            }) as unknown as JobRuntimeDispatchers;
+            return stampedDispatchersCache;
+        };
         // Build a frozen tenant view. Every method delegates back to
         // the singleton `TriggerService` (via `base`), but the view
         // carries the snapshot for downstream stamping.
@@ -241,7 +312,7 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             // -- IJobRuntimeProvider, delegating ----------------------
             runtimeId: base.runtimeId,
             get dispatchers(): JobRuntimeDispatchers {
-                return base.dispatchers;
+                return buildStampedDispatchers();
             },
             registerSchedules(schedules: readonly ScheduleSpec[]): Promise<void> {
                 return base.registerSchedules(schedules);
