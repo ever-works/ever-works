@@ -29,6 +29,7 @@
     },
     "dependencies": {
         "@ever-works/agent": "workspace:*",
+        "@ever-works/job-runtime-trigger-plugin": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@nestjs/cache-manager": "^3.1.0",
         "@nestjs/common": "^11.1.18",
