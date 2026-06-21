@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable, Logger } from '@nestjs/common';
 import { configure, runs } from '@trigger.dev/sdk';
 import { config } from '@ever-works/agent/config';
@@ -47,6 +48,45 @@ import { kbTranscribeTask } from '../tasks/trigger/kb-transcribe.task';
 import { kbReembedWorkTask } from '../tasks/trigger/kb-reembed-work.task';
 import { notificationChannelDeliveryTask } from '../tasks/trigger/notification-channel-delivery.task';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
+
+/**
+ * EW-742 P3.2 T22 (stamping) — minimal stamp payload set on the
+ * thread-local store by {@link TriggerJobRuntimeProvider}'s per-tenant
+ * Proxy view of {@link TriggerService.dispatchers}.
+ *
+ * Each tenant-scoped `dispatchXxx` method on {@link TriggerService}
+ * reads this store via {@link TriggerService.currentTenantStamp} and
+ * merges:
+ *   - `concurrencyKey`: composed with any existing key so the
+ *     dispatcher's per-workId / per-orgId serialization invariant is
+ *     preserved AND the queue still partitions per tenant.
+ *   - `tags`: prepended with `tenant:${tenantId}` for Trigger.dev
+ *     dashboard filtering.
+ *
+ * Fleet-wide dispatchers (operator bootstrap like
+ * `dispatchKbBackfillSkeleton`) intentionally do NOT call the helper
+ * — they run as platform scope.
+ *
+ * Idempotency: `idempotencyKey`, if set by the caller, takes
+ * precedence and is never derived from the tenant id (would silently
+ * promote a per-tenant idempotency window to a global one).
+ */
+export interface TriggerTenantStamp {
+    readonly tenantId: string;
+}
+
+/**
+ * Process-local store the {@link TriggerJobRuntimeProvider} per-tenant
+ * view writes the {@link TriggerTenantStamp} into for the duration of
+ * a single dispatch call. Module-level so the {@link TriggerService}
+ * method can read it without a per-call argument plumbing change
+ * (keeps every existing call site untouched).
+ *
+ * Exported so the binding-layer Proxy can call `.run(stamp, () =>
+ * method.apply(...))` without depending on a TriggerService instance
+ * member.
+ */
+export const triggerTenantStampStorage = new AsyncLocalStorage<TriggerTenantStamp>();
 
 @Injectable()
 export class TriggerService
@@ -322,16 +362,69 @@ export class TriggerService
         return undefined;
     }
 
+    /**
+     * EW-742 P3.2 T22 (stamping) — merge the tenant stamp from the
+     * thread-local {@link triggerTenantStampStorage} into a Trigger.dev
+     * `tasks.trigger()` options object.
+     *
+     * Called by every TENANT-SCOPED `dispatchXxx` (the 10 in
+     * `_tasks-symbols.ts` minus `KB_BACKFILL_SKELETON_DISPATCHER`,
+     * plus `dispatchNotificationChannelDelivery`). When there's no
+     * binding on the call stack (no `bindToTenant(...)` ancestor —
+     * fleet-wide bootstrap, dev one-offs, in-process fallback paths),
+     * the helper returns the input verbatim — byte-identical to the
+     * pre-stamp path.
+     *
+     * Merge rules:
+     *   - `concurrencyKey`: composed as `${tenantId}:${existing}` when
+     *     the dispatcher already specifies a per-workId / per-orgId
+     *     key (preserves the EW-641 per-Work serialization invariant
+     *     AND adds per-tenant queue partition). Set to just
+     *     `${tenantId}` when no existing key is present.
+     *   - `tags`: prepend `tenant:${tenantId}` so the Trigger.dev
+     *     dashboard filters per tenant. Existing tags preserved at
+     *     their original positions.
+     *   - `idempotencyKey`: NEVER touched — the caller's idempotency
+     *     window stays exactly as written. The task header documents
+     *     this as a hard invariant (a per-tenant idempotencyKey that
+     *     bled into a global one would be a silent correctness bug).
+     *
+     * The fleet-wide dispatcher (`dispatchKbBackfillSkeleton` —
+     * operator bootstrap) deliberately does NOT call this helper —
+     * stamping it would semantically pin a platform-scope run to one
+     * tenant.
+     */
+    private stampTenantOptions<O extends Record<string, unknown>>(options: O): O {
+        const stamp = triggerTenantStampStorage.getStore();
+        if (!stamp?.tenantId) {
+            return options;
+        }
+        const existingConcurrencyKey =
+            typeof options.concurrencyKey === 'string' ? options.concurrencyKey : undefined;
+        const concurrencyKey = existingConcurrencyKey
+            ? `${stamp.tenantId}:${existingConcurrencyKey}`
+            : stamp.tenantId;
+        const existingTags = Array.isArray(options.tags) ? (options.tags as string[]) : [];
+        const tenantTag = `tenant:${stamp.tenantId}`;
+        const tags = existingTags.includes(tenantTag)
+            ? existingTags
+            : [tenantTag, ...existingTags];
+        return { ...options, concurrencyKey, tags } as O;
+    }
+
     async dispatchWorkGeneration(payload: WorkGenerationPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
             return null;
         }
 
         try {
-            const handle = await workGenerationTask.trigger(payload, {
-                tags: ['work-generation', payload.mode, payload.workId],
-                machine: this.machine() as any,
-            });
+            const handle = await workGenerationTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['work-generation', payload.mode, payload.workId],
+                    machine: this.machine() as any,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -360,10 +453,13 @@ export class TriggerService
         }
 
         try {
-            const handle = await workImportTask.trigger(payload, {
-                tags: ['work-import', payload.sourceType, payload.workId],
-                machine: this.machine() as any,
-            });
+            const handle = await workImportTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['work-import', payload.sourceType, payload.workId],
+                    machine: this.machine() as any,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -380,10 +476,13 @@ export class TriggerService
         }
 
         try {
-            const handle = await templateCustomizationTask.trigger(payload, {
-                tags: ['template-customization', payload.customizationId],
-                machine: this.machine() as any,
-            });
+            const handle = await templateCustomizationTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: ['template-customization', payload.customizationId],
+                    machine: this.machine() as any,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -405,14 +504,17 @@ export class TriggerService
         }
 
         try {
-            const handle = await webhookDeliveryTask.trigger(payload, {
-                tags: [
-                    'webhook-delivery',
-                    `event:${payload.eventName}`,
-                    `subscription:${payload.subscriptionId}`,
-                ],
-                machine: this.machine() as any,
-            });
+            const handle = await webhookDeliveryTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'webhook-delivery',
+                        `event:${payload.eventName}`,
+                        `subscription:${payload.subscriptionId}`,
+                    ],
+                    machine: this.machine() as any,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -438,15 +540,18 @@ export class TriggerService
 
         try {
             const delay = payload.deferUntil ? new Date(payload.deferUntil) : undefined;
-            const handle = await notificationChannelDeliveryTask.trigger(payload, {
-                tags: [
-                    'notification-channel-delivery',
-                    `channel:${payload.channelId}`,
-                    ...(payload.eventType ? [`event:${payload.eventType}`] : []),
-                ],
-                machine: this.machine() as any,
-                ...(delay ? { delay } : {}),
-            });
+            const handle = await notificationChannelDeliveryTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'notification-channel-delivery',
+                        `channel:${payload.channelId}`,
+                        ...(payload.eventType ? [`event:${payload.eventType}`] : []),
+                    ],
+                    machine: this.machine() as any,
+                    ...(delay ? { delay } : {}),
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -477,16 +582,19 @@ export class TriggerService
             // subsequent runs behind any in-flight one with the same
             // key — keyed on `workId`, two Works run in parallel but
             // two mutations on the same Work run sequentially.
-            const handle = await kbMirrorDocumentTask.trigger(payload, {
-                tags: [
-                    'kb-mirror-document',
-                    `op:${payload.operation}`,
-                    `work:${payload.workId}`,
-                    `doc:${payload.documentId}`,
-                ],
-                machine: this.machine() as any,
-                concurrencyKey: `kb-mirror:${payload.workId}`,
-            });
+            const handle = await kbMirrorDocumentTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'kb-mirror-document',
+                        `op:${payload.operation}`,
+                        `work:${payload.workId}`,
+                        `doc:${payload.documentId}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-mirror:${payload.workId}`,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -501,6 +609,15 @@ export class TriggerService
      * tasks; the per-document mirror task already lazy-creates the
      * skeleton, so this is only needed when the operator wants to
      * pre-populate it without an outbound mutation.
+     *
+     * EW-742 P3.2 T22 (stamping) note — fleet-wide, NOT stamped with
+     * `concurrencyKey: tenantId`. The backfill sweeps an operator-
+     * supplied list that may legitimately cross tenant boundaries
+     * (e.g. ops re-emitting skeletons after a migration); pinning the
+     * run to one tenant via the per-tenant Proxy view would mis-bucket
+     * the queue. Operators invoke this dispatcher directly on the
+     * unbound singleton TriggerService — there's no tenant binding on
+     * the stack to read.
      */
     async dispatchKbBackfillSkeleton(payload: KbBackfillSkeletonPayload): Promise<string | null> {
         if (!this.ensureConfigured()) {
@@ -537,11 +654,18 @@ export class TriggerService
         }
 
         try {
-            const handle = await kbEmbedDocumentTask.trigger(payload, {
-                tags: ['kb-embed-document', `work:${payload.workId}`, `doc:${payload.documentId}`],
-                machine: this.machine() as any,
-                concurrencyKey: `kb-embed:${payload.workId}`,
-            });
+            const handle = await kbEmbedDocumentTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'kb-embed-document',
+                        `work:${payload.workId}`,
+                        `doc:${payload.documentId}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-embed:${payload.workId}`,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -573,17 +697,20 @@ export class TriggerService
         }
 
         try {
-            const handle = await kbOrgOverlayFanoutTask.trigger(payload, {
-                tags: [
-                    'kb-org-overlay-fanout',
-                    `op:${payload.operation}`,
-                    `org:${payload.organizationId}`,
-                    `doc:${payload.documentId}`,
-                    `targets:${payload.workIds.length}`,
-                ],
-                machine: this.machine() as any,
-                concurrencyKey: `kb-org-overlay:${payload.organizationId}`,
-            });
+            const handle = await kbOrgOverlayFanoutTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'kb-org-overlay-fanout',
+                        `op:${payload.operation}`,
+                        `org:${payload.organizationId}`,
+                        `doc:${payload.documentId}`,
+                        `targets:${payload.workIds.length}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-org-overlay:${payload.organizationId}`,
+                }),
+            );
 
             return handle.id;
         } catch (error) {
@@ -612,15 +739,18 @@ export class TriggerService
         try {
             const taskHandle =
                 payload.mediaKind === 'video' ? kbNormalizeVideoTask : kbNormalizeAudioTask;
-            const handle = await taskHandle.trigger(payload, {
-                tags: [
-                    `kb-normalize-${payload.mediaKind}`,
-                    `work:${payload.workId}`,
-                    `upload:${payload.uploadId}`,
-                ],
-                machine: this.machine() as any,
-                concurrencyKey: `kb-normalize:${payload.workId}`,
-            });
+            const handle = await taskHandle.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        `kb-normalize-${payload.mediaKind}`,
+                        `work:${payload.workId}`,
+                        `upload:${payload.uploadId}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-normalize:${payload.workId}`,
+                }),
+            );
             return handle.id;
         } catch (error) {
             this.logger.error(
@@ -649,11 +779,18 @@ export class TriggerService
         }
 
         try {
-            const handle = await kbTranscribeTask.trigger(payload, {
-                tags: ['kb-transcribe', `work:${payload.workId}`, `upload:${payload.uploadId}`],
-                machine: this.machine() as any,
-                concurrencyKey: `kb-transcribe:${payload.workId}`,
-            });
+            const handle = await kbTranscribeTask.trigger(
+                payload,
+                this.stampTenantOptions({
+                    tags: [
+                        'kb-transcribe',
+                        `work:${payload.workId}`,
+                        `upload:${payload.uploadId}`,
+                    ],
+                    machine: this.machine() as any,
+                    concurrencyKey: `kb-transcribe:${payload.workId}`,
+                }),
+            );
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch kb-transcribe task', error as Error);
@@ -707,16 +844,19 @@ export class TriggerService
             );
         }
 
-        const handle = await kbReembedWorkTask.trigger(payload, {
-            tags: [
-                'kb-reembed-work',
-                `work:${payload.workId}`,
-                `from:${payload.previousModel}`,
-                `to:${payload.newModel}`,
-            ],
-            machine: this.machine() as any,
-            concurrencyKey: `kb-reembed:${payload.workId}`,
-        });
+        const handle = await kbReembedWorkTask.trigger(
+            payload,
+            this.stampTenantOptions({
+                tags: [
+                    'kb-reembed-work',
+                    `work:${payload.workId}`,
+                    `from:${payload.previousModel}`,
+                    `to:${payload.newModel}`,
+                ],
+                machine: this.machine() as any,
+                concurrencyKey: `kb-reembed:${payload.workId}`,
+            }),
+        );
         return handle.id;
     }
 }

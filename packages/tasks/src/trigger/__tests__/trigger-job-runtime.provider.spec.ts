@@ -276,12 +276,24 @@ describe('TriggerJobRuntimeProvider', () => {
             await view.cancel('run_xyz');
             expect(triggerServiceMock.cancel).toHaveBeenCalledWith('run_xyz');
 
-            // The dispatchers getter on the view passes through the
-            // singleton's dispatchers identity-equal — that's how the
-            // current "BYO with inherit (inherit only)" path keeps
-            // working in this PR; per-tenant Trigger.dev project
-            // switching is the T22 follow-up.
-            expect(view.dispatchers).toBe(dispatchersSentinel);
+            // EW-742 P3.2 T22 (stamping) — the view's `dispatchers`
+            // getter no longer returns the singleton's dispatchers
+            // identity-equal; it returns a Proxy that wraps each
+            // dispatchXxx call inside the per-tenant stamp store.
+            // Non-dispatch property reads still pass through to the
+            // underlying sentinel object — that's the structural
+            // superset guarantee the binding factory relies on.
+            const stampedDispatchers = view.dispatchers as Record<string, unknown>;
+            expect(stampedDispatchers).not.toBe(dispatchersSentinel);
+            expect(stampedDispatchers.__sentinel).toBe('dispatchers');
+        });
+
+        it('view.dispatchers is memoised — same Proxy returned across reads', () => {
+            const view = provider.bindToTenant(snapshot);
+            // Identity-stability matters for the EW-685 binding factory
+            // + the NestJS DI graph (consumers cache the dispatchers
+            // reference at module-init time).
+            expect(view.dispatchers).toBe(view.dispatchers);
         });
 
         it('the view is frozen', () => {
