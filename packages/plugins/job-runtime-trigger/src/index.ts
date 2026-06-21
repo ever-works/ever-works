@@ -1,11 +1,13 @@
 export {
 	TriggerJobRuntimePlugin,
 	TriggerDispatcherNotConfiguredError,
-	mapTriggerStatus
+	mapTriggerStatus,
+	DEFAULT_TRIGGER_API_URL
 } from './trigger-job-runtime.plugin.js';
 export type {
 	TriggerTenantBindingView,
-	TriggerJobRuntimePluginOptions
+	TriggerJobRuntimePluginOptions,
+	TriggerTenantCredentials
 } from './trigger-job-runtime.plugin.js';
 export { TriggerDispatcherFactory } from './trigger-dispatcher-factory.js';
 export {

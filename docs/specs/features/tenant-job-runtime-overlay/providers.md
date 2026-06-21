@@ -19,7 +19,7 @@ The three resolution modes referenced throughout this doc are:
 
 | Provider    | inherit / shared | inherit / per-tenant              | inherit / tiered | BYO | override | Notes                                                                              |
 | ----------- | ---------------- | --------------------------------- | ---------------- | --- | -------- | ---------------------------------------------------------------------------------- |
-| Trigger.dev | yes              | yes (PAT-provisioned, see gotcha) | yes              | yes | yes      | `per-tenant` cannot fully auto-provision prod key (dashboard-only); see below      |
+| Trigger.dev | yes              | n/a — see below                   | n/a — see below  | yes | yes      | Per-tenant **projects** rejected (10-project-per-org cap + vendor anti-pattern). Per-tenant **isolation** via runtime-scoping inside a single project. |
 | Temporal    | yes              | yes (control-plane call)          | yes              | yes | yes      | Per-tenant namespace creation adds ~5-10s to tenant signup                         |
 | BullMQ      | yes              | yes (DB or instance per tenant)   | yes              | yes | yes      | >16 tenants in DB-per-tenant mode requires Redis Cluster (flag)                    |
 | pg-boss     | yes              | yes (DB or instance per tenant)   | yes              | yes | yes      | `shared` policy still uses per-tenant **schemas** (Q2); tenant_id column forbidden |
@@ -79,21 +79,40 @@ The three resolution modes referenced throughout this doc are:
 
 ### Isolation model
 
-Per **Trigger.dev project**. Every tenant in `byo` or `override` gets its own project. In `inherit / per-tenant`, the platform auto-provisions a project under the operator's Trigger.dev org. In `inherit / shared`, all tenants share the operator project and are demultiplexed by tag on the run metadata.
+**Per-tenant routing happens inside a single Trigger.dev project per account, not across multiple projects.** This is a deliberate reframe of the original design — see the [per-provider gotchas](#per-provider-gotchas-at-tenant-scope) below for the trigger.
+
+Three resolution modes, all backed by the same `concurrencyKey: tenantId` + `externalId: tenantId` per-call routing inside whichever project is active:
+
+- **`inherit`** — tenant runs against the platform's shared Trigger.dev project (the operator's). Default; what unconfigured tenants get.
+- **`byo`** — tenant supplies its own Trigger.dev account + project. Full credential pass-through; the platform never sees the tenant's workload data plane on Trigger.dev.
+- **`override`** — same shape as `byo` (own account + own project) but the operator-intent semantic is "I'm overriding the platform default with my own infra" rather than "I'm bringing infra for a provider the platform doesn't offer by default." Kept as a distinct mode per EW-742 P3 so future operator policy can gate `override` (e.g. require explicit operator approval) without touching `byo`.
+
+In every mode, per-call routing is identical: `tasks.trigger(name, payload, { concurrencyKey: tenantId, externalId: tenantId, metadata: { tenantId } })`. The `concurrencyKey` gives each tenant its own queue inside the shared project (so a noisy-neighbour tenant cannot starve another tenant's concurrency budget — see [Trigger.dev's concurrency-keys guide](https://trigger.dev/docs/queue-concurrency#concurrency-keys-and-per-tenant-queuing)), and the `externalId` lets dashboard / search / observability tooling slice runs by tenant. Dynamic schedules use the same `externalId: tenantId` pattern per [Trigger.dev's per-tenant schedules guide](https://trigger.dev/docs/tasks/scheduled#dynamic-schedules-or-multi-tenant-schedules).
+
+### Credential bag shape
+
+The `byo` / `override` credential bag (resolved per-tenant via `SecretStoreResolver` → `TenantCredentialCache` → `provider.bindToTenant(snapshot)`):
+
+| Field         | Required          | Default                          | Notes                                                                                                  |
+| ------------- | ----------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `accessToken` | byo + override    | —                                | Trigger.dev personal/management access token (`tr_pat_*`) used by the SDK at dispatch.                 |
+| `secretKey`   | byo + override    | —                                | Server-side env secret (`tr_prod_*` / `tr_dev_*`); pairs with `projectRef`.                            |
+| `projectRef`  | byo + override    | —                                | Trigger.dev project reference (`proj_*`).                                                              |
+| `apiUrl`      | optional (always) | `https://api.trigger.dev` (SaaS) | Override **only** when pointing at a self-hosted Trigger.dev instance; otherwise leave unset for SaaS. |
+
+For `inherit`, none of these are stored on the tenant — the platform uses its own pre-configured Trigger.dev credentials.
 
 ### Inherit-mode behaviour
 
-- **shared** — One operator project; tenant id injected as a run tag (`tenant:<id>`) and a `tenantId` payload field. Webhook handler dispatches by tag. Cheapest; weakest isolation.
-- **per-tenant** — On tenant signup, platform calls `POST /api/v1/orgs/{orgId}/projects` with the operator's PAT (`tr_pat_*`) sourced from `TRIGGER_OPERATOR_PAT`. Project ref is persisted to the tenant record. See gotcha for the prod-key step.
-- **tiered** — Free/low-tier tenants land in `shared`; paid tier triggers a per-tenant provision. Selection is driven by a tenant-tier predicate evaluated at signup and at tier-change events.
+One operator-owned Trigger.dev project is shared by every `inherit` tenant. Per-tenant queue isolation is provided by `concurrencyKey: tenantId`; per-tenant observability is provided by `externalId: tenantId` + `metadata.tenantId`. The previously documented `shared` / `per-tenant` / `tiered` sub-policies for Trigger.dev are **no longer applicable** — they assumed per-tenant projects were achievable, which the Trigger.dev project cap (see gotchas) rules out. The Q5 platform-default policy axis still applies to providers where per-tenant infra IS the vendor pattern (Temporal namespaces, pg-boss schemas, BullMQ prefixes); for Trigger.dev, `inherit` always means "shared project with concurrency-key routing."
 
 ### BYO-mode behaviour
 
-Tenant admin pastes `projectRef` and `secretKey` in the tenant admin UI. On save, the platform runs the EW-683 conformance probe (enqueue → status → cancel of a no-op task) against the tenant credentials before persisting. Credentials are written through the secret store, never logged. Webhook URL is `/api/jobs/webhook/<tenant-id>/trigger-dev`.
+Tenant admin enters `accessToken`, `secretKey`, `projectRef`, and (optionally) `apiUrl` in the tenant admin UI. On save, the platform runs the EW-683 conformance probe (enqueue → status → cancel of a no-op task) against the tenant credentials before persisting. Credentials are written through the secret store, never logged. The receiving-side webhook URL is `/api/jobs/webhook/<tenant-id>/trigger-dev`; per-tenant HMAC verify lookup goes through `TenantJobRuntimeConfig.credentials.webhookSecret` (shipped in [#1533](https://github.com/ever-works/ever-works/pull/1533)).
 
 ### Override-mode behaviour
 
-Identical to BYO at the data-plane layer. The only difference is intent — the instance default is also Trigger.dev, so the tenant is moving to its own project (typically for stronger isolation, separate billing, or geo locality) rather than switching provider kinds. UI surfaces this as a one-click "use my own Trigger.dev project" option.
+Identical to BYO at the data-plane layer (same credential bag, same dispatch path, same concurrency-key routing). The only difference is intent — the instance default is also Trigger.dev, so the tenant is opting to run against its own Trigger.dev account (typically for stronger billing isolation, contractual data-locality requirements, or geo proximity) rather than bringing a provider kind the operator didn't otherwise offer. The picker surfaces this as a one-click "use my own Trigger.dev account" option.
 
 ### Worker-hosting impact at tenant scope
 
@@ -101,10 +120,11 @@ Trigger.dev is push-model. Workers are hosted by Trigger.dev; the operator does 
 
 ### Per-provider gotchas at tenant scope
 
-- The operator PAT (`tr_pat_*`) can **create** projects via `POST /api/v1/orgs/{orgId}/projects` but **cannot** read the resulting `tr_prod_*` secret key, and cannot delete or rename projects via REST (all dashboard-only as of 2026-06). This breaks the zero-touch promise of `inherit / per-tenant`. Workarounds:
-    1.  **Worker self-registration (preferred)** — the deployed worker registers itself against an internal Ever Works callback and reports the prod key back. Requires a worker-side patch and a one-time bootstrap token.
-    2.  **Manual paste** — after auto-provision, surface the project URL in the admin UI and prompt the tenant operator to copy the prod key from the Trigger.dev dashboard. Degrades the `per-tenant` UX to a two-step flow.
-- Per-project rate limits apply at the Trigger.dev account level; large `inherit / per-tenant` deployments must monitor org-wide project counts against Trigger.dev plan limits.
+- **Trigger.dev caps projects at 10 per organization across every tier** ([source](https://trigger.dev/docs/limits#projects)). This rules out the "one project per tenant" pattern entirely — there is no tier we can buy our way out of. The vendor's own guidance is explicit: their [multi-tenant applications page](https://trigger.dev/docs/deploy-environment-variables#multi-tenant-applications) calls per-tenant projects an anti-pattern and points operators at runtime-scoping inside a shared project instead. We follow the vendor pattern; the credential bag above is how an operator BYOs an entire Trigger.dev account, not how the platform splinters tenants across projects.
+- **Programmatic project creation is not exposed in our runtime.** Trigger.dev's `create_project_in_org` capability exists only in the Trigger.dev MCP server (`mcp__trigger__*`), not in the public REST/CLI surface. Even if we wanted per-tenant projects, we could not provision them from inside a production deployment. Operators (and tenants in `byo`/`override` mode) create projects through the Trigger.dev dashboard click flow — same as everyone else.
+- **Project URL / dashboard is the source of truth for `projectRef` + `secretKey`.** Tenants in `byo`/`override` copy these values out of the Trigger.dev dashboard after they create the project — there is no REST round-trip to do it for them.
+- **Per-project rate limits apply at the Trigger.dev account level.** Because every tenant shares one project per account, queue depth + run rate inside that project sum across tenants. The `concurrencyKey: tenantId` budget caps how much of the project's per-task concurrency one tenant can hold at a time; operators planning a large fleet should size the Trigger.dev account against expected aggregate run rate (not just peak per-tenant).
+- **Self-hosted Trigger.dev points at `apiUrl`.** The default `https://api.trigger.dev` resolves to Trigger.dev Cloud; setting `apiUrl` per-tenant lets a tenant point at their own self-hosted Trigger.dev installation. The cap above is a Cloud-tier limit; self-hosted Trigger.dev's project count is bounded by the operator's own infra, not by a vendor limit.
 
 ### Conformance scope at tenant level
 
@@ -545,3 +565,8 @@ Each plugin's vitest suite covers (a) the factory's enqueue/cancel/lookup/lifecy
 - Tasks: [`./tasks.md`](./tasks.md)
 - Settings-schema conventions: [`../../architecture/settings-system.md`](../../architecture/settings-system.md)
 - Jira: [EW-742](https://evertech.atlassian.net/browse/EW-742), [EW-743](https://evertech.atlassian.net/browse/EW-743)
+- Trigger.dev vendor docs (load-bearing for § Trigger.dev above):
+    - [Limits — projects](https://trigger.dev/docs/limits#projects) — the 10-per-org cap.
+    - [Deploy / multi-tenant applications](https://trigger.dev/docs/deploy-environment-variables#multi-tenant-applications) — vendor anti-pattern call-out.
+    - [Queue concurrency — concurrency keys and per-tenant queuing](https://trigger.dev/docs/queue-concurrency#concurrency-keys-and-per-tenant-queuing) — runtime-scoping primitive.
+    - [Scheduled tasks — dynamic / multi-tenant schedules](https://trigger.dev/docs/tasks/scheduled#dynamic-schedules-or-multi-tenant-schedules) — same pattern for cron / scheduled tasks.

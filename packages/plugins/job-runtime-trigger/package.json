@@ -47,7 +47,58 @@
 			"distribution": "core",
 			"builtIn": true,
 			"visibility": "operator",
-			"envVars": ["TRIGGER_SECRET_KEY", "TRIGGER_PROJECT_REF"]
+			"envVars": ["TRIGGER_SECRET_KEY", "TRIGGER_PROJECT_REF", "TRIGGER_API_URL"],
+			"settingsSchema": {
+				"type": "object",
+				"properties": {
+					"mode": {
+						"type": "string",
+						"enum": ["inherit", "byo", "override"],
+						"default": "inherit",
+						"title": "Tenant Mode",
+						"description": "Tenant overlay mode. `inherit` uses the platform default; `byo` / `override` use the tenant credentials below."
+					},
+					"accessToken": {
+						"type": "string",
+						"title": "Trigger.dev Personal Access Token (PAT)",
+						"description": "Tenant-supplied management PAT (tr_pat_*). Required when mode is `byo` or `override`.",
+						"x-secret": true,
+						"x-scope": "tenant"
+					},
+					"secretKey": {
+						"type": "string",
+						"title": "Trigger.dev Secret Key",
+						"description": "Project-scoped server secret (tr_dev_* or tr_prod_*). Used by the SDK to authenticate tasks.trigger calls. Required when mode is `byo` or `override`; in `inherit` mode the operator default (TRIGGER_SECRET_KEY) is used.",
+						"x-secret": true,
+						"x-scope": "tenant",
+						"x-envVar": "TRIGGER_SECRET_KEY"
+					},
+					"projectRef": {
+						"type": "string",
+						"title": "Trigger.dev Project Ref",
+						"description": "Trigger.dev project reference (e.g. proj_abc123). Required when mode is `byo` or `override`.",
+						"x-scope": "tenant",
+						"x-envVar": "TRIGGER_PROJECT_REF"
+					},
+					"apiUrl": {
+						"type": "string",
+						"title": "Trigger.dev API URL",
+						"description": "Override for self-hosted Trigger.dev (default https://api.trigger.dev).",
+						"default": "https://api.trigger.dev",
+						"x-scope": "tenant",
+						"x-envVar": "TRIGGER_API_URL"
+					}
+				},
+				"allOf": [
+					{
+						"if": {
+							"properties": { "mode": { "enum": ["byo", "override"] } },
+							"required": ["mode"]
+						},
+						"then": { "required": ["accessToken", "secretKey", "projectRef"] }
+					}
+				]
+			}
 		}
 	}
 }
