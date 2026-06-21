@@ -24,6 +24,8 @@ import { WebhooksDeliveriesService } from './webhooks-deliveries.service';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
 import { TriggerWebhookController } from './trigger-webhook.controller';
 import { TriggerWebhookEventRouterService } from './trigger-webhook-event-router.service';
+import { TriggerRunStatusSubscriber } from './subscribers/trigger-run-status.subscriber';
+import { TriggerRunFailureSentryBreadcrumbSubscriber } from './subscribers/trigger-run-failure-sentry-breadcrumb.subscriber';
 
 /**
  * `/api/webhooks` surface — subscriptions CRUD, delivery test-fire,
@@ -77,6 +79,15 @@ import { TriggerWebhookEventRouterService } from './trigger-webhook-event-router
         // via @OnEvent on the constants from
         // ./trigger-webhook-events.
         TriggerWebhookEventRouterService,
+        // EW-743 Phase 3 — Trigger.dev internal-event subscribers.
+        // Each subscribes via @OnEvent('trigger.*') and consumes the
+        // router's envelope. They are deliberately NOT exported — no
+        // one outside this module calls them directly; they live as
+        // EventEmitter2 listeners. Adding more subscribers in the
+        // future means: drop the @Injectable file under
+        // ./subscribers, append it here, and add a spec.
+        TriggerRunStatusSubscriber,
+        TriggerRunFailureSentryBreadcrumbSubscriber,
     ],
     exports: [
         WebhooksService,
