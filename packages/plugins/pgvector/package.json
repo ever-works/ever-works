@@ -38,13 +38,13 @@
 		"@types/node": "^22.0.0",
 		"pg": "^8.13.0",
 		"tsup": "^8.0.0",
-		"typeorm": "0.3.28",
+		"typeorm": "0.3.29",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.0"
 	},
 	"peerDependencies": {
 		"pg": "^8.13.0",
-		"typeorm": "^0.3.28"
+		"typeorm": "^0.3.29"
 	},
 	"peerDependenciesMeta": {
 		"pg": {
