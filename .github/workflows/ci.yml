@@ -161,12 +161,12 @@ jobs:
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
 
-  # EW-742 P6 T32/T37 real-infra axis — BullMQ + pg-boss against
-  # live Redis + Postgres service containers. Temporal + Inngest skipped
-  # for now (heavier containerisation: Temporal needs auto-setup image,
-  # Inngest needs the dev-server CLI). Real-infra cells run as a SEPARATE
-  # job from the mocks-only matrix so an infra hiccup doesn't mask the
-  # mocks-only failure signal.
+  # EW-742 P6 T32/T37 real-infra axis — all 4 push-model providers
+  # against live infra: BullMQ on Redis, pg-boss on Postgres, Temporal
+  # via temporalio/auto-setup (shares the Postgres service, Temporal
+  # namespaces its own tables), Inngest via the inngest/inngest dev
+  # server. Real-infra cells run as a SEPARATE job from the mocks-only
+  # matrix so an infra hiccup doesn't mask the mocks-only failure signal.
   job-runtime-real-infra:
     runs-on: ubicloud-standard-8
     services:
@@ -182,6 +182,22 @@ jobs:
           POSTGRES_DB: test
         ports: ['5432:5432']
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      temporal:
+        image: temporalio/auto-setup:latest
+        env:
+          DB: postgres12
+          DB_PORT: '5432'
+          POSTGRES_USER: test
+          POSTGRES_PWD: test
+          POSTGRES_SEEDS: postgres
+        ports: ['7233:7233']
+        # auto-setup boots in 60-90s; generous start-period + retries
+        # absorb the warm-up without flaking the job.
+        options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 30s
+      inngest:
+        image: inngest/inngest:latest
+        ports: ['8288:8288']
+        options: --health-cmd "wget -qO- http://localhost:8288/ || exit 1" --health-interval 5s --health-timeout 3s --health-retries 5
 
     steps:
       - name: Checkout repository
@@ -215,6 +231,16 @@ jobs:
         env:
           EW_TEST_REAL_PGBOSS_URL: postgres://test:test@localhost:5432/test
         run: pnpm --filter @ever-works/job-runtime-pgboss-plugin test
+
+      - name: Temporal real-infra
+        env:
+          EW_TEST_REAL_TEMPORAL_ADDRESS: localhost:7233
+        run: pnpm --filter @ever-works/job-runtime-temporal-plugin test
+
+      - name: Inngest real-infra
+        env:
+          EW_TEST_REAL_INNGEST_URL: http://localhost:8288
+        run: pnpm --filter @ever-works/job-runtime-inngest-plugin test
 
   # Companion matrix for the secret-store-resolver provider family
   # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
