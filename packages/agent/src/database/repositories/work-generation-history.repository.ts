@@ -179,6 +179,23 @@ export class WorkGenerationHistoryRepository {
         return this.repository.findOne({ where: { id } });
     }
 
+    /**
+     * EW-743 Phase 3 — lookup a history record by the Trigger.dev run id
+     * stamped on it at enqueue time. Used by the trigger-webhook
+     * subscriber to flip a record's status when Trigger.dev fires
+     * `alert.run.{succeeded,failed,cancelled}`.
+     *
+     * Returns `null` (not throw) when no record matches: webhooks can
+     * fire for runs that were never recorded in `work_generation_history`
+     * (e.g. one-off Trigger.dev runs from `dev` projects, runs created
+     * before the column was populated, runs from other tenants reaching
+     * a misconfigured endpoint). Callers MUST handle null as "drop".
+     */
+    async findByTriggerRunId(triggerRunId: string): Promise<WorkGenerationHistory | null> {
+        if (!triggerRunId) return null;
+        return this.repository.findOne({ where: { triggerRunId } });
+    }
+
     async findLatestInProgressByWork(workId: string): Promise<WorkGenerationHistory | null> {
         return this.repository.findOne({
             where: {
