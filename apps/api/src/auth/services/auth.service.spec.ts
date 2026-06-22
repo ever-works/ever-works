@@ -144,6 +144,46 @@ describe('AuthService', () => {
             const granted = await service.grantPlatformAdminIfBootstrapped('u1', 'a@b.co');
             expect(granted).toBe(false);
         });
+
+        it('matches a prefix glob entry ending in *', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS =
+                'e2e-seed-primary-*@test.local';
+            userRepo.update.mockResolvedValue(undefined as any);
+            const granted = await service.grantPlatformAdminIfBootstrapped(
+                'u3',
+                'e2e-seed-primary-12345-abcd@test.local',
+            );
+            expect(granted).toBe(true);
+            expect(userRepo.update).toHaveBeenCalledWith('u3', { isPlatformAdmin: true });
+        });
+
+        it('prefix glob does NOT match addresses outside the prefix', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS =
+                'e2e-seed-primary-*@test.local';
+            const granted = await service.grantPlatformAdminIfBootstrapped(
+                'u4',
+                'e2e-seed-secondary-12345@test.local',
+            );
+            expect(granted).toBe(false);
+            expect(userRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('mixes prefix-glob and exact entries; any matching entry grants', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS =
+                'exact@b.co, e2e-seed-*@test.local';
+            userRepo.update.mockResolvedValue(undefined as any);
+            const grantedExact = await service.grantPlatformAdminIfBootstrapped(
+                'u5',
+                'exact@b.co',
+            );
+            const grantedGlob = await service.grantPlatformAdminIfBootstrapped(
+                'u6',
+                'e2e-seed-secondary-xyz@test.local',
+            );
+            expect(grantedExact).toBe(true);
+            expect(grantedGlob).toBe(true);
+            expect(userRepo.update).toHaveBeenCalledTimes(2);
+        });
     });
 
     describe('validateSocialUser', () => {
