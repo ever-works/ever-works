@@ -331,6 +331,7 @@ export function JobRuntimeSettings({
                             setProviderId(value as TenantJobRuntimeProviderId)
                         }
                         disabled={noProvidersAvailable}
+                        data-testid="job-runtime-provider-picker"
                     >
                         {providerOptions.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -350,6 +351,7 @@ export function JobRuntimeSettings({
                     <Select
                         value={mode}
                         onValueChange={(value) => setMode(value as TenantJobRuntimeMode)}
+                        data-testid="job-runtime-mode-picker"
                     >
                         {MODE_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>

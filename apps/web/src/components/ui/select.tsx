@@ -40,6 +40,12 @@ export interface SelectProps {
     placeholder?: string;
     id?: string;
     name?: string;
+    /**
+     * Forwarded to the trigger `<button>` so e2e specs can target the
+     * picker by a stable handle that survives style + label changes.
+     * Mirrors the same prop on native shadcn primitives.
+     */
+    'data-testid'?: string;
 }
 
 // ---- helpers ------------------------------------------------------ //
@@ -104,6 +110,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             placeholder,
             id,
             name,
+            'data-testid': dataTestId,
         },
         ref,
     ) => {
@@ -199,6 +206,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     name={name}
                     type="button"
                     disabled={disabled}
+                    data-testid={dataTestId}
                     onClick={() => {
                         if (!open) updatePos();
                         setOpen((v) => !v);
@@ -354,6 +362,7 @@ function OptionRow({
             role="option"
             aria-selected={selected}
             aria-disabled={opt.disabled}
+            data-value={opt.value}
             onClick={() => onPick(opt)}
             onKeyDown={handleKeyDown}
             tabIndex={opt.disabled ? -1 : 0}
