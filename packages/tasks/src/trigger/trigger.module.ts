@@ -31,7 +31,18 @@ import {
         // EW-686 P1 — adapter exposing TriggerService through the
         // pluggable IJobRuntimeProvider contract. The registry below
         // registers it as the active provider at boot.
-        TriggerJobRuntimeProvider,
+        //
+        // Use a factory so NestJS DI only injects TriggerService; the
+        // second constructor parameter (opts) is a plain object with a
+        // default value — NestJS cannot resolve plain interface types and
+        // would throw UnknownDependenciesException if the class were
+        // listed directly.
+        {
+            provide: TriggerJobRuntimeProvider,
+            useFactory: (triggerService: TriggerService) =>
+                new TriggerJobRuntimeProvider(triggerService),
+            inject: [TriggerService],
+        },
         // EW-685 T4 cutover — the in-memory registry + active-provider
         // registration. `JOB_RUNTIME_PROVIDER_REGISTRY` is the DI token
         // every `*_DISPATCHER` binding (below) injects through.
