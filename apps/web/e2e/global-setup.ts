@@ -158,7 +158,6 @@ setup('authenticate', async ({ page, baseURL }) => {
         }
     }, ONBOARDING_KEY);
 
-    const apiBase = process.env.API_URL || 'http://localhost:3100';
     try {
         const loginRes = await fetch(`${apiBase}/api/auth/login`, {
             method: 'POST',
