@@ -145,11 +145,27 @@ export class AuthService {
     async grantPlatformAdminIfBootstrapped(userId: string, email: string): Promise<boolean> {
         const raw = process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
         if (!raw) return false;
-        const allowed = raw
+        const target = email.trim().toLowerCase();
+        // Each entry is either an EXACT email (case-insensitive) or a
+        // PREFIX glob ending in `*` (e.g. `e2e-seed-primary-*@test.local`
+        // matches any address whose lower-cased form starts with
+        // `e2e-seed-primary-`). The glob is intentionally minimal — only
+        // a single trailing `*` is honoured, because the Playwright
+        // global-setup generates per-pid suffixes and the operator can't
+        // know the exact email in advance. No regex / shell-glob /
+        // mid-string wildcards: keeps the matching cheap and the auth
+        // path (production critical) easy to reason about.
+        const entries = raw
             .split(',')
             .map((s) => s.trim().toLowerCase())
             .filter((s) => s.length > 0);
-        if (!allowed.includes(email.trim().toLowerCase())) return false;
+        const matched = entries.some((entry) => {
+            if (entry.endsWith('*')) {
+                return target.startsWith(entry.slice(0, -1));
+            }
+            return entry === target;
+        });
+        if (!matched) return false;
         try {
             await this.userRepository.update(userId, { isPlatformAdmin: true });
             this.logger.log(
