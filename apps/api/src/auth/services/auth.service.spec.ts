@@ -100,6 +100,52 @@ describe('AuthService', () => {
         });
     });
 
+    describe('grantPlatformAdminIfBootstrapped', () => {
+        const ORIGINAL = process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
+        afterEach(() => {
+            if (ORIGINAL === undefined) delete process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
+            else process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS = ORIGINAL;
+        });
+
+        it('returns false and does NOT call update when the env var is unset', async () => {
+            delete process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
+            const granted = await service.grantPlatformAdminIfBootstrapped('u1', 'a@b.co');
+            expect(granted).toBe(false);
+            expect(userRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('returns false when the email is not in the bootstrap list', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS = 'admin@b.co';
+            const granted = await service.grantPlatformAdminIfBootstrapped('u1', 'a@b.co');
+            expect(granted).toBe(false);
+            expect(userRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('grants admin + returns true when the email matches (case-insensitive)', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS = 'Admin@B.Co';
+            userRepo.update.mockResolvedValue(undefined as any);
+            const granted = await service.grantPlatformAdminIfBootstrapped('u1', 'admin@b.co');
+            expect(granted).toBe(true);
+            expect(userRepo.update).toHaveBeenCalledWith('u1', { isPlatformAdmin: true });
+        });
+
+        it('handles a comma-separated list with whitespace and matches any entry', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS =
+                ' first@b.co , second@b.co ,third@b.co';
+            userRepo.update.mockResolvedValue(undefined as any);
+            const granted = await service.grantPlatformAdminIfBootstrapped('u2', 'second@b.co');
+            expect(granted).toBe(true);
+            expect(userRepo.update).toHaveBeenCalledWith('u2', { isPlatformAdmin: true });
+        });
+
+        it('returns false (does NOT throw) when userRepository.update rejects', async () => {
+            process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS = 'a@b.co';
+            userRepo.update.mockRejectedValueOnce(new Error('db down'));
+            const granted = await service.grantPlatformAdminIfBootstrapped('u1', 'a@b.co');
+            expect(granted).toBe(false);
+        });
+    });
+
     describe('validateSocialUser', () => {
         const socialUser = (overrides: Record<string, unknown> = {}) => ({
             email: 'sa@b.co',
