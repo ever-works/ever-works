@@ -128,6 +128,17 @@ export class AuthController {
             toHeaders(req.headers || {}),
         );
 
+        // EW-743 Phase A — dev-mode platform-admin bootstrap. When
+        // EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS lists this email,
+        // elevate the freshly-created user so e2e specs gated by
+        // `IsPlatformAdminGuard` can run without an out-of-band DB
+        // write. Production never sets the env var; the helper never
+        // throws so a misconfigured env never breaks registration.
+        await this.authService.grantPlatformAdminIfBootstrapped(
+            response.user.id,
+            registerDto.email,
+        );
+
         try {
             await this.authService.sendVerificationEmail(
                 response.user.id,
