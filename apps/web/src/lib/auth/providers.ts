@@ -29,19 +29,30 @@ async function fetchAuthProviders(): Promise<AuthProvidersResponse | null> {
     }
 }
 
+const KNOWN_PROVIDERS: OAuthProvider[] = [
+    OAuthProvider.GITHUB,
+    OAuthProvider.GOOGLE,
+    OAuthProvider.FACEBOOK,
+    OAuthProvider.LINKEDIN,
+];
+
 function filterSocialProviders(raw: string[] | undefined): OAuthProvider[] {
-    return (raw ?? []).filter(
-        (provider): provider is OAuthProvider =>
-            provider === OAuthProvider.GITHUB ||
-            provider === OAuthProvider.GOOGLE ||
-            provider === OAuthProvider.FACEBOOK ||
-            provider === OAuthProvider.LINKEDIN,
+    return (raw ?? []).filter((provider): provider is OAuthProvider =>
+        KNOWN_PROVIDERS.includes(provider as OAuthProvider),
     );
+}
+
+// Fallback: read from OAUTH_PROVIDERS env var (comma-separated, e.g. "github,google")
+// when the API is unreachable, so login buttons still render.
+function getFallbackProviders(): OAuthProvider[] {
+    const raw = process.env.OAUTH_PROVIDERS;
+    if (!raw) return [];
+    return filterSocialProviders(raw.split(',').map((s) => s.trim().toLowerCase()));
 }
 
 export async function getConfiguredAuthProviders(): Promise<OAuthProvider[]> {
     const data = await fetchAuthProviders();
-    if (!data) return [];
+    if (!data) return getFallbackProviders();
     return filterSocialProviders(data.socialProviders);
 }
 
@@ -53,7 +64,7 @@ export async function getConfiguredAuthProviders(): Promise<OAuthProvider[]> {
 export async function getAuthProvidersConfig(): Promise<AuthProvidersConfig> {
     const data = await fetchAuthProviders();
     if (!data) {
-        return { socialProviders: [], magicLinkEnabled: false };
+        return { socialProviders: getFallbackProviders(), magicLinkEnabled: false };
     }
     return {
         socialProviders: filterSocialProviders(data.socialProviders),
