@@ -42,6 +42,16 @@ function filterSocialProviders(raw: string[] | undefined): OAuthProvider[] {
     );
 }
 
+// Warn once at startup so operators know an unset OAUTH_PROVIDERS means no login
+// buttons appear during an API outage (silent empty-array fallback).
+if (!process.env.OAUTH_PROVIDERS) {
+    console.warn(
+        '[ever-works] OAUTH_PROVIDERS is not set. If the API becomes unreachable, ' +
+            'no OAuth login buttons will be shown. Set OAUTH_PROVIDERS to a ' +
+            'comma-separated list (e.g. "github,google") to enable the offline fallback.',
+    );
+}
+
 // Fallback: read from OAUTH_PROVIDERS env var (comma-separated, e.g. "github,google")
 // when the API is unreachable, so login buttons still render.
 function getFallbackProviders(): OAuthProvider[] {
