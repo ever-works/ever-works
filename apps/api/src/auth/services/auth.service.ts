@@ -115,6 +115,55 @@ export class AuthService {
         }
     }
 
+    /**
+     * Dev-mode hook for granting `isPlatformAdmin = true` to users whose
+     * email is listed in `EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS`
+     * (comma-separated; case-insensitive match on the trimmed email).
+     *
+     * Why this exists:
+     *
+     *   - The platform has no GUI for elevating a user to platform-admin
+     *     today; the column was added via migration
+     *     `1778871104492-AddUserPlatformAdminAndBudgetAlertEmail` and
+     *     populated via direct DB writes. That works in production but
+     *     blocks every spec / local-dev workflow that needs an authed
+     *     admin against a fresh sqlite DB.
+     *   - EW-743 Phase A e2e specs (`admin-tenant-runtime-allowlist`,
+     *     etc.) need a platform-admin storage-state to assert the
+     *     `IsPlatformAdminGuard` path. The `:memory:` sqlite default
+     *     means external tools can't UPDATE the DB after registration.
+     *   - This narrow hook closes that loop without adding a new
+     *     endpoint or controller surface. Production deployments never
+     *     set the env var, so the behaviour is dev-only by config.
+     *
+     * Failure handling: this method NEVER throws. A degraded
+     * `userRepository.update` only loses the elevation — the rest of the
+     * register flow proceeds — and the caller logs at warn. Throwing
+     * here would block legitimate registrations on operator
+     * misconfiguration of the env var, which is the wrong trade-off.
+     */
+    async grantPlatformAdminIfBootstrapped(userId: string, email: string): Promise<boolean> {
+        const raw = process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
+        if (!raw) return false;
+        const allowed = raw
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter((s) => s.length > 0);
+        if (!allowed.includes(email.trim().toLowerCase())) return false;
+        try {
+            await this.userRepository.update(userId, { isPlatformAdmin: true });
+            this.logger.log(
+                `[bootstrap] Granted isPlatformAdmin=true to ${email} (user ${userId}) via EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS.`,
+            );
+            return true;
+        } catch (err) {
+            this.logger.warn(
+                `[bootstrap] Failed to grant isPlatformAdmin to ${email}: ${(err as Error).message}`,
+            );
+            return false;
+        }
+    }
+
     async validateSocialUser(socialUser: SocialAuthUser) {
         const isTrustedEmail = socialUser.emailVerified !== false;
         let user = await this.userRepository.findByEmailForSocialAuth(socialUser.email);
