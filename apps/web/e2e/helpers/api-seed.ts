@@ -133,3 +133,48 @@ export async function putTriggerWebhookConfig(
 export function newWebhookSecret(): string {
     return `whsec_e2e_${randomBytes(16).toString('hex')}`;
 }
+
+/**
+ * PUT a job-runtime config for a tenant with a credentials bag that
+ * deliberately does NOT carry a `webhookSecret` field. Used by the
+ * webhook receiver spec's "tenant exists but webhookSecret bag absent
+ * → 401" case (#1533/#1537/#1542 contract: the receiver must fail
+ * closed at signature when the bag is present but the field is
+ * missing, not 404).
+ *
+ * Without this seeded row the secondary tenant has NO config at all,
+ * so the controller treats the tenant as having no provider configured
+ * and returns 404 (different semantic path), which the spec correctly
+ * reports as a mismatch.
+ *
+ * The bag is `{}` — present but missing the field — so the secret-ref
+ * resolver returns an object that lacks `webhookSecret`, exactly the
+ * shape the fail-closed branch is meant to cover.
+ */
+export async function putTriggerEmptyBagConfig(
+    apiBase: string,
+    tenant: SeededTenant,
+): Promise<void> {
+    const bag = {};
+    const base64 = Buffer.from(JSON.stringify(bag), 'utf8').toString('base64');
+    const credentialsSecretRef = `inline:${base64}`;
+    const res = await fetch(`${apiBase}/api/account/job-runtime/config`, {
+        method: 'PUT',
+        headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${tenant.user.accessToken}`,
+        },
+        body: JSON.stringify({
+            providerId: 'trigger',
+            mode: 'byo',
+            credentialsSecretRef,
+            enabled: true,
+        }),
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        throw new Error(
+            `[api-seed] putEmptyBagConfig failed ${res.status}: ${body}`,
+        );
+    }
+}
