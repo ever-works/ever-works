@@ -3,6 +3,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { TEST_USER } from './helpers/test-user';
 import { registerViaAPI } from './helpers/auth';
+import {
+    createOrganization,
+    newWebhookSecret,
+    putTriggerWebhookConfig,
+    registerSeedUser,
+} from './helpers/api-seed';
+import { writeSeed, SEED_PATH } from './helpers/seed';
 
 const authFile = 'e2e/.auth/user.json';
 const credentialsFile = 'e2e/.auth/test-user.json';
@@ -18,6 +25,76 @@ setup('authenticate', async ({ page, baseURL }) => {
     // dashboard routes (10-25s EACH on a cold runner), so the whole setup
     // needs a very generous budget.
     setup.setTimeout(600_000);
+
+    // 0. EW-743 Phase A — seed two tenants against the live API so the
+    //    webhook receiver spec runs against real fixtures instead of
+    //    skipping every case. The first tenant carries a resolvable
+    //    `webhookSecret` bag (covers the 11 "happy path" cases); the
+    //    second tenant has NO job-runtime config (covers the 12th case:
+    //    "tenant exists but webhookSecret bag absent → 401"). Best-effort:
+    //    on any failure we log and continue — every spec self-skips when
+    //    its required env/seed is missing, so a degraded API never blocks
+    //    the rest of the suite. The seed file is the single source of
+    //    truth specs read via `loadSeed()`.
+    const apiBase = process.env.API_URL || 'http://localhost:3100';
+    try {
+        const primaryUser = await registerSeedUser(apiBase, 'primary');
+        const primaryTenant = await createOrganization(
+            apiBase,
+            primaryUser,
+            'primary',
+        );
+        const webhookSecret = newWebhookSecret();
+        await putTriggerWebhookConfig(apiBase, primaryTenant, webhookSecret);
+
+        let tenantIdNoSecret: string | undefined;
+        let secondaryUserMeta:
+            | { email: string; password: string; username: string }
+            | undefined;
+        try {
+            const secondaryUser = await registerSeedUser(apiBase, 'secondary');
+            const secondaryTenant = await createOrganization(
+                apiBase,
+                secondaryUser,
+                'secondary',
+            );
+            tenantIdNoSecret = secondaryTenant.tenantId;
+            secondaryUserMeta = {
+                email: secondaryUser.email,
+                password: secondaryUser.password,
+                username: secondaryUser.username,
+            };
+        } catch (err) {
+            console.warn(
+                `[e2e global-setup] secondary tenant seed skipped (${(err as Error).message}). ` +
+                    `Webhook spec's "no-secret" case will skip itself.`,
+            );
+        }
+
+        writeSeed({
+            apiBase,
+            tenantId: primaryTenant.tenantId,
+            webhookSecret,
+            tenantIdNoSecret,
+            primaryUser: {
+                email: primaryUser.email,
+                password: primaryUser.password,
+                username: primaryUser.username,
+            },
+            secondaryUser: secondaryUserMeta,
+            generatedAt: new Date().toISOString(),
+        });
+        console.log(
+            `[e2e global-setup] seeded tenants: primary=${primaryTenant.tenantId}` +
+                (tenantIdNoSecret ? `, no-secret=${tenantIdNoSecret}` : '') +
+                ` → ${SEED_PATH}`,
+        );
+    } catch (err) {
+        console.warn(
+            `[e2e global-setup] tenant seed failed (${(err as Error).message}). ` +
+                `Webhook + allow-list specs will self-skip. Verify API is up at ${apiBase}.`,
+        );
+    }
 
     // 1. Register the user via API (fast)
     try {
