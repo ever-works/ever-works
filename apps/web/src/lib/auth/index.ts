@@ -39,6 +39,14 @@ async function clearAuthCookieOnUnauthorized(error: unknown): Promise<boolean> {
     return false;
 }
 
+// Node.js fetch throws TypeError('fetch failed') for network-level failures
+// (ECONNREFUSED, ENOTFOUND, ETIMEDOUT, etc.). These are distinct from HTTP
+// error responses that arrive as ApiResponseError. When the API is unreachable
+// we treat the session as unauthenticated rather than crashing the render.
+function isNetworkError(error: unknown): boolean {
+    return error instanceof TypeError && error.message === 'fetch failed';
+}
+
 const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
@@ -54,20 +62,25 @@ const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
                 isActive: auth.user.isActive,
             };
         } catch (error) {
-            if (!(await clearAuthCookieOnUnauthorized(error))) {
-                throw error;
+            if (await clearAuthCookieOnUnauthorized(error)) return null;
+            if (isNetworkError(error)) {
+                console.warn('API unreachable; keeping session from JWT cookie data.');
+                return normalizeJwtUser(auth.user);
             }
-            return null;
+            throw error;
         }
     }
 
+    // Opaque (non-JWT) token — no local user data to fall back on.
     try {
         return normalizeProfileUser(await authAPI.getProfile());
     } catch (error) {
-        if (!(await clearAuthCookieOnUnauthorized(error))) {
-            throw error;
+        if (await clearAuthCookieOnUnauthorized(error)) return null;
+        if (isNetworkError(error)) {
+            console.warn('API unreachable during auth validation (opaque token); treating session as unauthenticated.');
+            return null;
         }
-        return null;
+        throw error;
     }
 };
 
@@ -80,10 +93,12 @@ const getAuthFromAPIImpl = async (): Promise<AuthUser | null> => {
     try {
         return normalizeProfileUser(await authAPI.getFreshProfile());
     } catch (error) {
-        if (!(await clearAuthCookieOnUnauthorized(error))) {
-            throw error;
+        if (await clearAuthCookieOnUnauthorized(error)) return null;
+        if (isNetworkError(error)) {
+            console.warn('API unreachable; keeping session from JWT cookie data.');
+            return auth.user ? normalizeJwtUser(auth.user) : null;
         }
-        return null;
+        throw error;
     }
 };
 
