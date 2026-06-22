@@ -1523,7 +1523,14 @@
             "updated": "{date} güncellendi",
             "viewAction": "Görüntüle →",
             "openingTitle": "İş açılıyor",
-            "openingMessage": "İş hazırlanıyor. Detaylar kısa süre sonra açılacak. Bu sayfada kalın."
+            "openingMessage": "Çalışmanız hazırlanıyor. Ayrıntılar kısa süre içinde açılacak. Bu sayfada kalın.",
+            "statusPopup": {
+                "errorTitle": "Oluşturma Başarısız",
+                "warningsTitle": "Uyarılarla Tamamlandı",
+                "viewDetails": "Oluşturma ayrıntılarını görüntüle",
+                "syncErrorLabel": "Senkronizasyon hatası",
+                "syncErrorTitle": "Yapılandırma Senkronizasyonu Başarısız"
+            }
         },
         "workList": {
             "title": "İşleriniz",

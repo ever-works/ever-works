@@ -147,23 +147,31 @@ export class AuthService {
         if (!raw) return false;
         const target = email.trim().toLowerCase();
         // Each entry is either an EXACT email (case-insensitive) or a
-        // PREFIX glob ending in `*` (e.g. `e2e-seed-primary-*@test.local`
-        // matches any address whose lower-cased form starts with
-        // `e2e-seed-primary-`). The glob is intentionally minimal — only
-        // a single trailing `*` is honoured, because the Playwright
-        // global-setup generates per-pid suffixes and the operator can't
-        // know the exact email in advance. No regex / shell-glob /
-        // mid-string wildcards: keeps the matching cheap and the auth
-        // path (production critical) easy to reason about.
+        // glob containing exactly ONE `*` wildcard:
+        //   - `prefix*`         → target starts with `prefix`
+        //   - `*suffix`         → target ends with `suffix`
+        //   - `prefix*suffix`   → target starts with `prefix` AND ends with `suffix`
+        // The Playwright global-setup generates per-pid suffixes (the
+        // operator can't know the exact email in advance), and useful
+        // patterns like `e2e-seed-primary-*@test.local` need to pin the
+        // domain — hence one mid-string `*`. Entries containing more
+        // than one `*` are rejected (no match) so the matching stays
+        // cheap and the auth path (production critical) easy to reason
+        // about. No full regex / shell-glob support.
         const entries = raw
             .split(',')
             .map((s) => s.trim().toLowerCase())
             .filter((s) => s.length > 0);
         const matched = entries.some((entry) => {
-            if (entry.endsWith('*')) {
-                return target.startsWith(entry.slice(0, -1));
+            if (!entry.includes('*')) {
+                return entry === target;
             }
-            return entry === target;
+            const parts = entry.split('*');
+            if (parts.length !== 2) {
+                return false;
+            }
+            const [prefix, suffix] = parts;
+            return target.startsWith(prefix) && target.endsWith(suffix);
         });
         if (!matched) return false;
         try {

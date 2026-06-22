@@ -1750,7 +1750,14 @@
             "updated": "Updated {date}",
             "viewAction": "View →",
             "openingTitle": "Opening work",
-            "openingMessage": "Preparing your work. Details will open shortly. Stay on this page."
+            "openingMessage": "Preparing your work. Details will open shortly. Stay on this page.",
+            "statusPopup": {
+                "errorTitle": "Generation Failed",
+                "warningsTitle": "Completed with Warnings",
+                "viewDetails": "View generation details",
+                "syncErrorLabel": "Sync error",
+                "syncErrorTitle": "Config Sync Failed"
+            }
         },
         "workList": {
             "title": "Your Works",

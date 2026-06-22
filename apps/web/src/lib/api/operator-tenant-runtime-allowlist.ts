@@ -36,7 +36,7 @@ export interface TenantRuntimeAllowlistResponse {
     perTenantGatingEnabled: boolean;
 }
 
-const base = (tenantId: string) => `/api/operator/tenants/${tenantId}/runtime-allowlist`;
+const base = (tenantId: string) => `/operator/tenants/${tenantId}/runtime-allowlist`;
 
 export const operatorTenantRuntimeAllowlistAPI = {
     list: async (tenantId: string) => {

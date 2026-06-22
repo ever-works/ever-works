@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IJobRuntimeProvider,
     JobRunStatus,
@@ -138,13 +138,24 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
 
     constructor(
         private readonly triggerService: TriggerService,
-        opts: {
+        // NestJS DI is metadata-driven: `opts` is typed as an inline
+        // object literal, which SWC emits as `Object` in the design
+        // paramtypes. Without `@Optional()` the container tries (and
+        // fails) to resolve a provider for `Object` at API boot, even
+        // though the default value `= {}` makes the param logically
+        // optional. `@Optional()` tells the injector to pass `undefined`
+        // when no provider matches — the runtime then falls back to the
+        // default in the same way the unit tests (which pass nothing)
+        // already exercise.
+        @Optional()
+        opts?: {
             clientFactory?: (credentials: TriggerTenantCredentials) => TriggerClient;
             dispatchersFromClient?: (client: TriggerClient) => JobRuntimeDispatchers;
-        } = {},
+        },
     ) {
-        this.clientFactory = opts.clientFactory ?? createTenantTriggerClient;
-        this.dispatchersFromClient = opts.dispatchersFromClient ?? dispatchersFromTenantClient;
+        this.clientFactory = opts?.clientFactory ?? createTenantTriggerClient;
+        this.dispatchersFromClient =
+            opts?.dispatchersFromClient ?? dispatchersFromTenantClient;
     }
 
     /**

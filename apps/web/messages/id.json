@@ -1523,7 +1523,14 @@
             "updated": "Diperbarui {date}",
             "viewAction": "Lihat →",
             "openingTitle": "Membuka karya",
-            "openingMessage": "Mempersiapkan karya Anda. Detail akan segera terbuka. Tetap di halaman ini."
+            "openingMessage": "Mempersiapkan pekerjaan Anda. Detail akan segera dibuka. Tetap di halaman ini.",
+            "statusPopup": {
+                "errorTitle": "Pembuatan Gagal",
+                "warningsTitle": "Selesai dengan Peringatan",
+                "viewDetails": "Lihat detail pembuatan",
+                "syncErrorLabel": "Kesalahan sinkronisasi",
+                "syncErrorTitle": "Sinkronisasi Konfigurasi Gagal"
+            }
         },
         "workList": {
             "title": "Karya Anda",

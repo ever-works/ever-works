@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { routing } from '@/i18n/routing';
 import { Toaster } from 'sonner';
 
@@ -36,10 +37,8 @@ export default async function RootLayout({
 
     return (
         <html lang={locale} suppressHydrationWarning>
-            <head>
-                <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-            </head>
             <body className="antialiased" suppressHydrationWarning>
+                <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
                 <TopLoader />
                 <NextIntlClientProvider>
                     <PostHogProvider>

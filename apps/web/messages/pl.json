@@ -1523,7 +1523,14 @@
             "updated": "Zaktualizowano {date}",
             "viewAction": "Wyświetl →",
             "openingTitle": "Otwieranie pracy",
-            "openingMessage": "Przygotowywanie pracy. Szczegóły otworzą się za chwilę. Pozostań na tej stronie."
+            "openingMessage": "Przygotowywanie pracy. Szczegóły zostaną otwarte wkrótce. Pozostań na tej stronie.",
+            "statusPopup": {
+                "errorTitle": "Generowanie nie powiodło się",
+                "warningsTitle": "Zakończono z ostrzeżeniami",
+                "viewDetails": "Wyświetl szczegóły generowania",
+                "syncErrorLabel": "Błąd synchronizacji",
+                "syncErrorTitle": "Synchronizacja konfiguracji nie powiodła się"
+            }
         },
         "workList": {
             "title": "Twoje prace",
