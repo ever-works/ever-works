@@ -35,11 +35,21 @@ async function ensurePlatformAdmin() {
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
-    // Defense-in-depth: verify the platform-admin flag is set on the
-    // fresh profile, not just on the cached cookie claims. The API
-    // guard remains the authoritative check.
+    // Defense-in-depth: when the profile DTO carries `isPlatformAdmin`,
+    // short-circuit non-admins before issuing the admin-API mutation.
+    //
+    // `/api/auth/profile` is a WHITELIST projection (EW-722 Wave M #156)
+    // that intentionally strips `isPlatformAdmin` — so this check fires
+    // ONLY on an EXPLICIT `false` value (when/if the projection later
+    // includes the flag). For the current `undefined` state, the API
+    // tier's `IsPlatformAdminGuard` remains the authoritative gate;
+    // non-admin callers reach the underlying REST call and 403 there,
+    // which the caller surfaces as `success: false`. Without this
+    // change, `if (!profile?.isPlatformAdmin)` would `redirect('/')`
+    // for every visitor (including actual admins) and every mutation
+    // would silently navigate the user back to the dashboard root.
     const profile = await authAPI.getProfile().catch(() => null);
-    if (!profile?.isPlatformAdmin) {
+    if (profile?.isPlatformAdmin === false) {
         // Match the page-level posture: pretend the route does not
         // exist rather than leak its existence via a 403.
         redirect('/');

@@ -1634,7 +1634,14 @@
             "updated": "Aktualisiert {date}",
             "viewAction": "Ansehen →",
             "openingTitle": "Werk wird geöffnet",
-            "openingMessage": "Ihr Werk wird vorbereitet. Details öffnen sich bald. Bleiben Sie auf dieser Seite."
+            "openingMessage": "Ihre Arbeit wird vorbereitet. Details werden in Kürze geöffnet. Bleiben Sie auf dieser Seite.",
+            "statusPopup": {
+                "errorTitle": "Generierung fehlgeschlagen",
+                "warningsTitle": "Mit Warnungen abgeschlossen",
+                "viewDetails": "Generierungsdetails anzeigen",
+                "syncErrorLabel": "Synchronisierungsfehler",
+                "syncErrorTitle": "Konfigurationssynchronisierung fehlgeschlagen"
+            }
         },
         "workList": {
             "title": "Ihre Werke",

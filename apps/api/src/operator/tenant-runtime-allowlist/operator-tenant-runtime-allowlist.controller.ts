@@ -40,7 +40,6 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthSessionGuard } from '../../auth';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import { IsPlatformAdminGuard } from '../../auth/guards/platform-admin.guard';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
@@ -58,7 +57,7 @@ import {
 @ApiTags('Operator · Tenant Runtime Allowlist')
 @ApiBearerAuth('JWT-auth')
 @Controller('api/operator/tenants/:tenantId/runtime-allowlist')
-@UseGuards(AuthSessionGuard, IsPlatformAdminGuard)
+@UseGuards(IsPlatformAdminGuard)
 export class OperatorTenantRuntimeAllowlistController {
     constructor(private readonly service: TenantJobRuntimeService) {}
 

@@ -1,6 +1,13 @@
 'use client';
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, {
+    useDeferredValue,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useTransition,
+} from 'react';
 import {
     Combobox,
     ComboboxButton,
@@ -9,6 +16,8 @@ import {
     ComboboxOptions,
 } from '@headlessui/react';
 import { AlertTriangle, Check, ChevronDown, FolderOpen, LoaderCircle, Search } from 'lucide-react';
+import { HoverPopup } from '@/components/works/detail/items/HoverPopup';
+import { WorkErrorPopup } from '@/components/works/WorkErrorPopup';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter as useTopLoaderRouter } from 'nextjs-toploader/app';
@@ -299,6 +308,7 @@ export function WorkSwitcher() {
                                 badgeClassName={currentWorkStatus.badge}
                                 isGenerating={currentWorkStatus.isGenerating}
                                 showWarningIcon={currentWorkStatus.isGeneratedWithWarnings}
+                                work={currentWork ?? undefined}
                             />
                         )}
 
@@ -385,6 +395,7 @@ export function WorkSwitcher() {
                                                         showWarningIcon={
                                                             isItemGeneratedWithWarnings
                                                         }
+                                                        work={work}
                                                     />
 
                                                     {isCurrentWork && (
@@ -410,24 +421,64 @@ function WorkStatusBadge({
     isGenerating,
     showWarningIcon,
     className,
+    work,
 }: {
     label: string;
     badgeClassName: string;
     isGenerating: boolean;
     showWarningIcon: boolean;
     className?: string;
+    /** When provided, shows an error/warning popup on hover */
+    work?: Work;
 }) {
-    return (
-        <span
-            className={cn(
-                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
-                badgeClassName,
-                isGenerating && 'animate-pulse',
-                className,
-            )}
-        >
+    const errorMessage = work?.generateStatus?.error ?? work?.platformSyncLastErrorMessage ?? null;
+    const warnings = work?.generateStatus?.warnings;
+    const isWarn = showWarningIcon && !errorMessage;
+    const hasPopup = !isGenerating && work && (!!errorMessage || !!warnings?.length);
+
+    const badgeClassName_ = cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-normal whitespace-nowrap',
+        badgeClassName,
+        isGenerating && 'animate-pulse',
+        className,
+    );
+
+    const badgeChildren = (
+        <>
             {isGenerating ? <ShinyText text={label} /> : label}
             {showWarningIcon && <AlertTriangle className="h-3 w-3" />}
-        </span>
+        </>
+    );
+
+    if (!hasPopup || !work) {
+        return <span className={badgeClassName_}>{badgeChildren}</span>;
+    }
+
+    return (
+        <HoverPopup
+            trigger={(ref, props) => (
+                <span
+                    ref={ref}
+                    onMouseEnter={props.onMouseEnter}
+                    onMouseLeave={props.onMouseLeave}
+                    onClick={props.onClick}
+                    onTouchEnd={props.onTouchEnd}
+                    onKeyDown={props.onKeyDown}
+                    aria-expanded={props['aria-expanded']}
+                    aria-haspopup={props['aria-haspopup']}
+                    className={badgeClassName_}
+                >
+                    {badgeChildren}
+                </span>
+            )}
+        >
+            <WorkErrorPopup
+                workId={work.id}
+                message={errorMessage}
+                warnings={isWarn ? warnings : undefined}
+                isWarn={isWarn}
+                updatedAt={work.platformSyncLastErrorAt ?? work.updatedAt}
+            />
+        </HoverPopup>
     );
 }

@@ -1523,7 +1523,14 @@
             "updated": "{date} 업데이트됨",
             "viewAction": "보기 →",
             "openingTitle": "워크 열기 중",
-            "openingMessage": "워크를 준비 중입니다. 곧 세부 정보가 열립니다. 이 페이지를 유지하세요."
+            "openingMessage": "작업을 준비 중입니다. 세부 정보가 곧 열립니다. 이 페이지에 머물러 주세요.",
+            "statusPopup": {
+                "errorTitle": "생성 실패",
+                "warningsTitle": "경고와 함께 완료",
+                "viewDetails": "생성 세부 정보 보기",
+                "syncErrorLabel": "동기화 오류",
+                "syncErrorTitle": "구성 동기화 실패"
+            }
         },
         "workList": {
             "title": "내 워크",

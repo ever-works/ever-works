@@ -28,12 +28,23 @@ function formatCents(cents: number, currency = 'usd'): string {
 export default async function AdminUsagePage() {
     const t = await getTranslations('dashboard.adminUsage');
 
-    // Security: defense-in-depth — verify the caller holds the platform-admin
-    // flag before issuing the admin API call. The backend's IsPlatformAdminGuard
-    // is the authoritative check; this is a redundant frontend layer so that a
-    // future misconfiguration of the backend guard does not silently expose data.
+    // Security: defense-in-depth — when the profile DTO carries
+    // `isPlatformAdmin`, short-circuit to notFound() for non-admins so
+    // the route stays invisible without an admin-API round-trip.
+    //
+    // Important: `/api/auth/profile` is a WHITELIST projection (EW-722
+    // Wave M #156) that intentionally strips `isPlatformAdmin` per the
+    // controller's "operational state must never leave the server"
+    // rule. Until that projection is revisited, the field is always
+    // `undefined` on the response — so we check for an EXPLICIT
+    // `false` here, not a truthy/falsy split. Otherwise the early-out
+    // would fire for every visitor (including actual admins) and the
+    // page would never render. The backend `IsPlatformAdminGuard` on
+    // `AdminUsageController` remains the authoritative gate — when
+    // the admin-API call below fires, a non-admin caller still 403s
+    // and falls into the catch → 404.
     const profile = await authAPI.getProfile().catch(() => null);
-    if (!profile?.isPlatformAdmin) {
+    if (profile?.isPlatformAdmin === false) {
         notFound();
     }
 

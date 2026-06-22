@@ -2,10 +2,11 @@ import { test as setup, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { TEST_USER } from './helpers/test-user';
-import { registerViaAPI } from './helpers/auth';
+import { registerViaAPI, loginViaAPI } from './helpers/auth';
 import {
     createOrganization,
     newWebhookSecret,
+    putTriggerEmptyBagConfig,
     putTriggerWebhookConfig,
     registerSeedUser,
 } from './helpers/api-seed';
@@ -58,6 +59,22 @@ setup('authenticate', async ({ page, baseURL }) => {
                 secondaryUser,
                 'secondary',
             );
+            // EW-743 — the webhook spec's "tenant exists but
+            // webhookSecret bag absent → 401" case needs a config row
+            // with a resolvable secret ref whose bag does NOT carry
+            // `webhookSecret`. Without this PUT the secondary tenant
+            // has no config at all and the controller returns 404
+            // instead of the fail-closed 401. Best-effort: a degraded
+            // call here only loses the 401 case (the spec falls back
+            // to skipping when TENANT_ID_NO_SECRET is absent).
+            try {
+                await putTriggerEmptyBagConfig(apiBase, secondaryTenant);
+            } catch (err) {
+                console.warn(
+                    `[e2e global-setup] secondary empty-bag config skipped (${(err as Error).message}). ` +
+                        `Webhook spec's "no-secret" case will report a 404 vs 401 mismatch.`,
+                );
+            }
             tenantIdNoSecret = secondaryTenant.tenantId;
             secondaryUserMeta = {
                 email: secondaryUser.email,
@@ -96,11 +113,65 @@ setup('authenticate', async ({ page, baseURL }) => {
         );
     }
 
-    // 1. Register the user via API (fast)
+    // 1. Register the user via API (fast). Capture the access token so
+    //    we can also lazy-bootstrap a tenant for TEST_USER (step 1b) —
+    //    every browser-driven spec that depends on the `chromium`
+    //    project's storageState relies on this user, and several
+    //    (EW-743 Phase A admin allow-list + 3-mode picker; future
+    //    settings/job-runtime) require a tenant context to render at
+    //    all. Without the lazy-create, the provider picker doesn't
+    //    populate and the operator admin page falls through to the
+    //    not-found tree.
+    let testUserToken: string | undefined;
     try {
-        await registerViaAPI(baseURL!, TEST_USER);
+        const registered = await registerViaAPI(baseURL!, TEST_USER);
+        testUserToken = registered.access_token;
     } catch {
         // User may already exist from a previous run — try logging in instead
+        try {
+            const logged = await loginViaAPI(baseURL!, {
+                email: TEST_USER.email,
+                password: TEST_USER.password,
+            });
+            testUserToken = logged.access_token;
+        } catch {
+            // Both register + login failed (API down / throttled). Step 3's
+            // UI login flow will surface the real failure and `chromium`
+            // specs will fail loudly there instead of skipping silently.
+        }
+    }
+
+    // 1b. Lazy-bootstrap a tenant for TEST_USER if we got a token. The
+    //     dev-mode bootstrap-platform-admin path (EW-743 P? — see
+    //     `AuthService.grantPlatformAdminIfBootstrapped`) is what makes
+    //     the admin allow-list spec assert against a real admin user.
+    //     Best-effort: every artifact already required is written above,
+    //     so a degraded API only loses the tenant context for the few
+    //     specs that actually need it (they self-skip on lookup failure).
+    if (testUserToken) {
+        try {
+            const apiBaseInner = process.env.API_URL || apiBase;
+            const orgRes = await fetch(`${apiBaseInner}/api/organizations`, {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json',
+                    authorization: `Bearer ${testUserToken}`,
+                },
+                body: JSON.stringify({
+                    name: `E2E TestUser Org ${process.pid}`,
+                    slug: `e2e-test-user-org-${process.pid}-${Date.now().toString(36)}`,
+                }),
+            });
+            if (!orgRes.ok) {
+                console.warn(
+                    `[e2e global-setup] TEST_USER organization lazy-create returned ${orgRes.status} — admin/3-mode specs may skip or fall through to the not-found tree.`,
+                );
+            }
+        } catch (err) {
+            console.warn(
+                `[e2e global-setup] TEST_USER organization lazy-create threw (${(err as Error).message}). Continuing — admin/3-mode specs may degrade.`,
+            );
+        }
     }
 
     // 2. Thorough warmup: hit /en/login AND /en so both routes are compiled
@@ -158,7 +229,6 @@ setup('authenticate', async ({ page, baseURL }) => {
         }
     }, ONBOARDING_KEY);
 
-    const apiBase = process.env.API_URL || 'http://localhost:3100';
     try {
         const loginRes = await fetch(`${apiBase}/api/auth/login`, {
             method: 'POST',
