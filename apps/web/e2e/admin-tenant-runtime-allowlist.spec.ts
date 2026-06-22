@@ -80,6 +80,19 @@ async function gotoAllowlist(page: Page, tenantId: string = TENANT_ID) {
 	const response = await page.goto(pagePath(tenantId), {
 		waitUntil: 'domcontentloaded',
 	});
+	// React hydration races: a click that lands before the
+	// `TenantRuntimeAllowlistManager` client component has wired its
+	// `onChange` listener toggles the input visually (native
+	// label-checkbox behaviour) without dispatching the React event,
+	// so `draft` never updates and the Save button stays
+	// `disabled: !isDirty`. Waiting for the network to go idle gives
+	// Next.js's RSC stream + hydration script time to finish before
+	// any test interaction.
+	await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {
+		// Intermittently dev's Fast Refresh keeps the connection
+		// warm — fall back to a brief explicit wait rather than
+		// failing the whole test.
+	});
 	return response;
 }
 
@@ -221,16 +234,34 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
 		// default-everywhere `trigger`).
 		const target = page.locator('input#runtime-allowlist-temporal');
 		await expect(target).toBeVisible({ timeout: 10_000 });
-		const beforeChecked = await target.isChecked();
-		if (!beforeChecked) {
-			await target.check();
-		}
-		await page.getByRole('button', { name: /Save allow-list/i }).click();
-		// Toast success is ephemeral — wait for the button to re-enable
-		// (transition pending → idle) before reloading.
+		const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
+		// Click the label rather than the bare input. The label captures
+		// the click in dev (Turbopack) reliably; a click straight at the
+		// hidden input intermittently fails to dispatch the onChange
+		// React listener picks up, so the `draft` set never gains the
+		// provider and `isDirty` stays false → Save stays disabled.
+		await page
+			.locator('label[for="runtime-allowlist-temporal"]')
+			.click();
+		await expect(target).toBeChecked({ timeout: 5_000 });
+		await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+		await saveBtn.click();
+		// Wait for the post-save UI to settle: when the action returns
+		// `{success: true}`, the component calls `setSaved(result.data)`
+		// + `setDraft(...)`, which flips `isDirty` back to false and
+		// re-disables the Save button. Observing that flip is the most
+		// reliable post-save signal (the bare `waitForResponse` matched
+		// non-save POSTs in some runs and let the test reload before
+		// the server had actually committed).
+		await expect(saveBtn).toBeDisabled({ timeout: 15_000 });
+		// Also surface the success toast so a future regression to a
+		// silently-failing action turns into a clear failure here
+		// rather than the much-further-down `toBeChecked` mismatch
+		// after reload. Canonical en copy: "Tenant runtime allow-list
+		// saved" (`dashboard.adminTenantRuntimeAllowlist.messages.saveSuccess`).
 		await expect(
-			page.getByRole('button', { name: /Save allow-list/i }),
-		).toBeEnabled({ timeout: 15_000 });
+			page.getByText(/Tenant runtime allow-list saved/i).first(),
+		).toBeVisible({ timeout: 5_000 });
 
 		await page.reload({ waitUntil: 'domcontentloaded' });
 		const afterReload = page.locator('input#runtime-allowlist-temporal');
@@ -245,11 +276,26 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
 		const target = page.locator('input#runtime-allowlist-temporal');
 		await expect(target).toBeVisible({ timeout: 10_000 });
 		if (await target.isChecked()) {
-			await target.uncheck();
-			await page.getByRole('button', { name: /Save allow-list/i }).click();
+			// Click the label rather than the bare input — Turbopack
+			// dev's React onChange is unreliable on direct input clicks
+			// pre-hydration (see "check a provider" case for the full
+			// rationale).
+			await page
+				.locator('label[for="runtime-allowlist-temporal"]')
+				.click();
+			await expect(target).not.toBeChecked({ timeout: 5_000 });
+			const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
+			await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+			await saveBtn.click();
+			// Post-save the button re-disables (`!isDirty` flips back
+			// to true once local `draft` re-syncs to the server). Also
+			// surface the success toast so a silent server-action
+			// failure shows up here, not via the reload-then-checked
+			// mismatch far below.
+			await expect(saveBtn).toBeDisabled({ timeout: 15_000 });
 			await expect(
-				page.getByRole('button', { name: /Save allow-list/i }),
-			).toBeEnabled({ timeout: 15_000 });
+				page.getByText(/Tenant runtime allow-list saved/i).first(),
+			).toBeVisible({ timeout: 5_000 });
 		}
 		// Re-check via UI is the act we want persisted-as-unchecked-after-reload
 		await page.reload({ waitUntil: 'domcontentloaded' });
@@ -266,12 +312,27 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
 
 		// Ensure at least one chip exists by adding bullmq first.
 		const bullmq = page.locator('input#runtime-allowlist-bullmq');
+		await expect(bullmq).toBeVisible({ timeout: 10_000 });
 		if (!(await bullmq.isChecked())) {
-			await bullmq.check();
-			await page.getByRole('button', { name: /Save allow-list/i }).click();
-			await expect(
-				page.getByRole('button', { name: /Save allow-list/i }),
-			).toBeEnabled({ timeout: 15_000 });
+			// Click the label rather than the bare input — same reason
+			// as the parallel "check a provider" case (Turbopack dev's
+			// React onChange is unreliable on direct input clicks).
+			await page.locator('label[for="runtime-allowlist-bullmq"]').click();
+			await expect(bullmq).toBeChecked({ timeout: 5_000 });
+			const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
+			await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
+			// Wait for the save POST to complete (button does not visibly
+			// re-enable — see other save-flow cases for why).
+			const saveResponse = page.waitForResponse(
+				(r) =>
+					r.url().includes('/admin/tenants/') &&
+					r.url().includes('/runtime-allowlist') &&
+					r.request().method() === 'POST' &&
+					r.status() < 400,
+				{ timeout: 15_000 },
+			);
+			await saveBtn.click();
+			await saveResponse;
 		}
 
 		const removeBtn = page.getByRole('button', { name: /Remove BullMQ/i });
@@ -350,18 +411,32 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
 		requireSeededTenant();
 		await gotoAllowlist(page);
 		const target = page.locator('input#runtime-allowlist-inngest');
-		// Force a dirty state we can save
-		if (!(await target.isChecked())) await target.check();
-		else await target.uncheck();
+		await expect(target).toBeVisible({ timeout: 10_000 });
+		// Force a dirty state we can save — click the label so the
+		// onChange propagates reliably to React (see check-a-provider
+		// for the rationale).
+		await page.locator('label[for="runtime-allowlist-inngest"]').click();
 		const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
 		await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
-		// Kick off the click but don't await — measure the disabled
-		// transition synchronously after.
+		// During in-flight the button is disabled. After the save POST
+		// completes, the local `draft` re-syncs to the server response
+		// → `isDirty` flips back to false → the button is
+		// `disabled: !isDirty` again. So we cannot observe a stable
+		// "enabled" post-state — we only assert the in-flight disable
+		// and that the save round-trip actually completes.
+		const saveResponse = page.waitForResponse(
+			(r) =>
+				r.url().includes('/admin/tenants/') &&
+				r.url().includes('/runtime-allowlist') &&
+				r.request().method() === 'POST' &&
+				r.status() < 400,
+			{ timeout: 15_000 },
+		);
 		await saveBtn.click();
 		// During the in-flight transition the button must be disabled.
 		await expect(saveBtn).toBeDisabled({ timeout: 5_000 });
-		// And eventually re-enable once the transition resolves.
-		await expect(saveBtn).toBeEnabled({ timeout: 15_000 });
+		// The save POST settles.
+		await saveResponse;
 	});
 
 	test('cross-tenant isolation: navigate A → B → A produces tenant-specific state', async ({

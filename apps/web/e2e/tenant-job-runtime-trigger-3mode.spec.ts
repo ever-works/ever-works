@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * EW-743 (#1552) — Tenant settings form: Trigger.dev provider with the
@@ -49,18 +49,50 @@ const TRIGGER_SECRET = 'tr_prod_e2e_trigger_3mode_marker';
 const TRIGGER_PROJECT_REF = 'proj_e2e_trigger_3mode';
 const TRIGGER_API_URL = 'https://trigger.example.dev';
 
-async function ensureTriggerOrSkip(page: import('@playwright/test').Page) {
-	const providerSelect = page.locator('select').first();
-	const opts = await providerSelect
-		.locator('option')
+const PROVIDER_PICKER = 'job-runtime-provider-picker';
+const MODE_PICKER = 'job-runtime-mode-picker';
+
+/**
+ * `<JobRuntimeSettings>` renders the provider + mode pickers via the
+ * custom `<Select>` in `apps/web/src/components/ui/select.tsx` — a
+ * `<button aria-haspopup="listbox">` trigger that portals a
+ * `[role="listbox"]` with `[role="option"]` rows tagged with a
+ * stable `data-value` attribute. Playwright's `selectOption()` /
+ * `.locator('select')` APIs do NOT work against this DOM shape; we
+ * drive it explicitly by opening the trigger + clicking the
+ * matching option.
+ */
+async function readPickerValues(page: Page, testid: string): Promise<string[]> {
+	const trigger = page.getByTestId(testid);
+	await trigger.click();
+	const values = await page
+		.locator('[role="listbox"][class*="sel-dropdown"] [role="option"]')
 		.evaluateAll((nodes) =>
-			nodes.map((o) => (o as HTMLOptionElement).value),
+			nodes
+				.map((n) => (n as HTMLElement).getAttribute('data-value') ?? '')
+				.filter((v) => v.length > 0),
 		);
+	// Close the dropdown by pressing Escape so the next interaction
+	// starts from a clean state.
+	await page.keyboard.press('Escape');
+	return values;
+}
+
+async function pickOption(page: Page, testid: string, value: string) {
+	const trigger = page.getByTestId(testid);
+	await trigger.click();
+	await page
+		.locator(`[role="listbox"][class*="sel-dropdown"] [role="option"][data-value="${value}"]`)
+		.click();
+}
+
+async function ensureTriggerOrSkip(page: Page) {
+	const values = await readPickerValues(page, PROVIDER_PICKER);
 	test.skip(
-		!opts.includes('trigger'),
+		!values.includes('trigger'),
 		'`trigger` provider missing from operator allow-list for this env — run with it enabled.',
 	);
-	await providerSelect.selectOption('trigger');
+	await pickOption(page, PROVIDER_PICKER, 'trigger');
 }
 
 test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => {
@@ -78,11 +110,9 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 	test('page renders and provider picker exposes the trigger option', async ({
 		page,
 	}) => {
-		const providerSelect = page.locator('select').first();
-		await expect(providerSelect).toBeVisible({ timeout: 10_000 });
-		const opts = await providerSelect
-			.locator('option')
-			.evaluateAll((nodes) => nodes.map((o) => (o as HTMLOptionElement).value));
+		const providerTrigger = page.getByTestId(PROVIDER_PICKER);
+		await expect(providerTrigger).toBeVisible({ timeout: 10_000 });
+		const opts = await readPickerValues(page, PROVIDER_PICKER);
 		// Soft: just assert the picker has SOME options. The trigger
 		// option assertion lives in the next test (which skips when
 		// the operator hasn't enabled it).
@@ -93,11 +123,9 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
-		await expect(modeSelect).toBeVisible({ timeout: 10_000 });
-		const modeOpts = await modeSelect
-			.locator('option')
-			.evaluateAll((nodes) => nodes.map((o) => (o as HTMLOptionElement).value));
+		const modeTrigger = page.getByTestId(MODE_PICKER);
+		await expect(modeTrigger).toBeVisible({ timeout: 10_000 });
+		const modeOpts = await readPickerValues(page, MODE_PICKER);
 		expect(modeOpts).toEqual(
 			expect.arrayContaining(['inherit', 'byo', 'override']),
 		);
@@ -107,8 +135,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
-		await modeSelect.selectOption('inherit');
+		await pickOption(page, MODE_PICKER, 'inherit');
 		await page.waitForTimeout(400);
 		await expect(
 			page.locator('[data-testid="job-runtime-credentials-form"]'),
@@ -122,8 +149,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 
 		await expect(
@@ -143,8 +169,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
-		await modeSelect.selectOption('override');
+		await pickOption(page, MODE_PICKER, 'override');
 		await page.waitForTimeout(400);
 		await expect(
 			page.locator('[data-testid="job-runtime-credentials-form"]'),
@@ -158,7 +183,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 
 		// Fill ONLY the secret-ref so the parent's other guard
@@ -168,10 +193,13 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		await secretRefInput.fill('secret://e2e/missing-creds');
 
 		await page.getByRole('button', { name: /^Save$/ }).first().click();
-		// The form surfaces a toast for missing fields. Wait briefly
-		// for the toast region to populate.
+		// The form surfaces a toast for missing fields. The canonical en
+		// copy (`messages.requiredFieldsMissing` in messages/en.json) is
+		// "Required credential fields are empty: <fields>". Match the
+		// distinctive "Required credential fields" prefix — the
+		// `<fields>` substitution varies per-provider and per-mode.
 		await expect(
-			page.getByText(/required.*missing|missing.*required/i).first(),
+			page.getByText(/Required credential fields/i).first(),
 		).toBeVisible({ timeout: 5_000 });
 	});
 
@@ -179,7 +207,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 
 		const secretRefInput = page.locator('input[maxlength="128"]').first();
@@ -215,63 +243,74 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
 
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const firstPassword = page.locator('input[type="password"]').first();
 		await firstPassword.fill(TRIGGER_PAT);
 		await expect(firstPassword).toHaveValue(TRIGGER_PAT);
 
-		await modeSelect.selectOption('inherit');
+		await pickOption(page, MODE_PICKER, 'inherit');
 		await page.waitForTimeout(400);
 		await expect(
 			page.locator('[data-testid="job-runtime-credentials-form"]'),
 		).toHaveCount(0);
 
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		await expect(page.locator('input[type="password"]').first()).toHaveValue(
 			TRIGGER_PAT,
 		);
 	});
 
-	test('trigger → bullmq → trigger: provider remount drops form-local field state', async ({
+	test('trigger → bullmq → trigger: provider remount preserves credential values but resets form-local UI state', async ({
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const providerSelect = page.locator('select').first();
-		const modeSelect = page.locator('select').nth(1);
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const firstPassword = page.locator('input[type="password"]').first();
 		await firstPassword.fill(TRIGGER_PAT);
 
+		// Reveal the secret so we can observe whether the form-local
+		// `revealed` toggle state survives the remount or resets.
+		await page.getByRole('button', { name: /Reveal secret/i }).first().click();
+		await expect(
+			page.locator(`input[type="text"][value="${TRIGGER_PAT}"]`).first(),
+		).toBeVisible({ timeout: 5_000 });
+
 		// Hop to a different provider if available, then back.
-		const opts = await providerSelect
-			.locator('option')
-			.evaluateAll((nodes) => nodes.map((o) => (o as HTMLOptionElement).value));
+		const opts = await readPickerValues(page, PROVIDER_PICKER);
 		test.skip(
 			!opts.includes('bullmq'),
 			'bullmq not in allow-list — need a second provider to assert remount.',
 		);
-		await providerSelect.selectOption('bullmq');
+		await pickOption(page, PROVIDER_PICKER, 'bullmq');
 		await page.waitForTimeout(400);
-		await providerSelect.selectOption('trigger');
+		await pickOption(page, PROVIDER_PICKER, 'trigger');
 		await page.waitForTimeout(400);
-		// After remount the password field is empty (form-local state
-		// reset via key={providerId} per #1552).
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
+
+		// Parent owns `credentialValues` and intentionally does NOT
+		// clear them on provider switch — the values are preserved so
+		// an accidental click on a different provider doesn't lose
+		// half-typed creds. The form-local `revealed` toggle state
+		// however IS reset by the `key={providerId}` remount, so the
+		// secret renders as a `type="password"` masked input again
+		// rather than the `type="text"` reveal state from before.
 		const firstPasswordAfter = page.locator('input[type="password"]').first();
-		await expect(firstPasswordAfter).toHaveValue('');
+		await expect(firstPasswordAfter).toHaveValue(TRIGGER_PAT);
+		await expect(
+			page.locator(`input[type="text"][value="${TRIGGER_PAT}"]`),
+		).toHaveCount(0);
 	});
 
 	test('valid byo save survives a reload (saved state restored from server)', async ({
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const secretRefInput = page.locator('input[maxlength="128"]').first();
 		await secretRefInput.fill('secret://e2e/trigger-byo-reload');
@@ -297,7 +336,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 
 		for (const envVar of [
@@ -313,7 +352,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 
 	test('each secret field is type="password" by default', async ({ page }) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const passwordCount = await page.locator('input[type="password"]').count();
 		// Trigger.dev declares accessToken + secretKey as `secret: true`
@@ -324,7 +363,7 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		await page.locator('select').nth(1).selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const firstPassword = page.locator('input[type="password"]').first();
 		await firstPassword.fill(TRIGGER_PAT);
@@ -350,10 +389,9 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
 		const seen: Record<string, string> = {};
 		for (const m of ['inherit', 'byo', 'override'] as const) {
-			await modeSelect.selectOption(m);
+			await pickOption(page, MODE_PICKER, m);
 			await page.waitForTimeout(300);
 			const banner = page.locator(
 				`[data-testid="job-runtime-mode-banner-trigger-${m}"]`,
@@ -369,13 +407,12 @@ test.describe('Tenant job-runtime — Trigger.dev 3-mode picker (#1552)', () => 
 		page,
 	}) => {
 		await ensureTriggerOrSkip(page);
-		const modeSelect = page.locator('select').nth(1);
-		await modeSelect.selectOption('byo');
+		await pickOption(page, MODE_PICKER, 'byo');
 		await page.waitForTimeout(400);
 		const secretRefInput = page.locator('input[maxlength="128"]').first();
 		const SENTINEL = 'secret://e2e/preserve-on-mode-flip';
 		await secretRefInput.fill(SENTINEL);
-		await modeSelect.selectOption('override');
+		await pickOption(page, MODE_PICKER, 'override');
 		await page.waitForTimeout(400);
 		// `override` keeps the credentials block visible, so the
 		// secret-ref input should still hold the same value.
