@@ -1523,7 +1523,14 @@
             "updated": "{date} को अपडेट किया गया",
             "viewAction": "देखें →",
             "openingTitle": "कार्य खोल रहे हैं",
-            "openingMessage": "आपकी कार्य तैयार हो रही है। विवरण जल्द ही खुलेंगे। इस पृष्ठ पर रहें।"
+            "openingMessage": "आपका काम तैयार किया जा रहा है। विवरण जल्द ही खुलेगा। इस पेज पर बने रहें।",
+            "statusPopup": {
+                "errorTitle": "निर्माण विफल",
+                "warningsTitle": "चेतावनियों के साथ पूर्ण",
+                "viewDetails": "निर्माण विवरण देखें",
+                "syncErrorLabel": "सिंक त्रुटि",
+                "syncErrorTitle": "कॉन्फ़िगरेशन सिंक विफल"
+            }
         },
         "workList": {
             "title": "आपकी कार्यएँ",

@@ -1523,7 +1523,14 @@
             "updated": "Cập nhật {date}",
             "viewAction": "Xem →",
             "openingTitle": "Đang mở công việc",
-            "openingMessage": "Đang chuẩn bị công việc của bạn. Chi tiết sẽ mở ngay. Hãy ở lại trang này."
+            "openingMessage": "Đang chuẩn bị công việc của bạn. Chi tiết sẽ mở sớm. Vui lòng ở lại trang này.",
+            "statusPopup": {
+                "errorTitle": "Tạo thất bại",
+                "warningsTitle": "Hoàn thành với cảnh báo",
+                "viewDetails": "Xem chi tiết tạo",
+                "syncErrorLabel": "Lỗi đồng bộ hóa",
+                "syncErrorTitle": "Đồng bộ hóa cấu hình thất bại"
+            }
         },
         "workList": {
             "title": "Công việc của bạn",

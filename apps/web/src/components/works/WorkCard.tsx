@@ -8,11 +8,13 @@ import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api/work';
 import { WorkMemberRole, WorkScheduleStatus, WorkScheduleCadence } from '@/lib/api/enums';
-import { Github, Users, FolderClosed, AlertTriangle } from 'lucide-react';
+import { Github, Users, FolderClosed, AlertTriangle, AlertCircle } from 'lucide-react';
+import { WorkErrorPopup } from './WorkErrorPopup';
 import { ShowDateTime } from '../ui/show-datetime';
 import { Tooltip } from '../ui/tooltip';
 import { ShinyText } from '../ui/ShinyText';
 import { AnimatedClock } from '../ui/AnimatedClock';
+import { HoverPopup } from './detail/items/HoverPopup';
 
 interface WorkCardProps {
     work: Work;
@@ -37,6 +39,113 @@ const formatDate = (date: string, locale: string) => {
         year: 'numeric',
     });
 };
+
+interface StatusBadgeProps {
+    work: Work;
+    statusConfig: ReturnType<typeof getGenerationStatusConfig>;
+    isOpening: boolean;
+    isGenerating: boolean;
+    baseStatusLabel: string;
+}
+
+function StatusBadge({
+    work,
+    statusConfig,
+    isOpening,
+    isGenerating,
+    baseStatusLabel,
+}: StatusBadgeProps) {
+    const t = useTranslations('dashboard.workCard');
+
+    const generationError = work.generateStatus?.error;
+    const syncError = work.platformSyncLastErrorMessage ?? null;
+    const errorMessage = generationError ?? syncError;
+
+    const warnings = work.generateStatus?.warnings;
+    const isError =
+        statusConfig.labelKey === 'error' && !!errorMessage && !isGenerating && !isOpening;
+    const isWarning =
+        statusConfig.labelKey === 'generatedWithWarnings' &&
+        !!warnings?.length &&
+        !isGenerating &&
+        !isOpening;
+    const hasPopup = isError || isWarning;
+
+    const showSyncErrorBadge =
+        !isError && !isGenerating && !isOpening && !!syncError && statusConfig.labelKey !== 'error';
+
+    // Badge classes match the original exactly — no cursor/underline changes
+    const badgeClasses = cn(
+        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0',
+        isOpening
+            ? 'bg-primary/15 text-primary dark:bg-white/12 dark:text-white'
+            : statusConfig.badge,
+        isGenerating && 'animate-pulse bg-gray-100',
+    );
+
+    const badgeContent = (
+        <>
+            {isGenerating || isOpening ? <ShinyText text={baseStatusLabel} /> : baseStatusLabel}
+            {(isWarning || isError) && <AlertTriangle className="w-3 h-3" />}
+        </>
+    );
+
+    return (
+        <>
+            {hasPopup ? (
+                <HoverPopup
+                    stopNavigation
+                    trigger={(ref, props) => (
+                        <span
+                            ref={ref}
+                            {...props}
+                            role="button"
+                            tabIndex={0}
+                            className={badgeClasses}
+                        >
+                            {badgeContent}
+                        </span>
+                    )}
+                >
+                    <WorkErrorPopup
+                        workId={work.id}
+                        message={isError ? errorMessage : null}
+                        warnings={isWarning ? warnings : undefined}
+                        isWarn={isWarning}
+                        updatedAt={work.updatedAt}
+                    />
+                </HoverPopup>
+            ) : (
+                <span className={badgeClasses}>{badgeContent}</span>
+            )}
+
+            {/* Config-sync error badge — when generation is OK but works_config.sync_failed */}
+            {showSyncErrorBadge && (
+                <HoverPopup
+                    stopNavigation
+                    trigger={(ref, props) => (
+                        <span
+                            ref={ref}
+                            {...props}
+                            role="button"
+                            tabIndex={0}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0 bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-white/90"
+                        >
+                            <AlertCircle className="w-3 h-3" />
+                            {t('statusPopup.syncErrorLabel')}
+                        </span>
+                    )}
+                >
+                    <WorkErrorPopup
+                        workId={work.id}
+                        message={syncError}
+                        updatedAt={work.platformSyncLastErrorAt ?? work.updatedAt}
+                    />
+                </HoverPopup>
+            )}
+        </>
+    );
+}
 
 const formatScheduledDate = (date: string, locale: string) => {
     const d = new Date(date);
@@ -128,7 +237,7 @@ export function WorkCard({ work }: WorkCardProps) {
         >
             {isOpening ? (
                 <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/88 dark:bg-card-primary-dark/88 backdrop-blur-[2px]">
-                    <div className="flex max-w-[17rem] flex-col items-center gap-2 px-4 text-center">
+                    <div className="flex max-w-68 flex-col items-center gap-2 px-4 text-center">
                         <div className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/8 px-3 py-1.5 dark:border-white/10 dark:bg-white/8">
                             <span className="h-2 w-2 rounded-full bg-primary animate-pulse dark:bg-white" />
                             <span className="text-xs font-normal uppercase tracking-[0.18em] text-primary dark:text-white">
@@ -197,24 +306,13 @@ export function WorkCard({ work }: WorkCardProps) {
                 <div className="flex items-center justify-between text-[11px] pt-4 border-t border-border dark:border-border-dark mt-auto">
                     <div className="flex items-center gap-1.5">
                         {showStatusBadge && (
-                            <span
-                                className={cn(
-                                    'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0',
-                                    isOpening
-                                        ? 'bg-primary/15 text-primary dark:bg-white/12 dark:text-white'
-                                        : statusConfig.badge,
-                                    isGenerating && 'animate-pulse bg-gray-100',
-                                )}
-                            >
-                                {isGenerating || isOpening ? (
-                                    <ShinyText text={baseStatusLabel} />
-                                ) : (
-                                    baseStatusLabel
-                                )}
-                                {statusConfig.labelKey === 'generatedWithWarnings' &&
-                                    !isGenerating &&
-                                    !isOpening && <AlertTriangle className="w-3 h-3" />}
-                            </span>
+                            <StatusBadge
+                                work={work}
+                                statusConfig={statusConfig}
+                                isOpening={isOpening}
+                                isGenerating={isGenerating}
+                                baseStatusLabel={baseStatusLabel}
+                            />
                         )}
                         {showScheduledBadge && (
                             <span
