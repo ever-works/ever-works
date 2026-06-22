@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { loadSeed } from './helpers/seed';
 
 /**
  * EW-742 P5.1 (#1516) — Operator admin UI for the per-tenant runtime
@@ -51,9 +52,17 @@ import { test, expect, type Page } from '@playwright/test';
  *   - a11y: keyboard navigation through the checkbox grid
  */
 
+// EW-743 Phase A — fall back to the seed file written by global-setup
+// when TEST_TENANT_ID is not explicitly exported. The seed tenant is a
+// REGULAR user (not platform-admin), so the page-renders / checkbox-grid
+// cases assert the not-found tree by design until a dev-mode platform
+// admin grant ships — every check tolerates that via `expect(...).not.toHaveURL(/\/login/)`
+// + explicit "h1 absent" assertions.
+const seed = loadSeed();
 const LOCALE = 'en';
-const TENANT_ID = process.env.TEST_TENANT_ID ?? '';
-const TENANT_ID_B = process.env.TEST_TENANT_ID_B ?? '';
+const TENANT_ID = process.env.TEST_TENANT_ID || seed?.tenantId || '';
+const TENANT_ID_B =
+    process.env.TEST_TENANT_ID_B || seed?.tenantIdNoSecret || '';
 const GATING_ENV = process.env.TEST_PER_TENANT_GATING_ENABLED;
 
 const pagePath = (tenantId: string) =>

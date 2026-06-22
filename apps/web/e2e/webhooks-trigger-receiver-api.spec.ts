@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { createHmac, randomUUID } from 'crypto';
+import { loadSeed } from './helpers/seed';
 
 /**
  * EW-743 (#1533 + #1537 + #1542) — Trigger.dev webhook receiver at
@@ -47,10 +48,20 @@ import { createHmac, randomUUID } from 'crypto';
  *   - 10 concurrent valid POSTs → all 200
  */
 
-const API_BASE = process.env.PLAYWRIGHT_API_BASE_URL ?? 'http://localhost:3100';
-const TENANT_ID = process.env.TEST_TENANT_ID ?? '';
-const WEBHOOK_SECRET = process.env.TEST_TRIGGER_WEBHOOK_SECRET ?? '';
-const TENANT_ID_NO_SECRET = process.env.TEST_TENANT_ID_NO_SECRET ?? '';
+// EW-743 Phase A — env vars take precedence (CI sharding / manual
+// override), otherwise fall back to the seed file written by the
+// `global-setup.ts` setup project. When BOTH are absent every case
+// self-skips with a clear message.
+const seed = loadSeed();
+const API_BASE =
+    process.env.PLAYWRIGHT_API_BASE_URL ??
+    seed?.apiBase ??
+    'http://localhost:3100';
+const TENANT_ID = process.env.TEST_TENANT_ID || seed?.tenantId || '';
+const WEBHOOK_SECRET =
+    process.env.TEST_TRIGGER_WEBHOOK_SECRET || seed?.webhookSecret || '';
+const TENANT_ID_NO_SECRET =
+    process.env.TEST_TENANT_ID_NO_SECRET || seed?.tenantIdNoSecret || '';
 
 const url = (tenantId: string) =>
 	`${API_BASE}/api/webhooks/trigger/${tenantId}`;
