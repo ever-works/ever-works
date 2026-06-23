@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Rechercher",
+                "searchPlaceholder": "Titre ou description",
+                "status": "Statut",
+                "anyStatus": "Tout statut",
+                "apply": "Appliquer",
+                "reset": "Réinitialiser"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "Statut",
                     "priority": "Priorité",
                     "label": "Étiquette",
-                    "all": "Tous"
+                    "all": "Tous",
+                    "search": "Rechercher",
+                    "searchPlaceholder": "Titre, slug ou description",
+                    "anyStatus": "Tout statut",
+                    "anyPriority": "Toute priorité",
+                    "labelPlaceholder": "étiquette",
+                    "apply": "Appliquer",
+                    "reset": "Réinitialiser"
+                },
+                "pagination": {
+                    "showing": "Affichage de {from}-{to} sur {total}",
+                    "previous": "Précédent",
+                    "next": "Suivant"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Rechercher",
+                "searchPlaceholder": "Titre ou description",
+                "status": "Statut",
+                "anyStatus": "Tout statut",
+                "apply": "Appliquer",
+                "reset": "Réinitialiser"
+            }
         },
         "discover": {
             "title": "Découvrir",

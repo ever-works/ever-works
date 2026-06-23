@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Търсене",
+                "searchPlaceholder": "Заглавие или описание",
+                "status": "Статус",
+                "anyStatus": "Всякакъв статус",
+                "apply": "Приложи",
+                "reset": "Нулирай"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "Статус",
                     "priority": "Приоритет",
                     "label": "Етикет",
-                    "all": "Всички"
+                    "all": "Всички",
+                    "search": "Търсене",
+                    "searchPlaceholder": "Заглавие, идентификатор или описание",
+                    "anyStatus": "Всякакъв статус",
+                    "anyPriority": "Всякакъв приоритет",
+                    "labelPlaceholder": "етикет",
+                    "apply": "Приложи",
+                    "reset": "Нулирай"
+                },
+                "pagination": {
+                    "showing": "Показване на {from}-{to} от {total}",
+                    "previous": "Предишна",
+                    "next": "Следваща"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Търсене",
+                "searchPlaceholder": "Заглавие или описание",
+                "status": "Статус",
+                "anyStatus": "Всякакъв статус",
+                "apply": "Приложи",
+                "reset": "Нулирай"
+            }
         },
         "discover": {
             "title": "Открийте",

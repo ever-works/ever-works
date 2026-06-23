@@ -33,8 +33,8 @@ export interface SelectProps {
     onValueChange?: (value: string) => void;
     onChange?: React.ChangeEventHandler<HTMLSelectElement>;
     disabled?: boolean;
-    /** 'sm' = h-8 text-xs  |  'default' = h-9 text-sm */
-    size?: 'sm' | 'default';
+    /** 'xs' = h-8 text-xs  |  'sm' = h-8 text-xs  |  'default' = h-9 text-sm */
+    size?: 'xs' | 'sm' | 'default';
     className?: string;
     children?: React.ReactNode;
     placeholder?: string;
@@ -214,7 +214,8 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     aria-haspopup="listbox"
                     aria-expanded={open}
                     className={cn(
-                        'w-full flex items-center justify-between rounded-lg border text-sm',
+                        'w-full flex items-center justify-between rounded-lg border',
+                        size === 'xs' ? 'text-xs' : 'text-sm',
                         'transition-colors outline-none text-left cursor-pointer',
                         'bg-card dark:bg-card-primary-dark',
                         'border-border dark:border-border-secondary-dark',
@@ -223,7 +224,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                         'disabled:cursor-not-allowed disabled:opacity-50',
                         open &&
                             'border-border-secondary dark:border-white/20 ring-1 ring-primary/20 dark:ring-white/10',
-                        size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2 text-sm',
+                        size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2',
                     )}
                 >
                     <span
@@ -315,7 +316,7 @@ function OptionRow({
 }: {
     opt: OptionData;
     selected: boolean;
-    size: 'sm' | 'default';
+    size: 'xs' | 'sm' | 'default';
     onPick: (opt: OptionData) => void;
     indent?: boolean;
 }) {
@@ -370,7 +371,9 @@ function OptionRow({
                 'flex items-center gap-2 cursor-pointer select-none transition-colors',
                 size === 'default'
                     ? 'px-3 py-2 text-sm mx-1 rounded-sm my-px'
-                    : 'px-2 py-1.5 mx-1 rounded-sm my-px text-sm',
+                    : size === 'xs'
+                      ? 'px-2 py-1 mx-1 rounded-sm my-px text-xs'
+                      : 'px-2 py-1.5 mx-1 rounded-sm my-px text-sm',
                 indent && 'pl-6',
                 selected
                     ? 'bg-surface-secondary dark:bg-white/6 font-medium text-text dark:text-text-dark'
