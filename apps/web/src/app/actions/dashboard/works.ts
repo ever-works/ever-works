@@ -404,6 +404,37 @@ export async function createWorkWithAI(request: AIWorkOptions) {
     }
 }
 
+export type CheckWorkSlugResult =
+    | { available: boolean; slug: string; suggestion?: string }
+    | { error: string };
+
+/**
+ * Live slug-availability check for the create-Work form (GitHub-style
+ * "repository name" check). Returns `{ available, slug, suggestion? }` on
+ * success or `{ error }` so the client can render a neutral hint instead of
+ * blocking. Work slugs are unique per user, so this proxies the
+ * authenticated `GET /works/check-slug` endpoint.
+ */
+export async function checkWorkSlug(slug: string): Promise<CheckWorkSlugResult> {
+    // Security: verify authentication at the server-action boundary.
+    const user = await getAuthFromCookie();
+    if (!user) {
+        return { error: 'unauthorized' };
+    }
+
+    const trimmed = (slug ?? '').trim();
+    if (!trimmed) {
+        return { available: false, slug: '' };
+    }
+
+    try {
+        return await workAPI.checkSlug(trimmed);
+    } catch (error) {
+        console.error('Failed to check Work slug availability:', error);
+        return { error: error instanceof Error ? error.message : 'check failed' };
+    }
+}
+
 export async function fetchWorkGenerationHistory(
     workId: string,
     options: { limit?: number; offset?: number; activityType?: string } = {},
