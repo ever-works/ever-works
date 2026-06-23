@@ -568,6 +568,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Cari",
+                "searchPlaceholder": "Judul atau deskripsi",
+                "status": "Status",
+                "anyStatus": "Semua status",
+                "apply": "Terapkan",
+                "reset": "Reset"
             }
         },
         "agentsPage": {
@@ -632,7 +640,19 @@
                     "status": "Status",
                     "priority": "Prioritas",
                     "label": "Label",
-                    "all": "Semua"
+                    "all": "Semua",
+                    "search": "Cari",
+                    "searchPlaceholder": "Judul, slug, atau deskripsi",
+                    "anyStatus": "Semua status",
+                    "anyPriority": "Semua prioritas",
+                    "labelPlaceholder": "label",
+                    "apply": "Terapkan",
+                    "reset": "Reset"
+                },
+                "pagination": {
+                    "showing": "Menampilkan {from}-{to} dari {total}",
+                    "previous": "Sebelumnya",
+                    "next": "Berikutnya"
                 }
             },
             "newDialog": {
@@ -872,7 +892,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Cari",
+                "searchPlaceholder": "Judul atau deskripsi",
+                "status": "Status",
+                "anyStatus": "Semua status",
+                "apply": "Terapkan",
+                "reset": "Reset"
+            }
         },
         "discover": {
             "title": "Discover",
@@ -4563,7 +4591,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Cari",
+                "searchPlaceholder": "Judul atau deskripsi",
+                "status": "Status",
+                "anyStatus": "Semua status",
+                "apply": "Terapkan",
+                "reset": "Reset"
+            }
         },
         "discover": {
             "title": "Discover",

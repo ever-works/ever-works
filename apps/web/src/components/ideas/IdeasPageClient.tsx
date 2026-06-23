@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { Lightbulb, Settings as SettingsIcon } from 'lucide-react';
+import { useState, useTransition, useEffect } from 'react';
+import { Lightbulb, Settings as SettingsIcon, Search } from 'lucide-react';
+import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { buildIdeaAction } from '@/app/actions/dashboard/work-proposals';
@@ -97,6 +98,10 @@ export function IdeasPageClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [isCreating, startCreating] = useTransition();
     const [isBuilding, startBuilding] = useTransition();
+    let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'actionable');
+    useEffect(() => {
+        setStatusFilter(filters?.status ?? 'actionable');
+    }, [filters?.status]);
 
     const startFromPrompt = useStartFromPrompt();
 
@@ -249,44 +254,41 @@ export function IdeasPageClient({
             <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Search
+                        {t('filterBar.search')}
                     </span>
-                    <input
-                        name="search"
-                        defaultValue={filters?.search ?? ''}
-                        placeholder="Title or description"
-                        maxLength={500}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                    />
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted dark:text-text-muted-dark pointer-events-none" />
+                        <input
+                            name="search"
+                            defaultValue={filters?.search ?? ''}
+                            placeholder={t('filterBar.searchPlaceholder')}
+                            maxLength={500}
+                            className="w-full rounded-lg border border-card-border dark:border-white/9 bg-card dark:bg-card-primary-dark pl-9 pr-4 py-2 h-9 text-xs text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20 transition-colors outline-none"
+                        />
+                    </div>
                 </label>
-                <label className="min-w-44">
+                <div className="min-w-44">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Status
+                        {t('filterBar.status')}
                     </span>
-                    <select
-                        name="status"
-                        defaultValue={filters?.status ?? 'actionable'}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                    >
+                    <input type="hidden" name="status" value={statusFilter} />
+                    <Select value={statusFilter} onValueChange={setStatusFilter} size="xs">
                         {STATUS_FILTER_ORDER.map((status) => (
                             <option key={status} value={status}>
                                 {status === 'actionable' ? 'Actionable' : t(`filters.${status}`)}
                             </option>
                         ))}
-                    </select>
-                </label>
+                    </Select>
+                </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        type="submit"
-                        className="inline-flex h-9 items-center justify-center rounded-md bg-button-primary dark:bg-button-primary-dark px-3 text-sm font-medium text-button-primary-foreground dark:text-button-primary-foreground-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark"
-                    >
-                        Apply
-                    </button>
+                    <Button type="submit" size="sm">
+                        {t('filterBar.apply')}
+                    </Button>
                     <Link
                         href={ROUTES.DASHBOARD_IDEAS}
                         className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                     >
-                        Reset
+                        {t('filterBar.reset')}
                     </Link>
                 </div>
             </form>

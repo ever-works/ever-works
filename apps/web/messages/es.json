@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Buscar",
+                "searchPlaceholder": "Título o descripción",
+                "status": "Estado",
+                "anyStatus": "Cualquier estado",
+                "apply": "Aplicar",
+                "reset": "Restablecer"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "Estado",
                     "priority": "Prioridad",
                     "label": "Etiqueta",
-                    "all": "Todas"
+                    "all": "Todas",
+                    "search": "Buscar",
+                    "searchPlaceholder": "Título, slug o descripción",
+                    "anyStatus": "Cualquier estado",
+                    "anyPriority": "Cualquier prioridad",
+                    "labelPlaceholder": "etiqueta",
+                    "apply": "Aplicar",
+                    "reset": "Restablecer"
+                },
+                "pagination": {
+                    "showing": "Mostrando {from}-{to} de {total}",
+                    "previous": "Anterior",
+                    "next": "Siguiente"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Buscar",
+                "searchPlaceholder": "Título o descripción",
+                "status": "Estado",
+                "anyStatus": "Cualquier estado",
+                "apply": "Aplicar",
+                "reset": "Restablecer"
+            }
         },
         "discover": {
             "title": "Descubrir",
