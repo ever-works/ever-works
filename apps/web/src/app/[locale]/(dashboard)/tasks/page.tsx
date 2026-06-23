@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { ListChecks, Plus } from 'lucide-react';
+import { ListChecks, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { tasksAPI, type TaskPriority, type TaskStatus } from '@/lib/api/tasks';
+import { TasksFilterSelects } from '@/components/tasks/TasksFilterSelects';
 import { TasksList } from '@/components/tasks/TasksList';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
@@ -105,66 +106,40 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
             <form className="mb-4 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
                 <label className="flex-1 min-w-0">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Search
+                        {t('list.filter.search')}
                     </span>
-                    <input
-                        name="search"
-                        defaultValue={query.search ?? ''}
-                        placeholder="Title, slug, or description"
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                    />
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted dark:text-text-muted-dark pointer-events-none" />
+                        <input
+                            name="search"
+                            defaultValue={query.search ?? ''}
+                            placeholder={t('list.filter.searchPlaceholder')}
+                            className="w-full rounded-lg border border-card-border dark:border-white/9 bg-card dark:bg-card-primary-dark pl-9 pr-4 py-2 h-9 text-xs text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20 transition-colors outline-none"
+                        />
+                    </div>
                 </label>
-                <label className="min-w-40">
-                    <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Status
-                    </span>
-                    <select
-                        name="status"
-                        defaultValue={query.status ?? ''}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                    >
-                        <option value="">Any status</option>
-                        {TASK_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                                {s.replace('_', ' ')}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                <TasksFilterSelects
+                    key={`${query.status ?? ''}-${query.priority ?? ''}`}
+                    defaultStatus={query.status}
+                    defaultPriority={query.priority}
+                />
                 <label className="min-w-36">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Priority
-                    </span>
-                    <select
-                        name="priority"
-                        defaultValue={query.priority ?? ''}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                    >
-                        <option value="">Any priority</option>
-                        {TASK_PRIORITIES.map((p) => (
-                            <option key={p} value={p}>
-                                {p.toUpperCase()}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-                <label className="min-w-36">
-                    <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
-                        Label
+                        {t('list.filter.label')}
                     </span>
                     <input
                         name="label"
                         defaultValue={query.label ?? ''}
-                        placeholder="label"
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                        placeholder={t('list.filter.labelPlaceholder')}
+                        className="w-full rounded-lg border border-card-border dark:border-white/9 bg-card dark:bg-card-primary-dark px-4 py-2 h-9 text-xs text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20 transition-colors outline-none"
                     />
                 </label>
                 <div className="flex items-center gap-2">
                     <Button type="submit" size="sm">
-                        Apply
+                        {t('list.filter.apply')}
                     </Button>
                     <Button href={ROUTES.DASHBOARD_TASKS} size="sm" variant="ghost">
-                        Reset
+                        {t('list.filter.reset')}
                     </Button>
                 </div>
             </form>
@@ -172,9 +147,14 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
             {result.meta.total > result.meta.limit && (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
                     <span>
-                        Showing {result.meta.offset + 1}-
-                        {Math.min(result.meta.offset + result.data.length, result.meta.total)} of{' '}
-                        {result.meta.total}
+                        {t('list.pagination.showing', {
+                            from: result.meta.offset + 1,
+                            to: Math.min(
+                                result.meta.offset + result.data.length,
+                                result.meta.total,
+                            ),
+                            total: result.meta.total,
+                        })}
                     </span>
                     <div className="flex items-center gap-2">
                         {result.meta.offset > 0 && (
@@ -182,7 +162,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                                 href={buildTasksHref({ ...baseHrefInput, offset: prevOffset })}
                                 className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                             >
-                                Previous
+                                {t('list.pagination.previous')}
                             </Link>
                         )}
                         {nextOffset < result.meta.total && (
@@ -190,7 +170,7 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                                 href={buildTasksHref({ ...baseHrefInput, offset: nextOffset })}
                                 className="rounded-md border border-border/60 dark:border-border-dark/60 px-3 py-1.5 text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark"
                             >
-                                Next
+                                {t('list.pagination.next')}
                             </Link>
                         )}
                     </div>

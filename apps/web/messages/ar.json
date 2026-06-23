@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "بحث",
+                "searchPlaceholder": "العنوان أو الوصف",
+                "status": "الحالة",
+                "anyStatus": "أي حالة",
+                "apply": "تطبيق",
+                "reset": "إعادة تعيين"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "الحالة",
                     "priority": "الأولوية",
                     "label": "العلامة",
-                    "all": "الكل"
+                    "all": "الكل",
+                    "search": "بحث",
+                    "searchPlaceholder": "العنوان أو الوصف أو الرمز",
+                    "anyStatus": "أي حالة",
+                    "anyPriority": "أي أولوية",
+                    "labelPlaceholder": "تسمية",
+                    "apply": "تطبيق",
+                    "reset": "إعادة تعيين"
+                },
+                "pagination": {
+                    "showing": "عرض {from}-{to} من {total}",
+                    "previous": "السابق",
+                    "next": "التالي"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "بحث",
+                "searchPlaceholder": "العنوان أو الوصف",
+                "status": "الحالة",
+                "anyStatus": "أي حالة",
+                "apply": "تطبيق",
+                "reset": "إعادة تعيين"
+            }
         },
         "discover": {
             "title": "اكتشف",

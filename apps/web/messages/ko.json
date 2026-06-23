@@ -568,6 +568,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "검색",
+                "searchPlaceholder": "제목 또는 설명",
+                "status": "상태",
+                "anyStatus": "모든 상태",
+                "apply": "적용",
+                "reset": "초기화"
             }
         },
         "agentsPage": {
@@ -632,7 +640,19 @@
                     "status": "상태",
                     "priority": "우선순위",
                     "label": "레이블",
-                    "all": "전체"
+                    "all": "전체",
+                    "search": "검색",
+                    "searchPlaceholder": "제목, 슬러그 또는 설명",
+                    "anyStatus": "모든 상태",
+                    "anyPriority": "모든 우선순위",
+                    "labelPlaceholder": "레이블",
+                    "apply": "적용",
+                    "reset": "초기화"
+                },
+                "pagination": {
+                    "showing": "{total}개 중 {from}-{to} 표시",
+                    "previous": "이전",
+                    "next": "다음"
                 }
             },
             "newDialog": {
@@ -872,7 +892,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "검색",
+                "searchPlaceholder": "제목 또는 설명",
+                "status": "상태",
+                "anyStatus": "모든 상태",
+                "apply": "적용",
+                "reset": "초기화"
+            }
         },
         "discover": {
             "title": "Discover",
@@ -4563,7 +4591,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "검색",
+                "searchPlaceholder": "제목 또는 설명",
+                "status": "상태",
+                "anyStatus": "모든 상태",
+                "apply": "적용",
+                "reset": "초기화"
+            }
         },
         "discover": {
             "title": "Discover",

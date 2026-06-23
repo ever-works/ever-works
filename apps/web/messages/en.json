@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Search",
+                "searchPlaceholder": "Title or description",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset",
+                "status": "Status"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "Status",
                     "priority": "Priority",
                     "label": "Label",
-                    "all": "All"
+                    "all": "All",
+                    "search": "Search",
+                    "searchPlaceholder": "Title, slug, or description",
+                    "anyStatus": "Any status",
+                    "anyPriority": "Any priority",
+                    "labelPlaceholder": "label",
+                    "apply": "Apply",
+                    "reset": "Reset"
+                },
+                "pagination": {
+                    "showing": "Showing {from}-{to} of {total}",
+                    "previous": "Previous",
+                    "next": "Next"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Search",
+                "searchPlaceholder": "Title or description",
+                "apply": "Apply",
+                "reset": "Reset",
+                "status": "Status",
+                "anyStatus": "Any status"
+            }
         },
         "discover": {
             "title": "Discover",

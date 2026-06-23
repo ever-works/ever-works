@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Suche",
+                "searchPlaceholder": "Titel oder Beschreibung",
+                "status": "Status",
+                "anyStatus": "Beliebiger Status",
+                "apply": "Übernehmen",
+                "reset": "Zurücksetzen"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "Status",
                     "priority": "Priorität",
                     "label": "Label",
-                    "all": "Alle"
+                    "all": "Alle",
+                    "search": "Suche",
+                    "searchPlaceholder": "Titel, Slug oder Beschreibung",
+                    "anyStatus": "Beliebiger Status",
+                    "anyPriority": "Beliebige Priorität",
+                    "labelPlaceholder": "Bezeichnung",
+                    "apply": "Übernehmen",
+                    "reset": "Zurücksetzen"
+                },
+                "pagination": {
+                    "showing": "{from}–{to} von {total} angezeigt",
+                    "previous": "Zurück",
+                    "next": "Weiter"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "Suche",
+                "searchPlaceholder": "Titel oder Beschreibung",
+                "status": "Status",
+                "anyStatus": "Beliebiger Status",
+                "apply": "Übernehmen",
+                "reset": "Zurücksetzen"
+            }
         },
         "discover": {
             "title": "Entdecken",
