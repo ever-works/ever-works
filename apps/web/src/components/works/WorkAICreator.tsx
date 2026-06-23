@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
-import { createWorkWithAI } from '@/app/actions/dashboard';
+import { createWorkWithAI, checkWorkSlug } from '@/app/actions/dashboard';
 
 /**
  * Browser-side slug helper. Mirrors `slugify` from `@ever-works/plugin`
@@ -18,6 +18,28 @@ function slugifyForWork(value: string): string {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 }
+
+/** Debounce window for the live slug-availability check (ms). */
+const SLUG_CHECK_DEBOUNCE_MS = 400;
+
+/**
+ * Live slug-availability state, mirroring the GitHub "create a new
+ * repository" name check. `available`/`taken` carry the server-normalized
+ * slug so the hint reflects exactly what would be created.
+ */
+type SlugStatus =
+    | { kind: 'idle' }
+    | { kind: 'checking' }
+    | { kind: 'available'; slug: string }
+    | { kind: 'taken'; slug: string; suggestion?: string }
+    | { kind: 'error'; slug: string };
+
+/**
+ * Resolved (server-answered) slug states only — `idle`/`checking` are derived
+ * during render from whether this result still matches the current slug, so we
+ * never call setState synchronously inside the check effect.
+ */
+type SlugCheckResult = Exclude<SlugStatus, { kind: 'idle' } | { kind: 'checking' }>;
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { ROUTES } from '@/lib/constants';
 import { useRouter } from '@/i18n/navigation';
@@ -30,7 +52,7 @@ import { DynamicPluginFields } from './detail/generator/DynamicPluginFields';
 import { ProviderSelectionSection } from './shared/ProviderSelectionSection';
 import { WebsiteTemplateSelector } from './shared/WebsiteTemplateSelector';
 import { CollapsibleSection } from './detail/shared';
-import { Lightbulb, Check } from 'lucide-react';
+import { Lightbulb, Check, X, Loader2 } from 'lucide-react';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
@@ -68,6 +90,7 @@ export function WorkAICreator({
         proposal?.slugSuggestion ?? slugifyForWork(proposal?.title ?? ''),
     );
     const [slugDirty, setSlugDirty] = useState(Boolean(proposal?.slugSuggestion));
+    const [slugResult, setSlugResult] = useState<SlugCheckResult | null>(null);
     const [organization, setOrganization] = useState(false);
     const [owner, setOwner] = useState('');
     const [websiteTemplateId, setWebsiteTemplateId] = useState('');
@@ -127,6 +150,53 @@ export function WorkAICreator({
         loadSchema();
     }, [formSchema, providers.pipeline, syncResolvedPipeline, handleProviderChange]);
 
+    // Live, debounced slug-availability check (GitHub "create a new
+    // repository" style). Each keystroke resets the timer; the request only
+    // fires once typing pauses. We store ONLY the resolved server answer
+    // (keyed by the slug it was computed for) and derive idle/checking during
+    // render — so the effect never calls setState synchronously in its body.
+    // A monotonically-increasing version guards against out-of-order responses
+    // overwriting a newer check.
+    const slugCandidate = slugifyForWork(slug);
+    const slugCheckVersionRef = useRef(0);
+    useEffect(() => {
+        if (!slugCandidate) return;
+        const version = ++slugCheckVersionRef.current;
+        const timer = setTimeout(() => {
+            void (async () => {
+                try {
+                    const result = await checkWorkSlug(slugCandidate);
+                    if (version !== slugCheckVersionRef.current) return;
+                    if ('error' in result) {
+                        setSlugResult({ kind: 'error', slug: slugCandidate });
+                    } else if (result.available) {
+                        setSlugResult({ kind: 'available', slug: result.slug });
+                    } else {
+                        setSlugResult({
+                            kind: 'taken',
+                            slug: result.slug,
+                            suggestion: result.suggestion,
+                        });
+                    }
+                } catch {
+                    if (version !== slugCheckVersionRef.current) return;
+                    setSlugResult({ kind: 'error', slug: slugCandidate });
+                }
+            })();
+        }, SLUG_CHECK_DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [slugCandidate]);
+
+    // Derived display status — `checking` whenever the latest resolved answer
+    // doesn't (yet) match the current slug; `idle` when there's nothing to
+    // check. No state/effect round-trip.
+    const slugStatus: SlugStatus = !slugCandidate
+        ? { kind: 'idle' }
+        : slugResult && slugResult.slug === slugCandidate
+          ? slugResult
+          : { kind: 'checking' };
+
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
     }, []);
@@ -139,6 +209,14 @@ export function WorkAICreator({
 
         if (!prompt.trim()) {
             toast.error(t('errors.promptRequired'));
+            return;
+        }
+
+        // Block on a known-taken slug before hitting the API — the create
+        // call would 409 anyway ("Work already exists"). Mirrors GitHub
+        // disabling "Create repository" when the name is taken.
+        if (slugStatus.kind === 'taken') {
+            toast.error(t('errors.slugTaken'));
             return;
         }
 
@@ -227,21 +305,34 @@ export function WorkAICreator({
                     {/* Slug — auto-generated from name, user-editable.
                         Carried over from the legacy WorkManualForm so the
                         combined Create form covers everything the manual
-                        form did. */}
-                    <Input
-                        label={t('slugLabel')}
-                        type="text"
-                        name="slug"
-                        value={slug}
-                        onChange={(e) => {
-                            setSlug(e.target.value);
-                            setSlugDirty(true);
-                        }}
-                        placeholder={t('slugPlaceholder')}
-                        pattern="[a-z0-9-]+"
-                        helperText={t('slugHelp')}
-                        variant="form"
-                    />
+                        form did. A live, debounced availability check
+                        mirrors GitHub's "create a new repository" name
+                        check (see SlugAvailabilityHint below). */}
+                    <div className="space-y-1.5">
+                        <Input
+                            label={t('slugLabel')}
+                            type="text"
+                            name="slug"
+                            value={slug}
+                            onChange={(e) => {
+                                setSlug(e.target.value);
+                                setSlugDirty(true);
+                            }}
+                            placeholder={t('slugPlaceholder')}
+                            pattern="[a-z0-9-]+"
+                            helperText={t('slugHelp')}
+                            variant="form"
+                            aria-invalid={slugStatus.kind === 'taken'}
+                            aria-describedby="work-slug-status"
+                        />
+                        <SlugAvailabilityHint
+                            status={slugStatus}
+                            onUseSuggestion={(suggestion) => {
+                                setSlug(suggestion);
+                                setSlugDirty(true);
+                            }}
+                        />
+                    </div>
 
                     {/* AI Prompt */}
                     <Textarea
@@ -341,7 +432,7 @@ export function WorkAICreator({
             <div className="flex gap-3">
                 <Button
                     onClick={handleGenerate}
-                    disabled={isPending || !prompt.trim()}
+                    disabled={isPending || !prompt.trim() || slugStatus.kind === 'taken'}
                     loading={isPending}
                     variant="primary"
                     size="lg"
@@ -378,6 +469,71 @@ export function WorkAICreator({
                     <strong>{t('noteTitle')}</strong> {t('noteText')}
                 </p>
             </div>
+        </div>
+    );
+}
+
+/**
+ * GitHub-style slug-availability hint rendered under the Work Slug input.
+ * Shows a spinner while checking, a green check + "available" when free, and
+ * an amber warning + one-click suggestion when the slug is already taken on
+ * the user's account.
+ */
+function SlugAvailabilityHint({
+    status,
+    onUseSuggestion,
+}: {
+    status: SlugStatus;
+    onUseSuggestion: (suggestion: string) => void;
+}) {
+    const t = useTranslations('dashboard.workCreation.ai');
+
+    if (status.kind === 'idle') {
+        return null;
+    }
+
+    return (
+        <div
+            id="work-slug-status"
+            aria-live="polite"
+            className="flex items-center gap-1.5 text-xs"
+        >
+            {status.kind === 'checking' && (
+                <span className="flex items-center gap-1.5 text-text-muted dark:text-text-muted-dark">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    {t('slugChecking')}
+                </span>
+            )}
+            {status.kind === 'available' && (
+                <span className="flex items-center gap-1.5 text-success">
+                    <Check className="w-3.5 h-3.5" />
+                    {t('slugAvailable', { slug: status.slug })}
+                </span>
+            )}
+            {status.kind === 'taken' &&
+                (() => {
+                    const { suggestion } = status;
+                    return (
+                        <span className="flex flex-wrap items-center gap-1.5 text-warning">
+                            <X className="w-3.5 h-3.5 shrink-0" />
+                            <span>{t('slugTakenName', { slug: status.slug })}</span>
+                            {suggestion && (
+                                <button
+                                    type="button"
+                                    onClick={() => onUseSuggestion(suggestion)}
+                                    className="font-medium underline underline-offset-2 hover:no-underline cursor-pointer"
+                                >
+                                    {t('slugUseSuggestion', { suggestion })}
+                                </button>
+                            )}
+                        </span>
+                    );
+                })()}
+            {status.kind === 'error' && (
+                <span className="text-text-muted dark:text-text-muted-dark">
+                    {t('slugCheckError')}
+                </span>
+            )}
         </div>
     );
 }
