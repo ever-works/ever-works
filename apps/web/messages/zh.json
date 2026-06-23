@@ -568,6 +568,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "搜索",
+                "searchPlaceholder": "标题或描述",
+                "status": "状态",
+                "anyStatus": "任意状态",
+                "apply": "应用",
+                "reset": "重置"
             }
         },
         "agentsPage": {
@@ -632,7 +640,19 @@
                     "status": "状态",
                     "priority": "优先级",
                     "label": "标签",
-                    "all": "全部"
+                    "all": "全部",
+                    "search": "搜索",
+                    "searchPlaceholder": "标题、标识符或描述",
+                    "anyStatus": "任意状态",
+                    "anyPriority": "任意优先级",
+                    "labelPlaceholder": "标签",
+                    "apply": "应用",
+                    "reset": "重置"
+                },
+                "pagination": {
+                    "showing": "显示第 {from}-{to} 条，共 {total} 条",
+                    "previous": "上一页",
+                    "next": "下一页"
                 }
             },
             "newDialog": {
@@ -872,7 +892,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "搜索",
+                "searchPlaceholder": "标题或描述",
+                "status": "状态",
+                "anyStatus": "任意状态",
+                "apply": "应用",
+                "reset": "重置"
+            }
         },
         "discover": {
             "title": "Discover",
@@ -4563,7 +4591,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "搜索",
+                "searchPlaceholder": "标题或描述",
+                "status": "状态",
+                "anyStatus": "任意状态",
+                "apply": "应用",
+                "reset": "重置"
+            }
         },
         "discover": {
             "title": "Discover",

@@ -599,6 +599,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "חיפוש",
+                "searchPlaceholder": "כותרת או תיאור",
+                "status": "סטטוס",
+                "anyStatus": "כל סטטוס",
+                "apply": "החל",
+                "reset": "אפס"
             }
         },
         "agentsPage": {
@@ -690,7 +698,19 @@
                     "status": "מצב",
                     "priority": "עדיפות",
                     "label": "תווית",
-                    "all": "הכל"
+                    "all": "הכל",
+                    "search": "חיפוש",
+                    "searchPlaceholder": "כותרת, מזהה או תיאור",
+                    "anyStatus": "כל סטטוס",
+                    "anyPriority": "כל עדיפות",
+                    "labelPlaceholder": "תווית",
+                    "apply": "החל",
+                    "reset": "אפס"
+                },
+                "pagination": {
+                    "showing": "מציג {from}-{to} מתוך {total}",
+                    "previous": "הקודם",
+                    "next": "הבא"
                 }
             },
             "newDialog": {
@@ -977,7 +997,15 @@
                 "title": "No Ideas match these filters.",
                 "subtitle": "Toggle accepted / dismissed, or add one with the field above."
             },
-            "viewAll": "View all ({n}) →"
+            "viewAll": "View all ({n}) →",
+            "filterBar": {
+                "search": "חיפוש",
+                "searchPlaceholder": "כותרת או תיאור",
+                "status": "סטטוס",
+                "anyStatus": "כל סטטוס",
+                "apply": "החל",
+                "reset": "אפס"
+            }
         },
         "discover": {
             "title": "גלה",
