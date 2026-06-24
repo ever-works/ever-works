@@ -3836,6 +3836,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Make a collection of sustainable fashion brands"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Build a directory of self-hostable, open-source alternatives to popular SaaS tools"
+                    },
+                    "5": {
+                        "name": "AI Coding Agents",
+                        "prompt": "Create a curated directory of AI coding agents and assistants with pricing and IDE support"
+                    },
+                    "6": {
+                        "name": "Indie Maker Tools",
+                        "prompt": "Build a Work cataloguing tools and services for indie makers and solo founders"
+                    },
+                    "7": {
+                        "name": "Design Inspiration",
+                        "prompt": "Make a collection of design-inspiration sites for landing pages and portfolios"
                     }
                 },
                 "featuresTitle": "What AI will do for you:",
