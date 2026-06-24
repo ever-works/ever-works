@@ -1040,7 +1040,8 @@
                     "title": "Schnelle Tipps",
                     "tip1": "Erstellen Sie Ihr erstes Werk, indem Sie die Schaltfläche „Werk erstellen“ auf der Übersicht klicken.",
                     "tip2": "Verwenden Sie den KI-Generator, um Ihr Werk automatisch mit relevanten Elementen zu füllen.",
-                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen."
+                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen.",
+                    "tip4": "Drücken Sie jederzeit ?, um dieses Hilfe- & Ressourcen-Panel erneut zu öffnen."
                 },
                 "shortcuts": {
                     "title": "Tastaturkürzel",
@@ -1054,9 +1055,36 @@
                     "github": "GitHub-Repository",
                     "issues": "Problem melden",
                     "docs": "Dokumentation",
-                    "comingSoon": "Bald verfügbar"
+                    "comingSoon": "Bald verfügbar",
+                    "community": "Community-Diskussionen"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Brauchen Sie weitere Hilfe?",
+                    "description": "Durchsuchen Sie die Dokumentation oder fragen Sie die Community — wir antworten meist schnell.",
+                    "action": "An der Diskussion teilnehmen"
+                },
+                "faq": {
+                    "title": "Häufige Fragen",
+                    "q1": "Wie funktioniert die KI-Generierung?",
+                    "a1": "Beschreiben Sie Ihr Werk und der KI-Agent recherchiert, verfasst und füllt es mit relevanten Elementen, die Sie prüfen und bearbeiten können.",
+                    "q2": "Wie verbinde ich GitHub?",
+                    "a2": "Öffnen Sie Einstellungen → Integrationen und autorisieren Sie GitHub, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen.",
+                    "q3": "Kann ich Elemente nach der Generierung bearbeiten?",
+                    "a3": "Ja. Jedes generierte Element ist vollständig bearbeitbar – verfeinern Sie den Inhalt oder generieren Sie einzelne Elemente jederzeit neu."
+                },
+                "whatsNew": {
+                    "title": "Neuigkeiten",
+                    "item1": "Prüfen Sie die Verfügbarkeit des Werk-Slugs während der Eingabe.",
+                    "item2": "Neue Inspirations-Vorschläge beim Erstellen eines Werks.",
+                    "item3": "Werkname und Slug bleiben jetzt synchron.",
+                    "viewAll": "Alle Versionen anzeigen"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Alle Systeme betriebsbereit",
+                    "environment": "Umgebung"
+                }
             }
         },
         "activity": {

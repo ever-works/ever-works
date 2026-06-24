@@ -935,7 +935,8 @@
                     "title": "Tips Cepat",
                     "tip1": "Buat karya pertama Anda dengan mengklik tombol 'Buat Karya' di dasbor.",
                     "tip2": "Gunakan generator AI untuk mengisi karya Anda secara otomatis dengan item relevan.",
-                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori."
+                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori.",
+                    "tip4": "Tekan ? kapan saja untuk membuka kembali panel Bantuan & Sumber Daya ini."
                 },
                 "shortcuts": {
                     "title": "Pintasan Keyboard",
@@ -949,9 +950,36 @@
                     "github": "Repositori GitHub",
                     "issues": "Laporkan Masalah",
                     "docs": "Dokumentasi",
-                    "comingSoon": "Segera hadir"
+                    "comingSoon": "Segera hadir",
+                    "community": "Diskusi Komunitas"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Butuh bantuan lebih?",
+                    "description": "Jelajahi dokumentasi atau tanyakan kepada komunitas — kami biasanya membalas dengan cepat.",
+                    "action": "Gabung diskusi"
+                },
+                "faq": {
+                    "title": "Pertanyaan Umum",
+                    "q1": "Bagaimana cara kerja pembuatan dengan AI?",
+                    "a1": "Jelaskan pekerjaan Anda dan agen AI akan meneliti, menyusun, serta mengisinya dengan item relevan yang dapat Anda tinjau dan edit.",
+                    "q2": "Bagaimana cara menghubungkan GitHub?",
+                    "a2": "Buka Pengaturan → Integrasi dan otorisasi GitHub untuk menyinkronkan dan men-deploy pekerjaan Anda sebagai repositori.",
+                    "q3": "Bisakah saya mengedit item setelah dibuat?",
+                    "a3": "Ya. Setiap item yang dibuat dapat diedit sepenuhnya — sempurnakan kontennya atau buat ulang item satu per satu kapan saja."
+                },
+                "whatsNew": {
+                    "title": "Yang Baru",
+                    "item1": "Periksa ketersediaan slug pekerjaan saat Anda mengetik.",
+                    "item2": "Saran inspirasi baru saat membuat pekerjaan.",
+                    "item3": "Nama dan slug pekerjaan kini tetap sinkron.",
+                    "viewAll": "Lihat semua rilis"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Semua sistem beroperasi",
+                    "environment": "Lingkungan"
+                }
             }
         },
         "activity": {

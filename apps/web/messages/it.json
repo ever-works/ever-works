@@ -935,7 +935,8 @@
                     "title": "Suggerimenti Rapidi",
                     "tip1": "Crea la tua prima lavori cliccando sul pulsante 'Crea Lavori' nel cruscotto.",
                     "tip2": "Usa il generatore IA per popolare automaticamente la tua lavori con elementi rilevanti.",
-                    "tip3": "Collega il tuo account GitHub per sincronizzare e distribuire le tue lavori come repository."
+                    "tip3": "Collega il tuo account GitHub per sincronizzare e distribuire le tue lavori come repository.",
+                    "tip4": "Premi ? in qualsiasi momento per riaprire questo pannello Aiuto e Risorse."
                 },
                 "shortcuts": {
                     "title": "Scorciatoie da Tastiera",
@@ -949,9 +950,36 @@
                     "github": "Repository GitHub",
                     "issues": "Segnala un problema",
                     "docs": "Documentazione",
-                    "comingSoon": "Prossimamente"
+                    "comingSoon": "Prossimamente",
+                    "community": "Discussioni della community"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Hai bisogno di altro aiuto?",
+                    "description": "Consulta la documentazione o chiedi alla community — di solito rispondiamo rapidamente.",
+                    "action": "Partecipa alla discussione"
+                },
+                "faq": {
+                    "title": "Domande frequenti",
+                    "q1": "Come funziona la generazione con l'IA?",
+                    "a1": "Descrivi il tuo lavoro e l'agente IA fa ricerche, redige e lo popola con elementi pertinenti che puoi rivedere e modificare.",
+                    "q2": "Come collego GitHub?",
+                    "a2": "Apri Impostazioni → Integrazioni e autorizza GitHub per sincronizzare e distribuire i tuoi lavori come repository.",
+                    "q3": "Posso modificare gli elementi dopo la generazione?",
+                    "a3": "Sì. Ogni elemento generato è completamente modificabile: perfeziona il contenuto o rigenera singoli elementi in qualsiasi momento."
+                },
+                "whatsNew": {
+                    "title": "Novità",
+                    "item1": "Verifica la disponibilità dello slug di un lavoro mentre scrivi.",
+                    "item2": "Nuovi spunti di ispirazione durante la creazione di un lavoro.",
+                    "item3": "Il nome e lo slug di un lavoro ora restano sincronizzati.",
+                    "viewAll": "Vedi tutte le versioni"
+                },
+                "system": {
+                    "title": "Sistema",
+                    "operational": "Tutti i sistemi operativi",
+                    "environment": "Ambiente"
+                }
             }
         },
         "activity": {

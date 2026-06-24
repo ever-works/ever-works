@@ -935,7 +935,8 @@
                     "title": "Snelle tips",
                     "tip1": "Maak je eerste werk door op de knop 'Werk maken' op het dashboard te klikken.",
                     "tip2": "Gebruik de AI-generator om je werk automatisch te vullen met relevante items.",
-                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren."
+                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren.",
+                    "tip4": "Druk op elk moment op ? om dit Help & Bronnen-paneel opnieuw te openen."
                 },
                 "shortcuts": {
                     "title": "Toetsenbord-snelkoppelingen",
@@ -949,9 +950,36 @@
                     "github": "GitHub-repository",
                     "issues": "Probleem melden",
                     "docs": "Documentatie",
-                    "comingSoon": "Binnenkort beschikbaar"
+                    "comingSoon": "Binnenkort beschikbaar",
+                    "community": "Community-discussies"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Meer hulp nodig?",
+                    "description": "Raadpleeg de documentatie of vraag het de community — we reageren meestal snel.",
+                    "action": "Doe mee aan de discussie"
+                },
+                "faq": {
+                    "title": "Veelgestelde vragen",
+                    "q1": "Hoe werkt AI-generatie?",
+                    "a1": "Beschrijf je werk en de AI-agent onderzoekt, stelt op en vult het met relevante items die je kunt bekijken en bewerken.",
+                    "q2": "Hoe verbind ik GitHub?",
+                    "a2": "Open Instellingen → Integraties en autoriseer GitHub om je werken als repository's te synchroniseren en te implementeren.",
+                    "q3": "Kan ik items bewerken na het genereren?",
+                    "a3": "Ja. Elk gegenereerd item is volledig bewerkbaar: verfijn de inhoud of genereer afzonderlijke items op elk moment opnieuw."
+                },
+                "whatsNew": {
+                    "title": "Nieuw",
+                    "item1": "Controleer de beschikbaarheid van de slug van een werk tijdens het typen.",
+                    "item2": "Nieuwe inspiratiesuggesties bij het maken van een werk.",
+                    "item3": "Naam en slug van een werk blijven nu gesynchroniseerd.",
+                    "viewAll": "Alle releases bekijken"
+                },
+                "system": {
+                    "title": "Systeem",
+                    "operational": "Alle systemen operationeel",
+                    "environment": "Omgeving"
+                }
             }
         },
         "activity": {

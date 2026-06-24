@@ -935,7 +935,8 @@
                     "title": "Hızlı İpuçları",
                     "tip1": "Panodaki 'İş Oluştur' düğmesine tıklayarak ilk işinizi oluşturun.",
                     "tip2": "İşizi ilgili öğelerle otomatik olarak doldurmak için AI üretecisini kullanın.",
-                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın."
+                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın.",
+                    "tip4": "Bu Yardım ve Kaynaklar panelini yeniden açmak için istediğiniz zaman ? tuşuna basın."
                 },
                 "shortcuts": {
                     "title": "Klavye Kısayolları",
@@ -949,9 +950,36 @@
                     "github": "GitHub Deposu",
                     "issues": "Sorun Bildir",
                     "docs": "Belgeler",
-                    "comingSoon": "Yakında"
+                    "comingSoon": "Yakında",
+                    "community": "Topluluk Tartışmaları"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Daha fazla yardıma mı ihtiyacınız var?",
+                    "description": "Belgelere göz atın veya topluluğa sorun — genellikle hızlı yanıt veriyoruz.",
+                    "action": "Tartışmaya katıl"
+                },
+                "faq": {
+                    "title": "Sıkça Sorulan Sorular",
+                    "q1": "Yapay zeka üretimi nasıl çalışır?",
+                    "a1": "İşinizi tanımlayın; yapay zeka aracısı araştırır, taslak hazırlar ve onu inceleyip düzenleyebileceğiniz ilgili öğelerle doldurur.",
+                    "q2": "GitHub'ı nasıl bağlarım?",
+                    "a2": "Ayarlar → Entegrasyonlar'ı açın ve işlerinizi depo olarak senkronize edip dağıtmak için GitHub'a yetki verin.",
+                    "q3": "Öğeleri ürettikten sonra düzenleyebilir miyim?",
+                    "a3": "Evet. Üretilen her öğe tamamen düzenlenebilir — içeriği iyileştirin veya tek tek öğeleri istediğiniz zaman yeniden üretin."
+                },
+                "whatsNew": {
+                    "title": "Yenilikler",
+                    "item1": "Bir işin slug uygunluğunu yazarken kontrol edin.",
+                    "item2": "Bir iş oluştururken yeni ilham önerileri.",
+                    "item3": "İş adı ve slug artık senkronize kalıyor.",
+                    "viewAll": "Tüm sürümleri görüntüle"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Tüm sistemler çalışıyor",
+                    "environment": "Ortam"
+                }
             }
         },
         "activity": {

@@ -1040,7 +1040,8 @@
                     "title": "Conseils rapides",
                     "tip1": "Créez votre premier travail en cliquant sur le bouton « Créer un travail » dans le tableau de bord.",
                     "tip2": "Utilisez le générateur IA pour peupler automatiquement votre travail avec des éléments pertinents.",
-                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels."
+                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels.",
+                    "tip4": "Appuyez sur ? à tout moment pour rouvrir ce panneau Aide & Ressources."
                 },
                 "shortcuts": {
                     "title": "Raccourcis clavier",
@@ -1054,9 +1055,36 @@
                     "github": "Dépôt GitHub",
                     "issues": "Signaler un problème",
                     "docs": "Documentation",
-                    "comingSoon": "Bientôt disponible"
+                    "comingSoon": "Bientôt disponible",
+                    "community": "Discussions de la communauté"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Besoin d'aide supplémentaire ?",
+                    "description": "Consultez la documentation ou demandez à la communauté — nous répondons généralement rapidement.",
+                    "action": "Rejoindre la discussion"
+                },
+                "faq": {
+                    "title": "Questions fréquentes",
+                    "q1": "Comment fonctionne la génération par IA ?",
+                    "a1": "Décrivez votre travail et l'agent IA effectue des recherches, rédige et le remplit d'éléments pertinents que vous pouvez relire et modifier.",
+                    "q2": "Comment connecter GitHub ?",
+                    "a2": "Ouvrez Paramètres → Intégrations et autorisez GitHub pour synchroniser et déployer vos travaux en tant que référentiels.",
+                    "q3": "Puis-je modifier les éléments après la génération ?",
+                    "a3": "Oui. Chaque élément généré est entièrement modifiable : affinez le contenu ou régénérez des éléments individuels à tout moment."
+                },
+                "whatsNew": {
+                    "title": "Nouveautés",
+                    "item1": "Vérifiez la disponibilité du slug d'un travail pendant la saisie.",
+                    "item2": "De nouvelles suggestions d'inspiration pour créer un travail.",
+                    "item3": "Le nom et le slug d'un travail restent désormais synchronisés.",
+                    "viewAll": "Voir toutes les versions"
+                },
+                "system": {
+                    "title": "Système",
+                    "operational": "Tous les systèmes sont opérationnels",
+                    "environment": "Environnement"
+                }
             }
         },
         "activity": {

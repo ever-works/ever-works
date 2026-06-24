@@ -935,7 +935,8 @@
                     "title": "Szybkie wskazówki",
                     "tip1": "Utwórz swój pierwszy praca, klikając przycisk „Utwórz praca” na pulpicie.",
                     "tip2": "Użyj generatora AI, aby automatycznie wypełnić praca odpowiednimi elementami.",
-                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria."
+                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria.",
+                    "tip4": "Naciśnij ? w dowolnym momencie, aby ponownie otworzyć ten panel Pomoc i zasoby."
                 },
                 "shortcuts": {
                     "title": "Skróty klawiaturowe",
@@ -949,9 +950,36 @@
                     "github": "Repozytorium GitHub",
                     "issues": "Zgłoś problem",
                     "docs": "Dokumentacja",
-                    "comingSoon": "Wkrótce"
+                    "comingSoon": "Wkrótce",
+                    "community": "Dyskusje społeczności"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Potrzebujesz więcej pomocy?",
+                    "description": "Przejrzyj dokumentację lub zapytaj społeczność — zwykle odpowiadamy szybko.",
+                    "action": "Dołącz do dyskusji"
+                },
+                "faq": {
+                    "title": "Najczęstsze pytania",
+                    "q1": "Jak działa generowanie przez SI?",
+                    "a1": "Opisz swoją pracę, a agent SI przeprowadzi research, przygotuje treść i wypełni ją odpowiednimi elementami, które możesz sprawdzić i edytować.",
+                    "q2": "Jak połączyć GitHub?",
+                    "a2": "Otwórz Ustawienia → Integracje i autoryzuj GitHub, aby synchronizować i wdrażać swoje prace jako repozytoria.",
+                    "q3": "Czy mogę edytować elementy po wygenerowaniu?",
+                    "a3": "Tak. Każdy wygenerowany element można w pełni edytować — dopracuj treść lub w dowolnej chwili wygeneruj poszczególne elementy ponownie."
+                },
+                "whatsNew": {
+                    "title": "Nowości",
+                    "item1": "Sprawdzaj dostępność sluga pracy podczas pisania.",
+                    "item2": "Nowe podpowiedzi inspiracji przy tworzeniu pracy.",
+                    "item3": "Nazwa i slug pracy są teraz zsynchronizowane.",
+                    "viewAll": "Zobacz wszystkie wydania"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Wszystkie systemy działają",
+                    "environment": "Środowisko"
+                }
             }
         },
         "activity": {

@@ -1040,7 +1040,8 @@
                     "title": "Consejos Rápidos",
                     "tip1": "Crea tu primer trabajo haciendo clic en el botón 'Crear trabajo' en el tablero.",
                     "tip2": "Usa el generador de IA para poblar automáticamente tu trabajo con elementos relevantes.",
-                    "tip3": "Conecta tu cuenta de GitHub para sincronizar y desplegar tus trabajos como repositorios."
+                    "tip3": "Conecta tu cuenta de GitHub para sincronizar y desplegar tus trabajos como repositorios.",
+                    "tip4": "Pulsa ? en cualquier momento para reabrir este panel de Ayuda y Recursos."
                 },
                 "shortcuts": {
                     "title": "Atajos de teclado",
@@ -1054,9 +1055,36 @@
                     "github": "Repositorio de GitHub",
                     "issues": "Reportar un problema",
                     "docs": "Documentación",
-                    "comingSoon": "Próximamente"
+                    "comingSoon": "Próximamente",
+                    "community": "Discusiones de la comunidad"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "¿Necesitas más ayuda?",
+                    "description": "Consulta la documentación o pregunta a la comunidad — solemos responder rápido.",
+                    "action": "Unirse a la conversación"
+                },
+                "faq": {
+                    "title": "Preguntas frecuentes",
+                    "q1": "¿Cómo funciona la generación con IA?",
+                    "a1": "Describe tu trabajo y el agente de IA investiga, redacta y lo completa con elementos relevantes que puedes revisar y editar.",
+                    "q2": "¿Cómo conecto GitHub?",
+                    "a2": "Abre Ajustes → Integraciones y autoriza GitHub para sincronizar y desplegar tus trabajos como repositorios.",
+                    "q3": "¿Puedo editar los elementos después de generarlos?",
+                    "a3": "Sí. Cada elemento generado es totalmente editable: refina el contenido o regenera elementos individuales cuando quieras."
+                },
+                "whatsNew": {
+                    "title": "Novedades",
+                    "item1": "Comprueba la disponibilidad del slug de un trabajo mientras escribes.",
+                    "item2": "Nuevas sugerencias de inspiración al crear un trabajo.",
+                    "item3": "El nombre y el slug de un trabajo ahora se mantienen sincronizados.",
+                    "viewAll": "Ver todas las versiones"
+                },
+                "system": {
+                    "title": "Sistema",
+                    "operational": "Todos los sistemas operativos",
+                    "environment": "Entorno"
+                }
             }
         },
         "activity": {

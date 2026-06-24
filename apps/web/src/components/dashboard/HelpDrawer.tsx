@@ -1,9 +1,32 @@
 'use client';
 
-import { Dialog, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
+import { Fragment, type ReactNode } from 'react';
+import {
+    Dialog,
+    DialogPanel,
+    DialogTitle,
+    Disclosure,
+    DisclosureButton,
+    DisclosurePanel,
+    Transition,
+    TransitionChild,
+} from '@headlessui/react';
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
-import { X, ExternalLink, BookOpen, Keyboard } from 'lucide-react';
+import {
+    X,
+    ExternalLink,
+    BookOpen,
+    Keyboard,
+    Github,
+    Bug,
+    MessageCircle,
+    LifeBuoy,
+    Sparkles,
+    ChevronDown,
+    Server,
+    type LucideIcon,
+} from 'lucide-react';
 
 interface HelpDrawerProps {
     open: boolean;
@@ -16,6 +39,43 @@ interface HelpDrawerProps {
 }
 
 const DOCS_URL = 'https://docs.ever.works/docs';
+const GITHUB_URL = 'https://github.com/ever-works/ever-works';
+const ISSUES_URL = 'https://github.com/ever-works/ever-works/issues';
+const DISCUSSIONS_URL = 'https://github.com/ever-works/ever-works/discussions';
+const RELEASES_URL = 'https://github.com/ever-works/ever-works/releases';
+
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
+const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV || 'production';
+const STATUS_URL = process.env.NEXT_PUBLIC_STATUS_URL;
+
+// Shared visual tokens so every block reads with the same rhythm.
+const CARD = 'overflow-hidden rounded-xl border border-border dark:border-border-dark';
+const DIVIDE = 'divide-y divide-border dark:divide-border-dark';
+const ROW = 'flex items-center justify-between gap-3 px-4 py-2.5';
+
+function SectionHeading({
+    icon: Icon,
+    children,
+    trailing,
+}: {
+    icon?: LucideIcon;
+    children: ReactNode;
+    trailing?: ReactNode;
+}) {
+    return (
+        <h3
+            className={cn(
+                'mb-3 flex items-center gap-2',
+                'text-[11px] font-semibold uppercase tracking-wider',
+                'text-text-secondary dark:text-text-secondary-dark',
+            )}
+        >
+            {Icon && <Icon className="h-3.5 w-3.5" aria-hidden="true" />}
+            <span>{children}</span>
+            {trailing && <span className="ml-auto">{trailing}</span>}
+        </h3>
+    );
+}
 
 export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
@@ -25,20 +85,28 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
         { icon: '1', text: t('quickTips.tip1') },
         { icon: '2', text: t('quickTips.tip2') },
         { icon: '3', text: t('quickTips.tip3') },
+        { icon: '4', text: t('quickTips.tip4') },
     ];
 
     const keyboardShortcuts = [
         { keys: ['Ctrl', 'K'], label: t('shortcuts.search') },
         { keys: ['C'], label: t('shortcuts.newWork') },
+        { keys: ['?'], label: t('shortcuts.help') },
+    ];
+
+    const whatsNewItems = [t('whatsNew.item1'), t('whatsNew.item2'), t('whatsNew.item3')];
+
+    const faqs = [
+        { q: t('faq.q1'), a: t('faq.a1') },
+        { q: t('faq.q2'), a: t('faq.a2') },
+        { q: t('faq.q3'), a: t('faq.a3') },
     ];
 
     const links = [
-        {
-            label: t('links.docs'),
-            href: DOCS_URL,
-            icon: BookOpen,
-            external: true,
-        },
+        { label: t('links.docs'), href: DOCS_URL, icon: BookOpen },
+        { label: t('links.github'), href: GITHUB_URL, icon: Github },
+        { label: t('links.issues'), href: ISSUES_URL, icon: Bug },
+        { label: t('links.community'), href: DISCUSSIONS_URL, icon: MessageCircle },
     ];
 
     return (
@@ -79,14 +147,15 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                         {/* Header */}
                                         <div
                                             className={cn(
-                                                'px-6 py-4',
+                                                'sticky top-0 z-10 px-6 py-4',
+                                                'bg-white/90 dark:bg-surface-dark/90 backdrop-blur',
                                                 'border-b border-border dark:border-border-dark',
                                             )}
                                         >
                                             <div className="flex items-center justify-between">
                                                 <DialogTitle
                                                     className={cn(
-                                                        'text-lg font-semibold',
+                                                        'text-base font-semibold',
                                                         'text-text dark:text-text-dark',
                                                     )}
                                                 >
@@ -102,28 +171,21 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                     )}
                                                 >
                                                     <X className="w-5 h-5" />
-                                                    <span className="sr-only">
-                                                        {tCommon('close')}
-                                                    </span>
+                                                    <span className="sr-only">{tCommon('close')}</span>
                                                 </button>
                                             </div>
-                                            <p className="mt-1 text-sm text-text-secondary dark:text-text-secondary-dark">
+                                            <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
                                                 {t('subtitle')}
                                             </p>
                                         </div>
 
                                         {/* Content */}
-                                        <div className="flex-1 px-6 py-6 space-y-8">
+                                        <div className="flex-1 px-6 py-6 space-y-7">
                                             {onboarding && (
                                                 <section>
-                                                    <h3
-                                                        className={cn(
-                                                            'text-sm font-semibold uppercase tracking-wider mb-4',
-                                                            'text-text-secondary dark:text-text-secondary-dark',
-                                                        )}
-                                                    >
+                                                    <SectionHeading>
                                                         {t('onboarding.title')}
-                                                    </h3>
+                                                    </SectionHeading>
                                                     <button
                                                         type="button"
                                                         onClick={() => {
@@ -131,15 +193,15 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                             onClose();
                                                         }}
                                                         className={cn(
-                                                            'w-full rounded-xl border p-4 text-left transition-colors',
-                                                            'border-border dark:border-border-dark',
+                                                            CARD,
+                                                            'w-full p-4 text-left transition-colors',
                                                             'bg-surface dark:bg-surface-secondary-dark',
-                                                            'hover:border-primary/50 hover:bg-surface-secondary dark:hover:bg-surface-dark',
+                                                            'hover:border-primary/50',
                                                         )}
                                                     >
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="space-y-1">
-                                                                <p className="text-sm font-medium text-text dark:text-text-dark">
+                                                                <p className="text-xs font-medium text-text dark:text-text-dark">
                                                                     {t('onboarding.action', {
                                                                         currentStep:
                                                                             onboarding.currentStep,
@@ -147,7 +209,7 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                             onboarding.totalSteps,
                                                                     })}
                                                                 </p>
-                                                                <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                                                                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
                                                                     {t('onboarding.description')}
                                                                 </p>
                                                             </div>
@@ -157,16 +219,9 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                 </section>
                                             )}
 
-                                            {/* Quick Tips Section */}
+                                            {/* Quick Tips */}
                                             <section>
-                                                <h3
-                                                    className={cn(
-                                                        'text-sm font-semibold uppercase tracking-wider mb-4',
-                                                        'text-text-secondary dark:text-text-secondary-dark',
-                                                    )}
-                                                >
-                                                    {t('quickTips.title')}
-                                                </h3>
+                                                <SectionHeading>{t('quickTips.title')}</SectionHeading>
                                                 <ul className="space-y-3">
                                                     {quickTips.map((tip, index) => (
                                                         <li
@@ -175,15 +230,15 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                         >
                                                             <span
                                                                 className={cn(
-                                                                    'flex-shrink-0 w-6 h-6 rounded-full',
+                                                                    'flex-shrink-0 w-5 h-5 rounded-full',
                                                                     'bg-primary/10 text-primary',
                                                                     'flex items-center justify-center',
-                                                                    'text-xs font-semibold',
+                                                                    'text-[10px] font-semibold',
                                                                 )}
                                                             >
                                                                 {tip.icon}
                                                             </span>
-                                                            <span className="text-sm text-text dark:text-text-dark">
+                                                            <span className="text-xs leading-relaxed text-text dark:text-text-dark">
                                                                 {tip.text}
                                                             </span>
                                                         </li>
@@ -191,59 +246,87 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                 </ul>
                                             </section>
 
-                                            {/* Keyboard Shortcuts Section */}
+                                            {/* What's New */}
                                             <section>
-                                                <h3
-                                                    className={cn(
-                                                        'text-sm font-semibold uppercase tracking-wider mb-4',
-                                                        'text-text-secondary dark:text-text-secondary-dark',
-                                                        'flex items-center gap-2',
-                                                    )}
-                                                >
-                                                    <Keyboard className="w-4 h-4" />
-                                                    {t('shortcuts.title')}
-                                                </h3>
-                                                <div className="space-y-2">
-                                                    {keyboardShortcuts.map((shortcut, index) => (
-                                                        <div
-                                                            key={index}
+                                                <SectionHeading
+                                                    icon={Sparkles}
+                                                    trailing={
+                                                        <span
                                                             className={cn(
-                                                                'flex items-center justify-between py-2 px-3 rounded-lg',
-                                                                'bg-surface dark:bg-surface-secondary-dark',
+                                                                'rounded-full px-2 py-0.5',
+                                                                'text-[10px] font-medium normal-case tracking-normal',
+                                                                'bg-primary/10 text-primary',
                                                             )}
                                                         >
-                                                            <span className="text-sm text-text dark:text-text-dark">
+                                                            v{APP_VERSION}
+                                                        </span>
+                                                    }
+                                                >
+                                                    {t('whatsNew.title')}
+                                                </SectionHeading>
+                                                <div className={CARD}>
+                                                    <ul className={DIVIDE}>
+                                                        {whatsNewItems.map((item, index) => (
+                                                            <li
+                                                                key={index}
+                                                                className="flex items-start gap-2.5 px-4 py-2.5 text-xs leading-relaxed text-text dark:text-text-dark"
+                                                            >
+                                                                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                                                                <span>{item}</span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                    <a
+                                                        href={RELEASES_URL}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className={cn(
+                                                            ROW,
+                                                            'border-t border-border dark:border-border-dark',
+                                                            'text-xs font-medium text-primary transition-colors',
+                                                            'hover:bg-surface dark:hover:bg-surface-secondary-dark',
+                                                        )}
+                                                    >
+                                                        {t('whatsNew.viewAll')}
+                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                    </a>
+                                                </div>
+                                            </section>
+
+                                            {/* Keyboard Shortcuts */}
+                                            <section>
+                                                <SectionHeading icon={Keyboard}>
+                                                    {t('shortcuts.title')}
+                                                </SectionHeading>
+                                                <div className={cn(CARD, DIVIDE)}>
+                                                    {keyboardShortcuts.map((shortcut, index) => (
+                                                        <div key={index} className={ROW}>
+                                                            <span className="text-xs text-text dark:text-text-dark">
                                                                 {shortcut.label}
                                                             </span>
                                                             <div className="flex items-center gap-1">
-                                                                {shortcut.keys.map(
-                                                                    (key, keyIndex) => (
-                                                                        <>
-                                                                            <kbd
-                                                                                key={`key-${keyIndex}`}
-                                                                                className={cn(
-                                                                                    'px-2 py-1 text-xs font-medium rounded',
-                                                                                    'bg-white dark:bg-surface-dark',
-                                                                                    'border border-border dark:border-border-dark',
-                                                                                    'text-text-secondary dark:text-text-secondary-dark',
-                                                                                )}
-                                                                            >
-                                                                                {key}
-                                                                            </kbd>
-                                                                            {keyIndex <
-                                                                                shortcut.keys
-                                                                                    .length -
-                                                                                    1 && (
-                                                                                <span
-                                                                                    key={`sep-${keyIndex}`}
-                                                                                    className="text-text-muted dark:text-text-muted-dark"
-                                                                                >
-                                                                                    +
-                                                                                </span>
+                                                                {shortcut.keys.map((key, keyIndex) => (
+                                                                    <Fragment key={`key-${keyIndex}`}>
+                                                                        <kbd
+                                                                            className={cn(
+                                                                                'min-w-[1.5rem] text-center px-1.5 py-0.5 rounded',
+                                                                                'text-[11px] font-medium',
+                                                                                'bg-surface dark:bg-surface-dark',
+                                                                                'border border-border dark:border-border-dark',
+                                                                                'text-text-secondary dark:text-text-secondary-dark',
                                                                             )}
-                                                                        </>
-                                                                    ),
-                                                                )}
+                                                                        >
+                                                                            {key}
+                                                                        </kbd>
+                                                                        {keyIndex <
+                                                                            shortcut.keys.length -
+                                                                                1 && (
+                                                                            <span className="text-text-muted dark:text-text-muted-dark">
+                                                                                +
+                                                                            </span>
+                                                                        )}
+                                                                    </Fragment>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     ))}
@@ -253,46 +336,135 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                 </p>
                                             </section>
 
-                                            {/* Links Section */}
+                                            {/* FAQ */}
                                             <section>
-                                                <h3
-                                                    className={cn(
-                                                        'text-sm font-semibold uppercase tracking-wider mb-4',
-                                                        'text-text-secondary dark:text-text-secondary-dark',
-                                                    )}
-                                                >
-                                                    {t('links.title')}
-                                                </h3>
+                                                <SectionHeading>{t('faq.title')}</SectionHeading>
                                                 <div className="space-y-2">
+                                                    {faqs.map((faq, index) => (
+                                                        <Disclosure key={index}>
+                                                            {({ open }) => (
+                                                                <div className={CARD}>
+                                                                    <DisclosureButton
+                                                                        className={cn(
+                                                                            'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left',
+                                                                            'transition-colors',
+                                                                            'hover:bg-surface dark:hover:bg-surface-secondary-dark',
+                                                                        )}
+                                                                    >
+                                                                        <span className="text-xs font-medium text-text dark:text-text-dark">
+                                                                            {faq.q}
+                                                                        </span>
+                                                                        <ChevronDown
+                                                                            className={cn(
+                                                                                'h-4 w-4 flex-shrink-0 transition-transform',
+                                                                                'text-text-muted dark:text-text-muted-dark',
+                                                                                open && 'rotate-180',
+                                                                            )}
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                    </DisclosureButton>
+                                                                    <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
+                                                                        {faq.a}
+                                                                    </DisclosurePanel>
+                                                                </div>
+                                                            )}
+                                                        </Disclosure>
+                                                    ))}
+                                                </div>
+                                            </section>
+
+                                            {/* Resources */}
+                                            <section>
+                                                <SectionHeading>{t('links.title')}</SectionHeading>
+                                                <div className={cn(CARD, DIVIDE)}>
                                                     {links.map((link, index) => (
                                                         <a
                                                             key={index}
                                                             href={link.href}
-                                                            target={
-                                                                link.external ? '_blank' : undefined
-                                                            }
-                                                            rel={
-                                                                link.external
-                                                                    ? 'noopener noreferrer'
-                                                                    : undefined
-                                                            }
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
                                                             className={cn(
-                                                                'flex items-center justify-between py-3 px-4 rounded-lg transition-colors',
-                                                                'border border-border dark:border-border-dark',
-                                                                'hover:bg-surface dark:hover:bg-surface-secondary-dark hover:border-primary/50',
+                                                                ROW,
+                                                                'transition-colors',
+                                                                'hover:bg-surface dark:hover:bg-surface-secondary-dark',
                                                             )}
                                                         >
-                                                            <div className="flex items-center gap-3">
-                                                                <link.icon className="w-5 h-5 text-text-secondary dark:text-text-secondary-dark" />
-                                                                <span className="text-sm font-medium text-text dark:text-text-dark">
+                                                            <span className="flex items-center gap-3">
+                                                                <link.icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
+                                                                <span className="text-xs font-medium text-text dark:text-text-dark">
                                                                     {link.label}
                                                                 </span>
-                                                            </div>
-                                                            {link.external && (
-                                                                <ExternalLink className="w-4 h-4 text-text-muted dark:text-text-muted-dark" />
-                                                            )}
+                                                            </span>
+                                                            <ExternalLink className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
                                                         </a>
                                                     ))}
+                                                </div>
+                                            </section>
+
+                                            {/* Support */}
+                                            <section>
+                                                <div
+                                                    className={cn(
+                                                        'rounded-xl border border-primary/20 bg-primary/5 p-4',
+                                                    )}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <LifeBuoy className="h-5 w-5 flex-shrink-0 text-primary" />
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs font-semibold text-text dark:text-text-dark">
+                                                                {t('support.title')}
+                                                            </p>
+                                                            <p className="text-xs leading-relaxed text-text-secondary dark:text-text-secondary-dark">
+                                                                {t('support.description')}
+                                                            </p>
+                                                            <a
+                                                                href={DISCUSSIONS_URL}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className={cn(
+                                                                    'mt-1 inline-flex items-center gap-1',
+                                                                    'text-xs font-medium text-primary',
+                                                                    'hover:underline',
+                                                                )}
+                                                            >
+                                                                {t('support.action')}
+                                                                <ExternalLink className="h-3 w-3" />
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </section>
+
+                                            {/* System */}
+                                            <section>
+                                                <SectionHeading icon={Server}>
+                                                    {t('system.title')}
+                                                </SectionHeading>
+                                                <div className={cn(CARD, DIVIDE)}>
+                                                    <div className={ROW}>
+                                                        <span className="flex items-center gap-2 text-xs text-text dark:text-text-dark">
+                                                            <span className="h-2 w-2 rounded-full bg-green-500" />
+                                                            {t('system.operational')}
+                                                        </span>
+                                                        {STATUS_URL && (
+                                                            <a
+                                                                href={STATUS_URL}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-text-muted transition-colors hover:text-primary dark:text-text-muted-dark"
+                                                            >
+                                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                    <div className={ROW}>
+                                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                            {t('system.environment')}
+                                                        </span>
+                                                        <span className="text-xs font-medium capitalize text-text dark:text-text-dark">
+                                                            {APP_ENV}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </section>
                                         </div>
@@ -306,11 +478,7 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                             )}
                                         >
                                             <p className="text-xs text-text-muted dark:text-text-muted-dark text-center">
-                                                {t('version', {
-                                                    version:
-                                                        process.env.NEXT_PUBLIC_APP_VERSION ||
-                                                        '1.0.0',
-                                                })}
+                                                {t('version', { version: APP_VERSION })}
                                             </p>
                                         </div>
                                     </div>

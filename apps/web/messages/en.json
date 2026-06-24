@@ -1040,7 +1040,8 @@
                     "title": "Quick Tips",
                     "tip1": "Create your first Work by clicking the '+ New Work' button on the dashboard.",
                     "tip2": "Use the AI generator to automatically populate your Work with relevant items.",
-                    "tip3": "Connect your GitHub account to sync and deploy your works as repositories."
+                    "tip3": "Connect your GitHub account to sync and deploy your works as repositories.",
+                    "tip4": "Press ? anytime to reopen this Help & Resources panel."
                 },
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
@@ -1054,9 +1055,36 @@
                     "github": "GitHub Repository",
                     "issues": "Report an Issue",
                     "docs": "Documentation",
-                    "comingSoon": "Coming soon"
+                    "comingSoon": "Coming soon",
+                    "community": "Community Discussions"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Need more help?",
+                    "description": "Browse the docs or ask the community — we usually reply quickly.",
+                    "action": "Join the discussion"
+                },
+                "faq": {
+                    "title": "Frequently Asked",
+                    "q1": "How does AI generation work?",
+                    "a1": "Describe your Work and the AI agent researches, drafts, and fills it with relevant items you can review and edit.",
+                    "q2": "How do I connect GitHub?",
+                    "a2": "Open Settings → Integrations and authorize GitHub to sync and deploy your works as repositories.",
+                    "q3": "Can I edit items after generating?",
+                    "a3": "Yes. Every generated item is fully editable — refine the content or regenerate individual items anytime."
+                },
+                "whatsNew": {
+                    "title": "What's New",
+                    "item1": "Check Work slug availability as you type.",
+                    "item2": "Fresh inspiration prompts when creating a Work.",
+                    "item3": "Work name and slug now stay in sync.",
+                    "viewAll": "View all releases"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "All systems operational",
+                    "environment": "Environment"
+                }
             }
         },
         "activity": {

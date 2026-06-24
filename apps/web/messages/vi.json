@@ -935,7 +935,8 @@
                     "title": "Mẹo Nhanh",
                     "tip1": "Tạo công việc đầu tiên bằng cách nhấp vào nút 'Tạo Công việc' trên bảng điều khiển.",
                     "tip2": "Sử dụng trình tạo AI để tự động điền công việc của bạn với các mục liên quan.",
-                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ."
+                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ.",
+                    "tip4": "Nhấn ? bất cứ lúc nào để mở lại bảng Trợ giúp & Tài nguyên này."
                 },
                 "shortcuts": {
                     "title": "Phím Tắt Bàn Phím",
@@ -949,9 +950,36 @@
                     "github": "Kho GitHub",
                     "issues": "Báo cáo Sự cố",
                     "docs": "Tài liệu",
-                    "comingSoon": "Sắp ra mắt"
+                    "comingSoon": "Sắp ra mắt",
+                    "community": "Thảo luận cộng đồng"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Cần thêm trợ giúp?",
+                    "description": "Xem tài liệu hoặc hỏi cộng đồng — chúng tôi thường phản hồi nhanh.",
+                    "action": "Tham gia thảo luận"
+                },
+                "faq": {
+                    "title": "Câu hỏi thường gặp",
+                    "q1": "Tạo nội dung bằng AI hoạt động thế nào?",
+                    "a1": "Mô tả công việc của bạn và tác nhân AI sẽ nghiên cứu, soạn thảo và điền vào đó các mục liên quan mà bạn có thể xem lại và chỉnh sửa.",
+                    "q2": "Làm cách nào để kết nối GitHub?",
+                    "a2": "Mở Cài đặt → Tích hợp và cấp quyền cho GitHub để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ.",
+                    "q3": "Tôi có thể chỉnh sửa các mục sau khi tạo không?",
+                    "a3": "Có. Mọi mục được tạo đều có thể chỉnh sửa hoàn toàn — tinh chỉnh nội dung hoặc tạo lại từng mục bất cứ lúc nào."
+                },
+                "whatsNew": {
+                    "title": "Có gì mới",
+                    "item1": "Kiểm tra tình trạng còn trống của slug công việc khi bạn nhập.",
+                    "item2": "Gợi ý cảm hứng mới khi tạo công việc.",
+                    "item3": "Tên và slug của công việc giờ đây luôn đồng bộ.",
+                    "viewAll": "Xem tất cả phiên bản"
+                },
+                "system": {
+                    "title": "Hệ thống",
+                    "operational": "Tất cả hệ thống đang hoạt động",
+                    "environment": "Môi trường"
+                }
             }
         },
         "activity": {
