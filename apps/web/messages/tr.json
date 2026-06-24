@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Sürdürülebilir Moda",
                         "prompt": "Sürdürülebilir moda markalarının koleksiyonunu oluştur"
+                    },
+                    "4": {
+                        "name": "Kendi Sunucunda Barındırılan Uygulamalar",
+                        "prompt": "Popüler SaaS araçlarına kendi sunucunda barındırılabilen açık kaynak alternatiflerin dizinini oluştur"
+                    },
+                    "5": {
+                        "name": "AI Kodlama Ajanları",
+                        "prompt": "Fiyatlandırma ve IDE desteğiyle AI kodlama ajanları ve asistanlarının seçkin dizinini oluştur"
+                    },
+                    "6": {
+                        "name": "Indie Üretici Araçları",
+                        "prompt": "Indie üreticiler ve tek kişilik kurucular için araç ve hizmetleri kataloglayan işini oluştur"
+                    },
+                    "7": {
+                        "name": "Tasarım İlhamı",
+                        "prompt": "Açılış sayfaları ve portföyler için tasarım ilham sitelerinin koleksiyonunu oluştur"
                     }
                 },
                 "featuresTitle": "AI sizin için şunları yapacak:",

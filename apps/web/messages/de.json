@@ -3564,6 +3564,22 @@
                     "3": {
                         "name": "Nachhaltige Mode",
                         "prompt": "Erstellen Sie eine Sammlung nachhaltiger Mode-Marken"
+                    },
+                    "4": {
+                        "name": "Selbstgehostete Apps",
+                        "prompt": "Erstellen Sie ein Verzeichnis selbst hostbarer, quelloffener Alternativen zu beliebten SaaS-Tools"
+                    },
+                    "5": {
+                        "name": "KI-Coding-Agenten",
+                        "prompt": "Erstellen Sie ein kuratiertes Verzeichnis von KI-Coding-Agenten und -Assistenten mit Preisen und IDE-Unterstützung"
+                    },
+                    "6": {
+                        "name": "Tools für Indie-Maker",
+                        "prompt": "Erstellen Sie ein Werk, das Tools und Dienste für Indie-Maker und Solo-Gründer katalogisiert"
+                    },
+                    "7": {
+                        "name": "Design-Inspiration",
+                        "prompt": "Erstellen Sie eine Sammlung von Design-Inspirationsseiten für Landingpages und Portfolios"
                     }
                 },
                 "featuresTitle": "Was KI für Sie tun wird:",

@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Moda Sustentável",
                         "prompt": "Faça uma coleção de marcas de moda sustentável"
+                    },
+                    "4": {
+                        "name": "Aplicativos Auto-hospedados",
+                        "prompt": "Crie um diretório de alternativas open-source auto-hospedáveis para ferramentas SaaS populares"
+                    },
+                    "5": {
+                        "name": "Agentes de IA para Código",
+                        "prompt": "Crie um diretório curado de agentes e assistentes de IA para código com preços e suporte a IDE"
+                    },
+                    "6": {
+                        "name": "Ferramentas para Criadores Indie",
+                        "prompt": "Construa um trabalho catalogando ferramentas e serviços para criadores indie e fundadores solo"
+                    },
+                    "7": {
+                        "name": "Inspiração de Design",
+                        "prompt": "Faça uma coleção de sites de inspiração de design para landing pages e portfólios"
                     }
                 },
                 "featuresTitle": "O que a IA fará por você:",

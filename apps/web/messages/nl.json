@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Maak een collectie van duurzame mode-merken"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Maak een directory van zelf te hosten, open-source alternatieven voor populaire SaaS-tools"
+                    },
+                    "5": {
+                        "name": "AI-Coding-Agents",
+                        "prompt": "Maak een gecureerde directory van AI-coding-agents en -assistenten met prijzen en IDE-ondersteuning"
+                    },
+                    "6": {
+                        "name": "Tools voor Indie Makers",
+                        "prompt": "Bouw een werk dat tools en diensten voor indie makers en solo-oprichters catalogiseert"
+                    },
+                    "7": {
+                        "name": "Ontwerp-inspiratie",
+                        "prompt": "Maak een collectie van ontwerp-inspiratiesites voor landingspagina's en portfolio's"
                     }
                 },
                 "featuresTitle": "Wat AI voor je doet:",

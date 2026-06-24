@@ -3564,6 +3564,22 @@
                     "3": {
                         "name": "Mode durable",
                         "prompt": "Créer une collection de marques de mode durable"
+                    },
+                    "4": {
+                        "name": "Applications auto-hébergées",
+                        "prompt": "Créer un répertoire d'alternatives open source auto-hébergeables aux outils SaaS populaires"
+                    },
+                    "5": {
+                        "name": "Agents de codage IA",
+                        "prompt": "Créer un répertoire sélectionné d'agents et assistants de codage IA avec tarifs et prise en charge des IDE"
+                    },
+                    "6": {
+                        "name": "Outils pour créateurs indépendants",
+                        "prompt": "Créer un travail répertoriant les outils et services pour les créateurs indépendants et fondateurs solo"
+                    },
+                    "7": {
+                        "name": "Inspiration design",
+                        "prompt": "Créer une collection de sites d'inspiration design pour landing pages et portfolios"
                     }
                 },
                 "featuresTitle": "Ce que l'IA fera pour vous :",

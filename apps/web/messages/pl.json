@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Zrównoważona moda",
                         "prompt": "Utwórz kolekcję zrównoważonych marek modowych"
+                    },
+                    "4": {
+                        "name": "Aplikacje self-hosted",
+                        "prompt": "Utwórz katalog możliwych do samodzielnego hostowania, open-source alternatyw dla popularnych narzędzi SaaS"
+                    },
+                    "5": {
+                        "name": "Agenci AI do kodowania",
+                        "prompt": "Utwórz wyselekcjonowany katalog agentów i asystentów AI do kodowania z cenami i wsparciem IDE"
+                    },
+                    "6": {
+                        "name": "Narzędzia dla twórców indie",
+                        "prompt": "Utwórz praca katalogujące narzędzia i usługi dla twórców indie i samodzielnych założycieli"
+                    },
+                    "7": {
+                        "name": "Inspiracje projektowe",
+                        "prompt": "Utwórz kolekcję stron z inspiracjami projektowymi dla landing pages i portfolio"
                     }
                 },
                 "featuresTitle": "Co AI zrobi dla Ciebie:",

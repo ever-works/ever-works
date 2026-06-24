@@ -3564,6 +3564,22 @@
                     "3": {
                         "name": "Moda Sostenible",
                         "prompt": "Crear una colección de marcas de moda sostenible"
+                    },
+                    "4": {
+                        "name": "Aplicaciones Autoalojadas",
+                        "prompt": "Crear un directorio de alternativas de código abierto autoalojables a herramientas SaaS populares"
+                    },
+                    "5": {
+                        "name": "Agentes de IA para Programar",
+                        "prompt": "Crear un directorio curado de agentes y asistentes de IA para programar con precios y soporte de IDE"
+                    },
+                    "6": {
+                        "name": "Herramientas para Creadores Indie",
+                        "prompt": "Construir un trabajo que catalogue herramientas y servicios para creadores indie y fundadores en solitario"
+                    },
+                    "7": {
+                        "name": "Inspiración de Diseño",
+                        "prompt": "Crear una colección de sitios de inspiración de diseño para landing pages y portafolios"
                     }
                 },
                 "featuresTitle": "Lo que la IA hará por ti:",

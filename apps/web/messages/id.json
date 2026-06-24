@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Fashion Berkelanjutan",
                         "prompt": "Buat koleksi merek fashion berkelanjutan"
+                    },
+                    "4": {
+                        "name": "Aplikasi Self-Hosted",
+                        "prompt": "Buat direktori alternatif open-source yang dapat di-host sendiri untuk alat SaaS populer"
+                    },
+                    "5": {
+                        "name": "Agen Pengkodean AI",
+                        "prompt": "Buat direktori terkurasi agen dan asisten pengkodean AI dengan harga dan dukungan IDE"
+                    },
+                    "6": {
+                        "name": "Alat Pembuat Indie",
+                        "prompt": "Bangun karya yang mengatalogkan alat dan layanan untuk pembuat indie dan pendiri solo"
+                    },
+                    "7": {
+                        "name": "Inspirasi Desain",
+                        "prompt": "Buat koleksi situs inspirasi desain untuk landing page dan portofolio"
                     }
                 },
                 "featuresTitle": "Apa yang akan dilakukan AI untuk Anda:",

@@ -3420,6 +3420,22 @@
                     "3": {
                         "name": "Thời Trang Bền Vững",
                         "prompt": "Tạo bộ sưu tập các thương hiệu thời trang bền vững"
+                    },
+                    "4": {
+                        "name": "Ứng Dụng Tự Lưu Trữ",
+                        "prompt": "Tạo một thư mục các lựa chọn thay thế mã nguồn mở tự lưu trữ cho các công cụ SaaS phổ biến"
+                    },
+                    "5": {
+                        "name": "Tác Nhân AI Lập Trình",
+                        "prompt": "Tạo một thư mục được biên tập các tác nhân và trợ lý AI lập trình kèm giá và hỗ trợ IDE"
+                    },
+                    "6": {
+                        "name": "Công Cụ Cho Nhà Phát Triển Indie",
+                        "prompt": "Xây dựng công việc liệt kê các công cụ và dịch vụ cho nhà phát triển indie và nhà sáng lập độc lập"
+                    },
+                    "7": {
+                        "name": "Cảm Hứng Thiết Kế",
+                        "prompt": "Tạo bộ sưu tập các trang cảm hứng thiết kế cho landing page và portfolio"
                     }
                 },
                 "featuresTitle": "AI sẽ làm gì cho bạn:",
