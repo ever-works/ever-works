@@ -330,6 +330,23 @@ export function WorkAICreator({
                             onUseSuggestion={(suggestion) => {
                                 setSlug(suggestion);
                                 setSlugDirty(true);
+                                // Keep the Work Name aligned with the
+                                // de-duplicated slug so they don't drift and
+                                // the name isn't a duplicate either: append the
+                                // slug's disambiguating suffix (e.g. "-2") to
+                                // the name as " 2". Only when the suggestion is
+                                // the taken base slug plus a suffix and a name
+                                // is present.
+                                if (slugStatus.kind === 'taken') {
+                                    const base = slugStatus.slug;
+                                    if (
+                                        suggestion.startsWith(`${base}-`) &&
+                                        workName.trim()
+                                    ) {
+                                        const suffix = suggestion.slice(base.length + 1);
+                                        setWorkName((prev) => `${prev.trim()} ${suffix}`);
+                                    }
+                                }
                             }}
                         />
                     </div>
@@ -351,6 +368,14 @@ export function WorkAICreator({
                         onSelect={(selectedPrompt, selectedName) => {
                             setPrompt(selectedPrompt);
                             setWorkName(selectedName);
+                            // Picking an example is an explicit "use this idea"
+                            // replacement, so it re-derives the slug from the
+                            // example name even if the slug was previously
+                            // edited or filled from a "-2" suggestion — keeping
+                            // name and slug in sync. Clearing the dirty flag
+                            // lets later name edits keep updating the slug.
+                            setSlug(slugifyForWork(selectedName));
+                            setSlugDirty(false);
 
                             document
                                 .getElementById('main-content')
@@ -547,24 +572,14 @@ function ExamplePrompts({
 }) {
     const t = useTranslations('dashboard.workCreation.ai');
 
-    const examplePrompts = [
-        {
-            name: t('examplePrompts.0.name'),
-            prompt: t('examplePrompts.0.prompt'),
-        },
-        {
-            name: t('examplePrompts.1.name'),
-            prompt: t('examplePrompts.1.prompt'),
-        },
-        {
-            name: t('examplePrompts.2.name'),
-            prompt: t('examplePrompts.2.prompt'),
-        },
-        {
-            name: t('examplePrompts.3.name'),
-            prompt: t('examplePrompts.3.prompt'),
-        },
-    ];
+    // Data-driven so the chip list adapts to however many examples a locale
+    // defines (en ships 8; locales with fewer simply render fewer — no missing
+    // -key crashes). Numeric-string keys ("0".."7") iterate in ascending order.
+    const examplePrompts = Object.values(
+        (t.raw as (key: string) => Record<string, { name: string; prompt: string }>)(
+            'examplePrompts',
+        ),
+    );
 
     return (
         <div>
