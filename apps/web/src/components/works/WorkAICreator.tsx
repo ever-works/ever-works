@@ -197,6 +197,20 @@ export function WorkAICreator({
           ? slugResult
           : { kind: 'checking' };
 
+    // Single entry point for setting the slug. When the new value normalizes
+    // to an empty candidate, drop any cached availability answer so a later
+    // re-type of the same slug triggers a fresh check instead of briefly
+    // flashing the stale 'taken'/'available' result during the debounce window
+    // (a re-typed 'taken' would otherwise disable Generate for 400ms with no
+    // live check behind it). Clearing here (an event-driven setState) keeps the
+    // availability effect free of synchronous setState.
+    const setSlugValue = useCallback((next: string) => {
+        setSlug(next);
+        if (!slugifyForWork(next)) {
+            setSlugResult(null);
+        }
+    }, []);
+
     const handlePluginConfigChange = useCallback((values: Record<string, unknown>) => {
         setPluginConfig(values);
     }, []);
@@ -229,7 +243,12 @@ export function WorkAICreator({
         startTransition(async () => {
             const result = await createWorkWithAI({
                 name: workName,
-                slug: slug.trim() || undefined,
+                // Submit the same normalized candidate the live check
+                // validated (e.g. "My Work 2" -> "my-work-2"), not the raw
+                // field text — otherwise the server's slug regex rejects it
+                // and the user sees a format error despite the green
+                // "available" badge.
+                slug: slugCandidate || undefined,
                 prompt,
                 organization,
                 owner: organization ? owner : undefined,
@@ -295,7 +314,7 @@ export function WorkAICreator({
                             // legacy WorkManualForm behaviour so a quick
                             // rename keeps the slug aligned for free.
                             if (!slugDirty) {
-                                setSlug(slugifyForWork(nextName));
+                                setSlugValue(slugifyForWork(nextName));
                             }
                         }}
                         placeholder={t('workNamePlaceholder')}
@@ -315,7 +334,7 @@ export function WorkAICreator({
                             name="slug"
                             value={slug}
                             onChange={(e) => {
-                                setSlug(e.target.value);
+                                setSlugValue(e.target.value);
                                 setSlugDirty(true);
                             }}
                             placeholder={t('slugPlaceholder')}
@@ -328,7 +347,7 @@ export function WorkAICreator({
                         <SlugAvailabilityHint
                             status={slugStatus}
                             onUseSuggestion={(suggestion) => {
-                                setSlug(suggestion);
+                                setSlugValue(suggestion);
                                 setSlugDirty(true);
                                 // Keep the Work Name aligned with the
                                 // de-duplicated slug so they don't drift and
@@ -374,7 +393,7 @@ export function WorkAICreator({
                             // edited or filled from a "-2" suggestion — keeping
                             // name and slug in sync. Clearing the dirty flag
                             // lets later name edits keep updating the slug.
-                            setSlug(slugifyForWork(selectedName));
+                            setSlugValue(slugifyForWork(selectedName));
                             setSlugDirty(false);
 
                             document
