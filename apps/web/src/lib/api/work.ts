@@ -578,6 +578,13 @@ export const workAPI = {
         return serverFetch<WorkStatsResponse>(`/works/stats`);
     },
 
+    // Live slug-availability check for the create-Work form.
+    checkSlug: async (slug: string) => {
+        return serverFetch<{ available: boolean; slug: string; suggestion?: string }>(
+            `/works/check-slug?slug=${encodeURIComponent(slug)}`,
+        );
+    },
+
     // Get a work by ID.
     //
     // Wrapped in React.cache so the per-request work fetch is

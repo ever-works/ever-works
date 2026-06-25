@@ -3812,6 +3812,11 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override.",
+                "slugChecking": "Checking availability…",
+                "slugAvailable": "{slug} is available",
+                "slugTakenName": "{slug} already exists in your works",
+                "slugUseSuggestion": "Use {suggestion}",
+                "slugCheckError": "Couldn't check availability — you can still continue",
                 "githubRequired": "Please connect your GitHub account first.",
                 "promptPlaceholder": "Describe what kind of Work you want to create, what items it should contain, and any specific requirements...",
                 "inspirationText": "Need inspiration? Try one of these:",
@@ -3831,6 +3836,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Make a collection of sustainable fashion brands"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Build a directory of self-hostable, open-source alternatives to popular SaaS tools"
+                    },
+                    "5": {
+                        "name": "AI Coding Agents",
+                        "prompt": "Create a curated directory of AI coding agents and assistants with pricing and IDE support"
+                    },
+                    "6": {
+                        "name": "Indie Maker Tools",
+                        "prompt": "Build a Work cataloguing tools and services for indie makers and solo founders"
+                    },
+                    "7": {
+                        "name": "Design Inspiration",
+                        "prompt": "Make a collection of design-inspiration sites for landing pages and portfolios"
                     }
                 },
                 "featuresTitle": "What AI will do for you:",
@@ -3850,6 +3871,7 @@
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Work name is required",
                     "slugRequired": "Work slug is required",
+                    "slugTaken": "This slug already exists in your works. Choose another.",
                     "descriptionRequired": "Work description is required",
                     "githubRequired": "Please connect your GitHub account first.",
                     "createFailed": "Failed to create Work"

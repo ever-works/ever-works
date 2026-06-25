@@ -3396,6 +3396,11 @@
                 "workNamePlaceholder": "bijv. Awesome AI Tools",
                 "workNameHelp": "AI stelt een naam voor als je dit leeg laat",
                 "promptLabel": "Beschrijf je werk",
+                "slugChecking": "Beschikbaarheid controleren…",
+                "slugAvailable": "{slug} is beschikbaar",
+                "slugTakenName": "{slug} bestaat al in je werken",
+                "slugUseSuggestion": "{suggestion} gebruiken",
+                "slugCheckError": "Kon beschikbaarheid niet controleren — je kunt toch doorgaan",
                 "githubRequired": "Verbind eerst je GitHub-account.",
                 "promptPlaceholder": "Beschrijf welk soort werk je wilt aanmaken, welke items het moet bevatten en eventuele specifieke eisen...",
                 "inspirationText": "Inspiratie nodig? Probeer een van deze:",
@@ -3415,6 +3420,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Maak een collectie van duurzame mode-merken"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Maak een directory van zelf te hosten, open-source alternatieven voor populaire SaaS-tools"
+                    },
+                    "5": {
+                        "name": "AI-Coding-Agents",
+                        "prompt": "Maak een gecureerde directory van AI-coding-agents en -assistenten met prijzen en IDE-ondersteuning"
+                    },
+                    "6": {
+                        "name": "Tools voor Indie Makers",
+                        "prompt": "Bouw een werk dat tools en diensten voor indie makers en solo-oprichters catalogiseert"
+                    },
+                    "7": {
+                        "name": "Ontwerp-inspiratie",
+                        "prompt": "Maak een collectie van ontwerp-inspiratiesites voor landingspagina's en portfolio's"
                     }
                 },
                 "featuresTitle": "Wat AI voor je doet:",
@@ -3434,6 +3455,7 @@
                     "unconfiguredProviders": "{providers} niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor genereren.",
                     "nameRequired": "Werk-naam is verplicht",
                     "slugRequired": "Werk-slug is verplicht",
+                    "slugTaken": "Deze slug bestaat al in je werken. Kies een andere.",
                     "descriptionRequired": "Werk-beschrijving is verplicht",
                     "githubRequired": "Verbind eerst je GitHub-account.",
                     "createFailed": "Fout bij aanmaken werk"

@@ -3540,6 +3540,11 @@
                 "slugLabel": "Slug del Trabajo",
                 "slugPlaceholder": "herramientas-ai-geniales",
                 "slugHelp": "Identificador amigable para URL. Generado automáticamente a partir del nombre — editar para anular.",
+                "slugChecking": "Comprobando disponibilidad…",
+                "slugAvailable": "{slug} está disponible",
+                "slugTakenName": "{slug} ya existe en tus trabajos",
+                "slugUseSuggestion": "Usar {suggestion}",
+                "slugCheckError": "No se pudo comprobar la disponibilidad: puedes continuar igualmente",
                 "githubRequired": "Por favor, conecta tu cuenta de GitHub primero.",
                 "promptPlaceholder": "Describe qué tipo de trabajo quieres crear, qué elementos debe contener y cualquier requisito específico...",
                 "inspirationText": "¿Necesitas inspiración? Prueba uno de estos:",
@@ -3559,6 +3564,22 @@
                     "3": {
                         "name": "Moda Sostenible",
                         "prompt": "Crear una colección de marcas de moda sostenible"
+                    },
+                    "4": {
+                        "name": "Aplicaciones Autoalojadas",
+                        "prompt": "Crear un directorio de alternativas de código abierto autoalojables a herramientas SaaS populares"
+                    },
+                    "5": {
+                        "name": "Agentes de IA para Programar",
+                        "prompt": "Crear un directorio curado de agentes y asistentes de IA para programar con precios y soporte de IDE"
+                    },
+                    "6": {
+                        "name": "Herramientas para Creadores Indie",
+                        "prompt": "Construir un trabajo que catalogue herramientas y servicios para creadores indie y fundadores en solitario"
+                    },
+                    "7": {
+                        "name": "Inspiración de Diseño",
+                        "prompt": "Crear una colección de sitios de inspiración de diseño para landing pages y portafolios"
                     }
                 },
                 "featuresTitle": "Lo que la IA hará por ti:",
@@ -3578,6 +3599,7 @@
                     "unconfiguredProviders": "{providers} no configurado. Visita Configuración → Plugins para configurarlo antes de generar.",
                     "nameRequired": "El nombre del trabajo es requerido",
                     "slugRequired": "El slug del trabajo es requerido",
+                    "slugTaken": "Este slug ya existe en tus trabajos. Elige otro.",
                     "descriptionRequired": "La descripción del trabajo es requerida",
                     "githubRequired": "Por favor, conecta tu cuenta de GitHub primero.",
                     "createFailed": "Error al crear el trabajo"

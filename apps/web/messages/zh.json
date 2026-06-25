@@ -3396,6 +3396,11 @@
                 "workNamePlaceholder": "例如，Awesome AI Tools",
                 "workNameHelp": "如果留空，AI 将建议一个名称",
                 "promptLabel": "描述您的作品",
+                "slugChecking": "正在检查可用性…",
+                "slugAvailable": "{slug} 可用",
+                "slugTakenName": "{slug} 已存在于你的作品中",
+                "slugUseSuggestion": "使用 {suggestion}",
+                "slugCheckError": "无法检查可用性 — 你仍可继续",
                 "githubRequired": "请先连接您的 GitHub 账户。",
                 "promptPlaceholder": "描述您想要创建什么样的作品，它应该包含什么项目，以及任何具体要求...",
                 "inspirationText": "需要灵感？试试这些：",
@@ -3415,6 +3420,22 @@
                     "3": {
                         "name": "可持续时尚",
                         "prompt": "创建一个可持续时尚品牌集合"
+                    },
+                    "4": {
+                        "name": "自托管应用",
+                        "prompt": "创建一个可自托管的开源应用目录，作为流行 SaaS 工具的替代品"
+                    },
+                    "5": {
+                        "name": "AI 编程智能体",
+                        "prompt": "创建一个精选的 AI 编程智能体和助手目录，包含价格和 IDE 支持"
+                    },
+                    "6": {
+                        "name": "独立开发者工具",
+                        "prompt": "构建一个编录面向独立开发者和单人创始人的工具与服务的作品"
+                    },
+                    "7": {
+                        "name": "设计灵感",
+                        "prompt": "创建一个面向落地页和作品集的设计灵感网站集合"
                     }
                 },
                 "featuresTitle": "AI 将为您做什么：",
@@ -3434,6 +3455,7 @@
                     "unconfiguredProviders": "{providers} 未配置。请访问设置 → 插件在生成前进行设置。",
                     "nameRequired": "作品名称是必填的",
                     "slugRequired": "作品 slug 是必填的",
+                    "slugTaken": "该 slug 已存在于你的作品中。请选择其他。",
                     "descriptionRequired": "作品描述是必填的",
                     "githubRequired": "请先连接您的 GitHub 账户。",
                     "createFailed": "创建作品失败"

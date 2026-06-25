@@ -3396,6 +3396,11 @@
                 "workNamePlaceholder": "np. Świetne narzędzia AI",
                 "workNameHelp": "AI zasugeruje nazwę, jeśli zostawisz to puste",
                 "promptLabel": "Opisz swój praca",
+                "slugChecking": "Sprawdzanie dostępności…",
+                "slugAvailable": "{slug} jest dostępny",
+                "slugTakenName": "{slug} już istnieje w Twoich pracach",
+                "slugUseSuggestion": "Użyj {suggestion}",
+                "slugCheckError": "Nie udało się sprawdzić dostępności — możesz mimo to kontynuować",
                 "githubRequired": "Najpierw połącz konto GitHub.",
                 "promptPlaceholder": "Opisz, jaki praca chcesz utworzyć, jakie elementy powinien zawierać i wszelkie konkretne wymagania...",
                 "inspirationText": "Potrzebujesz inspiracji? Wypróbuj jedną z tych:",
@@ -3415,6 +3420,22 @@
                     "3": {
                         "name": "Zrównoważona moda",
                         "prompt": "Utwórz kolekcję zrównoważonych marek modowych"
+                    },
+                    "4": {
+                        "name": "Aplikacje self-hosted",
+                        "prompt": "Utwórz katalog możliwych do samodzielnego hostowania, open-source alternatyw dla popularnych narzędzi SaaS"
+                    },
+                    "5": {
+                        "name": "Agenci AI do kodowania",
+                        "prompt": "Utwórz wyselekcjonowany katalog agentów i asystentów AI do kodowania z cenami i wsparciem IDE"
+                    },
+                    "6": {
+                        "name": "Narzędzia dla twórców indie",
+                        "prompt": "Utwórz praca katalogujące narzędzia i usługi dla twórców indie i samodzielnych założycieli"
+                    },
+                    "7": {
+                        "name": "Inspiracje projektowe",
+                        "prompt": "Utwórz kolekcję stron z inspiracjami projektowymi dla landing pages i portfolio"
                     }
                 },
                 "featuresTitle": "Co AI zrobi dla Ciebie:",
@@ -3434,6 +3455,7 @@
                     "unconfiguredProviders": "{providers} nie skonfigurowane. Odwiedź Ustawienia → Wtyczki, aby skonfigurować przed generowaniem.",
                     "nameRequired": "Nazwa pracy jest wymagana",
                     "slugRequired": "Slug pracy jest wymagany",
+                    "slugTaken": "Ten slug już istnieje w Twoich pracach. Wybierz inny.",
                     "descriptionRequired": "Opis pracy jest wymagany",
                     "githubRequired": "Najpierw połącz konto GitHub.",
                     "createFailed": "Nie udało się utworzyć pracy"

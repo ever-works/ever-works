@@ -3540,6 +3540,11 @@
                 "slugLabel": "Slug du Travail",
                 "slugPlaceholder": "outils-ai-formidables",
                 "slugHelp": "Identifiant convivial pour l'URL. Généré automatiquement à partir du nom — modifier pour remplacer.",
+                "slugChecking": "Vérification de la disponibilité…",
+                "slugAvailable": "{slug} est disponible",
+                "slugTakenName": "{slug} existe déjà dans vos travaux",
+                "slugUseSuggestion": "Utiliser {suggestion}",
+                "slugCheckError": "Impossible de vérifier la disponibilité — vous pouvez tout de même continuer",
                 "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                 "promptPlaceholder": "Décrivez le type d'travail que vous souhaitez créer, les éléments qu'il doit contenir et toute exigence spécifique...",
                 "inspirationText": "Besoin d'inspiration ? Essayez l'un de ces :",
@@ -3559,6 +3564,22 @@
                     "3": {
                         "name": "Mode durable",
                         "prompt": "Créer une collection de marques de mode durable"
+                    },
+                    "4": {
+                        "name": "Applications auto-hébergées",
+                        "prompt": "Créer un répertoire d'alternatives open source auto-hébergeables aux outils SaaS populaires"
+                    },
+                    "5": {
+                        "name": "Agents de codage IA",
+                        "prompt": "Créer un répertoire sélectionné d'agents et assistants de codage IA avec tarifs et prise en charge des IDE"
+                    },
+                    "6": {
+                        "name": "Outils pour créateurs indépendants",
+                        "prompt": "Créer un travail répertoriant les outils et services pour les créateurs indépendants et fondateurs solo"
+                    },
+                    "7": {
+                        "name": "Inspiration design",
+                        "prompt": "Créer une collection de sites d'inspiration design pour landing pages et portfolios"
                     }
                 },
                 "featuresTitle": "Ce que l'IA fera pour vous :",
@@ -3578,6 +3599,7 @@
                     "unconfiguredProviders": "{providers} non configurés. Visitez Paramètres → Plugins pour les configurer avant de générer.",
                     "nameRequired": "Le nom de l'travail est requis",
                     "slugRequired": "Le slug de l'travail est requis",
+                    "slugTaken": "Ce slug existe déjà dans vos travaux. Choisissez-en un autre.",
                     "descriptionRequired": "La description de l'travail est requise",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                     "createFailed": "Échec de la création de l'travail"

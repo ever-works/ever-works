@@ -3396,6 +3396,11 @@
                 "workNamePlaceholder": "例: Awesome AI Tools",
                 "workNameHelp": "空のままにすると AI が名前を提案します",
                 "promptLabel": "ワークを記述",
+                "slugChecking": "利用可否を確認中…",
+                "slugAvailable": "{slug} は利用可能です",
+                "slugTakenName": "{slug} はすでにワークに存在します",
+                "slugUseSuggestion": "{suggestion} を使用",
+                "slugCheckError": "利用可否を確認できませんでした — そのまま続行できます",
                 "githubRequired": "まず GitHub アカウントを接続してください。",
                 "promptPlaceholder": "作成したいワークの種類、含めるべきアイテム、特定の要件などを記述...",
                 "inspirationText": "インスピレーションが必要ですか？ これらのいずれかを試してみてください：",
@@ -3415,6 +3420,22 @@
                     "3": {
                         "name": "サステナブルファッション",
                         "prompt": "サステナブルファッションブランドのコレクションを作成"
+                    },
+                    "4": {
+                        "name": "セルフホスト型アプリ",
+                        "prompt": "人気の SaaS ツールに代わるセルフホスト可能なオープンソースの代替ソフトのディレクトリを作成"
+                    },
+                    "5": {
+                        "name": "AI コーディングエージェント",
+                        "prompt": "価格と IDE 対応を含む AI コーディングエージェントとアシスタントのキュレートディレクトリを作成"
+                    },
+                    "6": {
+                        "name": "インディーメーカー向けツール",
+                        "prompt": "インディーメーカーや個人創業者向けのツールとサービスをまとめたワークを作成"
+                    },
+                    "7": {
+                        "name": "デザインインスピレーション",
+                        "prompt": "ランディングページやポートフォリオ向けのデザインインスピレーションサイトのコレクションを作成"
                     }
                 },
                 "featuresTitle": "AI があなたのために行うこと：",
@@ -3434,6 +3455,7 @@
                     "unconfiguredProviders": "{providers} が未設定です。生成前に設定 → プラグインを訪れて設定してください。",
                     "nameRequired": "ワーク名が必要です",
                     "slugRequired": "ワーク スラグが必要です",
+                    "slugTaken": "このスラッグはすでにワークに存在します。別のものを選んでください。",
                     "descriptionRequired": "ワーク説明が必要です",
                     "githubRequired": "まず GitHub アカウントを接続してください。",
                     "createFailed": "ワーク作成に失敗しました"
