@@ -966,14 +966,8 @@
                     "q2": "Làm cách nào để kết nối GitHub?",
                     "a2": "Mở Cài đặt → Tích hợp và cấp quyền cho GitHub để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ.",
                     "q3": "Tôi có thể chỉnh sửa các mục sau khi tạo không?",
-                    "a3": "Có. Mọi mục được tạo đều có thể chỉnh sửa hoàn toàn — tinh chỉnh nội dung hoặc tạo lại từng mục bất cứ lúc nào."
-                },
-                "whatsNew": {
-                    "title": "Có gì mới",
-                    "item1": "Kiểm tra tình trạng còn trống của slug công việc khi bạn nhập.",
-                    "item2": "Gợi ý cảm hứng mới khi tạo công việc.",
-                    "item3": "Tên và slug của công việc giờ đây luôn đồng bộ.",
-                    "viewAll": "Xem tất cả phiên bản"
+                    "a3": "Có. Mọi mục được tạo đều có thể chỉnh sửa hoàn toàn — tinh chỉnh nội dung hoặc tạo lại từng mục bất cứ lúc nào.",
+                    "learnMore": "Tìm hiểu thêm"
                 },
                 "system": {
                     "title": "Hệ thống",

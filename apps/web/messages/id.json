@@ -966,14 +966,8 @@
                     "q2": "Bagaimana cara menghubungkan GitHub?",
                     "a2": "Buka Pengaturan → Integrasi dan otorisasi GitHub untuk menyinkronkan dan men-deploy pekerjaan Anda sebagai repositori.",
                     "q3": "Bisakah saya mengedit item setelah dibuat?",
-                    "a3": "Ya. Setiap item yang dibuat dapat diedit sepenuhnya — sempurnakan kontennya atau buat ulang item satu per satu kapan saja."
-                },
-                "whatsNew": {
-                    "title": "Yang Baru",
-                    "item1": "Periksa ketersediaan slug pekerjaan saat Anda mengetik.",
-                    "item2": "Saran inspirasi baru saat membuat pekerjaan.",
-                    "item3": "Nama dan slug pekerjaan kini tetap sinkron.",
-                    "viewAll": "Lihat semua rilis"
+                    "a3": "Ya. Setiap item yang dibuat dapat diedit sepenuhnya — sempurnakan kontennya atau buat ulang item satu per satu kapan saja.",
+                    "learnMore": "Pelajari selengkapnya"
                 },
                 "system": {
                     "title": "Sistem",

@@ -22,9 +22,9 @@ import {
     Bug,
     MessageCircle,
     LifeBuoy,
-    Sparkles,
     ChevronDown,
     Server,
+    Lightbulb,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -42,7 +42,6 @@ const DOCS_URL = 'https://docs.ever.works/docs';
 const GITHUB_URL = 'https://github.com/ever-works/ever-works';
 const ISSUES_URL = 'https://github.com/ever-works/ever-works/issues';
 const DISCUSSIONS_URL = 'https://github.com/ever-works/ever-works/discussions';
-const RELEASES_URL = 'https://github.com/ever-works/ever-works/releases';
 
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0';
 const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV || 'production';
@@ -94,12 +93,10 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
         { keys: ['?'], label: t('shortcuts.help') },
     ];
 
-    const whatsNewItems = [t('whatsNew.item1'), t('whatsNew.item2'), t('whatsNew.item3')];
-
     const faqs = [
-        { q: t('faq.q1'), a: t('faq.a1') },
-        { q: t('faq.q2'), a: t('faq.a2') },
-        { q: t('faq.q3'), a: t('faq.a3') },
+        { q: t('faq.q1'), a: t('faq.a1'), href: DOCS_URL },
+        { q: t('faq.q2'), a: t('faq.a2'), href: `${DOCS_URL}/integrations` },
+        { q: t('faq.q3'), a: t('faq.a3'), href: DOCS_URL },
     ];
 
     const links = [
@@ -221,18 +218,19 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
 
                                             {/* Quick Tips */}
                                             <section>
-                                                <SectionHeading>{t('quickTips.title')}</SectionHeading>
-                                                <ul className="space-y-3">
+                                                <SectionHeading icon={Lightbulb}>
+                                                    {t('quickTips.title')}
+                                                </SectionHeading>
+                                                <div className={cn(CARD, DIVIDE)}>
                                                     {quickTips.map((tip, index) => (
-                                                        <li
+                                                        <div
                                                             key={index}
-                                                            className="flex items-start gap-3"
+                                                            className="flex items-start gap-3 px-4 py-2.5"
                                                         >
                                                             <span
                                                                 className={cn(
-                                                                    'flex-shrink-0 w-5 h-5 rounded-full',
+                                                                    'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
                                                                     'bg-primary/10 text-primary',
-                                                                    'flex items-center justify-center',
                                                                     'text-[10px] font-semibold',
                                                                 )}
                                                             >
@@ -241,55 +239,8 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                             <span className="text-xs leading-relaxed text-text dark:text-text-dark">
                                                                 {tip.text}
                                                             </span>
-                                                        </li>
+                                                        </div>
                                                     ))}
-                                                </ul>
-                                            </section>
-
-                                            {/* What's New */}
-                                            <section>
-                                                <SectionHeading
-                                                    icon={Sparkles}
-                                                    trailing={
-                                                        <span
-                                                            className={cn(
-                                                                'rounded-full px-2 py-0.5',
-                                                                'text-[10px] font-medium normal-case tracking-normal',
-                                                                'bg-primary/10 text-primary',
-                                                            )}
-                                                        >
-                                                            v{APP_VERSION}
-                                                        </span>
-                                                    }
-                                                >
-                                                    {t('whatsNew.title')}
-                                                </SectionHeading>
-                                                <div className={CARD}>
-                                                    <ul className={DIVIDE}>
-                                                        {whatsNewItems.map((item, index) => (
-                                                            <li
-                                                                key={index}
-                                                                className="flex items-start gap-2.5 px-4 py-2.5 text-xs leading-relaxed text-text dark:text-text-dark"
-                                                            >
-                                                                <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
-                                                                <span>{item}</span>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                    <a
-                                                        href={RELEASES_URL}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className={cn(
-                                                            ROW,
-                                                            'border-t border-border dark:border-border-dark',
-                                                            'text-xs font-medium text-primary transition-colors',
-                                                            'hover:bg-surface dark:hover:bg-surface-secondary-dark',
-                                                        )}
-                                                    >
-                                                        {t('whatsNew.viewAll')}
-                                                        <ExternalLink className="h-3.5 w-3.5" />
-                                                    </a>
                                                 </div>
                                             </section>
 
@@ -365,6 +316,23 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                     </DisclosureButton>
                                                                     <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
                                                                         {faq.a}
+                                                                        {faq.href && (
+                                                                            <a
+                                                                                href={faq.href}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className={cn(
+                                                                                    'mt-2 inline-flex items-center gap-1 font-medium',
+                                                                                    'text-primary hover:underline dark:text-primary-dark',
+                                                                                )}
+                                                                            >
+                                                                                {t('faq.learnMore')}
+                                                                                <ExternalLink
+                                                                                    className="h-3 w-3"
+                                                                                    aria-hidden="true"
+                                                                                />
+                                                                            </a>
+                                                                        )}
                                                                     </DisclosurePanel>
                                                                 </div>
                                                             )}

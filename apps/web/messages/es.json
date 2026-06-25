@@ -1071,14 +1071,8 @@
                     "q2": "¿Cómo conecto GitHub?",
                     "a2": "Abre Ajustes → Integraciones y autoriza GitHub para sincronizar y desplegar tus trabajos como repositorios.",
                     "q3": "¿Puedo editar los elementos después de generarlos?",
-                    "a3": "Sí. Cada elemento generado es totalmente editable: refina el contenido o regenera elementos individuales cuando quieras."
-                },
-                "whatsNew": {
-                    "title": "Novedades",
-                    "item1": "Comprueba la disponibilidad del slug de un trabajo mientras escribes.",
-                    "item2": "Nuevas sugerencias de inspiración al crear un trabajo.",
-                    "item3": "El nombre y el slug de un trabajo ahora se mantienen sincronizados.",
-                    "viewAll": "Ver todas las versiones"
+                    "a3": "Sí. Cada elemento generado es totalmente editable: refina el contenido o regenera elementos individuales cuando quieras.",
+                    "learnMore": "Más información"
                 },
                 "system": {
                     "title": "Sistema",

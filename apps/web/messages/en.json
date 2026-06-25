@@ -1071,14 +1071,8 @@
                     "q2": "How do I connect GitHub?",
                     "a2": "Open Settings → Integrations and authorize GitHub to sync and deploy your works as repositories.",
                     "q3": "Can I edit items after generating?",
-                    "a3": "Yes. Every generated item is fully editable — refine the content or regenerate individual items anytime."
-                },
-                "whatsNew": {
-                    "title": "What's New",
-                    "item1": "Check Work slug availability as you type.",
-                    "item2": "Fresh inspiration prompts when creating a Work.",
-                    "item3": "Work name and slug now stay in sync.",
-                    "viewAll": "View all releases"
+                    "a3": "Yes. Every generated item is fully editable — refine the content or regenerate individual items anytime.",
+                    "learnMore": "Learn more"
                 },
                 "system": {
                     "title": "System",

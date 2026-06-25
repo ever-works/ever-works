@@ -966,14 +966,8 @@
                     "q2": "Hoe verbind ik GitHub?",
                     "a2": "Open Instellingen → Integraties en autoriseer GitHub om je werken als repository's te synchroniseren en te implementeren.",
                     "q3": "Kan ik items bewerken na het genereren?",
-                    "a3": "Ja. Elk gegenereerd item is volledig bewerkbaar: verfijn de inhoud of genereer afzonderlijke items op elk moment opnieuw."
-                },
-                "whatsNew": {
-                    "title": "Nieuw",
-                    "item1": "Controleer de beschikbaarheid van de slug van een werk tijdens het typen.",
-                    "item2": "Nieuwe inspiratiesuggesties bij het maken van een werk.",
-                    "item3": "Naam en slug van een werk blijven nu gesynchroniseerd.",
-                    "viewAll": "Alle releases bekijken"
+                    "a3": "Ja. Elk gegenereerd item is volledig bewerkbaar: verfijn de inhoud of genereer afzonderlijke items op elk moment opnieuw.",
+                    "learnMore": "Meer informatie"
                 },
                 "system": {
                     "title": "Systeem",

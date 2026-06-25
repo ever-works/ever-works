@@ -966,14 +966,8 @@
                     "q2": "Jak połączyć GitHub?",
                     "a2": "Otwórz Ustawienia → Integracje i autoryzuj GitHub, aby synchronizować i wdrażać swoje prace jako repozytoria.",
                     "q3": "Czy mogę edytować elementy po wygenerowaniu?",
-                    "a3": "Tak. Każdy wygenerowany element można w pełni edytować — dopracuj treść lub w dowolnej chwili wygeneruj poszczególne elementy ponownie."
-                },
-                "whatsNew": {
-                    "title": "Nowości",
-                    "item1": "Sprawdzaj dostępność sluga pracy podczas pisania.",
-                    "item2": "Nowe podpowiedzi inspiracji przy tworzeniu pracy.",
-                    "item3": "Nazwa i slug pracy są teraz zsynchronizowane.",
-                    "viewAll": "Zobacz wszystkie wydania"
+                    "a3": "Tak. Każdy wygenerowany element można w pełni edytować — dopracuj treść lub w dowolnej chwili wygeneruj poszczególne elementy ponownie.",
+                    "learnMore": "Dowiedz się więcej"
                 },
                 "system": {
                     "title": "System",

@@ -966,14 +966,8 @@
                     "q2": "GitHub'ı nasıl bağlarım?",
                     "a2": "Ayarlar → Entegrasyonlar'ı açın ve işlerinizi depo olarak senkronize edip dağıtmak için GitHub'a yetki verin.",
                     "q3": "Öğeleri ürettikten sonra düzenleyebilir miyim?",
-                    "a3": "Evet. Üretilen her öğe tamamen düzenlenebilir — içeriği iyileştirin veya tek tek öğeleri istediğiniz zaman yeniden üretin."
-                },
-                "whatsNew": {
-                    "title": "Yenilikler",
-                    "item1": "Bir işin slug uygunluğunu yazarken kontrol edin.",
-                    "item2": "Bir iş oluştururken yeni ilham önerileri.",
-                    "item3": "İş adı ve slug artık senkronize kalıyor.",
-                    "viewAll": "Tüm sürümleri görüntüle"
+                    "a3": "Evet. Üretilen her öğe tamamen düzenlenebilir — içeriği iyileştirin veya tek tek öğeleri istediğiniz zaman yeniden üretin.",
+                    "learnMore": "Daha fazla bilgi"
                 },
                 "system": {
                     "title": "Sistem",

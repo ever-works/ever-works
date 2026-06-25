@@ -966,14 +966,8 @@
                     "q2": "Come collego GitHub?",
                     "a2": "Apri Impostazioni → Integrazioni e autorizza GitHub per sincronizzare e distribuire i tuoi lavori come repository.",
                     "q3": "Posso modificare gli elementi dopo la generazione?",
-                    "a3": "Sì. Ogni elemento generato è completamente modificabile: perfeziona il contenuto o rigenera singoli elementi in qualsiasi momento."
-                },
-                "whatsNew": {
-                    "title": "Novità",
-                    "item1": "Verifica la disponibilità dello slug di un lavoro mentre scrivi.",
-                    "item2": "Nuovi spunti di ispirazione durante la creazione di un lavoro.",
-                    "item3": "Il nome e lo slug di un lavoro ora restano sincronizzati.",
-                    "viewAll": "Vedi tutte le versioni"
+                    "a3": "Sì. Ogni elemento generato è completamente modificabile: perfeziona il contenuto o rigenera singoli elementi in qualsiasi momento.",
+                    "learnMore": "Scopri di più"
                 },
                 "system": {
                     "title": "Sistema",

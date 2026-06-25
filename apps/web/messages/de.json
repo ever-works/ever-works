@@ -1071,14 +1071,8 @@
                     "q2": "Wie verbinde ich GitHub?",
                     "a2": "Öffnen Sie Einstellungen → Integrationen und autorisieren Sie GitHub, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen.",
                     "q3": "Kann ich Elemente nach der Generierung bearbeiten?",
-                    "a3": "Ja. Jedes generierte Element ist vollständig bearbeitbar – verfeinern Sie den Inhalt oder generieren Sie einzelne Elemente jederzeit neu."
-                },
-                "whatsNew": {
-                    "title": "Neuigkeiten",
-                    "item1": "Prüfen Sie die Verfügbarkeit des Werk-Slugs während der Eingabe.",
-                    "item2": "Neue Inspirations-Vorschläge beim Erstellen eines Werks.",
-                    "item3": "Werkname und Slug bleiben jetzt synchron.",
-                    "viewAll": "Alle Versionen anzeigen"
+                    "a3": "Ja. Jedes generierte Element ist vollständig bearbeitbar – verfeinern Sie den Inhalt oder generieren Sie einzelne Elemente jederzeit neu.",
+                    "learnMore": "Mehr erfahren"
                 },
                 "system": {
                     "title": "System",

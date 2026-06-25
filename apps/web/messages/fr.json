@@ -1071,14 +1071,8 @@
                     "q2": "Comment connecter GitHub ?",
                     "a2": "Ouvrez Paramètres → Intégrations et autorisez GitHub pour synchroniser et déployer vos travaux en tant que référentiels.",
                     "q3": "Puis-je modifier les éléments après la génération ?",
-                    "a3": "Oui. Chaque élément généré est entièrement modifiable : affinez le contenu ou régénérez des éléments individuels à tout moment."
-                },
-                "whatsNew": {
-                    "title": "Nouveautés",
-                    "item1": "Vérifiez la disponibilité du slug d'un travail pendant la saisie.",
-                    "item2": "De nouvelles suggestions d'inspiration pour créer un travail.",
-                    "item3": "Le nom et le slug d'un travail restent désormais synchronisés.",
-                    "viewAll": "Voir toutes les versions"
+                    "a3": "Oui. Chaque élément généré est entièrement modifiable : affinez le contenu ou régénérez des éléments individuels à tout moment.",
+                    "learnMore": "En savoir plus"
                 },
                 "system": {
                     "title": "Système",
