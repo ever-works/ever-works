@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新しいタスク",
+                "noDescription": "説明はまだありません",
                 "kanban": "カンバン",
                 "list": "リスト",
                 "filter": {

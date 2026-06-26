@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新任务",
+                "noDescription": "暂无描述",
                 "kanban": "看板",
                 "list": "列表",
                 "filter": {

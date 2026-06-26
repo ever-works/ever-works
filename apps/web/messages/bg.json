@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Нова Задача",
+                "noDescription": "Все още няма описание",
                 "kanban": "Канбан",
                 "list": "Списък",
                 "filter": {

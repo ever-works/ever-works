@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Neue Aufgabe",
+                "noDescription": "Noch keine Beschreibung",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {

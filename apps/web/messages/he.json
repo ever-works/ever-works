@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ משימה חדשה",
+                "noDescription": "אין תיאור עדיין",
                 "kanban": "קנבן",
                 "list": "רשימה",
                 "filter": {

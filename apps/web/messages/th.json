@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ งานใหม่",
+                "noDescription": "ยังไม่มีคำอธิบาย",
                 "kanban": "คันบัน",
                 "list": "รายการ",
                 "filter": {

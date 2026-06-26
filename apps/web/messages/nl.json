@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",
+                "noDescription": "Nog geen beschrijving",
                 "kanban": "Kanban",
                 "list": "Lijst",
                 "filter": {

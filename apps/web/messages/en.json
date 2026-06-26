@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "New Task",
+                "noDescription": "No description yet",
                 "kanban": "Kanban",
                 "list": "List",
                 "filter": {

@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Task mới",
+                "noDescription": "Chưa có mô tả",
                 "kanban": "Kanban",
                 "list": "Danh sách",
                 "filter": {

@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Нове завдання",
+                "noDescription": "Опису ще немає",
                 "kanban": "Канбан",
                 "list": "Список",
                 "filter": {

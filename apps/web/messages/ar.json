@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ مهمة جديدة",
+                "noDescription": "لا يوجد وصف بعد",
                 "kanban": "كانبان",
                 "list": "قائمة",
                 "filter": {

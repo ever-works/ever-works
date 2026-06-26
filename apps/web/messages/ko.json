@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 새 작업",
+                "noDescription": "아직 설명이 없습니다",
                 "kanban": "칸반",
                 "list": "목록",
                 "filter": {

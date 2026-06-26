@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Yeni Görev",
+                "noDescription": "Henüz açıklama yok",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {

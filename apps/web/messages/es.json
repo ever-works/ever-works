@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Nueva Tarea",
+                "noDescription": "Aún no hay descripción",
                 "kanban": "Kanban",
                 "list": "Lista",
                 "filter": {

@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Tugas Baru",
+                "noDescription": "Belum ada deskripsi",
                 "kanban": "Kanban",
                 "list": "Daftar",
                 "filter": {

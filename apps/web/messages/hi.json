@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ नया कार्य",
+                "noDescription": "अभी तक कोई विवरण नहीं",
                 "kanban": "कानबान",
                 "list": "सूची",
                 "filter": {
