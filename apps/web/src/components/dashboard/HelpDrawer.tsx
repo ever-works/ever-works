@@ -153,9 +153,8 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                         {/* Header */}
                                         <div
                                             className={cn(
-                                                'sticky top-0 z-10 px-6 py-4',
+                                                'sticky top-0 z-10 px-6 pt-4',
                                                 'bg-white/90 dark:bg-surface-dark/90 backdrop-blur',
-                                                'border-b border-border dark:border-border-dark',
                                             )}
                                         >
                                             <div className="flex items-center justify-between">
@@ -186,14 +185,13 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                 {t('subtitle')}
                                             </p>
 
-                                            {/* Segmented tabs */}
+                                            {/* Tabs */}
                                             <div
                                                 role="tablist"
                                                 aria-label={t('title')}
                                                 className={cn(
-                                                    'mt-4 flex gap-1 rounded-lg p-1',
-                                                    'bg-surface dark:bg-surface-secondary-dark',
-                                                    'border border-border dark:border-border-dark',
+                                                    '-mx-6 mt-4 flex items-center gap-6 px-6',
+                                                    'border-b border-border dark:border-border-dark',
                                                 )}
                                             >
                                                 {tabs.map((tab) => {
@@ -204,14 +202,13 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                             type="button"
                                                             role="tab"
                                                             aria-selected={active}
-                                                            title={tab.label}
                                                             onClick={() => setActiveTab(tab.id)}
                                                             className={cn(
-                                                                'min-w-0 flex-1 truncate rounded-md px-2 py-1.5',
-                                                                'text-center text-xs font-medium transition-colors',
+                                                                'relative -mb-px whitespace-nowrap border-b-2 pb-2.5 pt-1',
+                                                                'text-xs font-medium transition-colors',
                                                                 active
-                                                                    ? 'bg-white text-text shadow-sm dark:bg-surface-dark dark:text-text-dark'
-                                                                    : 'text-text-secondary hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark',
+                                                                    ? 'border-primary text-text dark:text-text-dark'
+                                                                    : 'border-transparent text-text-secondary hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark',
                                                             )}
                                                         >
                                                             {tab.label}
