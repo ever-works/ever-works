@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -14,7 +14,7 @@ import type {
     TaskPriority,
     TaskStatus,
 } from '@/lib/api/tasks';
-import { postTaskChatAction, transitionTaskAction } from '@/app/actions/tasks';
+import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 
@@ -110,6 +110,11 @@ export function TaskDetailClient({
     const [pendingTransition, startTransition] = useTransition();
     const [postError, setPostError] = useState<string | null>(null);
     const [transitionError, setTransitionError] = useState<string | null>(null);
+    const [description, setDescription] = useState(task.description ?? '');
+    const [editingDesc, setEditingDesc] = useState(false);
+    const [descDraft, setDescDraft] = useState(task.description ?? '');
+    const [pendingDesc, startDesc] = useTransition();
+    const [descError, setDescError] = useState<string | null>(null);
 
     const handlePost = (e: React.FormEvent) => {
         e.preventDefault();
@@ -138,6 +143,25 @@ export function TaskDetailClient({
                     setCurrentStatus(updated.status);
                 } catch (err) {
                     setTransitionError(err instanceof Error ? err.message : 'Transition failed');
+                }
+            })();
+        });
+    };
+
+    const handleSaveDescription = () => {
+        setDescError(null);
+        startDesc(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, {
+                        description: descDraft.trim() || null,
+                    });
+                    setDescription(updated.description ?? '');
+                    setEditingDesc(false);
+                } catch (err) {
+                    setDescError(
+                        err instanceof Error ? err.message : 'Failed to save description',
+                    );
                 }
             })();
         });
@@ -231,14 +255,70 @@ export function TaskDetailClient({
                         )}
                     </div>
 
-                    {/* Description */}
+                    {/* Description — inline editable, saves via updateTaskAction. */}
                     <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                        <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
-                            Description
-                        </h2>
-                        {task.description ? (
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                                Description
+                            </h2>
+                            {!editingDesc && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-xs gap-1.5"
+                                    onClick={() => {
+                                        setDescDraft(description);
+                                        setDescError(null);
+                                        setEditingDesc(true);
+                                    }}
+                                >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    Edit
+                                </Button>
+                            )}
+                        </div>
+                        {editingDesc ? (
+                            <div className="space-y-2">
+                                <textarea
+                                    value={descDraft}
+                                    onChange={(e) => setDescDraft(e.target.value)}
+                                    rows={6}
+                                    autoFocus
+                                    placeholder="Add a description…"
+                                    className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm leading-relaxed text-text dark:text-text-dark"
+                                />
+                                {descError && (
+                                    <p className="text-xs text-danger" role="alert">
+                                        {descError}
+                                    </p>
+                                )}
+                                <div className="flex justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        disabled={pendingDesc}
+                                        onClick={() => {
+                                            setEditingDesc(false);
+                                            setDescError(null);
+                                        }}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={pendingDesc}
+                                        onClick={handleSaveDescription}
+                                    >
+                                        {pendingDesc ? '…' : 'Save'}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : description ? (
                             <p className="text-sm leading-relaxed text-text-secondary dark:text-text-secondary-dark whitespace-pre-wrap">
-                                {task.description}
+                                {description}
                             </p>
                         ) : (
                             <p className="text-sm text-text-muted italic">No description provided.</p>

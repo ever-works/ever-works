@@ -205,20 +205,27 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
                             >
                                 <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    {/* FU-5 review fix (greptile + codex P1):
-                                        the previous `<a href="/api/uploads/{uploadId}">`
-                                        404'd because the existing backend GET is
-                                        `/:userId/:filename` and there's no resolver
-                                        that turns an uploadId alone into a download.
-                                        Surface filename as plain text + a tooltip
-                                        until the resolver lands — upload + detach
-                                        still work end-to-end. */}
-                                    <span
-                                        className="text-sm text-text dark:text-text-dark truncate block"
-                                        title="Download wiring pending — see FOLLOWUP-PROGRESS"
-                                    >
-                                        {filename}
-                                    </span>
+                                    {/* Download streams the raw bytes through the
+                                        KB upload download proxy
+                                        (/api/works/:id/kb/uploads/:uploadId/download),
+                                        which forwards to the owner/viewer-gated
+                                        NestJS route. Only Work-scoped tasks carry a
+                                        workId, which is also the only case an
+                                        attachment can exist. */}
+                                    {workId ? (
+                                        <a
+                                            href={`/api/works/${workId}/kb/uploads/${r.uploadId}/download`}
+                                            download={filename}
+                                            className="text-sm text-primary hover:underline truncate block"
+                                            title={`Download ${filename}`}
+                                        >
+                                            {filename}
+                                        </a>
+                                    ) : (
+                                        <span className="text-sm text-text dark:text-text-dark truncate block">
+                                            {filename}
+                                        </span>
+                                    )}
                                     <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                         {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
                                         {new Date(r.createdAt).toLocaleString()}
