@@ -926,6 +926,12 @@
             "help": {
                 "title": "Trợ giúp & Tài nguyên",
                 "subtitle": "Mẹo nhanh và liên kết hữu ích để giúp bạn bắt đầu",
+                "tabs": {
+                    "tips": "Mẹo",
+                    "shortcuts": "Phím tắt",
+                    "faq": "FAQ",
+                    "resources": "Tài nguyên"
+                },
                 "onboarding": {
                     "title": "Hướng dẫn",
                     "description": "Mở lại thiết lập hướng dẫn bất cứ lúc nào và tiếp tục từ nơi bạn dừng lại.",

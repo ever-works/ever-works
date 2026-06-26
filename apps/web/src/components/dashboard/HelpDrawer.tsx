@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useState, type ReactNode } from 'react';
 import {
     Dialog,
     DialogPanel,
@@ -80,6 +80,8 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     const t = useTranslations('dashboard.header.help');
     const tCommon = useTranslations('common.ui');
 
+    const [activeTab, setActiveTab] = useState<'tips' | 'shortcuts' | 'faq' | 'resources'>('tips');
+
     const quickTips = [
         { icon: '1', text: t('quickTips.tip1') },
         { icon: '2', text: t('quickTips.tip2') },
@@ -104,6 +106,13 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
         { label: t('links.github'), href: GITHUB_URL, icon: Github },
         { label: t('links.issues'), href: ISSUES_URL, icon: Bug },
         { label: t('links.community'), href: DISCUSSIONS_URL, icon: MessageCircle },
+    ];
+
+    const tabs = [
+        { id: 'tips' as const, label: t('tabs.tips') },
+        { id: 'shortcuts' as const, label: t('tabs.shortcuts') },
+        { id: 'faq' as const, label: t('tabs.faq') },
+        { id: 'resources' as const, label: t('tabs.resources') },
     ];
 
     return (
@@ -168,273 +177,341 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                     )}
                                                 >
                                                     <X className="w-5 h-5" />
-                                                    <span className="sr-only">{tCommon('close')}</span>
+                                                    <span className="sr-only">
+                                                        {tCommon('close')}
+                                                    </span>
                                                 </button>
                                             </div>
                                             <p className="mt-1 text-xs text-text-secondary dark:text-text-secondary-dark">
                                                 {t('subtitle')}
                                             </p>
+
+                                            {/* Segmented tabs */}
+                                            <div
+                                                role="tablist"
+                                                aria-label={t('title')}
+                                                className={cn(
+                                                    'mt-4 flex gap-1 rounded-lg p-1',
+                                                    'bg-surface dark:bg-surface-secondary-dark',
+                                                    'border border-border dark:border-border-dark',
+                                                )}
+                                            >
+                                                {tabs.map((tab) => {
+                                                    const active = activeTab === tab.id;
+                                                    return (
+                                                        <button
+                                                            key={tab.id}
+                                                            type="button"
+                                                            role="tab"
+                                                            aria-selected={active}
+                                                            title={tab.label}
+                                                            onClick={() => setActiveTab(tab.id)}
+                                                            className={cn(
+                                                                'min-w-0 flex-1 truncate rounded-md px-2 py-1.5',
+                                                                'text-center text-xs font-medium transition-colors',
+                                                                active
+                                                                    ? 'bg-white text-text shadow-sm dark:bg-surface-dark dark:text-text-dark'
+                                                                    : 'text-text-secondary hover:text-text dark:text-text-secondary-dark dark:hover:text-text-dark',
+                                                            )}
+                                                        >
+                                                            {tab.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
 
                                         {/* Content */}
                                         <div className="flex-1 px-6 py-6 space-y-7">
-                                            {onboarding && (
-                                                <section>
-                                                    <SectionHeading>
-                                                        {t('onboarding.title')}
-                                                    </SectionHeading>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            onboarding.onOpen();
-                                                            onClose();
-                                                        }}
-                                                        className={cn(
-                                                            CARD,
-                                                            'w-full p-4 text-left transition-colors',
-                                                            'bg-surface dark:bg-surface-secondary-dark',
-                                                            'hover:border-primary/50',
-                                                        )}
-                                                    >
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="space-y-1">
-                                                                <p className="text-xs font-medium text-text dark:text-text-dark">
-                                                                    {t('onboarding.action', {
-                                                                        currentStep:
-                                                                            onboarding.currentStep,
-                                                                        totalSteps:
-                                                                            onboarding.totalSteps,
-                                                                    })}
-                                                                </p>
-                                                                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                                    {t('onboarding.description')}
-                                                                </p>
-                                                            </div>
-                                                            <BookOpen className="h-5 w-5 flex-shrink-0 text-text-secondary dark:text-text-secondary-dark" />
+                                            {activeTab === 'tips' && (
+                                                <>
+                                                    {onboarding && (
+                                                        <section>
+                                                            <SectionHeading>
+                                                                {t('onboarding.title')}
+                                                            </SectionHeading>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    onboarding.onOpen();
+                                                                    onClose();
+                                                                }}
+                                                                className={cn(
+                                                                    CARD,
+                                                                    'w-full p-4 text-left transition-colors',
+                                                                    'bg-surface dark:bg-surface-secondary-dark',
+                                                                    'hover:border-primary/50',
+                                                                )}
+                                                            >
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="space-y-1">
+                                                                        <p className="text-xs font-medium text-text dark:text-text-dark">
+                                                                            {t(
+                                                                                'onboarding.action',
+                                                                                {
+                                                                                    currentStep:
+                                                                                        onboarding.currentStep,
+                                                                                    totalSteps:
+                                                                                        onboarding.totalSteps,
+                                                                                },
+                                                                            )}
+                                                                        </p>
+                                                                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                            {t(
+                                                                                'onboarding.description',
+                                                                            )}
+                                                                        </p>
+                                                                    </div>
+                                                                    <BookOpen className="h-5 w-5 flex-shrink-0 text-text-secondary dark:text-text-secondary-dark" />
+                                                                </div>
+                                                            </button>
+                                                        </section>
+                                                    )}
+
+                                                    {/* Quick Tips */}
+                                                    <section>
+                                                        <SectionHeading icon={Lightbulb}>
+                                                            {t('quickTips.title')}
+                                                        </SectionHeading>
+                                                        <div className={cn(CARD, DIVIDE)}>
+                                                            {quickTips.map((tip, index) => (
+                                                                <div
+                                                                    key={index}
+                                                                    className="flex items-start gap-3 px-4 py-2.5"
+                                                                >
+                                                                    <span
+                                                                        className={cn(
+                                                                            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
+                                                                            'bg-primary/10 text-primary',
+                                                                            'text-[10px] font-semibold',
+                                                                        )}
+                                                                    >
+                                                                        {tip.icon}
+                                                                    </span>
+                                                                    <span className="text-xs leading-relaxed text-text dark:text-text-dark">
+                                                                        {tip.text}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    </button>
+                                                    </section>
+                                                </>
+                                            )}
+
+                                            {activeTab === 'shortcuts' && (
+                                                /* Keyboard Shortcuts */
+                                                <section>
+                                                    <SectionHeading icon={Keyboard}>
+                                                        {t('shortcuts.title')}
+                                                    </SectionHeading>
+                                                    <div className={cn(CARD, DIVIDE)}>
+                                                        {keyboardShortcuts.map(
+                                                            (shortcut, index) => (
+                                                                <div key={index} className={ROW}>
+                                                                    <span className="text-xs text-text dark:text-text-dark">
+                                                                        {shortcut.label}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1">
+                                                                        {shortcut.keys.map(
+                                                                            (key, keyIndex) => (
+                                                                                <Fragment
+                                                                                    key={`key-${keyIndex}`}
+                                                                                >
+                                                                                    <kbd
+                                                                                        className={cn(
+                                                                                            'min-w-[1.5rem] text-center px-1.5 py-0.5 rounded',
+                                                                                            'text-[11px] font-medium',
+                                                                                            'bg-surface dark:bg-surface-dark',
+                                                                                            'border border-border dark:border-border-dark',
+                                                                                            'text-text-secondary dark:text-text-secondary-dark',
+                                                                                        )}
+                                                                                    >
+                                                                                        {key}
+                                                                                    </kbd>
+                                                                                    {keyIndex <
+                                                                                        shortcut
+                                                                                            .keys
+                                                                                            .length -
+                                                                                            1 && (
+                                                                                        <span className="text-text-muted dark:text-text-muted-dark">
+                                                                                            +
+                                                                                        </span>
+                                                                                    )}
+                                                                                </Fragment>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ),
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                                        {t('shortcuts.hint')}
+                                                    </p>
                                                 </section>
                                             )}
 
-                                            {/* Quick Tips */}
-                                            <section>
-                                                <SectionHeading icon={Lightbulb}>
-                                                    {t('quickTips.title')}
-                                                </SectionHeading>
-                                                <div className={cn(CARD, DIVIDE)}>
-                                                    {quickTips.map((tip, index) => (
-                                                        <div
-                                                            key={index}
-                                                            className="flex items-start gap-3 px-4 py-2.5"
-                                                        >
-                                                            <span
-                                                                className={cn(
-                                                                    'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
-                                                                    'bg-primary/10 text-primary',
-                                                                    'text-[10px] font-semibold',
-                                                                )}
-                                                            >
-                                                                {tip.icon}
-                                                            </span>
-                                                            <span className="text-xs leading-relaxed text-text dark:text-text-dark">
-                                                                {tip.text}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </section>
-
-                                            {/* Keyboard Shortcuts */}
-                                            <section>
-                                                <SectionHeading icon={Keyboard}>
-                                                    {t('shortcuts.title')}
-                                                </SectionHeading>
-                                                <div className={cn(CARD, DIVIDE)}>
-                                                    {keyboardShortcuts.map((shortcut, index) => (
-                                                        <div key={index} className={ROW}>
-                                                            <span className="text-xs text-text dark:text-text-dark">
-                                                                {shortcut.label}
-                                                            </span>
-                                                            <div className="flex items-center gap-1">
-                                                                {shortcut.keys.map((key, keyIndex) => (
-                                                                    <Fragment key={`key-${keyIndex}`}>
-                                                                        <kbd
+                                            {activeTab === 'faq' && (
+                                                /* FAQ */
+                                                <section>
+                                                    <SectionHeading>
+                                                        {t('faq.title')}
+                                                    </SectionHeading>
+                                                    <div className="space-y-2">
+                                                        {faqs.map((faq, index) => (
+                                                            <Disclosure key={index}>
+                                                                {({ open }) => (
+                                                                    <div className={CARD}>
+                                                                        <DisclosureButton
                                                                             className={cn(
-                                                                                'min-w-[1.5rem] text-center px-1.5 py-0.5 rounded',
-                                                                                'text-[11px] font-medium',
-                                                                                'bg-surface dark:bg-surface-dark',
-                                                                                'border border-border dark:border-border-dark',
-                                                                                'text-text-secondary dark:text-text-secondary-dark',
+                                                                                'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left',
+                                                                                'transition-colors',
+                                                                                'hover:bg-surface dark:hover:bg-surface-secondary-dark',
                                                                             )}
                                                                         >
-                                                                            {key}
-                                                                        </kbd>
-                                                                        {keyIndex <
-                                                                            shortcut.keys.length -
-                                                                                1 && (
-                                                                            <span className="text-text-muted dark:text-text-muted-dark">
-                                                                                +
+                                                                            <span className="text-xs font-medium text-text dark:text-text-dark">
+                                                                                {faq.q}
                                                                             </span>
-                                                                        )}
-                                                                    </Fragment>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
-                                                    {t('shortcuts.hint')}
-                                                </p>
-                                            </section>
-
-                                            {/* FAQ */}
-                                            <section>
-                                                <SectionHeading>{t('faq.title')}</SectionHeading>
-                                                <div className="space-y-2">
-                                                    {faqs.map((faq, index) => (
-                                                        <Disclosure key={index}>
-                                                            {({ open }) => (
-                                                                <div className={CARD}>
-                                                                    <DisclosureButton
-                                                                        className={cn(
-                                                                            'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left',
-                                                                            'transition-colors',
-                                                                            'hover:bg-surface dark:hover:bg-surface-secondary-dark',
-                                                                        )}
-                                                                    >
-                                                                        <span className="text-xs font-medium text-text dark:text-text-dark">
-                                                                            {faq.q}
-                                                                        </span>
-                                                                        <ChevronDown
-                                                                            className={cn(
-                                                                                'h-4 w-4 flex-shrink-0 transition-transform',
-                                                                                'text-text-muted dark:text-text-muted-dark',
-                                                                                open && 'rotate-180',
-                                                                            )}
-                                                                            aria-hidden="true"
-                                                                        />
-                                                                    </DisclosureButton>
-                                                                    <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
-                                                                        {faq.a}
-                                                                        {faq.href && (
-                                                                            <a
-                                                                                href={faq.href}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
+                                                                            <ChevronDown
                                                                                 className={cn(
-                                                                                    'mt-2 inline-flex items-center gap-1 font-medium',
-                                                                                    'text-primary hover:underline dark:text-primary-dark',
+                                                                                    'h-4 w-4 flex-shrink-0 transition-transform',
+                                                                                    'text-text-muted dark:text-text-muted-dark',
+                                                                                    open &&
+                                                                                        'rotate-180',
                                                                                 )}
-                                                                            >
-                                                                                {t('faq.learnMore')}
-                                                                                <ExternalLink
-                                                                                    className="h-3 w-3"
-                                                                                    aria-hidden="true"
-                                                                                />
-                                                                            </a>
-                                                                        )}
-                                                                    </DisclosurePanel>
-                                                                </div>
-                                                            )}
-                                                        </Disclosure>
-                                                    ))}
-                                                </div>
-                                            </section>
+                                                                                aria-hidden="true"
+                                                                            />
+                                                                        </DisclosureButton>
+                                                                        <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
+                                                                            {faq.a}
+                                                                            {faq.href && (
+                                                                                <a
+                                                                                    href={faq.href}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className={cn(
+                                                                                        'mt-2 inline-flex items-center gap-1 font-medium',
+                                                                                        'text-primary hover:underline dark:text-primary-dark',
+                                                                                    )}
+                                                                                >
+                                                                                    {t(
+                                                                                        'faq.learnMore',
+                                                                                    )}
+                                                                                    <ExternalLink
+                                                                                        className="h-3 w-3"
+                                                                                        aria-hidden="true"
+                                                                                    />
+                                                                                </a>
+                                                                            )}
+                                                                        </DisclosurePanel>
+                                                                    </div>
+                                                                )}
+                                                            </Disclosure>
+                                                        ))}
+                                                    </div>
+                                                </section>
+                                            )}
 
-                                            {/* Resources */}
-                                            <section>
-                                                <SectionHeading>{t('links.title')}</SectionHeading>
-                                                <div className={cn(CARD, DIVIDE)}>
-                                                    {links.map((link, index) => (
-                                                        <a
-                                                            key={index}
-                                                            href={link.href}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
+                                            {activeTab === 'resources' && (
+                                                <>
+                                                    {/* Resources */}
+                                                    <section>
+                                                        <SectionHeading>
+                                                            {t('links.title')}
+                                                        </SectionHeading>
+                                                        <div className={cn(CARD, DIVIDE)}>
+                                                            {links.map((link, index) => (
+                                                                <a
+                                                                    key={index}
+                                                                    href={link.href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className={cn(
+                                                                        ROW,
+                                                                        'transition-colors',
+                                                                        'hover:bg-surface dark:hover:bg-surface-secondary-dark',
+                                                                    )}
+                                                                >
+                                                                    <span className="flex items-center gap-3">
+                                                                        <link.icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
+                                                                        <span className="text-xs font-medium text-text dark:text-text-dark">
+                                                                            {link.label}
+                                                                        </span>
+                                                                    </span>
+                                                                    <ExternalLink className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
+                                                                </a>
+                                                            ))}
+                                                        </div>
+                                                    </section>
+
+                                                    {/* Support */}
+                                                    <section>
+                                                        <div
                                                             className={cn(
-                                                                ROW,
-                                                                'transition-colors',
-                                                                'hover:bg-surface dark:hover:bg-surface-secondary-dark',
+                                                                'rounded-xl border border-primary/20 bg-primary/5 p-4',
                                                             )}
                                                         >
-                                                            <span className="flex items-center gap-3">
-                                                                <link.icon className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark" />
-                                                                <span className="text-xs font-medium text-text dark:text-text-dark">
-                                                                    {link.label}
-                                                                </span>
-                                                            </span>
-                                                            <ExternalLink className="w-3.5 h-3.5 text-text-muted dark:text-text-muted-dark" />
-                                                        </a>
-                                                    ))}
-                                                </div>
-                                            </section>
-
-                                            {/* Support */}
-                                            <section>
-                                                <div
-                                                    className={cn(
-                                                        'rounded-xl border border-primary/20 bg-primary/5 p-4',
-                                                    )}
-                                                >
-                                                    <div className="flex items-start gap-3">
-                                                        <LifeBuoy className="h-5 w-5 flex-shrink-0 text-primary" />
-                                                        <div className="space-y-1">
-                                                            <p className="text-xs font-semibold text-text dark:text-text-dark">
-                                                                {t('support.title')}
-                                                            </p>
-                                                            <p className="text-xs leading-relaxed text-text-secondary dark:text-text-secondary-dark">
-                                                                {t('support.description')}
-                                                            </p>
-                                                            <a
-                                                                href={DISCUSSIONS_URL}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className={cn(
-                                                                    'mt-1 inline-flex items-center gap-1',
-                                                                    'text-xs font-medium text-primary',
-                                                                    'hover:underline',
-                                                                )}
-                                                            >
-                                                                {t('support.action')}
-                                                                <ExternalLink className="h-3 w-3" />
-                                                            </a>
+                                                            <div className="flex items-start gap-3">
+                                                                <LifeBuoy className="h-5 w-5 flex-shrink-0 text-primary" />
+                                                                <div className="space-y-1">
+                                                                    <p className="text-xs font-semibold text-text dark:text-text-dark">
+                                                                        {t('support.title')}
+                                                                    </p>
+                                                                    <p className="text-xs leading-relaxed text-text-secondary dark:text-text-secondary-dark">
+                                                                        {t('support.description')}
+                                                                    </p>
+                                                                    <a
+                                                                        href={DISCUSSIONS_URL}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className={cn(
+                                                                            'mt-1 inline-flex items-center gap-1',
+                                                                            'text-xs font-medium text-primary',
+                                                                            'hover:underline',
+                                                                        )}
+                                                                    >
+                                                                        {t('support.action')}
+                                                                        <ExternalLink className="h-3 w-3" />
+                                                                    </a>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            </section>
+                                                    </section>
 
-                                            {/* System */}
-                                            <section>
-                                                <SectionHeading icon={Server}>
-                                                    {t('system.title')}
-                                                </SectionHeading>
-                                                <div className={cn(CARD, DIVIDE)}>
-                                                    <div className={ROW}>
-                                                        <span className="flex items-center gap-2 text-xs text-text dark:text-text-dark">
-                                                            <span className="h-2 w-2 rounded-full bg-green-500" />
-                                                            {t('system.operational')}
-                                                        </span>
-                                                        {STATUS_URL && (
-                                                            <a
-                                                                href={STATUS_URL}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-text-muted transition-colors hover:text-primary dark:text-text-muted-dark"
-                                                            >
-                                                                <ExternalLink className="h-3.5 w-3.5" />
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                    <div className={ROW}>
-                                                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                                                            {t('system.environment')}
-                                                        </span>
-                                                        <span className="text-xs font-medium capitalize text-text dark:text-text-dark">
-                                                            {APP_ENV}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </section>
+                                                    {/* System */}
+                                                    <section>
+                                                        <SectionHeading icon={Server}>
+                                                            {t('system.title')}
+                                                        </SectionHeading>
+                                                        <div className={cn(CARD, DIVIDE)}>
+                                                            <div className={ROW}>
+                                                                <span className="flex items-center gap-2 text-xs text-text dark:text-text-dark">
+                                                                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                                                                    {t('system.operational')}
+                                                                </span>
+                                                                {STATUS_URL && (
+                                                                    <a
+                                                                        href={STATUS_URL}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="text-text-muted transition-colors hover:text-primary dark:text-text-muted-dark"
+                                                                    >
+                                                                        <ExternalLink className="h-3.5 w-3.5" />
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                            <div className={ROW}>
+                                                                <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                                                                    {t('system.environment')}
+                                                                </span>
+                                                                <span className="text-xs font-medium capitalize text-text dark:text-text-dark">
+                                                                    {APP_ENV}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </section>
+                                                </>
+                                            )}
                                         </div>
 
                                         {/* Footer */}

@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Help & Resources",
                 "subtitle": "Quick tips and useful links to help you get started",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Shortcuts",
+                    "faq": "FAQ",
+                    "resources": "Resources"
+                },
                 "onboarding": {
                     "title": "Onboarding",
                     "description": "Reopen the guided setup anytime and continue where you left off.",

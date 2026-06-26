@@ -926,6 +926,12 @@
             "help": {
                 "title": "ヘルプとリソース",
                 "subtitle": "開始するためのクイックヒントと便利なリンク",
+                "tabs": {
+                    "tips": "ヒント",
+                    "shortcuts": "ショートカット",
+                    "faq": "FAQ",
+                    "resources": "リソース"
+                },
                 "onboarding": {
                     "title": "オンボーディング",
                     "description": "いつでもガイド付きセットアップを再開し、途中から続けられます。",

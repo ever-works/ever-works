@@ -926,6 +926,12 @@
             "help": {
                 "title": "도움말 & 자료",
                 "subtitle": "시작하는 데 도움이 되는 빠른 팁과 유용한 링크",
+                "tabs": {
+                    "tips": "팁",
+                    "shortcuts": "단축키",
+                    "faq": "FAQ",
+                    "resources": "리소스"
+                },
                 "onboarding": {
                     "title": "온보딩",
                     "description": "언제든지 가이드 설정을 다시 열고 중단한 곳부터 계속할 수 있습니다.",

@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Hilfe & Ressourcen",
                 "subtitle": "Schnelle Tipps und nützliche Links, um Sie beim Einstieg zu unterstützen",
+                "tabs": {
+                    "tips": "Tipps",
+                    "shortcuts": "Tastenkürzel",
+                    "faq": "FAQ",
+                    "resources": "Ressourcen"
+                },
                 "onboarding": {
                     "title": "Einführung",
                     "description": "Öffnen Sie die geführte Einrichtung jederzeit erneut und setzen Sie dort fort, wo Sie aufgehört haben.",

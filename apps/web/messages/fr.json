@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Aide & Ressources",
                 "subtitle": "Conseils rapides et liens utiles pour vous aider à démarrer",
+                "tabs": {
+                    "tips": "Astuces",
+                    "shortcuts": "Raccourcis",
+                    "faq": "FAQ",
+                    "resources": "Ressources"
+                },
                 "onboarding": {
                     "title": "Initiation",
                     "description": "Rouvrez la configuration guidée à tout moment et continuez là où vous vous êtes arrêté.",

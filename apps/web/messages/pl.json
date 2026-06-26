@@ -926,6 +926,12 @@
             "help": {
                 "title": "Pomoc i zasoby",
                 "subtitle": "Szybkie wskazówki i przydatne linki, aby pomóc Ci zacząć",
+                "tabs": {
+                    "tips": "Wskazówki",
+                    "shortcuts": "Skróty",
+                    "faq": "FAQ",
+                    "resources": "Zasoby"
+                },
                 "onboarding": {
                     "title": "Wprowadzenie",
                     "description": "Otwórz ponownie przewodnik w dowolnym momencie i kontynuuj od miejsca, w którym przerwałeś.",

@@ -926,6 +926,12 @@
             "help": {
                 "title": "Yardım & Kaynaklar",
                 "subtitle": "Başlamanıza yardımcı olacak hızlı ipuçları ve faydalı bağlantılar",
+                "tabs": {
+                    "tips": "İpuçları",
+                    "shortcuts": "Kısayollar",
+                    "faq": "SSS",
+                    "resources": "Kaynaklar"
+                },
                 "onboarding": {
                     "title": "Başlangıç",
                     "description": "Yönlendirmeli kurulumun her zaman yeniden açın ve bıraktığınız yerden devam edin.",

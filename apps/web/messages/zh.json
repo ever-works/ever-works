@@ -926,6 +926,12 @@
             "help": {
                 "title": "帮助与资源",
                 "subtitle": "快速提示和有用链接，帮助您入门",
+                "tabs": {
+                    "tips": "提示",
+                    "shortcuts": "快捷键",
+                    "faq": "常见问题",
+                    "resources": "资源"
+                },
                 "onboarding": {
                     "title": "入门",
                     "description": "随时重新打开引导设置，并从您停止的地方继续。",

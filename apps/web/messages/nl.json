@@ -926,6 +926,12 @@
             "help": {
                 "title": "Help & bronnen",
                 "subtitle": "Snelle tips en nuttige links om aan de slag te gaan",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Sneltoetsen",
+                    "faq": "FAQ",
+                    "resources": "Bronnen"
+                },
                 "onboarding": {
                     "title": "Ingebruikname",
                     "description": "Open de begeleide setup op elk moment opnieuw en ga verder waar je gebleven was.",

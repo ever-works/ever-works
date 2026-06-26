@@ -926,6 +926,12 @@
             "help": {
                 "title": "Aiuto e Risorse",
                 "subtitle": "Suggerimenti rapidi e link utili per iniziare",
+                "tabs": {
+                    "tips": "Consigli",
+                    "shortcuts": "Scorciatoie",
+                    "faq": "FAQ",
+                    "resources": "Risorse"
+                },
                 "onboarding": {
                     "title": "Procedura guidata",
                     "description": "Riapri la procedura guidata in qualsiasi momento e continua da dove hai interrotto.",

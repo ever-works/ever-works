@@ -926,6 +926,12 @@
             "help": {
                 "title": "Bantuan & Sumber Daya",
                 "subtitle": "Tips cepat dan tautan berguna untuk membantu Anda memulai",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Pintasan",
+                    "faq": "FAQ",
+                    "resources": "Sumber Daya"
+                },
                 "onboarding": {
                     "title": "Onboarding",
                     "description": "Buka kembali pengaturan terpandu kapan saja dan lanjutkan dari tempat Anda berhenti.",

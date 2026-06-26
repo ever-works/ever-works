@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Ayuda y Recursos",
                 "subtitle": "Consejos rápidos y enlaces útiles para comenzar",
+                "tabs": {
+                    "tips": "Consejos",
+                    "shortcuts": "Atajos",
+                    "faq": "Preguntas",
+                    "resources": "Recursos"
+                },
                 "onboarding": {
                     "title": "Guía inicial",
                     "description": "Reabre la configuración guiada en cualquier momento y continúa donde lo dejaste.",
