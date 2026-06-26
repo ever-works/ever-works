@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { cn } from '@/lib/utils/cn';
 import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
 import { postTaskChatAction, transitionTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
@@ -29,6 +30,28 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
     done: ['in_progress'],
     cancelled: [],
 };
+
+// Status dots mirror /tasks (TasksList) so the workflow buttons share
+// the same colour language as the list filter.
+const STATUS_DOT: Record<TaskStatus, string> = {
+    backlog: 'bg-slate-400',
+    todo: 'bg-info',
+    in_progress: 'bg-warning',
+    in_review: 'bg-violet-500',
+    blocked: 'bg-danger',
+    done: 'bg-success',
+    cancelled: 'bg-text-muted',
+};
+
+const ALL_STATUSES: TaskStatus[] = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'in_review',
+    'blocked',
+    'done',
+    'cancelled',
+];
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 13.3 client.
@@ -143,22 +166,47 @@ export function TaskDetailClient({
                 <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
                     {t('moveTo')}
                 </h2>
-                <div className="flex flex-wrap gap-2">
-                    {(NEXT_STATUS[currentStatus] ?? []).map((next) => (
-                        <Button
-                            key={next}
-                            size="sm"
-                            variant="ghost"
-                            disabled={pendingTransition}
-                            onClick={() => handleTransition(next)}
-                            className="text-xs"
-                        >
-                            {tStatus(next)}
-                        </Button>
-                    ))}
-                    {(NEXT_STATUS[currentStatus] ?? []).length === 0 && (
-                        <span className="text-xs text-text-muted">{t('noTransitions')}</span>
-                    )}
+                {/* JIRA-style workflow buttons — mirror the /tasks status
+                    pills. Current status shows active in its own colour;
+                    allowed transitions are clickable; the rest are disabled
+                    so the state machine stays honest. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {ALL_STATUSES.map((s) => {
+                        const isCurrent = s === currentStatus;
+                        const isAllowed = (NEXT_STATUS[currentStatus] ?? []).includes(s);
+                        const disabled = pendingTransition || (!isCurrent && !isAllowed);
+                        return (
+                            <button
+                                key={s}
+                                type="button"
+                                disabled={disabled}
+                                aria-current={isCurrent}
+                                onClick={() => {
+                                    if (!isCurrent && isAllowed) handleTransition(s);
+                                }}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border whitespace-nowrap transition-colors',
+                                    isCurrent
+                                        ? cn(
+                                              STATUS_TONES[s],
+                                              'border-current/30 ring-1 ring-current/20 cursor-default',
+                                          )
+                                        : isAllowed
+                                          ? 'border-border/60 dark:border-border-dark/60 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark hover:text-text dark:hover:text-text-dark'
+                                          : 'border-border/40 dark:border-border-dark/40 text-text-muted/50 dark:text-text-muted-dark/50 cursor-not-allowed',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'w-1.5 h-1.5 rounded-full shrink-0',
+                                        STATUS_DOT[s],
+                                        !isCurrent && !isAllowed && 'opacity-50',
+                                    )}
+                                />
+                                {tStatus(s)}
+                            </button>
+                        );
+                    })}
                 </div>
                 {transitionError && (
                     <p className="text-xs text-danger mt-2" role="alert">
