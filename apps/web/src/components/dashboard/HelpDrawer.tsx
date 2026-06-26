@@ -284,27 +284,44 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                         <SectionHeading icon={Lightbulb}>
                                                             {t('quickTips.title')}
                                                         </SectionHeading>
-                                                        <div className={cn(CARD, DIVIDE)}>
-                                                            {quickTips.map((tip, index) => (
-                                                                <div
-                                                                    key={index}
-                                                                    className="flex items-start gap-3 px-4 py-2.5"
-                                                                >
-                                                                    <span
-                                                                        className={cn(
-                                                                            'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full',
-                                                                            'bg-primary/10 text-primary',
-                                                                            'text-[10px] font-semibold',
-                                                                        )}
+                                                        <ol className="px-1">
+                                                            {quickTips.map((tip, index) => {
+                                                                const isLast =
+                                                                    index === quickTips.length - 1;
+                                                                return (
+                                                                    <li
+                                                                        key={index}
+                                                                        className="flex gap-3"
                                                                     >
-                                                                        {tip.icon}
-                                                                    </span>
-                                                                    <span className="text-xs leading-relaxed text-text dark:text-text-dark">
-                                                                        {tip.text}
-                                                                    </span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
+                                                                        <div className="flex flex-col items-center">
+                                                                            <span
+                                                                                className={cn(
+                                                                                    'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full',
+                                                                                    'text-[11px] font-semibold tabular-nums leading-none',
+                                                                                    'bg-primary/10 text-primary ring-1 ring-inset ring-primary/15',
+                                                                                )}
+                                                                            >
+                                                                                {tip.icon}
+                                                                            </span>
+                                                                            {!isLast && (
+                                                                                <span
+                                                                                    className="mt-1 w-px flex-1 bg-border dark:bg-border-dark"
+                                                                                    aria-hidden="true"
+                                                                                />
+                                                                            )}
+                                                                        </div>
+                                                                        <span
+                                                                            className={cn(
+                                                                                'pt-0.5 text-xs leading-relaxed text-text dark:text-text-dark',
+                                                                                !isLast && 'pb-4',
+                                                                            )}
+                                                                        >
+                                                                            {tip.text}
+                                                                        </span>
+                                                                    </li>
+                                                                );
+                                                            })}
+                                                        </ol>
                                                     </section>
                                                 </>
                                             )}
@@ -395,7 +412,7 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                         </DisclosureButton>
                                                                         <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
                                                                             {faq.a}
-                                                                            <ol className="mt-2 list-decimal space-y-1.5 pl-4 marker:font-medium marker:text-text-muted dark:marker:text-text-muted-dark">
+                                                                            <ol className="mt-3 space-y-2.5">
                                                                                 {faq.steps.map(
                                                                                     (
                                                                                         step,
@@ -405,9 +422,23 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                                             key={
                                                                                                 stepIndex
                                                                                             }
-                                                                                            className="pl-1"
+                                                                                            className="flex items-start gap-2.5"
                                                                                         >
-                                                                                            {step}
+                                                                                            <span
+                                                                                                className={cn(
+                                                                                                    'flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full',
+                                                                                                    'text-[10px] font-semibold tabular-nums leading-none',
+                                                                                                    'bg-primary/10 text-primary ring-1 ring-inset ring-primary/15',
+                                                                                                )}
+                                                                                            >
+                                                                                                {stepIndex +
+                                                                                                    1}
+                                                                                            </span>
+                                                                                            <span className="text-text dark:text-text-dark">
+                                                                                                {
+                                                                                                    step
+                                                                                                }
+                                                                                            </span>
                                                                                         </li>
                                                                                     ),
                                                                                 )}
