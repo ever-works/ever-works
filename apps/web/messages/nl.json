@@ -968,11 +968,20 @@
                 "faq": {
                     "title": "Veelgestelde vragen",
                     "q1": "Hoe werkt AI-generatie?",
-                    "a1": "Beschrijf je werk en de AI-agent onderzoekt, stelt op en vult het met relevante items die je kunt bekijken en bewerken.",
+                    "a1": "Het verloopt als een korte, begeleide pijplijn:",
+                    "a1s1": "Beschrijf je Work: het onderwerp, publiek en doel.",
+                    "a1s2": "De AI onderzoekt bronnen en stelt items, categorieën en tags op.",
+                    "a1s3": "Bekijk en bewerk of genereer alles opnieuw vóór publicatie.",
                     "q2": "Hoe verbind ik GitHub?",
-                    "a2": "Open Instellingen → Integraties en autoriseer GitHub om je werken als repository's te synchroniseren en te implementeren.",
+                    "a2": "Verbind het om je works als repository’s te synchroniseren en te implementeren:",
+                    "a2s1": "Open Instellingen → Integraties en klik op Verbinden bij GitHub.",
+                    "a2s2": "Autoriseer Ever Works en kies een account of organisatie.",
+                    "a2s3": "Kies de repository om te synchroniseren of implementeren vanuit je Work.",
                     "q3": "Kan ik items bewerken na het genereren?",
-                    "a3": "Ja. Elk gegenereerd item is volledig bewerkbaar: verfijn de inhoud of genereer afzonderlijke items op elk moment opnieuw.",
+                    "a3": "Ja — elk item blijft volledig bewerkbaar:",
+                    "a3s1": "Open het item om titel, inhoud of metadata te bewerken.",
+                    "a3s2": "Of genereer één item opnieuw voor een nieuw AI-concept.",
+                    "a3s3": "Sla op en je wijzigingen worden direct toegepast.",
                     "learnMore": "Meer informatie"
                 },
                 "system": {

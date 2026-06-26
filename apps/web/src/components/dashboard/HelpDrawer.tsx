@@ -95,9 +95,24 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
     ];
 
     const faqs = [
-        { q: t('faq.q1'), a: t('faq.a1'), href: DOCS_URL },
-        { q: t('faq.q2'), a: t('faq.a2'), href: `${DOCS_URL}/integrations` },
-        { q: t('faq.q3'), a: t('faq.a3'), href: DOCS_URL },
+        {
+            q: t('faq.q1'),
+            a: t('faq.a1'),
+            steps: [t('faq.a1s1'), t('faq.a1s2'), t('faq.a1s3')],
+            href: DOCS_URL,
+        },
+        {
+            q: t('faq.q2'),
+            a: t('faq.a2'),
+            steps: [t('faq.a2s1'), t('faq.a2s2'), t('faq.a2s3')],
+            href: `${DOCS_URL}/integrations`,
+        },
+        {
+            q: t('faq.q3'),
+            a: t('faq.a3'),
+            steps: [t('faq.a3s1'), t('faq.a3s2'), t('faq.a3s3')],
+            href: DOCS_URL,
+        },
     ];
 
     const links = [
@@ -380,6 +395,23 @@ export function HelpDrawer({ open, onClose, onboarding }: HelpDrawerProps) {
                                                                         </DisclosureButton>
                                                                         <DisclosurePanel className="border-t border-border px-4 py-2.5 text-xs leading-relaxed text-text-secondary dark:border-border-dark dark:text-text-secondary-dark">
                                                                             {faq.a}
+                                                                            <ol className="mt-2 list-decimal space-y-1.5 pl-4 marker:font-medium marker:text-text-muted dark:marker:text-text-muted-dark">
+                                                                                {faq.steps.map(
+                                                                                    (
+                                                                                        step,
+                                                                                        stepIndex,
+                                                                                    ) => (
+                                                                                        <li
+                                                                                            key={
+                                                                                                stepIndex
+                                                                                            }
+                                                                                            className="pl-1"
+                                                                                        >
+                                                                                            {step}
+                                                                                        </li>
+                                                                                    ),
+                                                                                )}
+                                                                            </ol>
                                                                             {faq.href && (
                                                                                 <a
                                                                                     href={faq.href}

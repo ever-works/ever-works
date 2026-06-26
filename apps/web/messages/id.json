@@ -968,11 +968,20 @@
                 "faq": {
                     "title": "Pertanyaan Umum",
                     "q1": "Bagaimana cara kerja pembuatan dengan AI?",
-                    "a1": "Jelaskan pekerjaan Anda dan agen AI akan meneliti, menyusun, serta mengisinya dengan item relevan yang dapat Anda tinjau dan edit.",
+                    "a1": "Ini berjalan sebagai alur terpandu yang singkat:",
+                    "a1s1": "Jelaskan Work Anda — topik, audiens, dan tujuannya.",
+                    "a1s2": "AI meneliti sumber dan menyusun item, kategori, dan tag.",
+                    "a1s3": "Tinjau, lalu edit atau buat ulang apa pun sebelum menerbitkan.",
                     "q2": "Bagaimana cara menghubungkan GitHub?",
-                    "a2": "Buka Pengaturan → Integrasi dan otorisasi GitHub untuk menyinkronkan dan men-deploy pekerjaan Anda sebagai repositori.",
+                    "a2": "Hubungkan untuk menyinkronkan dan men-deploy works sebagai repositori:",
+                    "a2s1": "Buka Pengaturan → Integrasi dan klik Hubungkan pada GitHub.",
+                    "a2s2": "Otorisasi Ever Works dan pilih akun atau organisasi.",
+                    "a2s3": "Pilih repositori untuk disinkronkan atau di-deploy dari Work Anda.",
                     "q3": "Bisakah saya mengedit item setelah dibuat?",
-                    "a3": "Ya. Setiap item yang dibuat dapat diedit sepenuhnya — sempurnakan kontennya atau buat ulang item satu per satu kapan saja.",
+                    "a3": "Ya — setiap item tetap sepenuhnya dapat diedit:",
+                    "a3s1": "Buka item untuk mengedit judul, konten, atau metadatanya.",
+                    "a3s2": "Atau buat ulang satu item untuk mendapatkan draf AI baru.",
+                    "a3s3": "Simpan dan perubahan Anda langsung diterapkan.",
                     "learnMore": "Pelajari selengkapnya"
                 },
                 "system": {

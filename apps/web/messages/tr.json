@@ -968,11 +968,20 @@
                 "faq": {
                     "title": "Sıkça Sorulan Sorular",
                     "q1": "Yapay zeka üretimi nasıl çalışır?",
-                    "a1": "İşinizi tanımlayın; yapay zeka aracısı araştırır, taslak hazırlar ve onu inceleyip düzenleyebileceğiniz ilgili öğelerle doldurur.",
+                    "a1": "Kısa, yönlendirilmiş bir işlem hattı olarak çalışır:",
+                    "a1s1": "Work’ünüzü tanımlayın — konusu, hedef kitlesi ve amacı.",
+                    "a1s2": "Yapay zekâ kaynakları araştırır; öğeler, kategoriler ve etiketler oluşturur.",
+                    "a1s3": "İnceleyin, sonra yayımlamadan önce dilediğinizi düzenleyin veya yeniden oluşturun.",
                     "q2": "GitHub'ı nasıl bağlarım?",
-                    "a2": "Ayarlar → Entegrasyonlar'ı açın ve işlerinizi depo olarak senkronize edip dağıtmak için GitHub'a yetki verin.",
+                    "a2": "works’lerinizi depo olarak eşitlemek ve dağıtmak için bağlayın:",
+                    "a2s1": "Ayarlar → Entegrasyonlar’ı açın ve GitHub’da Bağla’ya tıklayın.",
+                    "a2s2": "Ever Works’e izin verin ve bir hesap ya da kuruluş seçin.",
+                    "a2s3": "Work’ünüzden eşitlenecek veya dağıtılacak depoyu seçin.",
                     "q3": "Öğeleri ürettikten sonra düzenleyebilir miyim?",
-                    "a3": "Evet. Üretilen her öğe tamamen düzenlenebilir — içeriği iyileştirin veya tek tek öğeleri istediğiniz zaman yeniden üretin.",
+                    "a3": "Evet — her öğe tamamen düzenlenebilir kalır:",
+                    "a3s1": "Başlığını, içeriğini veya meta verisini düzenlemek için öğeyi açın.",
+                    "a3s2": "Veya yeni bir yapay zekâ taslağı için tek bir öğeyi yeniden oluşturun.",
+                    "a3s3": "Kaydedin; değişiklikleriniz anında uygulanır.",
                     "learnMore": "Daha fazla bilgi"
                 },
                 "system": {

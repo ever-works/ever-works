@@ -968,11 +968,20 @@
                 "faq": {
                     "title": "Câu hỏi thường gặp",
                     "q1": "Tạo nội dung bằng AI hoạt động thế nào?",
-                    "a1": "Mô tả công việc của bạn và tác nhân AI sẽ nghiên cứu, soạn thảo và điền vào đó các mục liên quan mà bạn có thể xem lại và chỉnh sửa.",
+                    "a1": "Nó chạy như một quy trình hướng dẫn ngắn:",
+                    "a1s1": "Mô tả Work của bạn — chủ đề, đối tượng và mục tiêu.",
+                    "a1s2": "AI nghiên cứu nguồn và soạn các mục, danh mục và thẻ.",
+                    "a1s3": "Xem lại, rồi chỉnh sửa hoặc tạo lại bất kỳ thứ gì trước khi xuất bản.",
                     "q2": "Làm cách nào để kết nối GitHub?",
-                    "a2": "Mở Cài đặt → Tích hợp và cấp quyền cho GitHub để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ.",
+                    "a2": "Kết nối để đồng bộ và triển khai works dưới dạng kho lưu trữ:",
+                    "a2s1": "Mở Cài đặt → Tích hợp và nhấp Kết nối ở GitHub.",
+                    "a2s2": "Cấp quyền cho Ever Works và chọn tài khoản hoặc tổ chức.",
+                    "a2s3": "Chọn kho lưu trữ để đồng bộ hoặc triển khai từ Work của bạn.",
                     "q3": "Tôi có thể chỉnh sửa các mục sau khi tạo không?",
-                    "a3": "Có. Mọi mục được tạo đều có thể chỉnh sửa hoàn toàn — tinh chỉnh nội dung hoặc tạo lại từng mục bất cứ lúc nào.",
+                    "a3": "Có — mọi mục vẫn có thể chỉnh sửa hoàn toàn:",
+                    "a3s1": "Mở mục để chỉnh sửa tiêu đề, nội dung hoặc siêu dữ liệu.",
+                    "a3s2": "Hoặc tạo lại một mục để có bản nháp AI mới.",
+                    "a3s3": "Lưu lại và thay đổi của bạn được áp dụng ngay.",
                     "learnMore": "Tìm hiểu thêm"
                 },
                 "system": {

@@ -1073,11 +1073,20 @@
                 "faq": {
                     "title": "Preguntas frecuentes",
                     "q1": "¿Cómo funciona la generación con IA?",
-                    "a1": "Describe tu trabajo y el agente de IA investiga, redacta y lo completa con elementos relevantes que puedes revisar y editar.",
+                    "a1": "Funciona como una breve canalización guiada:",
+                    "a1s1": "Describe tu Work: su tema, audiencia y objetivo.",
+                    "a1s2": "La IA investiga fuentes y redacta elementos, categorías y etiquetas.",
+                    "a1s3": "Revisa y luego edita o regenera lo que quieras antes de publicar.",
                     "q2": "¿Cómo conecto GitHub?",
-                    "a2": "Abre Ajustes → Integraciones y autoriza GitHub para sincronizar y desplegar tus trabajos como repositorios.",
+                    "a2": "Conéctalo para sincronizar y desplegar tus works como repositorios:",
+                    "a2s1": "Abre Ajustes → Integraciones y pulsa Conectar en GitHub.",
+                    "a2s2": "Autoriza Ever Works y elige una cuenta u organización.",
+                    "a2s3": "Elige el repositorio para sincronizar o desplegar desde tu Work.",
                     "q3": "¿Puedo editar los elementos después de generarlos?",
-                    "a3": "Sí. Cada elemento generado es totalmente editable: refina el contenido o regenera elementos individuales cuando quieras.",
+                    "a3": "Sí: cada elemento sigue siendo totalmente editable:",
+                    "a3s1": "Abre el elemento para editar su título, contenido o metadatos.",
+                    "a3s2": "O regenera un solo elemento para obtener un nuevo borrador de IA.",
+                    "a3s3": "Guarda y tus cambios se aplican al instante.",
                     "learnMore": "Más información"
                 },
                 "system": {

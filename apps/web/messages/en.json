@@ -1073,11 +1073,20 @@
                 "faq": {
                     "title": "Frequently Asked",
                     "q1": "How does AI generation work?",
-                    "a1": "Describe your Work and the AI agent researches, drafts, and fills it with relevant items you can review and edit.",
+                    "a1": "It runs as a short, guided pipeline:",
+                    "a1s1": "Describe your Work — its topic, audience, and goal.",
+                    "a1s2": "The AI researches sources and drafts items, categories, and tags.",
+                    "a1s3": "Review, then edit or regenerate anything before publishing.",
                     "q2": "How do I connect GitHub?",
-                    "a2": "Open Settings → Integrations and authorize GitHub to sync and deploy your works as repositories.",
+                    "a2": "Connect it to sync and deploy your works as repositories:",
+                    "a2s1": "Open Settings → Integrations and click Connect on GitHub.",
+                    "a2s2": "Authorize Ever Works and choose an account or organization.",
+                    "a2s3": "Pick the repository to sync or deploy from your Work.",
                     "q3": "Can I edit items after generating?",
-                    "a3": "Yes. Every generated item is fully editable — refine the content or regenerate individual items anytime.",
+                    "a3": "Yes — every item stays fully editable:",
+                    "a3s1": "Open the item to edit its title, content, or metadata.",
+                    "a3s2": "Or regenerate a single item for a fresh AI draft.",
+                    "a3s3": "Save and your changes apply instantly.",
                     "learnMore": "Learn more"
                 },
                 "system": {

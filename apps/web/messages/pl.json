@@ -968,11 +968,20 @@
                 "faq": {
                     "title": "Najczęstsze pytania",
                     "q1": "Jak działa generowanie przez SI?",
-                    "a1": "Opisz swoją pracę, a agent SI przeprowadzi research, przygotuje treść i wypełni ją odpowiednimi elementami, które możesz sprawdzić i edytować.",
+                    "a1": "Działa jak krótki, prowadzony potok:",
+                    "a1s1": "Opisz swój Work — temat, odbiorców i cel.",
+                    "a1s2": "AI bada źródła i tworzy elementy, kategorie i tagi.",
+                    "a1s3": "Sprawdź, a potem edytuj lub wygeneruj ponownie cokolwiek przed publikacją.",
                     "q2": "Jak połączyć GitHub?",
-                    "a2": "Otwórz Ustawienia → Integracje i autoryzuj GitHub, aby synchronizować i wdrażać swoje prace jako repozytoria.",
+                    "a2": "Połącz go, aby synchronizować i wdrażać swoje works jako repozytoria:",
+                    "a2s1": "Otwórz Ustawienia → Integracje i kliknij Połącz przy GitHub.",
+                    "a2s2": "Autoryzuj Ever Works i wybierz konto lub organizację.",
+                    "a2s3": "Wybierz repozytorium do synchronizacji lub wdrożenia ze swojego Work.",
                     "q3": "Czy mogę edytować elementy po wygenerowaniu?",
-                    "a3": "Tak. Każdy wygenerowany element można w pełni edytować — dopracuj treść lub w dowolnej chwili wygeneruj poszczególne elementy ponownie.",
+                    "a3": "Tak — każdy element pozostaje w pełni edytowalny:",
+                    "a3s1": "Otwórz element, aby edytować tytuł, treść lub metadane.",
+                    "a3s2": "Albo wygeneruj ponownie pojedynczy element, aby uzyskać nowy szkic AI.",
+                    "a3s3": "Zapisz, a zmiany zostaną zastosowane natychmiast.",
                     "learnMore": "Dowiedz się więcej"
                 },
                 "system": {
