@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Aide & Ressources",
                 "subtitle": "Conseils rapides et liens utiles pour vous aider à démarrer",
+                "tabs": {
+                    "tips": "Astuces",
+                    "shortcuts": "Raccourcis",
+                    "faq": "FAQ",
+                    "resources": "Ressources"
+                },
                 "onboarding": {
                     "title": "Initiation",
                     "description": "Rouvrez la configuration guidée à tout moment et continuez là où vous vous êtes arrêté.",
@@ -1040,7 +1046,8 @@
                     "title": "Conseils rapides",
                     "tip1": "Créez votre premier travail en cliquant sur le bouton « Créer un travail » dans le tableau de bord.",
                     "tip2": "Utilisez le générateur IA pour peupler automatiquement votre travail avec des éléments pertinents.",
-                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels."
+                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels.",
+                    "tip4": "Appuyez sur ? à tout moment pour rouvrir ce panneau Aide & Ressources."
                 },
                 "shortcuts": {
                     "title": "Raccourcis clavier",
@@ -1054,9 +1061,39 @@
                     "github": "Dépôt GitHub",
                     "issues": "Signaler un problème",
                     "docs": "Documentation",
-                    "comingSoon": "Bientôt disponible"
+                    "comingSoon": "Bientôt disponible",
+                    "community": "Discussions de la communauté"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Besoin d'aide supplémentaire ?",
+                    "description": "Consultez la documentation ou demandez à la communauté — nous répondons généralement rapidement.",
+                    "action": "Rejoindre la discussion"
+                },
+                "faq": {
+                    "title": "Questions fréquentes",
+                    "q1": "Comment fonctionne la génération par IA ?",
+                    "a1": "Cela fonctionne comme un court pipeline guidé :",
+                    "a1s1": "Décrivez votre Work : son sujet, son public et son objectif.",
+                    "a1s2": "L’IA recherche des sources et rédige éléments, catégories et tags.",
+                    "a1s3": "Vérifiez, puis modifiez ou régénérez ce que vous voulez avant publication.",
+                    "q2": "Comment connecter GitHub ?",
+                    "a2": "Connectez-le pour synchroniser et déployer vos works en dépôts :",
+                    "a2s1": "Ouvrez Paramètres → Intégrations et cliquez sur Connecter pour GitHub.",
+                    "a2s2": "Autorisez Ever Works et choisissez un compte ou une organisation.",
+                    "a2s3": "Choisissez le dépôt à synchroniser ou déployer depuis votre Work.",
+                    "q3": "Puis-je modifier les éléments après la génération ?",
+                    "a3": "Oui : chaque élément reste entièrement modifiable :",
+                    "a3s1": "Ouvrez l’élément pour modifier son titre, son contenu ou ses métadonnées.",
+                    "a3s2": "Ou régénérez un seul élément pour obtenir un nouveau brouillon IA.",
+                    "a3s3": "Enregistrez et vos modifications s’appliquent immédiatement.",
+                    "learnMore": "En savoir plus"
+                },
+                "system": {
+                    "title": "Système",
+                    "operational": "Tous les systèmes sont opérationnels",
+                    "environment": "Environnement"
+                }
             }
         },
         "activity": {

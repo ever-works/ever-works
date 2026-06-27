@@ -926,6 +926,12 @@
             "help": {
                 "title": "Pomoc i zasoby",
                 "subtitle": "Szybkie wskazówki i przydatne linki, aby pomóc Ci zacząć",
+                "tabs": {
+                    "tips": "Wskazówki",
+                    "shortcuts": "Skróty",
+                    "faq": "FAQ",
+                    "resources": "Zasoby"
+                },
                 "onboarding": {
                     "title": "Wprowadzenie",
                     "description": "Otwórz ponownie przewodnik w dowolnym momencie i kontynuuj od miejsca, w którym przerwałeś.",
@@ -935,7 +941,8 @@
                     "title": "Szybkie wskazówki",
                     "tip1": "Utwórz swój pierwszy praca, klikając przycisk „Utwórz praca” na pulpicie.",
                     "tip2": "Użyj generatora AI, aby automatycznie wypełnić praca odpowiednimi elementami.",
-                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria."
+                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria.",
+                    "tip4": "Naciśnij ? w dowolnym momencie, aby ponownie otworzyć ten panel Pomoc i zasoby."
                 },
                 "shortcuts": {
                     "title": "Skróty klawiaturowe",
@@ -949,9 +956,39 @@
                     "github": "Repozytorium GitHub",
                     "issues": "Zgłoś problem",
                     "docs": "Dokumentacja",
-                    "comingSoon": "Wkrótce"
+                    "comingSoon": "Wkrótce",
+                    "community": "Dyskusje społeczności"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Potrzebujesz więcej pomocy?",
+                    "description": "Przejrzyj dokumentację lub zapytaj społeczność — zwykle odpowiadamy szybko.",
+                    "action": "Dołącz do dyskusji"
+                },
+                "faq": {
+                    "title": "Najczęstsze pytania",
+                    "q1": "Jak działa generowanie przez SI?",
+                    "a1": "Działa jak krótki, prowadzony potok:",
+                    "a1s1": "Opisz swój Work — temat, odbiorców i cel.",
+                    "a1s2": "AI bada źródła i tworzy elementy, kategorie i tagi.",
+                    "a1s3": "Sprawdź, a potem edytuj lub wygeneruj ponownie cokolwiek przed publikacją.",
+                    "q2": "Jak połączyć GitHub?",
+                    "a2": "Połącz go, aby synchronizować i wdrażać swoje works jako repozytoria:",
+                    "a2s1": "Otwórz Ustawienia → Integracje i kliknij Połącz przy GitHub.",
+                    "a2s2": "Autoryzuj Ever Works i wybierz konto lub organizację.",
+                    "a2s3": "Wybierz repozytorium do synchronizacji lub wdrożenia ze swojego Work.",
+                    "q3": "Czy mogę edytować elementy po wygenerowaniu?",
+                    "a3": "Tak — każdy element pozostaje w pełni edytowalny:",
+                    "a3s1": "Otwórz element, aby edytować tytuł, treść lub metadane.",
+                    "a3s2": "Albo wygeneruj ponownie pojedynczy element, aby uzyskać nowy szkic AI.",
+                    "a3s3": "Zapisz, a zmiany zostaną zastosowane natychmiast.",
+                    "learnMore": "Dowiedz się więcej"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Wszystkie systemy działają",
+                    "environment": "Środowisko"
+                }
             }
         },
         "activity": {

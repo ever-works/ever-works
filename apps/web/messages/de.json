@@ -1031,6 +1031,12 @@
             "help": {
                 "title": "Hilfe & Ressourcen",
                 "subtitle": "Schnelle Tipps und nützliche Links, um Sie beim Einstieg zu unterstützen",
+                "tabs": {
+                    "tips": "Tipps",
+                    "shortcuts": "Tastenkürzel",
+                    "faq": "FAQ",
+                    "resources": "Ressourcen"
+                },
                 "onboarding": {
                     "title": "Einführung",
                     "description": "Öffnen Sie die geführte Einrichtung jederzeit erneut und setzen Sie dort fort, wo Sie aufgehört haben.",
@@ -1040,7 +1046,8 @@
                     "title": "Schnelle Tipps",
                     "tip1": "Erstellen Sie Ihr erstes Werk, indem Sie die Schaltfläche „Werk erstellen“ auf der Übersicht klicken.",
                     "tip2": "Verwenden Sie den KI-Generator, um Ihr Werk automatisch mit relevanten Elementen zu füllen.",
-                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen."
+                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen.",
+                    "tip4": "Drücken Sie jederzeit ?, um dieses Hilfe- & Ressourcen-Panel erneut zu öffnen."
                 },
                 "shortcuts": {
                     "title": "Tastaturkürzel",
@@ -1054,9 +1061,39 @@
                     "github": "GitHub-Repository",
                     "issues": "Problem melden",
                     "docs": "Dokumentation",
-                    "comingSoon": "Bald verfügbar"
+                    "comingSoon": "Bald verfügbar",
+                    "community": "Community-Diskussionen"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Brauchen Sie weitere Hilfe?",
+                    "description": "Durchsuchen Sie die Dokumentation oder fragen Sie die Community — wir antworten meist schnell.",
+                    "action": "An der Diskussion teilnehmen"
+                },
+                "faq": {
+                    "title": "Häufige Fragen",
+                    "q1": "Wie funktioniert die KI-Generierung?",
+                    "a1": "Es läuft als kurze, geführte Pipeline ab:",
+                    "a1s1": "Beschreibe deinen Work – Thema, Zielgruppe und Ziel.",
+                    "a1s2": "Die KI recherchiert Quellen und erstellt Einträge, Kategorien und Tags.",
+                    "a1s3": "Prüfe und bearbeite oder regeneriere alles vor dem Veröffentlichen.",
+                    "q2": "Wie verbinde ich GitHub?",
+                    "a2": "Verbinde ihn, um deine works als Repositorys zu synchronisieren und bereitzustellen:",
+                    "a2s1": "Öffne Einstellungen → Integrationen und klicke bei GitHub auf Verbinden.",
+                    "a2s2": "Autorisiere Ever Works und wähle ein Konto oder eine Organisation.",
+                    "a2s3": "Wähle das Repository zum Synchronisieren oder Bereitstellen aus deinem Work.",
+                    "q3": "Kann ich Elemente nach der Generierung bearbeiten?",
+                    "a3": "Ja – jeder Eintrag bleibt jederzeit bearbeitbar:",
+                    "a3s1": "Öffne den Eintrag, um Titel, Inhalt oder Metadaten zu bearbeiten.",
+                    "a3s2": "Oder regeneriere einen einzelnen Eintrag für einen neuen KI-Entwurf.",
+                    "a3s3": "Speichere und deine Änderungen werden sofort übernommen.",
+                    "learnMore": "Mehr erfahren"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Alle Systeme betriebsbereit",
+                    "environment": "Umgebung"
+                }
             }
         },
         "activity": {

@@ -926,6 +926,12 @@
             "help": {
                 "title": "Yardım & Kaynaklar",
                 "subtitle": "Başlamanıza yardımcı olacak hızlı ipuçları ve faydalı bağlantılar",
+                "tabs": {
+                    "tips": "İpuçları",
+                    "shortcuts": "Kısayollar",
+                    "faq": "SSS",
+                    "resources": "Kaynaklar"
+                },
                 "onboarding": {
                     "title": "Başlangıç",
                     "description": "Yönlendirmeli kurulumun her zaman yeniden açın ve bıraktığınız yerden devam edin.",
@@ -935,7 +941,8 @@
                     "title": "Hızlı İpuçları",
                     "tip1": "Panodaki 'İş Oluştur' düğmesine tıklayarak ilk işinizi oluşturun.",
                     "tip2": "İşizi ilgili öğelerle otomatik olarak doldurmak için AI üretecisini kullanın.",
-                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın."
+                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın.",
+                    "tip4": "Bu Yardım ve Kaynaklar panelini yeniden açmak için istediğiniz zaman ? tuşuna basın."
                 },
                 "shortcuts": {
                     "title": "Klavye Kısayolları",
@@ -949,9 +956,39 @@
                     "github": "GitHub Deposu",
                     "issues": "Sorun Bildir",
                     "docs": "Belgeler",
-                    "comingSoon": "Yakında"
+                    "comingSoon": "Yakında",
+                    "community": "Topluluk Tartışmaları"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Daha fazla yardıma mı ihtiyacınız var?",
+                    "description": "Belgelere göz atın veya topluluğa sorun — genellikle hızlı yanıt veriyoruz.",
+                    "action": "Tartışmaya katıl"
+                },
+                "faq": {
+                    "title": "Sıkça Sorulan Sorular",
+                    "q1": "Yapay zeka üretimi nasıl çalışır?",
+                    "a1": "Kısa, yönlendirilmiş bir işlem hattı olarak çalışır:",
+                    "a1s1": "Work’ünüzü tanımlayın — konusu, hedef kitlesi ve amacı.",
+                    "a1s2": "Yapay zekâ kaynakları araştırır; öğeler, kategoriler ve etiketler oluşturur.",
+                    "a1s3": "İnceleyin, sonra yayımlamadan önce dilediğinizi düzenleyin veya yeniden oluşturun.",
+                    "q2": "GitHub'ı nasıl bağlarım?",
+                    "a2": "works’lerinizi depo olarak eşitlemek ve dağıtmak için bağlayın:",
+                    "a2s1": "Ayarlar → Entegrasyonlar’ı açın ve GitHub’da Bağla’ya tıklayın.",
+                    "a2s2": "Ever Works’e izin verin ve bir hesap ya da kuruluş seçin.",
+                    "a2s3": "Work’ünüzden eşitlenecek veya dağıtılacak depoyu seçin.",
+                    "q3": "Öğeleri ürettikten sonra düzenleyebilir miyim?",
+                    "a3": "Evet — her öğe tamamen düzenlenebilir kalır:",
+                    "a3s1": "Başlığını, içeriğini veya meta verisini düzenlemek için öğeyi açın.",
+                    "a3s2": "Veya yeni bir yapay zekâ taslağı için tek bir öğeyi yeniden oluşturun.",
+                    "a3s3": "Kaydedin; değişiklikleriniz anında uygulanır.",
+                    "learnMore": "Daha fazla bilgi"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Tüm sistemler çalışıyor",
+                    "environment": "Ortam"
+                }
             }
         },
         "activity": {

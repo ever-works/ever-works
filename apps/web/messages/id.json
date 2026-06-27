@@ -926,6 +926,12 @@
             "help": {
                 "title": "Bantuan & Sumber Daya",
                 "subtitle": "Tips cepat dan tautan berguna untuk membantu Anda memulai",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Pintasan",
+                    "faq": "FAQ",
+                    "resources": "Sumber Daya"
+                },
                 "onboarding": {
                     "title": "Onboarding",
                     "description": "Buka kembali pengaturan terpandu kapan saja dan lanjutkan dari tempat Anda berhenti.",
@@ -935,7 +941,8 @@
                     "title": "Tips Cepat",
                     "tip1": "Buat karya pertama Anda dengan mengklik tombol 'Buat Karya' di dasbor.",
                     "tip2": "Gunakan generator AI untuk mengisi karya Anda secara otomatis dengan item relevan.",
-                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori."
+                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori.",
+                    "tip4": "Tekan ? kapan saja untuk membuka kembali panel Bantuan & Sumber Daya ini."
                 },
                 "shortcuts": {
                     "title": "Pintasan Keyboard",
@@ -949,9 +956,39 @@
                     "github": "Repositori GitHub",
                     "issues": "Laporkan Masalah",
                     "docs": "Dokumentasi",
-                    "comingSoon": "Segera hadir"
+                    "comingSoon": "Segera hadir",
+                    "community": "Diskusi Komunitas"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Butuh bantuan lebih?",
+                    "description": "Jelajahi dokumentasi atau tanyakan kepada komunitas — kami biasanya membalas dengan cepat.",
+                    "action": "Gabung diskusi"
+                },
+                "faq": {
+                    "title": "Pertanyaan Umum",
+                    "q1": "Bagaimana cara kerja pembuatan dengan AI?",
+                    "a1": "Ini berjalan sebagai alur terpandu yang singkat:",
+                    "a1s1": "Jelaskan Work Anda — topik, audiens, dan tujuannya.",
+                    "a1s2": "AI meneliti sumber dan menyusun item, kategori, dan tag.",
+                    "a1s3": "Tinjau, lalu edit atau buat ulang apa pun sebelum menerbitkan.",
+                    "q2": "Bagaimana cara menghubungkan GitHub?",
+                    "a2": "Hubungkan untuk menyinkronkan dan men-deploy works sebagai repositori:",
+                    "a2s1": "Buka Pengaturan → Integrasi dan klik Hubungkan pada GitHub.",
+                    "a2s2": "Otorisasi Ever Works dan pilih akun atau organisasi.",
+                    "a2s3": "Pilih repositori untuk disinkronkan atau di-deploy dari Work Anda.",
+                    "q3": "Bisakah saya mengedit item setelah dibuat?",
+                    "a3": "Ya — setiap item tetap sepenuhnya dapat diedit:",
+                    "a3s1": "Buka item untuk mengedit judul, konten, atau metadatanya.",
+                    "a3s2": "Atau buat ulang satu item untuk mendapatkan draf AI baru.",
+                    "a3s3": "Simpan dan perubahan Anda langsung diterapkan.",
+                    "learnMore": "Pelajari selengkapnya"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Semua sistem beroperasi",
+                    "environment": "Lingkungan"
+                }
             }
         },
         "activity": {

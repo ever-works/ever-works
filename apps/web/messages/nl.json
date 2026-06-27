@@ -926,6 +926,12 @@
             "help": {
                 "title": "Help & bronnen",
                 "subtitle": "Snelle tips en nuttige links om aan de slag te gaan",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Sneltoetsen",
+                    "faq": "FAQ",
+                    "resources": "Bronnen"
+                },
                 "onboarding": {
                     "title": "Ingebruikname",
                     "description": "Open de begeleide setup op elk moment opnieuw en ga verder waar je gebleven was.",
@@ -935,7 +941,8 @@
                     "title": "Snelle tips",
                     "tip1": "Maak je eerste werk door op de knop 'Werk maken' op het dashboard te klikken.",
                     "tip2": "Gebruik de AI-generator om je werk automatisch te vullen met relevante items.",
-                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren."
+                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren.",
+                    "tip4": "Druk op elk moment op ? om dit Help & Bronnen-paneel opnieuw te openen."
                 },
                 "shortcuts": {
                     "title": "Toetsenbord-snelkoppelingen",
@@ -949,9 +956,39 @@
                     "github": "GitHub-repository",
                     "issues": "Probleem melden",
                     "docs": "Documentatie",
-                    "comingSoon": "Binnenkort beschikbaar"
+                    "comingSoon": "Binnenkort beschikbaar",
+                    "community": "Community-discussies"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Meer hulp nodig?",
+                    "description": "Raadpleeg de documentatie of vraag het de community — we reageren meestal snel.",
+                    "action": "Doe mee aan de discussie"
+                },
+                "faq": {
+                    "title": "Veelgestelde vragen",
+                    "q1": "Hoe werkt AI-generatie?",
+                    "a1": "Het verloopt als een korte, begeleide pijplijn:",
+                    "a1s1": "Beschrijf je Work: het onderwerp, publiek en doel.",
+                    "a1s2": "De AI onderzoekt bronnen en stelt items, categorieën en tags op.",
+                    "a1s3": "Bekijk en bewerk of genereer alles opnieuw vóór publicatie.",
+                    "q2": "Hoe verbind ik GitHub?",
+                    "a2": "Verbind het om je works als repository’s te synchroniseren en te implementeren:",
+                    "a2s1": "Open Instellingen → Integraties en klik op Verbinden bij GitHub.",
+                    "a2s2": "Autoriseer Ever Works en kies een account of organisatie.",
+                    "a2s3": "Kies de repository om te synchroniseren of implementeren vanuit je Work.",
+                    "q3": "Kan ik items bewerken na het genereren?",
+                    "a3": "Ja — elk item blijft volledig bewerkbaar:",
+                    "a3s1": "Open het item om titel, inhoud of metadata te bewerken.",
+                    "a3s2": "Of genereer één item opnieuw voor een nieuw AI-concept.",
+                    "a3s3": "Sla op en je wijzigingen worden direct toegepast.",
+                    "learnMore": "Meer informatie"
+                },
+                "system": {
+                    "title": "Systeem",
+                    "operational": "Alle systemen operationeel",
+                    "environment": "Omgeving"
+                }
             }
         },
         "activity": {
