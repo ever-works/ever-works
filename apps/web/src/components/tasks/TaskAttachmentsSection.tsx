@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Paperclip, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -36,6 +37,7 @@ interface Props {
  * 400 message instead of a generic toast.
  */
 export function TaskAttachmentsSection({ taskId, workId, initial, initialError = null }: Props) {
+    const t = useTranslations('dashboard.tasksPage.detail');
     const [rows, setRows] = useState<TaskAttachmentRow[]>(initial);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
     const [pending, startTransition] = useTransition();
@@ -178,7 +180,7 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
             ) : (
                 <div className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        Attachments are available after the task is scoped to a Work.
+                        {t('attachmentsWorkOnly')}
                     </p>
                 </div>
             )}

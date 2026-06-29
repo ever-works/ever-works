@@ -750,6 +750,7 @@
                 "browse": "עיין",
                 "uploading": "מעלה...",
                 "detach": "נתק",
+                "attachmentsWorkOnly": "קבצים מצורפים זמינים רק במשימות בהיקף Work. צור משימה מתוך Work כדי לצרף קבצים.",
                 "labels": "תוויות",
                 "edited": "נערך"
             },

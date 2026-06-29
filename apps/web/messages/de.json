@@ -750,6 +750,7 @@
                 "browse": "Durchsuchen",
                 "uploading": "Hochladen…",
                 "detach": "Trennen",
+                "attachmentsWorkOnly": "Anhänge sind nur bei Work-bezogenen Aufgaben verfügbar. Erstelle eine Aufgabe aus einem Work, um Dateien anzuhängen.",
                 "labels": "Labels",
                 "edited": "bearbeitet"
             },

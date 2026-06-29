@@ -692,6 +692,7 @@
                 "browse": "찾아보기",
                 "uploading": "업로드 중...",
                 "detach": "분리",
+                "attachmentsWorkOnly": "첨부 파일은 Work 범위 작업에서만 사용할 수 있습니다. 파일을 첨부하려면 Work에서 작업을 만드세요.",
                 "labels": "레이블",
                 "edited": "편집됨"
             },

@@ -750,6 +750,7 @@
                 "browse": "Browse",
                 "uploading": "Uploading…",
                 "detach": "Detach",
+                "attachmentsWorkOnly": "Attachments are only available on Work-scoped tasks. Create a task from a Work to attach files.",
                 "labels": "Labels",
                 "edited": "edited"
             },

@@ -692,6 +692,7 @@
                 "browse": "Bladeren",
                 "uploading": "Uploaden...",
                 "detach": "Loskoppelen",
+                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Maak een taak vanuit een Work om bestanden toe te voegen.",
                 "labels": "Labels",
                 "edited": "bewerkt"
             },

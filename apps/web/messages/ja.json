@@ -692,6 +692,7 @@
                 "browse": "参照",
                 "uploading": "アップロード中…",
                 "detach": "取り外す",
+                "attachmentsWorkOnly": "添付ファイルは Work にスコープされたタスクでのみ利用できます。ファイルを添付するには、Work からタスクを作成してください。",
                 "labels": "ラベル",
                 "edited": "編集済み"
             },

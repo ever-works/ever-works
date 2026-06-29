@@ -692,6 +692,7 @@
                 "browse": "Duyệt",
                 "uploading": "Đang tải lên...",
                 "detach": "Tách",
+                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
                 "labels": "Nhãn",
                 "edited": "đã chỉnh sửa"
             },

@@ -692,6 +692,7 @@
                 "browse": "Przeglądaj",
                 "uploading": "Wysyłanie…",
                 "detach": "Odłącz",
+                "attachmentsWorkOnly": "Załączniki są dostępne tylko w zadaniach powiązanych z Work. Utwórz zadanie z poziomu Work, aby dołączyć pliki.",
                 "labels": "Etykiety",
                 "edited": "edytowano"
             },

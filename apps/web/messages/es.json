@@ -750,6 +750,7 @@
                 "browse": "Examinar",
                 "uploading": "Subiendo...",
                 "detach": "Desvincular",
+                "attachmentsWorkOnly": "Los archivos adjuntos solo están disponibles en tareas limitadas a un Work. Crea una tarea desde un Work para adjuntar archivos.",
                 "labels": "Etiquetas",
                 "edited": "editado"
             },

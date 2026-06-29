@@ -692,6 +692,7 @@
                 "browse": "Sfoglia",
                 "uploading": "Caricamento…",
                 "detach": "Scollega",
+                "attachmentsWorkOnly": "Gli allegati sono disponibili solo per le attività legate a un Work. Crea un'attività da un Work per allegare file.",
                 "labels": "Etichette",
                 "edited": "modificato"
             },

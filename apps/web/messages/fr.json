@@ -750,6 +750,7 @@
                 "browse": "Parcourir",
                 "uploading": "Téléchargement en cours…",
                 "detach": "Détacher",
+                "attachmentsWorkOnly": "Les pièces jointes ne sont disponibles que sur les tâches liées à un Work. Créez une tâche depuis un Work pour joindre des fichiers.",
                 "labels": "Étiquettes",
                 "edited": "modifié"
             },

@@ -692,6 +692,7 @@
                 "browse": "Gözat",
                 "uploading": "Yükleniyor…",
                 "detach": "Ayır",
+                "attachmentsWorkOnly": "Ekler yalnızca Work kapsamındaki görevlerde kullanılabilir. Dosya eklemek için görevi bir Work üzerinden oluşturun.",
                 "labels": "Etiketler",
                 "edited": "düzenlendi"
             },

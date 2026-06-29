@@ -692,6 +692,7 @@
                 "browse": "浏览",
                 "uploading": "上传中…",
                 "detach": "分离",
+                "attachmentsWorkOnly": "附件仅在限定于 Work 的任务中可用。请从某个 Work 创建任务以附加文件。",
                 "labels": "标签",
                 "edited": "已编辑"
             },

@@ -692,6 +692,7 @@
                 "browse": "Telusuri",
                 "uploading": "Mengunggah…",
                 "detach": "Lepas",
+                "attachmentsWorkOnly": "Lampiran hanya tersedia pada tugas yang terkait dengan Work. Buat tugas dari sebuah Work untuk melampirkan file.",
                 "labels": "Label",
                 "edited": "diedit"
             },

@@ -692,6 +692,7 @@
                 "browse": "Procurar",
                 "uploading": "Enviando...",
                 "detach": "Desanexar",
+                "attachmentsWorkOnly": "Os anexos só estão disponíveis em tarefas vinculadas a um Work. Crie uma tarefa a partir de um Work para anexar arquivos.",
                 "labels": "Etiquetas",
                 "edited": "editado"
             },
