@@ -218,7 +218,7 @@ export function TaskDetailClient({
                                         key={s}
                                         type="button"
                                         disabled={disabled}
-                                        aria-current={isCurrent}
+                                        aria-current={isCurrent || undefined}
                                         onClick={() => {
                                             if (!isCurrent && isAllowed) handleTransition(s);
                                         }}
