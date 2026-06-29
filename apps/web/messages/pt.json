@@ -694,7 +694,23 @@
                 "detach": "Desanexar",
                 "attachmentsWorkOnly": "Os anexos só estão disponíveis em tarefas vinculadas a um Work. Crie uma tarefa a partir de um Work para anexar arquivos.",
                 "labels": "Etiquetas",
-                "edited": "editado"
+                "edited": "editado",
+                "description": "Descrição",
+                "edit": "Editar",
+                "save": "Salvar",
+                "cancel": "Cancelar",
+                "descriptionPlaceholder": "Adicione uma descrição…",
+                "noDescription": "Nenhuma descrição fornecida.",
+                "saveDescriptionError": "Falha ao salvar a descrição",
+                "details": "Detalhes",
+                "status": "Status",
+                "priority": "Prioridade",
+                "scope": "Escopo",
+                "created": "Criado",
+                "updated": "Atualizado",
+                "scopeWork": "Trabalho",
+                "scopeMission": "Missão",
+                "scopeIdea": "Ideia"
             },
             "recurring": {
                 "section": "Agenda recorrente",
@@ -718,6 +734,13 @@
                 "blocked": "Bloqueado",
                 "done": "Concluído",
                 "cancelled": "Cancelado"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Média",
+                "p3": "Normal",
+                "p4": "Baixa"
             }
         },
         "skillsPage": {

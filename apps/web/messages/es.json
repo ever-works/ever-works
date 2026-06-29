@@ -752,7 +752,23 @@
                 "detach": "Desvincular",
                 "attachmentsWorkOnly": "Los archivos adjuntos solo están disponibles en tareas limitadas a un Work. Crea una tarea desde un Work para adjuntar archivos.",
                 "labels": "Etiquetas",
-                "edited": "editado"
+                "edited": "editado",
+                "description": "Descripción",
+                "edit": "Editar",
+                "save": "Guardar",
+                "cancel": "Cancelar",
+                "descriptionPlaceholder": "Añade una descripción…",
+                "noDescription": "No se proporcionó ninguna descripción.",
+                "saveDescriptionError": "No se pudo guardar la descripción",
+                "details": "Detalles",
+                "status": "Estado",
+                "priority": "Prioridad",
+                "scope": "Ámbito",
+                "created": "Creado",
+                "updated": "Actualizado",
+                "scopeWork": "Trabajo",
+                "scopeMission": "Misión",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Programación recurrente",
@@ -776,6 +792,13 @@
                 "blocked": "Bloqueado",
                 "done": "Hecho",
                 "cancelled": "Cancelado"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Media",
+                "p3": "Normal",
+                "p4": "Baja"
             }
         },
         "skillsPage": {

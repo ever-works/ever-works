@@ -752,7 +752,23 @@
                 "detach": "Trennen",
                 "attachmentsWorkOnly": "Anhänge sind nur bei Work-bezogenen Aufgaben verfügbar. Erstelle eine Aufgabe aus einem Work, um Dateien anzuhängen.",
                 "labels": "Labels",
-                "edited": "bearbeitet"
+                "edited": "bearbeitet",
+                "description": "Beschreibung",
+                "edit": "Bearbeiten",
+                "save": "Speichern",
+                "cancel": "Abbrechen",
+                "descriptionPlaceholder": "Beschreibung hinzufügen…",
+                "noDescription": "Keine Beschreibung vorhanden.",
+                "saveDescriptionError": "Beschreibung konnte nicht gespeichert werden",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priorität",
+                "scope": "Bereich",
+                "created": "Erstellt",
+                "updated": "Aktualisiert",
+                "scopeWork": "Arbeit",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -776,6 +792,13 @@
                 "blocked": "Blockiert",
                 "done": "Erledigt",
                 "cancelled": "Abgebrochen"
+            },
+            "priority": {
+                "p0": "Dringend",
+                "p1": "Hoch",
+                "p2": "Mittel",
+                "p3": "Normal",
+                "p4": "Niedrig"
             }
         },
         "skillsPage": {

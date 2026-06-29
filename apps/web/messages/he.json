@@ -752,7 +752,23 @@
                 "detach": "נתק",
                 "attachmentsWorkOnly": "קבצים מצורפים זמינים רק במשימות בהיקף Work. צור משימה מתוך Work כדי לצרף קבצים.",
                 "labels": "תוויות",
-                "edited": "נערך"
+                "edited": "נערך",
+                "description": "תיאור",
+                "edit": "עריכה",
+                "save": "שמור",
+                "cancel": "בטל",
+                "descriptionPlaceholder": "הוסף תיאור…",
+                "noDescription": "לא סופק תיאור.",
+                "saveDescriptionError": "שמירת התיאור נכשלה",
+                "details": "פרטים",
+                "status": "סטטוס",
+                "priority": "עדיפות",
+                "scope": "היקף",
+                "created": "נוצר",
+                "updated": "עודכן",
+                "scopeWork": "עבודה",
+                "scopeMission": "משימה",
+                "scopeIdea": "רעיון"
             },
             "recurring": {
                 "section": "תדירות חוזרת",
@@ -776,6 +792,13 @@
                 "blocked": "חסום",
                 "done": "הושלם",
                 "cancelled": "בוטל"
+            },
+            "priority": {
+                "p0": "דחוף",
+                "p1": "גבוה",
+                "p2": "בינוני",
+                "p3": "רגיל",
+                "p4": "נמוך"
             }
         },
         "skillsPage": {

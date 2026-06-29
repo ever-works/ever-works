@@ -752,7 +752,23 @@
                 "detach": "Détacher",
                 "attachmentsWorkOnly": "Les pièces jointes ne sont disponibles que sur les tâches liées à un Work. Créez une tâche depuis un Work pour joindre des fichiers.",
                 "labels": "Étiquettes",
-                "edited": "modifié"
+                "edited": "modifié",
+                "description": "Description",
+                "edit": "Modifier",
+                "save": "Enregistrer",
+                "cancel": "Annuler",
+                "descriptionPlaceholder": "Ajouter une description…",
+                "noDescription": "Aucune description fournie.",
+                "saveDescriptionError": "Échec de l'enregistrement de la description",
+                "details": "Détails",
+                "status": "Statut",
+                "priority": "Priorité",
+                "scope": "Étendue",
+                "created": "Créé",
+                "updated": "Mis à jour",
+                "scopeWork": "Travail",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idée"
             },
             "recurring": {
                 "section": "Calendrier récurrent",
@@ -776,6 +792,13 @@
                 "blocked": "Bloqué",
                 "done": "Terminé",
                 "cancelled": "Annulé"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Élevée",
+                "p2": "Moyenne",
+                "p3": "Normale",
+                "p4": "Basse"
             }
         },
         "skillsPage": {

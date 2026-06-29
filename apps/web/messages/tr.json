@@ -694,7 +694,23 @@
                 "detach": "Ayır",
                 "attachmentsWorkOnly": "Ekler yalnızca Work kapsamındaki görevlerde kullanılabilir. Dosya eklemek için görevi bir Work üzerinden oluşturun.",
                 "labels": "Etiketler",
-                "edited": "düzenlendi"
+                "edited": "düzenlendi",
+                "description": "Açıklama",
+                "edit": "Düzenle",
+                "save": "Kaydet",
+                "cancel": "İptal",
+                "descriptionPlaceholder": "Bir açıklama ekleyin…",
+                "noDescription": "Açıklama girilmedi.",
+                "saveDescriptionError": "Açıklama kaydedilemedi",
+                "details": "Ayrıntılar",
+                "status": "Durum",
+                "priority": "Öncelik",
+                "scope": "Kapsam",
+                "created": "Oluşturulma",
+                "updated": "Güncellenme",
+                "scopeWork": "İş",
+                "scopeMission": "Görev",
+                "scopeIdea": "Fikir"
             },
             "recurring": {
                 "section": "Tekrarlayan zamanlama",
@@ -718,6 +734,13 @@
                 "blocked": "Engellendi",
                 "done": "Tamamlandı",
                 "cancelled": "İptal edildi"
+            },
+            "priority": {
+                "p0": "Acil",
+                "p1": "Yüksek",
+                "p2": "Orta",
+                "p3": "Normal",
+                "p4": "Düşük"
             }
         },
         "skillsPage": {

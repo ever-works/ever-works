@@ -60,14 +60,14 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
     cancelled: [],
 };
 
-// Priority metadata — JIRA-style labelled, colour-coded chips so a
-// bare "p3" reads as a meaningful "Normal" with the right tone.
-const PRIORITY_META: Record<TaskPriority, { label: string; dot: string; tone: string }> = {
-    p0: { label: 'Urgent', dot: 'bg-danger', tone: 'text-danger' },
-    p1: { label: 'High', dot: 'bg-warning', tone: 'text-warning' },
-    p2: { label: 'Medium', dot: 'bg-amber-500', tone: 'text-amber-600 dark:text-amber-400' },
-    p3: { label: 'Normal', dot: 'bg-info', tone: 'text-info' },
-    p4: { label: 'Low', dot: 'bg-text-muted', tone: 'text-text-muted' },
+// Priority metadata — JIRA-style colour-coded chips. Labels come from
+// the `tasksPage.priority` i18n namespace; only the tone/dot live here.
+const PRIORITY_META: Record<TaskPriority, { dot: string; tone: string }> = {
+    p0: { dot: 'bg-danger', tone: 'text-danger' },
+    p1: { dot: 'bg-warning', tone: 'text-warning' },
+    p2: { dot: 'bg-amber-500', tone: 'text-amber-600 dark:text-amber-400' },
+    p3: { dot: 'bg-info', tone: 'text-info' },
+    p4: { dot: 'bg-text-muted', tone: 'text-text-muted' },
 };
 
 function formatDate(iso: string): string {
@@ -103,6 +103,7 @@ export function TaskDetailClient({
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
     const tStatus = useTranslations('dashboard.tasksPage.status');
+    const tPriority = useTranslations('dashboard.tasksPage.priority');
     const [messages, setMessages] = useState(initialChat);
     const [currentStatus, setCurrentStatus] = useState<TaskStatus>(task.status);
     const [draft, setDraft] = useState('');
@@ -160,7 +161,7 @@ export function TaskDetailClient({
                     setEditingDesc(false);
                 } catch (err) {
                     setDescError(
-                        err instanceof Error ? err.message : 'Failed to save description',
+                        err instanceof Error ? err.message : t('saveDescriptionError'),
                     );
                 }
             })();
@@ -173,11 +174,11 @@ export function TaskDetailClient({
     const labels = task.labels ?? [];
     const priority = PRIORITY_META[task.priority];
     const scope = task.workId
-        ? { label: 'Work', id: task.workId }
+        ? { label: t('scopeWork'), id: task.workId }
         : task.missionId
-          ? { label: 'Mission', id: task.missionId }
+          ? { label: t('scopeMission'), id: task.missionId }
           : task.ideaId
-            ? { label: 'Idea', id: task.ideaId }
+            ? { label: t('scopeIdea'), id: task.ideaId }
             : null;
 
     return (
@@ -259,7 +260,7 @@ export function TaskDetailClient({
                     <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                         <div className="flex items-center justify-between mb-3">
                             <h2 className="text-sm font-medium text-text dark:text-text-dark">
-                                Description
+                                {t('description')}
                             </h2>
                             {!editingDesc && (
                                 <Button
@@ -274,7 +275,7 @@ export function TaskDetailClient({
                                     }}
                                 >
                                     <Pencil className="w-3.5 h-3.5" />
-                                    Edit
+                                    {t('edit')}
                                 </Button>
                             )}
                         </div>
@@ -285,7 +286,7 @@ export function TaskDetailClient({
                                     onChange={(e) => setDescDraft(e.target.value)}
                                     rows={6}
                                     autoFocus
-                                    placeholder="Add a description…"
+                                    placeholder={t('descriptionPlaceholder')}
                                     className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm leading-relaxed text-text dark:text-text-dark"
                                 />
                                 {descError && (
@@ -304,7 +305,7 @@ export function TaskDetailClient({
                                             setDescError(null);
                                         }}
                                     >
-                                        Cancel
+                                        {t('cancel')}
                                     </Button>
                                     <Button
                                         type="button"
@@ -312,7 +313,7 @@ export function TaskDetailClient({
                                         disabled={pendingDesc}
                                         onClick={handleSaveDescription}
                                     >
-                                        {pendingDesc ? '…' : 'Save'}
+                                        {pendingDesc ? '…' : t('save')}
                                     </Button>
                                 </div>
                             </div>
@@ -321,7 +322,7 @@ export function TaskDetailClient({
                                 {description}
                             </p>
                         ) : (
-                            <p className="text-sm text-text-muted italic">No description provided.</p>
+                            <p className="text-sm text-text-muted italic">{t('noDescription')}</p>
                         )}
                     </section>
 
@@ -421,22 +422,22 @@ export function TaskDetailClient({
                 <aside className="space-y-6 lg:sticky lg:top-6 lg:self-start">
                     <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
                         <h2 className="text-xs font-semibold uppercase tracking-wide text-text-muted mb-4">
-                            Details
+                            {t('details')}
                         </h2>
                         <dl className="space-y-4">
-                            <DetailRow label="Status">
+                            <DetailRow label={t('status')}>
                                 <span
                                     className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium uppercase tracking-wide ${STATUS_TONES[currentStatus]}`}
                                 >
                                     {tStatus(currentStatus)}
                                 </span>
                             </DetailRow>
-                            <DetailRow label="Priority">
+                            <DetailRow label={t('priority')}>
                                 <span
                                     className={`inline-flex items-center gap-1.5 text-xs font-medium ${priority.tone}`}
                                 >
                                     <span className={`w-2 h-2 rounded-full ${priority.dot}`} />
-                                    {priority.label}
+                                    {tPriority(task.priority)}
                                 </span>
                             </DetailRow>
                             <DetailRow label={t('labels')}>
@@ -456,7 +457,7 @@ export function TaskDetailClient({
                                 )}
                             </DetailRow>
                             {scope && (
-                                <DetailRow label="Scope">
+                                <DetailRow label={t('scope')}>
                                     <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary">
                                         {scope.label}
                                         <span className="font-mono text-text-muted">
@@ -465,12 +466,12 @@ export function TaskDetailClient({
                                     </span>
                                 </DetailRow>
                             )}
-                            <DetailRow label="Created">
+                            <DetailRow label={t('created')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.createdAt)}
                                 </span>
                             </DetailRow>
-                            <DetailRow label="Updated">
+                            <DetailRow label={t('updated')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.updatedAt)}
                                 </span>

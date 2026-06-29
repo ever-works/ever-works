@@ -752,7 +752,23 @@
                 "detach": "فصل",
                 "attachmentsWorkOnly": "المرفقات متاحة فقط للمهام المرتبطة بـ Work. أنشئ مهمة من داخل Work لإرفاق الملفات.",
                 "labels": "العلامات",
-                "edited": "تم التعديل"
+                "edited": "تم التعديل",
+                "description": "الوصف",
+                "edit": "تعديل",
+                "save": "حفظ",
+                "cancel": "إلغاء",
+                "descriptionPlaceholder": "أضف وصفًا…",
+                "noDescription": "لا يوجد وصف.",
+                "saveDescriptionError": "فشل حفظ الوصف",
+                "details": "التفاصيل",
+                "status": "الحالة",
+                "priority": "الأولوية",
+                "scope": "النطاق",
+                "created": "تم الإنشاء",
+                "updated": "آخر تحديث",
+                "scopeWork": "العمل",
+                "scopeMission": "المهمة",
+                "scopeIdea": "الفكرة"
             },
             "recurring": {
                 "section": "جدول متكرر",
@@ -776,6 +792,13 @@
                 "blocked": "مُعطَّل",
                 "done": "مكتمل",
                 "cancelled": "ملغى"
+            },
+            "priority": {
+                "p0": "عاجل",
+                "p1": "عالية",
+                "p2": "متوسطة",
+                "p3": "عادية",
+                "p4": "منخفضة"
             }
         },
         "skillsPage": {

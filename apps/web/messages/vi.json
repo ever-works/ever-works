@@ -694,7 +694,23 @@
                 "detach": "Tách",
                 "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
                 "labels": "Nhãn",
-                "edited": "đã chỉnh sửa"
+                "edited": "đã chỉnh sửa",
+                "description": "Mô tả",
+                "edit": "Chỉnh sửa",
+                "save": "Lưu",
+                "cancel": "Hủy",
+                "descriptionPlaceholder": "Thêm mô tả…",
+                "noDescription": "Chưa có mô tả.",
+                "saveDescriptionError": "Không thể lưu mô tả",
+                "details": "Chi tiết",
+                "status": "Trạng thái",
+                "priority": "Ưu tiên",
+                "scope": "Phạm vi",
+                "created": "Đã tạo",
+                "updated": "Đã cập nhật",
+                "scopeWork": "Công việc",
+                "scopeMission": "Nhiệm vụ",
+                "scopeIdea": "Ý tưởng"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -718,6 +734,13 @@
                 "blocked": "Bị chặn",
                 "done": "Hoàn thành",
                 "cancelled": "Đã hủy"
+            },
+            "priority": {
+                "p0": "Khẩn cấp",
+                "p1": "Cao",
+                "p2": "Trung bình",
+                "p3": "Bình thường",
+                "p4": "Thấp"
             }
         },
         "skillsPage": {

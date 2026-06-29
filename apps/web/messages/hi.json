@@ -694,7 +694,23 @@
                 "detach": "अलग करें",
                 "attachmentsWorkOnly": "अनुलग्नक केवल Work से जुड़े कार्यों में उपलब्ध हैं। फ़ाइलें संलग्न करने के लिए किसी Work से कार्य बनाएँ।",
                 "labels": "लेबल",
-                "edited": "संपादित"
+                "edited": "संपादित",
+                "description": "विवरण",
+                "edit": "संपादित करें",
+                "save": "सहेजें",
+                "cancel": "रद्द करें",
+                "descriptionPlaceholder": "विवरण जोड़ें…",
+                "noDescription": "कोई विवरण नहीं दिया गया।",
+                "saveDescriptionError": "विवरण सहेजने में विफल",
+                "details": "विवरण",
+                "status": "स्थिति",
+                "priority": "प्राथमिकता",
+                "scope": "स्कोप",
+                "created": "बनाया गया",
+                "updated": "अपडेट किया गया",
+                "scopeWork": "काम",
+                "scopeMission": "मिशन",
+                "scopeIdea": "विचार"
             },
             "recurring": {
                 "section": "पुनरावर्ती अनुसूची",
@@ -718,6 +734,13 @@
                 "blocked": "रोका गया",
                 "done": "पूर्ण",
                 "cancelled": "रद्द"
+            },
+            "priority": {
+                "p0": "अत्यावश्यक",
+                "p1": "उच्च",
+                "p2": "मध्यम",
+                "p3": "सामान्य",
+                "p4": "निम्न"
             }
         },
         "skillsPage": {

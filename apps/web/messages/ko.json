@@ -694,7 +694,23 @@
                 "detach": "분리",
                 "attachmentsWorkOnly": "첨부 파일은 Work 범위 작업에서만 사용할 수 있습니다. 파일을 첨부하려면 Work에서 작업을 만드세요.",
                 "labels": "레이블",
-                "edited": "편집됨"
+                "edited": "편집됨",
+                "description": "설명",
+                "edit": "편집",
+                "save": "저장",
+                "cancel": "취소",
+                "descriptionPlaceholder": "설명 추가…",
+                "noDescription": "제공된 설명이 없습니다.",
+                "saveDescriptionError": "설명을 저장하지 못했습니다",
+                "details": "상세 정보",
+                "status": "상태",
+                "priority": "우선순위",
+                "scope": "범위",
+                "created": "생성일",
+                "updated": "수정일",
+                "scopeWork": "작업",
+                "scopeMission": "임무",
+                "scopeIdea": "아이디어"
             },
             "recurring": {
                 "section": "반복 일정",
@@ -718,6 +734,13 @@
                 "blocked": "차단됨",
                 "done": "완료됨",
                 "cancelled": "취소됨"
+            },
+            "priority": {
+                "p0": "긴급",
+                "p1": "높음",
+                "p2": "보통",
+                "p3": "일반",
+                "p4": "낮음"
             }
         },
         "skillsPage": {

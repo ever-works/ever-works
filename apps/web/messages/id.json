@@ -694,7 +694,23 @@
                 "detach": "Lepas",
                 "attachmentsWorkOnly": "Lampiran hanya tersedia pada tugas yang terkait dengan Work. Buat tugas dari sebuah Work untuk melampirkan file.",
                 "labels": "Label",
-                "edited": "diedit"
+                "edited": "diedit",
+                "description": "Deskripsi",
+                "edit": "Edit",
+                "save": "Simpan",
+                "cancel": "Batal",
+                "descriptionPlaceholder": "Tambahkan deskripsi…",
+                "noDescription": "Tidak ada deskripsi.",
+                "saveDescriptionError": "Gagal menyimpan deskripsi",
+                "details": "Detail",
+                "status": "Status",
+                "priority": "Prioritas",
+                "scope": "Cakupan",
+                "created": "Dibuat",
+                "updated": "Diperbarui",
+                "scopeWork": "Karya",
+                "scopeMission": "Misi",
+                "scopeIdea": "Ide"
             },
             "recurring": {
                 "section": "Jadwal berulang",
@@ -718,6 +734,13 @@
                 "blocked": "Diblokir",
                 "done": "Selesai",
                 "cancelled": "Dibatalkan"
+            },
+            "priority": {
+                "p0": "Mendesak",
+                "p1": "Tinggi",
+                "p2": "Sedang",
+                "p3": "Normal",
+                "p4": "Rendah"
             }
         },
         "skillsPage": {

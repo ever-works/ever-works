@@ -752,7 +752,23 @@
                 "detach": "Detach",
                 "attachmentsWorkOnly": "Attachments are only available on Work-scoped tasks. Create a task from a Work to attach files.",
                 "labels": "Labels",
-                "edited": "edited"
+                "edited": "edited",
+                "description": "Description",
+                "edit": "Edit",
+                "save": "Save",
+                "cancel": "Cancel",
+                "descriptionPlaceholder": "Add a description…",
+                "noDescription": "No description provided.",
+                "saveDescriptionError": "Failed to save description",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priority",
+                "scope": "Scope",
+                "created": "Created",
+                "updated": "Updated",
+                "scopeWork": "Work",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -776,6 +792,13 @@
                 "blocked": "Blocked",
                 "done": "Done",
                 "cancelled": "Cancelled"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "High",
+                "p2": "Medium",
+                "p3": "Normal",
+                "p4": "Low"
             }
         },
         "skillsPage": {

@@ -694,7 +694,23 @@
                 "detach": "Scollega",
                 "attachmentsWorkOnly": "Gli allegati sono disponibili solo per le attività legate a un Work. Crea un'attività da un Work per allegare file.",
                 "labels": "Etichette",
-                "edited": "modificato"
+                "edited": "modificato",
+                "description": "Descrizione",
+                "edit": "Modifica",
+                "save": "Salva",
+                "cancel": "Annulla",
+                "descriptionPlaceholder": "Aggiungi una descrizione…",
+                "noDescription": "Nessuna descrizione fornita.",
+                "saveDescriptionError": "Impossibile salvare la descrizione",
+                "details": "Dettagli",
+                "status": "Stato",
+                "priority": "Priorità",
+                "scope": "Ambito",
+                "created": "Creato",
+                "updated": "Aggiornato",
+                "scopeWork": "Lavoro",
+                "scopeMission": "Missione",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Programma ricorrente",
@@ -718,6 +734,13 @@
                 "blocked": "Bloccato",
                 "done": "Completato",
                 "cancelled": "Annullato"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Media",
+                "p3": "Normale",
+                "p4": "Bassa"
             }
         },
         "skillsPage": {

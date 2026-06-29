@@ -694,7 +694,23 @@
                 "detach": "分离",
                 "attachmentsWorkOnly": "附件仅在限定于 Work 的任务中可用。请从某个 Work 创建任务以附加文件。",
                 "labels": "标签",
-                "edited": "已编辑"
+                "edited": "已编辑",
+                "description": "描述",
+                "edit": "编辑",
+                "save": "保存",
+                "cancel": "取消",
+                "descriptionPlaceholder": "添加描述…",
+                "noDescription": "暂无描述。",
+                "saveDescriptionError": "保存描述失败",
+                "details": "详细信息",
+                "status": "状态",
+                "priority": "优先级",
+                "scope": "范围",
+                "created": "创建时间",
+                "updated": "更新时间",
+                "scopeWork": "工作",
+                "scopeMission": "任务",
+                "scopeIdea": "想法"
             },
             "recurring": {
                 "section": "重复计划",
@@ -718,6 +734,13 @@
                 "blocked": "受阻",
                 "done": "完成",
                 "cancelled": "已取消"
+            },
+            "priority": {
+                "p0": "紧急",
+                "p1": "高",
+                "p2": "中",
+                "p3": "普通",
+                "p4": "低"
             }
         },
         "skillsPage": {

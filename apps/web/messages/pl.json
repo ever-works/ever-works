@@ -694,7 +694,23 @@
                 "detach": "Odłącz",
                 "attachmentsWorkOnly": "Załączniki są dostępne tylko w zadaniach powiązanych z Work. Utwórz zadanie z poziomu Work, aby dołączyć pliki.",
                 "labels": "Etykiety",
-                "edited": "edytowano"
+                "edited": "edytowano",
+                "description": "Opis",
+                "edit": "Edytuj",
+                "save": "Zapisz",
+                "cancel": "Anuluj",
+                "descriptionPlaceholder": "Dodaj opis…",
+                "noDescription": "Nie podano opisu.",
+                "saveDescriptionError": "Nie udało się zapisać opisu",
+                "details": "Szczegóły",
+                "status": "Status",
+                "priority": "Priorytet",
+                "scope": "Zasięg",
+                "created": "Utworzono",
+                "updated": "Zaktualizowano",
+                "scopeWork": "Praca",
+                "scopeMission": "Misja",
+                "scopeIdea": "Pomysł"
             },
             "recurring": {
                 "section": "Cykliczne harmonogramy",
@@ -718,6 +734,13 @@
                 "blocked": "Zablokowany",
                 "done": "Zrobione",
                 "cancelled": "Anulowano"
+            },
+            "priority": {
+                "p0": "Pilne",
+                "p1": "Wysoki",
+                "p2": "Średni",
+                "p3": "Normalny",
+                "p4": "Niski"
             }
         },
         "skillsPage": {
