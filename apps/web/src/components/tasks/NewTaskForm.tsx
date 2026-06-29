@@ -68,7 +68,14 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const missionId = searchParams?.get('missionId') || null;
     const ideaId = searchParams?.get('ideaId') || null;
     const scopeCount = [workId, missionId, ideaId].filter(Boolean).length;
-    const scopeLabel = scopeCount === 1 ? (workId ? 'Work' : missionId ? 'Mission' : 'Idea') : null;
+    const scopeKey =
+        scopeCount === 1
+            ? workId
+                ? ('workScopedTask' as const)
+                : missionId
+                  ? ('missionScopedTask' as const)
+                  : ('ideaScopedTask' as const)
+            : null;
 
     // PASS-4 fix: read ?from=<slug> and pre-fill title + description
     // + labels (tags carry over from the template entry). Without
@@ -165,7 +172,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     });
                     router.push(ROUTES.DASHBOARD_TASK(task.id));
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to create Task');
+                    setError(err instanceof Error ? err.message : t('createError'));
                 }
             })();
         });
@@ -181,9 +188,9 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     <h1 className="text-xl font-semibold text-text dark:text-text-dark">
                         {t('title')}
                     </h1>
-                    {scopeLabel && (
+                    {scopeKey && (
                         <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
-                            {scopeLabel}-scoped task
+                            {t(scopeKey)}
                         </p>
                     )}
                 </div>
@@ -193,17 +200,19 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 before submitting. */}
             {preFillSource === 'prompt' && (
                 <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
-                    This form was pre-filled from a URL link. Review the content before creating the
-                    task.
+                    {t('prefillPromptNotice')}
                 </div>
             )}
             {preFillSource === 'template' && templateSlug && (
                 <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
-                    Pre-filled from template{' '}
-                    <span className="font-medium text-text dark:text-text-dark">
-                        {templateSlug}
-                    </span>
-                    . Review the content before creating the task.
+                    {t.rich('prefillTemplateNotice', {
+                        slug: templateSlug,
+                        name: (chunks) => (
+                            <span className="font-medium text-text dark:text-text-dark">
+                                {chunks}
+                            </span>
+                        )
+                    })}
                 </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -241,11 +250,11 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                             onValueChange={(value) => setPriority(value as TaskPriority)}
                             size="xs"
                         >
-                            <option value="p0">P0 — urgent</option>
-                            <option value="p1">P1</option>
-                            <option value="p2">P2</option>
-                            <option value="p3">P3 — default</option>
-                            <option value="p4">P4 — low</option>
+                            <option value="p0">{t('priorityP0')}</option>
+                            <option value="p1">{t('priorityP1')}</option>
+                            <option value="p2">{t('priorityP2')}</option>
+                            <option value="p3">{t('priorityP3')}</option>
+                            <option value="p4">{t('priorityP4')}</option>
                         </Select>
                     </div>
                     <div>
