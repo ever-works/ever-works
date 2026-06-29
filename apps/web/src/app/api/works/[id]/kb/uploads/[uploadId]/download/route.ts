@@ -4,6 +4,15 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
 
 type RouteContext = { params: Promise<{ id: string; uploadId: string }> };
 
+// Security: UUID pattern — both `id` and `uploadId` are persisted as
+// `@PrimaryGeneratedColumn('uuid')`. Validating them before they are
+// interpolated into the upstream URL prevents URL-encoded traversal
+// segments (e.g. `..%2Fetc`, which Next.js decodes to `../etc`) from
+// rewriting the upstream path to a different NestJS route, where the
+// user's bearer token would be checked against the wrong owner/viewer
+// guard. Non-UUID values (including CRLF sequences) get a 400.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Download proxy for a KB upload — backs the Task attachment download
  * links (and any other surface that needs the raw bytes from the
@@ -18,6 +27,16 @@ type RouteContext = { params: Promise<{ id: string; uploadId: string }> };
  */
 export async function GET(_request: NextRequest, { params }: RouteContext) {
     const { id, uploadId } = await params;
+
+    // Security: validate both ids are UUIDs before embedding them in the
+    // upstream URL path. Rejects traversal/CRLF payloads with a 400.
+    if (!UUID_RE.test(id) || !UUID_RE.test(uploadId)) {
+        return new Response('Invalid work or upload id', {
+            status: 400,
+            headers: { 'Cache-Control': 'no-store' },
+        });
+    }
+
     const token = await getAuthAccessCookie();
 
     const headers = new Headers();
