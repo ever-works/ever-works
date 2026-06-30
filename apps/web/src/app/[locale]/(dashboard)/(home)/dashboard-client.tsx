@@ -126,6 +126,7 @@ export default function DashboardClient({
                         initiallyCanRefresh={initiallyCanRefresh}
                         username={user.username}
                         autoStart={autoStartProposals}
+                        totalIdeas={totalIdeas}
                     />
                 </div>
 
