@@ -4658,6 +4658,22 @@
                 "anyStatus": "すべてのステータス",
                 "apply": "適用",
                 "reset": "リセット"
+            },
+            "newPage": {
+                "link": "手動で作成",
+                "or": "または",
+                "title": "新しい Idea",
+                "subtitle": "自分の Idea を書きましょう。作成したい Work を説明してください — その後、ビルドのキューに追加できます。",
+                "nameLabel": "タイトル",
+                "namePlaceholder": "任意 — 空欄にすると説明から自動生成されます",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "この Idea が形になる Work を説明してください — 例:「オープンソースの AI エージェントフレームワークを、フレームワークの種類とライセンスごとに整理した厳選ディレクトリ。」",
+                "descriptionHint": "10 文字以上。",
+                "cancel": "キャンセル",
+                "create": "Idea を作成",
+                "creating": "作成中…",
+                "minLength": "説明は 10 文字以上で入力してください。",
+                "error": "Idea を作成できませんでした。もう一度お試しください。"
             }
         },
         "discover": {

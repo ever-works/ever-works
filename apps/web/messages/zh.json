@@ -4658,6 +4658,22 @@
                 "anyStatus": "任意状态",
                 "apply": "应用",
                 "reset": "重置"
+            },
+            "newPage": {
+                "link": "手动创建",
+                "or": "或",
+                "title": "新建 Idea",
+                "subtitle": "撰写你自己的 Idea。描述你想创建的 Work — 之后即可将其加入构建队列。",
+                "nameLabel": "标题",
+                "namePlaceholder": "可选 — 留空则根据描述自动生成",
+                "descriptionLabel": "描述",
+                "descriptionPlaceholder": "描述这个 Idea 将要变成的 Work — 例如“一个精选的开源 AI 智能体框架目录，按框架类型和许可证组织。”",
+                "descriptionHint": "至少 10 个字符。",
+                "cancel": "取消",
+                "create": "创建 Idea",
+                "creating": "正在创建…",
+                "minLength": "描述至少需要 10 个字符。",
+                "error": "无法创建 Idea，请重试。"
             }
         },
         "discover": {

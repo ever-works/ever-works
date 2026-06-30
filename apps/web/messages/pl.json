@@ -4658,6 +4658,22 @@
                 "anyStatus": "Dowolny status",
                 "apply": "Zastosuj",
                 "reset": "Resetuj"
+            },
+            "newPage": {
+                "link": "Utwórz ręcznie",
+                "or": "Lub",
+                "title": "Nowa Idea",
+                "subtitle": "Napisz własną Idea. Opisz Work, który chcesz utworzyć — później możesz dodać go do kolejki budowania.",
+                "nameLabel": "Tytuł",
+                "namePlaceholder": "Opcjonalnie — pozostaw puste, aby wygenerować na podstawie opisu",
+                "descriptionLabel": "Opis",
+                "descriptionPlaceholder": "Opisz Work, w który ma się przekształcić ta Idea — np. „Wyselekcjonowany katalog otwartoźródłowych frameworków agentów AI, uporządkowany według typu frameworka i licencji.”",
+                "descriptionHint": "Co najmniej 10 znaków.",
+                "cancel": "Anuluj",
+                "create": "Utwórz Idea",
+                "creating": "Tworzenie…",
+                "minLength": "Opis musi mieć co najmniej 10 znaków.",
+                "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             }
         },
         "discover": {

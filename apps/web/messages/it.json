@@ -4658,6 +4658,22 @@
                 "anyStatus": "Qualsiasi stato",
                 "apply": "Applica",
                 "reset": "Reimposta"
+            },
+            "newPage": {
+                "link": "Crea manualmente",
+                "or": "Oppure",
+                "title": "Nuova Idea",
+                "subtitle": "Scrivi la tua Idea. Descrivi il Work che vuoi creare — potrai poi metterlo in coda per la generazione.",
+                "nameLabel": "Titolo",
+                "namePlaceholder": "Facoltativo — lascia vuoto per ricavarlo dalla descrizione",
+                "descriptionLabel": "Descrizione",
+                "descriptionPlaceholder": "Descrivi il Work in cui questa Idea dovrebbe trasformarsi — ad es. «Una directory curata di framework open source per agenti IA, organizzati per tipo di framework e licenza.»",
+                "descriptionHint": "Almeno 10 caratteri.",
+                "cancel": "Annulla",
+                "create": "Crea Idea",
+                "creating": "Creazione…",
+                "minLength": "La descrizione deve contenere almeno 10 caratteri.",
+                "error": "Impossibile creare la Idea. Riprova."
             }
         },
         "discover": {

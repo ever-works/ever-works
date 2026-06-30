@@ -4658,6 +4658,22 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "newPage": {
+                "link": "Tạo thủ công",
+                "or": "Hoặc",
+                "title": "Idea mới",
+                "subtitle": "Viết Idea của riêng bạn. Mô tả Work bạn muốn tạo — sau đó bạn có thể đưa vào hàng đợi để dựng.",
+                "nameLabel": "Tiêu đề",
+                "namePlaceholder": "Tùy chọn — để trống để tự suy ra từ mô tả",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Mô tả Work mà Idea này sẽ trở thành — ví dụ “Một thư mục được tuyển chọn về các framework agent AI nguồn mở, sắp xếp theo loại framework và giấy phép.”",
+                "descriptionHint": "Ít nhất 10 ký tự.",
+                "cancel": "Hủy",
+                "create": "Tạo Idea",
+                "creating": "Đang tạo…",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "error": "Không thể tạo Idea. Vui lòng thử lại."
             }
         },
         "discover": {

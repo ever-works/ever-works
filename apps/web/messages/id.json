@@ -4658,6 +4658,22 @@
                 "anyStatus": "Semua status",
                 "apply": "Terapkan",
                 "reset": "Reset"
+            },
+            "newPage": {
+                "link": "Buat manual",
+                "or": "Atau",
+                "title": "Idea Baru",
+                "subtitle": "Tulis Idea Anda sendiri. Jelaskan Work yang ingin Anda buat — Anda bisa mengantrekannya untuk dibangun setelahnya.",
+                "nameLabel": "Judul",
+                "namePlaceholder": "Opsional — biarkan kosong untuk menurunkannya dari deskripsi",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Jelaskan Work yang akan menjadi Idea ini — mis. “Direktori terkurasi framework agen AI sumber terbuka, diatur menurut jenis framework dan lisensi.”",
+                "descriptionHint": "Minimal 10 karakter.",
+                "cancel": "Batal",
+                "create": "Buat Idea",
+                "creating": "Membuat…",
+                "minLength": "Deskripsi harus minimal 10 karakter.",
+                "error": "Tidak dapat membuat Idea. Silakan coba lagi."
             }
         },
         "discover": {

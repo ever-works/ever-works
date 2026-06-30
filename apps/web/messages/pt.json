@@ -4658,6 +4658,22 @@
                 "anyStatus": "Qualquer status",
                 "apply": "Aplicar",
                 "reset": "Redefinir"
+            },
+            "newPage": {
+                "link": "Criar manualmente",
+                "or": "Ou",
+                "title": "Nova Idea",
+                "subtitle": "Escreva a sua própria Idea. Descreva o Work que quer criar — depois pode colocá-lo na fila para geração.",
+                "nameLabel": "Título",
+                "namePlaceholder": "Opcional — deixe em branco para derivar da descrição",
+                "descriptionLabel": "Descrição",
+                "descriptionPlaceholder": "Descreva o Work em que esta Idea deve se tornar — por ex. “Um diretório curado de frameworks de agentes de IA de código aberto, organizados por tipo de framework e licença.”",
+                "descriptionHint": "Pelo menos 10 caracteres.",
+                "cancel": "Cancelar",
+                "create": "Criar Idea",
+                "creating": "Criando…",
+                "minLength": "A descrição deve ter pelo menos 10 caracteres.",
+                "error": "Não foi possível criar a Idea. Tente novamente."
             }
         },
         "discover": {
