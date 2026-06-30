@@ -58,6 +58,18 @@ interface WorkProposalsSectionProps {
      * that don't have the stats total (e.g. the Discover page).
      */
     totalIdeas?: number;
+    /**
+     * When true, the preview surfaces Ideas of EVERY status on first
+     * paint — the accepted/dismissed toggles start ON and are marked
+     * pre-loaded, so a non-PENDING Idea (e.g. a manually-created one
+     * that was already accepted or dismissed) is visible without the
+     * user flipping a toggle. The home dashboard passes the full
+     * all-status list as `initialProposals` and sets this; callers
+     * that want the default PENDING-only preview (e.g. Discover) omit
+     * it. The toggles still work — they just default to showing
+     * everything here.
+     */
+    showAllStatuses?: boolean;
 }
 
 export function WorkProposalsSection({
@@ -67,6 +79,7 @@ export function WorkProposalsSection({
     username,
     autoStart = false,
     totalIdeas,
+    showAllStatuses = false,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
@@ -88,10 +101,14 @@ export function WorkProposalsSection({
     // toggle handler lazy-fetches the additional status buckets
     // the first time it ticks on, so a user who never opens them
     // doesn't pay the round-trip.
-    const [showAccepted, setShowAccepted] = useState(false);
-    const [showDismissed, setShowDismissed] = useState(false);
-    const [loadedAccepted, setLoadedAccepted] = useState(false);
-    const [loadedDismissed, setLoadedDismissed] = useState(false);
+    // When `showAllStatuses` is set the parent has already supplied the
+    // full all-status list, so start with both toggles ON and marked
+    // loaded — no lazy round-trip needed and terminal Ideas show up
+    // immediately.
+    const [showAccepted, setShowAccepted] = useState(showAllStatuses);
+    const [showDismissed, setShowDismissed] = useState(showAllStatuses);
+    const [loadedAccepted, setLoadedAccepted] = useState(showAllStatuses);
+    const [loadedDismissed, setLoadedDismissed] = useState(showAllStatuses);
 
     const refreshListAndStatus = useCallback(async () => {
         const [status, list] = await Promise.all([

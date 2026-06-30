@@ -121,12 +121,17 @@ export default function DashboardClient({
 
                 <div className="py-8">
                     <WorkProposalsSection
+                        // Home shows Ideas of every status (page.tsx feeds the
+                        // all-status list here) so a manually-created Idea is
+                        // visible regardless of its status — `showAllStatuses`
+                        // starts the accepted/dismissed toggles ON.
                         initialProposals={initialProposals}
                         initiallyResearching={initiallyResearching}
                         initiallyCanRefresh={initiallyCanRefresh}
                         username={user.username}
                         autoStart={autoStartProposals}
                         totalIdeas={totalIdeas}
+                        showAllStatuses
                     />
                 </div>
 

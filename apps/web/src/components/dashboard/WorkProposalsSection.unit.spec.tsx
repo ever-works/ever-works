@@ -248,6 +248,31 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         expect(createIdeaMock).not.toHaveBeenCalled();
     });
 
+    it('showAllStatuses renders accepted/dismissed Ideas on first paint without toggling', () => {
+        // Home passes the full all-status list + showAllStatuses so a
+        // non-PENDING Idea (e.g. a manually-created one already accepted
+        // or dismissed) is visible immediately. No lazy-load round-trip
+        // should fire since the data is supplied up-front.
+        listProposalsMock.mockClear();
+        render(
+            <WorkProposalsSection
+                initialProposals={[
+                    mkIdea('p1', 'pending'),
+                    mkIdea('acc1', 'accepted'),
+                    mkIdea('dis1', 'dismissed'),
+                ]}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                showAllStatuses
+            />,
+        );
+        expect(screen.getByText('Idea p1')).toBeTruthy();
+        expect(screen.getByText('Idea acc1')).toBeTruthy();
+        expect(screen.getByText('Idea dis1')).toBeTruthy();
+        // Toggles start ON + pre-loaded — no fetch on mount.
+        expect(listProposalsMock).not.toHaveBeenCalled();
+    });
+
     it('dismissing an Idea (via the card X) keeps it locally as DISMISSED, hidden by default', () => {
         // The card calls dismissProposalAction internally; the parent's
         // onDismissed flips status to 'dismissed' rather than dropping

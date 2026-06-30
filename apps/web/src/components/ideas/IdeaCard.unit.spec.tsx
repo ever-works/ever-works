@@ -238,11 +238,15 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         // diff is what surfaces it in code review.
         expect(container.firstChild).toMatchInlineSnapshot(`
           <div
-            class="group relative flex min-h-[17rem] flex-col overflow-hidden rounded-lg p-4 shadow-xs bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20 transition-colors"
+            class="group relative flex min-h-68 flex-col overflow-hidden rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/10 shadow-sm hover:shadow-lg dark:shadow-black/20 hover:border-primary-500/40 dark:hover:border-white/20 transition-all duration-200"
           >
+            <div
+              aria-hidden="true"
+              class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+            />
             <button
               aria-label="actions.dismissAria"
-              class="absolute top-3 right-3 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
+              class="absolute top-3.5 right-3.5 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
               type="button"
             >
               <svg
@@ -267,18 +271,23 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               </svg>
             </button>
             <div
-              class="flex items-center gap-3 mb-2 pr-6 min-w-0"
+              class="mb-3 pr-7"
             >
-              <div
-                class="min-h-[lh] flex items-center min-w-0"
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize bg-slate-500/10 text-slate-600 dark:text-slate-300 ring-slate-500/20"
               >
-                <h3
-                  class="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2"
-                >
-                  Top AI coding assistants
-                </h3>
-              </div>
+                <span
+                  aria-hidden="true"
+                  class="h-1.5 w-1.5 rounded-full bg-slate-400"
+                />
+                filters.pending
+              </span>
             </div>
+            <h3
+              class="mb-2 pr-1 min-w-0 text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2"
+            >
+              Top AI coding assistants
+            </h3>
             <p
               class="text-xs leading-4.5 text-text-secondary dark:text-text-secondary-dark line-clamp-3 min-h-[3lh] mb-3"
             >
@@ -288,7 +297,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="flex flex-wrap gap-1.5 mb-3"
             >
               <span
-                class="inline-flex items-center rounded-full bg-primary-400/10 dark:bg-white/10 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-200"
+                class="inline-flex items-center rounded-full border border-border/60 dark:border-white/10 bg-surface-secondary/60 dark:bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary dark:text-gray-300"
               >
                 AI
               </span>
@@ -306,7 +315,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               </span>
             </div>
             <p
-              class="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4"
+              class="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4 border-l-2 border-border/60 dark:border-white/10 pl-2.5"
             >
               "
               Picks adjacent to the user accepting Claude Code

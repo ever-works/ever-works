@@ -54,7 +54,7 @@ const STATUS_FILTER_ORDER: IdeasStatusFilter[] = [
     'done',
 ];
 
-function ideaMatchesFilter(idea: WorkProposal, filter: IdeasStatusFilter = 'actionable'): boolean {
+function ideaMatchesFilter(idea: WorkProposal, filter: IdeasStatusFilter = 'all'): boolean {
     if (filter === 'all') return true;
     if (filter === 'done') return idea.status === 'accepted';
     if (filter === 'actionable') return ACTIONABLE_STATUSES.includes(idea.status);
@@ -98,9 +98,9 @@ export function IdeasPageClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [isCreating, startCreating] = useTransition();
     const [isBuilding, startBuilding] = useTransition();
-    let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'actionable');
+    let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'all');
     useEffect(() => {
-        setStatusFilter(filters?.status ?? 'actionable');
+        setStatusFilter(filters?.status ?? 'all');
     }, [filters?.status]);
 
     const startFromPrompt = useStartFromPrompt();
