@@ -85,6 +85,7 @@ export const ROUTES = {
     // gears menu deep-linking to the auto-generate/auto-build
     // settings anchors from Phase 4 PR L / PR EE.
     DASHBOARD_IDEAS: '/ideas',
+    DASHBOARD_IDEAS_NEW: '/ideas/new',
     DASHBOARD_WORKS: '/works',
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
