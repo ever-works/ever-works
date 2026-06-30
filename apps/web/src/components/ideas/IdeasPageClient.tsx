@@ -231,12 +231,23 @@ export function IdeasPageClient({
 
             {/* Quick add — shared composer matches the marketing site. */}
             <div className="mb-6">
-                <label
-                    htmlFor="ideas-quick-add"
-                    className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-2"
-                >
-                    {t('quickAdd.label')}
-                </label>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                    <label
+                        htmlFor="ideas-quick-add"
+                        className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
+                    >
+                        {t('quickAdd.label')}
+                    </label>
+                    {/* Deterministic, no-AI path: the composer above routes
+                        prompts through the chat AI; this links to the manual
+                        create form at /ideas/new. */}
+                    <Link
+                        href={ROUTES.DASHBOARD_IDEAS_NEW}
+                        className="shrink-0 text-xs font-medium text-primary hover:underline"
+                    >
+                        {t('newPage.link')}
+                    </Link>
+                </div>
                 <PromptComposer
                     inputId="ideas-quick-add"
                     value={draft}
