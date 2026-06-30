@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { Lightbulb, Settings as SettingsIcon, Search } from 'lucide-react';
+import { Lightbulb, Settings as SettingsIcon, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -231,23 +231,12 @@ export function IdeasPageClient({
 
             {/* Quick add — shared composer matches the marketing site. */}
             <div className="mb-6">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                    <label
-                        htmlFor="ideas-quick-add"
-                        className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
-                    >
-                        {t('quickAdd.label')}
-                    </label>
-                    {/* Deterministic, no-AI path: the composer above routes
-                        prompts through the chat AI; this links to the manual
-                        create form at /ideas/new. */}
-                    <Link
-                        href={ROUTES.DASHBOARD_IDEAS_NEW}
-                        className="shrink-0 text-xs font-medium text-primary hover:underline"
-                    >
-                        {t('newPage.link')}
-                    </Link>
-                </div>
+                <label
+                    htmlFor="ideas-quick-add"
+                    className="block text-xs font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark mb-2"
+                >
+                    {t('quickAdd.label')}
+                </label>
                 <PromptComposer
                     inputId="ideas-quick-add"
                     value={draft}
@@ -260,6 +249,25 @@ export function IdeasPageClient({
                     testId="ideas-quick-add"
                     onAttachmentsChange={setAttachments}
                 />
+
+                {/* Deterministic, no-AI path. The composer above routes
+                    prompts through the chat AI; this "Or … Create manually"
+                    bar mirrors the /works composer (WorksCreateComposer) and
+                    links to the manual create form at /ideas/new. */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('newPage.or')}
+                    </p>
+                    <Button
+                        href={ROUTES.DASHBOARD_IDEAS_NEW}
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5"
+                    >
+                        <PenLine className="w-3.5 h-3.5" />
+                        {t('newPage.link')}
+                    </Button>
+                </div>
             </div>
 
             <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
