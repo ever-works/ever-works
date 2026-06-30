@@ -1008,6 +1008,7 @@
             },
             "newPage": {
                 "link": "Create manually",
+                "or": "Or",
                 "title": "New Idea",
                 "subtitle": "Write your own Idea. Describe the Work you want to build — you can queue it for build afterward.",
                 "nameLabel": "Title",
