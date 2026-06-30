@@ -115,7 +115,7 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
     return (
         <div
             className={cn(
-                'group relative flex min-h-68 flex-col overflow-hidden rounded-lg p-5',
+                'group relative flex min-h-62 flex-col overflow-hidden rounded-lg p-5',
                 'bg-card dark:bg-card-primary-dark/70',
                 'border border-card-border dark:border-white/10',
                 'shadow-sm hover:shadow-lg dark:shadow-black/20',
@@ -181,7 +181,7 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
             )}
 
             {proposal.reasoning && (
-                <p className="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4 border-l-2 border-border/60 dark:border-white/10 pl-2.5">
+                <p className="text-[10px] italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-2 border-l-2 border-border/60 dark:border-white/10 pl-2.5">
                     &quot;{proposal.reasoning}&quot;
                 </p>
             )}

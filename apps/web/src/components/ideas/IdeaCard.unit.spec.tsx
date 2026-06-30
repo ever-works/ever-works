@@ -238,12 +238,8 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         // diff is what surfaces it in code review.
         expect(container.firstChild).toMatchInlineSnapshot(`
           <div
-            class="group relative flex min-h-68 flex-col overflow-hidden rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/10 shadow-sm hover:shadow-lg dark:shadow-black/20 hover:border-primary-500/40 dark:hover:border-white/20 transition-all duration-200"
+            class="group relative flex min-h-62 flex-col overflow-hidden rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/10 shadow-sm hover:shadow-lg dark:shadow-black/20 hover:border-primary-500/40 dark:hover:border-white/20 transition-all duration-200"
           >
-            <div
-              aria-hidden="true"
-              class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-            />
             <button
               aria-label="actions.dismissAria"
               class="absolute top-3.5 right-3.5 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
@@ -315,7 +311,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               </span>
             </div>
             <p
-              class="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4 border-l-2 border-border/60 dark:border-white/10 pl-2.5"
+              class="text-[10px] italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-2 border-l-2 border-border/60 dark:border-white/10 pl-2.5"
             >
               "
               Picks adjacent to the user accepting Claude Code
