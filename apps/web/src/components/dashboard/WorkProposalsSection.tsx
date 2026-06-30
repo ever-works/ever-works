@@ -47,6 +47,16 @@ interface WorkProposalsSectionProps {
     initiallyCanRefresh: boolean;
     username?: string;
     autoStart?: boolean;
+    /**
+     * Real total of every Idea in the user's catalog (all statuses),
+     * sourced from the server stats endpoint — the same total the
+     * StatsOverview tile uses. Drives the "View all (N) →" link so it
+     * stays present (and accurate) like the Missions / Works / Agents
+     * sections, even when the default PENDING-only preview is empty.
+     * Optional + falls back to the visible-preview count for callers
+     * that don't have the stats total (e.g. the Discover page).
+     */
+    totalIdeas?: number;
 }
 
 export function WorkProposalsSection({
@@ -55,6 +65,7 @@ export function WorkProposalsSection({
     initiallyCanRefresh,
     username,
     autoStart = false,
+    totalIdeas,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
@@ -225,6 +236,10 @@ export function WorkProposalsSection({
 
     const previewCards = visibleProposals.slice(0, PREVIEW_CARD_LIMIT);
     const totalVisible = visibleProposals.length;
+    // Count behind the "View all (N) →" link. Prefer the server-side
+    // catalog total (mirrors Missions / Works / Agents); fall back to
+    // the visible-preview count when no total was passed.
+    const viewAllCount = totalIdeas ?? totalVisible;
 
     const showEmpty = visibleProposals.length === 0 && !researching;
     const showResearching = researching && visibleProposals.length === 0;
@@ -361,7 +376,7 @@ export function WorkProposalsSection({
                     {/* View all (n) — moved into the header row so the
                         section reads icon → title → actions → counts on
                         one line, matching the Works section below. */}
-                    {totalVisible > 0 && (
+                    {viewAllCount > 0 && (
                         <Link
                             href={ROUTES.DASHBOARD_IDEAS}
                             className={cn(
@@ -369,7 +384,7 @@ export function WorkProposalsSection({
                                 'inline-flex items-center gap-1',
                             )}
                         >
-                            {tPage('viewAll', { n: totalVisible })}
+                            {tPage('viewAll', { n: viewAllCount })}
                         </Link>
                     )}
                 </div>
@@ -400,33 +415,44 @@ export function WorkProposalsSection({
                         className="w-full text-sm"
                         autoFocus
                     />
-                    <div className="mt-2 flex items-center justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                                setQuickAddOpen(false);
-                                setDraft('');
-                            }}
-                            disabled={isCreating}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                        {/* Deterministic, no-AI path: the textarea above hands
+                            the prompt to the chat AI; this links to the manual
+                            create form at /ideas/new. */}
+                        <Link
+                            href={ROUTES.DASHBOARD_IDEAS_NEW}
+                            className="text-xs font-medium text-primary hover:underline"
                         >
-                            {/* Re-use the dismiss-aria string as a Cancel label —
+                            {tPage('newPage.link')}
+                        </Link>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                    setQuickAddOpen(false);
+                                    setDraft('');
+                                }}
+                                disabled={isCreating}
+                            >
+                                {/* Re-use the dismiss-aria string as a Cancel label —
                                 the dashboard preview rarely needs a dedicated
                                 "Cancel" key for v1; if QA flags it we'll add
                                 one in PR P. */}
-                            ✕
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={handleQuickAdd}
-                            disabled={isCreating || draft.trim().length < 10}
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            {tPage('quickAdd.submit')}
-                        </Button>
+                                ✕
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={handleQuickAdd}
+                                disabled={isCreating || draft.trim().length < 10}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                {tPage('quickAdd.submit')}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
