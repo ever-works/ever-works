@@ -6,6 +6,7 @@ import {
     Hammer,
     Lightbulb,
     Loader2,
+    PenLine,
     Plus,
     RefreshCw,
     Settings as SettingsIcon,
@@ -417,14 +418,18 @@ export function WorkProposalsSection({
                     />
                     <div className="mt-2 flex items-center justify-between gap-2">
                         {/* Deterministic, no-AI path: the textarea above hands
-                            the prompt to the chat AI; this links to the manual
-                            create form at /ideas/new. */}
-                        <Link
+                            the prompt to the chat AI; this secondary Button
+                            mirrors the /works "Create manually" affordance and
+                            links to the manual create form at /ideas/new. */}
+                        <Button
                             href={ROUTES.DASHBOARD_IDEAS_NEW}
-                            className="text-xs font-medium text-primary hover:underline"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5"
                         >
+                            <PenLine className="w-3.5 h-3.5" />
                             {tPage('newPage.link')}
-                        </Link>
+                        </Button>
                         <div className="flex items-center gap-2">
                             <Button
                                 type="button"
