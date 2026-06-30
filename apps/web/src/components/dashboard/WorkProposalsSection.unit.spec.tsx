@@ -108,6 +108,36 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         expect(screen.queryByText(/viewAll:/)).toBeNull();
     });
 
+    it('"View all (N)" uses the server total (totalIdeas) when provided, even if the preview is empty', () => {
+        // Matches the Missions / Works / Agents sections: the link stays
+        // present and reflects the real catalog total, not the
+        // PENDING-only preview subset.
+        render(
+            <WorkProposalsSection
+                initialProposals={[]}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                totalIdeas={7}
+            />,
+        );
+        const link = screen.getByText('viewAll:{"n":7}').closest('a');
+        expect(link?.getAttribute('href')).toBe('/ideas');
+    });
+
+    it('totalIdeas overrides the visible-preview count for the "View all" link', () => {
+        const ideas = ['a', 'b'].map((id) => mkIdea(id));
+        render(
+            <WorkProposalsSection
+                initialProposals={ideas}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                totalIdeas={12}
+            />,
+        );
+        expect(screen.getByText('viewAll:{"n":12}')).toBeTruthy();
+        expect(screen.queryByText('viewAll:{"n":2}')).toBeNull();
+    });
+
     it('toggling "Show accepted" lazy-loads the accepted bucket via listProposalsAction', async () => {
         listProposalsMock.mockClear();
         listProposalsMock.mockResolvedValueOnce([mkIdea('a1', 'accepted')]);
