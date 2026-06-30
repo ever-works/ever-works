@@ -1005,6 +1005,21 @@
                 "reset": "Reset",
                 "status": "Status",
                 "anyStatus": "Any status"
+            },
+            "newPage": {
+                "link": "Create manually",
+                "title": "New Idea",
+                "subtitle": "Write your own Idea. Describe the Work you want to build — you can queue it for build afterward.",
+                "nameLabel": "Title",
+                "namePlaceholder": "Optional — leave blank to derive one from the description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Describe the Work this Idea should become — e.g. \"A curated directory of open-source AI agent frameworks, organized by framework type and license.\"",
+                "descriptionHint": "At least 10 characters.",
+                "cancel": "Cancel",
+                "create": "Create Idea",
+                "creating": "Creating…",
+                "minLength": "Description must be at least 10 characters.",
+                "error": "Couldn't create the Idea. Please try again."
             }
         },
         "discover": {
