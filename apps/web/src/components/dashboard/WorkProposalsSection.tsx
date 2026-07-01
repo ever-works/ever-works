@@ -289,12 +289,14 @@ export function WorkProposalsSection({
                         only below `@xl/main` so the action row fits one line
                         when the chat panel is open. */}
                     {!quickAddOpen && (
-                        <Button
+                        // Plain <button> (not the <Button> component) so the
+                        // "+ Add" entry point matches the other dashboard
+                        // sections exactly. <Button variant/size> would layer
+                        // its own bg/rounded/padding on top and drift visually.
+                        <button
                             type="button"
-                            variant="secondary"
-                            size="sm"
                             className={cn(
-                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer',
                                 'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
                                 'text-text-secondary dark:text-text-secondary-dark',
                                 'hover:border-border dark:hover:border-white/16',
@@ -308,7 +310,7 @@ export function WorkProposalsSection({
                             <span className="hidden @xl/main:inline">
                                 {tPage('quickAdd.submit')}
                             </span>
-                        </Button>
+                        </button>
                     )}
 
                     <DropdownMenu>
