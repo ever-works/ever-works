@@ -141,37 +141,26 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
     });
 
-    it('uses onQueueBuild for pending Ideas when provided', () => {
-        routerPushMock.mockClear();
-        const onQueueBuild = vi.fn();
-        render(<IdeaCard proposal={minimalProposal} onQueueBuild={onQueueBuild} />);
-        fireEvent.click(screen.getByText('actions.accept'));
-        expect(onQueueBuild).toHaveBeenCalledWith('prop-1');
-        expect(routerPushMock).not.toHaveBeenCalled();
-    });
-
-    describe('anti-multi-build CTA state', () => {
-        it('disables the CTA for an already queued/building Idea', () => {
-            const onQueueBuild = vi.fn();
-            for (const status of ['queued', 'building'] as const) {
-                const { unmount } = render(
-                    <IdeaCard
-                        proposal={{ ...minimalProposal, status }}
-                        onQueueBuild={onQueueBuild}
-                    />,
-                );
-                // The status label shows in both the badge and the CTA, so
-                // find the CTA by its disabled state (the dismiss X stays
-                // enabled). Build must not be re-triggerable.
+    describe('CTA always opens the /works/new build flow', () => {
+        // The card never calls the build endpoint directly: it rejects
+        // any status other than pending/failed AND needs git/provider
+        // config that only /works/new collects. So every non-Done status
+        // routes to /works/new — reliable, never a server-side error.
+        it.each(['pending', 'failed', 'queued', 'building'] as const)(
+            'opens /works/new for a %s Idea and stays clickable',
+            (status) => {
+                routerPushMock.mockClear();
+                render(<IdeaCard proposal={{ ...minimalProposal, status }} />);
+                // The CTA (not the dismiss X) must stay enabled.
                 const cta = screen
                     .getAllByRole('button')
-                    .find((b) => (b as HTMLButtonElement).disabled);
+                    .find((b) => b.getAttribute('aria-label') !== 'actions.dismissAria');
                 expect(cta).toBeTruthy();
+                expect((cta as HTMLButtonElement).disabled).toBe(false);
                 fireEvent.click(cta as HTMLButtonElement);
-                unmount();
-            }
-            expect(onQueueBuild).not.toHaveBeenCalled();
-        });
+                expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
+            },
+        );
     });
 
     it('calls dismissProposalAction + onDismissed when the X is clicked', async () => {
@@ -236,15 +225,31 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             expect(screen.getByText('actions.accept')).toBeTruthy();
         });
 
-        it('Build CTA + /works/new flow unchanged for non-ACCEPTED statuses', () => {
+        it('Build CTA + /works/new flow used when there is no linked Work', () => {
             routerPushMock.mockClear();
-            // Status PENDING — even if acceptedWorkId is somehow set
-            // (it shouldn't be), the Done state requires status =
-            // 'accepted', so this row uses the Build flow.
+            // Status PENDING with no acceptedWorkId → no Work exists yet,
+            // so this row uses the Build flow.
             render(<IdeaCard proposal={minimalProposal} />);
             fireEvent.click(screen.getByText('actions.accept'));
             expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
         });
+
+        it.each(['queued', 'building', 'failed'] as const)(
+            'shows "View Work" and redirects when a %s Idea already has a linked Work',
+            (status) => {
+                routerPushMock.mockClear();
+                render(
+                    <IdeaCard
+                        proposal={{ ...minimalProposal, status, acceptedWorkId: 'work-99' }}
+                    />,
+                );
+                // A Work exists → surface "View Work", not the status label.
+                expect(screen.getByText('actions.viewWork')).toBeTruthy();
+                expect(screen.queryByText('actions.accept')).toBeNull();
+                fireEvent.click(screen.getByText('actions.viewWork'));
+                expect(routerPushMock).toHaveBeenCalledWith('/works/work-99');
+            },
+        );
     });
 
     it('locks the rendered markup so the extraction is byte-identical (Decision A10)', () => {
