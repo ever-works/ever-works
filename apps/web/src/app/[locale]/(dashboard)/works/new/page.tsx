@@ -114,15 +114,16 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
     let proposal: WorkProposal | null = null;
     if (proposalId) {
         proposal = await workProposalsAPI.get(proposalId);
-        // If the proposal is already accepted, send the user to the existing Work
-        // instead of starting a duplicate create flow.
+        // If the proposal is already accepted AND has a built Work, send the
+        // user to the existing Work instead of starting a duplicate create flow.
         if (proposal?.status === 'accepted' && proposal.acceptedWorkId) {
             redirect(`/works/${proposal.acceptedWorkId}`);
         }
-        // Already-dismissed proposals fall through: form opens blank, no prefill.
-        if (proposal?.status !== 'pending') {
-            proposal = null;
-        }
+        // Any other status (pending / queued / building / failed / dismissed, or
+        // accepted-without-a-Work) keeps the proposal so the create form opens
+        // pre-filled with the Idea's detail. The home page surfaces Ideas of
+        // every status and "Build" routes here, so gating prefill to `pending`
+        // left the form blank for those cards.
     }
 
     // Gate each work-kind chip behind its `works-<value>` PostHog flag.

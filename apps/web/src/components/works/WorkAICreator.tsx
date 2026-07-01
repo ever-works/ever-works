@@ -79,7 +79,15 @@ export function WorkAICreator({
     initialPrompt,
     initialKind,
 }: WorkAICreatorProps) {
-    const [prompt, setPrompt] = useState(proposal?.generatedPrompt ?? initialPrompt ?? '');
+    // Seed the prompt from the proposal so clicking "Build" on an Idea card
+    // opens the form pre-filled. Prefer the AI-refined `generatedPrompt`, but
+    // fall back to the Idea's `description` (the detail shown on the card) so
+    // manually-created Ideas — which have no `generatedPrompt` — still land
+    // the user's text in the textarea. `||` (not `??`) so an empty
+    // `generatedPrompt` string falls through to the description.
+    const [prompt, setPrompt] = useState(
+        proposal?.generatedPrompt || proposal?.description || initialPrompt || '',
+    );
     const [workName, setWorkName] = useState(proposal?.title ?? '');
     // Slug is auto-generated from the name (mirrors WorkManualForm's
     // generateSlug) but stays user-editable so the combined Create
