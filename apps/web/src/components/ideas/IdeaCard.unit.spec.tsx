@@ -266,6 +266,11 @@ describe('IdeaCard (Phase 5 PR M)', () => {
                 />
               </svg>
             </button>
+            <a
+              aria-label="Top AI coding assistants"
+              class="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              href="/ideas/prop-1"
+            />
             <div
               class="mb-3 pr-7"
             >
@@ -318,7 +323,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               "
             </p>
             <div
-              class="mt-auto flex items-center gap-2"
+              class="relative z-10 mt-auto flex items-center gap-2"
             >
               <button
                 class="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"

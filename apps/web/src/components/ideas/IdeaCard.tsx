@@ -8,43 +8,9 @@ import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
+import type { WorkProposal } from '@/lib/api/work-proposals';
 import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
-
-/**
- * Per-status badge palette. Hoisted to module scope so it isn't
- * re-created on every render. Each entry is a soft tinted pill
- * (ring + bg + text) plus a leading status dot — `building` pulses
- * to read as "in progress" at a glance. Labels reuse the existing
- * `dashboard.ideasPage.filters.*` i18n keys so no new strings are
- * needed.
- */
-const STATUS_STYLES: Record<WorkProposalStatus, { badge: string; dot: string }> = {
-    pending: {
-        badge: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 ring-slate-500/20',
-        dot: 'bg-slate-400',
-    },
-    queued: {
-        badge: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-300 ring-indigo-500/20',
-        dot: 'bg-indigo-400',
-    },
-    building: {
-        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-300 ring-amber-500/20',
-        dot: 'bg-amber-500 animate-pulse',
-    },
-    failed: {
-        badge: 'bg-danger/10 text-danger ring-danger/20',
-        dot: 'bg-danger',
-    },
-    accepted: {
-        badge: 'bg-success/10 text-success ring-success/20',
-        dot: 'bg-success',
-    },
-    dismissed: {
-        badge: 'bg-gray-500/10 text-gray-500 dark:text-gray-400 ring-gray-500/20',
-        dot: 'bg-gray-400',
-    },
-};
+import { STATUS_STYLES } from './idea-status';
 
 /**
  * Phase 5 PR M — `IdeaCard` is the canonical name for what used
@@ -133,6 +99,18 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                 <X className="w-4 h-4" aria-hidden="true" />
             </button>
 
+            {/* Full-card click target → Idea detail page. Rendered as an
+                absolutely-positioned overlay (the "card link" pattern) so
+                the whole card is a single accessible link. It sits at
+                `z-0`; the dismiss button and the footer actions below are
+                lifted to `z-10` so they stay independently clickable and
+                aren't swallowed by this overlay. */}
+            <Link
+                href={ROUTES.DASHBOARD_IDEA(proposal.id)}
+                aria-label={proposal.title}
+                className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            />
+
             {/* Status badge — meaningful now that the home preview surfaces
                 Ideas of every status (pending / building / accepted / …). */}
             <div className="mb-3 pr-7">
@@ -220,7 +198,9 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                 </div>
             )}
 
-            <div className="mt-auto flex items-center gap-2">
+            {/* `relative z-10` lifts the action row above the full-card
+                link overlay so these controls handle their own clicks. */}
+            <div className="relative z-10 mt-auto flex items-center gap-2">
                 <button
                     type="button"
                     onClick={handleAccept}
