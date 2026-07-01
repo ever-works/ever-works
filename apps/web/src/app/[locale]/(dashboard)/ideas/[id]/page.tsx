@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
@@ -19,9 +20,18 @@ import { IdeaDetailClient } from '@/components/ideas';
  */
 type Params = Promise<{ id: string; locale: string }>;
 
+/**
+ * Shared, request-deduped Idea fetch. `generateMetadata` and the page
+ * component both need the Idea; wrapping in React's `cache` collapses
+ * their two calls into a single HTTP request per render pass. The
+ * `.catch(() => null)` degrades a transient failure (`get` now rethrows
+ * non-404/403 errors) to the not-found path instead of erroring the route.
+ */
+const getIdea = cache((id: string) => workProposalsAPI.get(id).catch(() => null));
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
     const { id } = await params;
-    const idea = await workProposalsAPI.get(id).catch(() => null);
+    const idea = await getIdea(id);
     if (!idea) {
         const tPage = await getTranslations('dashboard.ideasPage');
         return { title: tPage('title') };
@@ -31,7 +41,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function IdeaDetailPage({ params }: { params: Params }) {
     const { id } = await params;
-    const idea = await workProposalsAPI.get(id).catch(() => null);
+    const idea = await getIdea(id);
     if (!idea) {
         notFound();
     }
