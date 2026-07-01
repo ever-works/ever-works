@@ -59,6 +59,19 @@ export async function acceptProposalAction(proposalId: string, workId: string) {
     return result;
 }
 
+// Idea detail page (`/ideas/[id]`) — single-Idea fetch used by the
+// live-status poller. Returns `null` on unknown / unauthorized id so
+// the client can stop polling instead of throwing. Read-only, so no
+// revalidation.
+export async function getProposalAction(proposalId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    return workProposalsAPI.get(proposalId);
+}
+
 export async function getProposalsStatusAction() {
     const user = await getAuthFromCookie();
     if (!user) {

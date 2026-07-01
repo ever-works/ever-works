@@ -150,6 +150,30 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         expect(routerPushMock).not.toHaveBeenCalled();
     });
 
+    describe('anti-multi-build CTA state', () => {
+        it('disables the CTA for an already queued/building Idea', () => {
+            const onQueueBuild = vi.fn();
+            for (const status of ['queued', 'building'] as const) {
+                const { unmount } = render(
+                    <IdeaCard
+                        proposal={{ ...minimalProposal, status }}
+                        onQueueBuild={onQueueBuild}
+                    />,
+                );
+                // The status label shows in both the badge and the CTA, so
+                // find the CTA by its disabled state (the dismiss X stays
+                // enabled). Build must not be re-triggerable.
+                const cta = screen
+                    .getAllByRole('button')
+                    .find((b) => (b as HTMLButtonElement).disabled);
+                expect(cta).toBeTruthy();
+                fireEvent.click(cta as HTMLButtonElement);
+                unmount();
+            }
+            expect(onQueueBuild).not.toHaveBeenCalled();
+        });
+    });
+
     it('calls dismissProposalAction + onDismissed when the X is clicked', async () => {
         dismissProposalMock.mockClear();
         dismissProposalMock.mockResolvedValueOnce(undefined);
@@ -326,7 +350,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="relative z-10 mt-auto flex items-center gap-2"
             >
               <button
-                class="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
+                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
                 type="button"
               >
                 actions.accept

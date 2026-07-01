@@ -98,6 +98,12 @@ export function IdeasPageClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [isCreating, startCreating] = useTransition();
     const [isBuilding, startBuilding] = useTransition();
+    // Ids with a build request in flight. Invisible safety net: it only
+    // guards `handleQueueBuild` against a rapid double-submit during the
+    // brief window before the server flips the Idea to `queued`. The
+    // visible "Queued"/"Building" mark on each card is driven by the
+    // Idea's persisted status, not by this set.
+    const [buildingIds, setBuildingIds] = useState<ReadonlySet<string>>(new Set());
     let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'all');
     useEffect(() => {
         setStatusFilter(filters?.status ?? 'all');
@@ -150,6 +156,10 @@ export function IdeasPageClient({
     };
 
     const handleQueueBuild = (id: string) => {
+        // Re-entrancy guard: ignore a second Build click for an Idea whose
+        // build request is already in flight.
+        if (buildingIds.has(id)) return;
+        setBuildingIds((prev) => new Set(prev).add(id));
         startBuilding(async () => {
             try {
                 const { idea } = await buildIdeaAction(id);
@@ -162,6 +172,15 @@ export function IdeasPageClient({
             } catch {
                 // Security: never expose raw error messages (may contain internal details, API keys, stack fragments)
                 toast.error(t('toasts.ideaQueueError'));
+            } finally {
+                // Clear the in-flight flag. Once cleared, the card's own
+                // `queued`/`building` status keeps the CTA disabled, so the
+                // Build action still can't fire twice.
+                setBuildingIds((prev) => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                });
             }
         });
     };

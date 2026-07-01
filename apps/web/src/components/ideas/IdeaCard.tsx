@@ -51,7 +51,19 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
         typeof proposal.acceptedWorkId === 'string' &&
         proposal.acceptedWorkId.length > 0;
 
+    // Whether this Idea already exists as a build/Work. Derived purely
+    // from the Idea's persisted status (server truth) — NOT from any
+    // click state — so the "Queued"/"Building" mark is correct on first
+    // paint and survives reloads for as long as the build exists. The
+    // primary CTA is disabled in this state so it can't queue a duplicate.
+    const isBuilding =
+        !isDone && (proposal.status === 'queued' || proposal.status === 'building');
+
     const handleAccept = () => {
+        // Guard: never act while a build is already in progress.
+        if (isBuilding) {
+            return;
+        }
         if (isDone && proposal.acceptedWorkId) {
             router.push(ROUTES.DASHBOARD_WORK(proposal.acceptedWorkId));
             return;
@@ -204,18 +216,29 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                 <button
                     type="button"
                     onClick={handleAccept}
+                    disabled={isBuilding}
+                    aria-busy={isBuilding || undefined}
                     className={cn(
-                        'flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
+                        'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
+                        // While a build is underway the CTA is inert: no
+                        // pointer cursor, dimmed, and shows the live status
+                        // so it can't be re-triggered.
+                        isBuilding
+                            ? 'cursor-not-allowed opacity-70 bg-black/60 dark:bg-white/6'
+                            : 'cursor-pointer',
                         // Phase 5 PR P — Done state uses the success
                         // color and a checkmark icon. Visually distinct
                         // from the primary-blue Build CTA so a finished
                         // Idea reads as "completed" at a glance.
-                        isDone
-                            ? 'bg-success hover:bg-success/90'
-                            : 'bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10',
+                        !isBuilding &&
+                            (isDone
+                                ? 'bg-success hover:bg-success/90'
+                                : 'bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10'),
                     )}
                 >
-                    {isDone ? (
+                    {isBuilding ? (
+                        tPage(`filters.${proposal.status === 'building' ? 'building' : 'queued'}`)
+                    ) : isDone ? (
                         <>
                             <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                             {t('actions.viewWork')}
