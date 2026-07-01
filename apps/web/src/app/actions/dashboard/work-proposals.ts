@@ -60,9 +60,11 @@ export async function acceptProposalAction(proposalId: string, workId: string) {
 }
 
 // Idea detail page (`/ideas/[id]`) — single-Idea fetch used by the
-// live-status poller. Returns `null` on unknown / unauthorized id so
-// the client can stop polling instead of throwing. Read-only, so no
-// revalidation.
+// live-status poller. `workProposalsAPI.get` returns `null` ONLY for a
+// definitively gone/unauthorized id (404/403) and rethrows every other
+// (transient) failure. That split is deliberate: the poller stops on
+// `null` (the Idea is gone) but keeps retrying on a thrown error (a blip
+// shouldn't look like deletion). Read-only, so no revalidation.
 export async function getProposalAction(proposalId: string) {
     const user = await getAuthFromCookie();
     if (!user) {

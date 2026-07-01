@@ -113,7 +113,10 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
 
     let proposal: WorkProposal | null = null;
     if (proposalId) {
-        proposal = await workProposalsAPI.get(proposalId);
+        // `get` now rethrows transient failures (only 404/403 → null). This
+        // is a best-effort prefill on an SSR page load, so degrade to an
+        // empty create form rather than error the whole route on a blip.
+        proposal = await workProposalsAPI.get(proposalId).catch(() => null);
         // If the proposal is already accepted AND has a built Work, send the
         // user to the existing Work instead of starting a duplicate create flow.
         if (proposal?.status === 'accepted' && proposal.acceptedWorkId) {

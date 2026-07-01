@@ -79,8 +79,21 @@ export const workProposalsAPI = {
     async get(id: string): Promise<WorkProposal | null> {
         try {
             return await serverFetch<WorkProposal>(`/me/work-proposals/${id}`, { method: 'GET' });
-        } catch {
-            return null;
+        } catch (err) {
+            // Distinguish a definitive "this Idea isn't yours / doesn't
+            // exist" from a transient failure. A 404 (unknown id) or 403
+            // (not the caller's Idea) means the Idea is genuinely gone —
+            // return null so callers can render not-found / stop polling.
+            // Every other failure (network blip, 5xx, timeout) is transient
+            // and MUST propagate, otherwise a poller treats a momentary
+            // outage as "the Idea vanished" and gives up.
+            if (
+                err instanceof ApiResponseError &&
+                (err.statusCode === 404 || err.statusCode === 403)
+            ) {
+                return null;
+            }
+            throw err;
         }
     },
 

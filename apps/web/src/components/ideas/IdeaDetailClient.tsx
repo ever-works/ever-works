@@ -11,7 +11,7 @@ import {
     Lightbulb,
     Radio,
 } from 'lucide-react';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { getProposalAction } from '@/app/actions/dashboard/work-proposals';
@@ -49,6 +49,7 @@ interface IdeaDetailClientProps {
 export function IdeaDetailClient({ idea: initialIdea }: IdeaDetailClientProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
+    const router = useRouter();
 
     const [idea, setIdea] = useState<WorkProposal>(initialIdea);
     const isLive = IN_PROGRESS.has(idea.status);
@@ -68,11 +69,22 @@ export function IdeaDetailClient({ idea: initialIdea }: IdeaDetailClientProps) {
                 if (cancelled) return;
                 try {
                     const next = await getProposalAction(idea.id);
-                    if (cancelled || !next) return;
+                    if (cancelled) return;
+                    if (!next) {
+                        // `null` is a definitive 404/403 — the Idea was
+                        // deleted or access was revoked. Stop polling and
+                        // tell the user instead of freezing on a stale page,
+                        // then send them back to the catalog.
+                        toast.error(tPage('toasts.ideaGone'));
+                        router.replace(ROUTES.DASHBOARD_IDEAS);
+                        return;
+                    }
                     setIdea(next);
                     if (!IN_PROGRESS.has(next.status)) return; // settled — stop.
                 } catch {
-                    // Network blip — keep polling until the deadline.
+                    // Transient failure (network blip / 5xx) — the action
+                    // rethrows these, so swallow here and keep polling until
+                    // the deadline.
                 }
             }
         };
@@ -82,7 +94,9 @@ export function IdeaDetailClient({ idea: initialIdea }: IdeaDetailClientProps) {
         };
         // Re-arm whenever the id or the live-ness changes. Static content
         // fields aren't dependencies — only the status gate matters.
-    }, [idea.id, idea.status]);
+        // `tPage`/`router` are stable (next-intl memoizes them) so they
+        // don't cause extra re-arms.
+    }, [idea.id, idea.status, tPage, router]);
 
     // Fire a single toast on the in-progress → terminal transition so a
     // user who scrolled away still notices the build landed.
