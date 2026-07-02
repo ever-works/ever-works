@@ -1,7 +1,17 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { Paperclip, Trash2, Upload } from 'lucide-react';
+import {
+    File as FileIcon,
+    FileArchive,
+    FileAudio,
+    FileImage,
+    FileSpreadsheet,
+    FileText,
+    FileVideo,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
@@ -35,6 +45,37 @@ interface UploadedFileMeta {
     filename: string;
     sizeBytes: number;
     contentType: string;
+    /** API-served URL, present for in-session uploads — enables image previews. */
+    url?: string;
+}
+
+/**
+ * Maps a file to a preview affordance: an icon + accent tint, and whether
+ * it can render an inline image thumbnail. Server-loaded rows only carry a
+ * `uploadId` (no filename/mime), so they fall back to the generic icon; a
+ * fresh upload has both mime + url, so images get a real thumbnail.
+ */
+function fileKind(
+    filename: string,
+    contentType?: string,
+): { icon: typeof FileIcon; tint: string; isImage: boolean } {
+    const ct = (contentType ?? '').toLowerCase();
+    const ext = filename.includes('.') ? (filename.split('.').pop() ?? '').toLowerCase() : '';
+    const inExt = (list: string[]) => list.includes(ext);
+
+    if (ct.startsWith('image/') || inExt(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']))
+        return { icon: FileImage, tint: 'text-info', isImage: true };
+    if (ct === 'application/pdf' || ext === 'pdf')
+        return { icon: FileText, tint: 'text-danger', isImage: false };
+    if (ct.startsWith('video/') || inExt(['mp4', 'mov', 'webm', 'mkv', 'avi']))
+        return { icon: FileVideo, tint: 'text-primary', isImage: false };
+    if (ct.startsWith('audio/') || inExt(['mp3', 'wav', 'ogg', 'flac', 'm4a']))
+        return { icon: FileAudio, tint: 'text-warning', isImage: false };
+    if (inExt(['zip', 'tar', 'gz', 'rar', '7z']))
+        return { icon: FileArchive, tint: 'text-text-muted', isImage: false };
+    if (inExt(['csv', 'xls', 'xlsx', 'ods']))
+        return { icon: FileSpreadsheet, tint: 'text-success', isImage: false };
+    return { icon: FileIcon, tint: 'text-text-muted', isImage: false };
 }
 
 export interface EntityAttachmentRow {
@@ -96,6 +137,7 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                 filename: file.name,
                                 sizeBytes: file.size,
                                 contentType: file.type,
+                                url: res.url,
                             },
                         }));
                     } catch (err) {
@@ -217,12 +259,29 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                         const m = meta[r.id] ?? null;
                         const filename = m?.filename ?? r.uploadId;
                         const size = m ? formatSize(m.sizeBytes) : null;
+                        const kind = fileKind(filename, m?.contentType);
+                        const KindIcon = kind.icon;
+                        const thumbUrl = kind.isImage ? m?.url : undefined;
                         return (
                             <li
                                 key={r.id}
                                 className="flex items-center gap-3 rounded-md border border-border/40 dark:border-border-dark/40 p-2.5"
                             >
-                                <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
+                                <div className="shrink-0 w-10 h-10 rounded-md border border-border/40 dark:border-border-dark/40 bg-surface-secondary dark:bg-surface-secondary-dark overflow-hidden flex items-center justify-center">
+                                    {thumbUrl ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded URL isn't a configured next/image domain; a plain thumbnail is sufficient here.
+                                        <img
+                                            src={thumbUrl}
+                                            alt={filename}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <KindIcon
+                                            className={cn('w-4 h-4', kind.tint)}
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                </div>
                                 <div className="min-w-0 flex-1">
                                     {/* Download wiring pending — the upload
                                         URL needs the user id, which we don't
