@@ -5,10 +5,10 @@ import {
     File as FileIcon,
     FileArchive,
     FileAudio,
-    FileImage,
     FileSpreadsheet,
     FileText,
     FileVideo,
+    Image as ImageIcon,
     Trash2,
     Upload,
 } from 'lucide-react';
@@ -55,27 +55,78 @@ interface UploadedFileMeta {
  * `uploadId` (no filename/mime), so they fall back to the generic icon; a
  * fresh upload has both mime + url, so images get a real thumbnail.
  */
-function fileKind(
-    filename: string,
-    contentType?: string,
-): { icon: typeof FileIcon; tint: string; isImage: boolean } {
+interface FileKind {
+    icon: typeof FileIcon;
+    /** Icon/label text tint. */
+    tint: string;
+    /** Tinted background for the Drive-style preview area. */
+    previewBg: string;
+    /** Short label shown on the preview tile (e.g. PDF, MP4). */
+    label: string;
+    isImage: boolean;
+}
+
+function fileKind(filename: string, contentType?: string): FileKind {
     const ct = (contentType ?? '').toLowerCase();
     const ext = filename.includes('.') ? (filename.split('.').pop() ?? '').toLowerCase() : '';
     const inExt = (list: string[]) => list.includes(ext);
+    const label = (fallback: string) => (ext ? ext.toUpperCase() : fallback);
 
     if (ct.startsWith('image/') || inExt(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']))
-        return { icon: FileImage, tint: 'text-info', isImage: true };
+        return {
+            icon: ImageIcon,
+            tint: 'text-info',
+            previewBg: 'bg-info/10',
+            label: label('IMG'),
+            isImage: true,
+        };
     if (ct === 'application/pdf' || ext === 'pdf')
-        return { icon: FileText, tint: 'text-danger', isImage: false };
+        return {
+            icon: FileText,
+            tint: 'text-danger',
+            previewBg: 'bg-danger/10',
+            label: 'PDF',
+            isImage: false,
+        };
     if (ct.startsWith('video/') || inExt(['mp4', 'mov', 'webm', 'mkv', 'avi']))
-        return { icon: FileVideo, tint: 'text-primary', isImage: false };
+        return {
+            icon: FileVideo,
+            tint: 'text-primary',
+            previewBg: 'bg-primary/10',
+            label: label('VIDEO'),
+            isImage: false,
+        };
     if (ct.startsWith('audio/') || inExt(['mp3', 'wav', 'ogg', 'flac', 'm4a']))
-        return { icon: FileAudio, tint: 'text-warning', isImage: false };
+        return {
+            icon: FileAudio,
+            tint: 'text-warning',
+            previewBg: 'bg-warning/10',
+            label: label('AUDIO'),
+            isImage: false,
+        };
     if (inExt(['zip', 'tar', 'gz', 'rar', '7z']))
-        return { icon: FileArchive, tint: 'text-text-muted', isImage: false };
+        return {
+            icon: FileArchive,
+            tint: 'text-text-muted',
+            previewBg: 'bg-surface-secondary dark:bg-surface-secondary-dark',
+            label: label('ZIP'),
+            isImage: false,
+        };
     if (inExt(['csv', 'xls', 'xlsx', 'ods']))
-        return { icon: FileSpreadsheet, tint: 'text-success', isImage: false };
-    return { icon: FileIcon, tint: 'text-text-muted', isImage: false };
+        return {
+            icon: FileSpreadsheet,
+            tint: 'text-success',
+            previewBg: 'bg-success/10',
+            label: label('SHEET'),
+            isImage: false,
+        };
+    return {
+        icon: FileIcon,
+        tint: 'text-text-muted',
+        previewBg: 'bg-surface-secondary dark:bg-surface-secondary-dark',
+        label: label('FILE'),
+        isImage: false,
+    };
 }
 
 export interface EntityAttachmentRow {
@@ -254,64 +305,97 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
             )}
 
             {rows.length > 0 && (
-                <ul className="mt-4 space-y-2" data-testid={testId ? `${testId}-list` : undefined}>
+                <ul
+                    className="mt-4 grid grid-cols-2 sm:grid-cols-3 @2xl/main:grid-cols-4 gap-3"
+                    data-testid={testId ? `${testId}-list` : undefined}
+                >
                     {rows.map((r) => {
                         const m = meta[r.id] ?? null;
                         const filename = m?.filename ?? r.uploadId;
                         const size = m ? formatSize(m.sizeBytes) : null;
                         const kind = fileKind(filename, m?.contentType);
                         const KindIcon = kind.icon;
-                        const thumbUrl = kind.isImage ? m?.url : undefined;
+                        // Only in-session uploads carry a URL, so only those are openable.
+                        const openUrl = m?.url;
+                        // A type-aware icon tile — images get the image icon, PDFs the
+                        // PDF icon, etc. (Drive-style, reliable — no broken thumbnails.)
+                        const PreviewInner = (
+                            <div className="flex flex-col items-center justify-center gap-1.5">
+                                <KindIcon className={cn('w-8 h-8', kind.tint)} aria-hidden="true" />
+                                <span
+                                    className={cn(
+                                        'text-[10px] font-semibold tracking-wide',
+                                        kind.tint,
+                                    )}
+                                >
+                                    {kind.label}
+                                </span>
+                            </div>
+                        );
                         return (
                             <li
                                 key={r.id}
-                                className="flex items-center gap-3 rounded-md border border-border/40 dark:border-border-dark/40 p-2.5"
+                                className="group relative rounded-lg border border-border/50 dark:border-border-dark/50 bg-card dark:bg-card-primary-dark overflow-hidden hover:border-border dark:hover:border-border-dark hover:shadow-sm transition-all"
                             >
-                                <div className="shrink-0 w-10 h-10 rounded-md border border-border/40 dark:border-border-dark/40 bg-surface-secondary dark:bg-surface-secondary-dark overflow-hidden flex items-center justify-center">
-                                    {thumbUrl ? (
-                                        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded URL isn't a configured next/image domain; a plain thumbnail is sufficient here.
-                                        <img
-                                            src={thumbUrl}
-                                            alt={filename}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <KindIcon
-                                            className={cn('w-4 h-4', kind.tint)}
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    {/* Download wiring pending — the upload
-                                        URL needs the user id, which we don't
-                                        carry on this row. Surface filename as
-                                        plain text + a tooltip until a
-                                        uploadId-only resolver lands (same
-                                        constraint TaskAttachmentsSection
-                                        documents). */}
-                                    <span
-                                        className="text-sm text-text dark:text-text-dark truncate block"
-                                        title="Download wiring pending"
+                                {/* Preview tile — Drive-style. Clickable when we
+                                    have a URL (in-session uploads); otherwise a
+                                    static thumbnail/type tile. */}
+                                {openUrl ? (
+                                    <a
+                                        href={openUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={`Open ${filename}`}
+                                        className={cn(
+                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            kind.previewBg,
+                                        )}
                                     >
-                                        {filename}
-                                    </span>
-                                    <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                        {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
-                                        {new Date(r.createdAt).toLocaleString()}
+                                        {PreviewInner}
+                                    </a>
+                                ) : (
+                                    <div
+                                        className={cn(
+                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            kind.previewBg,
+                                        )}
+                                    >
+                                        {PreviewInner}
+                                    </div>
+                                )}
+
+                                {/* Footer — filename + meta */}
+                                <div className="flex items-center gap-2 p-2.5 border-t border-border/40 dark:border-border-dark/40">
+                                    <KindIcon
+                                        className={cn('w-3.5 h-3.5 shrink-0', kind.tint)}
+                                        aria-hidden="true"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <span
+                                            className="block truncate text-xs font-medium text-text dark:text-text-dark"
+                                            title={filename}
+                                        >
+                                            {filename}
+                                        </span>
+                                        <span className="block truncate text-[10px] text-text-muted dark:text-text-muted-dark">
+                                            {size ? `${size} · ` : ''}
+                                            {new Date(r.createdAt).toLocaleDateString()}
+                                        </span>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+
+                                {/* Detach — reveals on hover, Drive-style */}
+                                <button
+                                    type="button"
                                     onClick={() => handleRemove(r.id)}
                                     disabled={pending}
-                                    className="text-danger hover:text-danger gap-1.5"
                                     title="Detach"
+                                    aria-label={`Detach ${filename}`}
                                     data-testid={testId ? `${testId}-detach-${r.id}` : undefined}
+                                    className="absolute top-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-md bg-card/90 dark:bg-card-primary-dark/90 text-text-muted opacity-0 shadow-sm backdrop-blur transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                </button>
                             </li>
                         );
                     })}
