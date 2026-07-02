@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Archive, Pause, Play, Save } from 'lucide-react';
+import { Archive, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useRouter } from '@/i18n/navigation';
 import {
     archiveAgentAction,
@@ -111,16 +115,24 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
 
     return (
         <div className="p-6 max-w-screen-2xl mx-auto space-y-4">
-            <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 className="text-sm font-medium text-text dark:text-text-dark">
-                            Identity
-                        </h2>
-                        <p className="text-xs text-text-muted font-mono">{agent.slug}</p>
+            {/* Identity */}
+            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                            <IdCard className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                                Identity
+                            </h2>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark font-mono">
+                                {agent.slug}
+                            </p>
+                        </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-sm border border-border/60 px-2 py-1 text-xs capitalize text-text-secondary dark:border-border-dark/60 dark:text-text-secondary-dark">
+                        <span className="rounded-full border border-border/60 px-2.5 py-1 text-xs capitalize text-text-secondary dark:border-border-dark/60 dark:text-text-secondary-dark">
                             {agent.status}
                         </span>
                         {canPause ? (
@@ -129,8 +141,9 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                                 size="sm"
                                 onClick={() => changeStatus('pause')}
                                 loading={isChangingStatus}
+                                className="gap-1.5 px-2.5 py-1 text-xs"
                             >
-                                <Pause className="h-4 w-4" />
+                                <Pause className="h-3.5 w-3.5" />
                                 Pause
                             </Button>
                         ) : null}
@@ -140,8 +153,9 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                                 size="sm"
                                 onClick={() => changeStatus('resume')}
                                 loading={isChangingStatus}
+                                className="gap-1.5 px-2.5 py-1 text-xs"
                             >
-                                <Play className="h-4 w-4" />
+                                <Play className="h-3.5 w-3.5" />
                                 {agent.status === 'draft' ? 'Activate' : 'Resume'}
                             </Button>
                         ) : null}
@@ -150,139 +164,155 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                             size="sm"
                             onClick={() => changeStatus('archive')}
                             loading={isChangingStatus}
+                            className="gap-1.5 px-2.5 py-1 text-xs"
                         >
-                            <Archive className="h-4 w-4" />
+                            <Archive className="h-3.5 w-3.5" />
                             Archive
                         </Button>
                     </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Name</span>
-                        <input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Title</span>
-                        <input
-                            value={title}
-                            onChange={(event) => setTitle(event.target.value)}
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                </div>
-                <label className="space-y-1 text-xs text-text-muted">
-                    <span>Capabilities</span>
-                    <textarea
-                        value={capabilities}
-                        onChange={(event) => setCapabilities(event.target.value)}
-                        rows={4}
-                        className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
+                    <Input
+                        label="Name"
+                        variant="form"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
                     />
-                </label>
+                    <Input
+                        label="Title"
+                        variant="form"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                    />
+                </div>
+                <Textarea
+                    label="Capabilities"
+                    variant="form"
+                    rows={4}
+                    value={capabilities}
+                    onChange={(event) => setCapabilities(event.target.value)}
+                />
             </section>
 
-            <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">Runtime</h2>
+            {/* Runtime */}
+            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <Cpu className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                        <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                            Runtime
+                        </h2>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            Model, cadence, and idle behavior for this Agent.
+                        </p>
+                    </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>AI provider id</span>
-                        <input
-                            value={aiProviderId}
-                            onChange={(event) => setAiProviderId(event.target.value)}
-                            placeholder="Account default"
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Model id</span>
-                        <input
-                            value={modelId}
-                            onChange={(event) => setModelId(event.target.value)}
-                            placeholder="Provider default"
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Heartbeat cadence</span>
-                        <input
-                            value={heartbeatCadence}
-                            onChange={(event) => setHeartbeatCadence(event.target.value)}
-                            placeholder="manual or cron expression"
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Idle behavior</span>
-                        <select
+                    <Input
+                        label="AI provider id"
+                        variant="form"
+                        value={aiProviderId}
+                        onChange={(event) => setAiProviderId(event.target.value)}
+                        placeholder="Account default"
+                    />
+                    <Input
+                        label="Model id"
+                        variant="form"
+                        value={modelId}
+                        onChange={(event) => setModelId(event.target.value)}
+                        placeholder="Provider default"
+                    />
+                    <Input
+                        label="Heartbeat cadence"
+                        variant="form"
+                        value={heartbeatCadence}
+                        onChange={(event) => setHeartbeatCadence(event.target.value)}
+                        placeholder="manual or cron expression"
+                    />
+                    <div>
+                        <label className="block text-xs font-medium text-text dark:text-text-dark mb-2">
+                            Idle behavior
+                        </label>
+                        <Select
                             value={idleBehavior}
-                            onChange={(event) =>
-                                setIdleBehavior(event.target.value as AgentIdleBehavior)
+                            onValueChange={(value) =>
+                                setIdleBehavior(value as AgentIdleBehavior)
                             }
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
                         >
                             {idleBehaviorOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}
                                 </option>
                             ))}
-                        </select>
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Skill context tokens</span>
-                        <input
-                            type="number"
-                            min={500}
-                            max={20000}
-                            value={maxSkillContextTokens}
-                            onChange={(event) => setMaxSkillContextTokens(event.target.value)}
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
-                    <label className="space-y-1 text-xs text-text-muted">
-                        <span>Pause after failures</span>
-                        <input
-                            type="number"
-                            min={1}
-                            max={20}
-                            value={pauseAfterFailures}
-                            onChange={(event) => setPauseAfterFailures(event.target.value)}
-                            className="w-full rounded-sm border border-border/70 bg-background px-3 py-2 text-sm text-text outline-none focus:border-button-primary dark:border-border-dark/70 dark:bg-background-dark dark:text-text-dark"
-                        />
-                    </label>
+                        </Select>
+                    </div>
+                    <Input
+                        label="Skill context tokens"
+                        variant="form"
+                        type="number"
+                        min={500}
+                        max={20000}
+                        value={maxSkillContextTokens}
+                        onChange={(event) => setMaxSkillContextTokens(event.target.value)}
+                    />
+                    <Input
+                        label="Pause after failures"
+                        variant="form"
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={pauseAfterFailures}
+                        onChange={(event) => setPauseAfterFailures(event.target.value)}
+                    />
                 </div>
             </section>
 
-            <section className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">Permissions</h2>
+            {/* Permissions */}
+            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                        <ShieldCheck className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                        <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                            Permissions
+                        </h2>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            Control what this Agent is allowed to do on its own.
+                        </p>
+                    </div>
+                </div>
                 <div className="grid gap-3 md:grid-cols-2">
                     {permissionLabels.map((permission) => (
-                        <label
+                        <div
                             key={permission.key}
-                            className="flex items-center justify-between gap-3 rounded-sm border border-border/50 px-3 py-2 text-sm text-text-secondary dark:border-border-dark/50 dark:text-text-secondary-dark"
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border/50 px-3 py-2.5 text-sm text-text-secondary dark:border-border-dark/50 dark:text-text-secondary-dark"
                         >
                             <span>{permission.label}</span>
-                            <input
-                                type="checkbox"
+                            <Switch
+                                className="mt-0"
                                 checked={permissions[permission.key]}
-                                onChange={(event) =>
+                                onChange={(checked) =>
                                     setPermissions((current) => ({
                                         ...current,
-                                        [permission.key]: event.target.checked,
+                                        [permission.key]: checked,
                                     }))
                                 }
-                                className="h-4 w-4"
                             />
-                        </label>
+                        </div>
                     ))}
                 </div>
                 <div className="flex justify-end">
-                    <Button onClick={save} loading={isSaving}>
-                        <Save className="h-4 w-4" />
+                    <Button
+                        onClick={save}
+                        loading={isSaving}
+                        size="sm"
+                        className="gap-1.5 px-2.5 py-1 text-xs"
+                    >
+                        <Save className="h-3.5 w-3.5" />
                         Save settings
                     </Button>
                 </div>
