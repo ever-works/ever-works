@@ -146,6 +146,19 @@ export async function listAgentRunsAction(
     return agentsAPI.listRuns(id, opts);
 }
 
+export async function listAgentEventsAction(
+    id: string,
+    opts: { limit?: number; offset?: number } = {},
+) {
+    await ensureAuth();
+    return agentsAPI.listEvents(id, opts);
+}
+
+export async function getAgentRunDetailAction(id: string, runId: string) {
+    await ensureAuth();
+    return agentsAPI.getRun(id, runId);
+}
+
 export async function listAgentSkillsAction(id: string) {
     await ensureAuth();
     return agentsAPI.listSkills(id);
