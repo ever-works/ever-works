@@ -17,9 +17,16 @@ export default async function AgentActivityPage({ params }: { params: Params }) 
     const agent = await agentsAPI.get(id);
     if (!agent) notFound();
 
-    const initial = await agentsAPI
-        .listRuns(id, { limit: 25, offset: 0 })
-        .catch(() => ({ data: [], meta: { total: 0, limit: 25, offset: 0 } }));
+    // Lifecycle events (paused / resumed / …) are few per Agent — one
+    // 100-row page covers the interleaved timeline across run pages.
+    const [initial, initialEvents] = await Promise.all([
+        agentsAPI
+            .listRuns(id, { limit: 25, offset: 0 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 25, offset: 0 } })),
+        agentsAPI
+            .listEvents(id, { limit: 100, offset: 0 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 100, offset: 0 } })),
+    ]);
 
-    return <AgentActivityClient agentId={id} initial={initial} />;
+    return <AgentActivityClient agentId={id} initial={initial} initialEvents={initialEvents.data} />;
 }
