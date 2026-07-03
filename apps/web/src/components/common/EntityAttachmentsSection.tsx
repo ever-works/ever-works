@@ -173,6 +173,9 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
 }: EntityAttachmentsSectionProps<TRow>) {
     const [rows, setRows] = useState<TRow[]>([...initial]);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
+    // Attachment ids whose <img> failed to load — those tiles fall back
+    // to the type icon instead of showing a broken-image glyph.
+    const [brokenThumbs, setBrokenThumbs] = useState<Record<string, true>>({});
     const [pending, startTransition] = useTransition();
     const [dragOver, setDragOver] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -329,21 +332,39 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                         // In-session uploads carry the URL in local meta;
                         // server-listed rows carry it on the row itself.
                         const openUrl = m?.url ?? r.url ?? undefined;
-                        // A type-aware icon tile — images get the image icon, PDFs the
-                        // PDF icon, etc. (Drive-style, reliable — no broken thumbnails.)
-                        const PreviewInner = (
-                            <div className="flex flex-col items-center justify-center gap-1.5">
-                                <KindIcon className={cn('w-8 h-8', kind.tint)} aria-hidden="true" />
-                                <span
-                                    className={cn(
-                                        'text-[10px] font-semibold tracking-wide',
-                                        kind.tint,
-                                    )}
-                                >
-                                    {kind.label}
-                                </span>
-                            </div>
-                        );
+                        // Images render a real thumbnail (served same-origin via
+                        // the auth proxy); everything else — and any image that
+                        // fails to load — gets the type-aware icon tile. Plain
+                        // <img>, not next/image: the optimizer fetches server-side
+                        // without the viewer's session cookie, which the
+                        // owner-gated serve proxy rejects with a 401.
+                        const PreviewInner =
+                            kind.isImage && openUrl && !brokenThumbs[r.id] ? (
+                                <img
+                                    src={openUrl}
+                                    alt={filename}
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                    onError={() =>
+                                        setBrokenThumbs((prev) => ({ ...prev, [r.id]: true }))
+                                    }
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <KindIcon
+                                        className={cn('w-8 h-8', kind.tint)}
+                                        aria-hidden="true"
+                                    />
+                                    <span
+                                        className={cn(
+                                            'text-[10px] font-semibold tracking-wide',
+                                            kind.tint,
+                                        )}
+                                    >
+                                        {kind.label}
+                                    </span>
+                                </div>
+                            );
                         return (
                             <li
                                 key={r.id}
