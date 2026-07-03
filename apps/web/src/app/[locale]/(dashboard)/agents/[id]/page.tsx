@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { Bot, CalendarClock, Clock, HeartPulse, Moon, Sparkles, TriangleAlert } from 'lucide-react';
+import { Bot, CalendarClock, Clock, HeartPulse, Moon, TriangleAlert } from 'lucide-react';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
 import { ShowDateTime } from '@/components/ui/show-datetime';
@@ -166,8 +166,7 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
 
             {/* Capabilities */}
             <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-4 h-4 text-concept-agents" />
+                <div className="mb-3">
                     <h2 className="text-sm font-medium text-text dark:text-text-dark">
                         Capabilities
                     </h2>
