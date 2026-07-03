@@ -351,6 +351,57 @@ export const agentsAPI = {
         return serverFetch(`/agents/${id}/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
+    // Lifecycle events (paused / resumed / created / …) for the
+    // activity feed — interleaved with runs client-side.
+    async listEvents(
+        id: string,
+        opts: { limit?: number; offset?: number } = {},
+    ): Promise<{
+        data: Array<{
+            id: string;
+            actionType: string;
+            details: Record<string, unknown> | null;
+            createdAt: string;
+        }>;
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const params = new URLSearchParams();
+        if (opts.limit) params.set('limit', String(opts.limit));
+        if (opts.offset) params.set('offset', String(opts.offset));
+        const qs = params.toString();
+        return serverFetch(`/agents/${id}/events${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    },
+
+    // FU-4 follow-up — full run detail incl. the structured step logs
+    // written to `agent_run_logs` during the run (previously write-only).
+    async getRun(
+        id: string,
+        runId: string,
+    ): Promise<{
+        id: string;
+        status: string;
+        triggerKind: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+        durationMs: number | null;
+        summary: string | null;
+        errorMessage: string | null;
+        taskId: string | null;
+        chatMessageId: string | null;
+        memorySessionId: string | null;
+        createdAt: string;
+        logs: Array<{
+            id: string;
+            level: 'INFO' | 'WARN' | 'ERROR';
+            step: string;
+            message: string;
+            metadata: Record<string, unknown> | null;
+            createdAt: string;
+        }>;
+    }> {
+        return serverFetch(`/agents/${id}/runs/${runId}`, { method: 'GET' });
+    },
+
     async listSkills(id: string): Promise<{
         data: Array<{
             bindingId: string;
