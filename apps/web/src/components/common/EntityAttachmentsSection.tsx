@@ -51,9 +51,9 @@ interface UploadedFileMeta {
 
 /**
  * Maps a file to a preview affordance: an icon + accent tint, and whether
- * it can render an inline image thumbnail. Server-loaded rows only carry a
- * `uploadId` (no filename/mime), so they fall back to the generic icon; a
- * fresh upload has both mime + url, so images get a real thumbnail.
+ * it can render an inline image thumbnail. Server-loaded rows may carry
+ * joined upload metadata (filename/mime) on the row itself; rows without
+ * either source fall back to the generic icon.
  */
 interface FileKind {
     icon: typeof FileIcon;
@@ -133,6 +133,14 @@ export interface EntityAttachmentRow {
     readonly id: string;
     readonly uploadId: string;
     readonly createdAt: string;
+    // Optional joined upload metadata. When the entity's list endpoint
+    // enriches rows server-side (agents do), refreshed pages keep the
+    // type-aware icon/label/size instead of the generic-file fallback.
+    readonly filename?: string | null;
+    readonly mimeType?: string | null;
+    readonly sizeBytes?: number | null;
+    /** API-routed serve URL — makes the tile openable after a refresh. */
+    readonly url?: string | null;
 }
 
 export interface EntityAttachmentsSectionProps<TRow extends EntityAttachmentRow> {
@@ -310,13 +318,17 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                     data-testid={testId ? `${testId}-list` : undefined}
                 >
                     {rows.map((r) => {
+                        // In-session upload meta wins (it has the URL); fall
+                        // back to the server-joined row metadata on refresh.
                         const m = meta[r.id] ?? null;
-                        const filename = m?.filename ?? r.uploadId;
-                        const size = m ? formatSize(m.sizeBytes) : null;
-                        const kind = fileKind(filename, m?.contentType);
+                        const filename = m?.filename ?? r.filename ?? r.uploadId;
+                        const sizeBytes = m?.sizeBytes ?? r.sizeBytes ?? null;
+                        const size = sizeBytes == null ? null : formatSize(sizeBytes);
+                        const kind = fileKind(filename, m?.contentType ?? r.mimeType ?? undefined);
                         const KindIcon = kind.icon;
-                        // Only in-session uploads carry a URL, so only those are openable.
-                        const openUrl = m?.url;
+                        // In-session uploads carry the URL in local meta;
+                        // server-listed rows carry it on the row itself.
+                        const openUrl = m?.url ?? r.url ?? undefined;
                         // A type-aware icon tile — images get the image icon, PDFs the
                         // PDF icon, etc. (Drive-style, reliable — no broken thumbnails.)
                         const PreviewInner = (
@@ -338,8 +350,8 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                 className="group relative rounded-lg border border-border/50 dark:border-border-dark/50 bg-card dark:bg-card-primary-dark overflow-hidden hover:border-border dark:hover:border-border-dark hover:shadow-sm transition-all"
                             >
                                 {/* Preview tile — Drive-style. Clickable when we
-                                    have a URL (in-session uploads); otherwise a
-                                    static thumbnail/type tile. */}
+                                    have a URL (in-session or server-provided);
+                                    otherwise a static thumbnail/type tile. */}
                                 {openUrl ? (
                                     <a
                                         href={openUrl}

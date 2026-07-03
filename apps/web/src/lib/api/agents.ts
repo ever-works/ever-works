@@ -479,4 +479,13 @@ export interface AgentAttachmentRow {
     readonly agentId: string;
     readonly uploadId: string;
     readonly createdAt: string;
+    // Joined `user_uploads` metadata — present on list responses (the
+    // API enriches rows server-side) so attachment tiles can render
+    // type-aware icons after a refresh; absent on add responses, where
+    // the client already knows the file it just uploaded.
+    readonly filename?: string | null;
+    readonly mimeType?: string | null;
+    readonly sizeBytes?: number | null;
+    /** API-routed serve URL (`/api/uploads/<userId>/<hash>.<ext>`). */
+    readonly url?: string | null;
 }
