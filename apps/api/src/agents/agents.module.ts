@@ -65,6 +65,12 @@ import {
 // `PluginUsageRepository`.
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { DatabaseModule } from '@ever-works/agent/database';
+// ActivityLogService is injected @Optional() into AgentsController for
+// the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
+// run-cancelled / task-assigned) and the GET :id/events feed. Without
+// this import the optional injection silently resolved to `undefined`
+// and every tryLog() was a no-op — same wiring as works/plugins/auth.
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
@@ -110,6 +116,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         TasksDomainModule,
         FacadesModule,
         AuthModule,
+        ActivityLogModule,
         // Notifications v2 (EW-670) — EmailModule provides EmailService,
         // consumed by the AGENT_EMAIL_FACADE binding below.
         EmailModule,
