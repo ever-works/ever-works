@@ -26,8 +26,8 @@ import {
  * click away. The list is server-fetched by `works/[id]/layout.tsx`
  * and threaded down through WorkLayoutClient → WorkHeader.
  *
- * Rows reuse the AgentCard design language (initials avatar on the
- * concept-agents tint, tone-mapped status badge with the translated
+ * Rows reuse the AgentCard design language (bot avatar tile tinted by
+ * the Agent's status tone, tone-mapped status badge with the translated
  * `agentsPage.card.status*` labels) and expose a hover pause/resume
  * quick action mirroring the AgentSettingsClient semantics: pause is
  * offered for `active`, resume for `draft`/`paused`/`error`.
@@ -51,16 +51,14 @@ const STATUS_DOT_CLASS: Record<Agent['status'], string> = {
     archived: 'bg-text-muted/60',
 };
 
-function agentInitials(name: string): string {
-    return (
-        name
-            .split(/\s+/)
-            .map((p) => p.charAt(0))
-            .join('')
-            .slice(0, 2)
-            .toUpperCase() || 'A'
-    );
-}
+const STATUS_AVATAR_CLASS: Record<Agent['status'], string> = {
+    draft: 'bg-text-muted/10 border-text-muted/20 text-text-muted',
+    active: 'bg-success/10 border-success/20 text-success',
+    paused: 'bg-warning/10 border-warning/20 text-warning',
+    running: 'bg-info/10 border-info/20 text-info',
+    error: 'bg-danger/10 border-danger/20 text-danger',
+    archived: 'bg-text-muted/10 border-text-muted/20 text-text-muted',
+};
 
 export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents: Agent[] }) {
     const t = useTranslations('dashboard.agentsPage.card');
@@ -102,7 +100,7 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
         <span className="inline-flex">
             <DropdownMenu>
                 <DropdownMenuTrigger
-                    className="gap-1.5 rounded-lg border border-border dark:border-border-dark px-3 h-8 text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
+                    className="gap-1.5 rounded-lg border border-border dark:border-border-dark px-3 h-8 text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark hover:border-border-hover dark:hover:border-border-hover-dark hover:text-text dark:hover:text-text-dark outline-none focus:outline-none focus-visible:border-border-hover dark:focus-visible:border-border-hover-dark transition-colors"
                     aria-label="Agents for this Work"
                 >
                     <Bot className="w-3.5 h-3.5" />
@@ -145,10 +143,13 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                                             href={ROUTES.DASHBOARD_AGENT(agent.id)}
                                             className="group/agent cursor-pointer items-center gap-2.5 py-2"
                                         >
-                                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-concept-agents/10 border border-concept-agents/20">
-                                                <span className="text-[10px] font-semibold text-concept-agents">
-                                                    {agentInitials(agent.name)}
-                                                </span>
+                                            <span
+                                                className={cn(
+                                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border',
+                                                    STATUS_AVATAR_CLASS[agent.status],
+                                                )}
+                                            >
+                                                <Bot className="h-3.5 w-3.5" />
                                             </span>
                                             <span className="min-w-0 flex-1">
                                                 <span className="flex items-center gap-2">
@@ -157,13 +158,13 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                                                     </span>
                                                     <span
                                                         className={cn(
-                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[8px] font-medium uppercase tracking-wide',
                                                             STATUS_BADGE_CLASS[agent.status],
                                                         )}
                                                     >
                                                         <span
                                                             className={cn(
-                                                                'h-1.5 w-1.5 rounded-full',
+                                                                'h-1 w-1 rounded-full',
                                                                 STATUS_DOT_CLASS[agent.status],
                                                             )}
                                                         />
