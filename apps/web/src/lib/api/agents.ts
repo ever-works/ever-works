@@ -345,8 +345,8 @@ export const agentsAPI = {
         meta: { total: number; limit: number; offset: number };
     }> {
         const params = new URLSearchParams();
-        if (opts.limit) params.set('limit', String(opts.limit));
-        if (opts.offset) params.set('offset', String(opts.offset));
+        if (opts.limit != null) params.set('limit', String(opts.limit));
+        if (opts.offset != null) params.set('offset', String(opts.offset));
         const qs = params.toString();
         return serverFetch(`/agents/${id}/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
@@ -366,8 +366,8 @@ export const agentsAPI = {
         meta: { total: number; limit: number; offset: number };
     }> {
         const params = new URLSearchParams();
-        if (opts.limit) params.set('limit', String(opts.limit));
-        if (opts.offset) params.set('offset', String(opts.offset));
+        if (opts.limit != null) params.set('limit', String(opts.limit));
+        if (opts.offset != null) params.set('offset', String(opts.offset));
         const qs = params.toString();
         return serverFetch(`/agents/${id}/events${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
