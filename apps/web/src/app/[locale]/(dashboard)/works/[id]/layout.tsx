@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Work, workAPI, gitProvidersAPI, GitProviderConnectionInfo } from '@/lib/api';
+import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { notFound } from 'next/navigation';
 import { WorkLayoutClient } from '@/components/works/detail/WorkLayoutClient';
 import { getTranslations } from 'next-intl/server';
@@ -36,6 +37,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let work: Work;
     let oauthConnection: GitProviderConnectionInfo | null = null;
     let config = null;
+    let agents: Agent[] = [];
 
     try {
         const res = await workAPI.get(id);
@@ -46,11 +48,15 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
         config = work.configCache ?? null;
 
         if (work) {
-            // Fetch connection info and provider list in parallel
-            const [connectionRes, providersRes] = await Promise.all([
+            // Fetch connection info, provider list, and the Work-scoped
+            // Agents (header dropdown) in parallel
+            const [connectionRes, providersRes, agentsRes] = await Promise.all([
                 gitProvidersAPI.checkConnection(work.gitProvider).catch(() => null),
                 gitProvidersAPI.list().catch(() => null),
+                agentsAPI.list({ scope: 'work', workId: id, limit: 50 }).catch(() => null),
             ]);
+
+            agents = agentsRes?.data ?? [];
 
             oauthConnection = connectionRes;
 
@@ -69,7 +75,12 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     }
 
     return (
-        <WorkLayoutClient work={work} oauthConnection={oauthConnection} config={config}>
+        <WorkLayoutClient
+            work={work}
+            oauthConnection={oauthConnection}
+            config={config}
+            agents={agents}
+        >
             {children}
         </WorkLayoutClient>
     );

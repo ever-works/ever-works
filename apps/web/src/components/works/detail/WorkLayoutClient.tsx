@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import { GitProviderConnectionInfo, Work, WorkConfig } from '@/lib/api/types-only';
+import type { Agent } from '@/lib/api/agents';
 import { WorkHeader } from './WorkHeader';
 import { WorkTabs } from './WorkTabs';
 import { GenerateStatusType } from '@/lib/api/enums';
@@ -21,12 +22,15 @@ interface WorkLayoutClientProps {
     children: React.ReactNode;
     oauthConnection: GitProviderConnectionInfo | null;
     config: WorkConfig | null;
+    /** Work-scoped Agents for the header dropdown. */
+    agents?: Agent[];
 }
 
 export function WorkLayoutClient({
     work,
     oauthConnection,
     config,
+    agents = [],
     children,
 }: WorkLayoutClientProps) {
     const router = useRouter();
@@ -160,7 +164,7 @@ export function WorkLayoutClient({
             onWorkChange={setSyncedWork}
         >
             <div className="w-full">
-                <WorkHeader work={syncedWork} />
+                <WorkHeader work={syncedWork} agents={agents} />
                 <WorkTabs work={syncedWork} />
 
                 <div className="mt-6">{children}</div>
