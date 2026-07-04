@@ -1602,6 +1602,18 @@
             "createButton": "कार्य बनाएँ"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "एजेंट",
+                "heading": "इस काम के एजेंट",
+                "emptyTitle": "अभी तक कोई एजेंट नहीं",
+                "emptySubtitle": "इस काम को स्वचालित करने के लिए एक एजेंट बनाएं।",
+                "pause": "एजेंट रोकें",
+                "activate": "एजेंट सक्रिय करें",
+                "pausedToast": "एजेंट रोका गया",
+                "activatedToast": "एजेंट सक्रिय किया गया",
+                "statusUpdateFailed": "स्थिति अपडेट नहीं हो सकी",
+                "newAgent": "नया एजेंट"
+            },
             "failedToGenerateItems": "आइटम उत्पन्न करने में विफल। कृपया पुनः प्रयास करें।",
             "generationCompleted": "उत्पत्ति सफलतापूर्वक पूर्ण हुई",
             "generationCancelled": "उत्पत्ति रद्द कर दी गई",

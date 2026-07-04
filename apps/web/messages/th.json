@@ -1602,6 +1602,18 @@
             "createButton": "สร้างงาน"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "เอเจนต์",
+                "heading": "เอเจนต์สำหรับงานนี้",
+                "emptyTitle": "ยังไม่มีเอเจนต์",
+                "emptySubtitle": "สร้างเอเจนต์เพื่อทำให้งานนี้เป็นอัตโนมัติ",
+                "pause": "หยุดเอเจนต์ชั่วคราว",
+                "activate": "เปิดใช้งานเอเจนต์",
+                "pausedToast": "หยุดเอเจนต์ชั่วคราวแล้ว",
+                "activatedToast": "เปิดใช้งานเอเจนต์แล้ว",
+                "statusUpdateFailed": "ไม่สามารถอัปเดตสถานะได้",
+                "newAgent": "เอเจนต์ใหม่"
+            },
             "failedToGenerateItems": "ไม่สามารถสร้างรายการได้ โปรดลองอีกครั้ง",
             "generationCompleted": "การสร้างเสร็จสิ้นเรียบร้อยแล้ว",
             "generationCancelled": "การสร้างถูกยกเลิก",

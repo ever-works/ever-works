@@ -1602,6 +1602,18 @@
             "createButton": "ワークを作成"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "エージェント",
+                "heading": "この作業のエージェント",
+                "emptyTitle": "まだエージェントがありません",
+                "emptySubtitle": "エージェントを作成してこの作業を自動化しましょう。",
+                "pause": "エージェントを一時停止",
+                "activate": "エージェントを有効化",
+                "pausedToast": "エージェントを一時停止しました",
+                "activatedToast": "エージェントを有効化しました",
+                "statusUpdateFailed": "ステータスを更新できませんでした",
+                "newAgent": "新しいエージェント"
+            },
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",
             "generationCancelled": "生成がキャンセルされました",

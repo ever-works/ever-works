@@ -1602,6 +1602,18 @@
             "createButton": "Создать работа"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенты",
+                "heading": "Агенты этой Работы",
+                "emptyTitle": "Пока нет агентов",
+                "emptySubtitle": "Создайте агента, чтобы автоматизировать эту Работу.",
+                "pause": "Приостановить агента",
+                "activate": "Активировать агента",
+                "pausedToast": "Агент приостановлен",
+                "activatedToast": "Агент активирован",
+                "statusUpdateFailed": "Не удалось обновить статус",
+                "newAgent": "Новый агент"
+            },
             "failedToGenerateItems": "Не удалось сгенерировать элементы. Пожалуйста, попробуйте снова.",
             "generationCompleted": "Генерация успешно завершена",
             "generationCancelled": "Генерация была отменена",

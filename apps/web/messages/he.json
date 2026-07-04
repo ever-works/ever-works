@@ -1713,6 +1713,18 @@
             "createButton": "צור עבודה"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "סוכנים",
+                "heading": "סוכנים לעבודה זו",
+                "emptyTitle": "אין סוכנים עדיין",
+                "emptySubtitle": "צרו סוכן כדי להפוך עבודה זו לאוטומטית.",
+                "pause": "השהיית הסוכן",
+                "activate": "הפעלת הסוכן",
+                "pausedToast": "הסוכן הושהה",
+                "activatedToast": "הסוכן הופעל",
+                "statusUpdateFailed": "לא ניתן לעדכן את הסטטוס",
+                "newAgent": "סוכן חדש"
+            },
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
             "generationCompleted": "היצירה הושלמה בהצלחה",
             "generationCancelled": "היצירה בוטלה",

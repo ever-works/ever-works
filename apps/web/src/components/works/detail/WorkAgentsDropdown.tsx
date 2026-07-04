@@ -30,7 +30,8 @@ import {
  * the Agent's status tone, tone-mapped status badge with the translated
  * `agentsPage.card.status*` labels) and expose a hover pause/resume
  * quick action mirroring the AgentSettingsClient semantics: pause is
- * offered for `active`, resume for `draft`/`paused`/`error`.
+ * offered for `active`, resume for `draft`/`paused`/`error`. All other
+ * copy lives under `dashboard.workDetail.agentsDropdown`.
  */
 
 const STATUS_BADGE_CLASS: Record<Agent['status'], string> = {
@@ -62,6 +63,7 @@ const STATUS_AVATAR_CLASS: Record<Agent['status'], string> = {
 
 export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents: Agent[] }) {
     const t = useTranslations('dashboard.agentsPage.card');
+    const tDropdown = useTranslations('dashboard.workDetail.agentsDropdown');
     const router = useRouter();
     const [pendingId, setPendingId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -82,14 +84,16 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
             try {
                 if (action === 'pause') {
                     await pauseAgentAction(agent.id);
-                    toast.success('Agent paused');
+                    toast.success(tDropdown('pausedToast'));
                 } else {
                     await resumeAgentAction(agent.id);
-                    toast.success('Agent activated');
+                    toast.success(tDropdown('activatedToast'));
                 }
                 router.refresh();
             } catch (error) {
-                toast.error(error instanceof Error ? error.message : 'Could not update status');
+                toast.error(
+                    error instanceof Error ? error.message : tDropdown('statusUpdateFailed'),
+                );
             } finally {
                 setPendingId(null);
             }
@@ -101,10 +105,10 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
             <DropdownMenu>
                 <DropdownMenuTrigger
                     className="gap-1.5 rounded-lg border border-border dark:border-border-dark px-3 h-8 text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark hover:border-border-hover dark:hover:border-border-hover-dark hover:text-text dark:hover:text-text-dark outline-none focus:outline-none focus-visible:border-border-hover dark:focus-visible:border-border-hover-dark transition-colors"
-                    aria-label="Agents for this Work"
+                    aria-label={tDropdown('heading')}
                 >
                     <Bot className="w-3.5 h-3.5" />
-                    Agents
+                    {tDropdown('trigger')}
                     {agents.length > 0 && (
                         <span className="rounded-full bg-black/5 px-1.5 text-[10px] tabular-nums dark:bg-white/8">
                             {agents.length}
@@ -114,7 +118,7 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80">
                     <DropdownMenuLabel className="text-[11px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                        Agents for this Work
+                        {tDropdown('heading')}
                     </DropdownMenuLabel>
                     <div className="max-h-80 overflow-y-auto">
                         {agents.length === 0 ? (
@@ -123,10 +127,10 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                                     <Bot className="h-4 w-4 text-concept-agents" />
                                 </div>
                                 <p className="text-sm text-text dark:text-text-dark">
-                                    No Agents yet
+                                    {tDropdown('emptyTitle')}
                                 </p>
                                 <p className="mt-0.5 text-xs text-text-muted dark:text-text-muted-dark">
-                                    Create one to automate this Work.
+                                    {tDropdown('emptySubtitle')}
                                 </p>
                             </div>
                         ) : (
@@ -179,10 +183,14 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                                                 <button
                                                     type="button"
                                                     aria-label={
-                                                        canPause ? 'Pause Agent' : 'Activate Agent'
+                                                        canPause
+                                                            ? tDropdown('pause')
+                                                            : tDropdown('activate')
                                                     }
                                                     title={
-                                                        canPause ? 'Pause Agent' : 'Activate Agent'
+                                                        canPause
+                                                            ? tDropdown('pause')
+                                                            : tDropdown('activate')
                                                     }
                                                     disabled={isPending}
                                                     onClick={(e) => {
@@ -223,7 +231,7 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-border dark:border-border-dark">
                                 <Plus className="h-3.5 w-3.5" />
                             </span>
-                            New Agent
+                            {tDropdown('newAgent')}
                         </Link>
                     </DropdownMenuItem>
                 </DropdownMenuContent>

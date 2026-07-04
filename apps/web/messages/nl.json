@@ -1602,6 +1602,18 @@
             "createButton": "Werk aanmaken"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten voor deze Work",
+                "emptyTitle": "Nog geen Agenten",
+                "emptySubtitle": "Maak een Agent om deze Work te automatiseren.",
+                "pause": "Agent pauzeren",
+                "activate": "Agent activeren",
+                "pausedToast": "Agent gepauzeerd",
+                "activatedToast": "Agent geactiveerd",
+                "statusUpdateFailed": "Status kon niet worden bijgewerkt",
+                "newAgent": "Nieuwe Agent"
+            },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
             "generationCancelled": "Generatie is geannuleerd",

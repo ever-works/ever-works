@@ -1602,6 +1602,18 @@
             "createButton": "创建作品"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "代理",
+                "heading": "此工作的代理",
+                "emptyTitle": "还没有代理",
+                "emptySubtitle": "创建一个代理来自动化此工作。",
+                "pause": "暂停代理",
+                "activate": "激活代理",
+                "pausedToast": "代理已暂停",
+                "activatedToast": "代理已激活",
+                "statusUpdateFailed": "无法更新状态",
+                "newAgent": "新代理"
+            },
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",

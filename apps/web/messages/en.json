@@ -1829,6 +1829,18 @@
             "createButton": "New Work"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents for this Work",
+                "emptyTitle": "No Agents yet",
+                "emptySubtitle": "Create one to automate this Work.",
+                "pause": "Pause Agent",
+                "activate": "Activate Agent",
+                "pausedToast": "Agent paused",
+                "activatedToast": "Agent activated",
+                "statusUpdateFailed": "Could not update status",
+                "newAgent": "New Agent"
+            },
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",

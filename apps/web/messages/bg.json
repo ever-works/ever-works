@@ -1713,6 +1713,18 @@
             "createButton": "Създай работа"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенти",
+                "heading": "Агенти за тази Работа",
+                "emptyTitle": "Все още няма Агенти",
+                "emptySubtitle": "Създайте Агент, за да автоматизирате тази Работа.",
+                "pause": "Пауза на Агента",
+                "activate": "Активиране на Агента",
+                "pausedToast": "Агентът е поставен на пауза",
+                "activatedToast": "Агентът е активиран",
+                "statusUpdateFailed": "Статусът не можа да бъде обновен",
+                "newAgent": "Нов Агент"
+            },
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",
             "generationCancelled": "Генерирането беше отменено",

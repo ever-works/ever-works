@@ -1602,6 +1602,18 @@
             "createButton": "Tạo công việc"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents của Công việc này",
+                "emptyTitle": "Chưa có Agent nào",
+                "emptySubtitle": "Tạo một Agent để tự động hóa Công việc này.",
+                "pause": "Tạm dừng Agent",
+                "activate": "Kích hoạt Agent",
+                "pausedToast": "Đã tạm dừng Agent",
+                "activatedToast": "Đã kích hoạt Agent",
+                "statusUpdateFailed": "Không thể cập nhật trạng thái",
+                "newAgent": "Agent mới"
+            },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
             "generationCancelled": "Tạo đã bị hủy",

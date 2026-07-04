@@ -1602,6 +1602,18 @@
             "createButton": "Buat Karya"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agen",
+                "heading": "Agen untuk Karya ini",
+                "emptyTitle": "Belum ada Agen",
+                "emptySubtitle": "Buat Agen untuk mengotomatiskan Karya ini.",
+                "pause": "Jeda Agen",
+                "activate": "Aktifkan Agen",
+                "pausedToast": "Agen dijeda",
+                "activatedToast": "Agen diaktifkan",
+                "statusUpdateFailed": "Tidak dapat memperbarui status",
+                "newAgent": "Agen Baru"
+            },
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",
             "generationCancelled": "Generasi dibatalkan",

@@ -1602,6 +1602,18 @@
             "createButton": "Crea lavori"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenti",
+                "heading": "Agenti di questo Lavoro",
+                "emptyTitle": "Nessun Agente ancora",
+                "emptySubtitle": "Crea un Agente per automatizzare questo Lavoro.",
+                "pause": "Metti in pausa l'Agente",
+                "activate": "Attiva l'Agente",
+                "pausedToast": "Agente messo in pausa",
+                "activatedToast": "Agente attivato",
+                "statusUpdateFailed": "Impossibile aggiornare lo stato",
+                "newAgent": "Nuovo Agente"
+            },
             "failedToGenerateItems": "Impossibile generare gli elementi. Riprova.",
             "generationCompleted": "Generazione completata con successo",
             "generationCancelled": "Generazione annullata",
