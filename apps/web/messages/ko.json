@@ -1612,7 +1612,8 @@
                 "pausedToast": "에이전트가 일시중지되었습니다",
                 "activatedToast": "에이전트가 활성화되었습니다",
                 "statusUpdateFailed": "상태를 업데이트할 수 없습니다",
-                "newAgent": "새 에이전트"
+                "newAgent": "새 에이전트",
+                "moreAgents": "+{count}개 더"
             },
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
             "generationCompleted": "생성 완료",

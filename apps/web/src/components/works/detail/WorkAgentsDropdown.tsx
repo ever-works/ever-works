@@ -61,12 +61,23 @@ const STATUS_AVATAR_CLASS: Record<Agent['status'], string> = {
     archived: 'bg-text-muted/10 border-text-muted/20 text-text-muted',
 };
 
-export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents: Agent[] }) {
+export function WorkAgentsDropdown({
+    workId,
+    agents,
+    total,
+}: {
+    workId: string;
+    agents: Agent[];
+    /** Upstream total — may exceed agents.length when the fetch was capped. */
+    total?: number;
+}) {
     const t = useTranslations('dashboard.agentsPage.card');
     const tDropdown = useTranslations('dashboard.workDetail.agentsDropdown');
     const router = useRouter();
     const [pendingId, setPendingId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
+    const agentsTotal = Math.max(total ?? agents.length, agents.length);
+    const omittedCount = agentsTotal - agents.length;
 
     const statusLabel: Record<Agent['status'], string> = {
         draft: t('statusDraft'),
@@ -109,9 +120,9 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                 >
                     <Bot className="w-3.5 h-3.5" />
                     {tDropdown('trigger')}
-                    {agents.length > 0 && (
+                    {agentsTotal > 0 && (
                         <span className="rounded-full bg-black/5 px-1.5 text-[10px] tabular-nums dark:bg-white/8">
-                            {agents.length}
+                            {agentsTotal}
                         </span>
                     )}
                     <ChevronDown className="w-3 h-3 opacity-60" />
@@ -141,85 +152,101 @@ export function WorkAgentsDropdown({ workId, agents }: { workId: string; agents:
                                     agent.status === 'paused' ||
                                     agent.status === 'error';
                                 const isPending = pendingId === agent.id;
+                                const hasQuickAction = canPause || canResume;
                                 return (
-                                    <DropdownMenuItem key={agent.id} asChild>
-                                        <Link
-                                            href={ROUTES.DASHBOARD_AGENT(agent.id)}
-                                            className="group/agent cursor-pointer items-center gap-2.5 py-2"
-                                        >
-                                            <span
+                                    // The quick action is a positioned SIBLING of the row
+                                    // Link (not a child) so the DOM never nests a button
+                                    // inside an anchor: the Link stays the menu item and
+                                    // navigates on click/Enter, while button clicks never
+                                    // reach the anchor or close the menu — no
+                                    // preventDefault/stopPropagation needed.
+                                    <div key={agent.id} className="group/agent relative">
+                                        <DropdownMenuItem asChild>
+                                            <Link
+                                                href={ROUTES.DASHBOARD_AGENT(agent.id)}
                                                 className={cn(
-                                                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border',
-                                                    STATUS_AVATAR_CLASS[agent.status],
+                                                    'cursor-pointer items-center gap-2.5 py-2',
+                                                    hasQuickAction && 'pr-10',
                                                 )}
                                             >
-                                                <Bot className="h-3.5 w-3.5" />
-                                            </span>
-                                            <span className="min-w-0 flex-1">
-                                                <span className="flex items-center gap-2">
-                                                    <span className="truncate text-sm font-medium text-text dark:text-text-dark">
-                                                        {agent.name}
-                                                    </span>
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[8px] font-medium uppercase tracking-wide',
-                                                            STATUS_BADGE_CLASS[agent.status],
-                                                        )}
-                                                    >
-                                                        <span
-                                                            className={cn(
-                                                                'h-1 w-1 rounded-full',
-                                                                STATUS_DOT_CLASS[agent.status],
-                                                            )}
-                                                        />
-                                                        {statusLabel[agent.status]}
-                                                    </span>
-                                                </span>
-                                                <span className="mt-0.5 block truncate text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                    {agent.title ?? t('noTitle')}
-                                                </span>
-                                            </span>
-                                            {(canPause || canResume) && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={
-                                                        canPause
-                                                            ? tDropdown('pause')
-                                                            : tDropdown('activate')
-                                                    }
-                                                    title={
-                                                        canPause
-                                                            ? tDropdown('pause')
-                                                            : tDropdown('activate')
-                                                    }
-                                                    disabled={isPending}
-                                                    onClick={(e) => {
-                                                        // Quick action — don't navigate the row
-                                                        // Link or let the menu swallow the click.
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        toggleStatus(agent);
-                                                    }}
+                                                <span
                                                     className={cn(
-                                                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
-                                                        'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
-                                                        'hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                                        isPending && 'opacity-100',
+                                                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border',
+                                                        STATUS_AVATAR_CLASS[agent.status],
                                                     )}
                                                 >
-                                                    {isPending ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                    ) : canPause ? (
-                                                        <Pause className="h-3.5 w-3.5" />
-                                                    ) : (
-                                                        <Play className="h-3.5 w-3.5" />
-                                                    )}
-                                                </button>
-                                            )}
-                                        </Link>
-                                    </DropdownMenuItem>
+                                                    <Bot className="h-3.5 w-3.5" />
+                                                </span>
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="truncate text-sm font-medium text-text dark:text-text-dark">
+                                                            {agent.name}
+                                                        </span>
+                                                        <span
+                                                            className={cn(
+                                                                'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[8px] font-medium uppercase tracking-wide',
+                                                                STATUS_BADGE_CLASS[agent.status],
+                                                            )}
+                                                        >
+                                                            <span
+                                                                className={cn(
+                                                                    'h-1 w-1 rounded-full',
+                                                                    STATUS_DOT_CLASS[agent.status],
+                                                                )}
+                                                            />
+                                                            {statusLabel[agent.status]}
+                                                        </span>
+                                                    </span>
+                                                    <span className="mt-0.5 block truncate text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                        {agent.title ?? t('noTitle')}
+                                                    </span>
+                                                </span>
+                                            </Link>
+                                        </DropdownMenuItem>
+                                        {hasQuickAction && (
+                                            <button
+                                                type="button"
+                                                aria-label={
+                                                    canPause
+                                                        ? tDropdown('pause')
+                                                        : tDropdown('activate')
+                                                }
+                                                title={
+                                                    canPause
+                                                        ? tDropdown('pause')
+                                                        : tDropdown('activate')
+                                                }
+                                                disabled={isPending}
+                                                onClick={() => toggleStatus(agent)}
+                                                className={cn(
+                                                    'absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
+                                                    'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
+                                                    'hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                                    isPending && 'opacity-100',
+                                                )}
+                                            >
+                                                {isPending ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : canPause ? (
+                                                    <Pause className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <Play className="h-3.5 w-3.5" />
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
                                 );
                             })
+                        )}
+                        {omittedCount > 0 && (
+                            <DropdownMenuItem asChild>
+                                <Link
+                                    href={ROUTES.DASHBOARD_AGENTS}
+                                    className="cursor-pointer justify-center text-xs text-text-muted dark:text-text-muted-dark"
+                                >
+                                    {tDropdown('moreAgents', { count: omittedCount })}
+                                </Link>
+                            </DropdownMenuItem>
                         )}
                     </div>
                     <DropdownMenuSeparator />

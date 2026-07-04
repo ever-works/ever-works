@@ -1612,7 +1612,8 @@
                 "pausedToast": "หยุดเอเจนต์ชั่วคราวแล้ว",
                 "activatedToast": "เปิดใช้งานเอเจนต์แล้ว",
                 "statusUpdateFailed": "ไม่สามารถอัปเดตสถานะได้",
-                "newAgent": "เอเจนต์ใหม่"
+                "newAgent": "เอเจนต์ใหม่",
+                "moreAgents": "+อีก {count}"
             },
             "failedToGenerateItems": "ไม่สามารถสร้างรายการได้ โปรดลองอีกครั้ง",
             "generationCompleted": "การสร้างเสร็จสิ้นเรียบร้อยแล้ว",

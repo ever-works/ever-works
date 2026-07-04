@@ -1612,7 +1612,8 @@
                 "pausedToast": "Agen dijeda",
                 "activatedToast": "Agen diaktifkan",
                 "statusUpdateFailed": "Tidak dapat memperbarui status",
-                "newAgent": "Agen Baru"
+                "newAgent": "Agen Baru",
+                "moreAgents": "+{count} lainnya"
             },
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",

@@ -1723,7 +1723,8 @@
                 "pausedToast": "تم إيقاف الوكيل مؤقتًا",
                 "activatedToast": "تم تفعيل الوكيل",
                 "statusUpdateFailed": "تعذر تحديث الحالة",
-                "newAgent": "وكيل جديد"
+                "newAgent": "وكيل جديد",
+                "moreAgents": "+{count} أخرى"
             },
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",

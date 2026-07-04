@@ -1723,7 +1723,8 @@
                 "pausedToast": "Agent pausiert",
                 "activatedToast": "Agent aktiviert",
                 "statusUpdateFailed": "Status konnte nicht aktualisiert werden",
-                "newAgent": "Neuer Agent"
+                "newAgent": "Neuer Agent",
+                "moreAgents": "+{count} weitere"
             },
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",

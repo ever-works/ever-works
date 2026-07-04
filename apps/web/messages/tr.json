@@ -1612,7 +1612,8 @@
                 "pausedToast": "Ajan duraklatıldı",
                 "activatedToast": "Ajan etkinleştirildi",
                 "statusUpdateFailed": "Durum güncellenemedi",
-                "newAgent": "Yeni Ajan"
+                "newAgent": "Yeni Ajan",
+                "moreAgents": "+{count} daha"
             },
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",

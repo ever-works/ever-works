@@ -1612,7 +1612,8 @@
                 "pausedToast": "Đã tạm dừng Agent",
                 "activatedToast": "Đã kích hoạt Agent",
                 "statusUpdateFailed": "Không thể cập nhật trạng thái",
-                "newAgent": "Agent mới"
+                "newAgent": "Agent mới",
+                "moreAgents": "+{count} khác"
             },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",

@@ -38,6 +38,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let oauthConnection: GitProviderConnectionInfo | null = null;
     let config = null;
     let agents: Agent[] = [];
+    let agentsTotal = 0;
 
     try {
         const res = await workAPI.get(id);
@@ -57,6 +58,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             ]);
 
             agents = agentsRes?.data ?? [];
+            agentsTotal = agentsRes?.meta?.total ?? agents.length;
 
             oauthConnection = connectionRes;
 
@@ -80,6 +82,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             oauthConnection={oauthConnection}
             config={config}
             agents={agents}
+            agentsTotal={agentsTotal}
         >
             {children}
         </WorkLayoutClient>

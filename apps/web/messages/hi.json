@@ -1612,7 +1612,8 @@
                 "pausedToast": "एजेंट रोका गया",
                 "activatedToast": "एजेंट सक्रिय किया गया",
                 "statusUpdateFailed": "स्थिति अपडेट नहीं हो सकी",
-                "newAgent": "नया एजेंट"
+                "newAgent": "नया एजेंट",
+                "moreAgents": "+{count} और"
             },
             "failedToGenerateItems": "आइटम उत्पन्न करने में विफल। कृपया पुनः प्रयास करें।",
             "generationCompleted": "उत्पत्ति सफलतापूर्वक पूर्ण हुई",

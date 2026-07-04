@@ -18,9 +18,11 @@ interface WorkHeaderProps {
     work: Work;
     /** Work-scoped Agents shown in the header dropdown. */
     agents?: Agent[];
+    /** Total Work-scoped Agents upstream — may exceed agents.length. */
+    agentsTotal?: number;
 }
 
-export function WorkHeader({ work, agents = [] }: WorkHeaderProps) {
+export function WorkHeader({ work, agents = [], agentsTotal }: WorkHeaderProps) {
     const t = useTranslations('dashboard.workDetail');
     const { repoLinks } = useWorkDetail();
     const { role } = useWorkPermissions();
@@ -156,7 +158,7 @@ export function WorkHeader({ work, agents = [] }: WorkHeaderProps) {
                     <div className="flex items-center gap-2 shrink-0">
                         {/* Agents scoped to this Work — list + "+ New Agent"
                             (the FU-3 on-ramp lives in the dropdown footer). */}
-                        <WorkAgentsDropdown workId={work.id} agents={agents} />
+                        <WorkAgentsDropdown workId={work.id} agents={agents} total={agentsTotal} />
 
                         {/* External link */}
                         {externalWebsiteUrl && (

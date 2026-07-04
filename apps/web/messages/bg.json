@@ -1723,7 +1723,8 @@
                 "pausedToast": "Агентът е поставен на пауза",
                 "activatedToast": "Агентът е активиран",
                 "statusUpdateFailed": "Статусът не можа да бъде обновен",
-                "newAgent": "Нов Агент"
+                "newAgent": "Нов Агент",
+                "moreAgents": "+{count} още"
             },
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",

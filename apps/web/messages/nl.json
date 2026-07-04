@@ -1612,7 +1612,8 @@
                 "pausedToast": "Agent gepauzeerd",
                 "activatedToast": "Agent geactiveerd",
                 "statusUpdateFailed": "Status kon niet worden bijgewerkt",
-                "newAgent": "Nieuwe Agent"
+                "newAgent": "Nieuwe Agent",
+                "moreAgents": "+{count} meer"
             },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",

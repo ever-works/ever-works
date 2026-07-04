@@ -1612,7 +1612,8 @@
                 "pausedToast": "エージェントを一時停止しました",
                 "activatedToast": "エージェントを有効化しました",
                 "statusUpdateFailed": "ステータスを更新できませんでした",
-                "newAgent": "新しいエージェント"
+                "newAgent": "新しいエージェント",
+                "moreAgents": "他 {count} 件"
             },
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",

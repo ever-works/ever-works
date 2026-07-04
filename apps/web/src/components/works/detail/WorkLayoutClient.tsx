@@ -24,6 +24,8 @@ interface WorkLayoutClientProps {
     config: WorkConfig | null;
     /** Work-scoped Agents for the header dropdown. */
     agents?: Agent[];
+    /** Total Work-scoped Agents upstream — may exceed agents.length. */
+    agentsTotal?: number;
 }
 
 export function WorkLayoutClient({
@@ -31,6 +33,7 @@ export function WorkLayoutClient({
     oauthConnection,
     config,
     agents = [],
+    agentsTotal,
     children,
 }: WorkLayoutClientProps) {
     const router = useRouter();
@@ -164,7 +167,7 @@ export function WorkLayoutClient({
             onWorkChange={setSyncedWork}
         >
             <div className="w-full">
-                <WorkHeader work={syncedWork} agents={agents} />
+                <WorkHeader work={syncedWork} agents={agents} agentsTotal={agentsTotal} />
                 <WorkTabs work={syncedWork} />
 
                 <div className="mt-6">{children}</div>

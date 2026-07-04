@@ -1612,7 +1612,8 @@
                 "pausedToast": "代理已暂停",
                 "activatedToast": "代理已激活",
                 "statusUpdateFailed": "无法更新状态",
-                "newAgent": "新代理"
+                "newAgent": "新代理",
+                "moreAgents": "还有 {count} 个"
             },
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
