@@ -16,6 +16,9 @@ interface OptionData {
     value: string;
     label: string;
     disabled?: boolean;
+    /** Tailwind bg-* class rendered as a small colored dot before the label.
+     *  Set via `data-dot` on the `<option>` (e.g. status color chips). */
+    dotClass?: string;
 }
 
 interface GroupData {
@@ -57,11 +60,13 @@ function parseItems(children: React.ReactNode): FlatItem[] {
 
         if (child.type === 'option') {
             const p = child.props as React.OptionHTMLAttributes<HTMLOptionElement>;
+            const dot = (p as Record<string, unknown>)['data-dot'];
             items.push({
                 type: 'option',
                 value: String(p.value ?? ''),
                 label: nodeText(p.children),
                 disabled: !!p.disabled,
+                ...(typeof dot === 'string' && dot ? { dotClass: dot } : {}),
             });
         } else if (child.type === 'optgroup') {
             const p = child.props as React.OptgroupHTMLAttributes<HTMLOptGroupElement>;
@@ -227,15 +232,26 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                         size === 'default' ? 'h-9 px-3 py-2' : 'h-8 px-2',
                     )}
                 >
-                    <span
-                        className={cn(
-                            'truncate leading-none',
-                            selected
-                                ? 'text-text dark:text-text-dark'
-                                : 'text-text-muted dark:text-text-muted-dark',
+                    <span className="flex min-w-0 items-center gap-1.5">
+                        {selected?.dotClass && (
+                            <span
+                                aria-hidden="true"
+                                className={cn(
+                                    'size-1.5 shrink-0 rounded-full',
+                                    selected.dotClass,
+                                )}
+                            />
                         )}
-                    >
-                        {displayLabel}
+                        <span
+                            className={cn(
+                                'truncate leading-none',
+                                selected
+                                    ? 'text-text dark:text-text-dark'
+                                    : 'text-text-muted dark:text-text-muted-dark',
+                            )}
+                        >
+                            {displayLabel}
+                        </span>
                     </span>
                     <ChevronDownIcon
                         className={cn(
@@ -382,6 +398,12 @@ function OptionRow({
                     'opacity-50 cursor-not-allowed pointer-events-none text-text-muted dark:text-text-muted-dark',
             )}
         >
+            {opt.dotClass && (
+                <span
+                    aria-hidden="true"
+                    className={cn('size-1.5 shrink-0 rounded-full', opt.dotClass)}
+                />
+            )}
             <span className="flex-1 truncate">{opt.label}</span>
             {selected && <CheckIcon className="size-4 shrink-0 text-gray-800 dark:text-gray-100" />}
         </div>
