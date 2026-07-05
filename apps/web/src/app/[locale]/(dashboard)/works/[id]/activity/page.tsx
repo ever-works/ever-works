@@ -5,6 +5,10 @@ import { workAPI } from '@/lib/api';
 import { ActivityFeedClient } from '@/components/works/detail/activity/ActivityFeedClient';
 import type { FeedCategory } from '@/lib/api/works/activity-feed.types';
 import { FEED_CATEGORIES } from '@/lib/api/works/activity-feed.types';
+import {
+    FEED_STATUS_FILTERS,
+    type FeedStatusFilter,
+} from '@/components/works/detail/activity/feed-status';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.workDetail.activity');
@@ -13,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type Params = {
     params: Promise<{ id: string }>;
-    searchParams: Promise<{ category?: string }>;
+    searchParams: Promise<{ category?: string; status?: string }>;
 };
 
 function parseCategory(value: string | undefined): FeedCategory {
@@ -23,9 +27,16 @@ function parseCategory(value: string | undefined): FeedCategory {
     return 'all';
 }
 
+function parseStatus(value: string | undefined): FeedStatusFilter {
+    if (value && (FEED_STATUS_FILTERS as readonly string[]).includes(value)) {
+        return value as FeedStatusFilter;
+    }
+    return 'all';
+}
+
 export default async function WorkActivityPage({ params, searchParams }: Params) {
     const { id } = await params;
-    const { category } = await searchParams;
+    const { category, status } = await searchParams;
 
     try {
         await workAPI.get(id);
@@ -33,5 +44,11 @@ export default async function WorkActivityPage({ params, searchParams }: Params)
         notFound();
     }
 
-    return <ActivityFeedClient workId={id} initialCategory={parseCategory(category)} />;
+    return (
+        <ActivityFeedClient
+            workId={id}
+            initialCategory={parseCategory(category)}
+            initialStatus={parseStatus(status)}
+        />
+    );
 }
