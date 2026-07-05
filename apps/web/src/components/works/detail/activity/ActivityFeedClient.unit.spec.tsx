@@ -7,9 +7,10 @@ const mockSearchParams = new URLSearchParams();
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
+    useLocale: () => 'en',
 }));
 vi.mock('@/i18n/navigation', () => ({
-    useRouter: () => ({ replace: mockReplace }),
+    useRouter: () => ({ replace: mockReplace, push: vi.fn() }),
     usePathname: () => '/works/work-1/activity',
     Link: ({ href, children, ...rest }: any) => (
         <a href={typeof href === 'string' ? href : ''} {...rest}>

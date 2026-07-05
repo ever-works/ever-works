@@ -14,7 +14,7 @@ import type {
 } from '@/lib/api/works/activity-feed.types';
 import { DegradedBanner } from './DegradedBanner';
 import { FeedFilterChips } from './FeedFilterChips';
-import { FeedRow } from './FeedRow';
+import { FeedTable } from './FeedTable';
 import { EmptyState } from './EmptyState';
 import { SkeletonList } from './SkeletonList';
 
@@ -224,13 +224,7 @@ export function ActivityFeedClient({ workId, initialCategory }: ActivityFeedClie
 
             {!isInitialLoading && entries && entries.length > 0 && (
                 <>
-                    <ul className="space-y-2">
-                        {entries.map((entry) => (
-                            <li key={`${entry.source}-${entry.id}`}>
-                                <FeedRow entry={entry} workId={workId} />
-                            </li>
-                        ))}
-                    </ul>
+                    <FeedTable entries={entries} workId={workId} />
                     {nextCursor && (
                         <div className="flex justify-center pt-2">
                             <button
