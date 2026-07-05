@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   lint-and-test:
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
 
     strategy:
       matrix:
@@ -118,7 +118,7 @@ jobs:
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
 
     strategy:
       fail-fast: false
@@ -178,7 +178,7 @@ jobs:
     # stays covered by the mocks-only job-runtime-plugin-matrix above.
     # Re-enable per-PR by removing this `if:` line.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
     services:
       redis:
         image: redis:7-alpine
@@ -257,7 +257,7 @@ jobs:
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
 
     strategy:
       fail-fast: false

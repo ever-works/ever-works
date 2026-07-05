@@ -52,7 +52,7 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
     # Each shard runs ~1/E2E_SHARDS of the 1670-test suite. 90 min keeps
     # plenty of headroom for the slowest shard (cold dev-mode compile +
     # retries) while letting GitHub kill genuine hangs reasonably fast.
@@ -448,7 +448,7 @@ jobs:
   # don't pay the cost of a prod build for the 1000+ dev-mode specs
   # while still validating the ~4 prod-only invariants.
   e2e-prod-build:
-    runs-on: ubicloud-standard-8
+    runs-on: ever-works-k8s-linux-x64-8
     timeout-minutes: 45
 
     strategy:
