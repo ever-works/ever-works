@@ -1,4 +1,4 @@
-name: Deploy to Trigger.dev Stage
+﻿name: Deploy to Trigger.dev Stage
 
 on:
   workflow_run:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ever-works-k8s-linux-x64-4
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment: stage
 
@@ -41,8 +41,9 @@ jobs:
         working-directory: packages/tasks
         run: pnpm prepare:plugins
 
-      - name: 🚀 Deploy Trigger.dev to Development environment
+      - name: ðŸš€ Deploy Trigger.dev to Development environment
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
         run: pnpm dlx trigger.dev@4.4.6 deploy --env staging
+

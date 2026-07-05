@@ -1,4 +1,4 @@
-name: Deploy to DO Prod
+﻿name: Deploy to DO Prod
 
 on:
   workflow_run:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   deploy-prod:
-    runs-on: ever-works-k8s-linux-x64-4
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment:
       name: prod
@@ -42,7 +42,7 @@ jobs:
         # interpolating `${{ secrets.X }}` directly into the shell. Inline
         # interpolation expands client-side and a secret containing shell
         # metacharacters (backticks, $(...), etc.) would break the step or
-        # — in pathological cases — leak via shell expansion.
+        # â€” in pathological cases â€” leak via shell expansion.
         run: |
           rm -f ${HOME}/ingress.api.crt ${HOME}/ingress.api.key ${HOME}/ingress.webapp.crt ${HOME}/ingress.webapp.key
           echo "$INGRESS_API_CERT" | base64 --decode > ${HOME}/ingress.api.crt
@@ -143,16 +143,16 @@ jobs:
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
           POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
 
-          # Ever Works Git (EW-608) — onboarding-wizard-v2 storage provider.
+          # Ever Works Git (EW-608) â€” onboarding-wizard-v2 storage provider.
           # PAT is fine-grained, scoped to ever-works-cloud only. Non-secret
           # config (flag, org, visibility) is inlined here; only the PAT
-          # comes from secrets. See deployment.md §1.
+          # comes from secrets. See deployment.md Â§1.
           STORAGE_EVER_WORKS_GIT_ENABLED: 'true'
           EVER_WORKS_CUSTOMERS_GITHUB_ORG: ever-works-cloud
           EVER_WORKS_CUSTOMERS_GITHUB_PAT: ${{ secrets.EVER_WORKS_CUSTOMERS_GITHUB_PAT }}
           EVER_WORKS_CUSTOMERS_GITHUB_VISIBILITY: private
 
-          # 2026-05-17 security audit env knobs — see PR ever-works#816 and
+          # 2026-05-17 security audit env knobs â€” see PR ever-works#816 and
           # the audit doc at
           # Workspace/knowledge/security/audits/2026-05-17-ever-works-platform-security-audit.md
           # C-08: AES-256-GCM key for plugin secretSettings encryption.
@@ -161,7 +161,7 @@ jobs:
           PLUGIN_SECRET_ENCRYPTION_KEY: ${{ secrets.PLUGIN_SECRET_ENCRYPTION_KEY }}
           # EW-716 (#1262): master key for at-rest encryption of operator
           # secrets (per-Work platform_sync_secret). REQUIRED at boot in
-          # non-local envs — without it the API crash-loops on startup
+          # non-local envs â€” without it the API crash-loops on startup
           # (config/constants.ts platformEncryptionKey()). 32-byte hex
           # (openssl rand -hex 32). Create the GitHub secret before deploy.
           PLATFORM_ENCRYPTION_KEY: ${{ secrets.PLATFORM_ENCRYPTION_KEY }}
@@ -176,20 +176,20 @@ jobs:
           # host is always included). Empty = WEB_URL only.
           ALLOWED_CALLBACK_HOSTS: ''
           # H-17: per-user login lockout knobs. Empty = built-in defaults
-          # (5 failed verifies → 15 min lock).
+          # (5 failed verifies â†’ 15 min lock).
           LOGIN_LOCKOUT_THRESHOLD: ''
           LOGIN_LOCKOUT_DURATION_MS: ''
           # M-19: HTTP body parser limit. Empty = default 1mb.
           BODY_LIMIT: ''
 
-          # EW-616 — kubeconfigs for platform-managed `clusterSource`
+          # EW-616 â€” kubeconfigs for platform-managed `clusterSource`
           # values on the k8s deploy plugin. Both are base64-encoded
           # so envsubst can splice them into Secret.data fields without
           # newline trouble; Kubernetes auto-decodes when mounting.
           EVER_WORKS_K8S_WORKS_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
           EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
 
-          # EW-617 — Ever Works zero-friction deploy + DNS automation.
+          # EW-617 â€” Ever Works zero-friction deploy + DNS automation.
           # DEPLOY_EVER_WORKS_ENABLED gates the 'ever-works' deploy
           # provider choice. CLOUDFLARE_* drive the subdomain DNS
           # automation. EVER_WORKS_DEPLOY_LB_HOSTNAME is the anchor record
@@ -201,7 +201,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
 
-          # EW-617 G7 — captcha verifier. Empty defaults keep captcha
+          # EW-617 G7 â€” captcha verifier. Empty defaults keep captcha
           # disabled; flip CAPTCHA_PROVIDER + CAPTCHA_SECRET when the
           # Turnstile widget is provisioned + client integration ships.
           CAPTCHA_PROVIDER: ${{ secrets.CAPTCHA_PROVIDER }}
@@ -213,3 +213,4 @@ jobs:
         run: |
           kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-api
           kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-web
+

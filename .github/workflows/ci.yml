@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   lint-and-test:
-    runs-on: ever-works-k8s-linux-x64-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
 
     strategy:
       matrix:
@@ -82,7 +82,7 @@ jobs:
         working-directory: apps/internal-cli
         # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
         # in-memory sqlite here, not a real database). C-07 PR-B made
-        # `autoMigrate()` default-off everywhere except NODE_ENV=test — without
+        # `autoMigrate()` default-off everywhere except NODE_ENV=test â€” without
         # this env, `synchronize` doesn't run and the eager NestJS bootstrap
         # hits "no such table: subscription_plans". Equivalent to setting
         # DATABASE_AUTOMIGRATE=true explicitly; NODE_ENV=test is the standard
@@ -93,12 +93,12 @@ jobs:
 
       - name: Test External CLI
         working-directory: apps/cli
-        # See note above on the Internal CLI step — same C-07 PR-B implication.
+        # See note above on the Internal CLI step â€” same C-07 PR-B implication.
         env:
           NODE_ENV: test
         run: pnpm test:cli
 
-  # EW-742 P6 T37 — per-provider job-runtime plugin matrix.
+  # EW-742 P6 T37 â€” per-provider job-runtime plugin matrix.
   #
   # Why a separate job: the aggregate `pnpm test` step in `lint-and-test`
   # passes/fails as a single signal. When a contract change in
@@ -108,17 +108,17 @@ jobs:
   #
   # Scope: contract + bindToTenant + dispatcher/worker-host factories +
   # T31 enqueue-options translators + T36-T40 tenant conformance suite
-  # — all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
-  # {off|on}` × `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
+  # â€” all mocks-only. The real-infra portion of T37 (a `TENANT_OVERLAY=
+  # {off|on}` Ã— `JOB_RUNTIME={trigger|temporal|bullmq|pgboss|inngest}`
   # matrix against live Redis/Postgres/Temporal/Inngest service
-  # containers) remains gated on CI infra availability — tracked in
+  # containers) remains gated on CI infra availability â€” tracked in
   # tasks.md and ADR-017.
   #
   # Independent of `lint-and-test`: this job re-installs and re-builds
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
-    runs-on: ever-works-k8s-linux-x64-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
 
     strategy:
       fail-fast: false
@@ -161,7 +161,7 @@ jobs:
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
 
-  # EW-742 P6 T32/T37 real-infra axis — all 4 push-model providers
+  # EW-742 P6 T32/T37 real-infra axis â€” all 4 push-model providers
   # against live infra: BullMQ on Redis, pg-boss on Postgres, Temporal
   # via temporalio/auto-setup (shares the Postgres service, Temporal
   # namespaces its own tables), Inngest via the inngest/inngest dev
@@ -174,11 +174,11 @@ jobs:
   job-runtime-real-infra:
     # Cost gate: real-infra cells spin up 4 service containers (Redis,
     # Postgres, Temporal auto-setup, Inngest dev-server) which burn
-    # Ubicloud minutes. Run on direct pushes to main only — PR signal
+    # Ubicloud minutes. Run on direct pushes to main only â€” PR signal
     # stays covered by the mocks-only job-runtime-plugin-matrix above.
     # Re-enable per-PR by removing this `if:` line.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ever-works-k8s-linux-x64-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     services:
       redis:
         image: redis:7-alpine
@@ -253,11 +253,11 @@ jobs:
         run: pnpm --filter @ever-works/job-runtime-inngest-plugin test
 
   # Companion matrix for the secret-store-resolver provider family
-  # (EW-742 P3.2 / P6 — runSecretStoreContractSuite is wired into all 7
+  # (EW-742 P3.2 / P6 â€” runSecretStoreContractSuite is wired into all 7
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
-    runs-on: ever-works-k8s-linux-x64-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
 
     strategy:
       fail-fast: false
@@ -297,3 +297,4 @@ jobs:
 
       - name: Test @ever-works/secret-store-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/secret-store-${{ matrix.provider }}-plugin test
+

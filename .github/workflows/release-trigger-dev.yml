@@ -1,4 +1,4 @@
-name: Deploy to Trigger.dev Dev
+﻿name: Deploy to Trigger.dev Dev
 
 on:
   workflow_run:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ever-works-k8s-linux-x64-4
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment: dev
 
@@ -37,7 +37,7 @@ jobs:
       - name: Build all packages
         run: pnpm build --filter './packages/**'
 
-      - name: 🚀 Verify Trigger.dev is available
+      - name: ðŸš€ Verify Trigger.dev is available
         working-directory: packages/tasks
         env:
           TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_ACCESS_TOKEN }}
@@ -46,3 +46,4 @@ jobs:
         # That's why we just run the login operation below.
         run: |
           pnpm dlx trigger.dev@4.4.6 login
+
