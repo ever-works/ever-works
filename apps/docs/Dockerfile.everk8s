@@ -38,7 +38,7 @@ RUN pnpm install --frozen-lockfile
 # trigger a full (~10 min) webpack compile of English-fallback pages, adding
 # ~2h with zero unique content. Restrict the build to the locales that actually
 # have translations. Add more --locale flags here if/when they gain content.
-RUN pnpm --filter ever-works-docs run build -- --locale en --locale fr
+RUN pnpm --filter ever-works-docs exec docusaurus build --locale en --locale fr
 
 # ---------------------------------------------------------------------------
 # Runtime: nginx serving the static build output
