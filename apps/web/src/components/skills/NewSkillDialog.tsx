@@ -2,9 +2,22 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import {
+    Bot,
+    Building2,
+    ChevronLeft,
+    ChevronRight,
+    FolderClosed,
+    Lightbulb,
+    Sparkles,
+    Target,
+    type LucideIcon,
+} from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillFrontmatter, SkillOwnerType } from '@/lib/api/skills';
@@ -106,27 +119,43 @@ export function NewSkillDialog({
     const scopeChoices: Array<{
         value: SkillOwnerType;
         desc: string;
+        icon: LucideIcon;
+        /** Same per-concept tints the sidebar/PageHeader use for these entities. */
+        iconClass: string;
         emptyHint?: string;
     }> = [
-        { value: 'tenant', desc: t('scopeTenantDesc') },
+        {
+            value: 'tenant',
+            desc: t('scopeTenantDesc'),
+            icon: Building2,
+            iconClass: 'text-text-secondary dark:text-text-secondary-dark',
+        },
         {
             value: 'mission',
             desc: t('scopeMissionDesc'),
+            icon: Target,
+            iconClass: 'text-concept-missions',
             emptyHint: missions.length === 0 ? t('noMissions') : undefined,
         },
         {
             value: 'work',
             desc: t('scopeWorkDesc'),
+            icon: FolderClosed,
+            iconClass: 'text-concept-works',
             emptyHint: works.length === 0 ? t('noWorks') : undefined,
         },
         {
             value: 'idea',
             desc: t('scopeIdeaDesc'),
+            icon: Lightbulb,
+            iconClass: 'text-concept-ideas',
             emptyHint: ideas.length === 0 ? t('noIdeas') : undefined,
         },
         {
             value: 'agent',
             desc: t('scopeAgentDesc'),
+            icon: Bot,
+            iconClass: 'text-concept-agents',
             emptyHint: agents.length === 0 ? t('noAgents') : undefined,
         },
     ];
@@ -199,14 +228,14 @@ export function NewSkillDialog({
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center">
                     <Sparkles className="w-4 h-4 text-success" aria-hidden="true" />
                 </div>
-                <h1 className="text-xl font-semibold text-text dark:text-text-dark">
+                <h1 className="text-lg font-semibold text-text dark:text-text-dark">
                     {t('title')}
                 </h1>
             </div>
 
             {step === 'template' && (
                 <section>
-                    <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                    <h2 className="text-xs font-medium text-text dark:text-text-dark mb-3">
                         {t('templateStepTitle')}
                     </h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -215,13 +244,13 @@ export function NewSkillDialog({
                                 key={tpl.slug}
                                 type="button"
                                 onClick={() => handlePickTemplate(tpl)}
-                                className="text-left rounded-lg border border-border/60 dark:border-border-dark/60 p-3 transition-colors hover:border-primary"
+                                className="text-left rounded-lg border border-border/60 dark:border-border-dark/60 p-3 transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50"
                                 data-testid={`skill-template-step-${tpl.slug}`}
                             >
-                                <div className="text-sm font-medium text-text dark:text-text-dark">
+                                <div className="text-xs font-medium text-text dark:text-text-dark">
                                     {tpl.title}
                                 </div>
-                                <div className="mt-0.5 text-xs text-text-muted dark:text-text-muted-dark line-clamp-2">
+                                <div className="mt-0.5 text-[11px] text-text-muted dark:text-text-muted-dark line-clamp-2">
                                     {tpl.description}
                                 </div>
                             </button>
@@ -246,7 +275,7 @@ export function NewSkillDialog({
 
             {step === 'scope' && (
                 <section>
-                    <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                    <h2 className="text-xs font-medium text-text dark:text-text-dark mb-3">
                         {t('scopeStepTitle')}
                     </h2>
                     <ul className="space-y-2">
@@ -258,23 +287,34 @@ export function NewSkillDialog({
                                         setScope(c.value);
                                         setParentId('');
                                     }}
+                                    aria-pressed={scope === c.value}
                                     className={`w-full text-left rounded-lg border p-3 transition-colors ${
                                         scope === c.value
-                                            ? 'border-primary bg-primary/5'
+                                            ? 'border-border-secondary dark:border-border-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark'
                                             : 'border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark'
                                     }`}
                                 >
-                                    <div className="text-sm font-medium text-text dark:text-text-dark capitalize">
-                                        {c.value === 'tenant' ? t('scopeTenantLabel') : c.value}
-                                    </div>
-                                    <div className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {c.desc}
-                                    </div>
-                                    {c.emptyHint && scope === c.value && (
-                                        <div className="mt-1 text-xs text-warning">
-                                            {c.emptyHint}
+                                    <div className="flex items-start gap-2.5">
+                                        <c.icon
+                                            className={`w-4 h-4 mt-0.5 shrink-0 ${c.iconClass}`}
+                                            aria-hidden="true"
+                                        />
+                                        <div className="min-w-0">
+                                            <div className="text-xs font-medium text-text dark:text-text-dark capitalize">
+                                                {c.value === 'tenant'
+                                                    ? t('scopeTenantLabel')
+                                                    : c.value}
+                                            </div>
+                                            <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                {c.desc}
+                                            </div>
+                                            {c.emptyHint && scope === c.value && (
+                                                <div className="mt-1 text-[11px] text-warning">
+                                                    {c.emptyHint}
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </button>
                             </li>
                         ))}
@@ -288,19 +328,20 @@ export function NewSkillDialog({
                             >
                                 {t('parentLabel', { scope })}
                             </label>
-                            <select
+                            <Select
                                 id="skill-scope-parent"
+                                size="xs"
                                 value={parentId}
-                                onChange={(e) => setParentId(e.target.value)}
-                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                                onValueChange={setParentId}
+                                placeholder={t('parentPlaceholder')}
+                                data-testid="skill-scope-parent"
                             >
-                                <option value="">{t('parentPlaceholder')}</option>
                                 {parentOptions.map((opt) => (
                                     <option key={opt.id} value={opt.id}>
                                         {opt.label}
                                     </option>
                                 ))}
-                            </select>
+                            </Select>
                         </div>
                     )}
 
@@ -325,7 +366,7 @@ export function NewSkillDialog({
                             silent dead-end. Workspace scope always advances. */}
                         <div className="flex flex-col items-end gap-1">
                             {!canAdvance && (
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark text-right">
+                                <p className="text-[11px] text-text-muted dark:text-text-muted-dark text-right">
                                     {t('pickParentHint', { scope })}
                                 </p>
                             )}
@@ -347,7 +388,7 @@ export function NewSkillDialog({
             {step === 'details' && (
                 <section>
                     {scope !== 'tenant' && parentId && (
-                        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                        <div className="mb-4 rounded-md border border-border/60 dark:border-border-dark/60 bg-surface-secondary dark:bg-surface-secondary-dark px-3 py-2 text-[11px] text-text-secondary dark:text-text-secondary-dark">
                             <span className="font-medium text-text dark:text-text-dark capitalize">
                                 {scope}
                             </span>{' '}
@@ -357,57 +398,45 @@ export function NewSkillDialog({
                             </span>
                         </div>
                     )}
-                    <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                    <h2 className="text-xs font-medium text-text dark:text-text-dark mb-3">
                         {t('detailsStepTitle')}
                     </h2>
-                    <label
-                        htmlFor="new-skill-title"
-                        className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1"
-                    >
-                        {t('titleLabel')}
-                    </label>
-                    <input
-                        id="new-skill-title"
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder={t('titlePlaceholder')}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                        maxLength={120}
-                        autoFocus
-                    />
-                    <label
-                        htmlFor="new-skill-description"
-                        className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1 mt-3"
-                    >
-                        {t('descriptionLabel')}
-                    </label>
-                    <input
-                        id="new-skill-description"
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder={t('descriptionPlaceholder')}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
-                        maxLength={240}
-                    />
-                    <label
-                        htmlFor="new-skill-instructions"
-                        className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1 mt-3"
-                    >
-                        {t('instructionsLabel')}
-                    </label>
-                    <textarea
-                        id="new-skill-instructions"
-                        value={instructionsMd}
-                        onChange={(e) => setInstructionsMd(e.target.value)}
-                        placeholder={t('instructionsPlaceholder')}
-                        rows={10}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 py-2 text-sm font-mono text-text dark:text-text-dark resize-y"
-                    />
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
-                        {t('instructionsHint')}
-                    </p>
+                    <div className="space-y-3">
+                        <Input
+                            id="new-skill-title"
+                            variant="form"
+                            label={t('titleLabel')}
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder={t('titlePlaceholder')}
+                            className="h-8 px-2.5 text-xs"
+                            maxLength={120}
+                            autoFocus
+                        />
+                        <Input
+                            id="new-skill-description"
+                            variant="form"
+                            label={t('descriptionLabel')}
+                            type="text"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder={t('descriptionPlaceholder')}
+                            className="h-8 px-2.5 text-xs"
+                            maxLength={240}
+                        />
+                        <Textarea
+                            id="new-skill-instructions"
+                            variant="form"
+                            label={t('instructionsLabel')}
+                            value={instructionsMd}
+                            onChange={(e) => setInstructionsMd(e.target.value)}
+                            placeholder={t('instructionsPlaceholder')}
+                            rows={10}
+                            className="px-2.5 py-2 text-xs font-mono resize-y"
+                            helperText={t('instructionsHint')}
+                        />
+                    </div>
                     {error && (
                         <p className="text-xs text-danger mt-2" role="alert">
                             {error}
