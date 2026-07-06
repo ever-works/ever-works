@@ -820,7 +820,7 @@
                 "next": "Nächste"
             },
             "list": {
-                "newSkill": "+ Neue Fähigkeit",
+                "newSkill": "Neue Fähigkeit",
                 "filter": {
                     "scope": "Bereich",
                     "all": "Alle"
@@ -839,6 +839,43 @@
                 "idea": "Idee",
                 "work": "Aufgabe",
                 "tenant": "Mandant"
+            },
+            "newPage": {
+                "title": "Neuer Skill",
+                "templateStepTitle": "Mit einer Vorlage starten (optional)",
+                "startFromScratch": "Von Grund auf neu beginnen",
+                "scopeStepTitle": "Wo soll dieser Skill leben?",
+                "scopeTenantLabel": "Arbeitsbereich",
+                "scopeTenantDesc": "Im gesamten Arbeitsbereich verfügbar.",
+                "scopeMissionDesc": "Auf eine einzelne Mission beschränkt.",
+                "scopeWorkDesc": "Auf ein einzelnes Work beschränkt.",
+                "scopeIdeaDesc": "Auf eine einzelne Idee beschränkt.",
+                "scopeAgentDesc": "Gehört einem einzelnen Agent.",
+                "noMissions": "Noch keine Missionen — erstelle zuerst eine oder wähle einen anderen Bereich.",
+                "noWorks": "Noch keine Works — erstelle zuerst eines oder wähle einen anderen Bereich.",
+                "noIdeas": "Noch keine Ideen — erstelle zuerst eine oder wähle einen anderen Bereich.",
+                "noAgents": "Noch keine Agents — erstelle zuerst einen oder wähle einen anderen Bereich.",
+                "parentLabel": "Welche(r) {scope}?",
+                "parentPlaceholder": "Auswählen…",
+                "pickParentHint": "Wähle eine(n) {scope}, um fortzufahren, oder wähle den Arbeitsbereich.",
+                "nextDisabledReason": "Wähle ein übergeordnetes Element, um fortzufahren",
+                "scopeSuffix": "Bereich —",
+                "detailsStepTitle": "Beschreibe den Skill",
+                "titleLabel": "Titel",
+                "titlePlaceholder": "z. B. Code-Review-Checkliste",
+                "descriptionLabel": "Beschreibung (optional)",
+                "descriptionPlaceholder": "Einzeiler, den Agents sehen, wenn sie diesen Skill laden.",
+                "instructionsLabel": "Anweisungen (Markdown, optional)",
+                "instructionsPlaceholder": "# Mein Skill\n\nWas soll der Agent wissen oder tun?",
+                "instructionsHint": "Du kannst den Inhalt später auf der Skill-Detailseite verfeinern.",
+                "back": "Zurück",
+                "next": "Weiter",
+                "cancel": "Abbrechen",
+                "create": "Skill erstellen",
+                "creating": "Wird erstellt...",
+                "titleRequired": "Titel ist erforderlich.",
+                "parentRequired": "Wähle ein übergeordnetes Element für diesen Bereich.",
+                "createFailed": "Skill konnte nicht erstellt werden"
             }
         },
         "templatesPage": {

@@ -820,7 +820,7 @@
                 "next": "הבא"
             },
             "list": {
-                "newSkill": "+ מיומנות חדשה",
+                "newSkill": "מיומנות חדשה",
                 "filter": {
                     "scope": "היקף",
                     "all": "הכל"
@@ -839,6 +839,43 @@
                 "idea": "רעיון",
                 "work": "עבודה",
                 "tenant": "דייר"
+            },
+            "newPage": {
+                "title": "כישור חדש",
+                "templateStepTitle": "התחלה מתבנית (אופציונלי)",
+                "startFromScratch": "התחלה מאפס",
+                "scopeStepTitle": "איפה הכישור הזה צריך לחיות?",
+                "scopeTenantLabel": "סביבת עבודה",
+                "scopeTenantDesc": "זמין בכל סביבת העבודה שלך.",
+                "scopeMissionDesc": "מוגבל למשימה אחת.",
+                "scopeWorkDesc": "מוגבל לעבודה אחת.",
+                "scopeIdeaDesc": "מוגבל לרעיון אחד.",
+                "scopeAgentDesc": "בבעלות סוכן אחד.",
+                "noMissions": "אין עדיין משימות — צרו אחת קודם או בחרו היקף אחר.",
+                "noWorks": "אין עדיין עבודות — צרו אחת קודם או בחרו היקף אחר.",
+                "noIdeas": "אין עדיין רעיונות — צרו אחד קודם או בחרו היקף אחר.",
+                "noAgents": "אין עדיין סוכנים — צרו אחד קודם או בחרו היקף אחר.",
+                "parentLabel": "איזה {scope}?",
+                "parentPlaceholder": "בחרו…",
+                "pickParentHint": "בחרו {scope} כדי להמשיך, או בחרו בהיקף סביבת העבודה.",
+                "nextDisabledReason": "בחרו הורה כדי להמשיך",
+                "scopeSuffix": "היקף —",
+                "detailsStepTitle": "תארו את הכישור",
+                "titleLabel": "כותרת",
+                "titlePlaceholder": "למשל: רשימת בדיקה לסקירת קוד",
+                "descriptionLabel": "תיאור (אופציונלי)",
+                "descriptionPlaceholder": "סיכום בשורה אחת שסוכנים רואים כשהם טוענים את הכישור.",
+                "instructionsLabel": "הוראות (Markdown, אופציונלי)",
+                "instructionsPlaceholder": "# הכישור שלי\n\nמה הסוכן צריך לדעת או לעשות?",
+                "instructionsHint": "אפשר לחדד את התוכן מאוחר יותר בעמוד פרטי הכישור.",
+                "back": "חזרה",
+                "next": "הבא",
+                "cancel": "ביטול",
+                "create": "יצירת כישור",
+                "creating": "יוצר...",
+                "titleRequired": "כותרת היא שדה חובה.",
+                "parentRequired": "בחרו הורה להיקף הזה.",
+                "createFailed": "יצירת הכישור נכשלה"
             }
         },
         "templatesPage": {

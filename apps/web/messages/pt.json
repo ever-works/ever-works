@@ -715,7 +715,7 @@
                 "subtitle": "Habilidades serão lançadas em uma fase posterior da implementação de Agentes/Habilidades/Tarefas. A página está reservada para que a rota de navegação na barra lateral seja resolvida."
             },
             "list": {
-                "newSkill": "+ Nova Habilidade",
+                "newSkill": "Nova Habilidade",
                 "filter": {
                     "scope": "Escopo",
                     "all": "Todos"

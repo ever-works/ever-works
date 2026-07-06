@@ -820,7 +820,7 @@
                 "next": "Next"
             },
             "list": {
-                "newSkill": "+ New Skill",
+                "newSkill": "New Skill",
                 "filter": {
                     "scope": "Scope",
                     "all": "All"
@@ -839,6 +839,43 @@
                 "idea": "Idea",
                 "work": "Work",
                 "tenant": "Workspace"
+            },
+            "newPage": {
+                "title": "New Skill",
+                "templateStepTitle": "Start from a template (optional)",
+                "startFromScratch": "Start from scratch",
+                "scopeStepTitle": "Where should this Skill live?",
+                "scopeTenantLabel": "Workspace",
+                "scopeTenantDesc": "Available across your whole workspace.",
+                "scopeMissionDesc": "Scoped to a single Mission.",
+                "scopeWorkDesc": "Scoped to a single Work.",
+                "scopeIdeaDesc": "Scoped to a single Idea.",
+                "scopeAgentDesc": "Owned by a single Agent.",
+                "noMissions": "No Missions yet — create one first, or pick another scope.",
+                "noWorks": "No Works yet — create one first, or pick another scope.",
+                "noIdeas": "No Ideas yet — create one first, or pick another scope.",
+                "noAgents": "No Agents yet — create one first, or pick another scope.",
+                "parentLabel": "Which {scope}?",
+                "parentPlaceholder": "Select…",
+                "pickParentHint": "Pick a {scope} to continue, or choose Workspace scope.",
+                "nextDisabledReason": "Select a parent to continue",
+                "scopeSuffix": "scope —",
+                "detailsStepTitle": "Describe the Skill",
+                "titleLabel": "Title",
+                "titlePlaceholder": "e.g. Code review checklist",
+                "descriptionLabel": "Description (optional)",
+                "descriptionPlaceholder": "One-line summary Agents see when deciding to load this Skill.",
+                "instructionsLabel": "Instructions (Markdown, optional)",
+                "instructionsPlaceholder": "# My Skill\n\nWhat should the Agent know or do?",
+                "instructionsHint": "You can refine the body later on the Skill detail page.",
+                "back": "Back",
+                "next": "Next",
+                "cancel": "Cancel",
+                "create": "Create Skill",
+                "creating": "Creating...",
+                "titleRequired": "Title is required.",
+                "parentRequired": "Pick a parent for this scope.",
+                "createFailed": "Failed to create Skill"
             }
         },
         "templatesPage": {

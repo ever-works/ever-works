@@ -820,7 +820,7 @@
                 "next": "التالي"
             },
             "list": {
-                "newSkill": "+ مهارة جديدة",
+                "newSkill": "مهارة جديدة",
                 "filter": {
                     "scope": "النطاق",
                     "all": "الكل"
@@ -839,6 +839,43 @@
                 "idea": "الفكرة",
                 "work": "العمل",
                 "tenant": "المستأجر"
+            },
+            "newPage": {
+                "title": "مهارة جديدة",
+                "templateStepTitle": "ابدأ من قالب (اختياري)",
+                "startFromScratch": "ابدأ من الصفر",
+                "scopeStepTitle": "أين يجب أن تعيش هذه المهارة؟",
+                "scopeTenantLabel": "مساحة العمل",
+                "scopeTenantDesc": "متاحة عبر مساحة العمل بأكملها.",
+                "scopeMissionDesc": "مقيدة بمهمة واحدة.",
+                "scopeWorkDesc": "مقيدة بعمل واحد.",
+                "scopeIdeaDesc": "مقيدة بفكرة واحدة.",
+                "scopeAgentDesc": "مملوكة لوكيل واحد.",
+                "noMissions": "لا توجد مهمات بعد — أنشئ واحدة أولاً أو اختر نطاقاً آخر.",
+                "noWorks": "لا توجد أعمال بعد — أنشئ واحداً أولاً أو اختر نطاقاً آخر.",
+                "noIdeas": "لا توجد أفكار بعد — أنشئ واحدة أولاً أو اختر نطاقاً آخر.",
+                "noAgents": "لا يوجد وكلاء بعد — أنشئ واحداً أولاً أو اختر نطاقاً آخر.",
+                "parentLabel": "أي {scope}؟",
+                "parentPlaceholder": "اختر…",
+                "pickParentHint": "اختر {scope} للمتابعة، أو اختر نطاق مساحة العمل.",
+                "nextDisabledReason": "اختر عنصراً أصلياً للمتابعة",
+                "scopeSuffix": "النطاق —",
+                "detailsStepTitle": "صِف المهارة",
+                "titleLabel": "العنوان",
+                "titlePlaceholder": "مثال: قائمة مراجعة الكود",
+                "descriptionLabel": "الوصف (اختياري)",
+                "descriptionPlaceholder": "ملخص من سطر واحد يراه الوكلاء عند تحميل هذه المهارة.",
+                "instructionsLabel": "التعليمات (Markdown، اختياري)",
+                "instructionsPlaceholder": "# مهارتي\n\nما الذي يجب أن يعرفه الوكيل أو يفعله؟",
+                "instructionsHint": "يمكنك تحسين المحتوى لاحقاً في صفحة تفاصيل المهارة.",
+                "back": "رجوع",
+                "next": "التالي",
+                "cancel": "إلغاء",
+                "create": "إنشاء مهارة",
+                "creating": "جارٍ الإنشاء...",
+                "titleRequired": "العنوان مطلوب.",
+                "parentRequired": "اختر عنصراً أصلياً لهذا النطاق.",
+                "createFailed": "فشل إنشاء المهارة"
             }
         },
         "templatesPage": {

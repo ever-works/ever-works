@@ -715,7 +715,7 @@
                 "subtitle": "Vaardigheden komen in een latere fase van de Agents/Skills/Tasks uitrol. De pagina is gereserveerd zodat de zijbalk navigatie route werkt."
             },
             "list": {
-                "newSkill": "+ Nieuwe Vaardigheid",
+                "newSkill": "Nieuwe Vaardigheid",
                 "filter": {
                     "scope": "Scope",
                     "all": "Alle"

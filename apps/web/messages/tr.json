@@ -715,7 +715,7 @@
                 "subtitle": "Yetenekler, Ajanlar/Yetenekler/Görevler dağıtımının daha sonraki bir aşamasında gelecek. Sayfa, kenar çubuğu gezinme rotasının çözülmesi için ayrılmıştır."
             },
             "list": {
-                "newSkill": "+ Yeni Yetenek",
+                "newSkill": "Yeni Yetenek",
                 "filter": {
                     "scope": "Kapsam",
                     "all": "Tümü"

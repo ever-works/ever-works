@@ -715,7 +715,7 @@
                 "subtitle": "Keterampilan akan tersedia di fase berikutnya dari peluncuran Agen/Keterampilan/Tugas. Halaman ini telah disiapkan agar rute navigasi sidebar dapat teratasi."
             },
             "list": {
-                "newSkill": "+ Keterampilan Baru",
+                "newSkill": "Keterampilan Baru",
                 "filter": {
                     "scope": "Cakupan",
                     "all": "Semua"
