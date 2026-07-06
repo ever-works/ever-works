@@ -108,6 +108,36 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         expect(screen.queryByText(/viewAll:/)).toBeNull();
     });
 
+    it('"View all (N)" uses the server total (totalIdeas) when provided, even if the preview is empty', () => {
+        // Matches the Missions / Works / Agents sections: the link stays
+        // present and reflects the real catalog total, not the
+        // PENDING-only preview subset.
+        render(
+            <WorkProposalsSection
+                initialProposals={[]}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                totalIdeas={7}
+            />,
+        );
+        const link = screen.getByText('viewAll:{"n":7}').closest('a');
+        expect(link?.getAttribute('href')).toBe('/ideas');
+    });
+
+    it('totalIdeas overrides the visible-preview count for the "View all" link', () => {
+        const ideas = ['a', 'b'].map((id) => mkIdea(id));
+        render(
+            <WorkProposalsSection
+                initialProposals={ideas}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                totalIdeas={12}
+            />,
+        );
+        expect(screen.getByText('viewAll:{"n":12}')).toBeTruthy();
+        expect(screen.queryByText('viewAll:{"n":2}')).toBeNull();
+    });
+
     it('toggling "Show accepted" lazy-loads the accepted bucket via listProposalsAction', async () => {
         listProposalsMock.mockClear();
         listProposalsMock.mockResolvedValueOnce([mkIdea('a1', 'accepted')]);
@@ -216,6 +246,31 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
             intent: 'Idea',
         });
         expect(createIdeaMock).not.toHaveBeenCalled();
+    });
+
+    it('showAllStatuses renders accepted/dismissed Ideas on first paint without toggling', () => {
+        // Home passes the full all-status list + showAllStatuses so a
+        // non-PENDING Idea (e.g. a manually-created one already accepted
+        // or dismissed) is visible immediately. No lazy-load round-trip
+        // should fire since the data is supplied up-front.
+        listProposalsMock.mockClear();
+        render(
+            <WorkProposalsSection
+                initialProposals={[
+                    mkIdea('p1', 'pending'),
+                    mkIdea('acc1', 'accepted'),
+                    mkIdea('dis1', 'dismissed'),
+                ]}
+                initiallyResearching={false}
+                initiallyCanRefresh={true}
+                showAllStatuses
+            />,
+        );
+        expect(screen.getByText('Idea p1')).toBeTruthy();
+        expect(screen.getByText('Idea acc1')).toBeTruthy();
+        expect(screen.getByText('Idea dis1')).toBeTruthy();
+        // Toggles start ON + pre-loaded — no fetch on mount.
+        expect(listProposalsMock).not.toHaveBeenCalled();
     });
 
     it('dismissing an Idea (via the card X) keeps it locally as DISMISSED, hidden by default', () => {

@@ -922,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "이 아이디어는 더 이상 사용할 수 없습니다."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4680,7 +4681,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "이 아이디어는 더 이상 사용할 수 없습니다."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4694,6 +4696,22 @@
                 "anyStatus": "모든 상태",
                 "apply": "적용",
                 "reset": "초기화"
+            },
+            "newPage": {
+                "link": "직접 만들기",
+                "or": "또는",
+                "title": "새 Idea",
+                "subtitle": "직접 Idea를 작성하세요. 만들고 싶은 Work를 설명하면 — 이후 빌드 대기열에 추가할 수 있습니다.",
+                "nameLabel": "제목",
+                "namePlaceholder": "선택 사항 — 비워 두면 설명에서 자동으로 생성됩니다",
+                "descriptionLabel": "설명",
+                "descriptionPlaceholder": "이 Idea가 될 Work를 설명하세요 — 예: “프레임워크 유형과 라이선스별로 정리한 오픈소스 AI 에이전트 프레임워크 큐레이션 디렉터리.”",
+                "descriptionHint": "최소 10자 이상.",
+                "cancel": "취소",
+                "create": "Idea 만들기",
+                "creating": "만드는 중…",
+                "minLength": "설명은 최소 10자 이상이어야 합니다.",
+                "error": "Idea를 만들 수 없습니다. 다시 시도해 주세요."
             }
         },
         "discover": {

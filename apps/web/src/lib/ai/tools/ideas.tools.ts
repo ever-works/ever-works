@@ -81,7 +81,10 @@ export const getIdeaDetails = tool({
         ideaId: z.string().describe('Idea / WorkProposal ID'),
     }),
     execute: async ({ ideaId }) => {
-        const idea = await workProposalsAPI.get(ideaId);
+        // `get` rethrows transient failures (only 404/403 → null); collapse
+        // both cases to a not-found result for the tool so a blip doesn't
+        // surface as an unhandled tool error.
+        const idea = await workProposalsAPI.get(ideaId).catch(() => null);
         if (!idea) return { error: 'Idea not found' };
         return {
             ...summarizeIdea(idea),

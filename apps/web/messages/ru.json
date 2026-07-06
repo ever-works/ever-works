@@ -922,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Эта идея больше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4680,7 +4681,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Эта идея больше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4694,6 +4696,22 @@
                 "anyStatus": "Любой статус",
                 "apply": "Применить",
                 "reset": "Сбросить"
+            },
+            "newPage": {
+                "link": "Создать вручную",
+                "or": "Или",
+                "title": "Новая Idea",
+                "subtitle": "Напишите свою Idea. Опишите Work, который хотите создать — затем его можно поставить в очередь на сборку.",
+                "nameLabel": "Заголовок",
+                "namePlaceholder": "Необязательно — оставьте пустым, чтобы получить из описания",
+                "descriptionLabel": "Описание",
+                "descriptionPlaceholder": "Опишите Work, которым должна стать эта Idea — например, «Тщательно подобранный каталог open-source фреймворков для ИИ-агентов, упорядоченный по типу фреймворка и лицензии.»",
+                "descriptionHint": "Не менее 10 символов.",
+                "cancel": "Отмена",
+                "create": "Создать Idea",
+                "creating": "Создание…",
+                "minLength": "Описание должно содержать не менее 10 символов.",
+                "error": "Не удалось создать Idea. Пожалуйста, попробуйте ещё раз."
             }
         },
         "discover": {

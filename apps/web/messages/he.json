@@ -1027,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "רעיון זה אינו זמין עוד."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1041,6 +1042,22 @@
                 "anyStatus": "כל סטטוס",
                 "apply": "החל",
                 "reset": "אפס"
+            },
+            "newPage": {
+                "link": "יצירה ידנית",
+                "or": "או",
+                "title": "Idea חדשה",
+                "subtitle": "כתוב Idea משלך. תאר את ה-Work שברצונך ליצור — לאחר מכן תוכל להוסיף אותו לתור הבנייה.",
+                "nameLabel": "כותרת",
+                "namePlaceholder": "אופציונלי — השאר ריק כדי לגזור אותו מהתיאור",
+                "descriptionLabel": "תיאור",
+                "descriptionPlaceholder": "תאר את ה-Work ש-Idea זו צריכה להפוך אליו — לדוגמה “ספרייה אצורה של מסגרות סוכני AI בקוד פתוח, מאורגנת לפי סוג מסגרת ורישיון.”",
+                "descriptionHint": "לפחות 10 תווים.",
+                "cancel": "ביטול",
+                "create": "צור Idea",
+                "creating": "יוצר…",
+                "minLength": "התיאור חייב להכיל לפחות 10 תווים.",
+                "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
             }
         },
         "discover": {

@@ -1027,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Diese Idee ist nicht mehr verfügbar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1041,6 +1042,22 @@
                 "anyStatus": "Beliebiger Status",
                 "apply": "Übernehmen",
                 "reset": "Zurücksetzen"
+            },
+            "newPage": {
+                "link": "Manuell erstellen",
+                "or": "Oder",
+                "title": "Neue Idea",
+                "subtitle": "Schreibe deine eigene Idea. Beschreibe das Work, das du erstellen möchtest — du kannst es anschließend zur Generierung einreihen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optional — leer lassen, um ihn aus der Beschreibung abzuleiten",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Beschreibe das Work, das aus dieser Idea werden soll — z. B. „Ein kuratiertes Verzeichnis quelloffener KI-Agenten-Frameworks, geordnet nach Framework-Typ und Lizenz.“",
+                "descriptionHint": "Mindestens 10 Zeichen.",
+                "cancel": "Abbrechen",
+                "create": "Idea erstellen",
+                "creating": "Wird erstellt…",
+                "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
+                "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             }
         },
         "discover": {

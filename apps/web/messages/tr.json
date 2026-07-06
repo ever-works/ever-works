@@ -922,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4680,7 +4681,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4694,6 +4696,22 @@
                 "anyStatus": "Herhangi bir durum",
                 "apply": "Uygula",
                 "reset": "Sıfırla"
+            },
+            "newPage": {
+                "link": "Manuel oluştur",
+                "or": "Veya",
+                "title": "Yeni Idea",
+                "subtitle": "Kendi Idea'nı yaz. Oluşturmak istediğin Work'ü tanımla — daha sonra derleme için sıraya alabilirsin.",
+                "nameLabel": "Başlık",
+                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu Idea'nın dönüşmesi gereken Work'ü tanımlayın — örneğin “Framework türüne ve lisansa göre düzenlenmiş, açık kaynaklı YZ ajan framework'lerinin özenle seçilmiş bir dizini.”",
+                "descriptionHint": "En az 10 karakter.",
+                "cancel": "İptal",
+                "create": "Idea oluştur",
+                "creating": "Oluşturuluyor…",
+                "minLength": "Açıklama en az 10 karakter olmalıdır.",
+                "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             }
         },
         "discover": {

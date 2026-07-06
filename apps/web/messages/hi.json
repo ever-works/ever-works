@@ -922,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "यह आइडिया अब उपलब्ध नहीं है।"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4680,7 +4681,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "यह आइडिया अब उपलब्ध नहीं है।"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4694,6 +4696,22 @@
                 "anyStatus": "कोई भी स्थिति",
                 "apply": "लागू करें",
                 "reset": "रीसेट करें"
+            },
+            "newPage": {
+                "link": "मैन्युअल रूप से बनाएँ",
+                "or": "या",
+                "title": "नया Idea",
+                "subtitle": "अपना खुद का Idea लिखें। वह Work बताएँ जिसे आप बनाना चाहते हैं — उसके बाद आप उसे बिल्ड के लिए कतार में लगा सकते हैं।",
+                "nameLabel": "शीर्षक",
+                "namePlaceholder": "वैकल्पिक — विवरण से प्राप्त करने के लिए खाली छोड़ें",
+                "descriptionLabel": "विवरण",
+                "descriptionPlaceholder": "वह Work बताएँ जो यह Idea बनना चाहिए — जैसे “ओपन-सोर्स AI एजेंट फ्रेमवर्क की एक संकलित निर्देशिका, जो फ्रेमवर्क प्रकार और लाइसेंस के अनुसार व्यवस्थित है।”",
+                "descriptionHint": "कम से कम 10 अक्षर।",
+                "cancel": "रद्द करें",
+                "create": "Idea बनाएँ",
+                "creating": "बना रहे हैं…",
+                "minLength": "विवरण कम से कम 10 अक्षरों का होना चाहिए।",
+                "error": "Idea नहीं बनाया जा सका। कृपया पुनः प्रयास करें।"
             }
         },
         "discover": {

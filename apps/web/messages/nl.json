@@ -922,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4680,7 +4681,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4694,6 +4696,22 @@
                 "anyStatus": "Elke status",
                 "apply": "Toepassen",
                 "reset": "Herstellen"
+            },
+            "newPage": {
+                "link": "Handmatig aanmaken",
+                "or": "Of",
+                "title": "Nieuwe Idea",
+                "subtitle": "Schrijf je eigen Idea. Beschrijf het Work dat je wilt maken — je kunt het daarna in de wachtrij zetten om te bouwen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optioneel — laat leeg om het uit de beschrijving af te leiden",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Beschrijf het Work dat deze Idea moet worden — bijv. “Een samengestelde directory van open-source AI-agentframeworks, geordend op frameworktype en licentie.”",
+                "descriptionHint": "Minstens 10 tekens.",
+                "cancel": "Annuleren",
+                "create": "Idea aanmaken",
+                "creating": "Aanmaken…",
+                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
+                "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             }
         },
         "discover": {

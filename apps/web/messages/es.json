@@ -1027,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Esta idea ya no está disponible."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1041,6 +1042,22 @@
                 "anyStatus": "Cualquier estado",
                 "apply": "Aplicar",
                 "reset": "Restablecer"
+            },
+            "newPage": {
+                "link": "Crear manualmente",
+                "or": "O",
+                "title": "Nueva Idea",
+                "subtitle": "Escribe tu propia Idea. Describe el Work que quieres crear — luego podrás ponerlo en cola para generarlo.",
+                "nameLabel": "Título",
+                "namePlaceholder": "Opcional — déjalo en blanco para derivarlo de la descripción",
+                "descriptionLabel": "Descripción",
+                "descriptionPlaceholder": "Describe el Work en el que debe convertirse esta Idea — p. ej. «Un directorio curado de frameworks de agentes de IA de código abierto, organizados por tipo de framework y licencia.»",
+                "descriptionHint": "Al menos 10 caracteres.",
+                "cancel": "Cancelar",
+                "create": "Crear Idea",
+                "creating": "Creando…",
+                "minLength": "La descripción debe tener al menos 10 caracteres.",
+                "error": "No se pudo crear la Idea. Inténtalo de nuevo."
             }
         },
         "discover": {
