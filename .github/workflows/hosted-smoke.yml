@@ -1,7 +1,0 @@
-name: hosted-smoke
-on: { workflow_dispatch: {} }
-jobs:
-  s:
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo hosted-ok
