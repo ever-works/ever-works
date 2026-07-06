@@ -1,26 +1,26 @@
-name: E2E Tests
+﻿name: E2E Tests
 
-# Playwright e2e suite — auto-starts API (sqlite in-memory) + Next.js dev
+# Playwright e2e suite â€” auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope (intentionally DEVELOP-ONLY — never runs on feature/fix branches,
+# Scope (intentionally DEVELOP-ONLY â€” never runs on feature/fix branches,
 # and no longer re-runs on the stage/main release cascade):
-#   - push to `develop`              → run (the single integration gate)
-#   - workflow_dispatch on any branch → run (one-off pre-merge verification)
+#   - push to `develop`              â†’ run (the single integration gate)
+#   - workflow_dispatch on any branch â†’ run (one-off pre-merge verification)
 #
 # There is deliberately NO `pull_request` trigger, and (since 2026-06-12)
 # NO `stage` / `main` / `master` push trigger either. The full suite is
-# sharded 16× (~25 min wall-clock per shard on ubicloud-standard-8), so:
+# sharded 16Ã— (~25 min wall-clock per shard on ubicloud-standard-8), so:
 #   - running it on every feature/fix PR burned runners without gating
 #     anything the post-merge develop push doesn't already catch; and
 #   - re-running the IDENTICAL suite again when develop cascades to stage
-#     and then to main was pure duplicate work — the code is byte-for-byte
+#     and then to main was pure duplicate work â€” the code is byte-for-byte
 #     what already passed e2e on develop. `develop` is the integration
 #     point: once code is green there, promotion to stage/main is a
 #     fast-forward cascade, not a re-test.
 #
 # Nothing downstream depends on this workflow (no `workflow_run` consumer),
-# so trimming the cascade triggers cannot break a deploy/release chain —
+# so trimming the cascade triggers cannot break a deploy/release chain â€”
 # unlike `CI` (ci.yml), whose stage/main push runs are load-bearing for
 # the `release-trigger-{stage,prod}` Trigger.dev releases and MUST stay.
 #
@@ -52,7 +52,7 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubicloud-standard-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     # Each shard runs ~1/E2E_SHARDS of the 1670-test suite. 90 min keeps
     # plenty of headroom for the slowest shard (cold dev-mode compile +
     # retries) while letting GitHub kill genuine hangs reasonably fast.
@@ -62,10 +62,10 @@ jobs:
     strategy:
       # Shard the Playwright suite across multiple machines. Each shard
       # boots its own API + sqlite in-memory DB, so they're fully isolated
-      # — no shared-state races. Wall-clock = single-shard runtime
-      # (~90/N min) rather than sum-of-all (~90 min × 1 worker).
+      # â€” no shared-state races. Wall-clock = single-shard runtime
+      # (~90/N min) rather than sum-of-all (~90 min Ã— 1 worker).
       #
-      # 4 shards × ubicloud-standard-8 = 4× infra cost but ~4× faster.
+      # 4 shards Ã— ubicloud-standard-8 = 4Ã— infra cost but ~4Ã— faster.
       # Adjust by editing the `shard` array AND the `--shard=X/Y` totals
       # in the playwright invocation below; they MUST stay in sync.
       fail-fast: false
@@ -75,7 +75,7 @@ jobs:
         # with the +1000 mega-wave). The binding constraint is NOT wall-clock
         # but MEMORY: `next dev` accumulates compiled-route memory over a long
         # shard, and on a long run the web (or the API's RegExp route-table
-        # compiler) eventually OOM-aborts mid-shard — every later spec on that
+        # compiler) eventually OOM-aborts mid-shard â€” every later spec on that
         # shard then fails ERR_CONNECTION_REFUSED, and the casualty shard moves
         # run-to-run (the classic "random" e2e red). Halving each shard's spec
         # count (and therefore its peak resident memory + duration) is a pure-
@@ -83,7 +83,7 @@ jobs:
         # 32 GB box, so 16 shards = ~half the per-shard memory accumulation.
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
-    # Service containers — let the e2e suite exercise features that would
+    # Service containers â€” let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
     #   - mailhog: SMTP sink on :1025 + web UI on :8025. Lets the email-
     #     verification / password-reset / magic-link / invitation specs
@@ -137,17 +137,17 @@ jobs:
 
       - name: Start dev servers, wait, run Playwright
         # Background processes started in one `run:` step are killed when the
-        # step ends — so we spawn API + Web AND wait AND run tests inside the
+        # step ends â€” so we spawn API + Web AND wait AND run tests inside the
         # same step. nohup + disown to fully detach from the shell.
         #
-        # Both web and Playwright helpers consume API_URL as a bare host —
+        # Both web and Playwright helpers consume API_URL as a bare host â€”
         # web's lib/constants.ts auto-appends '/api', and helpers/api.ts
         # prepends '/api/...' to each request. Keep these aligned.
         working-directory: apps/web
         run: |
           set -e
 
-          echo "::group::Starting API on :3100 (prebuilt dist — no watch/typecheck)"
+          echo "::group::Starting API on :3100 (prebuilt dist â€” no watch/typecheck)"
           # Run the API from the prebuilt `dist/` (the "Build all packages"
           # step above already compiled apps/api) via `start:prod`
           # (`node dist/main`), NOT `nest start -b swc --watch`.
@@ -156,15 +156,15 @@ jobs:
           # (nest-cli.json `typeCheck: true`) plus a file watcher alongside
           # the booting app. Under that extra memory pressure V8's RegExp
           # compiler intermittently fails to allocate while the route table
-          # is compiled at startup —
+          # is compiled at startup â€”
           #   FATAL ERROR: RegExpCompiler Allocation failed - process out of
           #   memory   (RegExpCapture::ToNode -> RegExpDisjunction::ToNode)
-          # — which ABORTS the whole API process mid-suite. Every later spec
+          # â€” which ABORTS the whole API process mid-suite. Every later spec
           # in that shard then fails with `connect ECONNREFUSED
           # 127.0.0.1:3100`, and because the timing is nondeterministic the
           # casualty shard moves run-to-run (the classic "random" e2e red).
           # The prebuilt server has no watcher and no typechecker, so it
-          # boots once and stays up. Runtime behaviour is identical — the
+          # boots once and stays up. Runtime behaviour is identical â€” the
           # dev-vs-prod code branches key off env vars (NODE_ENV,
           # DATABASE_*), not the build/start mode.
           nohup pnpm --filter ever-works-api start:prod > /tmp/api.log 2>&1 &
@@ -173,13 +173,13 @@ jobs:
           echo "API pid=$API_PID"
           echo "::endgroup::"
 
-          echo "::group::Starting Web on :3000 (prebuilt next start — no dev compiler)"
+          echo "::group::Starting Web on :3000 (prebuilt next start â€” no dev compiler)"
           # Run the PREBUILT web (`next start` from the .next the "Build all
           # packages" step already produced) instead of `next dev`. Why:
           # `next dev` keeps the whole compiler + HMR resident and LAZILY
           # compiles every route on first hit, so a shard that navigates many
           # distinct UI routes accumulates route-compile memory until the web
-          # process (and sometimes the API alongside it) OOM-aborts mid-shard —
+          # process (and sometimes the API alongside it) OOM-aborts mid-shard â€”
           # after which every later spec on that shard fails
           # ERR_CONNECTION_REFUSED and the casualty shard moves run-to-run.
           # The prebuilt server has no per-route compile and a fraction of the
@@ -196,16 +196,16 @@ jobs:
 
           echo "Waiting for API on :3100 ..."
           timeout 180 bash -c 'until curl -sSf http://127.0.0.1:3100/api/health > /dev/null; do sleep 3; done' \
-            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+            || { echo "API never came up â€” last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
           echo "API ready."
 
           echo "Waiting for Web on :3000 ..."
           timeout 240 bash -c 'until curl -sSf http://127.0.0.1:3000/en/login > /dev/null; do sleep 3; done' \
-            || { echo "Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+            || { echo "Web never came up â€” last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
           echo "Web ready."
 
           echo "::group::Running Playwright e2e suite"
-          # Trap to dump API + Web stdout on Playwright failure — without this
+          # Trap to dump API + Web stdout on Playwright failure â€” without this
           # we can only see the test-runner's view (e.g. `Expected: 200,
           # Received: 401`) and not why the API was rejecting. The dev-server
           # stdout is the authoritative source for NestJS exceptions and
@@ -236,9 +236,9 @@ jobs:
           # H-14 (PR #816) raised the floor on COOKIE_SECRET / AUTH_SECRET
           # to 32 characters of high-entropy material and removed the silent
           # short-secret padding. The previous 24-char value broke cookie
-          # encryption in the web's `setAuthCookies` → registration succeeded
-          # but no session cookie was set → every subsequent request 401'd.
-          # Padded to 51 chars (CI-only, obviously fake — do not reuse).
+          # encryption in the web's `setAuthCookies` â†’ registration succeeded
+          # but no session cookie was set â†’ every subsequent request 401'd.
+          # Padded to 51 chars (CI-only, obviously fake â€” do not reuse).
           AUTH_SECRET: ever-works-e2e-ci-secret-padding-to-meet-32min-fake
           NODE_ENV: development
           # C-07 PR-B: `autoMigrate()` now defaults to OFF everywhere except
@@ -253,7 +253,7 @@ jobs:
           # EMAIL_NOT_VERIFIED. Production still enforces the check (default
           # `true`); `false` is opt-in for test contexts only.
           REQUIRE_EMAIL_VERIFICATION: 'false'
-          # SMTP — point at the mailhog service container above. The
+          # SMTP â€” point at the mailhog service container above. The
           # specs that exercise the email flow (verification, reset,
           # magic-link, invitation) can now actually emit mail. The
           # MailerService still no-ops if MAILER_PROVIDER is unset,
@@ -267,7 +267,7 @@ jobs:
           # MailHog HTTP API for specs that want to read back sent mail
           # to extract verification / reset tokens for end-to-end flows.
           MAILHOG_URL: http://127.0.0.1:8025
-          # KB upload cap — match the kb.controller's KB_UPLOAD_MAX_BYTES
+          # KB upload cap â€” match the kb.controller's KB_UPLOAD_MAX_BYTES
           # (200 MiB default). The local-fs storage plugin defaults its
           # own `maxBytes` to 5 MiB and rejects anything bigger with a
           # 500 before the controller's per-feature cap applies. The
@@ -275,7 +275,7 @@ jobs:
           # binaries to exercise the viewer's download-fallback path,
           # so the storage cap needs to match. 209715200 = 200 * 1024 * 1024.
           UPLOADS_MAX_BYTES: '209715200'
-          # Redis — wire up the throttler so distributed rate-limit
+          # Redis â€” wire up the throttler so distributed rate-limit
           # specs see cross-replica behaviour instead of the in-memory
           # fallback. Per @nest-lab/throttler-storage-redis we just
           # need the URL; the package is optional and silently falls
@@ -287,15 +287,15 @@ jobs:
           # register many users via `registerUserViaAPI`, so the strict default
           # 429s the bulk setup. Raise it here (prod keeps the strict default).
           # The register-throttle specs (rate-limit-deeper / rate-limit-headers)
-          # tolerate not hitting the threshold — they `test.skip` rather than
-          # fail — so the rest of the rate-limit coverage (anonymous / ingest)
+          # tolerate not hitting the threshold â€” they `test.skip` rather than
+          # fail â€” so the rest of the rate-limit coverage (anonymous / ingest)
           # is unaffected.
           REGISTER_THROTTLE_LIMIT: '100000'
           # Same rationale for login: the suite logs in many seeded/registered
           # users via `loginViaAPI` from the one CI IP. `LOGIN_THROTTLE_LIMIT`
           # already gates the per-route override (auth.controller.ts); raise it
           # here (prod default 10/min stays strict). The login-flood rate-limit
-          # spec is tolerant — it annotates when no 429 surfaces rather than
+          # spec is tolerant â€” it annotates when no 429 surfaces rather than
           # failing.
           LOGIN_THROTTLE_LIMIT: '100000'
           # Belt-and-braces for ALL the other audit-added auth throttles
@@ -306,18 +306,18 @@ jobs:
           # those rate-limit specs keep coverage; the auth-throttle specs already
           # `test.skip` when no 429 surfaces.
           E2E_DISABLE_AUTH_THROTTLE: 'true'
-          # Subscriptions — flip the kill-switch so the plan / tier /
+          # Subscriptions â€” flip the kill-switch so the plan / tier /
           # billing-grace specs run their real branches. The default
           # disabled state returns `plan: { code: 'free' }` (post-fix
           # b709f9cb) but several specs assert paid-tier transitions
           # that only fire when the module is on.
           SUBSCRIPTIONS_ENABLED: 'true'
-          # E2E-only escape hatch (hard-gated off in production — ignored
+          # E2E-only escape hatch (hard-gated off in production â€” ignored
           # unless NODE_ENV !== 'production'). Without a real billing
           # integration wired in, the only path to a PAID plan is the
           # privileged `assignPlanToUser` seam, which has no HTTP route. The
           # self-service `POST /api/subscriptions/plan` endpoint is FREE-only
-          # in prod (EW-711 #23 free→paid escalation guard). Flipping this on
+          # in prod (EW-711 #23 freeâ†’paid escalation guard). Flipping this on
           # lets the tier-gating / billing-grace / plan-tiers / org-billing
           # specs drive a user onto STANDARD/PREMIUM so they exercise the
           # downstream cadence gating they actually test. Prod stays strict.
@@ -327,7 +327,7 @@ jobs:
           # exercise their real branches, and the e2e magic-link.spec.ts
           # specs run against a live email round-trip via MailHog.
           MAGIC_LINK_ENABLED: 'true'
-          # OAuth — register test sentinels so the providers appear in
+          # OAuth â€” register test sentinels so the providers appear in
           # /api/auth/providers and the OAuth-flow specs can reach
           # /api/oauth/<provider>/authorize. The actual github.com /
           # accounts.google.com endpoints will reject these client_ids,
@@ -339,7 +339,7 @@ jobs:
           GH_CLIENT_SECRET: e2e-fake-github-client-secret-padding-to-32+
           GOOGLE_CLIENT_ID: e2e-fake-google-client-id
           GOOGLE_CLIENT_SECRET: e2e-fake-google-client-secret-padding-to-32+
-          # Platform secrets — set fake-but-shaped values so guards that
+          # Platform secrets â€” set fake-but-shaped values so guards that
           # require them at boot pass.
           # - PLATFORM_API_SECRET_TOKEN: bearer for /api/activity-log/ingest
           #   (PlatformSecretGuard, EW-120). Without it the guard 401s
@@ -351,7 +351,7 @@ jobs:
           #   not just 409.
           PLATFORM_API_SECRET_TOKEN: e2e-platform-secret-token-deterministic-32+chars
           PLATFORM_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          # GitHub App — fake but shaped values so the GitHubAppModule
+          # GitHub App â€” fake but shaped values so the GitHubAppModule
           # registers cleanly and the github-app webhook signature specs
           # can exercise the verify path (instead of skipping on
           # "no github-app webhook endpoint exposed"). The webhook
@@ -375,14 +375,14 @@ jobs:
           # NOTE: use 127.0.0.1 (not `localhost`) for every in-cluster HTTP
           # URL the test harness connects to. Node 18+/undici resolve
           # `localhost` to IPv6 `::1` first, but the dev API/web bind IPv4
-          # only — so Playwright's apiRequestContext hit `::1:3100` and
+          # only â€” so Playwright's apiRequestContext hit `::1:3100` and
           # failed every API-touching spec with `connect ECONNREFUSED
           # ::1:3100` (the curl health-gate uses IPv4 and passed, masking
           # it). Pinning IPv4 also keeps origins/cookies/callbacks aligned.
           API_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3100/api
           WEB_URL: http://127.0.0.1:3000
-          # CORS — declare the dev server origin explicitly so:
+          # CORS â€” declare the dev server origin explicitly so:
           # 1. cors-origin-allowlist e2e contract sees a non-default
           #    allowlist (the fallback `localhost:3000` works fine but
           #    sourcing it from env exercises the same plumbing prod uses).
@@ -440,7 +440,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # Prod-build sub-job — runs ONLY the specs that need `next start`
+  # Prod-build sub-job â€” runs ONLY the specs that need `next start`
   # (bundle-size budgets, _next/static fingerprint + long Cache-Control).
   # `next dev` ships unminified React + unsplit chunks and emits
   # `Cache-Control: no-store`, so those invariants only hold against
@@ -448,7 +448,7 @@ jobs:
   # don't pay the cost of a prod build for the 1000+ dev-mode specs
   # while still validating the ~4 prod-only invariants.
   e2e-prod-build:
-    runs-on: ubicloud-standard-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     timeout-minutes: 45
 
     strategy:
@@ -486,7 +486,7 @@ jobs:
         run: |
           set -e
 
-          echo "::group::Starting API on :3100 (prebuilt dist — no watch/typecheck)"
+          echo "::group::Starting API on :3100 (prebuilt dist â€” no watch/typecheck)"
           # Same rationale as the sharded e2e job: run the prebuilt API via
           # `start:prod` (`node dist/main`) rather than `nest start --watch`,
           # so the concurrent TSC type-checker + file watcher can't pressure
@@ -506,11 +506,11 @@ jobs:
 
           echo "Waiting for API on :3100 ..."
           timeout 180 bash -c 'until curl -sSf http://127.0.0.1:3100/api/health > /dev/null; do sleep 3; done' \
-            || { echo "API never came up — last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
+            || { echo "API never came up â€” last 80 lines:"; tail -n 80 /tmp/api.log || true; exit 1; }
 
           echo "Waiting for prod Web on :3000 ..."
           timeout 240 bash -c 'until curl -sSf http://127.0.0.1:3000/en/login > /dev/null; do sleep 3; done' \
-            || { echo "Prod Web never came up — last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
+            || { echo "Prod Web never came up â€” last 80 lines:"; tail -n 80 /tmp/web.log || true; exit 1; }
 
           echo "::group::Running prod-only Playwright specs"
           trap '{
@@ -524,7 +524,7 @@ jobs:
           pnpm exec playwright test bundle-size-budget static-asset-fingerprint
           echo "::endgroup::"
         env:
-          # Heap headroom on the 32 GB runner — see the dev-mode job's
+          # Heap headroom on the 32 GB runner â€” see the dev-mode job's
           # NODE_OPTIONS note above.
           NODE_OPTIONS: --max-old-space-size=8192
           # API + web env mirror the dev-mode job above; the only delta
@@ -537,7 +537,7 @@ jobs:
           NODE_ENV: development # API stays in dev for in-memory DB
           DATABASE_AUTOMIGRATE: 'true'
           REQUIRE_EMAIL_VERIFICATION: 'false'
-          # 127.0.0.1 (not localhost) — force IPv4; see the e2e job's note.
+          # 127.0.0.1 (not localhost) â€” force IPv4; see the e2e job's note.
           API_URL: http://127.0.0.1:3100
           NEXT_PUBLIC_API_URL: http://127.0.0.1:3100/api
           WEB_URL: http://127.0.0.1:3000
@@ -551,7 +551,7 @@ jobs:
           E2E_PROD_BUILD: '1'
 
       - name: Sanitize branch tag for artifact names
-        # Same rationale as the sharded e2e job above — `github.ref_name`
+        # Same rationale as the sharded e2e job above â€” `github.ref_name`
         # is `<PR#>/merge` on pull_request events, which actions/upload-
         # artifact rejects.
         id: tag
@@ -573,3 +573,4 @@ jobs:
             apps/web/e2e/test-results
           retention-days: 14
           if-no-files-found: ignore
+
