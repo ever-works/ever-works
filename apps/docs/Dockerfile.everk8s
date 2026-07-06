@@ -33,12 +33,12 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 
 # Build only the docs workspace. Docusaurus emits static HTML to apps/docs/build.
-# The config declares 13 i18n locales but only `en` (default) and `fr` have
-# translation content under apps/docs/i18n/. The other 11 locales would each
-# trigger a full (~10 min) webpack compile of English-fallback pages, adding
-# ~2h with zero unique content. Restrict the build to the locales that actually
-# have translations. Add more --locale flags here if/when they gain content.
-RUN pnpm --filter ever-works-docs exec docusaurus build --locale en --locale fr
+# The config declares 13 i18n locales; building all of them runs a full (~10 min)
+# webpack compile per locale. Only `en` (default) and `fr` carry real translation
+# content under apps/docs/i18n/. For the dev image we build the default locale
+# `en` (the complete English docs). Add `--locale fr` (and others) here once the
+# build environment allows the longer multi-locale compile.
+RUN pnpm --filter ever-works-docs exec docusaurus build --locale en
 
 # ---------------------------------------------------------------------------
 # Runtime: nginx serving the static build output
