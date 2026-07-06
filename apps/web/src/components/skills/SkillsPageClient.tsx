@@ -116,8 +116,8 @@ export function SkillsPageClient({
                         onClick={() => handleSectionChange(s)}
                         className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
                             section === s
-                                ? 'border-primary bg-primary/10 text-primary'
-                                : 'border-border/60 dark:border-border-dark/60 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark'
+                                ? 'border-border-secondary dark:border-border-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark font-medium text-text dark:text-text-dark'
+                                : 'border-border/60 dark:border-border-dark/60 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border dark:hover:border-border-dark'
                         }`}
                     >
                         {t(`tabs.${s}`)}
