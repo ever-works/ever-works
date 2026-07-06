@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link2, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
@@ -56,10 +59,10 @@ export function SkillDetailClient({
                             <span>·</span>
                             <span>v{skill.version}</span>
                         </div>
-                        <h1 className="text-2xl font-semibold text-text dark:text-text-dark mt-1">
+                        <h1 className="text-xl font-semibold text-text dark:text-text-dark mt-1">
                             {skill.title}
                         </h1>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
+                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
                             {skill.description}
                         </p>
                     </div>
@@ -108,8 +111,8 @@ function BodyEditor({ skill }: { skill: Skill }) {
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
             <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">Body</h2>
-                <span className="text-xs text-text-muted">
+                <h2 className="text-xs font-medium text-text dark:text-text-dark">Body</h2>
+                <span className="text-[11px] text-text-muted">
                     {status === 'saving' && '…saving'}
                     {status === 'saved' && '✓ saved'}
                     {status === 'error' && <span className="text-danger">save failed</span>}
@@ -120,12 +123,13 @@ function BodyEditor({ skill }: { skill: Skill }) {
                     {error}
                 </p>
             )}
-            <textarea
+            <Textarea
+                variant="form"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 rows={20}
                 spellCheck={false}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 font-mono text-xs text-text dark:text-text-dark"
+                className="p-3 font-mono text-xs resize-y"
             />
         </section>
     );
@@ -237,18 +241,25 @@ function BindingsPanel({
                 className="grid grid-cols-1 @md/main:grid-cols-[auto_1fr_auto_auto] gap-2 items-end pt-3 border-t border-border/40 dark:border-border-dark/40"
             >
                 <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Target type</label>
-                    <select
+                    <label
+                        htmlFor="skill-binding-target-type"
+                        className="block text-[10px] text-text-muted mb-1"
+                    >
+                        Target type
+                    </label>
+                    <Select
+                        id="skill-binding-target-type"
+                        size="xs"
                         value={targetType}
-                        onChange={(e) => setTargetType(e.target.value as SkillBindingTargetType)}
-                        className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        onValueChange={(v) => setTargetType(v as SkillBindingTargetType)}
+                        className="w-32"
                     >
                         <option value="tenant">workspace</option>
                         <option value="agent">agent</option>
                         <option value="work">work</option>
                         <option value="mission">mission</option>
                         <option value="idea">idea</option>
-                    </select>
+                    </Select>
                 </div>
                 <div>
                     <label className="block text-[10px] text-text-muted mb-1">
@@ -261,14 +272,21 @@ function BindingsPanel({
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Priority</label>
-                    <input
+                    <label
+                        htmlFor="skill-binding-priority"
+                        className="block text-[10px] text-text-muted mb-1"
+                    >
+                        Priority
+                    </label>
+                    <Input
+                        id="skill-binding-priority"
+                        variant="form"
                         type="number"
                         value={priority}
                         onChange={(e) => setPriority(parseInt(e.target.value, 10) || 100)}
                         min={1}
                         max={9999}
-                        className="w-20 rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        className="w-24 h-8 px-2 text-xs"
                     />
                 </div>
                 <Button type="submit" size="sm" disabled={pending}>
@@ -347,17 +365,17 @@ function SkillBindingTargetPicker({
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetType]);
 
     if (targetType === 'tenant') {
         return (
-            <input
+            <Input
+                variant="form"
                 type="text"
                 value=""
                 disabled
                 placeholder="auto"
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
+                className="h-8 px-2 text-xs font-mono"
             />
         );
     }
@@ -369,39 +387,41 @@ function SkillBindingTargetPicker({
 
     if (loadError || options.length === 0) {
         return (
-            <input
+            <Input
+                variant="form"
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={loadError ? 'paste a uuid' : `no ${targetType}s — paste uuid`}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                className="h-8 px-2 text-xs font-mono"
             />
         );
     }
 
     return (
         <div className="space-y-1">
-            <input
+            <Input
+                variant="form"
                 type="text"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 placeholder={`Search ${targetType}s`}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                className="h-8 px-2 text-xs"
                 disabled={loading}
             />
-            <select
+            <Select
+                size="xs"
                 value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                size={Math.min(5, Math.max(2, filtered.length + 1))}
+                onValueChange={onChange}
+                placeholder={`— pick a ${targetType} —`}
+                data-testid="skill-binding-target-picker"
             >
-                <option value="">— pick a {targetType} —</option>
                 {filtered.map((o) => (
                     <option key={o.id} value={o.id}>
                         {o.label}
                     </option>
                 ))}
-            </select>
+            </Select>
         </div>
     );
 }
@@ -446,12 +466,7 @@ function DangerZone({ skillId }: { skillId: string }) {
                     >
                         Cancel
                     </Button>
-                    <Button
-                        size="sm"
-                        onClick={handleDelete}
-                        disabled={pending}
-                        className="bg-danger text-white hover:bg-danger/90"
-                    >
+                    <Button size="sm" variant="danger" onClick={handleDelete} disabled={pending}>
                         {pending ? '…' : 'Confirm delete'}
                     </Button>
                 </div>
