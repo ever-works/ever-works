@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Neue Aufgabe",
+                "noDescription": "Noch keine Beschreibung",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priorität",
                 "labels": "Labels",
                 "labelsPlaceholder": "durch Komma getrennt",
+                "workScopedTask": "Auf einen Work begrenzte Aufgabe",
+                "missionScopedTask": "Auf eine Mission begrenzte Aufgabe",
+                "ideaScopedTask": "Auf eine Idea begrenzte Aufgabe",
+                "prefillPromptNotice": "Dieses Formular wurde aus einem URL-Link vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "prefillTemplateNotice": "Aus Vorlage <name>{slug}</name> vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "priorityP0": "P0 — dringend",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — Standard",
+                "priorityP4": "P4 — niedrig",
+                "createError": "Aufgabe konnte nicht erstellt werden",
                 "cancel": "Abbrechen",
                 "create": "Erstellen"
             },
@@ -738,8 +750,25 @@
                 "browse": "Durchsuchen",
                 "uploading": "Hochladen…",
                 "detach": "Trennen",
+                "attachmentsWorkOnly": "Anhänge sind nur bei Work-bezogenen Aufgaben verfügbar. Erstelle eine Aufgabe aus einem Work, um Dateien anzuhängen.",
                 "labels": "Labels",
-                "edited": "bearbeitet"
+                "edited": "bearbeitet",
+                "description": "Beschreibung",
+                "edit": "Bearbeiten",
+                "save": "Speichern",
+                "cancel": "Abbrechen",
+                "descriptionPlaceholder": "Beschreibung hinzufügen…",
+                "noDescription": "Keine Beschreibung vorhanden.",
+                "saveDescriptionError": "Beschreibung konnte nicht gespeichert werden",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priorität",
+                "scope": "Bereich",
+                "created": "Erstellt",
+                "updated": "Aktualisiert",
+                "scopeWork": "Arbeit",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -763,6 +792,13 @@
                 "blocked": "Blockiert",
                 "done": "Erledigt",
                 "cancelled": "Abgebrochen"
+            },
+            "priority": {
+                "p0": "Dringend",
+                "p1": "Hoch",
+                "p2": "Mittel",
+                "p3": "Normal",
+                "p4": "Niedrig"
             }
         },
         "skillsPage": {

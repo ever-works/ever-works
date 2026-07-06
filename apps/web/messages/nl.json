@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",
+                "noDescription": "Nog geen beschrijving",
                 "kanban": "Kanban",
                 "list": "Lijst",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Prioriteit",
                 "labels": "Labels",
                 "labelsPlaceholder": "komma-gescheiden",
+                "workScopedTask": "Taak beperkt tot een Work",
+                "missionScopedTask": "Taak beperkt tot een Mission",
+                "ideaScopedTask": "Taak beperkt tot een Idea",
+                "prefillPromptNotice": "Dit formulier is vooraf ingevuld vanuit een URL-link. Controleer de inhoud voordat je de taak aanmaakt.",
+                "prefillTemplateNotice": "Vooraf ingevuld vanuit sjabloon <name>{slug}</name>. Controleer de inhoud voordat je de taak aanmaakt.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — standaard",
+                "priorityP4": "P4 — laag",
+                "createError": "Taak aanmaken mislukt",
                 "cancel": "Annuleren",
                 "create": "Maken"
             },
@@ -680,8 +692,25 @@
                 "browse": "Bladeren",
                 "uploading": "Uploaden...",
                 "detach": "Loskoppelen",
+                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Maak een taak vanuit een Work om bestanden toe te voegen.",
                 "labels": "Labels",
-                "edited": "bewerkt"
+                "edited": "bewerkt",
+                "description": "Beschrijving",
+                "edit": "Bewerken",
+                "save": "Opslaan",
+                "cancel": "Annuleren",
+                "descriptionPlaceholder": "Voeg een beschrijving toe…",
+                "noDescription": "Geen beschrijving opgegeven.",
+                "saveDescriptionError": "Beschrijving opslaan mislukt",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Prioriteit",
+                "scope": "Scope",
+                "created": "Aangemaakt",
+                "updated": "Bijgewerkt",
+                "scopeWork": "Werk",
+                "scopeMission": "Missie",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Terugkerend schema",
@@ -705,6 +734,13 @@
                 "blocked": "Geblokkeerd",
                 "done": "Klaar",
                 "cancelled": "Geannuleerd"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Hoog",
+                "p2": "Gemiddeld",
+                "p3": "Normaal",
+                "p4": "Laag"
             }
         },
         "skillsPage": {

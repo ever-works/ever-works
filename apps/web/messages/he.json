@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ משימה חדשה",
+                "noDescription": "אין תיאור עדיין",
                 "kanban": "קנבן",
                 "list": "רשימה",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "עדיפות",
                 "labels": "תוויות",
                 "labelsPlaceholder": "מופרדות בפסיקים",
+                "workScopedTask": "משימה בהיקף Work",
+                "missionScopedTask": "משימה בהיקף Mission",
+                "ideaScopedTask": "משימה בהיקף Idea",
+                "prefillPromptNotice": "טופס זה מולא מראש מקישור URL. בדוק את התוכן לפני יצירת המשימה.",
+                "prefillTemplateNotice": "מולא מראש מהתבנית <name>{slug}</name>. בדוק את התוכן לפני יצירת המשימה.",
+                "priorityP0": "P0 — דחוף",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — ברירת מחדל",
+                "priorityP4": "P4 — נמוך",
+                "createError": "יצירת המשימה נכשלה",
                 "cancel": "בטל",
                 "create": "צור"
             },
@@ -738,8 +750,25 @@
                 "browse": "עיין",
                 "uploading": "מעלה...",
                 "detach": "נתק",
+                "attachmentsWorkOnly": "קבצים מצורפים זמינים רק במשימות בהיקף Work. צור משימה מתוך Work כדי לצרף קבצים.",
                 "labels": "תוויות",
-                "edited": "נערך"
+                "edited": "נערך",
+                "description": "תיאור",
+                "edit": "עריכה",
+                "save": "שמור",
+                "cancel": "בטל",
+                "descriptionPlaceholder": "הוסף תיאור…",
+                "noDescription": "לא סופק תיאור.",
+                "saveDescriptionError": "שמירת התיאור נכשלה",
+                "details": "פרטים",
+                "status": "סטטוס",
+                "priority": "עדיפות",
+                "scope": "היקף",
+                "created": "נוצר",
+                "updated": "עודכן",
+                "scopeWork": "עבודה",
+                "scopeMission": "משימה",
+                "scopeIdea": "רעיון"
             },
             "recurring": {
                 "section": "תדירות חוזרת",
@@ -763,6 +792,13 @@
                 "blocked": "חסום",
                 "done": "הושלם",
                 "cancelled": "בוטל"
+            },
+            "priority": {
+                "p0": "דחוף",
+                "p1": "גבוה",
+                "p2": "בינוני",
+                "p3": "רגיל",
+                "p4": "נמוך"
             }
         },
         "skillsPage": {

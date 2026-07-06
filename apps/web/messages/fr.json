@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Nouvelle Tâche",
+                "noDescription": "Pas encore de description",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priorité",
                 "labels": "Étiquettes",
                 "labelsPlaceholder": "séparées par des virgules",
+                "workScopedTask": "Tâche limitée à un Work",
+                "missionScopedTask": "Tâche limitée à une Mission",
+                "ideaScopedTask": "Tâche limitée à une Idea",
+                "prefillPromptNotice": "Ce formulaire a été pré-rempli à partir d'un lien URL. Vérifiez le contenu avant de créer la tâche.",
+                "prefillTemplateNotice": "Pré-rempli à partir du modèle <name>{slug}</name>. Vérifiez le contenu avant de créer la tâche.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — par défaut",
+                "priorityP4": "P4 — faible",
+                "createError": "Échec de la création de la tâche",
                 "cancel": "Annuler",
                 "create": "Créer"
             },
@@ -738,8 +750,25 @@
                 "browse": "Parcourir",
                 "uploading": "Téléchargement en cours…",
                 "detach": "Détacher",
+                "attachmentsWorkOnly": "Les pièces jointes ne sont disponibles que sur les tâches liées à un Work. Créez une tâche depuis un Work pour joindre des fichiers.",
                 "labels": "Étiquettes",
-                "edited": "modifié"
+                "edited": "modifié",
+                "description": "Description",
+                "edit": "Modifier",
+                "save": "Enregistrer",
+                "cancel": "Annuler",
+                "descriptionPlaceholder": "Ajouter une description…",
+                "noDescription": "Aucune description fournie.",
+                "saveDescriptionError": "Échec de l'enregistrement de la description",
+                "details": "Détails",
+                "status": "Statut",
+                "priority": "Priorité",
+                "scope": "Étendue",
+                "created": "Créé",
+                "updated": "Mis à jour",
+                "scopeWork": "Travail",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idée"
             },
             "recurring": {
                 "section": "Calendrier récurrent",
@@ -763,6 +792,13 @@
                 "blocked": "Bloqué",
                 "done": "Terminé",
                 "cancelled": "Annulé"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Élevée",
+                "p2": "Moyenne",
+                "p3": "Normale",
+                "p4": "Basse"
             }
         },
         "skillsPage": {

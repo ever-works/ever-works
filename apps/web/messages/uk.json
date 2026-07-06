@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Нове завдання",
+                "noDescription": "Опису ще немає",
                 "kanban": "Канбан",
                 "list": "Список",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Пріоритет",
                 "labels": "Мітки",
                 "labelsPlaceholder": "розділені комами",
+                "workScopedTask": "Завдання в межах Work",
+                "missionScopedTask": "Завдання в межах Mission",
+                "ideaScopedTask": "Завдання в межах Idea",
+                "prefillPromptNotice": "Цю форму було попередньо заповнено з URL-посилання. Перевірте вміст перед створенням завдання.",
+                "prefillTemplateNotice": "Попередньо заповнено з шаблону <name>{slug}</name>. Перевірте вміст перед створенням завдання.",
+                "priorityP0": "P0 — терміново",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — за замовчуванням",
+                "priorityP4": "P4 — низький",
+                "createError": "Не вдалося створити завдання",
                 "cancel": "Скасувати",
                 "create": "Створити"
             },
@@ -680,8 +692,25 @@
                 "browse": "Огляд",
                 "uploading": "Завантаження...",
                 "detach": "Від'єднати",
+                "attachmentsWorkOnly": "Вкладення доступні лише для завдань, прив'язаних до Work. Створіть завдання з Work, щоб прикріплювати файли.",
                 "labels": "Мітки",
-                "edited": "відредаговано"
+                "edited": "відредаговано",
+                "description": "Опис",
+                "edit": "Редагувати",
+                "save": "Зберегти",
+                "cancel": "Скасувати",
+                "descriptionPlaceholder": "Додайте опис…",
+                "noDescription": "Опис не надано.",
+                "saveDescriptionError": "Не вдалося зберегти опис",
+                "details": "Деталі",
+                "status": "Статус",
+                "priority": "Пріоритет",
+                "scope": "Обсяг дій",
+                "created": "Створено",
+                "updated": "Оновлено",
+                "scopeWork": "Робота",
+                "scopeMission": "Місія",
+                "scopeIdea": "Ідея"
             },
             "recurring": {
                 "section": "Повторюване розкладання",
@@ -705,6 +734,13 @@
                 "blocked": "Заблоковано",
                 "done": "Виконано",
                 "cancelled": "Скасовано"
+            },
+            "priority": {
+                "p0": "Терміново",
+                "p1": "Високий",
+                "p2": "Середній",
+                "p3": "Звичайний",
+                "p4": "Низький"
             }
         },
         "skillsPage": {

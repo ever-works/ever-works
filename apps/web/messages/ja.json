@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新しいタスク",
+                "noDescription": "説明はまだありません",
                 "kanban": "カンバン",
                 "list": "リスト",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "優先度",
                 "labels": "ラベル",
                 "labelsPlaceholder": "コンマ区切り",
+                "workScopedTask": "Work にスコープされたタスク",
+                "missionScopedTask": "Mission にスコープされたタスク",
+                "ideaScopedTask": "Idea にスコープされたタスク",
+                "prefillPromptNotice": "このフォームは URL リンクから事前入力されました。タスクを作成する前に内容を確認してください。",
+                "prefillTemplateNotice": "テンプレート <name>{slug}</name> から事前入力されました。タスクを作成する前に内容を確認してください。",
+                "priorityP0": "P0 — 緊急",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — デフォルト",
+                "priorityP4": "P4 — 低",
+                "createError": "タスクの作成に失敗しました",
                 "cancel": "キャンセル",
                 "create": "作成"
             },
@@ -680,8 +692,25 @@
                 "browse": "参照",
                 "uploading": "アップロード中…",
                 "detach": "取り外す",
+                "attachmentsWorkOnly": "添付ファイルは Work にスコープされたタスクでのみ利用できます。ファイルを添付するには、Work からタスクを作成してください。",
                 "labels": "ラベル",
-                "edited": "編集済み"
+                "edited": "編集済み",
+                "description": "説明",
+                "edit": "編集",
+                "save": "保存",
+                "cancel": "キャンセル",
+                "descriptionPlaceholder": "説明を追加…",
+                "noDescription": "説明はありません。",
+                "saveDescriptionError": "説明の保存に失敗しました",
+                "details": "詳細",
+                "status": "ステータス",
+                "priority": "優先度",
+                "scope": "スコープ",
+                "created": "作成日",
+                "updated": "更新日",
+                "scopeWork": "作業",
+                "scopeMission": "ミッション",
+                "scopeIdea": "アイデア"
             },
             "recurring": {
                 "section": "定期的なスケジュール",
@@ -705,6 +734,13 @@
                 "blocked": "ブロック中",
                 "done": "完了",
                 "cancelled": "キャンセル済み"
+            },
+            "priority": {
+                "p0": "緊急",
+                "p1": "高",
+                "p2": "中",
+                "p3": "通常",
+                "p4": "低"
             }
         },
         "skillsPage": {

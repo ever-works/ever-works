@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Нова Задача",
+                "noDescription": "Все още няма описание",
                 "kanban": "Канбан",
                 "list": "Списък",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Приоритет",
                 "labels": "Етикети",
                 "labelsPlaceholder": "разделени с запетая",
+                "workScopedTask": "Задача, ограничена до Work",
+                "missionScopedTask": "Задача, ограничена до Mission",
+                "ideaScopedTask": "Задача, ограничена до Idea",
+                "prefillPromptNotice": "Този формуляр беше предварително попълнен от URL връзка. Прегледайте съдържанието, преди да създадете задачата.",
+                "prefillTemplateNotice": "Предварително попълнено от шаблон <name>{slug}</name>. Прегледайте съдържанието, преди да създадете задачата.",
+                "priorityP0": "P0 — спешно",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — по подразбиране",
+                "priorityP4": "P4 — нисък",
+                "createError": "Неуспешно създаване на задачата",
                 "cancel": "Отказ",
                 "create": "Създай"
             },
@@ -738,8 +750,25 @@
                 "browse": "Прегледай",
                 "uploading": "Качване...",
                 "detach": "Премахни",
+                "attachmentsWorkOnly": "Прикачените файлове са налични само за задачи, обвързани с Work. Създайте задача от Work, за да прикачвате файлове.",
                 "labels": "Етикети",
-                "edited": "редактирано"
+                "edited": "редактирано",
+                "description": "Описание",
+                "edit": "Редактиране",
+                "save": "Запази",
+                "cancel": "Отказ",
+                "descriptionPlaceholder": "Добавете описание…",
+                "noDescription": "Няма предоставено описание.",
+                "saveDescriptionError": "Неуспешно запазване на описанието",
+                "details": "Подробности",
+                "status": "Статус",
+                "priority": "Приоритет",
+                "scope": "Обхват",
+                "created": "Създадено",
+                "updated": "Актуализирано",
+                "scopeWork": "Работа",
+                "scopeMission": "Мисия",
+                "scopeIdea": "Идея"
             },
             "recurring": {
                 "section": "Повтарящ се график",
@@ -763,6 +792,13 @@
                 "blocked": "Блокиран",
                 "done": "Готово",
                 "cancelled": "Отменен"
+            },
+            "priority": {
+                "p0": "Спешно",
+                "p1": "Висок",
+                "p2": "Среден",
+                "p3": "Нормален",
+                "p4": "Нисък"
             }
         },
         "skillsPage": {

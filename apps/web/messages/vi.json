@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Task mới",
+                "noDescription": "Chưa có mô tả",
                 "kanban": "Kanban",
                 "list": "Danh sách",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Ưu tiên",
                 "labels": "Nhãn",
                 "labelsPlaceholder": "phân cách bằng dấu phẩy",
+                "workScopedTask": "Nhiệm vụ giới hạn trong Work",
+                "missionScopedTask": "Nhiệm vụ giới hạn trong Mission",
+                "ideaScopedTask": "Nhiệm vụ giới hạn trong Idea",
+                "prefillPromptNotice": "Biểu mẫu này đã được điền sẵn từ một liên kết URL. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "prefillTemplateNotice": "Được điền sẵn từ mẫu <name>{slug}</name>. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "priorityP0": "P0 — khẩn cấp",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — mặc định",
+                "priorityP4": "P4 — thấp",
+                "createError": "Không thể tạo nhiệm vụ",
                 "cancel": "Hủy",
                 "create": "Tạo"
             },
@@ -680,8 +692,25 @@
                 "browse": "Duyệt",
                 "uploading": "Đang tải lên...",
                 "detach": "Tách",
+                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
                 "labels": "Nhãn",
-                "edited": "đã chỉnh sửa"
+                "edited": "đã chỉnh sửa",
+                "description": "Mô tả",
+                "edit": "Chỉnh sửa",
+                "save": "Lưu",
+                "cancel": "Hủy",
+                "descriptionPlaceholder": "Thêm mô tả…",
+                "noDescription": "Chưa có mô tả.",
+                "saveDescriptionError": "Không thể lưu mô tả",
+                "details": "Chi tiết",
+                "status": "Trạng thái",
+                "priority": "Ưu tiên",
+                "scope": "Phạm vi",
+                "created": "Đã tạo",
+                "updated": "Đã cập nhật",
+                "scopeWork": "Công việc",
+                "scopeMission": "Nhiệm vụ",
+                "scopeIdea": "Ý tưởng"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -705,6 +734,13 @@
                 "blocked": "Bị chặn",
                 "done": "Hoàn thành",
                 "cancelled": "Đã hủy"
+            },
+            "priority": {
+                "p0": "Khẩn cấp",
+                "p1": "Cao",
+                "p2": "Trung bình",
+                "p3": "Bình thường",
+                "p4": "Thấp"
             }
         },
         "skillsPage": {

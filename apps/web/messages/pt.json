@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nova Tarefa",
+                "noDescription": "Ainda sem descrição",
                 "kanban": "Kanban",
                 "list": "Lista",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Prioridade",
                 "labels": "Etiquetas",
                 "labelsPlaceholder": "separadas por vírgula",
+                "workScopedTask": "Tarefa limitada a um Work",
+                "missionScopedTask": "Tarefa limitada a uma Mission",
+                "ideaScopedTask": "Tarefa limitada a uma Idea",
+                "prefillPromptNotice": "Este formulário foi preenchido a partir de um link de URL. Revise o conteúdo antes de criar a tarefa.",
+                "prefillTemplateNotice": "Preenchido a partir do modelo <name>{slug}</name>. Revise o conteúdo antes de criar a tarefa.",
+                "priorityP0": "P0 — urgente",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — padrão",
+                "priorityP4": "P4 — baixa",
+                "createError": "Falha ao criar a tarefa",
                 "cancel": "Cancelar",
                 "create": "Criar"
             },
@@ -680,8 +692,25 @@
                 "browse": "Procurar",
                 "uploading": "Enviando...",
                 "detach": "Desanexar",
+                "attachmentsWorkOnly": "Os anexos só estão disponíveis em tarefas vinculadas a um Work. Crie uma tarefa a partir de um Work para anexar arquivos.",
                 "labels": "Etiquetas",
-                "edited": "editado"
+                "edited": "editado",
+                "description": "Descrição",
+                "edit": "Editar",
+                "save": "Salvar",
+                "cancel": "Cancelar",
+                "descriptionPlaceholder": "Adicione uma descrição…",
+                "noDescription": "Nenhuma descrição fornecida.",
+                "saveDescriptionError": "Falha ao salvar a descrição",
+                "details": "Detalhes",
+                "status": "Status",
+                "priority": "Prioridade",
+                "scope": "Escopo",
+                "created": "Criado",
+                "updated": "Atualizado",
+                "scopeWork": "Trabalho",
+                "scopeMission": "Missão",
+                "scopeIdea": "Ideia"
             },
             "recurring": {
                 "section": "Agenda recorrente",
@@ -705,6 +734,13 @@
                 "blocked": "Bloqueado",
                 "done": "Concluído",
                 "cancelled": "Cancelado"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Média",
+                "p3": "Normal",
+                "p4": "Baixa"
             }
         },
         "skillsPage": {

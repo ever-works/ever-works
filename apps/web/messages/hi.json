@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ नया कार्य",
+                "noDescription": "अभी तक कोई विवरण नहीं",
                 "kanban": "कानबान",
                 "list": "सूची",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "प्राथमिकता",
                 "labels": "लेबल",
                 "labelsPlaceholder": "अल्पविराम से अलग किए गए",
+                "workScopedTask": "Work तक सीमित कार्य",
+                "missionScopedTask": "Mission तक सीमित कार्य",
+                "ideaScopedTask": "Idea तक सीमित कार्य",
+                "prefillPromptNotice": "यह फ़ॉर्म एक URL लिंक से पहले से भरा गया था। कार्य बनाने से पहले सामग्री की समीक्षा करें।",
+                "prefillTemplateNotice": "टेम्पलेट <name>{slug}</name> से पहले से भरा गया। कार्य बनाने से पहले सामग्री की समीक्षा करें।",
+                "priorityP0": "P0 — अत्यावश्यक",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — डिफ़ॉल्ट",
+                "priorityP4": "P4 — निम्न",
+                "createError": "कार्य बनाने में विफल",
                 "cancel": "रद्द करें",
                 "create": "बनाएं"
             },
@@ -680,8 +692,25 @@
                 "browse": "ब्राउज़ करें",
                 "uploading": "अपलोड हो रहा है…",
                 "detach": "अलग करें",
+                "attachmentsWorkOnly": "अनुलग्नक केवल Work से जुड़े कार्यों में उपलब्ध हैं। फ़ाइलें संलग्न करने के लिए किसी Work से कार्य बनाएँ।",
                 "labels": "लेबल",
-                "edited": "संपादित"
+                "edited": "संपादित",
+                "description": "विवरण",
+                "edit": "संपादित करें",
+                "save": "सहेजें",
+                "cancel": "रद्द करें",
+                "descriptionPlaceholder": "विवरण जोड़ें…",
+                "noDescription": "कोई विवरण नहीं दिया गया।",
+                "saveDescriptionError": "विवरण सहेजने में विफल",
+                "details": "विवरण",
+                "status": "स्थिति",
+                "priority": "प्राथमिकता",
+                "scope": "स्कोप",
+                "created": "बनाया गया",
+                "updated": "अपडेट किया गया",
+                "scopeWork": "काम",
+                "scopeMission": "मिशन",
+                "scopeIdea": "विचार"
             },
             "recurring": {
                 "section": "पुनरावर्ती अनुसूची",
@@ -705,6 +734,13 @@
                 "blocked": "रोका गया",
                 "done": "पूर्ण",
                 "cancelled": "रद्द"
+            },
+            "priority": {
+                "p0": "अत्यावश्यक",
+                "p1": "उच्च",
+                "p2": "मध्यम",
+                "p3": "सामान्य",
+                "p4": "निम्न"
             }
         },
         "skillsPage": {
