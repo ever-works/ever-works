@@ -210,9 +210,12 @@ export function ActivityFeedClient({
     }, [category, statusFilter]);
 
     // Clamp when the list shrinks under the current page (e.g. a filter cut
-    // it down, or a failed append left the page count unchanged).
+    // it down, or a failed append left the page count unchanged). Functional
+    // update: a filter change queues setPage(1) from the reset effect above in
+    // the same flush, and clamping to the render-scope `page` would overwrite
+    // that reset with a stale value.
     useEffect(() => {
-        if (page > totalPages) setPage(totalPages);
+        if (page > totalPages) setPage((current) => Math.min(current, totalPages));
     }, [page, totalPages]);
 
     const handlePreviousPage = useCallback(() => {
