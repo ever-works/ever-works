@@ -129,6 +129,7 @@ export const ROUTES = {
     DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
     // Skills
     DASHBOARD_SKILLS: '/skills',
+    DASHBOARD_SKILL_NEW: '/skills/new',
     DASHBOARD_SKILL: (id: string) => `/skills/${id}`,
     // Phase 18.6 — Skills templates browser (ADR-010 scaffold).
     DASHBOARD_SKILL_TEMPLATES: '/skills/templates',
