@@ -45,6 +45,7 @@ export {
 // budget rollup). Mirrors the same pattern as `AgentFileService` etc.
 export { AgentRepository } from '../database/repositories/agent.repository';
 export { AgentRunRepository } from '../database/repositories/agent-run.repository';
+export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 // FU-14 — re-export WorkRepository for the AGENT_GIT_FACADE binding

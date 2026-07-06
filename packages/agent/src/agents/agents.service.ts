@@ -19,7 +19,7 @@ import {
 } from '../entities/agent.entity';
 import { AgentAttachment } from '../entities/agent-attachment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
@@ -68,6 +68,25 @@ export interface CreateAgentInput {
     // name + a synthesized email (`<slug>@agents.ever.works`).
     committerName?: string | null;
     committerEmail?: string | null;
+}
+
+/**
+ * `AgentAttachment` edge enriched with the owning user's `user_uploads`
+ * metadata (when the uploads repo is wired and the row still exists).
+ * Returned by {@link AgentsService.listAttachments} so the web tiles
+ * can render type-aware icons/labels after a page refresh.
+ */
+export interface AgentAttachmentListRow extends AgentAttachment {
+    filename?: string | null;
+    mimeType?: string | null;
+    sizeBytes?: number | null;
+    /**
+     * API-routed serve URL (`/api/uploads/<userId>/<hash>.<ext>`), same
+     * shape `UploadsService.saveFile` returns at upload time — lets the
+     * web tiles stay openable after a refresh. Null when the stored
+     * object key can't provide the served filename.
+     */
+    url?: string | null;
 }
 
 export interface UpdateAgentInput {
@@ -446,12 +465,51 @@ export class AgentsService {
 
     /**
      * List the Upload edges attached to an Agent. Same shape as the
-     * Mission / Idea attachment surfaces.
+     * Mission / Idea attachment surfaces, plus joined `user_uploads`
+     * metadata (filename / mimeType / size) when available — without
+     * it the web attachment tiles can only render a generic file icon
+     * after a page refresh (the client-side filename/MIME cache only
+     * covers in-session uploads).
      */
-    async listAttachments(userId: string, id: string): Promise<AgentAttachment[]> {
+    async listAttachments(userId: string, id: string): Promise<AgentAttachmentListRow[]> {
         await this.requireOwned(userId, id);
         if (!this.agentAttachments) return [];
-        return this.agentAttachments.findByAgentId(id);
+        const rows = await this.agentAttachments.findByAgentId(id);
+        if (rows.length === 0 || !this.uploadsRepo) return rows;
+        // `user_uploads` is deduped per (userId, sha256); addAttachment
+        // already enforces the upload is owned by the caller, so the
+        // owner-scoped lookup resolves every attachable upload.
+        const uploads = await this.uploadsRepo.find({
+            where: { userId, sha256: In(rows.map((r) => r.uploadId)) },
+        });
+        const bySha = new Map(uploads.map((u) => [u.sha256, u]));
+        return rows.map((r) => {
+            const u = bySha.get(r.uploadId);
+            if (!u) return r;
+            // The storage key ends with the served filename
+            // (`<sha256>.<ext>` — see UploadsService.saveFile), which is
+            // what the owner-gated serve route keys on. Slice it off at
+            // the hash (rather than splitting on `/`) so per-Work keys
+            // like `dr:<workId>:<name>` resolve too, then rebuild the
+            // same API-routed URL saveFile returned at upload time,
+            // including the `?workId=` round-trip for those backends.
+            const nameAt = u.storagePath.lastIndexOf(u.sha256);
+            const servedName = nameAt >= 0 ? u.storagePath.slice(nameAt) : '';
+            let url: string | null = null;
+            if (servedName) {
+                url = u.workId
+                    ? `/api/uploads/${encodeURIComponent(userId)}/${servedName}?workId=${encodeURIComponent(u.workId)}`
+                    : `/api/uploads/${encodeURIComponent(userId)}/${servedName}`;
+            }
+            return {
+                ...r,
+                filename: u.originalFilename ?? null,
+                mimeType: u.mimeType ?? null,
+                // bigint columns come back as strings from the pg driver.
+                sizeBytes: u.fileSize == null ? null : Number(u.fileSize),
+                url,
+            };
+        });
     }
 
     /** Attach an uploaded file to an Agent. Idempotent. */
