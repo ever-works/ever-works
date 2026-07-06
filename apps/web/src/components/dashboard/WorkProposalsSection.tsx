@@ -6,6 +6,7 @@ import {
     Hammer,
     Lightbulb,
     Loader2,
+    PenLine,
     Plus,
     RefreshCw,
     Settings as SettingsIcon,
@@ -47,6 +48,28 @@ interface WorkProposalsSectionProps {
     initiallyCanRefresh: boolean;
     username?: string;
     autoStart?: boolean;
+    /**
+     * Real total of every Idea in the user's catalog (all statuses),
+     * sourced from the server stats endpoint — the same total the
+     * StatsOverview tile uses. Drives the "View all (N) →" link so it
+     * stays present (and accurate) like the Missions / Works / Agents
+     * sections, even when the default PENDING-only preview is empty.
+     * Optional + falls back to the visible-preview count for callers
+     * that don't have the stats total (e.g. the Discover page).
+     */
+    totalIdeas?: number;
+    /**
+     * When true, the preview surfaces Ideas of EVERY status on first
+     * paint — the accepted/dismissed toggles start ON and are marked
+     * pre-loaded, so a non-PENDING Idea (e.g. a manually-created one
+     * that was already accepted or dismissed) is visible without the
+     * user flipping a toggle. The home dashboard passes the full
+     * all-status list as `initialProposals` and sets this; callers
+     * that want the default PENDING-only preview (e.g. Discover) omit
+     * it. The toggles still work — they just default to showing
+     * everything here.
+     */
+    showAllStatuses?: boolean;
 }
 
 export function WorkProposalsSection({
@@ -55,6 +78,8 @@ export function WorkProposalsSection({
     initiallyCanRefresh,
     username,
     autoStart = false,
+    totalIdeas,
+    showAllStatuses = false,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
@@ -76,10 +101,14 @@ export function WorkProposalsSection({
     // toggle handler lazy-fetches the additional status buckets
     // the first time it ticks on, so a user who never opens them
     // doesn't pay the round-trip.
-    const [showAccepted, setShowAccepted] = useState(false);
-    const [showDismissed, setShowDismissed] = useState(false);
-    const [loadedAccepted, setLoadedAccepted] = useState(false);
-    const [loadedDismissed, setLoadedDismissed] = useState(false);
+    // When `showAllStatuses` is set the parent has already supplied the
+    // full all-status list, so start with both toggles ON and marked
+    // loaded — no lazy round-trip needed and terminal Ideas show up
+    // immediately.
+    const [showAccepted, setShowAccepted] = useState(showAllStatuses);
+    const [showDismissed, setShowDismissed] = useState(showAllStatuses);
+    const [loadedAccepted, setLoadedAccepted] = useState(showAllStatuses);
+    const [loadedDismissed, setLoadedDismissed] = useState(showAllStatuses);
 
     const refreshListAndStatus = useCallback(async () => {
         const [status, list] = await Promise.all([
@@ -225,6 +254,10 @@ export function WorkProposalsSection({
 
     const previewCards = visibleProposals.slice(0, PREVIEW_CARD_LIMIT);
     const totalVisible = visibleProposals.length;
+    // Count behind the "View all (N) →" link. Prefer the server-side
+    // catalog total (mirrors Missions / Works / Agents); fall back to
+    // the visible-preview count when no total was passed.
+    const viewAllCount = totalIdeas ?? totalVisible;
 
     const showEmpty = visibleProposals.length === 0 && !researching;
     const showResearching = researching && visibleProposals.length === 0;
@@ -256,12 +289,14 @@ export function WorkProposalsSection({
                         only below `@xl/main` so the action row fits one line
                         when the chat panel is open. */}
                     {!quickAddOpen && (
-                        <Button
+                        // Plain <button> (not the <Button> component) so the
+                        // "+ Add" entry point matches the other dashboard
+                        // sections exactly. <Button variant/size> would layer
+                        // its own bg/rounded/padding on top and drift visually.
+                        <button
                             type="button"
-                            variant="secondary"
-                            size="sm"
                             className={cn(
-                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
+                                'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap cursor-pointer',
                                 'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
                                 'text-text-secondary dark:text-text-secondary-dark',
                                 'hover:border-border dark:hover:border-white/16',
@@ -275,7 +310,7 @@ export function WorkProposalsSection({
                             <span className="hidden @xl/main:inline">
                                 {tPage('quickAdd.submit')}
                             </span>
-                        </Button>
+                        </button>
                     )}
 
                     <DropdownMenu>
@@ -361,7 +396,7 @@ export function WorkProposalsSection({
                     {/* View all (n) — moved into the header row so the
                         section reads icon → title → actions → counts on
                         one line, matching the Works section below. */}
-                    {totalVisible > 0 && (
+                    {viewAllCount > 0 && (
                         <Link
                             href={ROUTES.DASHBOARD_IDEAS}
                             className={cn(
@@ -369,7 +404,7 @@ export function WorkProposalsSection({
                                 'inline-flex items-center gap-1',
                             )}
                         >
-                            {tPage('viewAll', { n: totalVisible })}
+                            {tPage('viewAll', { n: viewAllCount })}
                         </Link>
                     )}
                 </div>
@@ -400,33 +435,48 @@ export function WorkProposalsSection({
                         className="w-full text-sm"
                         autoFocus
                     />
-                    <div className="mt-2 flex items-center justify-end gap-2">
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                        {/* Deterministic, no-AI path: the textarea above hands
+                            the prompt to the chat AI; this secondary Button
+                            mirrors the /works "Create manually" affordance and
+                            links to the manual create form at /ideas/new. */}
                         <Button
-                            type="button"
+                            href={ROUTES.DASHBOARD_IDEAS_NEW}
                             variant="secondary"
                             size="sm"
-                            onClick={() => {
-                                setQuickAddOpen(false);
-                                setDraft('');
-                            }}
-                            disabled={isCreating}
+                            className="gap-1.5"
                         >
-                            {/* Re-use the dismiss-aria string as a Cancel label —
+                            <PenLine className="w-3.5 h-3.5" />
+                            {tPage('newPage.link')}
+                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => {
+                                    setQuickAddOpen(false);
+                                    setDraft('');
+                                }}
+                                disabled={isCreating}
+                            >
+                                {/* Re-use the dismiss-aria string as a Cancel label —
                                 the dashboard preview rarely needs a dedicated
                                 "Cancel" key for v1; if QA flags it we'll add
                                 one in PR P. */}
-                            ✕
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={handleQuickAdd}
-                            disabled={isCreating || draft.trim().length < 10}
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            {tPage('quickAdd.submit')}
-                        </Button>
+                                ✕
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={handleQuickAdd}
+                                disabled={isCreating || draft.trim().length < 10}
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                {tPage('quickAdd.submit')}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

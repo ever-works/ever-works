@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",
+                "noDescription": "Nog geen beschrijving",
                 "kanban": "Kanban",
                 "list": "Lijst",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Prioriteit",
                 "labels": "Labels",
                 "labelsPlaceholder": "komma-gescheiden",
+                "workScopedTask": "Taak beperkt tot een Work",
+                "missionScopedTask": "Taak beperkt tot een Mission",
+                "ideaScopedTask": "Taak beperkt tot een Idea",
+                "prefillPromptNotice": "Dit formulier is vooraf ingevuld vanuit een URL-link. Controleer de inhoud voordat je de taak aanmaakt.",
+                "prefillTemplateNotice": "Vooraf ingevuld vanuit sjabloon <name>{slug}</name>. Controleer de inhoud voordat je de taak aanmaakt.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — standaard",
+                "priorityP4": "P4 — laag",
+                "createError": "Taak aanmaken mislukt",
                 "cancel": "Annuleren",
                 "create": "Maken"
             },
@@ -680,8 +692,25 @@
                 "browse": "Bladeren",
                 "uploading": "Uploaden...",
                 "detach": "Loskoppelen",
+                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Maak een taak vanuit een Work om bestanden toe te voegen.",
                 "labels": "Labels",
-                "edited": "bewerkt"
+                "edited": "bewerkt",
+                "description": "Beschrijving",
+                "edit": "Bewerken",
+                "save": "Opslaan",
+                "cancel": "Annuleren",
+                "descriptionPlaceholder": "Voeg een beschrijving toe…",
+                "noDescription": "Geen beschrijving opgegeven.",
+                "saveDescriptionError": "Beschrijving opslaan mislukt",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Prioriteit",
+                "scope": "Scope",
+                "created": "Aangemaakt",
+                "updated": "Bijgewerkt",
+                "scopeWork": "Werk",
+                "scopeMission": "Missie",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Terugkerend schema",
@@ -705,6 +734,13 @@
                 "blocked": "Geblokkeerd",
                 "done": "Klaar",
                 "cancelled": "Geannuleerd"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Hoog",
+                "p2": "Gemiddeld",
+                "p3": "Normaal",
+                "p4": "Laag"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "Werk aanmaken"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten voor deze Work",
+                "emptyTitle": "Nog geen Agenten",
+                "emptySubtitle": "Maak een Agent om deze Work te automatiseren.",
+                "pause": "Agent pauzeren",
+                "activate": "Agent activeren",
+                "pausedToast": "Agent gepauzeerd",
+                "activatedToast": "Agent geactiveerd",
+                "statusUpdateFailed": "Status kon niet worden bijgewerkt",
+                "newAgent": "Nieuwe Agent",
+                "moreAgents": "+{count} meer"
+            },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
             "generationCancelled": "Generatie is geannuleerd",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Elke status",
                 "apply": "Toepassen",
                 "reset": "Herstellen"
+            },
+            "newPage": {
+                "link": "Handmatig aanmaken",
+                "or": "Of",
+                "title": "Nieuwe Idea",
+                "subtitle": "Schrijf je eigen Idea. Beschrijf het Work dat je wilt maken — je kunt het daarna in de wachtrij zetten om te bouwen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optioneel — laat leeg om het uit de beschrijving af te leiden",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Beschrijf het Work dat deze Idea moet worden — bijv. “Een samengestelde directory van open-source AI-agentframeworks, geordend op frameworktype en licentie.”",
+                "descriptionHint": "Minstens 10 tekens.",
+                "cancel": "Annuleren",
+                "create": "Idea aanmaken",
+                "creating": "Aanmaken…",
+                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
+                "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             }
         },
         "discover": {

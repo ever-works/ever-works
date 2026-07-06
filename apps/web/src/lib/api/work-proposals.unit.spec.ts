@@ -31,6 +31,35 @@ vi.mock('./server-api', () => ({
 }));
 
 import { workProposalsAPI } from './work-proposals';
+import { ApiResponseError } from './server-api';
+
+describe('workProposalsAPI.get — null only for gone/unauthorized, rethrow transient', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('returns the proposal on success', async () => {
+        const proposal = { id: 'p1', title: 'Idea', status: 'building' };
+        serverFetchMock.mockResolvedValueOnce(proposal);
+        await expect(workProposalsAPI.get('p1')).resolves.toEqual(proposal);
+        expect(serverFetchMock).toHaveBeenCalledWith('/me/work-proposals/p1', { method: 'GET' });
+    });
+
+    it.each([404, 403])('returns null for a definitive %s', async (statusCode) => {
+        serverFetchMock.mockRejectedValueOnce(new ApiResponseError('nope', statusCode));
+        await expect(workProposalsAPI.get('p1')).resolves.toBeNull();
+    });
+
+    it.each([500, 502, 429])('rethrows a transient %s so pollers keep retrying', async (statusCode) => {
+        serverFetchMock.mockRejectedValueOnce(new ApiResponseError('boom', statusCode));
+        await expect(workProposalsAPI.get('p1')).rejects.toBeInstanceOf(ApiResponseError);
+    });
+
+    it('rethrows a non-HTTP failure (network blip) instead of swallowing it', async () => {
+        serverFetchMock.mockRejectedValueOnce(new Error('fetch failed'));
+        await expect(workProposalsAPI.get('p1')).rejects.toThrow('fetch failed');
+    });
+});
 
 describe('workProposalsAPI.build — reshape from server DTO to client shape', () => {
     beforeEach(() => {

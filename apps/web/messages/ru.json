@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Новая задача",
+                "noDescription": "Описания пока нет",
                 "kanban": "Канбан",
                 "list": "Список",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Приоритет",
                 "labels": "Метки",
                 "labelsPlaceholder": "через запятую",
+                "workScopedTask": "Задача в рамках Work",
+                "missionScopedTask": "Задача в рамках Mission",
+                "ideaScopedTask": "Задача в рамках Idea",
+                "prefillPromptNotice": "Эта форма была предзаполнена из URL-ссылки. Проверьте содержимое перед созданием задачи.",
+                "prefillTemplateNotice": "Предзаполнено из шаблона <name>{slug}</name>. Проверьте содержимое перед созданием задачи.",
+                "priorityP0": "P0 — срочно",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — по умолчанию",
+                "priorityP4": "P4 — низкий",
+                "createError": "Не удалось создать задачу",
                 "cancel": "Отмена",
                 "create": "Создать"
             },
@@ -680,8 +692,25 @@
                 "browse": "Обзор",
                 "uploading": "Загрузка...",
                 "detach": "Отсоединить",
+                "attachmentsWorkOnly": "Вложения доступны только для задач, привязанных к Work. Создайте задачу из Work, чтобы прикреплять файлы.",
                 "labels": "Метки",
-                "edited": "изменено"
+                "edited": "изменено",
+                "description": "Описание",
+                "edit": "Редактировать",
+                "save": "Сохранить",
+                "cancel": "Отмена",
+                "descriptionPlaceholder": "Добавьте описание…",
+                "noDescription": "Описание не указано.",
+                "saveDescriptionError": "Не удалось сохранить описание",
+                "details": "Детали",
+                "status": "Статус",
+                "priority": "Приоритет",
+                "scope": "Область действия",
+                "created": "Создано",
+                "updated": "Обновлено",
+                "scopeWork": "Работа",
+                "scopeMission": "Миссия",
+                "scopeIdea": "Идея"
             },
             "recurring": {
                 "section": "Повторяющееся расписание",
@@ -705,6 +734,13 @@
                 "blocked": "Заблокировано",
                 "done": "Выполнено",
                 "cancelled": "Отменено"
+            },
+            "priority": {
+                "p0": "Срочно",
+                "p1": "Высокий",
+                "p2": "Средний",
+                "p3": "Обычный",
+                "p4": "Низкий"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Эта идея больше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "Создать работа"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенты",
+                "heading": "Агенты этой Работы",
+                "emptyTitle": "Пока нет агентов",
+                "emptySubtitle": "Создайте агента, чтобы автоматизировать эту Работу.",
+                "pause": "Приостановить агента",
+                "activate": "Активировать агента",
+                "pausedToast": "Агент приостановлен",
+                "activatedToast": "Агент активирован",
+                "statusUpdateFailed": "Не удалось обновить статус",
+                "newAgent": "Новый агент",
+                "moreAgents": "+ещё {count}"
+            },
             "failedToGenerateItems": "Не удалось сгенерировать элементы. Пожалуйста, попробуйте снова.",
             "generationCompleted": "Генерация успешно завершена",
             "generationCancelled": "Генерация была отменена",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Эта идея больше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Любой статус",
                 "apply": "Применить",
                 "reset": "Сбросить"
+            },
+            "newPage": {
+                "link": "Создать вручную",
+                "or": "Или",
+                "title": "Новая Idea",
+                "subtitle": "Напишите свою Idea. Опишите Work, который хотите создать — затем его можно поставить в очередь на сборку.",
+                "nameLabel": "Заголовок",
+                "namePlaceholder": "Необязательно — оставьте пустым, чтобы получить из описания",
+                "descriptionLabel": "Описание",
+                "descriptionPlaceholder": "Опишите Work, которым должна стать эта Idea — например, «Тщательно подобранный каталог open-source фреймворков для ИИ-агентов, упорядоченный по типу фреймворка и лицензии.»",
+                "descriptionHint": "Не менее 10 символов.",
+                "cancel": "Отмена",
+                "create": "Создать Idea",
+                "creating": "Создание…",
+                "minLength": "Описание должно содержать не менее 10 символов.",
+                "error": "Не удалось создать Idea. Пожалуйста, попробуйте ещё раз."
             }
         },
         "discover": {

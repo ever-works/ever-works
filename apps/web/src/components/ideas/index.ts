@@ -5,4 +5,5 @@
 // expand this with the Dashboard preview block + the Done filter
 // chip.
 export { IdeaCard } from './IdeaCard';
+export { IdeaDetailClient } from './IdeaDetailClient';
 export { IdeasPageClient, ACTIONABLE_STATUSES } from './IdeasPageClient';

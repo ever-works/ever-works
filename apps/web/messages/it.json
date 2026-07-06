@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nuovo Task",
+                "noDescription": "Nessuna descrizione",
                 "kanban": "Kanban",
                 "list": "Elenco",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Priorità",
                 "labels": "Etichette",
                 "labelsPlaceholder": "separate da virgola",
+                "workScopedTask": "Attività limitata a un Work",
+                "missionScopedTask": "Attività limitata a una Mission",
+                "ideaScopedTask": "Attività limitata a una Idea",
+                "prefillPromptNotice": "Questo modulo è stato precompilato da un link URL. Controlla il contenuto prima di creare l'attività.",
+                "prefillTemplateNotice": "Precompilato dal modello <name>{slug}</name>. Controlla il contenuto prima di creare l'attività.",
+                "priorityP0": "P0 — urgente",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — predefinita",
+                "priorityP4": "P4 — bassa",
+                "createError": "Creazione dell'attività non riuscita",
                 "cancel": "Annulla",
                 "create": "Crea"
             },
@@ -680,8 +692,25 @@
                 "browse": "Sfoglia",
                 "uploading": "Caricamento…",
                 "detach": "Scollega",
+                "attachmentsWorkOnly": "Gli allegati sono disponibili solo per le attività legate a un Work. Crea un'attività da un Work per allegare file.",
                 "labels": "Etichette",
-                "edited": "modificato"
+                "edited": "modificato",
+                "description": "Descrizione",
+                "edit": "Modifica",
+                "save": "Salva",
+                "cancel": "Annulla",
+                "descriptionPlaceholder": "Aggiungi una descrizione…",
+                "noDescription": "Nessuna descrizione fornita.",
+                "saveDescriptionError": "Impossibile salvare la descrizione",
+                "details": "Dettagli",
+                "status": "Stato",
+                "priority": "Priorità",
+                "scope": "Ambito",
+                "created": "Creato",
+                "updated": "Aggiornato",
+                "scopeWork": "Lavoro",
+                "scopeMission": "Missione",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Programma ricorrente",
@@ -705,6 +734,13 @@
                 "blocked": "Bloccato",
                 "done": "Completato",
                 "cancelled": "Annullato"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Media",
+                "p3": "Normale",
+                "p4": "Bassa"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Questa idea non è più disponibile."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "Crea lavori"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenti",
+                "heading": "Agenti di questo Lavoro",
+                "emptyTitle": "Nessun Agente ancora",
+                "emptySubtitle": "Crea un Agente per automatizzare questo Lavoro.",
+                "pause": "Metti in pausa l'Agente",
+                "activate": "Attiva l'Agente",
+                "pausedToast": "Agente messo in pausa",
+                "activatedToast": "Agente attivato",
+                "statusUpdateFailed": "Impossibile aggiornare lo stato",
+                "newAgent": "Nuovo Agente",
+                "moreAgents": "+{count} altri"
+            },
             "failedToGenerateItems": "Impossibile generare gli elementi. Riprova.",
             "generationCompleted": "Generazione completata con successo",
             "generationCancelled": "Generazione annullata",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Questa idea non è più disponibile."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Qualsiasi stato",
                 "apply": "Applica",
                 "reset": "Reimposta"
+            },
+            "newPage": {
+                "link": "Crea manualmente",
+                "or": "Oppure",
+                "title": "Nuova Idea",
+                "subtitle": "Scrivi la tua Idea. Descrivi il Work che vuoi creare — potrai poi metterlo in coda per la generazione.",
+                "nameLabel": "Titolo",
+                "namePlaceholder": "Facoltativo — lascia vuoto per ricavarlo dalla descrizione",
+                "descriptionLabel": "Descrizione",
+                "descriptionPlaceholder": "Descrivi il Work in cui questa Idea dovrebbe trasformarsi — ad es. «Una directory curata di framework open source per agenti IA, organizzati per tipo di framework e licenza.»",
+                "descriptionHint": "Almeno 10 caratteri.",
+                "cancel": "Annulla",
+                "create": "Crea Idea",
+                "creating": "Creazione…",
+                "minLength": "La descrizione deve contenere almeno 10 caratteri.",
+                "error": "Impossibile creare la Idea. Riprova."
             }
         },
         "discover": {

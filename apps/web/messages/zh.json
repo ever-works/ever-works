@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新任务",
+                "noDescription": "暂无描述",
                 "kanban": "看板",
                 "list": "列表",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "优先级",
                 "labels": "标签",
                 "labelsPlaceholder": "用逗号分隔",
+                "workScopedTask": "限定于 Work 的任务",
+                "missionScopedTask": "限定于 Mission 的任务",
+                "ideaScopedTask": "限定于 Idea 的任务",
+                "prefillPromptNotice": "此表单已根据 URL 链接预填充。请在创建任务前检查内容。",
+                "prefillTemplateNotice": "已根据模板 <name>{slug}</name> 预填充。请在创建任务前检查内容。",
+                "priorityP0": "P0 — 紧急",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — 默认",
+                "priorityP4": "P4 — 低",
+                "createError": "创建任务失败",
                 "cancel": "取消",
                 "create": "创建"
             },
@@ -680,8 +692,25 @@
                 "browse": "浏览",
                 "uploading": "上传中…",
                 "detach": "分离",
+                "attachmentsWorkOnly": "附件仅在限定于 Work 的任务中可用。请从某个 Work 创建任务以附加文件。",
                 "labels": "标签",
-                "edited": "已编辑"
+                "edited": "已编辑",
+                "description": "描述",
+                "edit": "编辑",
+                "save": "保存",
+                "cancel": "取消",
+                "descriptionPlaceholder": "添加描述…",
+                "noDescription": "暂无描述。",
+                "saveDescriptionError": "保存描述失败",
+                "details": "详细信息",
+                "status": "状态",
+                "priority": "优先级",
+                "scope": "范围",
+                "created": "创建时间",
+                "updated": "更新时间",
+                "scopeWork": "工作",
+                "scopeMission": "任务",
+                "scopeIdea": "想法"
             },
             "recurring": {
                 "section": "重复计划",
@@ -705,6 +734,13 @@
                 "blocked": "受阻",
                 "done": "完成",
                 "cancelled": "已取消"
+            },
+            "priority": {
+                "p0": "紧急",
+                "p1": "高",
+                "p2": "中",
+                "p3": "普通",
+                "p4": "低"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "该创意已不可用。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "创建作品"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "代理",
+                "heading": "此工作的代理",
+                "emptyTitle": "还没有代理",
+                "emptySubtitle": "创建一个代理来自动化此工作。",
+                "pause": "暂停代理",
+                "activate": "激活代理",
+                "pausedToast": "代理已暂停",
+                "activatedToast": "代理已激活",
+                "statusUpdateFailed": "无法更新状态",
+                "newAgent": "新代理",
+                "moreAgents": "还有 {count} 个"
+            },
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "该创意已不可用。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "任意状态",
                 "apply": "应用",
                 "reset": "重置"
+            },
+            "newPage": {
+                "link": "手动创建",
+                "or": "或",
+                "title": "新建 Idea",
+                "subtitle": "撰写你自己的 Idea。描述你想创建的 Work — 之后即可将其加入构建队列。",
+                "nameLabel": "标题",
+                "namePlaceholder": "可选 — 留空则根据描述自动生成",
+                "descriptionLabel": "描述",
+                "descriptionPlaceholder": "描述这个 Idea 将要变成的 Work — 例如“一个精选的开源 AI 智能体框架目录，按框架类型和许可证组织。”",
+                "descriptionHint": "至少 10 个字符。",
+                "cancel": "取消",
+                "create": "创建 Idea",
+                "creating": "正在创建…",
+                "minLength": "描述至少需要 10 个字符。",
+                "error": "无法创建 Idea，请重试。"
             }
         },
         "discover": {

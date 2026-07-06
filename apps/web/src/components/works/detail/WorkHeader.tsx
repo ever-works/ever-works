@@ -5,18 +5,24 @@ import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
 import { WorkMemberRole, WorkScheduleStatus } from '@/lib/api/enums';
-import { Link as IconLink, Users, Cog, Github, Clock, AlertTriangle, Bot } from 'lucide-react';
+import { Link as IconLink, Users, Cog, Github, Clock, AlertTriangle } from 'lucide-react';
 import { useWorkDetail, useWorkPermissions } from './WorkDetailContext';
 import { buildPublicComparisonUrl } from '@/lib/utils/comparison';
 import { Link, usePathname } from '@/i18n/navigation';
 import { ShinyText } from '@/components/ui/ShinyText';
 import { AnimatedClock } from '@/components/ui/AnimatedClock';
+import { WorkAgentsDropdown } from './WorkAgentsDropdown';
+import type { Agent } from '@/lib/api/agents';
 
 interface WorkHeaderProps {
     work: Work;
+    /** Work-scoped Agents shown in the header dropdown. */
+    agents?: Agent[];
+    /** Total Work-scoped Agents upstream — may exceed agents.length. */
+    agentsTotal?: number;
 }
 
-export function WorkHeader({ work }: WorkHeaderProps) {
+export function WorkHeader({ work, agents = [], agentsTotal }: WorkHeaderProps) {
     const t = useTranslations('dashboard.workDetail');
     const { repoLinks } = useWorkDetail();
     const { role } = useWorkPermissions();
@@ -150,15 +156,9 @@ export function WorkHeader({ work }: WorkHeaderProps) {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                        {/* FU-3 — direct on-ramp to a Work-scoped Agent. */}
-                        <Link
-                            href={`/works/${work.id}/agents/new`}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border dark:border-border-dark px-3 h-8 text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark hover:border-primary/40 hover:text-primary dark:hover:text-primary transition-colors"
-                            title="Create a new Work-scoped Agent"
-                        >
-                            <Bot className="w-3.5 h-3.5" />
-                            New Agent
-                        </Link>
+                        {/* Agents scoped to this Work — list + "+ New Agent"
+                            (the FU-3 on-ramp lives in the dropdown footer). */}
+                        <WorkAgentsDropdown workId={work.id} agents={agents} total={agentsTotal} />
 
                         {/* External link */}
                         {externalWebsiteUrl && (

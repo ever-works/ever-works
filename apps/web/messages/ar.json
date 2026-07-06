@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ مهمة جديدة",
+                "noDescription": "لا يوجد وصف بعد",
                 "kanban": "كانبان",
                 "list": "قائمة",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "الأولوية",
                 "labels": "العلامات",
                 "labelsPlaceholder": "مفصولة بفواصل",
+                "workScopedTask": "مهمة مرتبطة بـ Work",
+                "missionScopedTask": "مهمة مرتبطة بـ Mission",
+                "ideaScopedTask": "مهمة مرتبطة بـ Idea",
+                "prefillPromptNotice": "تم ملء هذا النموذج مسبقًا من رابط URL. راجع المحتوى قبل إنشاء المهمة.",
+                "prefillTemplateNotice": "تم الملء المسبق من القالب <name>{slug}</name>. راجع المحتوى قبل إنشاء المهمة.",
+                "priorityP0": "P0 — عاجل",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — افتراضي",
+                "priorityP4": "P4 — منخفض",
+                "createError": "فشل إنشاء المهمة",
                 "cancel": "إلغاء",
                 "create": "إنشاء"
             },
@@ -738,8 +750,25 @@
                 "browse": "تصفح",
                 "uploading": "جاري الرفع...",
                 "detach": "فصل",
+                "attachmentsWorkOnly": "المرفقات متاحة فقط للمهام المرتبطة بـ Work. أنشئ مهمة من داخل Work لإرفاق الملفات.",
                 "labels": "العلامات",
-                "edited": "تم التعديل"
+                "edited": "تم التعديل",
+                "description": "الوصف",
+                "edit": "تعديل",
+                "save": "حفظ",
+                "cancel": "إلغاء",
+                "descriptionPlaceholder": "أضف وصفًا…",
+                "noDescription": "لا يوجد وصف.",
+                "saveDescriptionError": "فشل حفظ الوصف",
+                "details": "التفاصيل",
+                "status": "الحالة",
+                "priority": "الأولوية",
+                "scope": "النطاق",
+                "created": "تم الإنشاء",
+                "updated": "آخر تحديث",
+                "scopeWork": "العمل",
+                "scopeMission": "المهمة",
+                "scopeIdea": "الفكرة"
             },
             "recurring": {
                 "section": "جدول متكرر",
@@ -763,6 +792,13 @@
                 "blocked": "مُعطَّل",
                 "done": "مكتمل",
                 "cancelled": "ملغى"
+            },
+            "priority": {
+                "p0": "عاجل",
+                "p1": "عالية",
+                "p2": "متوسطة",
+                "p3": "عادية",
+                "p4": "منخفضة"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "لم تعد هذه الفكرة متاحة."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "anyStatus": "أي حالة",
                 "apply": "تطبيق",
                 "reset": "إعادة تعيين"
+            },
+            "newPage": {
+                "link": "إنشاء يدوي",
+                "or": "أو",
+                "title": "Idea جديدة",
+                "subtitle": "اكتب Idea الخاصة بك. صِف Work الذي تريد إنشاءه — يمكنك بعد ذلك إضافته إلى قائمة الانتظار للبناء.",
+                "nameLabel": "العنوان",
+                "namePlaceholder": "اختياري — اتركه فارغًا ليُشتق من الوصف",
+                "descriptionLabel": "الوصف",
+                "descriptionPlaceholder": "صِف Work الذي يجب أن تصبح عليه هذه الـ Idea — مثل “دليل منسَّق لأطر عمل وكلاء الذكاء الاصطناعي مفتوحة المصدر، منظَّم حسب نوع الإطار والترخيص.”",
+                "descriptionHint": "10 أحرف على الأقل.",
+                "cancel": "إلغاء",
+                "create": "إنشاء Idea",
+                "creating": "جارٍ الإنشاء…",
+                "minLength": "يجب ألا يقل الوصف عن 10 أحرف.",
+                "error": "تعذّر إنشاء الـ Idea. يُرجى المحاولة مرة أخرى."
             }
         },
         "discover": {
@@ -1713,6 +1766,19 @@
             "createButton": "إنشاء عمل"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "الوكلاء",
+                "heading": "وكلاء هذا العمل",
+                "emptyTitle": "لا يوجد وكلاء بعد",
+                "emptySubtitle": "أنشئ وكيلاً لأتمتة هذا العمل.",
+                "pause": "إيقاف الوكيل مؤقتًا",
+                "activate": "تفعيل الوكيل",
+                "pausedToast": "تم إيقاف الوكيل مؤقتًا",
+                "activatedToast": "تم تفعيل الوكيل",
+                "statusUpdateFailed": "تعذر تحديث الحالة",
+                "newAgent": "وكيل جديد",
+                "moreAgents": "+{count} أخرى"
+            },
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",
             "generationCancelled": "تم إلغاء التوليد",

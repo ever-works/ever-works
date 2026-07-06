@@ -141,13 +141,26 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
     });
 
-    it('uses onQueueBuild for pending Ideas when provided', () => {
-        routerPushMock.mockClear();
-        const onQueueBuild = vi.fn();
-        render(<IdeaCard proposal={minimalProposal} onQueueBuild={onQueueBuild} />);
-        fireEvent.click(screen.getByText('actions.accept'));
-        expect(onQueueBuild).toHaveBeenCalledWith('prop-1');
-        expect(routerPushMock).not.toHaveBeenCalled();
+    describe('CTA always opens the /works/new build flow', () => {
+        // The card never calls the build endpoint directly: it rejects
+        // any status other than pending/failed AND needs git/provider
+        // config that only /works/new collects. So every non-Done status
+        // routes to /works/new — reliable, never a server-side error.
+        it.each(['pending', 'failed', 'queued', 'building'] as const)(
+            'opens /works/new for a %s Idea and stays clickable',
+            (status) => {
+                routerPushMock.mockClear();
+                render(<IdeaCard proposal={{ ...minimalProposal, status }} />);
+                // The CTA (not the dismiss X) must stay enabled.
+                const cta = screen
+                    .getAllByRole('button')
+                    .find((b) => b.getAttribute('aria-label') !== 'actions.dismissAria');
+                expect(cta).toBeTruthy();
+                expect((cta as HTMLButtonElement).disabled).toBe(false);
+                fireEvent.click(cta as HTMLButtonElement);
+                expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
+            },
+        );
     });
 
     it('calls dismissProposalAction + onDismissed when the X is clicked', async () => {
@@ -212,15 +225,31 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             expect(screen.getByText('actions.accept')).toBeTruthy();
         });
 
-        it('Build CTA + /works/new flow unchanged for non-ACCEPTED statuses', () => {
+        it('Build CTA + /works/new flow used when there is no linked Work', () => {
             routerPushMock.mockClear();
-            // Status PENDING — even if acceptedWorkId is somehow set
-            // (it shouldn't be), the Done state requires status =
-            // 'accepted', so this row uses the Build flow.
+            // Status PENDING with no acceptedWorkId → no Work exists yet,
+            // so this row uses the Build flow.
             render(<IdeaCard proposal={minimalProposal} />);
             fireEvent.click(screen.getByText('actions.accept'));
             expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
         });
+
+        it.each(['queued', 'building', 'failed'] as const)(
+            'shows "View Work" and redirects when a %s Idea already has a linked Work',
+            (status) => {
+                routerPushMock.mockClear();
+                render(
+                    <IdeaCard
+                        proposal={{ ...minimalProposal, status, acceptedWorkId: 'work-99' }}
+                    />,
+                );
+                // A Work exists → surface "View Work", not the status label.
+                expect(screen.getByText('actions.viewWork')).toBeTruthy();
+                expect(screen.queryByText('actions.accept')).toBeNull();
+                fireEvent.click(screen.getByText('actions.viewWork'));
+                expect(routerPushMock).toHaveBeenCalledWith('/works/work-99');
+            },
+        );
     });
 
     it('locks the rendered markup so the extraction is byte-identical (Decision A10)', () => {
@@ -238,11 +267,11 @@ describe('IdeaCard (Phase 5 PR M)', () => {
         // diff is what surfaces it in code review.
         expect(container.firstChild).toMatchInlineSnapshot(`
           <div
-            class="group relative flex min-h-[17rem] flex-col overflow-hidden rounded-lg p-4 shadow-xs bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/9 hover:border-primary-500/50 dark:hover:border-white/20 transition-colors"
+            class="group relative flex min-h-62 flex-col overflow-hidden rounded-lg p-5 bg-card dark:bg-card-primary-dark/70 border border-card-border dark:border-white/10 shadow-sm hover:shadow-lg dark:shadow-black/20 hover:border-primary-500/40 dark:hover:border-white/20 transition-all duration-200"
           >
             <button
               aria-label="actions.dismissAria"
-              class="absolute top-3 right-3 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
+              class="absolute top-3.5 right-3.5 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
               type="button"
             >
               <svg
@@ -266,19 +295,29 @@ describe('IdeaCard (Phase 5 PR M)', () => {
                 />
               </svg>
             </button>
+            <a
+              aria-label="Top AI coding assistants"
+              class="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              href="/ideas/prop-1"
+            />
             <div
-              class="flex items-center gap-3 mb-2 pr-6 min-w-0"
+              class="mb-3 pr-7"
             >
-              <div
-                class="min-h-[lh] flex items-center min-w-0"
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize bg-slate-500/10 text-slate-600 dark:text-slate-300 ring-slate-500/20"
               >
-                <h3
-                  class="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2"
-                >
-                  Top AI coding assistants
-                </h3>
-              </div>
+                <span
+                  aria-hidden="true"
+                  class="h-1.5 w-1.5 rounded-full bg-slate-400"
+                />
+                filters.pending
+              </span>
             </div>
+            <h3
+              class="mb-2 pr-1 min-w-0 text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2"
+            >
+              Top AI coding assistants
+            </h3>
             <p
               class="text-xs leading-4.5 text-text-secondary dark:text-text-secondary-dark line-clamp-3 min-h-[3lh] mb-3"
             >
@@ -288,7 +327,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="flex flex-wrap gap-1.5 mb-3"
             >
               <span
-                class="inline-flex items-center rounded-full bg-primary-400/10 dark:bg-white/10 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-200"
+                class="inline-flex items-center rounded-full border border-border/60 dark:border-white/10 bg-surface-secondary/60 dark:bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary dark:text-gray-300"
               >
                 AI
               </span>
@@ -306,17 +345,17 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               </span>
             </div>
             <p
-              class="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4"
+              class="text-[10px] italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-2 border-l-2 border-border/60 dark:border-white/10 pl-2.5"
             >
               "
               Picks adjacent to the user accepting Claude Code
               "
             </p>
             <div
-              class="mt-auto flex items-center gap-2"
+              class="relative z-10 mt-auto flex items-center gap-2"
             >
               <button
-                class="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
+                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
                 type="button"
               >
                 actions.accept

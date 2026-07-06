@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Нова Задача",
+                "noDescription": "Все още няма описание",
                 "kanban": "Канбан",
                 "list": "Списък",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Приоритет",
                 "labels": "Етикети",
                 "labelsPlaceholder": "разделени с запетая",
+                "workScopedTask": "Задача, ограничена до Work",
+                "missionScopedTask": "Задача, ограничена до Mission",
+                "ideaScopedTask": "Задача, ограничена до Idea",
+                "prefillPromptNotice": "Този формуляр беше предварително попълнен от URL връзка. Прегледайте съдържанието, преди да създадете задачата.",
+                "prefillTemplateNotice": "Предварително попълнено от шаблон <name>{slug}</name>. Прегледайте съдържанието, преди да създадете задачата.",
+                "priorityP0": "P0 — спешно",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — по подразбиране",
+                "priorityP4": "P4 — нисък",
+                "createError": "Неуспешно създаване на задачата",
                 "cancel": "Отказ",
                 "create": "Създай"
             },
@@ -738,8 +750,25 @@
                 "browse": "Прегледай",
                 "uploading": "Качване...",
                 "detach": "Премахни",
+                "attachmentsWorkOnly": "Прикачените файлове са налични само за задачи, обвързани с Work. Създайте задача от Work, за да прикачвате файлове.",
                 "labels": "Етикети",
-                "edited": "редактирано"
+                "edited": "редактирано",
+                "description": "Описание",
+                "edit": "Редактиране",
+                "save": "Запази",
+                "cancel": "Отказ",
+                "descriptionPlaceholder": "Добавете описание…",
+                "noDescription": "Няма предоставено описание.",
+                "saveDescriptionError": "Неуспешно запазване на описанието",
+                "details": "Подробности",
+                "status": "Статус",
+                "priority": "Приоритет",
+                "scope": "Обхват",
+                "created": "Създадено",
+                "updated": "Актуализирано",
+                "scopeWork": "Работа",
+                "scopeMission": "Мисия",
+                "scopeIdea": "Идея"
             },
             "recurring": {
                 "section": "Повтарящ се график",
@@ -763,6 +792,13 @@
                 "blocked": "Блокиран",
                 "done": "Готово",
                 "cancelled": "Отменен"
+            },
+            "priority": {
+                "p0": "Спешно",
+                "p1": "Висок",
+                "p2": "Среден",
+                "p3": "Нормален",
+                "p4": "Нисък"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Тази идея вече не е налична."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "anyStatus": "Всякакъв статус",
                 "apply": "Приложи",
                 "reset": "Нулирай"
+            },
+            "newPage": {
+                "link": "Създаване ръчно",
+                "or": "Или",
+                "title": "Нова Idea",
+                "subtitle": "Напишете собствена Idea. Опишете Work, който искате да създадете — след това можете да го добавите в опашката за изграждане.",
+                "nameLabel": "Заглавие",
+                "namePlaceholder": "По избор — оставете празно, за да се извлече от описанието",
+                "descriptionLabel": "Описание",
+                "descriptionPlaceholder": "Опишете Work, в който трябва да се превърне тази Idea — напр. „Подбран каталог на рамки за AI агенти с отворен код, организиран по тип рамка и лиценз.“",
+                "descriptionHint": "Поне 10 знака.",
+                "cancel": "Отказ",
+                "create": "Създаване на Idea",
+                "creating": "Създаване…",
+                "minLength": "Описанието трябва да е поне 10 знака.",
+                "error": "Idea не може да бъде създадена. Моля, опитайте отново."
             }
         },
         "discover": {
@@ -1713,6 +1766,19 @@
             "createButton": "Създай работа"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенти",
+                "heading": "Агенти за тази Работа",
+                "emptyTitle": "Все още няма Агенти",
+                "emptySubtitle": "Създайте Агент, за да автоматизирате тази Работа.",
+                "pause": "Пауза на Агента",
+                "activate": "Активиране на Агента",
+                "pausedToast": "Агентът е поставен на пауза",
+                "activatedToast": "Агентът е активиран",
+                "statusUpdateFailed": "Статусът не можа да бъде обновен",
+                "newAgent": "Нов Агент",
+                "moreAgents": "+{count} още"
+            },
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",
             "generationCancelled": "Генерирането беше отменено",

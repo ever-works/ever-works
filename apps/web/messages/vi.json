@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Task mới",
+                "noDescription": "Chưa có mô tả",
                 "kanban": "Kanban",
                 "list": "Danh sách",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Ưu tiên",
                 "labels": "Nhãn",
                 "labelsPlaceholder": "phân cách bằng dấu phẩy",
+                "workScopedTask": "Nhiệm vụ giới hạn trong Work",
+                "missionScopedTask": "Nhiệm vụ giới hạn trong Mission",
+                "ideaScopedTask": "Nhiệm vụ giới hạn trong Idea",
+                "prefillPromptNotice": "Biểu mẫu này đã được điền sẵn từ một liên kết URL. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "prefillTemplateNotice": "Được điền sẵn từ mẫu <name>{slug}</name>. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "priorityP0": "P0 — khẩn cấp",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — mặc định",
+                "priorityP4": "P4 — thấp",
+                "createError": "Không thể tạo nhiệm vụ",
                 "cancel": "Hủy",
                 "create": "Tạo"
             },
@@ -680,8 +692,25 @@
                 "browse": "Duyệt",
                 "uploading": "Đang tải lên...",
                 "detach": "Tách",
+                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
                 "labels": "Nhãn",
-                "edited": "đã chỉnh sửa"
+                "edited": "đã chỉnh sửa",
+                "description": "Mô tả",
+                "edit": "Chỉnh sửa",
+                "save": "Lưu",
+                "cancel": "Hủy",
+                "descriptionPlaceholder": "Thêm mô tả…",
+                "noDescription": "Chưa có mô tả.",
+                "saveDescriptionError": "Không thể lưu mô tả",
+                "details": "Chi tiết",
+                "status": "Trạng thái",
+                "priority": "Ưu tiên",
+                "scope": "Phạm vi",
+                "created": "Đã tạo",
+                "updated": "Đã cập nhật",
+                "scopeWork": "Công việc",
+                "scopeMission": "Nhiệm vụ",
+                "scopeIdea": "Ý tưởng"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -705,6 +734,13 @@
                 "blocked": "Bị chặn",
                 "done": "Hoàn thành",
                 "cancelled": "Đã hủy"
+            },
+            "priority": {
+                "p0": "Khẩn cấp",
+                "p1": "Cao",
+                "p2": "Trung bình",
+                "p3": "Bình thường",
+                "p4": "Thấp"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ý tưởng này không còn khả dụng."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "Tạo công việc"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents của Công việc này",
+                "emptyTitle": "Chưa có Agent nào",
+                "emptySubtitle": "Tạo một Agent để tự động hóa Công việc này.",
+                "pause": "Tạm dừng Agent",
+                "activate": "Kích hoạt Agent",
+                "pausedToast": "Đã tạm dừng Agent",
+                "activatedToast": "Đã kích hoạt Agent",
+                "statusUpdateFailed": "Không thể cập nhật trạng thái",
+                "newAgent": "Agent mới",
+                "moreAgents": "+{count} khác"
+            },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
             "generationCancelled": "Tạo đã bị hủy",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ý tưởng này không còn khả dụng."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "newPage": {
+                "link": "Tạo thủ công",
+                "or": "Hoặc",
+                "title": "Idea mới",
+                "subtitle": "Viết Idea của riêng bạn. Mô tả Work bạn muốn tạo — sau đó bạn có thể đưa vào hàng đợi để dựng.",
+                "nameLabel": "Tiêu đề",
+                "namePlaceholder": "Tùy chọn — để trống để tự suy ra từ mô tả",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Mô tả Work mà Idea này sẽ trở thành — ví dụ “Một thư mục được tuyển chọn về các framework agent AI nguồn mở, sắp xếp theo loại framework và giấy phép.”",
+                "descriptionHint": "Ít nhất 10 ký tự.",
+                "cancel": "Hủy",
+                "create": "Tạo Idea",
+                "creating": "Đang tạo…",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "error": "Không thể tạo Idea. Vui lòng thử lại."
             }
         },
         "discover": {

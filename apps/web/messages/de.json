@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Neue Aufgabe",
+                "noDescription": "Noch keine Beschreibung",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priorität",
                 "labels": "Labels",
                 "labelsPlaceholder": "durch Komma getrennt",
+                "workScopedTask": "Auf einen Work begrenzte Aufgabe",
+                "missionScopedTask": "Auf eine Mission begrenzte Aufgabe",
+                "ideaScopedTask": "Auf eine Idea begrenzte Aufgabe",
+                "prefillPromptNotice": "Dieses Formular wurde aus einem URL-Link vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "prefillTemplateNotice": "Aus Vorlage <name>{slug}</name> vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "priorityP0": "P0 — dringend",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — Standard",
+                "priorityP4": "P4 — niedrig",
+                "createError": "Aufgabe konnte nicht erstellt werden",
                 "cancel": "Abbrechen",
                 "create": "Erstellen"
             },
@@ -738,8 +750,25 @@
                 "browse": "Durchsuchen",
                 "uploading": "Hochladen…",
                 "detach": "Trennen",
+                "attachmentsWorkOnly": "Anhänge sind nur bei Work-bezogenen Aufgaben verfügbar. Erstelle eine Aufgabe aus einem Work, um Dateien anzuhängen.",
                 "labels": "Labels",
-                "edited": "bearbeitet"
+                "edited": "bearbeitet",
+                "description": "Beschreibung",
+                "edit": "Bearbeiten",
+                "save": "Speichern",
+                "cancel": "Abbrechen",
+                "descriptionPlaceholder": "Beschreibung hinzufügen…",
+                "noDescription": "Keine Beschreibung vorhanden.",
+                "saveDescriptionError": "Beschreibung konnte nicht gespeichert werden",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priorität",
+                "scope": "Bereich",
+                "created": "Erstellt",
+                "updated": "Aktualisiert",
+                "scopeWork": "Arbeit",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -763,6 +792,13 @@
                 "blocked": "Blockiert",
                 "done": "Erledigt",
                 "cancelled": "Abgebrochen"
+            },
+            "priority": {
+                "p0": "Dringend",
+                "p1": "Hoch",
+                "p2": "Mittel",
+                "p3": "Normal",
+                "p4": "Niedrig"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Diese Idee ist nicht mehr verfügbar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "anyStatus": "Beliebiger Status",
                 "apply": "Übernehmen",
                 "reset": "Zurücksetzen"
+            },
+            "newPage": {
+                "link": "Manuell erstellen",
+                "or": "Oder",
+                "title": "Neue Idea",
+                "subtitle": "Schreibe deine eigene Idea. Beschreibe das Work, das du erstellen möchtest — du kannst es anschließend zur Generierung einreihen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optional — leer lassen, um ihn aus der Beschreibung abzuleiten",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Beschreibe das Work, das aus dieser Idea werden soll — z. B. „Ein kuratiertes Verzeichnis quelloffener KI-Agenten-Frameworks, geordnet nach Framework-Typ und Lizenz.“",
+                "descriptionHint": "Mindestens 10 Zeichen.",
+                "cancel": "Abbrechen",
+                "create": "Idea erstellen",
+                "creating": "Wird erstellt…",
+                "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
+                "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             }
         },
         "discover": {
@@ -1713,6 +1766,19 @@
             "createButton": "Werk erstellen"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten für diese Aufgabe",
+                "emptyTitle": "Noch keine Agenten",
+                "emptySubtitle": "Erstellen Sie einen Agenten, um diese Aufgabe zu automatisieren.",
+                "pause": "Agent pausieren",
+                "activate": "Agent aktivieren",
+                "pausedToast": "Agent pausiert",
+                "activatedToast": "Agent aktiviert",
+                "statusUpdateFailed": "Status konnte nicht aktualisiert werden",
+                "newAgent": "Neuer Agent",
+                "moreAgents": "+{count} weitere"
+            },
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",

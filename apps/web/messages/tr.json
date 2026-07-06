@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Yeni Görev",
+                "noDescription": "Henüz açıklama yok",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Öncelik",
                 "labels": "Etiketler",
                 "labelsPlaceholder": "virgülle ayrılmış",
+                "workScopedTask": "Work kapsamına alınmış görev",
+                "missionScopedTask": "Mission kapsamına alınmış görev",
+                "ideaScopedTask": "Idea kapsamına alınmış görev",
+                "prefillPromptNotice": "Bu form bir URL bağlantısından önceden dolduruldu. Görevi oluşturmadan önce içeriği gözden geçirin.",
+                "prefillTemplateNotice": "<name>{slug}</name> şablonundan önceden dolduruldu. Görevi oluşturmadan önce içeriği gözden geçirin.",
+                "priorityP0": "P0 — acil",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — varsayılan",
+                "priorityP4": "P4 — düşük",
+                "createError": "Görev oluşturulamadı",
                 "cancel": "İptal",
                 "create": "Oluştur"
             },
@@ -680,8 +692,25 @@
                 "browse": "Gözat",
                 "uploading": "Yükleniyor…",
                 "detach": "Ayır",
+                "attachmentsWorkOnly": "Ekler yalnızca Work kapsamındaki görevlerde kullanılabilir. Dosya eklemek için görevi bir Work üzerinden oluşturun.",
                 "labels": "Etiketler",
-                "edited": "düzenlendi"
+                "edited": "düzenlendi",
+                "description": "Açıklama",
+                "edit": "Düzenle",
+                "save": "Kaydet",
+                "cancel": "İptal",
+                "descriptionPlaceholder": "Bir açıklama ekleyin…",
+                "noDescription": "Açıklama girilmedi.",
+                "saveDescriptionError": "Açıklama kaydedilemedi",
+                "details": "Ayrıntılar",
+                "status": "Durum",
+                "priority": "Öncelik",
+                "scope": "Kapsam",
+                "created": "Oluşturulma",
+                "updated": "Güncellenme",
+                "scopeWork": "İş",
+                "scopeMission": "Görev",
+                "scopeIdea": "Fikir"
             },
             "recurring": {
                 "section": "Tekrarlayan zamanlama",
@@ -705,6 +734,13 @@
                 "blocked": "Engellendi",
                 "done": "Tamamlandı",
                 "cancelled": "İptal edildi"
+            },
+            "priority": {
+                "p0": "Acil",
+                "p1": "Yüksek",
+                "p2": "Orta",
+                "p3": "Normal",
+                "p4": "Düşük"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "İş Oluştur"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Ajanlar",
+                "heading": "Bu İşin Ajanları",
+                "emptyTitle": "Henüz hiç Ajan yok",
+                "emptySubtitle": "Bu İşi otomatikleştirmek için bir Ajan oluşturun.",
+                "pause": "Ajanı duraklat",
+                "activate": "Ajanı etkinleştir",
+                "pausedToast": "Ajan duraklatıldı",
+                "activatedToast": "Ajan etkinleştirildi",
+                "statusUpdateFailed": "Durum güncellenemedi",
+                "newAgent": "Yeni Ajan",
+                "moreAgents": "+{count} daha"
+            },
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",
             "generationCancelled": "Oluşturma iptal edildi",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Herhangi bir durum",
                 "apply": "Uygula",
                 "reset": "Sıfırla"
+            },
+            "newPage": {
+                "link": "Manuel oluştur",
+                "or": "Veya",
+                "title": "Yeni Idea",
+                "subtitle": "Kendi Idea'nı yaz. Oluşturmak istediğin Work'ü tanımla — daha sonra derleme için sıraya alabilirsin.",
+                "nameLabel": "Başlık",
+                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu Idea'nın dönüşmesi gereken Work'ü tanımlayın — örneğin “Framework türüne ve lisansa göre düzenlenmiş, açık kaynaklı YZ ajan framework'lerinin özenle seçilmiş bir dizini.”",
+                "descriptionHint": "En az 10 karakter.",
+                "cancel": "İptal",
+                "create": "Idea oluştur",
+                "creating": "Oluşturuluyor…",
+                "minLength": "Açıklama en az 10 karakter olmalıdır.",
+                "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             }
         },
         "discover": {

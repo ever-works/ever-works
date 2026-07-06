@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Нове завдання",
+                "noDescription": "Опису ще немає",
                 "kanban": "Канбан",
                 "list": "Список",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Пріоритет",
                 "labels": "Мітки",
                 "labelsPlaceholder": "розділені комами",
+                "workScopedTask": "Завдання в межах Work",
+                "missionScopedTask": "Завдання в межах Mission",
+                "ideaScopedTask": "Завдання в межах Idea",
+                "prefillPromptNotice": "Цю форму було попередньо заповнено з URL-посилання. Перевірте вміст перед створенням завдання.",
+                "prefillTemplateNotice": "Попередньо заповнено з шаблону <name>{slug}</name>. Перевірте вміст перед створенням завдання.",
+                "priorityP0": "P0 — терміново",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — за замовчуванням",
+                "priorityP4": "P4 — низький",
+                "createError": "Не вдалося створити завдання",
                 "cancel": "Скасувати",
                 "create": "Створити"
             },
@@ -680,8 +692,25 @@
                 "browse": "Огляд",
                 "uploading": "Завантаження...",
                 "detach": "Від'єднати",
+                "attachmentsWorkOnly": "Вкладення доступні лише для завдань, прив'язаних до Work. Створіть завдання з Work, щоб прикріплювати файли.",
                 "labels": "Мітки",
-                "edited": "відредаговано"
+                "edited": "відредаговано",
+                "description": "Опис",
+                "edit": "Редагувати",
+                "save": "Зберегти",
+                "cancel": "Скасувати",
+                "descriptionPlaceholder": "Додайте опис…",
+                "noDescription": "Опис не надано.",
+                "saveDescriptionError": "Не вдалося зберегти опис",
+                "details": "Деталі",
+                "status": "Статус",
+                "priority": "Пріоритет",
+                "scope": "Обсяг дій",
+                "created": "Створено",
+                "updated": "Оновлено",
+                "scopeWork": "Робота",
+                "scopeMission": "Місія",
+                "scopeIdea": "Ідея"
             },
             "recurring": {
                 "section": "Повторюване розкладання",
@@ -705,6 +734,13 @@
                 "blocked": "Заблоковано",
                 "done": "Виконано",
                 "cancelled": "Скасовано"
+            },
+            "priority": {
+                "p0": "Терміново",
+                "p1": "Високий",
+                "p2": "Середній",
+                "p3": "Звичайний",
+                "p4": "Низький"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ця ідея більше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "Створити робота"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенти",
+                "heading": "Агенти цієї Роботи",
+                "emptyTitle": "Ще немає агентів",
+                "emptySubtitle": "Створіть агента, щоб автоматизувати цю Роботу.",
+                "pause": "Призупинити агента",
+                "activate": "Активувати агента",
+                "pausedToast": "Агента призупинено",
+                "activatedToast": "Агента активовано",
+                "statusUpdateFailed": "Не вдалося оновити статус",
+                "newAgent": "Новий Агент",
+                "moreAgents": "+ще {count}"
+            },
             "failedToGenerateItems": "Не вдалося згенерувати елементи. Спробуйте ще раз.",
             "generationCompleted": "Генерацію завершено успішно",
             "generationCancelled": "Генерацію скасовано",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ця ідея більше недоступна."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "Будь-який статус",
                 "apply": "Застосувати",
                 "reset": "Скинути"
+            },
+            "newPage": {
+                "link": "Створити вручну",
+                "or": "Або",
+                "title": "Нова Idea",
+                "subtitle": "Напишіть власну Idea. Опишіть Work, який хочете створити — потім його можна поставити в чергу на збірку.",
+                "nameLabel": "Заголовок",
+                "namePlaceholder": "Необов'язково — залиште порожнім, щоб отримати з опису",
+                "descriptionLabel": "Опис",
+                "descriptionPlaceholder": "Опишіть Work, яким має стати ця Idea — напр. «Ретельно дібраний каталог відкритих фреймворків для ШІ-агентів, упорядкований за типом фреймворка та ліцензією.»",
+                "descriptionHint": "Щонайменше 10 символів.",
+                "cancel": "Скасувати",
+                "create": "Створити Idea",
+                "creating": "Створення…",
+                "minLength": "Опис має містити щонайменше 10 символів.",
+                "error": "Не вдалося створити Idea. Будь ласка, спробуйте ще раз."
             }
         },
         "discover": {

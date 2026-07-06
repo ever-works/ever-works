@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Nueva Tarea",
+                "noDescription": "Aún no hay descripción",
                 "kanban": "Kanban",
                 "list": "Lista",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Prioridad",
                 "labels": "Etiquetas",
                 "labelsPlaceholder": "separadas por comas",
+                "workScopedTask": "Tarea limitada a un Work",
+                "missionScopedTask": "Tarea limitada a una Mission",
+                "ideaScopedTask": "Tarea limitada a una Idea",
+                "prefillPromptNotice": "Este formulario se rellenó previamente desde un enlace URL. Revisa el contenido antes de crear la tarea.",
+                "prefillTemplateNotice": "Rellenado desde la plantilla <name>{slug}</name>. Revisa el contenido antes de crear la tarea.",
+                "priorityP0": "P0 — urgente",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — predeterminada",
+                "priorityP4": "P4 — baja",
+                "createError": "No se pudo crear la tarea",
                 "cancel": "Cancelar",
                 "create": "Crear"
             },
@@ -738,8 +750,25 @@
                 "browse": "Examinar",
                 "uploading": "Subiendo...",
                 "detach": "Desvincular",
+                "attachmentsWorkOnly": "Los archivos adjuntos solo están disponibles en tareas limitadas a un Work. Crea una tarea desde un Work para adjuntar archivos.",
                 "labels": "Etiquetas",
-                "edited": "editado"
+                "edited": "editado",
+                "description": "Descripción",
+                "edit": "Editar",
+                "save": "Guardar",
+                "cancel": "Cancelar",
+                "descriptionPlaceholder": "Añade una descripción…",
+                "noDescription": "No se proporcionó ninguna descripción.",
+                "saveDescriptionError": "No se pudo guardar la descripción",
+                "details": "Detalles",
+                "status": "Estado",
+                "priority": "Prioridad",
+                "scope": "Ámbito",
+                "created": "Creado",
+                "updated": "Actualizado",
+                "scopeWork": "Trabajo",
+                "scopeMission": "Misión",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Programación recurrente",
@@ -763,6 +792,13 @@
                 "blocked": "Bloqueado",
                 "done": "Hecho",
                 "cancelled": "Cancelado"
+            },
+            "priority": {
+                "p0": "Urgente",
+                "p1": "Alta",
+                "p2": "Media",
+                "p3": "Normal",
+                "p4": "Baja"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Esta idea ya no está disponible."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "anyStatus": "Cualquier estado",
                 "apply": "Aplicar",
                 "reset": "Restablecer"
+            },
+            "newPage": {
+                "link": "Crear manualmente",
+                "or": "O",
+                "title": "Nueva Idea",
+                "subtitle": "Escribe tu propia Idea. Describe el Work que quieres crear — luego podrás ponerlo en cola para generarlo.",
+                "nameLabel": "Título",
+                "namePlaceholder": "Opcional — déjalo en blanco para derivarlo de la descripción",
+                "descriptionLabel": "Descripción",
+                "descriptionPlaceholder": "Describe el Work en el que debe convertirse esta Idea — p. ej. «Un directorio curado de frameworks de agentes de IA de código abierto, organizados por tipo de framework y licencia.»",
+                "descriptionHint": "Al menos 10 caracteres.",
+                "cancel": "Cancelar",
+                "create": "Crear Idea",
+                "creating": "Creando…",
+                "minLength": "La descripción debe tener al menos 10 caracteres.",
+                "error": "No se pudo crear la Idea. Inténtalo de nuevo."
             }
         },
         "discover": {
@@ -1713,6 +1766,19 @@
             "createButton": "Crear trabajo"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agentes",
+                "heading": "Agentes de este Trabajo",
+                "emptyTitle": "Aún no hay Agentes",
+                "emptySubtitle": "Crea un Agente para automatizar este Trabajo.",
+                "pause": "Pausar Agente",
+                "activate": "Activar Agente",
+                "pausedToast": "Agente pausado",
+                "activatedToast": "Agente activado",
+                "statusUpdateFailed": "No se pudo actualizar el estado",
+                "newAgent": "Nuevo Agente",
+                "moreAgents": "+{count} más"
+            },
             "failedToGenerateItems": "No se pudieron generar los elementos. Inténtalo de nuevo.",
             "generationCompleted": "Generación completada exitosamente",
             "generationCancelled": "La generación fue cancelada",

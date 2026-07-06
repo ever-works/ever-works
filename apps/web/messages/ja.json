@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新しいタスク",
+                "noDescription": "説明はまだありません",
                 "kanban": "カンバン",
                 "list": "リスト",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "優先度",
                 "labels": "ラベル",
                 "labelsPlaceholder": "コンマ区切り",
+                "workScopedTask": "Work にスコープされたタスク",
+                "missionScopedTask": "Mission にスコープされたタスク",
+                "ideaScopedTask": "Idea にスコープされたタスク",
+                "prefillPromptNotice": "このフォームは URL リンクから事前入力されました。タスクを作成する前に内容を確認してください。",
+                "prefillTemplateNotice": "テンプレート <name>{slug}</name> から事前入力されました。タスクを作成する前に内容を確認してください。",
+                "priorityP0": "P0 — 緊急",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — デフォルト",
+                "priorityP4": "P4 — 低",
+                "createError": "タスクの作成に失敗しました",
                 "cancel": "キャンセル",
                 "create": "作成"
             },
@@ -680,8 +692,25 @@
                 "browse": "参照",
                 "uploading": "アップロード中…",
                 "detach": "取り外す",
+                "attachmentsWorkOnly": "添付ファイルは Work にスコープされたタスクでのみ利用できます。ファイルを添付するには、Work からタスクを作成してください。",
                 "labels": "ラベル",
-                "edited": "編集済み"
+                "edited": "編集済み",
+                "description": "説明",
+                "edit": "編集",
+                "save": "保存",
+                "cancel": "キャンセル",
+                "descriptionPlaceholder": "説明を追加…",
+                "noDescription": "説明はありません。",
+                "saveDescriptionError": "説明の保存に失敗しました",
+                "details": "詳細",
+                "status": "ステータス",
+                "priority": "優先度",
+                "scope": "スコープ",
+                "created": "作成日",
+                "updated": "更新日",
+                "scopeWork": "作業",
+                "scopeMission": "ミッション",
+                "scopeIdea": "アイデア"
             },
             "recurring": {
                 "section": "定期的なスケジュール",
@@ -705,6 +734,13 @@
                 "blocked": "ブロック中",
                 "done": "完了",
                 "cancelled": "キャンセル済み"
+            },
+            "priority": {
+                "p0": "緊急",
+                "p1": "高",
+                "p2": "中",
+                "p3": "通常",
+                "p4": "低"
             }
         },
         "skillsPage": {
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "このアイデアは利用できなくなりました。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1602,6 +1639,19 @@
             "createButton": "ワークを作成"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "エージェント",
+                "heading": "この作業のエージェント",
+                "emptyTitle": "まだエージェントがありません",
+                "emptySubtitle": "エージェントを作成してこの作業を自動化しましょう。",
+                "pause": "エージェントを一時停止",
+                "activate": "エージェントを有効化",
+                "pausedToast": "エージェントを一時停止しました",
+                "activatedToast": "エージェントを有効化しました",
+                "statusUpdateFailed": "ステータスを更新できませんでした",
+                "newAgent": "新しいエージェント",
+                "moreAgents": "他 {count} 件"
+            },
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",
             "generationCancelled": "生成がキャンセルされました",
@@ -4644,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "このアイデアは利用できなくなりました。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4658,6 +4709,22 @@
                 "anyStatus": "すべてのステータス",
                 "apply": "適用",
                 "reset": "リセット"
+            },
+            "newPage": {
+                "link": "手動で作成",
+                "or": "または",
+                "title": "新しい Idea",
+                "subtitle": "自分の Idea を書きましょう。作成したい Work を説明してください — その後、ビルドのキューに追加できます。",
+                "nameLabel": "タイトル",
+                "namePlaceholder": "任意 — 空欄にすると説明から自動生成されます",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "この Idea が形になる Work を説明してください — 例:「オープンソースの AI エージェントフレームワークを、フレームワークの種類とライセンスごとに整理した厳選ディレクトリ。」",
+                "descriptionHint": "10 文字以上。",
+                "cancel": "キャンセル",
+                "create": "Idea を作成",
+                "creating": "作成中…",
+                "minLength": "説明は 10 文字以上で入力してください。",
+                "error": "Idea を作成できませんでした。もう一度お試しください。"
             }
         },
         "discover": {

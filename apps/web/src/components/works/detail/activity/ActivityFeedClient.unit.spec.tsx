@@ -7,9 +7,10 @@ const mockSearchParams = new URLSearchParams();
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
+    useLocale: () => 'en',
 }));
 vi.mock('@/i18n/navigation', () => ({
-    useRouter: () => ({ replace: mockReplace }),
+    useRouter: () => ({ replace: mockReplace, push: vi.fn() }),
     usePathname: () => '/works/work-1/activity',
     Link: ({ href, children, ...rest }: any) => (
         <a href={typeof href === 'string' ? href : ''} {...rest}>
@@ -121,7 +122,7 @@ describe('ActivityFeedClient', () => {
         render(<ActivityFeedClient workId="work-1" initialCategory="all" />);
         expect(await screen.findByText('First entry')).toBeInTheDocument();
 
-        await userEvent.click(screen.getByRole('button', { name: 'actions.loadMore' }));
+        await userEvent.click(screen.getByRole('button', { name: 'pagination.next' }));
 
         await waitFor(() => {
             expect(screen.getByText('Second entry')).toBeInTheDocument();
@@ -144,6 +145,46 @@ describe('ActivityFeedClient', () => {
         expect(mockReplace).toHaveBeenCalled();
         const target = mockReplace.mock.calls[0][0] as string;
         expect(target).toContain('category=users');
+    });
+
+    it('filters loaded entries client-side when a status chip is clicked', async () => {
+        mockGetActivityFeed.mockResolvedValue(
+            emptySuccess({
+                entries: [
+                    {
+                        id: 'entry-ok',
+                        source: 'platform-activity-log',
+                        type: 'generation',
+                        status: 'completed',
+                        category: 'generation',
+                        timestamp: '2026-05-13T00:00:00.000Z',
+                        summary: 'Generation finished',
+                    },
+                    {
+                        id: 'entry-bad',
+                        source: 'platform-activity-log',
+                        type: 'generation',
+                        status: 'failed',
+                        category: 'generation',
+                        timestamp: '2026-05-12T00:00:00.000Z',
+                        summary: 'Generation blew up',
+                    },
+                ],
+            }),
+        );
+
+        render(<ActivityFeedClient workId="work-1" initialCategory="all" />);
+        expect(await screen.findByText('Generation finished')).toBeInTheDocument();
+
+        // Open the status dropdown (trigger shows the "all statuses" label),
+        // then pick the "failed" option from the portalled listbox.
+        await userEvent.click(screen.getByRole('button', { name: /allStatuses/ }));
+        await userEvent.click(screen.getByRole('option', { name: /failed/ }));
+
+        expect(screen.getByText('Generation blew up')).toBeInTheDocument();
+        expect(screen.queryByText('Generation finished')).not.toBeInTheDocument();
+        const target = mockReplace.mock.calls.at(-1)?.[0] as string;
+        expect(target).toContain('status=failed');
     });
 
     it('surfaces an error message when the action returns failure', async () => {

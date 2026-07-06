@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "New Task",
+                "noDescription": "No description yet",
                 "kanban": "Kanban",
                 "list": "List",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priority",
                 "labels": "Labels",
                 "labelsPlaceholder": "comma-separated",
+                "workScopedTask": "Work-scoped task",
+                "missionScopedTask": "Mission-scoped task",
+                "ideaScopedTask": "Idea-scoped task",
+                "prefillPromptNotice": "This form was pre-filled from a URL link. Review the content before creating the task.",
+                "prefillTemplateNotice": "Pre-filled from template <name>{slug}</name>. Review the content before creating the task.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — default",
+                "priorityP4": "P4 — low",
+                "createError": "Failed to create Task",
                 "cancel": "Cancel",
                 "create": "Create"
             },
@@ -738,8 +750,25 @@
                 "browse": "Browse",
                 "uploading": "Uploading…",
                 "detach": "Detach",
+                "attachmentsWorkOnly": "Attachments are only available on Work-scoped tasks. Create a task from a Work to attach files.",
                 "labels": "Labels",
-                "edited": "edited"
+                "edited": "edited",
+                "description": "Description",
+                "edit": "Edit",
+                "save": "Save",
+                "cancel": "Cancel",
+                "descriptionPlaceholder": "Add a description…",
+                "noDescription": "No description provided.",
+                "saveDescriptionError": "Failed to save description",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priority",
+                "scope": "Scope",
+                "created": "Created",
+                "updated": "Updated",
+                "scopeWork": "Work",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -763,6 +792,13 @@
                 "blocked": "Blocked",
                 "done": "Done",
                 "cancelled": "Cancelled"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "High",
+                "p2": "Medium",
+                "p3": "Normal",
+                "p4": "Low"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "This Idea is no longer available."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "reset": "Reset",
                 "status": "Status",
                 "anyStatus": "Any status"
+            },
+            "newPage": {
+                "link": "Create manually",
+                "or": "Or",
+                "title": "New Idea",
+                "subtitle": "Write your own Idea. Describe the Work you want to build — you can queue it for build afterward.",
+                "nameLabel": "Title",
+                "namePlaceholder": "Optional — leave blank to derive one from the description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Describe the Work this Idea should become — e.g. \"A curated directory of open-source AI agent frameworks, organized by framework type and license.\"",
+                "descriptionHint": "At least 10 characters.",
+                "cancel": "Cancel",
+                "create": "Create Idea",
+                "creating": "Creating…",
+                "minLength": "Description must be at least 10 characters.",
+                "error": "Couldn't create the Idea. Please try again."
             }
         },
         "discover": {
@@ -1829,6 +1882,19 @@
             "createButton": "New Work"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents for this Work",
+                "emptyTitle": "No Agents yet",
+                "emptySubtitle": "Create one to automate this Work.",
+                "pause": "Pause Agent",
+                "activate": "Activate Agent",
+                "pausedToast": "Agent paused",
+                "activatedToast": "Agent activated",
+                "statusUpdateFailed": "Could not update status",
+                "newAgent": "New Agent",
+                "moreAgents": "+{count} more"
+            },
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",

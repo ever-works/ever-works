@@ -762,3 +762,16 @@ select:-webkit-autofill:focus {
     background: inherit;
     animation: sidebar-activity-ping 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* Idea detail (`/ideas/[id]`) live-build accent — a slim highlight
+   that sweeps left→right across the top of the card while a
+   background build (queued / building) is running. Consumed via the
+   `animate-[idea-live-sweep_...]` arbitrary utility on the sweep bar. */
+@keyframes idea-live-sweep {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(400%);
+    }
+}

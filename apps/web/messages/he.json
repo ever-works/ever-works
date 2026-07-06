@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ משימה חדשה",
+                "noDescription": "אין תיאור עדיין",
                 "kanban": "קנבן",
                 "list": "רשימה",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "עדיפות",
                 "labels": "תוויות",
                 "labelsPlaceholder": "מופרדות בפסיקים",
+                "workScopedTask": "משימה בהיקף Work",
+                "missionScopedTask": "משימה בהיקף Mission",
+                "ideaScopedTask": "משימה בהיקף Idea",
+                "prefillPromptNotice": "טופס זה מולא מראש מקישור URL. בדוק את התוכן לפני יצירת המשימה.",
+                "prefillTemplateNotice": "מולא מראש מהתבנית <name>{slug}</name>. בדוק את התוכן לפני יצירת המשימה.",
+                "priorityP0": "P0 — דחוף",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — ברירת מחדל",
+                "priorityP4": "P4 — נמוך",
+                "createError": "יצירת המשימה נכשלה",
                 "cancel": "בטל",
                 "create": "צור"
             },
@@ -738,8 +750,25 @@
                 "browse": "עיין",
                 "uploading": "מעלה...",
                 "detach": "נתק",
+                "attachmentsWorkOnly": "קבצים מצורפים זמינים רק במשימות בהיקף Work. צור משימה מתוך Work כדי לצרף קבצים.",
                 "labels": "תוויות",
-                "edited": "נערך"
+                "edited": "נערך",
+                "description": "תיאור",
+                "edit": "עריכה",
+                "save": "שמור",
+                "cancel": "בטל",
+                "descriptionPlaceholder": "הוסף תיאור…",
+                "noDescription": "לא סופק תיאור.",
+                "saveDescriptionError": "שמירת התיאור נכשלה",
+                "details": "פרטים",
+                "status": "סטטוס",
+                "priority": "עדיפות",
+                "scope": "היקף",
+                "created": "נוצר",
+                "updated": "עודכן",
+                "scopeWork": "עבודה",
+                "scopeMission": "משימה",
+                "scopeIdea": "רעיון"
             },
             "recurring": {
                 "section": "תדירות חוזרת",
@@ -763,6 +792,13 @@
                 "blocked": "חסום",
                 "done": "הושלם",
                 "cancelled": "בוטל"
+            },
+            "priority": {
+                "p0": "דחוף",
+                "p1": "גבוה",
+                "p2": "בינוני",
+                "p3": "רגיל",
+                "p4": "נמוך"
             }
         },
         "skillsPage": {
@@ -991,7 +1027,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "רעיון זה אינו זמין עוד."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1042,22 @@
                 "anyStatus": "כל סטטוס",
                 "apply": "החל",
                 "reset": "אפס"
+            },
+            "newPage": {
+                "link": "יצירה ידנית",
+                "or": "או",
+                "title": "Idea חדשה",
+                "subtitle": "כתוב Idea משלך. תאר את ה-Work שברצונך ליצור — לאחר מכן תוכל להוסיף אותו לתור הבנייה.",
+                "nameLabel": "כותרת",
+                "namePlaceholder": "אופציונלי — השאר ריק כדי לגזור אותו מהתיאור",
+                "descriptionLabel": "תיאור",
+                "descriptionPlaceholder": "תאר את ה-Work ש-Idea זו צריכה להפוך אליו — לדוגמה “ספרייה אצורה של מסגרות סוכני AI בקוד פתוח, מאורגנת לפי סוג מסגרת ורישיון.”",
+                "descriptionHint": "לפחות 10 תווים.",
+                "cancel": "ביטול",
+                "create": "צור Idea",
+                "creating": "יוצר…",
+                "minLength": "התיאור חייב להכיל לפחות 10 תווים.",
+                "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
             }
         },
         "discover": {
@@ -1713,6 +1766,19 @@
             "createButton": "צור עבודה"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "סוכנים",
+                "heading": "סוכנים לעבודה זו",
+                "emptyTitle": "אין סוכנים עדיין",
+                "emptySubtitle": "צרו סוכן כדי להפוך עבודה זו לאוטומטית.",
+                "pause": "השהיית הסוכן",
+                "activate": "הפעלת הסוכן",
+                "pausedToast": "הסוכן הושהה",
+                "activatedToast": "הסוכן הופעל",
+                "statusUpdateFailed": "לא ניתן לעדכן את הסטטוס",
+                "newAgent": "סוכן חדש",
+                "moreAgents": "+{count} נוספים"
+            },
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
             "generationCompleted": "היצירה הושלמה בהצלחה",
             "generationCancelled": "היצירה בוטלה",
