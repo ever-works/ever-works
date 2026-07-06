@@ -244,23 +244,25 @@ function InstalledList({ installed }: { installed: Skill[] }) {
                 <Link
                     key={s.id}
                     href={ROUTES.DASHBOARD_SKILL(s.id)}
-                    className="block rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
+                    className="group flex flex-col rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 hover:border-border dark:hover:border-border-dark transition-colors"
                 >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2">
                         <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
                             {s.title}
                         </h3>
-                        <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark">
+                        <span className="shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                             {s.ownerType}
                         </span>
                     </div>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1.5 line-clamp-2 min-h-8">
                         {s.description}
                     </p>
-                    <div className="flex items-center gap-2 mt-3 text-[11px] text-text-secondary dark:text-text-secondary-dark">
-                        <span className="font-mono">{s.slug}</span>
-                        <span>v{s.version}</span>
-                        {s.sourceCatalogSlug && <span>{t('card.fromCatalog')}</span>}
+                    <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/40 dark:border-border-dark/40 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                        <span className="min-w-0 truncate font-mono">{s.slug}</span>
+                        <span className="shrink-0 flex items-center gap-2">
+                            <span>v{s.version}</span>
+                            {s.sourceCatalogSlug && <span>{t('card.fromCatalog')}</span>}
+                        </span>
                     </div>
                 </Link>
             ))}
@@ -338,26 +340,26 @@ function CatalogCard({
     };
 
     return (
-        <div className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-            <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-4 hover:border-border dark:hover:border-border-dark transition-colors">
+            <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
                     {entry.title}
                 </h3>
-                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark">
+                <span className="shrink-0 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
                     v{entry.version}
                 </span>
             </div>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1">
+            <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1.5 line-clamp-2 min-h-8">
                 {entry.description}
             </p>
-            <div className="flex items-center justify-between gap-2 mt-3 text-[11px] text-text-secondary dark:text-text-secondary-dark">
-                <span className="font-mono truncate">{entry.slug}</span>
+            <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/40 dark:border-border-dark/40 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                <span className="min-w-0 truncate font-mono">{entry.slug}</span>
                 <Button
                     size="sm"
                     variant={done ? 'ghost' : 'primary'}
                     onClick={handleInstall}
                     disabled={pending || done}
-                    className="gap-1.5"
+                    className="gap-1.5 shrink-0"
                 >
                     <Download className="w-3.5 h-3.5" aria-hidden="true" />
                     {done
