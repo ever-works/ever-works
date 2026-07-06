@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
-import { createCustomSkillAction, installCatalogSkillAction } from '@/app/actions/skills';
+import { installCatalogSkillAction } from '@/app/actions/skills';
 
 type Section = 'installed' | 'available' | 'custom';
 
@@ -378,39 +378,6 @@ function CatalogCard({
 
 function CustomSection({ skills }: { skills: Skill[] }) {
     const t = useTranslations('dashboard.skillsPage');
-    const [open, setOpen] = useState(false);
-    const [title, setTitle] = useState('');
-    const [description, setDescription] = useState('');
-    const [pending, startTransition] = useTransition();
-    const [error, setError] = useState<string | null>(null);
-    const router = useRouter();
-
-    const handleCreate = (e: FormEvent) => {
-        e.preventDefault();
-        if (!title.trim()) {
-            setError(t('custom.titleRequired'));
-            return;
-        }
-        setError(null);
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const trimmedTitle = title.trim();
-                    const trimmedDescription = description.trim();
-                    const created = await createCustomSkillAction({
-                        ownerType: 'tenant',
-                        ownerId: '',
-                        title: trimmedTitle,
-                        description: trimmedDescription || `Custom Skill: ${trimmedTitle}`,
-                        instructionsMd: `# ${trimmedTitle}\n\n${trimmedDescription || '_Describe what this Skill teaches your Agent..._'}\n`,
-                    });
-                    router.push(ROUTES.DASHBOARD_SKILL(created.id));
-                } catch (err) {
-                    setError(err instanceof Error ? err.message : t('custom.createFailed'));
-                }
-            })();
-        });
-    };
 
     return (
         <div className="space-y-4">
@@ -418,81 +385,16 @@ function CustomSection({ skills }: { skills: Skill[] }) {
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
                     {t('custom.summary', { count: skills.length })}
                 </p>
-                {!open && (
-                    <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => setOpen(true)}
-                        className="gap-1.5"
-                    >
-                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                        {t('custom.new')}
-                    </Button>
-                )}
-            </div>
-
-            {open && (
-                <form
-                    onSubmit={handleCreate}
-                    className="rounded-md border border-primary/30 bg-primary/5 p-5 space-y-3"
+                <Button
+                    size="sm"
+                    variant="primary"
+                    href={ROUTES.DASHBOARD_SKILL_NEW}
+                    className="gap-1.5"
                 >
-                    <h3 className="text-sm font-medium text-text dark:text-text-dark">
-                        {t('custom.formTitle')}
-                    </h3>
-                    <div>
-                        <label
-                            className="block text-[10px] text-text-muted mb-1"
-                            htmlFor="skill-title"
-                        >
-                            {t('custom.title')}
-                        </label>
-                        <input
-                            id="skill-title"
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder={t('custom.titlePlaceholder')}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                            autoFocus
-                        />
-                    </div>
-                    <div>
-                        <label
-                            className="block text-[10px] text-text-muted mb-1"
-                            htmlFor="skill-description"
-                        >
-                            {t('custom.description')}
-                        </label>
-                        <input
-                            id="skill-description"
-                            type="text"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder={t('custom.descriptionPlaceholder')}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button type="submit" size="sm" disabled={pending}>
-                            {pending ? t('custom.creating') : t('custom.create')}
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setOpen(false)}
-                            disabled={pending}
-                        >
-                            {t('custom.cancel')}
-                        </Button>
-                    </div>
-                    {error && (
-                        <p className="text-xs text-danger" role="alert">
-                            {error}
-                        </p>
-                    )}
-                </form>
-            )}
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                    {t('custom.new')}
+                </Button>
+            </div>
 
             <InstalledList installed={skills} />
         </div>

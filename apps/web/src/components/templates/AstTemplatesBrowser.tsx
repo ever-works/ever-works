@@ -181,11 +181,7 @@ function newRouteFor(entity: AstTemplateEntityType, slug: string): string | null
         case 'task':
             return `${ROUTES.DASHBOARD_TASK_NEW}?from=${encodeURIComponent(slug)}`;
         case 'skill':
-            // Skills don't yet have a /new route — Phase 9 creates via
-            // the catalog install button + a "+ New Skill" inline form
-            // on /skills. Templates land on /skills with the slug
-            // pre-selected once that form gets a `?from=` handler.
-            return `${ROUTES.DASHBOARD_SKILLS}?from=${encodeURIComponent(slug)}`;
+            return `${ROUTES.DASHBOARD_SKILL_NEW}?from=${encodeURIComponent(slug)}`;
         default:
             return null;
     }
