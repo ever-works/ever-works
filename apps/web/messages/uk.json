@@ -1639,6 +1639,19 @@
             "createButton": "Створити робота"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Агенти",
+                "heading": "Агенти цієї Роботи",
+                "emptyTitle": "Ще немає агентів",
+                "emptySubtitle": "Створіть агента, щоб автоматизувати цю Роботу.",
+                "pause": "Призупинити агента",
+                "activate": "Активувати агента",
+                "pausedToast": "Агента призупинено",
+                "activatedToast": "Агента активовано",
+                "statusUpdateFailed": "Не вдалося оновити статус",
+                "newAgent": "Новий Агент",
+                "moreAgents": "+ще {count}"
+            },
             "failedToGenerateItems": "Не вдалося згенерувати елементи. Спробуйте ще раз.",
             "generationCompleted": "Генерацію завершено успішно",
             "generationCancelled": "Генерацію скасовано",

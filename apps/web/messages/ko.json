@@ -1639,6 +1639,19 @@
             "createButton": "워크 생성"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "에이전트",
+                "heading": "이 작업의 에이전트",
+                "emptyTitle": "아직 에이전트가 없습니다",
+                "emptySubtitle": "에이전트를 만들어 이 작업을 자동화하세요.",
+                "pause": "에이전트 일시중지",
+                "activate": "에이전트 활성화",
+                "pausedToast": "에이전트가 일시중지되었습니다",
+                "activatedToast": "에이전트가 활성화되었습니다",
+                "statusUpdateFailed": "상태를 업데이트할 수 없습니다",
+                "newAgent": "새 에이전트",
+                "moreAgents": "+{count}개 더"
+            },
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
             "generationCompleted": "생성 완료",
             "generationCancelled": "생성이 취소되었습니다",

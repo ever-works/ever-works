@@ -1639,6 +1639,19 @@
             "createButton": "İş Oluştur"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Ajanlar",
+                "heading": "Bu İşin Ajanları",
+                "emptyTitle": "Henüz hiç Ajan yok",
+                "emptySubtitle": "Bu İşi otomatikleştirmek için bir Ajan oluşturun.",
+                "pause": "Ajanı duraklat",
+                "activate": "Ajanı etkinleştir",
+                "pausedToast": "Ajan duraklatıldı",
+                "activatedToast": "Ajan etkinleştirildi",
+                "statusUpdateFailed": "Durum güncellenemedi",
+                "newAgent": "Yeni Ajan",
+                "moreAgents": "+{count} daha"
+            },
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",
             "generationCancelled": "Oluşturma iptal edildi",

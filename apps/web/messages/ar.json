@@ -1766,6 +1766,19 @@
             "createButton": "إنشاء عمل"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "الوكلاء",
+                "heading": "وكلاء هذا العمل",
+                "emptyTitle": "لا يوجد وكلاء بعد",
+                "emptySubtitle": "أنشئ وكيلاً لأتمتة هذا العمل.",
+                "pause": "إيقاف الوكيل مؤقتًا",
+                "activate": "تفعيل الوكيل",
+                "pausedToast": "تم إيقاف الوكيل مؤقتًا",
+                "activatedToast": "تم تفعيل الوكيل",
+                "statusUpdateFailed": "تعذر تحديث الحالة",
+                "newAgent": "وكيل جديد",
+                "moreAgents": "+{count} أخرى"
+            },
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",
             "generationCancelled": "تم إلغاء التوليد",

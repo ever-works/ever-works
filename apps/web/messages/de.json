@@ -1766,6 +1766,19 @@
             "createButton": "Werk erstellen"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten für diese Aufgabe",
+                "emptyTitle": "Noch keine Agenten",
+                "emptySubtitle": "Erstellen Sie einen Agenten, um diese Aufgabe zu automatisieren.",
+                "pause": "Agent pausieren",
+                "activate": "Agent aktivieren",
+                "pausedToast": "Agent pausiert",
+                "activatedToast": "Agent aktiviert",
+                "statusUpdateFailed": "Status konnte nicht aktualisiert werden",
+                "newAgent": "Neuer Agent",
+                "moreAgents": "+{count} weitere"
+            },
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",

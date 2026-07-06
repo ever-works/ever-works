@@ -1766,6 +1766,19 @@
             "createButton": "Créer un travail"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents de ce Work",
+                "emptyTitle": "Aucun Agent pour l'instant",
+                "emptySubtitle": "Créez un Agent pour automatiser ce Work.",
+                "pause": "Mettre l'Agent en pause",
+                "activate": "Activer l'Agent",
+                "pausedToast": "Agent mis en pause",
+                "activatedToast": "Agent activé",
+                "statusUpdateFailed": "Impossible de mettre à jour le statut",
+                "newAgent": "Nouvel Agent",
+                "moreAgents": "+{count} de plus"
+            },
             "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
             "generationCompleted": "Génération terminée avec succès",
             "generationCancelled": "Génération annulée",
