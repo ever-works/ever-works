@@ -827,6 +827,7 @@
                 }
             },
             "detail": {
+                "backToSkills": "Back to Skills",
                 "instructions": "Instructions",
                 "body": {
                     "write": "Write",

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import {
+    ArrowLeft,
     Bot,
     Briefcase,
     Building2,
@@ -55,32 +56,46 @@ export function SkillDetailClient({
     skill: Skill;
     initialBindings: SkillBinding[];
 }) {
+    const t = useTranslations('dashboard.skillsPage.detail');
+    const OwnerTypeIcon = TARGET_TYPE_ICONS[skill.ownerType];
+
     return (
         <div className="max-w-screen-2xl mx-auto p-6 space-y-6">
             <Link
                 href={ROUTES.DASHBOARD_SKILLS}
-                className="text-xs text-text-muted hover:text-text"
+                className="inline-flex items-center gap-1.5 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
             >
-                ← Skills
+                <ArrowLeft className="w-4 h-4" />
+                {t('backToSkills')}
             </Link>
-            <header className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <div className="flex items-start gap-3">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-success" />
+            <header className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6">
+                <div className="flex items-start gap-4">
+                    <div className="shrink-0 w-12 h-12 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-success" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 text-[11px] text-text-muted font-mono">
-                            <span>{skill.slug}</span>
-                            <span>·</span>
-                            <span className="uppercase tracking-wide">{skill.ownerType}</span>
-                            <span>·</span>
-                            <span>v{skill.version}</span>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <h1
+                                className="text-xl font-semibold text-text dark:text-text-dark truncate"
+                                title={skill.title}
+                            >
+                                {skill.title}
+                            </h1>
+                            <span className="text-xs font-mono text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                                v{skill.version}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                <OwnerTypeIcon className="w-3 h-3" />
+                                {t(skill.ownerType)}
+                            </span>
                         </div>
-                        <h1 className="text-xl font-semibold text-text dark:text-text-dark mt-1">
-                            {skill.title}
-                        </h1>
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-1">
-                            {skill.description}
+                        {skill.description && (
+                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-2 leading-relaxed">
+                                {skill.description}
+                            </p>
+                        )}
+                        <p className="text-xs font-mono text-text-muted dark:text-text-muted-dark mt-2">
+                            {skill.slug}
                         </p>
                     </div>
                 </div>
