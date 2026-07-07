@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import {
     Bot,
@@ -9,11 +8,9 @@ import {
     Building2,
     Check,
     ChevronDown,
-    Eye,
     FileText,
     Lightbulb,
     Link2,
-    Pencil,
     Plus,
     Search,
     Sparkles,
@@ -24,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
@@ -39,15 +36,6 @@ import {
 const AUTOSAVE_DELAY_MS = 800;
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
-
-// react-markdown + remark-gfm is ~50KB gzipped; only load it when a user
-// actually opens the Preview tab. The chunk is shared with the items
-// MarkdownBodyField and ChatMarkdown.
-const MarkdownPreview = dynamic(
-    () =>
-        import('@/components/works/detail/items/MarkdownPreview').then((m) => m.MarkdownPreview),
-    { ssr: false },
-);
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 9.4 client.
@@ -108,23 +96,11 @@ export function SkillDetailClient({
 function BodyEditor({ skill }: { skill: Skill }) {
     const t = useTranslations('dashboard.skillsPage.detail');
     const [body, setBody] = useState(skill.instructionsMd);
-    const [mode, setMode] = useState<'write' | 'preview'>('write');
     const [status, setStatus] = useState<SaveStatus>('idle');
     const [error, setError] = useState<string | null>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    // Click-to-edit: clicking the rendered preview flips back to Write
-    // and drops the caret into the textarea once it has re-rendered.
-    const focusPendingRef = useRef(false);
 
     const dirty = body !== skill.instructionsMd;
-
-    useEffect(() => {
-        if (mode === 'write' && focusPendingRef.current) {
-            focusPendingRef.current = false;
-            textareaRef.current?.focus();
-        }
-    }, [mode]);
 
     useEffect(() => {
         if (!dirty) return;
@@ -150,26 +126,24 @@ function BodyEditor({ skill }: { skill: Skill }) {
         }
     }
 
-    const wordCount = useMemo(() => {
-        const trimmed = body.trim();
-        return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
-    }, [body]);
-
-    const tabClass = (selected: boolean) =>
-        `inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-colors ${
-            selected
-                ? 'border-border-secondary dark:border-border-secondary-dark bg-surface-secondary dark:bg-surface-secondary-dark font-medium text-text dark:text-text-dark'
-                : 'border-border/60 dark:border-border-dark/60 text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark hover:border-border dark:hover:border-border-dark'
-        }`;
-
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-success" />
-                    {t('instructions')}
-                </h2>
-                <div className="flex items-center gap-3">
+            {error && (
+                <p className="text-xs text-danger" role="alert">
+                    {error}
+                </p>
+            )}
+            <SkillMarkdownEditor
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                idPrefix="skill-body"
+                label={
+                    <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-success" />
+                        {t('instructions')}
+                    </h2>
+                }
+                headerExtra={
                     <span className="text-[11px] text-text-muted" aria-live="polite">
                         {status === 'saving' && t('body.saving')}
                         {status === 'saved' && t('body.saved')}
@@ -177,84 +151,8 @@ function BodyEditor({ skill }: { skill: Skill }) {
                             <span className="text-danger">{t('body.saveFailed')}</span>
                         )}
                     </span>
-                    <div role="tablist" aria-label={t('instructions')} className="flex gap-1.5">
-                        <button
-                            id="skill-body-tab-write"
-                            type="button"
-                            role="tab"
-                            aria-selected={mode === 'write'}
-                            aria-controls="skill-body-panel-write"
-                            onClick={() => setMode('write')}
-                            className={tabClass(mode === 'write')}
-                        >
-                            <Pencil className="w-3 h-3" />
-                            {t('body.write')}
-                        </button>
-                        <button
-                            id="skill-body-tab-preview"
-                            type="button"
-                            role="tab"
-                            aria-selected={mode === 'preview'}
-                            aria-controls="skill-body-panel-preview"
-                            onClick={() => setMode('preview')}
-                            className={tabClass(mode === 'preview')}
-                        >
-                            <Eye className="w-3 h-3" />
-                            {t('body.preview')}
-                        </button>
-                    </div>
-                </div>
-            </div>
-            {error && (
-                <p className="text-xs text-danger" role="alert">
-                    {error}
-                </p>
-            )}
-            {mode === 'write' ? (
-                <div
-                    id="skill-body-panel-write"
-                    role="tabpanel"
-                    aria-labelledby="skill-body-tab-write"
-                >
-                    <Textarea
-                        ref={textareaRef}
-                        variant="form"
-                        value={body}
-                        onChange={(e) => setBody(e.target.value)}
-                        rows={20}
-                        spellCheck={false}
-                        placeholder={t('body.placeholder')}
-                        className="p-3 font-mono text-xs resize-y leading-relaxed"
-                    />
-                </div>
-            ) : (
-                <div
-                    id="skill-body-panel-preview"
-                    role="tabpanel"
-                    aria-labelledby="skill-body-tab-preview"
-                    title={t('body.clickToEdit')}
-                    onClick={(e) => {
-                        // Let links in the rendered markdown behave as links.
-                        if ((e.target as HTMLElement).closest('a')) return;
-                        focusPendingRef.current = true;
-                        setMode('write');
-                    }}
-                    className="rounded-lg border border-border/40 dark:border-border-dark/40 bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 px-4 py-3 min-h-40 max-h-128 overflow-auto cursor-text hover:border-border dark:hover:border-border-dark transition-colors"
-                >
-                    {body.trim().length > 0 ? (
-                        <MarkdownPreview content={body} />
-                    ) : (
-                        <p className="text-xs text-text-muted">{t('body.emptyPreview')}</p>
-                    )}
-                </div>
-            )}
-            <div className="flex items-center justify-between gap-3 text-[11px] text-text-muted pt-1 border-t border-border/40 dark:border-border-dark/40">
-                <span>{t('body.markdownHint')}</span>
-                <span>
-                    {t('body.words', { count: wordCount })} ·{' '}
-                    {t('body.characters', { count: body.length })}
-                </span>
-            </div>
+                }
+            />
         </section>
     );
 }

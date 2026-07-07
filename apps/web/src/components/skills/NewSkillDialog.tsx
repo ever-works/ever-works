@@ -17,7 +17,7 @@ import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillFrontmatter, SkillOwnerType } from '@/lib/api/skills';
@@ -425,17 +425,28 @@ export function NewSkillDialog({
                             className="h-8 px-2.5 text-xs"
                             maxLength={240}
                         />
-                        <Textarea
-                            id="new-skill-instructions"
-                            variant="form"
-                            label={t('instructionsLabel')}
-                            value={instructionsMd}
-                            onChange={(e) => setInstructionsMd(e.target.value)}
-                            placeholder={t('instructionsPlaceholder')}
-                            rows={10}
-                            className="px-2.5 py-2 text-xs font-mono resize-y"
-                            helperText={t('instructionsHint')}
-                        />
+                        <div>
+                            <SkillMarkdownEditor
+                                value={instructionsMd}
+                                onChange={(e) => setInstructionsMd(e.target.value)}
+                                rows={10}
+                                placeholder={t('instructionsPlaceholder')}
+                                idPrefix="new-skill-body"
+                                textareaId="new-skill-instructions"
+                                textareaClassName="px-2.5 py-2 text-xs font-mono resize-y leading-relaxed"
+                                label={
+                                    <label
+                                        htmlFor="new-skill-instructions"
+                                        className="text-sm font-medium text-text dark:text-text-dark"
+                                    >
+                                        {t('instructionsLabel')}
+                                    </label>
+                                }
+                            />
+                            <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('instructionsHint')}
+                            </p>
+                        </div>
                     </div>
                     {error && (
                         <p className="text-xs text-danger mt-2" role="alert">
