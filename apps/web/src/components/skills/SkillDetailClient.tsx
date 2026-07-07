@@ -221,6 +221,9 @@ function BindingsPanel({
 
     const sorted = useMemo(() => [...bindings].sort((a, b) => a.priority - b.priority), [bindings]);
 
+    // Prefix icon inside the "Bind to" trigger — tracks the selected type.
+    const TargetTypeIcon = TARGET_TYPE_ICONS[targetType];
+
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
             <div className="flex items-center gap-2">
@@ -300,19 +303,22 @@ function BindingsPanel({
                         >
                             {t('targetType')}
                         </label>
-                        <Select
-                            id="skill-binding-target-type"
-                            size="xs"
-                            value={targetType}
-                            onValueChange={(v) => setTargetType(v as SkillBindingTargetType)}
-                            className="w-32"
-                        >
-                            <option value="tenant">{t('tenant')}</option>
-                            <option value="agent">{t('agent')}</option>
-                            <option value="work">{t('work')}</option>
-                            <option value="mission">{t('mission')}</option>
-                            <option value="idea">{t('idea')}</option>
-                        </Select>
+                        <div className="relative w-32">
+                            <TargetTypeIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+                            <Select
+                                id="skill-binding-target-type"
+                                size="xs"
+                                value={targetType}
+                                onValueChange={(v) => setTargetType(v as SkillBindingTargetType)}
+                                className="w-32 [&>button]:pl-7"
+                            >
+                                <option value="tenant">{t('tenant')}</option>
+                                <option value="agent">{t('agent')}</option>
+                                <option value="work">{t('work')}</option>
+                                <option value="mission">{t('mission')}</option>
+                                <option value="idea">{t('idea')}</option>
+                            </Select>
+                        </div>
                     </div>
                     <div>
                         <label className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1">
