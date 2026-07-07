@@ -336,7 +336,12 @@ function BindingsPanel({
                         </div>
                     </div>
                     <div>
-                        <label className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1">
+                        {/* Tenant scope renders a static readout (no input), so only
+                            reference the picker input's id when one exists. */}
+                        <label
+                            htmlFor={targetType === 'tenant' ? undefined : 'skill-binding-target'}
+                            className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1"
+                        >
                             {t('target')}
                         </label>
                         <SkillBindingTargetPicker
@@ -472,6 +477,7 @@ function SkillBindingTargetPicker({
     if (loadError || (!loading && options.length === 0)) {
         return (
             <Input
+                id="skill-binding-target"
                 variant="form"
                 type="text"
                 value={value}
@@ -525,6 +531,7 @@ function SkillBindingTargetPicker({
         >
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
             <Input
+                id="skill-binding-target"
                 variant="form"
                 type="text"
                 role="combobox"
