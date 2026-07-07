@@ -21,9 +21,9 @@ export async function generateMetadata({
  * v1 ships a 2-section layout (Body + Bindings) instead of a tab
  * strip — the page is short enough that a vertical scroll is
  * clearer than tabs. Tiptap body editor lands once the shared
- * KbEditor toolbar is extracted; v1 uses a plain textarea with
- * the same 800ms autosave + secret/size error banner pattern as
- * the Agent Instructions editor.
+ * KbEditor toolbar is extracted; the body uses a Write/Preview
+ * markdown textarea with the same 800ms autosave + secret/size
+ * error banner pattern as the Agent Instructions editor.
  */
 export default async function SkillDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
