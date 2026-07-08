@@ -856,7 +856,7 @@
                 "next": "Suivant"
             },
             "list": {
-                "newSkill": "+ Nouvelle Compétence",
+                "newSkill": "Nouvelle Compétence",
                 "filter": {
                     "scope": "Étendue",
                     "all": "Tous"
@@ -875,6 +875,43 @@
                 "idea": "Idée",
                 "work": "Work",
                 "tenant": "Locataire"
+            },
+            "newPage": {
+                "title": "Nouvelle compétence",
+                "templateStepTitle": "Partir d’un modèle (facultatif)",
+                "startFromScratch": "Partir de zéro",
+                "scopeStepTitle": "Où cette compétence doit-elle vivre ?",
+                "scopeTenantLabel": "Espace de travail",
+                "scopeTenantDesc": "Disponible dans tout votre espace de travail.",
+                "scopeMissionDesc": "Limitée à une seule mission.",
+                "scopeWorkDesc": "Limitée à un seul travail.",
+                "scopeIdeaDesc": "Limitée à une seule idée.",
+                "scopeAgentDesc": "Détenue par un seul agent.",
+                "noMissions": "Pas encore de missions — créez-en une d’abord ou choisissez une autre portée.",
+                "noWorks": "Pas encore de travaux — créez-en un d’abord ou choisissez une autre portée.",
+                "noIdeas": "Pas encore d’idées — créez-en une d’abord ou choisissez une autre portée.",
+                "noAgents": "Pas encore d’agents — créez-en un d’abord ou choisissez une autre portée.",
+                "parentLabel": "Quel {scope} ?",
+                "parentPlaceholder": "Sélectionner…",
+                "pickParentHint": "Choisissez un {scope} pour continuer, ou choisissez la portée espace de travail.",
+                "nextDisabledReason": "Sélectionnez un parent pour continuer",
+                "scopeSuffix": "portée —",
+                "detailsStepTitle": "Décrivez la compétence",
+                "titleLabel": "Titre",
+                "titlePlaceholder": "p. ex. Checklist de revue de code",
+                "descriptionLabel": "Description (facultatif)",
+                "descriptionPlaceholder": "Résumé d’une ligne que les agents voient au chargement de cette compétence.",
+                "instructionsLabel": "Instructions (Markdown, facultatif)",
+                "instructionsPlaceholder": "# Ma compétence\n\nQue doit savoir ou faire l’agent ?",
+                "instructionsHint": "Vous pourrez affiner le contenu plus tard sur la page de détails.",
+                "back": "Retour",
+                "next": "Suivant",
+                "cancel": "Annuler",
+                "create": "Créer la compétence",
+                "creating": "Création...",
+                "titleRequired": "Le titre est obligatoire.",
+                "parentRequired": "Choisissez un parent pour cette portée.",
+                "createFailed": "Échec de la création de la compétence"
             }
         },
         "templatesPage": {

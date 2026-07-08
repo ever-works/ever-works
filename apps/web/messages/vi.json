@@ -751,7 +751,7 @@
                 "subtitle": "Skills sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
             },
             "list": {
-                "newSkill": "+ Skill mới",
+                "newSkill": "Skill mới",
                 "filter": {
                     "scope": "Phạm vi",
                     "all": "Tất cả"

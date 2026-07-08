@@ -751,7 +751,7 @@
                 "subtitle": "Umiejętności będą dostępne w późniejszej fazie wdrożenia Agentów/Umiejętności/Zadań. Strona jest zarezerwowana, aby trasa nawigacji paska bocznego była dostępna."
             },
             "list": {
-                "newSkill": "+ Nowa Umiejętność",
+                "newSkill": "Nowa Umiejętność",
                 "filter": {
                     "scope": "Zasięg",
                     "all": "Wszystkie"

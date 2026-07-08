@@ -856,7 +856,7 @@
                 "next": "Siguiente"
             },
             "list": {
-                "newSkill": "+ Nueva Habilidad",
+                "newSkill": "Nueva Habilidad",
                 "filter": {
                     "scope": "Ámbito",
                     "all": "Todos"
@@ -875,6 +875,43 @@
                 "idea": "Idea",
                 "work": "Trabajo",
                 "tenant": "Inquilino"
+            },
+            "newPage": {
+                "title": "Nueva habilidad",
+                "templateStepTitle": "Comenzar desde una plantilla (opcional)",
+                "startFromScratch": "Comenzar desde cero",
+                "scopeStepTitle": "¿Dónde debería vivir esta habilidad?",
+                "scopeTenantLabel": "Espacio de trabajo",
+                "scopeTenantDesc": "Disponible en todo tu espacio de trabajo.",
+                "scopeMissionDesc": "Limitada a una sola misión.",
+                "scopeWorkDesc": "Limitada a un solo trabajo.",
+                "scopeIdeaDesc": "Limitada a una sola idea.",
+                "scopeAgentDesc": "Propiedad de un solo agente.",
+                "noMissions": "Aún no hay misiones — crea una primero o elige otro alcance.",
+                "noWorks": "Aún no hay trabajos — crea uno primero o elige otro alcance.",
+                "noIdeas": "Aún no hay ideas — crea una primero o elige otro alcance.",
+                "noAgents": "Aún no hay agentes — crea uno primero o elige otro alcance.",
+                "parentLabel": "¿Qué {scope}?",
+                "parentPlaceholder": "Seleccionar…",
+                "pickParentHint": "Elige un {scope} para continuar, o elige el alcance del espacio de trabajo.",
+                "nextDisabledReason": "Selecciona un elemento padre para continuar",
+                "scopeSuffix": "alcance —",
+                "detailsStepTitle": "Describe la habilidad",
+                "titleLabel": "Título",
+                "titlePlaceholder": "p. ej. Lista de verificación de revisión de código",
+                "descriptionLabel": "Descripción (opcional)",
+                "descriptionPlaceholder": "Resumen de una línea que los agentes ven al cargar esta habilidad.",
+                "instructionsLabel": "Instrucciones (Markdown, opcional)",
+                "instructionsPlaceholder": "# Mi habilidad\n\n¿Qué debe saber o hacer el agente?",
+                "instructionsHint": "Puedes refinar el contenido más tarde en la página de detalles.",
+                "back": "Atrás",
+                "next": "Siguiente",
+                "cancel": "Cancelar",
+                "create": "Crear habilidad",
+                "creating": "Creando...",
+                "titleRequired": "El título es obligatorio.",
+                "parentRequired": "Elige un elemento padre para este alcance.",
+                "createFailed": "No se pudo crear la habilidad"
             }
         },
         "templatesPage": {

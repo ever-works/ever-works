@@ -751,7 +751,7 @@
                 "subtitle": "Le Competenze saranno disponibili in una fase successiva del rollout Agenti/Competenze/Task. La pagina è riservata in modo che il percorso di navigazione laterale si risolva."
             },
             "list": {
-                "newSkill": "+ Nuova Competenza",
+                "newSkill": "Nuova Competenza",
                 "filter": {
                     "scope": "Ambito",
                     "all": "Tutti"
