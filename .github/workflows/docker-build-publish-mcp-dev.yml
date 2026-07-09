@@ -47,6 +47,7 @@ jobs:
           cache-to: type=inline
           build-args: |
             NODE_ENV=development
+            VERDACCIO_REGISTRY=${{ vars.VERDACCIO_REGISTRY }}
 
       - name: Docker images list
         run: |

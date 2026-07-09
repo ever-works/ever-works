@@ -17,6 +17,20 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN echo "shamefully-hoist=true" > .npmrc
+
+# Package registry selection (backward-compatible, fork-safe):
+# When the VERDACCIO_REGISTRY build-arg is set, install deps through our internal
+# Verdaccio cache (an anonymous, read-only proxy of npm — identical integrity
+# hashes, so `pnpm install --frozen-lockfile` still verifies). When empty — a fork,
+# or any build that does not pass it (e.g. prod) — this is a no-op and pnpm uses the
+# public npm registry, exactly as before. The pnpm-lock rewrite is best-effort
+# (non-fatal) so a URL/path mismatch degrades to public downloads, never a hard fail.
+ARG VERDACCIO_REGISTRY=""
+RUN if [ -n "$VERDACCIO_REGISTRY" ]; then \
+        echo "registry=${VERDACCIO_REGISTRY}" >> .npmrc && \
+        { sed -i "s|https://registry.npmjs.org|${VERDACCIO_REGISTRY%/}|g; s|https://registry.yarnpkg.com|${VERDACCIO_REGISTRY%/}|g" pnpm-lock.yaml 2>/dev/null || true; }; \
+    fi
+
 RUN pnpm install --frozen-lockfile
 
 COPY --from=pruner /app/out/full/ .
@@ -45,6 +59,14 @@ WORKDIR /app
 COPY --from=api-pruner /app/out/json/ .
 COPY --from=api-pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN echo "shamefully-hoist=true" > .npmrc
+
+# Package registry selection (backward-compatible, fork-safe) — see installer stage above.
+ARG VERDACCIO_REGISTRY=""
+RUN if [ -n "$VERDACCIO_REGISTRY" ]; then \
+        echo "registry=${VERDACCIO_REGISTRY}" >> .npmrc && \
+        { sed -i "s|https://registry.npmjs.org|${VERDACCIO_REGISTRY%/}|g; s|https://registry.yarnpkg.com|${VERDACCIO_REGISTRY%/}|g" pnpm-lock.yaml 2>/dev/null || true; }; \
+    fi
+
 RUN pnpm install --frozen-lockfile
 COPY --from=api-pruner /app/out/full/ .
 RUN pnpm exec turbo build --filter=ever-works-api...
