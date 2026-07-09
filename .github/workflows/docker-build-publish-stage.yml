@@ -51,6 +51,7 @@ jobs:
           cache-to: type=inline
           build-args: |
             NODE_ENV=development
+            VERDACCIO_REGISTRY=${{ vars.VERDACCIO_REGISTRY }}
             BUILD_VERSION=${{ steps.meta.outputs.version }}
             GIT_SHA=${{ github.sha }}
             GIT_REF=${{ github.ref_name }}
@@ -151,6 +152,7 @@ jobs:
           # Reuses the existing POSTHOG_* secrets (same phc_* key, same host).
           build-args: |
             NODE_ENV=production
+            VERDACCIO_REGISTRY=${{ vars.VERDACCIO_REGISTRY }}
             NEXT_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_API_KEY }}
             NEXT_PUBLIC_POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
             NEXT_PUBLIC_BUILD_VERSION=${{ steps.meta.outputs.version }}

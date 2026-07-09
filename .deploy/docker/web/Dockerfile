@@ -61,6 +61,21 @@ RUN apk add --no-cache pixman-dev cairo-dev pango-dev jpeg-dev giflib-dev
 COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/.gitignore .gitignore
 
+# Package registry selection (backward-compatible, fork-safe):
+# When the VERDACCIO_REGISTRY build-arg is set, install deps through our internal
+# Verdaccio cache (an anonymous, read-only proxy of npm — identical integrity
+# hashes, so `pnpm install --frozen-lockfile` still verifies). We write the setting
+# to the workspace-root .npmrc (/app), which pnpm reads when installing under
+# apps/web. When empty — a fork, or any build that does not pass it (e.g. prod) —
+# this is a no-op and pnpm uses the public npm registry, exactly as before. The
+# pnpm-lock rewrite is best-effort (non-fatal) so a URL/path mismatch degrades to
+# public downloads, never a hard fail.
+ARG VERDACCIO_REGISTRY=""
+RUN if [ -n "$VERDACCIO_REGISTRY" ]; then \
+        echo "registry=${VERDACCIO_REGISTRY}" >> .npmrc && \
+        { sed -i "s|https://registry.npmjs.org|${VERDACCIO_REGISTRY%/}|g; s|https://registry.yarnpkg.com|${VERDACCIO_REGISTRY%/}|g" pnpm-lock.yaml 2>/dev/null || true; }; \
+    fi
+
 # Install deps
 RUN cd apps/web && pnpm install --frozen-lockfile
 
