@@ -19,12 +19,15 @@ jobs:
           - image: ever-works-api
             dockerfile: .deploy/docker/api/Dockerfile
             context: .
+            pkg: apps/api/package.json
           - image: ever-works-web
             dockerfile: .deploy/docker/web/Dockerfile
             context: .
+            pkg: apps/web/package.json
           - image: ever-works-mcp
             dockerfile: .deploy/docker/mcp/Dockerfile
             context: .
+            pkg: apps/mcp/package.json
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -41,11 +44,32 @@ jobs:
             main|master) echo "tag=prod" >> "$GITHUB_OUTPUT" ;;
             *) echo "tag=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT" ;;
           esac
+      # Build/release identity baked into the images so the app footer shows a
+      # real version + commit link + build time (web NEXT_PUBLIC_* are inlined by
+      # next build; api/mcp read BUILD_*/GIT_* at runtime). Without this the
+      # footer degrades to "v0.0.0 · dev" with no commit link.
+      - id: meta
+        run: |
+          VERSION=$(grep -m1 '"version"' "${{ matrix.pkg }}" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
+          echo "version=${VERSION:-0.0.0}" >> "$GITHUB_OUTPUT"
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            NODE_ENV=production
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            GIT_REF=${{ github.ref_name }}
+            BUILD_RUN=${{ github.run_number }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
+            NEXT_PUBLIC_BUILD_VERSION=${{ steps.meta.outputs.version }}
+            NEXT_PUBLIC_BUILD_SHA=${{ github.sha }}
+            NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
+            NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
+            NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
