@@ -128,9 +128,7 @@ export function tenantAwareInngestFunctionHandler(
 			if (!tenantId) {
 				binding = plugin;
 			} else {
-				const snapshot = resolveSnapshot
-					? await resolveSnapshot(tenantId)
-					: syntheticSnapshot(tenantId);
+				const snapshot = resolveSnapshot ? await resolveSnapshot(tenantId) : syntheticSnapshot(tenantId);
 				const bound = plugin.bindToTenant(snapshot);
 				binding = bound ?? plugin;
 			}

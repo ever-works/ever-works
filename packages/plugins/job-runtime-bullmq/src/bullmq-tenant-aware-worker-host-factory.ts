@@ -1,9 +1,4 @@
-import type {
-	BullMqDeps,
-	BullMqFactoryOptions,
-	BullMqJobView,
-	BullMqWorkerAdapter
-} from './bullmq-types.js';
+import type { BullMqDeps, BullMqFactoryOptions, BullMqJobView, BullMqWorkerAdapter } from './bullmq-types.js';
 import type {
 	IJobRuntimeProvider,
 	TenantCredentialSnapshot,
@@ -203,9 +198,7 @@ export class TenantAwareBullMqWorkerHostFactory {
 		if (!tenantId) {
 			return this.plugin;
 		}
-		const snapshot = this.resolveSnapshot
-			? await this.resolveSnapshot(tenantId)
-			: syntheticSnapshot(tenantId);
+		const snapshot = this.resolveSnapshot ? await this.resolveSnapshot(tenantId) : syntheticSnapshot(tenantId);
 		const bound = this.plugin.bindToTenant(snapshot);
 		return bound ?? this.plugin;
 	}

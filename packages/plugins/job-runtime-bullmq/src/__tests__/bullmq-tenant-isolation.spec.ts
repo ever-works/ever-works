@@ -2,12 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { IJobRuntimeProvider, TenantCredentialSnapshot } from '@ever-works/plugin';
 import { BullMqJobRuntimePlugin } from '../bullmq-job-runtime.plugin.js';
 import { TenantAwareBullMqWorkerHostFactory } from '../bullmq-tenant-aware-worker-host-factory.js';
-import type {
-	BullMqDeps,
-	BullMqJobView,
-	BullMqQueueAdapter,
-	BullMqWorkerAdapter
-} from '../bullmq-types.js';
+import type { BullMqDeps, BullMqJobView, BullMqQueueAdapter, BullMqWorkerAdapter } from '../bullmq-types.js';
 
 /**
  * EW-742 P4 T28/T30/T32 — tenant-isolation contract for the BullMQ
@@ -243,11 +238,7 @@ describe('TenantAwareBullMqWorkerHostFactory — tenant isolation', () => {
 		// resolveSnapshot fires once per job (the factory does not cache
 		// snapshots — that's the operator's resolveSnapshot impl's job).
 		expect(resolveSnapshot).toHaveBeenCalledTimes(3);
-		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([
-			TENANT_A_ID,
-			TENANT_A_ID,
-			TENANT_B_ID
-		]);
+		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([TENANT_A_ID, TENANT_A_ID, TENANT_B_ID]);
 
 		// But plugin.bindToTenant memoises by (tenantId, credentialVersion):
 		// the two A-tenant jobs share a binding identity.

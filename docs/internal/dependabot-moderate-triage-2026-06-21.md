@@ -167,8 +167,8 @@ These each follow the same pattern as the `effect@<3.20.0: >=3.20.0` override fr
 - **Lockfile:** `typeorm@0.3.28` (parents: `@nestjs/typeorm@11.0.1`, plus declared directly in `apps/api/package.json` and `packages/plugins/pgvector/package.json`).
 - **Override:** `"typeorm@<0.3.29": ">=0.3.29"`. Forces lockfile to 0.3.29.
 - **Manifest bumps required** (to silence the manifest-spec alert and align intent):
-  - `apps/api/package.json`: `"typeorm": "0.3.28"` → `"typeorm": "0.3.29"`
-  - `packages/plugins/pgvector/package.json` (dev + peer): pinned `0.3.28` → `0.3.29`; peer `^0.3.28` → `^0.3.29`.
+    - `apps/api/package.json`: `"typeorm": "0.3.28"` → `"typeorm": "0.3.29"`
+    - `packages/plugins/pgvector/package.json` (dev + peer): pinned `0.3.28` → `0.3.29`; peer `^0.3.28` → `^0.3.29`.
 - **Risk:** low. 0.3.28 → 0.3.29 is a patch bump. `@nestjs/typeorm@11.0.1` peer-range is `^0.3.x`. Run `apps/api` test suite to confirm.
 - **undici cap:** N/A.
 
@@ -204,12 +204,12 @@ These each follow the same pattern as the `effect@<3.20.0: >=3.20.0` override fr
 
 ## Summary
 
-| Block | Count | Action |
-|---|---|---|
-| A — additive transitive overrides | 16 advisories across 14 overrides | applied |
-| B — override + manifest catch-up | 2 advisories, 1 override + 3 manifest bumps | applied |
-| C — punted (postcss / older-major uuid paths / gray-matter js-yaml) | 1 advisory + 2 partial paths | dismiss as deferred / false-positive |
-| **Total in scope** | **27 advisories → 15 overrides + 3 manifest bumps** | |
+| Block                                                               | Count                                               | Action                               |
+| ------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| A — additive transitive overrides                                   | 16 advisories across 14 overrides                   | applied                              |
+| B — override + manifest catch-up                                    | 2 advisories, 1 override + 3 manifest bumps         | applied                              |
+| C — punted (postcss / older-major uuid paths / gray-matter js-yaml) | 1 advisory + 2 partial paths                        | dismiss as deferred / false-positive |
+| **Total in scope**                                                  | **27 advisories → 15 overrides + 3 manifest bumps** |                                      |
 
 ### Audit delta (post-apply)
 

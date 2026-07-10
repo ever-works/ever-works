@@ -18,9 +18,11 @@ describe('mapEnqueueOptions (EW-742 P4 T31 BullMQ stamping)', () => {
 	});
 
 	it('translates tags / maxDurationSeconds / machineHint as custom passthroughs', () => {
-		expect(
-			mapEnqueueOptions({ tags: ['kb', 'embed'], maxDurationSeconds: 900, machineHint: 'small-2x' })
-		).toEqual({ tags: ['kb', 'embed'], maxDurationSeconds: 900, machineHint: 'small-2x' });
+		expect(mapEnqueueOptions({ tags: ['kb', 'embed'], maxDurationSeconds: 900, machineHint: 'small-2x' })).toEqual({
+			tags: ['kb', 'embed'],
+			maxDurationSeconds: 900,
+			machineHint: 'small-2x'
+		});
 	});
 
 	it('omits fields that are undefined (no noisy keys)', () => {

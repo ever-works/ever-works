@@ -366,10 +366,7 @@ export function WorkAICreator({
                                 // is present.
                                 if (slugStatus.kind === 'taken') {
                                     const base = slugStatus.slug;
-                                    if (
-                                        suggestion.startsWith(`${base}-`) &&
-                                        workName.trim()
-                                    ) {
+                                    if (suggestion.startsWith(`${base}-`) && workName.trim()) {
                                         const suffix = suggestion.slice(base.length + 1);
                                         setWorkName((prev) => `${prev.trim()} ${suffix}`);
                                     }
@@ -545,11 +542,7 @@ function SlugAvailabilityHint({
     }
 
     return (
-        <div
-            id="work-slug-status"
-            aria-live="polite"
-            className="flex items-center gap-1.5 text-xs"
-        >
+        <div id="work-slug-status" aria-live="polite" className="flex items-center gap-1.5 text-xs">
             {status.kind === 'checking' && (
                 <span className="flex items-center gap-1.5 text-text-muted dark:text-text-muted-dark">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

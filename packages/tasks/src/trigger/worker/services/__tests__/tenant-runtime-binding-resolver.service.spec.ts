@@ -43,11 +43,13 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
         const workRepository = {
             findById: opts.workFindThrows
                 ? vi.fn().mockRejectedValue(new Error('db boom'))
-                : vi.fn().mockResolvedValue(
-                      opts.workTenantId === undefined
-                          ? null
-                          : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
-                  ),
+                : vi
+                      .fn()
+                      .mockResolvedValue(
+                          opts.workTenantId === undefined
+                              ? null
+                              : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                      ),
         } as unknown as WorkRepository;
 
         return new TenantRuntimeBindingResolverService(
@@ -63,10 +65,7 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
     describe('resolve()', () => {
         it('returns "no-binding" when providerId is null (pre-T22 payload)', async () => {
             const r = buildResolver({});
-            const out = await r.resolve(
-                { providerId: null, credentialVersion: 5 },
-                TENANT_ID,
-            );
+            const out = await r.resolve({ providerId: null, credentialVersion: 5 }, TENANT_ID);
             expect(out).toEqual({ status: 'no-binding' });
         });
 
@@ -87,19 +86,13 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
 
         it('returns "no-binding" when tenantId is null even with valid fields', async () => {
             const r = buildResolver({});
-            const out = await r.resolve(
-                { providerId: 'trigger', credentialVersion: 5 },
-                null,
-            );
+            const out = await r.resolve({ providerId: 'trigger', credentialVersion: 5 }, null);
             expect(out).toEqual({ status: 'no-binding' });
         });
 
         it('returns "no-binding" when CredentialVersionService is not wired', async () => {
             const r = buildResolver({ omitCredentialVersionService: true });
-            const out = await r.resolve(
-                { providerId: 'trigger', credentialVersion: 5 },
-                TENANT_ID,
-            );
+            const out = await r.resolve({ providerId: 'trigger', credentialVersion: 5 }, TENANT_ID);
             expect(out).toEqual({ status: 'no-binding' });
         });
 
@@ -112,10 +105,7 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
                 enabled: true,
             } as TenantJobRuntimeConfig;
             const r = buildResolver({ snapshot });
-            const out = await r.resolve(
-                { providerId: 'trigger', credentialVersion: 5 },
-                TENANT_ID,
-            );
+            const out = await r.resolve({ providerId: 'trigger', credentialVersion: 5 }, TENANT_ID);
             expect(out).toEqual({
                 status: 'resolved',
                 snapshot,
@@ -127,10 +117,7 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
 
         it('returns "drained" when resolveSnapshot returns null (rotated past version)', async () => {
             const r = buildResolver({ snapshot: null });
-            const out = await r.resolve(
-                { providerId: 'trigger', credentialVersion: 5 },
-                TENANT_ID,
-            );
+            const out = await r.resolve({ providerId: 'trigger', credentialVersion: 5 }, TENANT_ID);
             expect(out).toEqual({
                 status: 'drained',
                 providerId: 'trigger',
@@ -141,10 +128,7 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
 
         it('returns "error" + fails open when resolveSnapshot throws', async () => {
             const r = buildResolver({ resolveThrows: true });
-            const out = await r.resolve(
-                { providerId: 'trigger', credentialVersion: 5 },
-                TENANT_ID,
-            );
+            const out = await r.resolve({ providerId: 'trigger', credentialVersion: 5 }, TENANT_ID);
             expect(out).toEqual({ status: 'error' });
         });
     });
@@ -226,11 +210,13 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
             const orgRepository = {
                 findById: opts.orgFindThrows
                     ? vi.fn().mockRejectedValue(new Error('db boom'))
-                    : vi.fn().mockResolvedValue(
-                          opts.orgTenantId === undefined
-                              ? null
-                              : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
-                      ),
+                    : vi
+                          .fn()
+                          .mockResolvedValue(
+                              opts.orgTenantId === undefined
+                                  ? null
+                                  : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
+                          ),
             } as unknown as OrganizationRepository;
             return new TenantRuntimeBindingResolverService(
                 credentialVersionService,
@@ -300,11 +286,13 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
             const subRepository = {
                 findById: opts.subFindThrows
                     ? vi.fn().mockRejectedValue(new Error('db boom'))
-                    : vi.fn().mockResolvedValue(
-                          opts.subTenantId === undefined
-                              ? null
-                              : ({ id: SUB_ID, tenantId: opts.subTenantId } as any),
-                      ),
+                    : vi
+                          .fn()
+                          .mockResolvedValue(
+                              opts.subTenantId === undefined
+                                  ? null
+                                  : ({ id: SUB_ID, tenantId: opts.subTenantId } as any),
+                          ),
             } as unknown as WebhookSubscriptionRepository;
             return new TenantRuntimeBindingResolverService(
                 credentialVersionService,
@@ -375,11 +363,13 @@ describe('TenantRuntimeBindingResolverService (EW-742 P3.2 T22 worker-host)', ()
             const repo = {
                 findById: opts.rowFindThrows
                     ? vi.fn().mockRejectedValue(new Error('db boom'))
-                    : vi.fn().mockResolvedValue(
-                          opts.rowTenantId === undefined
-                              ? null
-                              : ({ id: CUST_ID, tenantId: opts.rowTenantId } as any),
-                      ),
+                    : vi
+                          .fn()
+                          .mockResolvedValue(
+                              opts.rowTenantId === undefined
+                                  ? null
+                                  : ({ id: CUST_ID, tenantId: opts.rowTenantId } as any),
+                          ),
             } as unknown as TemplateCustomizationRepository;
             return new TenantRuntimeBindingResolverService(
                 credentialVersionService,

@@ -241,10 +241,7 @@ describe('TriggerService per-tenant stamping (EW-742 P3.2 T22)', () => {
 
             await dispatchers.dispatchKbBackfillSkeleton({ workIds: ['w1', 'w2'] });
 
-            const opts = kbBackfillSkeletonTriggerMock.mock.calls[0][1] as Record<
-                string,
-                unknown
-            >;
+            const opts = kbBackfillSkeletonTriggerMock.mock.calls[0][1] as Record<string, unknown>;
             expect(opts.concurrencyKey).toBeUndefined();
             expect((opts.tags as string[]).some((t) => t.startsWith('tenant:'))).toBe(false);
         });
@@ -264,9 +261,11 @@ describe('TriggerService per-tenant stamping (EW-742 P3.2 T22)', () => {
             // Drive stampTenantOptions directly via the protected
             // member — exercises the merge rules without mutating the
             // public dispatcher signatures.
-            const stamped = (service as unknown as {
-                stampTenantOptions: <T extends Record<string, unknown>>(o: T) => T;
-            }).stampTenantOptions;
+            const stamped = (
+                service as unknown as {
+                    stampTenantOptions: <T extends Record<string, unknown>>(o: T) => T;
+                }
+            ).stampTenantOptions;
             // Call OUTSIDE the bound view — no stamp → noop.
             expect(stamped.call(service, { idempotencyKey: 'idem-1' })).toEqual({
                 idempotencyKey: 'idem-1',

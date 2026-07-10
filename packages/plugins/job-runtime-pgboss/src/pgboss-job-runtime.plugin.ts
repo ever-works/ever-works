@@ -199,12 +199,9 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 
 		const base = this;
-		const tenantSchema =
-			typeof snapshot.credentials.schema === 'string' ? snapshot.credentials.schema : null;
+		const tenantSchema = typeof snapshot.credentials.schema === 'string' ? snapshot.credentials.schema : null;
 		const tenantConnectionString =
-			typeof snapshot.credentials.connectionString === 'string'
-				? snapshot.credentials.connectionString
-				: null;
+			typeof snapshot.credentials.connectionString === 'string' ? snapshot.credentials.connectionString : null;
 
 		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
 			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
@@ -221,8 +218,7 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 			get dispatchers(): JobRuntimeDispatchers {
 				return dispatchersForView;
 			},
-			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
-				base.registerSchedules(schedules),
+			registerSchedules: (schedules: readonly ScheduleSpec[]) => base.registerSchedules(schedules),
 			cancel: (runId: string) => base.cancel(runId),
 			getRunStatus: (runId: string) => base.getRunStatus(runId),
 			isEnabled: () => base.isEnabled(),
@@ -230,10 +226,7 @@ export class PgBossJobRuntimePlugin implements IJobRuntimeProvider {
 			onLoad: (context: PluginContext) => base.onLoad(context),
 			onUnload: () => base.onUnload(),
 			bindToTenant: (other: TenantCredentialSnapshot) => {
-				if (
-					other.tenantId === snapshot.tenantId &&
-					other.credentialVersion === snapshot.credentialVersion
-				) {
+				if (other.tenantId === snapshot.tenantId && other.credentialVersion === snapshot.credentialVersion) {
 					return view;
 				}
 				return base.bindToTenant(other);

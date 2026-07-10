@@ -463,7 +463,11 @@ export function NewSkillDialog({
                             <ChevronLeft className="w-3.5 h-3.5" aria-hidden="true" />
                             {t('back')}
                         </Button>
-                        <Button size="sm" onClick={handleSubmit} disabled={pending || !title.trim()}>
+                        <Button
+                            size="sm"
+                            onClick={handleSubmit}
+                            disabled={pending || !title.trim()}
+                        >
                             {pending ? t('creating') : t('create')}
                         </Button>
                     </div>

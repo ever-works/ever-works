@@ -151,11 +151,11 @@ realInfra('Temporal real-infra (EW-742 P6 T37)', () => {
 		const tenantId = `tenant-${randomUUID().slice(0, 8)}`;
 		const factory = makeFactory(taskQueue);
 
-		const handle = await factory.enqueue(
-			'ewSmokeWorkflow',
-			[{ workId: 'w-1' }],
-			{ idempotencyKey: idemKey, tenantId, tags: ['kb', 'embed'] }
-		);
+		const handle = await factory.enqueue('ewSmokeWorkflow', [{ workId: 'w-1' }], {
+			idempotencyKey: idemKey,
+			tenantId,
+			tags: ['kb', 'embed']
+		});
 		trackCancel(handle);
 		// T31 translator: idempotencyKey becomes workflowId verbatim
 		// (per `providers.md` § Temporal).

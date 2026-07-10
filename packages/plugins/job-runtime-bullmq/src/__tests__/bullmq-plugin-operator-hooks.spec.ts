@@ -11,7 +11,10 @@ import type { BullMqDeps, BullMqQueueAdapter, BullMqWorkerAdapter } from '../bul
 class FakeQueue implements BullMqQueueAdapter {
 	static instances: FakeQueue[] = [];
 	readonly jobs = new Map<string, { remove: () => Promise<void>; getState: () => Promise<string> }>();
-	constructor(public readonly name: string, public readonly opts: Readonly<Record<string, unknown>>) {
+	constructor(
+		public readonly name: string,
+		public readonly opts: Readonly<Record<string, unknown>>
+	) {
 		FakeQueue.instances.push(this);
 	}
 	async add(_: string, __: unknown) {
@@ -35,7 +38,11 @@ class FakeQueue implements BullMqQueueAdapter {
 class FakeWorker implements BullMqWorkerAdapter {
 	static instances: FakeWorker[] = [];
 	closed = false;
-	constructor(public readonly name: string, public readonly fn: unknown, public readonly opts: unknown) {
+	constructor(
+		public readonly name: string,
+		public readonly fn: unknown,
+		public readonly opts: unknown
+	) {
 		FakeWorker.instances.push(this);
 	}
 	on() {

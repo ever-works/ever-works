@@ -27,8 +27,7 @@ import type { TenantJobRuntimeProviderId } from '@/lib/api/tenant-job-runtime';
  * pattern in `app/[locale]/(dashboard)/admin/usage/page.tsx`.
  */
 
-const ADMIN_PAGE_PATTERN =
-    '/[locale]/(dashboard)/admin/tenants/[tenantId]/runtime-allowlist';
+const ADMIN_PAGE_PATTERN = '/[locale]/(dashboard)/admin/tenants/[tenantId]/runtime-allowlist';
 
 async function ensurePlatformAdmin() {
     const user = await getAuthFromCookie();

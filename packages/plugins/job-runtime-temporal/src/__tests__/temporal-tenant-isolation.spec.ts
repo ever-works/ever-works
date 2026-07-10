@@ -9,7 +9,11 @@ class FakeWorker implements TemporalWorker {
 	runResolver: (() => void) | null = null;
 	runPromise: Promise<void>;
 	shutdownCount = 0;
-	constructor(public readonly tenantId: string, public readonly taskQueue: string, public readonly binding: IJobRuntimeProvider) {
+	constructor(
+		public readonly tenantId: string,
+		public readonly taskQueue: string,
+		public readonly binding: IJobRuntimeProvider
+	) {
 		FakeWorker.instances.push(this);
 		this.runPromise = new Promise<void>((resolve) => {
 			this.runResolver = resolve;

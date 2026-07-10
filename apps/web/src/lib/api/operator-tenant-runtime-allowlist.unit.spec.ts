@@ -46,7 +46,9 @@ describe('operatorTenantRuntimeAllowlistAPI.list', () => {
         const { operatorTenantRuntimeAllowlistAPI } = await importApi();
         await operatorTenantRuntimeAllowlistAPI.list('t-abc');
         expect(serverFetchMock).toHaveBeenCalledTimes(1);
-        expect(serverFetchMock).toHaveBeenCalledWith('/api/operator/tenants/t-abc/runtime-allowlist');
+        expect(serverFetchMock).toHaveBeenCalledWith(
+            '/api/operator/tenants/t-abc/runtime-allowlist',
+        );
     });
 
     it('returns the parsed response verbatim (no client-side reshaping)', async () => {
@@ -161,7 +163,9 @@ describe('convenience aliases', () => {
     it('getTenantRuntimeAllowlist delegates to .list(tenantId)', async () => {
         const { getTenantRuntimeAllowlist } = await importApi();
         await getTenantRuntimeAllowlist('t-99');
-        expect(serverFetchMock).toHaveBeenCalledWith('/api/operator/tenants/t-99/runtime-allowlist');
+        expect(serverFetchMock).toHaveBeenCalledWith(
+            '/api/operator/tenants/t-99/runtime-allowlist',
+        );
     });
 
     it('replaceTenantRuntimeAllowlist delegates to .replace(tenantId, providerIds)', async () => {

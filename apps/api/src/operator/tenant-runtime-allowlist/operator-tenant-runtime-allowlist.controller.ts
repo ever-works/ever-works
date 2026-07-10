@@ -97,7 +97,10 @@ export class OperatorTenantRuntimeAllowlistController {
     })
     @ApiParam({ name: 'tenantId', type: String, format: 'uuid' })
     @ApiResponse({ status: 200, type: TenantRuntimeAllowlistResponseDto })
-    @ApiResponse({ status: 400, description: 'Validation failed (unknown providerId or duplicates)' })
+    @ApiResponse({
+        status: 400,
+        description: 'Validation failed (unknown providerId or duplicates)',
+    })
     @ApiResponse({ status: 403, description: 'Caller is not a platform admin' })
     async replace(
         @Param('tenantId', new ParseUUIDPipe()) tenantId: string,

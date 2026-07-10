@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { IJobRuntimeProvider, TenantCredentialSnapshot } from '@ever-works/plugin';
 import { InngestJobRuntimePlugin } from '../inngest-job-runtime.plugin.js';
-import {
-	tenantAwareInngestFunctionHandler,
-	type InngestFunctionContext
-} from '../inngest-tenant-aware-handler.js';
+import { tenantAwareInngestFunctionHandler, type InngestFunctionContext } from '../inngest-tenant-aware-handler.js';
 import type { InngestSendEvent } from '../inngest-types.js';
 
 /**
@@ -174,11 +171,7 @@ describe('tenantAwareInngestFunctionHandler — tenant isolation', () => {
 		// resolveSnapshot fires once per invocation (the wrapper does NOT
 		// cache snapshots — that's the operator's resolveSnapshot impl's job).
 		expect(resolveSnapshot).toHaveBeenCalledTimes(3);
-		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([
-			TENANT_A_ID,
-			TENANT_A_ID,
-			TENANT_B_ID
-		]);
+		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([TENANT_A_ID, TENANT_A_ID, TENANT_B_ID]);
 
 		// But plugin.bindToTenant memoises by (tenantId, credentialVersion):
 		// the two A-tenant invocations share a binding identity.

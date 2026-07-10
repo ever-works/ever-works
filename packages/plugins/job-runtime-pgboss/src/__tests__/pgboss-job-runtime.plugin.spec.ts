@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TenantCredentialSnapshot } from '@ever-works/plugin';
-import {
-	PgBossDispatcherNotConfiguredError,
-	PgBossJobRuntimePlugin
-} from '../pgboss-job-runtime.plugin.js';
+import { PgBossDispatcherNotConfiguredError, PgBossJobRuntimePlugin } from '../pgboss-job-runtime.plugin.js';
 
 describe('PgBossJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 	let plugin: PgBossJobRuntimePlugin;

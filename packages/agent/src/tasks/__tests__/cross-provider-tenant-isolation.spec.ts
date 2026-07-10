@@ -2,9 +2,7 @@ import type { IJobRuntimeProvider, JobRuntimeDispatchers } from '@ever-works/plu
 import type { Repository } from 'typeorm';
 import { CredentialVersionService } from '../credential-version.service';
 import { TenantJobRuntimeConfig } from '../../entities/tenant-job-runtime-config.entity';
-import type {
-    JobRuntimeProviderRegistry,
-} from '../job-runtime.providers';
+import type { JobRuntimeProviderRegistry } from '../job-runtime.providers';
 import type { SecretStoreResolver } from '../secret-store-resolver.interface';
 import { TenantCredentialCache } from '../tenant-credential.cache';
 import { TenantAwareRuntimeResolver } from '../tenant-aware-runtime.resolver';
@@ -194,7 +192,10 @@ describe('Cross-provider tenant isolation (EW-742 T37 closeout, mocks-only)', ()
         const temporalBound: JobRuntimeDispatchers = { which: 'temporal-bound' };
 
         const pgbossBindToTenant = jest
-            .fn<IJobRuntimeProvider | undefined, Parameters<NonNullable<IJobRuntimeProvider['bindToTenant']>>>()
+            .fn<
+                IJobRuntimeProvider | undefined,
+                Parameters<NonNullable<IJobRuntimeProvider['bindToTenant']>>
+            >()
             .mockImplementation((snapshot) =>
                 mockProvider('pgboss', pgbossBound, () => {
                     throw new Error(
@@ -203,7 +204,10 @@ describe('Cross-provider tenant isolation (EW-742 T37 closeout, mocks-only)', ()
                 }),
             );
         const temporalBindToTenant = jest
-            .fn<IJobRuntimeProvider | undefined, Parameters<NonNullable<IJobRuntimeProvider['bindToTenant']>>>()
+            .fn<
+                IJobRuntimeProvider | undefined,
+                Parameters<NonNullable<IJobRuntimeProvider['bindToTenant']>>
+            >()
             .mockImplementation((snapshot) =>
                 mockProvider('temporal', temporalBound, () => {
                     throw new Error(

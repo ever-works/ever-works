@@ -190,14 +190,9 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 		}
 
 		const base = this;
-		const tenantEventKey =
-			typeof snapshot.credentials.eventKey === 'string'
-				? snapshot.credentials.eventKey
-				: null;
+		const tenantEventKey = typeof snapshot.credentials.eventKey === 'string' ? snapshot.credentials.eventKey : null;
 		const tenantSigningKey =
-			typeof snapshot.credentials.signingKey === 'string'
-				? snapshot.credentials.signingKey
-				: null;
+			typeof snapshot.credentials.signingKey === 'string' ? snapshot.credentials.signingKey : null;
 
 		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
 			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
@@ -214,8 +209,7 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 			get dispatchers(): JobRuntimeDispatchers {
 				return dispatchersForView;
 			},
-			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
-				base.registerSchedules(schedules),
+			registerSchedules: (schedules: readonly ScheduleSpec[]) => base.registerSchedules(schedules),
 			cancel: (runId: string) => base.cancel(runId),
 			getRunStatus: (runId: string) => base.getRunStatus(runId),
 			isEnabled: () => base.isEnabled(),
@@ -223,10 +217,7 @@ export class InngestJobRuntimePlugin implements IJobRuntimeProvider {
 			onLoad: (context: PluginContext) => base.onLoad(context),
 			onUnload: () => base.onUnload(),
 			bindToTenant: (other: TenantCredentialSnapshot) => {
-				if (
-					other.tenantId === snapshot.tenantId &&
-					other.credentialVersion === snapshot.credentialVersion
-				) {
+				if (other.tenantId === snapshot.tenantId && other.credentialVersion === snapshot.credentialVersion) {
 					return view;
 				}
 				return base.bindToTenant(other);

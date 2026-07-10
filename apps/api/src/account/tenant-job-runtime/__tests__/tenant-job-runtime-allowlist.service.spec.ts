@@ -23,9 +23,7 @@ jest.mock('@ever-works/agent/tasks', () => ({
 
 import { BadRequestException } from '@nestjs/common';
 import type { CredentialVersionService } from '@ever-works/agent/tasks';
-import type {
-    TenantRuntimeProviderAllowlist as TenantRuntimeProviderAllowlistEntity,
-} from '@ever-works/agent/entities';
+import type { TenantRuntimeProviderAllowlist as TenantRuntimeProviderAllowlistEntity } from '@ever-works/agent/entities';
 import { TenantJobRuntimeService } from '../tenant-job-runtime.service';
 
 type AllowlistRow = TenantRuntimeProviderAllowlistEntity & { createdAt: Date };
@@ -255,9 +253,7 @@ describe('TenantJobRuntimeService — per-tenant allow-list (P5.1 T35a)', () => 
             process.env[GLOBAL_ALLOWLIST_ENV] = 'trigger,temporal,bullmq';
             // Populate per-tenant rows that would NARROW the list if the
             // flag were on — to prove the flag-off branch ignores them.
-            store.push(
-                buildAllowlistRow({ providerId: 'trigger' }),
-            );
+            store.push(buildAllowlistRow({ providerId: 'trigger' }));
 
             const result = await service.getAvailableProvidersForTenant('tenant-1');
             expect(result).toEqual(['trigger', 'temporal', 'bullmq']);

@@ -1,9 +1,4 @@
-import type {
-	BullMqDeps,
-	BullMqFactoryOptions,
-	BullMqJobView,
-	BullMqWorkerAdapter
-} from './bullmq-types.js';
+import type { BullMqDeps, BullMqFactoryOptions, BullMqJobView, BullMqWorkerAdapter } from './bullmq-types.js';
 import type { WorkerHostHandle, WorkerHostOptions } from '@ever-works/plugin';
 
 export interface BullMqWorkerRegistration {

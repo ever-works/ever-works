@@ -44,11 +44,13 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         findOne: jest.Mock;
     };
 
-    function buildStamper(opts: {
-        repoFindOneImpl?: jest.Mock;
-        repoFindOneReturn?: TenantJobRuntimeConfig | null;
-        repoFindOneThrows?: unknown;
-    } = {}): { stamper: RuntimeBindingStamperService; configRepo: ConfigRepoMock } {
+    function buildStamper(
+        opts: {
+            repoFindOneImpl?: jest.Mock;
+            repoFindOneReturn?: TenantJobRuntimeConfig | null;
+            repoFindOneThrows?: unknown;
+        } = {},
+    ): { stamper: RuntimeBindingStamperService; configRepo: ConfigRepoMock } {
         const configRepo: ConfigRepoMock = {
             findOne:
                 opts.repoFindOneImpl ??
@@ -96,7 +98,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         });
 
         it('emits NO warn on a successful stamp (no log noise per call)', async () => {
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const tenantId = randomUUID();
                 const { stamper } = buildStamper({
@@ -202,7 +206,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
 
     describe('fail-open semantics', () => {
         it('warns + null/null when repository throws a string (non-Error)', async () => {
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const tenantId = randomUUID();
                 const { stamper } = buildStamper({
@@ -220,7 +226,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         });
 
         it('warns + null/null when repository throws an Error with empty message', async () => {
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const tenantId = randomUUID();
                 const { stamper } = buildStamper({
@@ -238,7 +246,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         });
 
         it('warns + null/null when repository throws a number', async () => {
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const tenantId = randomUUID();
                 const { stamper } = buildStamper({
@@ -256,7 +266,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         });
 
         it('includes the tenantId in the warn message for operator-side correlation', async () => {
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const tenantId = randomUUID();
                 const { stamper } = buildStamper({
@@ -272,7 +284,7 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
     });
 
     describe('concurrency invariants', () => {
-        it('100 concurrent stamps for distinct tenants return each tenant\'s OWN row data', async () => {
+        it("100 concurrent stamps for distinct tenants return each tenant's OWN row data", async () => {
             const rows = new Map<string, TenantJobRuntimeConfig>();
             for (let i = 0; i < 100; i++) {
                 const tenantId = randomUUID();
@@ -327,7 +339,9 @@ describe('RuntimeBindingStamperService — deep edge cases (EW-742 P3.1 / T22)',
         it('mixed-tenant fan-out with one failing tenant does NOT poison the others', async () => {
             const goodTenant = randomUUID();
             const badTenant = randomUUID();
-            const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+            const warnSpy = jest
+                .spyOn(Logger.prototype, 'warn')
+                .mockImplementation(() => undefined);
             try {
                 const repoFindOneImpl = jest.fn(
                     async ({ where }: { where: { tenantId: string } }) => {

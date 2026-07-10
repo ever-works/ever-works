@@ -2,14 +2,22 @@
 	"name": "@ever-works/secret-store-azure-kv-plugin",
 	"version": "1.0.0",
 	"description": "Azure Key Vault SecretStoreResolver plugin for Ever Works — resolves azure-kv:<vaultName>/<secretName> pointers via the Azure Key Vault REST API.",
-	"author": { "name": "Ever Co. LTD", "email": "ever@ever.co", "url": "https://ever.co" },
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
 	"license": "AGPL-3.0",
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"exports": {
-		".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" }
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
 	},
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
@@ -20,7 +28,9 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"peerDependencies": { "@ever-works/plugin": "workspace:*" },
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
 		"@types/node": "^22.0.0",
@@ -34,9 +44,13 @@
 			"name": "Azure Key Vault Secret Store",
 			"version": "1.0.0",
 			"category": "secret-store-resolver",
-			"capabilities": ["secret-store-resolve"],
+			"capabilities": [
+				"secret-store-resolve"
+			],
 			"description": "Resolves azure-kv:<vaultName>/<secretName> pointers via the Azure Key Vault REST API. Uses a pre-fetched bearer token from AZURE_KV_TOKEN env var (operators provision via Managed Identity, az cli, or sidecar token-refresher).",
-			"author": { "name": "Ever Works Team" },
+			"author": {
+				"name": "Ever Works Team"
+			},
 			"license": "AGPL-3.0",
 			"autoEnable": false,
 			"systemPlugin": false,

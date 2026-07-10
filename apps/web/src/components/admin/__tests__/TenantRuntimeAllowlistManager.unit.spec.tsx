@@ -72,8 +72,7 @@ const replaceActionMock = vi.fn();
 const deleteEntryActionMock = vi.fn();
 vi.mock('@/app/actions/admin/tenant-runtime-allowlist', () => ({
     replaceTenantRuntimeAllowlistAction: (...args: unknown[]) => replaceActionMock(...args),
-    deleteTenantRuntimeAllowlistEntryAction: (...args: unknown[]) =>
-        deleteEntryActionMock(...args),
+    deleteTenantRuntimeAllowlistEntryAction: (...args: unknown[]) => deleteEntryActionMock(...args),
 }));
 
 import { TenantRuntimeAllowlistManager } from '../TenantRuntimeAllowlistManager';
@@ -111,7 +110,8 @@ function findCheckbox(label: string): HTMLInputElement {
     const input = document.getElementById(
         `runtime-allowlist-${providerId}`,
     ) as HTMLInputElement | null;
-    if (!input) throw new Error(`Checkbox for "${label}" (id=runtime-allowlist-${providerId}) not found`);
+    if (!input)
+        throw new Error(`Checkbox for "${label}" (id=runtime-allowlist-${providerId}) not found`);
     return input;
 }
 

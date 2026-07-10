@@ -65,13 +65,13 @@
 import { auth, runs, tasks } from '@trigger.dev/sdk/v3';
 import {
     DEFAULT_TRIGGER_API_URL,
-    type TriggerTenantCredentials
+    type TriggerTenantCredentials,
 } from '@ever-works/job-runtime-trigger-plugin';
 import type {
     TriggerClient,
     TriggerRunHandle,
     TriggerRunRecord,
-    TriggerTaskOptions
+    TriggerTaskOptions,
 } from '@ever-works/job-runtime-trigger-plugin';
 import type { JobRuntimeDispatchers } from '@ever-works/plugin';
 import type {
@@ -85,7 +85,7 @@ import type {
     KbOrgOverlayFanoutPayload,
     KbNormalizeMediaPayload,
     KbTranscribePayload,
-    KbReembedWorkPayload
+    KbReembedWorkPayload,
 } from '@ever-works/agent/tasks';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
 
@@ -110,7 +110,7 @@ const TASK_IDS = {
     kbNormalizeAudio: 'kb-normalize-audio',
     kbTranscribe: 'kb-transcribe',
     kbReembedWork: 'kb-reembed-work',
-    notificationChannelDelivery: 'notification-channel-delivery'
+    notificationChannelDelivery: 'notification-channel-delivery',
 } as const;
 
 /**
@@ -127,20 +127,18 @@ const TASK_IDS = {
  * Construction is cheap + offline-safe — no network call happens
  * until a dispatcher fires.
  */
-export function createTenantTriggerClient(
-    credentials: TriggerTenantCredentials
-): TriggerClient {
+export function createTenantTriggerClient(credentials: TriggerTenantCredentials): TriggerClient {
     let clientConfig: { accessToken: string; baseURL: string };
     try {
         clientConfig = Object.freeze({
             accessToken: credentials.secretKey,
-            baseURL: credentials.apiUrl ?? DEFAULT_TRIGGER_API_URL
+            baseURL: credentials.apiUrl ?? DEFAULT_TRIGGER_API_URL,
         });
     } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         throw new Error(
             `createTenantTriggerClient: failed to assemble client config for ` +
-                `projectRef=${credentials.projectRef}: ${reason}`
+                `projectRef=${credentials.projectRef}: ${reason}`,
         );
     }
 
@@ -149,31 +147,26 @@ export function createTenantTriggerClient(
             async trigger(
                 taskId: string,
                 payload: unknown,
-                options?: TriggerTaskOptions
+                options?: TriggerTaskOptions,
             ): Promise<TriggerRunHandle> {
-                const handle = await tasks.trigger(
-                    taskId,
-                    payload,
-                    options as never,
-                    { clientConfig }
-                );
+                const handle = await tasks.trigger(taskId, payload, options as never, {
+                    clientConfig,
+                });
                 // `tasks.trigger` returns `RunHandle<...>` shaped as
                 // `{ id, publicAccessToken, ... }` — structurally a
                 // `TriggerRunHandle` per the plugin's types.
                 return handle as unknown as TriggerRunHandle;
-            }
+            },
         },
         runs: {
             async cancel(runId: string): Promise<unknown> {
                 return auth.withAuth(clientConfig, () => runs.cancel(runId));
             },
             async retrieve(runId: string): Promise<TriggerRunRecord> {
-                const run = await auth.withAuth(clientConfig, () =>
-                    runs.retrieve(runId)
-                );
+                const run = await auth.withAuth(clientConfig, () => runs.retrieve(runId));
                 return run as unknown as TriggerRunRecord;
-            }
-        }
+            },
+        },
     });
 }
 
@@ -206,9 +199,7 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
      * dispatcher overrides this with a `propagate` shape because its
      * contract forbids silent drops.
      */
-    const softDispatch = async (
-        fn: () => Promise<TriggerRunHandle>
-    ): Promise<string | null> => {
+    const softDispatch = async (fn: () => Promise<TriggerRunHandle>): Promise<string | null> => {
         try {
             const handle = await fn();
             return handle?.id ?? null;
@@ -221,26 +212,26 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
         async dispatchWorkGeneration(payload: WorkGenerationPayload): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.workGeneration, payload, {
-                    tags: ['work-generation', payload.mode, payload.workId]
-                })
+                    tags: ['work-generation', payload.mode, payload.workId],
+                }),
             );
         },
 
         async dispatchWorkImport(payload: WorkImportPayload): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.workImport, payload, {
-                    tags: ['work-import', payload.sourceType, payload.workId]
-                })
+                    tags: ['work-import', payload.sourceType, payload.workId],
+                }),
             );
         },
 
         async dispatchTemplateCustomization(
-            payload: TemplateCustomizationPayload
+            payload: TemplateCustomizationPayload,
         ): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.templateCustomization, payload, {
-                    tags: ['template-customization', payload.customizationId]
-                })
+                    tags: ['template-customization', payload.customizationId],
+                }),
             );
         },
 
@@ -250,9 +241,9 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     tags: [
                         'webhook-delivery',
                         `event:${payload.eventName}`,
-                        `subscription:${payload.subscriptionId}`
-                    ]
-                })
+                        `subscription:${payload.subscriptionId}`,
+                    ],
+                }),
             );
         },
 
@@ -263,15 +254,15 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                         'kb-mirror-document',
                         `op:${payload.operation}`,
                         `work:${payload.workId}`,
-                        `doc:${payload.documentId}`
+                        `doc:${payload.documentId}`,
                     ],
-                    concurrencyKey: `kb-mirror:${payload.workId}`
-                })
+                    concurrencyKey: `kb-mirror:${payload.workId}`,
+                }),
             );
         },
 
         async dispatchKbBackfillSkeleton(
-            payload: KbBackfillSkeletonPayload
+            payload: KbBackfillSkeletonPayload,
         ): Promise<string | null> {
             // Fleet-wide — operator bootstrap that may legitimately cross
             // tenant boundaries; on the BYO path the bootstrap STILL runs
@@ -281,31 +272,26 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
             // the singleton.
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.kbBackfillSkeleton, payload, {
-                    tags: [
-                        'kb-backfill-skeleton',
-                        `count:${payload.workIds?.length ?? 0}`
-                    ]
-                })
+                    tags: ['kb-backfill-skeleton', `count:${payload.workIds?.length ?? 0}`],
+                }),
             );
         },
 
-        async dispatchKbEmbedDocument(
-            payload: KbEmbedDocumentPayload
-        ): Promise<string | null> {
+        async dispatchKbEmbedDocument(payload: KbEmbedDocumentPayload): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.kbEmbedDocument, payload, {
                     tags: [
                         'kb-embed-document',
                         `work:${payload.workId}`,
-                        `doc:${payload.documentId}`
+                        `doc:${payload.documentId}`,
                     ],
-                    concurrencyKey: `kb-embed:${payload.workId}`
-                })
+                    concurrencyKey: `kb-embed:${payload.workId}`,
+                }),
             );
         },
 
         async dispatchKbOrgOverlayFanout(
-            payload: KbOrgOverlayFanoutPayload
+            payload: KbOrgOverlayFanoutPayload,
         ): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.kbOrgOverlayFanout, payload, {
@@ -314,16 +300,14 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                         `op:${payload.operation}`,
                         `org:${payload.organizationId}`,
                         `doc:${payload.documentId}`,
-                        `targets:${payload.workIds.length}`
+                        `targets:${payload.workIds.length}`,
                     ],
-                    concurrencyKey: `kb-org-overlay:${payload.organizationId}`
-                })
+                    concurrencyKey: `kb-org-overlay:${payload.organizationId}`,
+                }),
             );
         },
 
-        async dispatchKbNormalizeMedia(
-            payload: KbNormalizeMediaPayload
-        ): Promise<string | null> {
+        async dispatchKbNormalizeMedia(payload: KbNormalizeMediaPayload): Promise<string | null> {
             const taskId =
                 payload.mediaKind === 'video'
                     ? TASK_IDS.kbNormalizeVideo
@@ -333,23 +317,19 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     tags: [
                         `kb-normalize-${payload.mediaKind}`,
                         `work:${payload.workId}`,
-                        `upload:${payload.uploadId}`
+                        `upload:${payload.uploadId}`,
                     ],
-                    concurrencyKey: `kb-normalize:${payload.workId}`
-                })
+                    concurrencyKey: `kb-normalize:${payload.workId}`,
+                }),
             );
         },
 
         async dispatchKbTranscribe(payload: KbTranscribePayload): Promise<string | null> {
             return softDispatch(() =>
                 client.tasks.trigger(TASK_IDS.kbTranscribe, payload, {
-                    tags: [
-                        'kb-transcribe',
-                        `work:${payload.workId}`,
-                        `upload:${payload.uploadId}`
-                    ],
-                    concurrencyKey: `kb-transcribe:${payload.workId}`
-                })
+                    tags: ['kb-transcribe', `work:${payload.workId}`, `upload:${payload.uploadId}`],
+                    concurrencyKey: `kb-transcribe:${payload.workId}`,
+                }),
             );
         },
 
@@ -365,20 +345,20 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     'kb-reembed-work',
                     `work:${payload.workId}`,
                     `from:${payload.previousModel}`,
-                    `to:${payload.newModel}`
+                    `to:${payload.newModel}`,
                 ],
-                concurrencyKey: `kb-reembed:${payload.workId}`
+                concurrencyKey: `kb-reembed:${payload.workId}`,
             });
             if (!handle?.id) {
                 throw new Error(
-                    `dispatchKbReembedWork(work=${payload.workId}): SDK returned no run id`
+                    `dispatchKbReembedWork(work=${payload.workId}): SDK returned no run id`,
                 );
             }
             return handle.id;
         },
 
         async dispatchNotificationChannelDelivery(
-            payload: NotificationChannelDeliveryPayload
+            payload: NotificationChannelDeliveryPayload,
         ): Promise<string | null> {
             const delay = payload.deferUntil ? new Date(payload.deferUntil) : undefined;
             return softDispatch(() =>
@@ -386,12 +366,12 @@ export function dispatchersFromTenantClient(client: TriggerClient): JobRuntimeDi
                     tags: [
                         'notification-channel-delivery',
                         `channel:${payload.channelId}`,
-                        ...(payload.eventType ? [`event:${payload.eventType}`] : [])
+                        ...(payload.eventType ? [`event:${payload.eventType}`] : []),
                     ],
-                    ...(delay ? { delay } : {})
-                } as TriggerTaskOptions)
+                    ...(delay ? { delay } : {}),
+                } as TriggerTaskOptions),
             );
-        }
+        },
     };
 
     return Object.freeze(dispatchers) as JobRuntimeDispatchers;

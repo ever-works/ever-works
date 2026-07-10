@@ -2,13 +2,23 @@
 	"name": "@ever-works/job-runtime-inngest-plugin",
 	"version": "1.0.0",
 	"description": "Inngest IJobRuntimeProvider plugin for Ever Works — implements the BYO/inherit tenant-overlay binding for Inngest signing keys (EW-742 P3.2, SaaS only — self-host blocked at available-providers). Per-task dispatching is operator-provisioned.",
-	"author": { "name": "Ever Co. LTD", "email": "ever@ever.co", "url": "https://ever.co" },
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
 	"license": "AGPL-3.0",
 	"type": "module",
 	"main": "./dist/index.cjs",
 	"module": "./dist/index.js",
 	"types": "./dist/index.d.ts",
-	"exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" } },
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
 	"scripts": {
 		"build": "tsc --noEmit && tsup",
 		"dev": "tsup --watch",
@@ -18,7 +28,9 @@
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
 	},
-	"peerDependencies": { "@ever-works/plugin": "workspace:*" },
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
 		"@types/node": "^22.0.0",
@@ -41,14 +53,19 @@
 				"job-runtime-bind-tenant"
 			],
 			"description": "Inngest (https://www.inngest.com) IJobRuntimeProvider for the EW-742 tenant overlay. Implements bindToTenant via per-tenant signing keys (SaaS only — self-host blocked at available-providers per ADR-017 providers.md). Per-task dispatchers throw 'not implemented' until the operator wires per-payload-type Inngest functions.",
-			"author": { "name": "Ever Works Team" },
+			"author": {
+				"name": "Ever Works Team"
+			},
 			"license": "AGPL-3.0",
 			"autoEnable": false,
 			"systemPlugin": false,
 			"distribution": "core",
 			"builtIn": true,
 			"visibility": "operator",
-			"envVars": ["INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY"]
+			"envVars": [
+				"INNGEST_EVENT_KEY",
+				"INNGEST_SIGNING_KEY"
+			]
 		}
 	}
 }
