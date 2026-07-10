@@ -80,15 +80,18 @@ jobs:
       # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
       # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
+        if: ${{ vars.DO_ENABLED == 'true' }}
 
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: doctl registry login --expiry-seconds 3600
 
       - name: Push to DigitalOcean Registry
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: |
           docker push registry.digitalocean.com/ever/ever-works-api-dev:latest
 
@@ -183,14 +186,17 @@ jobs:
       # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
       # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
+        if: ${{ vars.DO_ENABLED == 'true' }}
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: doctl registry login --expiry-seconds 3600
 
       - name: Push to DigitalOcean Registry
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: |
           docker push registry.digitalocean.com/ever/ever-works-web-dev:latest
 

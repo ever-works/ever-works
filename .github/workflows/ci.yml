@@ -156,7 +156,7 @@ jobs:
       # / `runSecretStoreContractSuite`. Build it first so the
       # downstream plugin's vitest can resolve the subpath.
       - name: Build @ever-works/plugin (contract + conformance subpath)
-        run: pnpm --filter @ever-works/plugin build
+        run: pnpm --filter "@ever-works/plugin..." build
 
       - name: Test @ever-works/job-runtime-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/job-runtime-${{ matrix.provider }}-plugin test
@@ -230,7 +230,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build @ever-works/plugin (contract + conformance subpath)
-        run: pnpm --filter @ever-works/plugin build
+        run: pnpm --filter "@ever-works/plugin..." build
 
       - name: BullMQ real-infra
         env:
@@ -293,7 +293,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build @ever-works/plugin (contract + conformance subpath)
-        run: pnpm --filter @ever-works/plugin build
+        run: pnpm --filter "@ever-works/plugin..." build
 
       - name: Test @ever-works/secret-store-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/secret-store-${{ matrix.provider }}-plugin test

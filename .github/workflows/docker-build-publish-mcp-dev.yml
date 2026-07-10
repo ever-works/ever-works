@@ -66,16 +66,19 @@ jobs:
           docker push everco/ever-works-mcp-dev:latest
 
       - name: Install doctl
+        if: ${{ vars.DO_ENABLED == 'true' }}
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
         continue-on-error: true
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Log in to DigitalOcean Container Registry with short-lived credentials
+        if: ${{ vars.DO_ENABLED == 'true' }}
         continue-on-error: true
         run: doctl registry login --expiry-seconds 3600
 
       - name: Push to DigitalOcean Registry
+        if: ${{ vars.DO_ENABLED == 'true' }}
         continue-on-error: true
         run: |
           docker push registry.digitalocean.com/ever/ever-works-mcp-dev:latest
