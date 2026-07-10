@@ -109,6 +109,50 @@ export class ActivityLogRepository {
         return { activities, total };
     }
 
+    /**
+     * Per-Agent lifecycle events (AGENT_PAUSED / AGENT_RESUMED / …) for
+     * the /agents/[id]/activity feed. The activity log has no dedicated
+     * `agentId` column — agent writers (AgentsController.tryLog) stamp
+     * `details.resourceId` instead — so this matches on the serialized
+     * `"resourceId":"<agentId>"` JSON fragment. `details` is a
+     * `simple-json` (text) column, which makes LIKE portable across
+     * postgres/sqlite; the userId + actionType predicates keep the
+     * scanned set small.
+     */
+    async findAgentEvents(options: {
+        userId: string;
+        agentId: string;
+        actionTypes: ActivityActionType[];
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        if (options.actionTypes.length === 0) return { activities: [], total: 0 };
+        const limit = Math.min(options.limit ?? 25, 100);
+        const offset = options.offset ?? 0;
+        // The id lands inside the LIKE pattern, where `%` / `_` are
+        // wildcards — escape them (and the escape char itself) so the
+        // needle only ever matches the literal id. The controller path
+        // guarantees a UUID, but this is a public repository method and
+        // an unvalidated id must not be able to widen the match. The
+        // explicit ESCAPE keeps the behaviour portable: sqlite's LIKE
+        // has no default escape character.
+        const escapedAgentId = options.agentId.replace(/[\\%_]/g, '\\$&');
+        const [activities, total] = await this.repository
+            .createQueryBuilder('activity')
+            .where('activity.userId = :userId', { userId: options.userId })
+            .andWhere('activity.actionType IN (:...actionTypes)', {
+                actionTypes: options.actionTypes,
+            })
+            .andWhere("activity.details LIKE :needle ESCAPE '\\'", {
+                needle: `%"resourceId":"${escapedAgentId}"%`,
+            })
+            .orderBy('activity.createdAt', 'DESC')
+            .take(limit)
+            .skip(offset)
+            .getManyAndCount();
+        return { activities, total };
+    }
+
     async findLatestByUserWorkActionStatus(params: {
         userId: string;
         workId: string;

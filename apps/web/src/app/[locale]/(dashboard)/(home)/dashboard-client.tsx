@@ -121,11 +121,17 @@ export default function DashboardClient({
 
                 <div className="py-8">
                     <WorkProposalsSection
+                        // Home shows Ideas of every status (page.tsx feeds the
+                        // all-status list here) so a manually-created Idea is
+                        // visible regardless of its status — `showAllStatuses`
+                        // starts the accepted/dismissed toggles ON.
                         initialProposals={initialProposals}
                         initiallyResearching={initiallyResearching}
                         initiallyCanRefresh={initiallyCanRefresh}
                         username={user.username}
                         autoStart={autoStartProposals}
+                        totalIdeas={totalIdeas}
+                        showAllStatuses
                     />
                 </div>
 
@@ -143,10 +149,10 @@ export default function DashboardClient({
                             <Link
                                 href="/new?type=website"
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap',
+                                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-150 whitespace-nowrap',
                                     'border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark',
                                     'text-text-secondary dark:text-text-secondary-dark',
-                                    'hover:border-primary/40 hover:text-primary',
+                                    'hover:border-border dark:hover:border-white/16',
                                 )}
                             >
                                 <Plus className="w-3.5 h-3.5" />

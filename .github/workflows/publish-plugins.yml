@@ -1,13 +1,13 @@
-name: Publish Plugins
+﻿name: Publish Plugins
 
-# EW-693 — Dynamic plugin distribution publish pipeline.
+# EW-693 â€” Dynamic plugin distribution publish pipeline.
 #
 # Builds the plugin SDK + every distributable plugin, then publishes
 # each one (independently versioned via Changesets) to BOTH:
-#   1. npmjs.org      — `npm publish --access restricted`
+#   1. npmjs.org      â€” `npm publish --access restricted`
 #                        (per user directive 2026-06-03, all packages
 #                         ship PRIVATE until each is explicitly cleared.)
-#   2. GitHub Packages — `npm publish --registry=https://npm.pkg.github.com`
+#   2. GitHub Packages â€” `npm publish --registry=https://npm.pkg.github.com`
 #
 # Triggers:
 #   - push to main with a tag matching `plugin-v*` (cuts a real release).
@@ -15,8 +15,8 @@ name: Publish Plugins
 #     and `skip_github_packages` for npm-only publishes.
 #
 # Credentials (set as repo secrets):
-#   - NPM_TOKEN         — npmjs.org automation token, restricted scope.
-#   - GITHUB_TOKEN      — provided automatically; needs `packages:write`.
+#   - NPM_TOKEN         â€” npmjs.org automation token, restricted scope.
+#   - GITHUB_TOKEN      â€” provided automatically; needs `packages:write`.
 #
 # Local equivalents:
 #   pnpm publish:plugins:dry           # dry-run via the orchestrator script.
@@ -54,7 +54,7 @@ permissions:
 jobs:
   build:
     name: Build packages
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
   publish-npm:
     name: Publish to npmjs.org
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     # Push of a plugin-* tag, OR manual dispatch.
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -164,7 +164,7 @@ jobs:
   publish-github-packages:
     name: Publish to GitHub Packages
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     if: |
       github.event_name == 'push' && (
         startsWith(github.ref, 'refs/tags/plugin-v') ||
@@ -220,3 +220,4 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then ARGS+=(--dry-run); fi
           if [ -n "$FILTER" ]; then ARGS+=(--filter "$FILTER"); fi
           node scripts/publish-plugins.mjs --registry=https://npm.pkg.github.com "${ARGS[@]}"
+

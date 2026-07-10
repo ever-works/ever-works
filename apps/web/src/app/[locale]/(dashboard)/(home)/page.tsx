@@ -109,7 +109,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             activeWebsites={statsResponse.activeWebsites}
             totalMissions={statsResponse.totalMissions ?? 0}
             totalIdeas={statsResponse.totalIdeas ?? 0}
-            initialProposals={proposals}
+            initialProposals={allIdeas}
             initiallyResearching={proposalsStatus.researching}
             initiallyCanRefresh={proposalsStatus.canRefresh}
             autoStartProposals={newUser === 'true' && proposals.length === 0}

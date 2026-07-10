@@ -27,6 +27,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentExportService: class {},
     AgentScheduleDispatcherService: class {},
     AgentRunRepository: class {},
+    AgentRunLogRepository: class {},
     SkillBindingRepository: class {},
     PluginUsageRepository: class {},
 }));
@@ -41,6 +42,13 @@ jest.mock('@ever-works/agent/activity-log', () => ({
         AGENT_RUN_TRIGGERED: 'agent_run_triggered',
         AGENT_RUN_CANCELLED: 'agent_run_cancelled',
         AGENT_TASK_ASSIGNED: 'agent_task_assigned',
+        AGENT_CREATED: 'agent_created',
+        AGENT_PAUSED: 'agent_paused',
+        AGENT_RESUMED: 'agent_resumed',
+        AGENT_ARCHIVED: 'agent_archived',
+        AGENT_EXPORTED: 'agent_exported',
+        AGENT_IMPORTED: 'agent_imported',
+        AGENT_BUDGET_EXCEEDED: 'agent_budget_exceeded',
     },
     ActivityStatus: { COMPLETED: 'completed' },
 }));
@@ -63,6 +71,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     let exportService: any;
     let dispatcher: any;
     let agentRuns: any;
+    let agentRunLogs: any;
     let skillBindings: any;
     let pluginUsage: any;
     let tasks: any;
@@ -98,11 +107,16 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             createQueued: jest.fn(),
             findInFlightForTaskAgent: jest.fn().mockResolvedValue(null),
             markFailed: jest.fn().mockResolvedValue(undefined),
+            findByIdAndUser: jest.fn().mockResolvedValue(null),
         };
+        agentRunLogs = { findByRun: jest.fn().mockResolvedValue([]) };
         skillBindings = { resolveActive: jest.fn().mockResolvedValue([]) };
         pluginUsage = { getTotalSpendCentsForOwner: jest.fn().mockResolvedValue(0) };
         tasks = { getOne: jest.fn().mockResolvedValue({ id: taskId }) };
-        activityLog = { log: jest.fn().mockResolvedValue(undefined) };
+        activityLog = {
+            log: jest.fn().mockResolvedValue(undefined),
+            findAgentEvents: jest.fn().mockResolvedValue({ activities: [], total: 0 }),
+        };
         heartbeatTrigger = { enqueue: jest.fn() };
         taskExecuteDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId }) };
 
@@ -112,6 +126,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             exportService,
             dispatcher,
             agentRuns,
+            agentRunLogs,
             skillBindings,
             pluginUsage,
             tasks,
@@ -142,6 +157,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 exportService,
                 dispatcher,
                 agentRuns,
+                agentRunLogs,
                 skillBindings,
                 pluginUsage,
                 tasks,
@@ -202,6 +218,149 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             expect(result.data[0]).toMatchObject({ status: 'completed' });
             expect(agentRuns.findByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1', 25, 0);
             expect(agentRuns.countByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1');
+        });
+    });
+
+    describe('GET /:id/runs/:runId', () => {
+        const runRow = {
+            id: runId,
+            agentId,
+            status: 'failed',
+            triggerKind: 'task',
+            startedAt: new Date('2026-01-01T00:00:00Z'),
+            finishedAt: new Date('2026-01-01T00:00:05Z'),
+            durationMs: 5_000,
+            summary: 'partial note',
+            errorMessage: 'provider timeout',
+            taskId,
+            chatMessageId: null,
+            memorySessionId: 'sess-1',
+            createdAt: new Date('2026-01-01T00:00:00Z'),
+        };
+
+        it('returns full run detail + ordered step logs', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(runRow);
+            agentRunLogs.findByRun.mockResolvedValueOnce([
+                {
+                    id: 'log-1',
+                    level: 'INFO',
+                    step: 'provider-call',
+                    message: 'dispatched',
+                    metadata: { totalTokens: 42 },
+                    createdAt: new Date('2026-01-01T00:00:01Z'),
+                },
+            ]);
+            const result = await controller.getRun(auth, agentId, runId);
+            expect(result).toMatchObject({
+                id: runId,
+                status: 'failed',
+                summary: 'partial note',
+                errorMessage: 'provider timeout',
+                memorySessionId: 'sess-1',
+            });
+            expect(result.logs).toHaveLength(1);
+            expect(result.logs[0]).toMatchObject({
+                level: 'INFO',
+                step: 'provider-call',
+                metadata: { totalTokens: 42 },
+            });
+            expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1');
+            expect(agentRunLogs.findByRun).toHaveBeenCalledWith(runId, 500);
+        });
+
+        it('throws 404 when the run does not exist for this user', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(null);
+            await expect(controller.getRun(auth, agentId, runId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        });
+
+        it('throws 404 when the run belongs to a different agent (no cross-agent read)', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce({
+                ...runRow,
+                agentId: '00000000-0000-0000-0000-0000000000ff',
+            });
+            await expect(controller.getRun(auth, agentId, runId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(agentRunLogs.findByRun).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('POST /:id/pause + /:id/resume', () => {
+        it('pause logs AGENT_PAUSED with the agent as resource', async () => {
+            service.pause = jest.fn().mockResolvedValue({ id: agentId, status: 'paused' });
+            const result = await controller.pause(auth, agentId);
+            expect(result.status).toBe('paused');
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'agent_paused',
+                    userId: 'u1',
+                    details: expect.objectContaining({ resourceId: agentId }),
+                }),
+            );
+        });
+
+        it('resume logs AGENT_RESUMED', async () => {
+            service.resume = jest.fn().mockResolvedValue({ id: agentId, status: 'active' });
+            const result = await controller.resume(auth, agentId);
+            expect(result.status).toBe('active');
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({ actionType: 'agent_resumed' }),
+            );
+        });
+
+        it('does not log when the transition throws', async () => {
+            service.pause = jest.fn().mockRejectedValue(new ConflictException('raced'));
+            await expect(controller.pause(auth, agentId)).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(activityLog.log).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('GET /:id/events', () => {
+        it('returns paginated lifecycle events scoped to this agent', async () => {
+            activityLog.findAgentEvents.mockResolvedValueOnce({
+                activities: [
+                    {
+                        id: 'evt-1',
+                        actionType: 'agent_paused',
+                        details: { status: 'paused', resourceId: agentId },
+                        createdAt: new Date('2026-01-02T00:00:00Z'),
+                    },
+                ],
+                total: 1,
+            });
+            const result = await controller.listEvents(auth, agentId, { limit: 25, offset: 0 });
+            expect(result.meta).toEqual({ total: 1, limit: 25, offset: 0 });
+            expect(result.data[0]).toMatchObject({ id: 'evt-1', actionType: 'agent_paused' });
+            expect(activityLog.findAgentEvents).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    agentId,
+                    actionTypes: expect.arrayContaining(['agent_paused', 'agent_resumed']),
+                }),
+            );
+        });
+
+        it('returns an empty page when ActivityLogService is unbound', async () => {
+            controller = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                undefined,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+            );
+            const result = await controller.listEvents(auth, agentId, {});
+            expect(result).toEqual({ data: [], meta: { total: 0, limit: 25, offset: 0 } });
         });
     });
 
@@ -316,6 +475,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 exportService,
                 dispatcher,
                 agentRuns,
+                agentRunLogs,
                 skillBindings,
                 pluginUsage,
                 tasks,

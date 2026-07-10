@@ -613,18 +613,16 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
         // ── Render the /ideas catalog ──────────────────────────────────────
         await page.goto('/ideas', { waitUntil: 'domcontentloaded' });
 
-        // The QUEUED Idea is in ACTIONABLE_STATUSES → visible immediately.
+        // The default Status filter is now `all`, so BOTH the actionable
+        // QUEUED Idea and the terminal ACCEPTED Idea are visible on first
+        // load (the catalog no longer hides terminal Ideas by default).
         await expect(page.getByText(queuedDesc).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
 
-        // The ACCEPTED (terminal) Idea is hidden under the default
-        // `actionable` Status filter (accepted ∉ ACTIONABLE_STATUSES).
-        await expect(page.getByText(acceptedDesc).first()).toHaveCount(0);
-
-        // Reveal accepted Ideas via the real filter surface: the page is
-        // server-filtered through a Status <select> (`name="status"`) +
-        // an "Apply" submit, which navigates to `/ideas?status=<value>`.
-        // (There is no client-side "Show accepted" toggle — selecting the
-        // "Accepted" option and applying is how the catalog surfaces them.)
+        // The page is server-filtered through a Status <select>
+        // (`name="status"`) + an "Apply" submit, which navigates to
+        // `/ideas?status=<value>`. Narrowing to "Accepted" keeps the
+        // terminal Idea visible and confirms the filter surface works.
         const statusSelect = page.locator('select[name="status"]');
         await expect(statusSelect).toBeVisible({ timeout: 30_000 });
         await statusSelect.selectOption({ label: 'Accepted' });

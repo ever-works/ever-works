@@ -1,11 +1,11 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { useLocale, useTranslations } from 'next-intl';
-import { formatDistanceToNow } from 'date-fns';
+import { useTranslations } from 'next-intl';
 import type { ActivityLogEntry } from '@/lib/api/activity-log';
 import { formatActivitySummary } from './activity-summary';
 import { ActivityStatusBadge } from './ActivityStatusBadge';
+import { ActivityTimestamp } from './ActivityTimestamp';
 import { ActivityTypeBadge } from './ActivityTypeBadge';
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -13,101 +13,12 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { TerminalLogViewer } from '@/components/works/detail/shared/TerminalLogViewer';
 import type { GenerationStepLog } from '@/lib/api/types-only';
-import { useMounted } from '@/lib/hooks/use-mounted';
 import { CancelGenerationButton } from '@/components/works/detail/generator/CancelGenerationButton';
 
 interface ActivityTableProps {
     activities: ActivityLogEntry[];
     loading: boolean;
     onStopRequested?: () => void;
-}
-
-const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
-const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
-const timeFormatterCache = new Map<string, Intl.DateTimeFormat>();
-
-function formatActivityDateTime(value: string, locale: string) {
-    if (!dateTimeFormatterCache.has(locale)) {
-        dateTimeFormatterCache.set(
-            locale,
-            new Intl.DateTimeFormat(locale, {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-            }),
-        );
-    }
-
-    return dateTimeFormatterCache.get(locale)!.format(new Date(value));
-}
-
-function formatActivityDate(value: string, locale: string) {
-    if (!dateFormatterCache.has(locale)) {
-        dateFormatterCache.set(
-            locale,
-            new Intl.DateTimeFormat(locale, {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-            }),
-        );
-    }
-
-    return dateFormatterCache.get(locale)!.format(new Date(value));
-}
-
-function formatActivityTime(value: string, locale: string) {
-    if (!timeFormatterCache.has(locale)) {
-        timeFormatterCache.set(
-            locale,
-            new Intl.DateTimeFormat(locale, {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-            }),
-        );
-    }
-
-    return timeFormatterCache.get(locale)!.format(new Date(value));
-}
-
-function ActivityTimestamp({
-    value,
-    variant = 'absolute',
-    className,
-}: {
-    value: string;
-    variant?: 'absolute' | 'relative' | 'stacked';
-    className?: string;
-}) {
-    const locale = useLocale();
-    const mounted = useMounted();
-
-    if (!mounted) {
-        return <time dateTime={value} className={className} />;
-    }
-
-    const absoluteValue = formatActivityDateTime(value, locale);
-    const dateValue = formatActivityDate(value, locale);
-    const timeValue = formatActivityTime(value, locale);
-
-    return (
-        <time
-            dateTime={value}
-            title={variant === 'relative' ? absoluteValue : undefined}
-            className={className}
-        >
-            {variant === 'relative' ? (
-                formatDistanceToNow(new Date(value), { addSuffix: true })
-            ) : variant === 'stacked' ? (
-                <span className="inline-flex flex-col leading-4 whitespace-nowrap">
-                    <span>{dateValue}</span>
-                    <span>{timeValue}</span>
-                </span>
-            ) : (
-                absoluteValue
-            )}
-        </time>
-    );
 }
 
 function hasStructuredData(value?: Record<string, unknown>) {
@@ -409,7 +320,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
                                          * new column header order:
                                          *   expander | DATE/TIME | WORK | TYPE | SUMMARY | STATUS
                                          */}
-                                        <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
+                                        <td className="px-4 py-3 text-[11px] text-text-muted dark:text-text-muted-dark whitespace-nowrap">
                                             <ActivityTimestamp
                                                 value={activity.createdAt}
                                                 variant="stacked"

@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { Lightbulb, Settings as SettingsIcon, Search } from 'lucide-react';
+import { Lightbulb, Settings as SettingsIcon, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { buildIdeaAction } from '@/app/actions/dashboard/work-proposals';
 import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { Button } from '@/components/ui/button';
 import {
@@ -54,7 +53,7 @@ const STATUS_FILTER_ORDER: IdeasStatusFilter[] = [
     'done',
 ];
 
-function ideaMatchesFilter(idea: WorkProposal, filter: IdeasStatusFilter = 'actionable'): boolean {
+function ideaMatchesFilter(idea: WorkProposal, filter: IdeasStatusFilter = 'all'): boolean {
     if (filter === 'all') return true;
     if (filter === 'done') return idea.status === 'accepted';
     if (filter === 'actionable') return ACTIONABLE_STATUSES.includes(idea.status);
@@ -97,10 +96,9 @@ export function IdeasPageClient({
     const [draft, setDraft] = useState('');
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [isCreating, startCreating] = useTransition();
-    const [isBuilding, startBuilding] = useTransition();
-    let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'actionable');
+    let [statusFilter, setStatusFilter] = useState<string>(filters?.status ?? 'all');
     useEffect(() => {
-        setStatusFilter(filters?.status ?? 'actionable');
+        setStatusFilter(filters?.status ?? 'all');
     }, [filters?.status]);
 
     const startFromPrompt = useStartFromPrompt();
@@ -146,23 +144,6 @@ export function IdeasPageClient({
                 idea.id === id ? { ...idea, status: 'dismissed' as const } : idea,
             );
             return next.filter((idea) => ideaMatchesFilter(idea, filters?.status));
-        });
-    };
-
-    const handleQueueBuild = (id: string) => {
-        startBuilding(async () => {
-            try {
-                const { idea } = await buildIdeaAction(id);
-                setIdeas((prev) =>
-                    prev
-                        .map((row) => (row.id === id ? idea : row))
-                        .filter((row) => ideaMatchesFilter(row, filters?.status)),
-                );
-                toast.success(t('toasts.ideaQueued'));
-            } catch {
-                // Security: never expose raw error messages (may contain internal details, API keys, stack fragments)
-                toast.error(t('toasts.ideaQueueError'));
-            }
         });
     };
 
@@ -249,6 +230,25 @@ export function IdeasPageClient({
                     testId="ideas-quick-add"
                     onAttachmentsChange={setAttachments}
                 />
+
+                {/* Deterministic, no-AI path. The composer above routes
+                    prompts through the chat AI; this "Or … Create manually"
+                    bar mirrors the /works composer (WorksCreateComposer) and
+                    links to the manual create form at /ideas/new. */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('newPage.or')}
+                    </p>
+                    <Button
+                        href={ROUTES.DASHBOARD_IDEAS_NEW}
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5"
+                    >
+                        <PenLine className="w-3.5 h-3.5" />
+                        {t('newPage.link')}
+                    </Button>
+                </div>
             </div>
 
             <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
@@ -320,10 +320,7 @@ export function IdeasPageClient({
                 </div>
             ) : null}
             {!loadError && ideas.length > 0 ? (
-                <div
-                    className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4"
-                    aria-busy={isBuilding}
-                >
+                <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {ideas
                         .slice()
                         .sort(
@@ -336,7 +333,6 @@ export function IdeasPageClient({
                                 key={idea.id}
                                 proposal={idea}
                                 onDismissed={handleDismissed}
-                                onQueueBuild={handleQueueBuild}
                             />
                         ))}
                 </div>

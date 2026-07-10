@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { ListChecks } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskPriority } from '@/lib/api/tasks';
@@ -31,6 +32,19 @@ type CreateTaskFn = (input: {
  * recurring chips land in a follow-up sub-tick (component is the
  * primitive, the surrounding context wires the picker UIs).
  */
+/**
+ * Slugify the task title into a label: lowercase, spaces (and other
+ * non-alphanumerics) collapse to a single hyphen, with no leading or
+ * trailing hyphens. So "Redesign onboarding flow" → "redesign-onboarding-flow".
+ */
+function slugifyTitle(title: string): string {
+    return title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const t = useTranslations('dashboard.tasksPage.newDialog');
     const router = useRouter();
@@ -39,6 +53,9 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const [description, setDescription] = useState('');
     const [priority, setPriority] = useState<TaskPriority>('p3');
     const [labelsRaw, setLabelsRaw] = useState('');
+    // Once the user edits the Labels field (or a template/URL pre-fills it) we
+    // stop auto-deriving labels from the title so we never clobber their input.
+    const [labelsTouched, setLabelsTouched] = useState(false);
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     // Security: track whether the form was pre-filled from a URL param so we
     // can show a visible notice to the user (guards against phishing deep-links
@@ -51,7 +68,14 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const missionId = searchParams?.get('missionId') || null;
     const ideaId = searchParams?.get('ideaId') || null;
     const scopeCount = [workId, missionId, ideaId].filter(Boolean).length;
-    const scopeLabel = scopeCount === 1 ? (workId ? 'Work' : missionId ? 'Mission' : 'Idea') : null;
+    const scopeKey =
+        scopeCount === 1
+            ? workId
+                ? ('workScopedTask' as const)
+                : missionId
+                  ? ('missionScopedTask' as const)
+                  : ('ideaScopedTask' as const)
+            : null;
 
     // PASS-4 fix: read ?from=<slug> and pre-fill title + description
     // + labels (tags carry over from the template entry). Without
@@ -73,6 +97,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     if (!title) setTitle(entry.title);
                     if (!description && entry.description) setDescription(entry.description);
                     if (!labelsRaw && entry.tags && entry.tags.length > 0) {
+                        setLabelsTouched(true);
                         setLabelsRaw(entry.tags.join(', '));
                     }
                 }
@@ -121,6 +146,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
+    // Until the field is touched, the Labels input mirrors the slugified
+    // title — auto-filling directly as the user types (spaces become "-").
+    const labelsValue = labelsTouched ? labelsRaw : slugifyTitle(title);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) return;
@@ -128,7 +157,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
         startTransition(() => {
             void (async () => {
                 try {
-                    const labels = labelsRaw
+                    const labels = labelsValue
                         .split(',')
                         .map((l) => l.trim())
                         .filter(Boolean);
@@ -143,7 +172,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     });
                     router.push(ROUTES.DASHBOARD_TASK(task.id));
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to create Task');
+                    setError(err instanceof Error ? err.message : t('createError'));
                 }
             })();
         });
@@ -159,9 +188,9 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                     <h1 className="text-xl font-semibold text-text dark:text-text-dark">
                         {t('title')}
                     </h1>
-                    {scopeLabel && (
+                    {scopeKey && (
                         <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5">
-                            {scopeLabel}-scoped task
+                            {t(scopeKey)}
                         </p>
                     )}
                 </div>
@@ -171,17 +200,19 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                 before submitting. */}
             {preFillSource === 'prompt' && (
                 <div className="mb-4 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
-                    This form was pre-filled from a URL link. Review the content before creating the
-                    task.
+                    {t('prefillPromptNotice')}
                 </div>
             )}
             {preFillSource === 'template' && templateSlug && (
                 <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
-                    Pre-filled from template{' '}
-                    <span className="font-medium text-text dark:text-text-dark">
-                        {templateSlug}
-                    </span>
-                    . Review the content before creating the task.
+                    {t.rich('prefillTemplateNotice', {
+                        slug: templateSlug,
+                        name: (chunks) => (
+                            <span className="font-medium text-text dark:text-text-dark">
+                                {chunks}
+                            </span>
+                        )
+                    })}
                 </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -214,17 +245,17 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         <label className="block text-xs text-text-secondary mb-1">
                             {t('priority')}
                         </label>
-                        <select
+                        <Select
                             value={priority}
-                            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            onValueChange={(value) => setPriority(value as TaskPriority)}
+                            size="xs"
                         >
-                            <option value="p0">P0 — urgent</option>
-                            <option value="p1">P1</option>
-                            <option value="p2">P2</option>
-                            <option value="p3">P3 — default</option>
-                            <option value="p4">P4 — low</option>
-                        </select>
+                            <option value="p0">{t('priorityP0')}</option>
+                            <option value="p1">{t('priorityP1')}</option>
+                            <option value="p2">{t('priorityP2')}</option>
+                            <option value="p3">{t('priorityP3')}</option>
+                            <option value="p4">{t('priorityP4')}</option>
+                        </Select>
                     </div>
                     <div>
                         <label className="block text-xs text-text-secondary mb-1">
@@ -232,8 +263,11 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         </label>
                         <input
                             type="text"
-                            value={labelsRaw}
-                            onChange={(e) => setLabelsRaw(e.target.value)}
+                            value={labelsValue}
+                            onChange={(e) => {
+                                setLabelsTouched(true);
+                                setLabelsRaw(e.target.value);
+                            }}
                             placeholder={t('labelsPlaceholder')}
                             className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
                         />

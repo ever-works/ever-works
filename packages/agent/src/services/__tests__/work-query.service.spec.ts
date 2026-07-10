@@ -20,6 +20,7 @@ describe('WorkQueryService', () => {
         workRepository = {
             findAllAccessible: jest.fn(),
             countAllAccessible: jest.fn(),
+            existsByUserAndSlug: jest.fn(),
         };
         workMemberRepository = {
             getAccessibleWorkIds: jest.fn(),
@@ -159,6 +160,43 @@ describe('WorkQueryService', () => {
                 userRole: WorkMemberRole.OWNER,
             }),
         );
+    });
+
+    describe('checkSlugAvailability', () => {
+        it('reports a free slug as available, scoped to the user', async () => {
+            workRepository.existsByUserAndSlug.mockResolvedValue(false);
+
+            const result = await service.checkSlugAvailability('My Awesome Tools', user);
+
+            expect(workRepository.existsByUserAndSlug).toHaveBeenCalledWith(
+                user.id,
+                'my-awesome-tools',
+            );
+            expect(result).toEqual({ available: true, slug: 'my-awesome-tools' });
+        });
+
+        it('returns the first free `<slug>-N` suggestion when taken', async () => {
+            // base + "-2" taken, "-3" free
+            workRepository.existsByUserAndSlug.mockImplementation(
+                async (_userId: string, slug: string) =>
+                    slug === 'awesome-tools' || slug === 'awesome-tools-2',
+            );
+
+            const result = await service.checkSlugAvailability('awesome-tools', user);
+
+            expect(result).toEqual({
+                available: false,
+                slug: 'awesome-tools',
+                suggestion: 'awesome-tools-3',
+            });
+        });
+
+        it('treats an empty/symbol-only slug as unavailable without hitting the repo', async () => {
+            const result = await service.checkSlugAvailability('***', user);
+
+            expect(workRepository.existsByUserAndSlug).not.toHaveBeenCalled();
+            expect(result).toEqual({ available: false, slug: '' });
+        });
     });
 
     it('returns the authoritative website repository initialization state on getWork', async () => {

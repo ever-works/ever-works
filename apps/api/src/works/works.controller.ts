@@ -307,6 +307,33 @@ export class WorksController {
         };
     }
 
+    @Get('works/check-slug')
+    @HttpCode(HttpStatus.OK)
+    // Live slug-availability check for the create-Work form (GitHub-style
+    // "repository name" check). Throttled because the form fires it on a
+    // debounced keystroke; the per-IP envelope is generous enough for normal
+    // typing but caps abuse. Declared BEFORE `GET works/:id` so the static
+    // `check-slug` segment isn't swallowed by the `:id` param route.
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Check work slug availability',
+        description:
+            'Checks whether the given slug is free for the authenticated user (Work slugs are unique per user). Returns the normalized slug and, when taken, a free `<slug>-N` suggestion.',
+    })
+    @ApiQuery({ name: 'slug', type: String, required: true })
+    @ApiResponse({ status: 200, description: 'Slug availability result' })
+    @ApiResponse({ status: 400, description: 'Missing slug query parameter' })
+    async checkWorkSlug(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('slug') slug?: string,
+    ): Promise<{ available: boolean; slug: string; suggestion?: string }> {
+        if (!slug || slug.trim().length === 0) {
+            throw new BadRequestException('Missing required `slug` query parameter');
+        }
+        const user = await this.authService.getUser(auth.userId);
+        return this.workQueryService.checkSlugAvailability(slug, user);
+    }
+
     @Post('works')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Create work', description: 'Create a new work' })

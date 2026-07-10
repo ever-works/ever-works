@@ -1,4 +1,4 @@
-name: Build and Publish Docker Images Prod
+﻿name: Build and Publish Docker Images Prod
 
 on:
   push:
@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   ever-works-api:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,7 +76,7 @@ jobs:
       # DigitalOcean is the registry k8s pulls the runtime image from, so the
       # doctl auth + DO push below are FATAL (no continue-on-error): a silent
       # failure would ship a stale :latest as a "green" build (incident
-      # 2026-06-12 — expired DO token → prod served the prior build). The
+      # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
       # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
 
@@ -115,7 +115,7 @@ jobs:
     #      docker push ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-api:latest
 
   ever-works-web:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -146,7 +146,7 @@ jobs:
             registry.digitalocean.com/ever/ever-works-web:latest
           cache-from: type=registry,ref=ghcr.io/ever-works/ever-works-web:latest
           cache-to: type=inline
-          # NEXT_PUBLIC_* must be passed at BUILD time — Next.js bakes them
+          # NEXT_PUBLIC_* must be passed at BUILD time â€” Next.js bakes them
           # into the client bundle at `next build`, not at container start.
           # Reuses the existing POSTHOG_* secrets (same phc_* key, same host).
           build-args: |
@@ -178,7 +178,7 @@ jobs:
       # DigitalOcean is the registry k8s pulls the runtime image from, so the
       # doctl auth + DO push below are FATAL (no continue-on-error): a silent
       # failure would ship a stale :latest as a "green" build (incident
-      # 2026-06-12 — expired DO token → prod served the prior build). The
+      # 2026-06-12 â€” expired DO token â†’ prod served the prior build). The
       # DockerHub/CW mirrors above stay best-effort by design.
       - name: Install doctl
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
@@ -214,3 +214,4 @@ jobs:
     #  - name: Push to CW Registry
     #    run: |
     #      docker push ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-web:latest
+

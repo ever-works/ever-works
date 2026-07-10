@@ -85,6 +85,8 @@ export const ROUTES = {
     // gears menu deep-linking to the auto-generate/auto-build
     // settings anchors from Phase 4 PR L / PR EE.
     DASHBOARD_IDEAS: '/ideas',
+    DASHBOARD_IDEAS_NEW: '/ideas/new',
+    DASHBOARD_IDEA: (id: string) => `/ideas/${id}`,
     DASHBOARD_WORKS: '/works',
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
@@ -129,6 +131,7 @@ export const ROUTES = {
     DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
     // Skills
     DASHBOARD_SKILLS: '/skills',
+    DASHBOARD_SKILL_NEW: '/skills/new',
     DASHBOARD_SKILL: (id: string) => `/skills/${id}`,
     // Phase 18.6 — Skills templates browser (ADR-010 scaffold).
     DASHBOARD_SKILL_TEMPLATES: '/skills/templates',

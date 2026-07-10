@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",
+                "noDescription": "Nog geen beschrijving",
                 "kanban": "Kanban",
                 "list": "Lijst",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Prioriteit",
                 "labels": "Labels",
                 "labelsPlaceholder": "komma-gescheiden",
+                "workScopedTask": "Taak beperkt tot een Work",
+                "missionScopedTask": "Taak beperkt tot een Mission",
+                "ideaScopedTask": "Taak beperkt tot een Idea",
+                "prefillPromptNotice": "Dit formulier is vooraf ingevuld vanuit een URL-link. Controleer de inhoud voordat je de taak aanmaakt.",
+                "prefillTemplateNotice": "Vooraf ingevuld vanuit sjabloon <name>{slug}</name>. Controleer de inhoud voordat je de taak aanmaakt.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — standaard",
+                "priorityP4": "P4 — laag",
+                "createError": "Taak aanmaken mislukt",
                 "cancel": "Annuleren",
                 "create": "Maken"
             },
@@ -680,8 +692,25 @@
                 "browse": "Bladeren",
                 "uploading": "Uploaden...",
                 "detach": "Loskoppelen",
+                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Maak een taak vanuit een Work om bestanden toe te voegen.",
                 "labels": "Labels",
-                "edited": "bewerkt"
+                "edited": "bewerkt",
+                "description": "Beschrijving",
+                "edit": "Bewerken",
+                "save": "Opslaan",
+                "cancel": "Annuleren",
+                "descriptionPlaceholder": "Voeg een beschrijving toe…",
+                "noDescription": "Geen beschrijving opgegeven.",
+                "saveDescriptionError": "Beschrijving opslaan mislukt",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Prioriteit",
+                "scope": "Scope",
+                "created": "Aangemaakt",
+                "updated": "Bijgewerkt",
+                "scopeWork": "Werk",
+                "scopeMission": "Missie",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Terugkerend schema",
@@ -705,6 +734,13 @@
                 "blocked": "Geblokkeerd",
                 "done": "Klaar",
                 "cancelled": "Geannuleerd"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Hoog",
+                "p2": "Gemiddeld",
+                "p3": "Normaal",
+                "p4": "Laag"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "Vaardigheden komen in een latere fase van de Agents/Skills/Tasks uitrol. De pagina is gereserveerd zodat de zijbalk navigatie route werkt."
             },
             "list": {
-                "newSkill": "+ Nieuwe Vaardigheid",
+                "newSkill": "Nieuwe Vaardigheid",
                 "filter": {
                     "scope": "Scope",
                     "all": "Alle"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "Help & bronnen",
                 "subtitle": "Snelle tips en nuttige links om aan de slag te gaan",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Sneltoetsen",
+                    "faq": "FAQ",
+                    "resources": "Bronnen"
+                },
                 "onboarding": {
                     "title": "Ingebruikname",
                     "description": "Open de begeleide setup op elk moment opnieuw en ga verder waar je gebleven was.",
@@ -935,7 +978,8 @@
                     "title": "Snelle tips",
                     "tip1": "Maak je eerste werk door op de knop 'Werk maken' op het dashboard te klikken.",
                     "tip2": "Gebruik de AI-generator om je werk automatisch te vullen met relevante items.",
-                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren."
+                    "tip3": "Verbind je GitHub-account om je werken te synchroniseren en als repositories te implementeren.",
+                    "tip4": "Druk op elk moment op ? om dit Help & Bronnen-paneel opnieuw te openen."
                 },
                 "shortcuts": {
                     "title": "Toetsenbord-snelkoppelingen",
@@ -949,9 +993,39 @@
                     "github": "GitHub-repository",
                     "issues": "Probleem melden",
                     "docs": "Documentatie",
-                    "comingSoon": "Binnenkort beschikbaar"
+                    "comingSoon": "Binnenkort beschikbaar",
+                    "community": "Community-discussies"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Meer hulp nodig?",
+                    "description": "Raadpleeg de documentatie of vraag het de community — we reageren meestal snel.",
+                    "action": "Doe mee aan de discussie"
+                },
+                "faq": {
+                    "title": "Veelgestelde vragen",
+                    "q1": "Hoe werkt AI-generatie?",
+                    "a1": "Het verloopt als een korte, begeleide pijplijn:",
+                    "a1s1": "Beschrijf je Work: het onderwerp, publiek en doel.",
+                    "a1s2": "De AI onderzoekt bronnen en stelt items, categorieën en tags op.",
+                    "a1s3": "Bekijk en bewerk of genereer alles opnieuw vóór publicatie.",
+                    "q2": "Hoe verbind ik GitHub?",
+                    "a2": "Verbind het om je works als repository’s te synchroniseren en te implementeren:",
+                    "a2s1": "Open Instellingen → Integraties en klik op Verbinden bij GitHub.",
+                    "a2s2": "Autoriseer Ever Works en kies een account of organisatie.",
+                    "a2s3": "Kies de repository om te synchroniseren of implementeren vanuit je Work.",
+                    "q3": "Kan ik items bewerken na het genereren?",
+                    "a3": "Ja — elk item blijft volledig bewerkbaar:",
+                    "a3s1": "Open het item om titel, inhoud of metadata te bewerken.",
+                    "a3s2": "Of genereer één item opnieuw voor een nieuw AI-concept.",
+                    "a3s3": "Sla op en je wijzigingen worden direct toegepast.",
+                    "learnMore": "Meer informatie"
+                },
+                "system": {
+                    "title": "Systeem",
+                    "operational": "Alle systemen operationeel",
+                    "environment": "Omgeving"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "Werk aanmaken"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten voor deze Work",
+                "emptyTitle": "Nog geen Agenten",
+                "emptySubtitle": "Maak een Agent om deze Work te automatiseren.",
+                "pause": "Agent pauzeren",
+                "activate": "Agent activeren",
+                "pausedToast": "Agent gepauzeerd",
+                "activatedToast": "Agent geactiveerd",
+                "statusUpdateFailed": "Status kon niet worden bijgewerkt",
+                "newAgent": "Nieuwe Agent",
+                "moreAgents": "+{count} meer"
+            },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
             "generationCancelled": "Generatie is geannuleerd",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "bijv. Awesome AI Tools",
                 "workNameHelp": "AI stelt een naam voor als je dit leeg laat",
                 "promptLabel": "Beschrijf je werk",
+                "slugChecking": "Beschikbaarheid controleren…",
+                "slugAvailable": "{slug} is beschikbaar",
+                "slugTakenName": "{slug} bestaat al in je werken",
+                "slugUseSuggestion": "{suggestion} gebruiken",
+                "slugCheckError": "Kon beschikbaarheid niet controleren — je kunt toch doorgaan",
                 "githubRequired": "Verbind eerst je GitHub-account.",
                 "promptPlaceholder": "Beschrijf welk soort werk je wilt aanmaken, welke items het moet bevatten en eventuele specifieke eisen...",
                 "inspirationText": "Inspiratie nodig? Probeer een van deze:",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Maak een collectie van duurzame mode-merken"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Maak een directory van zelf te hosten, open-source alternatieven voor populaire SaaS-tools"
+                    },
+                    "5": {
+                        "name": "AI-Coding-Agents",
+                        "prompt": "Maak een gecureerde directory van AI-coding-agents en -assistenten met prijzen en IDE-ondersteuning"
+                    },
+                    "6": {
+                        "name": "Tools voor Indie Makers",
+                        "prompt": "Bouw een werk dat tools en diensten voor indie makers en solo-oprichters catalogiseert"
+                    },
+                    "7": {
+                        "name": "Ontwerp-inspiratie",
+                        "prompt": "Maak een collectie van ontwerp-inspiratiesites voor landingspagina's en portfolio's"
                     }
                 },
                 "featuresTitle": "Wat AI voor je doet:",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} niet geconfigureerd. Ga naar Instellingen → Plugins om in te stellen voor genereren.",
                     "nameRequired": "Werk-naam is verplicht",
                     "slugRequired": "Werk-slug is verplicht",
+                    "slugTaken": "Deze slug bestaat al in je werken. Kies een andere.",
                     "descriptionRequired": "Werk-beschrijving is verplicht",
                     "githubRequired": "Verbind eerst je GitHub-account.",
                     "createFailed": "Fout bij aanmaken werk"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Dit idee is niet meer beschikbaar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "Elke status",
                 "apply": "Toepassen",
                 "reset": "Herstellen"
+            },
+            "newPage": {
+                "link": "Handmatig aanmaken",
+                "or": "Of",
+                "title": "Nieuwe Idea",
+                "subtitle": "Schrijf je eigen Idea. Beschrijf het Work dat je wilt maken — je kunt het daarna in de wachtrij zetten om te bouwen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optioneel — laat leeg om het uit de beschrijving af te leiden",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Beschrijf het Work dat deze Idea moet worden — bijv. “Een samengestelde directory van open-source AI-agentframeworks, geordend op frameworktype en licentie.”",
+                "descriptionHint": "Minstens 10 tekens.",
+                "cancel": "Annuleren",
+                "create": "Idea aanmaken",
+                "creating": "Aanmaken…",
+                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
+                "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             }
         },
         "discover": {

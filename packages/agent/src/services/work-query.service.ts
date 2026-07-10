@@ -245,6 +245,60 @@ export class WorkQueryService {
         return this.workRepository.existsByUserAndSlug(user.id, slug);
     }
 
+    /**
+     * Live slug-availability check for the create-Work form (mirrors the
+     * GitHub "create a new repository" name check). Work slugs are unique
+     * **per user**, so the lookup is scoped to `user.id`. Returns the
+     * normalized slug we actually checked plus, when taken, a free
+     * `<slug>-N` suggestion the UI can offer as a one-click fix.
+     */
+    async checkSlugAvailability(
+        rawSlug: string,
+        user: User,
+    ): Promise<{ available: boolean; slug: string; suggestion?: string }> {
+        const slug = this.normalizeSlug(rawSlug);
+        if (!slug) {
+            return { available: false, slug: '' };
+        }
+
+        const exists = await this.workRepository.existsByUserAndSlug(user.id, slug);
+        if (!exists) {
+            return { available: true, slug };
+        }
+
+        // Suggest the first free `<slug>-N`. Bounded probing keeps this to a
+        // handful of cheap COUNT lookups; the deterministic suffix loop falls
+        // back to a base36-timestamp suffix so we always hand back something
+        // unique even in the (degenerate) case where -2..-20 are all taken.
+        let suggestion: string | undefined;
+        for (let i = 2; i <= 20; i += 1) {
+            const candidate = `${slug}-${i}`;
+            if (!(await this.workRepository.existsByUserAndSlug(user.id, candidate))) {
+                suggestion = candidate;
+                break;
+            }
+        }
+        if (!suggestion) {
+            suggestion = `${slug}-${Date.now().toString(36)}`;
+        }
+
+        return { available: false, slug, suggestion };
+    }
+
+    /**
+     * Browser-side `slugifyForWork` (WorkAICreator) mirror — lowercase
+     * letters + digits, hyphen-joined, leading/trailing hyphens stripped.
+     * Kept in sync so the slug we availability-check is exactly the slug the
+     * form will submit.
+     */
+    private normalizeSlug(value: string): string {
+        return (value ?? '')
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    }
+
     async workItems(workId: string, user: User) {
         // Any access level can view items
         const { work } = await this.ownershipService.ensureCanView(workId, user.id);

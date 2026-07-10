@@ -1,4 +1,4 @@
-name: K8s Plugin E2E
+﻿name: K8s Plugin E2E
 
 # Spins up a kind cluster and runs `@ever-works/k8s-plugin`'s e2e suite
 # (`packages/plugins/k8s/src/__tests__/e2e/`) against it. The unit suite
@@ -12,7 +12,7 @@ name: K8s Plugin E2E
 # Scope: only the release branches stage / main, and only when files
 # that could affect the runtime path change. PR and develop triggers
 # were removed in 2026-05-27 (see
-# Workspace/knowledge/runbooks/CI_RELEASE_GATES.md) — kind-cluster
+# Workspace/knowledge/runbooks/CI_RELEASE_GATES.md) â€” kind-cluster
 # provisioning is expensive, so we restrict to release gates.
 
 on:
@@ -29,7 +29,7 @@ permissions:
 
 concurrency:
   # On stage/main the workflow can take 5+ minutes to spin up the kind
-  # cluster — if a second push lands while the first is still in setup,
+  # cluster â€” if a second push lands while the first is still in setup,
   # cancelling it shows "FAILURE" after 2-3 seconds, indistinguishable
   # from a real test failure unless you click into the logs. Let
   # branch-push runs finish so their result is a real signal.
@@ -38,17 +38,17 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
         # Each Kubernetes version we want to keep working. kind images
-        # come from kubernetes-sigs/kind release notes — bump versions
+        # come from kubernetes-sigs/kind release notes â€” bump versions
         # here when we promote a new floor.
         kubernetes:
           - { version: 'v1.28', image: 'kindest/node:v1.28.15' }
           - { version: 'v1.30', image: 'kindest/node:v1.30.13' }
-        # Whether ingress-nginx is installed in the cluster — exercises
+        # Whether ingress-nginx is installed in the cluster â€” exercises
         # both the "no ingress controller" and "nginx detected" paths
         # in `validateConnection.listIngressClasses`.
         ingress: [false, true]
@@ -91,7 +91,7 @@ jobs:
 
       - name: Install ingress-nginx
         if: matrix.ingress == true
-        # Pin to a specific controller release tag — using `main` makes
+        # Pin to a specific controller release tag â€” using `main` makes
         # the cluster state non-deterministic across runs (a breaking
         # change merged to main would silently alter behaviour without a
         # diff in this repo). Bump this tag deliberately when promoting
@@ -104,7 +104,7 @@ jobs:
           kubectl wait --namespace ingress-nginx \
               --for=condition=ready pod \
               --selector=app.kubernetes.io/component=controller \
-              --timeout=180s || echo "ingress-nginx not Ready in time — continuing anyway, IngressClass should still resolve"
+              --timeout=180s || echo "ingress-nginx not Ready in time â€” continuing anyway, IngressClass should still resolve"
 
       - name: Export kubeconfig for e2e suite
         run: |
@@ -134,3 +134,4 @@ jobs:
       - name: Tear down kind cluster
         if: always()
         run: kind delete cluster --name ever-works-e2e || true
+

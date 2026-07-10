@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Task mới",
+                "noDescription": "Chưa có mô tả",
                 "kanban": "Kanban",
                 "list": "Danh sách",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Ưu tiên",
                 "labels": "Nhãn",
                 "labelsPlaceholder": "phân cách bằng dấu phẩy",
+                "workScopedTask": "Nhiệm vụ giới hạn trong Work",
+                "missionScopedTask": "Nhiệm vụ giới hạn trong Mission",
+                "ideaScopedTask": "Nhiệm vụ giới hạn trong Idea",
+                "prefillPromptNotice": "Biểu mẫu này đã được điền sẵn từ một liên kết URL. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "prefillTemplateNotice": "Được điền sẵn từ mẫu <name>{slug}</name>. Hãy xem lại nội dung trước khi tạo nhiệm vụ.",
+                "priorityP0": "P0 — khẩn cấp",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — mặc định",
+                "priorityP4": "P4 — thấp",
+                "createError": "Không thể tạo nhiệm vụ",
                 "cancel": "Hủy",
                 "create": "Tạo"
             },
@@ -680,8 +692,25 @@
                 "browse": "Duyệt",
                 "uploading": "Đang tải lên...",
                 "detach": "Tách",
+                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
                 "labels": "Nhãn",
-                "edited": "đã chỉnh sửa"
+                "edited": "đã chỉnh sửa",
+                "description": "Mô tả",
+                "edit": "Chỉnh sửa",
+                "save": "Lưu",
+                "cancel": "Hủy",
+                "descriptionPlaceholder": "Thêm mô tả…",
+                "noDescription": "Chưa có mô tả.",
+                "saveDescriptionError": "Không thể lưu mô tả",
+                "details": "Chi tiết",
+                "status": "Trạng thái",
+                "priority": "Ưu tiên",
+                "scope": "Phạm vi",
+                "created": "Đã tạo",
+                "updated": "Đã cập nhật",
+                "scopeWork": "Công việc",
+                "scopeMission": "Nhiệm vụ",
+                "scopeIdea": "Ý tưởng"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -705,6 +734,13 @@
                 "blocked": "Bị chặn",
                 "done": "Hoàn thành",
                 "cancelled": "Đã hủy"
+            },
+            "priority": {
+                "p0": "Khẩn cấp",
+                "p1": "Cao",
+                "p2": "Trung bình",
+                "p3": "Bình thường",
+                "p4": "Thấp"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "Skills sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
             },
             "list": {
-                "newSkill": "+ Skill mới",
+                "newSkill": "Skill mới",
                 "filter": {
                     "scope": "Phạm vi",
                     "all": "Tất cả"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ý tưởng này không còn khả dụng."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "Trợ giúp & Tài nguyên",
                 "subtitle": "Mẹo nhanh và liên kết hữu ích để giúp bạn bắt đầu",
+                "tabs": {
+                    "tips": "Mẹo",
+                    "shortcuts": "Phím tắt",
+                    "faq": "FAQ",
+                    "resources": "Tài nguyên"
+                },
                 "onboarding": {
                     "title": "Hướng dẫn",
                     "description": "Mở lại thiết lập hướng dẫn bất cứ lúc nào và tiếp tục từ nơi bạn dừng lại.",
@@ -935,7 +978,8 @@
                     "title": "Mẹo Nhanh",
                     "tip1": "Tạo công việc đầu tiên bằng cách nhấp vào nút 'Tạo Công việc' trên bảng điều khiển.",
                     "tip2": "Sử dụng trình tạo AI để tự động điền công việc của bạn với các mục liên quan.",
-                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ."
+                    "tip3": "Kết nối tài khoản GitHub của bạn để đồng bộ và triển khai các công việc của bạn dưới dạng kho lưu trữ.",
+                    "tip4": "Nhấn ? bất cứ lúc nào để mở lại bảng Trợ giúp & Tài nguyên này."
                 },
                 "shortcuts": {
                     "title": "Phím Tắt Bàn Phím",
@@ -949,9 +993,39 @@
                     "github": "Kho GitHub",
                     "issues": "Báo cáo Sự cố",
                     "docs": "Tài liệu",
-                    "comingSoon": "Sắp ra mắt"
+                    "comingSoon": "Sắp ra mắt",
+                    "community": "Thảo luận cộng đồng"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Cần thêm trợ giúp?",
+                    "description": "Xem tài liệu hoặc hỏi cộng đồng — chúng tôi thường phản hồi nhanh.",
+                    "action": "Tham gia thảo luận"
+                },
+                "faq": {
+                    "title": "Câu hỏi thường gặp",
+                    "q1": "Tạo nội dung bằng AI hoạt động thế nào?",
+                    "a1": "Nó chạy như một quy trình hướng dẫn ngắn:",
+                    "a1s1": "Mô tả Work của bạn — chủ đề, đối tượng và mục tiêu.",
+                    "a1s2": "AI nghiên cứu nguồn và soạn các mục, danh mục và thẻ.",
+                    "a1s3": "Xem lại, rồi chỉnh sửa hoặc tạo lại bất kỳ thứ gì trước khi xuất bản.",
+                    "q2": "Làm cách nào để kết nối GitHub?",
+                    "a2": "Kết nối để đồng bộ và triển khai works dưới dạng kho lưu trữ:",
+                    "a2s1": "Mở Cài đặt → Tích hợp và nhấp Kết nối ở GitHub.",
+                    "a2s2": "Cấp quyền cho Ever Works và chọn tài khoản hoặc tổ chức.",
+                    "a2s3": "Chọn kho lưu trữ để đồng bộ hoặc triển khai từ Work của bạn.",
+                    "q3": "Tôi có thể chỉnh sửa các mục sau khi tạo không?",
+                    "a3": "Có — mọi mục vẫn có thể chỉnh sửa hoàn toàn:",
+                    "a3s1": "Mở mục để chỉnh sửa tiêu đề, nội dung hoặc siêu dữ liệu.",
+                    "a3s2": "Hoặc tạo lại một mục để có bản nháp AI mới.",
+                    "a3s3": "Lưu lại và thay đổi của bạn được áp dụng ngay.",
+                    "learnMore": "Tìm hiểu thêm"
+                },
+                "system": {
+                    "title": "Hệ thống",
+                    "operational": "Tất cả hệ thống đang hoạt động",
+                    "environment": "Môi trường"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "Tạo công việc"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents của Công việc này",
+                "emptyTitle": "Chưa có Agent nào",
+                "emptySubtitle": "Tạo một Agent để tự động hóa Công việc này.",
+                "pause": "Tạm dừng Agent",
+                "activate": "Kích hoạt Agent",
+                "pausedToast": "Đã tạm dừng Agent",
+                "activatedToast": "Đã kích hoạt Agent",
+                "statusUpdateFailed": "Không thể cập nhật trạng thái",
+                "newAgent": "Agent mới",
+                "moreAgents": "+{count} khác"
+            },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
             "generationCancelled": "Tạo đã bị hủy",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "ví dụ: Awesome AI Tools",
                 "workNameHelp": "AI sẽ gợi ý tên nếu bạn để trống",
                 "promptLabel": "Mô Tả Công Việc Của Bạn",
+                "slugChecking": "Đang kiểm tra tính khả dụng…",
+                "slugAvailable": "{slug} khả dụng",
+                "slugTakenName": "{slug} đã tồn tại trong các công việc của bạn",
+                "slugUseSuggestion": "Dùng {suggestion}",
+                "slugCheckError": "Không thể kiểm tra tính khả dụng — bạn vẫn có thể tiếp tục",
                 "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                 "promptPlaceholder": "Mô tả loại công việc bạn muốn tạo, các mục nó nên chứa và bất kỳ yêu cầu cụ thể nào...",
                 "inspirationText": "Cần cảm hứng? Thử một trong số này:",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "Thời Trang Bền Vững",
                         "prompt": "Tạo bộ sưu tập các thương hiệu thời trang bền vững"
+                    },
+                    "4": {
+                        "name": "Ứng Dụng Tự Lưu Trữ",
+                        "prompt": "Tạo một thư mục các lựa chọn thay thế mã nguồn mở tự lưu trữ cho các công cụ SaaS phổ biến"
+                    },
+                    "5": {
+                        "name": "Tác Nhân AI Lập Trình",
+                        "prompt": "Tạo một thư mục được biên tập các tác nhân và trợ lý AI lập trình kèm giá và hỗ trợ IDE"
+                    },
+                    "6": {
+                        "name": "Công Cụ Cho Nhà Phát Triển Indie",
+                        "prompt": "Xây dựng công việc liệt kê các công cụ và dịch vụ cho nhà phát triển indie và nhà sáng lập độc lập"
+                    },
+                    "7": {
+                        "name": "Cảm Hứng Thiết Kế",
+                        "prompt": "Tạo bộ sưu tập các trang cảm hứng thiết kế cho landing page và portfolio"
                     }
                 },
                 "featuresTitle": "AI sẽ làm gì cho bạn:",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} chưa được cấu hình. Truy cập Cài Đặt → Plugins để thiết lập trước khi tạo.",
                     "nameRequired": "Tên công việc là bắt buộc",
                     "slugRequired": "Slug công việc là bắt buộc",
+                    "slugTaken": "Slug này đã tồn tại trong các công việc của bạn. Hãy chọn slug khác.",
                     "descriptionRequired": "Mô tả công việc là bắt buộc",
                     "githubRequired": "Vui lòng kết nối tài khoản GitHub của bạn trước.",
                     "createFailed": "Tạo công việc thất bại"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ý tưởng này không còn khả dụng."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "newPage": {
+                "link": "Tạo thủ công",
+                "or": "Hoặc",
+                "title": "Idea mới",
+                "subtitle": "Viết Idea của riêng bạn. Mô tả Work bạn muốn tạo — sau đó bạn có thể đưa vào hàng đợi để dựng.",
+                "nameLabel": "Tiêu đề",
+                "namePlaceholder": "Tùy chọn — để trống để tự suy ra từ mô tả",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Mô tả Work mà Idea này sẽ trở thành — ví dụ “Một thư mục được tuyển chọn về các framework agent AI nguồn mở, sắp xếp theo loại framework và giấy phép.”",
+                "descriptionHint": "Ít nhất 10 ký tự.",
+                "cancel": "Hủy",
+                "create": "Tạo Idea",
+                "creating": "Đang tạo…",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "error": "Không thể tạo Idea. Vui lòng thử lại."
             }
         },
         "discover": {
