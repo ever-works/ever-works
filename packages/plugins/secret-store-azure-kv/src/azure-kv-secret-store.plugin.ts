@@ -1,10 +1,4 @@
-import type {
-	IPlugin,
-	ISecretStoreProvider,
-	JsonSchema,
-	PluginCategory,
-	PluginContext
-} from '@ever-works/plugin';
+import type { IPlugin, ISecretStoreProvider, JsonSchema, PluginCategory, PluginContext } from '@ever-works/plugin';
 import { SECRET_STORE_CAPABILITIES } from '@ever-works/plugin';
 
 /**
@@ -80,9 +74,7 @@ export class AzureKvSecretStorePlugin implements IPlugin, ISecretStoreProvider {
 	async resolveSecret(pointer: string): Promise<Record<string, unknown> | null> {
 		if (!pointer.startsWith('azure-kv:')) {
 			const scheme = pointer.split(':', 1)[0] ?? 'unknown';
-			this.warn(
-				`AzureKvSecretStorePlugin: pointer scheme "${scheme}:" not handled. Returning null (fail-open).`
-			);
+			this.warn(`AzureKvSecretStorePlugin: pointer scheme "${scheme}:" not handled. Returning null (fail-open).`);
 			return null;
 		}
 
@@ -98,9 +90,7 @@ export class AzureKvSecretStorePlugin implements IPlugin, ISecretStoreProvider {
 		const vaultName = rest.slice(0, slashIdx);
 		const secretName = rest.slice(slashIdx + 1);
 		if (!vaultName || !secretName) {
-			this.warn(
-				`AzureKvSecretStorePlugin: empty vaultName or secretName in "${pointer}". Returning null.`
-			);
+			this.warn(`AzureKvSecretStorePlugin: empty vaultName or secretName in "${pointer}". Returning null.`);
 			return null;
 		}
 

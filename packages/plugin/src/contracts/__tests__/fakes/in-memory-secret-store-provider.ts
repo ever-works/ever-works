@@ -60,8 +60,6 @@ export class InMemorySecretStoreProvider implements ISecretStoreProvider {
 	}
 }
 
-export function createInMemorySecretStoreProvider(
-	seed: InMemorySecretStoreSeed = {}
-): InMemorySecretStoreProvider {
+export function createInMemorySecretStoreProvider(seed: InMemorySecretStoreSeed = {}): InMemorySecretStoreProvider {
 	return new InMemorySecretStoreProvider(seed);
 }

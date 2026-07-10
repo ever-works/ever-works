@@ -115,10 +115,7 @@ export const workGenerationTask = task<'work-generation', WorkGenerationPayload>
                 // so an operator can spot drained runs at a glance.
                 if (payload.triggerSource === 'schedule' && payload.scheduleId) {
                     const scheduleService = appContext.get(WorkScheduleService);
-                    await scheduleService.markRunFailed(
-                        payload.scheduleId,
-                        'credentials-drained',
-                    );
+                    await scheduleService.markRunFailed(payload.scheduleId, 'credentials-drained');
                 }
                 return {
                     status: 'skipped' as const,

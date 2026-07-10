@@ -135,9 +135,9 @@ describe('TenantJobRuntimeController (integration)', () => {
     describe('tenant gate', () => {
         it('refuses GET /config with 403 when caller has no tenant (null)', async () => {
             const { controller } = await bootstrap();
-            await expect(controller.getConfig(buildAuth({ tenantId: null }))).rejects.toBeInstanceOf(
-                ForbiddenException,
-            );
+            await expect(
+                controller.getConfig(buildAuth({ tenantId: null })),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it('refuses PUT /config with 403 when tenantId is the empty string', async () => {
@@ -152,23 +152,23 @@ describe('TenantJobRuntimeController (integration)', () => {
 
         it('refuses POST /rotate with 403 when tenantId is missing', async () => {
             const { controller } = await bootstrap();
-            await expect(controller.rotateCredential(buildAuth({ tenantId: null }))).rejects.toBeInstanceOf(
-                ForbiddenException,
-            );
+            await expect(
+                controller.rotateCredential(buildAuth({ tenantId: null })),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it('refuses POST /force-invalidate with 403 when tenantId is missing', async () => {
             const { controller } = await bootstrap();
-            await expect(controller.forceInvalidate(buildAuth({ tenantId: null }))).rejects.toBeInstanceOf(
-                ForbiddenException,
-            );
+            await expect(
+                controller.forceInvalidate(buildAuth({ tenantId: null })),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it('refuses DELETE /config with 403 when tenantId is missing', async () => {
             const { controller } = await bootstrap();
-            await expect(controller.revertToInherit(buildAuth({ tenantId: null }))).rejects.toBeInstanceOf(
-                ForbiddenException,
-            );
+            await expect(
+                controller.revertToInherit(buildAuth({ tenantId: null })),
+            ).rejects.toBeInstanceOf(ForbiddenException);
         });
 
         it('refuses GET /available-providers with 403 when tenantId is missing', async () => {
@@ -257,7 +257,11 @@ describe('TenantJobRuntimeController (integration)', () => {
         it('inherit-mode persisted row reports hasCredentials=false and null redaction', async () => {
             const { controller, configRepo } = await bootstrap();
             configRepo.findOne.mockResolvedValue(
-                buildConfigRow({ mode: 'inherit', credentialsSecretRef: null, credentialVersion: 5 }),
+                buildConfigRow({
+                    mode: 'inherit',
+                    credentialsSecretRef: null,
+                    credentialVersion: 5,
+                }),
             );
             const result = await controller.getConfig(buildAuth());
             expect(result.mode).toBe('inherit');
@@ -474,7 +478,9 @@ describe('TenantJobRuntimeController (integration)', () => {
         it('passes the authenticated tenantId to CredentialVersionService.bumpVersion', async () => {
             const { controller, configRepo, credentialVersionService } = await bootstrap();
             const tenantId = randomUUID();
-            configRepo.findOne.mockResolvedValue(buildConfigRow({ tenantId, credentialVersion: 11 }));
+            configRepo.findOne.mockResolvedValue(
+                buildConfigRow({ tenantId, credentialVersion: 11 }),
+            );
             credentialVersionService.bumpVersion.mockResolvedValue(12);
             await controller.rotateCredential(buildAuth({ tenantId }));
             expect(credentialVersionService.bumpVersion).toHaveBeenCalledWith(tenantId);
@@ -499,7 +505,8 @@ describe('TenantJobRuntimeController (integration)', () => {
         });
 
         it('emits the rotate audit row with the post-bump version', async () => {
-            const { controller, configRepo, auditRepo, credentialVersionService } = await bootstrap();
+            const { controller, configRepo, auditRepo, credentialVersionService } =
+                await bootstrap();
             configRepo.findOne.mockResolvedValue(buildConfigRow({ credentialVersion: 5 }));
             credentialVersionService.bumpVersion.mockResolvedValue(6);
             await controller.rotateCredential(buildAuth());
@@ -511,7 +518,8 @@ describe('TenantJobRuntimeController (integration)', () => {
         });
 
         it('rotate audit "before" snapshot keeps the SAME redacted ref as "after" (rotation is version-only)', async () => {
-            const { controller, configRepo, auditRepo, credentialVersionService } = await bootstrap();
+            const { controller, configRepo, auditRepo, credentialVersionService } =
+                await bootstrap();
             configRepo.findOne.mockResolvedValue(
                 buildConfigRow({ credentialsSecretRef: 'rotate-ref-tttt', credentialVersion: 9 }),
             );
@@ -530,11 +538,14 @@ describe('TenantJobRuntimeController (integration)', () => {
             const { controller, configRepo, credentialVersionService } = await bootstrap();
             configRepo.findOne.mockResolvedValue(buildConfigRow({ credentialVersion: 4 }));
             credentialVersionService.bumpVersion.mockResolvedValue(null);
-            await expect(controller.forceInvalidate(buildAuth())).rejects.toMatchObject({ status: 409 });
+            await expect(controller.forceInvalidate(buildAuth())).rejects.toMatchObject({
+                status: 409,
+            });
         });
 
         it('audit row preserves the offending credentialsSecretRef redaction in BOTH before + after', async () => {
-            const { controller, configRepo, auditRepo, credentialVersionService } = await bootstrap();
+            const { controller, configRepo, auditRepo, credentialVersionService } =
+                await bootstrap();
             configRepo.findOne.mockResolvedValue(
                 buildConfigRow({ credentialsSecretRef: 'force-ref-ffff', credentialVersion: 1 }),
             );
@@ -546,7 +557,8 @@ describe('TenantJobRuntimeController (integration)', () => {
         });
 
         it('records actorUserId so the operator who pulled the switch is visible in audit', async () => {
-            const { controller, configRepo, auditRepo, credentialVersionService } = await bootstrap();
+            const { controller, configRepo, auditRepo, credentialVersionService } =
+                await bootstrap();
             const actorId = randomUUID();
             configRepo.findOne.mockResolvedValue(buildConfigRow({ credentialVersion: 1 }));
             credentialVersionService.bumpVersion.mockResolvedValue(2);
@@ -636,15 +648,25 @@ describe('TenantJobRuntimeController (integration)', () => {
             const { controller, configRepo } = await bootstrap();
             const tenantA = randomUUID();
             const tenantB = randomUUID();
-            configRepo.findOne.mockImplementation(async ({ where }: { where: { tenantId: string } }) => {
-                if (where.tenantId === tenantA) {
-                    return buildConfigRow({ tenantId: tenantA, providerId: 'trigger', credentialVersion: 11 });
-                }
-                if (where.tenantId === tenantB) {
-                    return buildConfigRow({ tenantId: tenantB, providerId: 'temporal', credentialVersion: 22 });
-                }
-                return null;
-            });
+            configRepo.findOne.mockImplementation(
+                async ({ where }: { where: { tenantId: string } }) => {
+                    if (where.tenantId === tenantA) {
+                        return buildConfigRow({
+                            tenantId: tenantA,
+                            providerId: 'trigger',
+                            credentialVersion: 11,
+                        });
+                    }
+                    if (where.tenantId === tenantB) {
+                        return buildConfigRow({
+                            tenantId: tenantB,
+                            providerId: 'temporal',
+                            credentialVersion: 22,
+                        });
+                    }
+                    return null;
+                },
+            );
             const [resA, resB] = await Promise.all([
                 controller.getConfig(buildAuth({ tenantId: tenantA })),
                 controller.getConfig(buildAuth({ tenantId: tenantB })),
@@ -661,7 +683,9 @@ describe('TenantJobRuntimeController (integration)', () => {
             const { controller, configRepo, credentialVersionService } = await bootstrap();
             const tenantA = randomUUID();
             const tenantB = randomUUID();
-            configRepo.findOne.mockResolvedValue(buildConfigRow({ tenantId: tenantA, credentialVersion: 1 }));
+            configRepo.findOne.mockResolvedValue(
+                buildConfigRow({ tenantId: tenantA, credentialVersion: 1 }),
+            );
             credentialVersionService.bumpVersion.mockResolvedValue(2);
             await controller.rotateCredential(buildAuth({ tenantId: tenantA }));
             expect(credentialVersionService.bumpVersion).toHaveBeenCalledWith(tenantA);

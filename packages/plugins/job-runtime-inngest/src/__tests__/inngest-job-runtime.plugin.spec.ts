@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TenantCredentialSnapshot } from '@ever-works/plugin';
-import {
-	InngestDispatcherNotConfiguredError,
-	InngestJobRuntimePlugin
-} from '../inngest-job-runtime.plugin.js';
+import { InngestDispatcherNotConfiguredError, InngestJobRuntimePlugin } from '../inngest-job-runtime.plugin.js';
 
 describe('InngestJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 	let plugin: InngestJobRuntimePlugin;

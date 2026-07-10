@@ -12,21 +12,18 @@ import { BullMqJobRuntimePlugin } from '../bullmq-job-runtime.plugin.js';
  * the platform-default Redis prefix.
  */
 describe('BullMqJobRuntimePlugin — tenant overlay conformance', () => {
-	runJobRuntimeTenantContractSuite(
-		() => new BullMqJobRuntimePlugin(),
-		{
-			tenantA: {
-				tenantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-				providerId: 'bullmq',
-				credentialVersion: 1,
-				credentials: { queuePrefix: 'tenant-a' }
-			},
-			tenantB: {
-				tenantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-				providerId: 'bullmq',
-				credentialVersion: 1,
-				credentials: { queuePrefix: 'tenant-b' }
-			}
+	runJobRuntimeTenantContractSuite(() => new BullMqJobRuntimePlugin(), {
+		tenantA: {
+			tenantId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+			providerId: 'bullmq',
+			credentialVersion: 1,
+			credentials: { queuePrefix: 'tenant-a' }
+		},
+		tenantB: {
+			tenantId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+			providerId: 'bullmq',
+			credentialVersion: 1,
+			credentials: { queuePrefix: 'tenant-b' }
 		}
-	);
+	});
 });

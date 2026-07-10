@@ -40,25 +40,15 @@ setup('authenticate', async ({ page, baseURL }) => {
     const apiBase = process.env.API_URL || 'http://localhost:3100';
     try {
         const primaryUser = await registerSeedUser(apiBase, 'primary');
-        const primaryTenant = await createOrganization(
-            apiBase,
-            primaryUser,
-            'primary',
-        );
+        const primaryTenant = await createOrganization(apiBase, primaryUser, 'primary');
         const webhookSecret = newWebhookSecret();
         await putTriggerWebhookConfig(apiBase, primaryTenant, webhookSecret);
 
         let tenantIdNoSecret: string | undefined;
-        let secondaryUserMeta:
-            | { email: string; password: string; username: string }
-            | undefined;
+        let secondaryUserMeta: { email: string; password: string; username: string } | undefined;
         try {
             const secondaryUser = await registerSeedUser(apiBase, 'secondary');
-            const secondaryTenant = await createOrganization(
-                apiBase,
-                secondaryUser,
-                'secondary',
-            );
+            const secondaryTenant = await createOrganization(apiBase, secondaryUser, 'secondary');
             // EW-743 — the webhook spec's "tenant exists but
             // webhookSecret bag absent → 401" case needs a config row
             // with a resolvable secret ref whose bag does NOT carry

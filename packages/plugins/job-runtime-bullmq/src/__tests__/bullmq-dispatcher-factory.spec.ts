@@ -21,7 +21,10 @@ class FakeQueue implements BullMqQueueAdapter {
 	closed = false;
 	private nextId = 1;
 
-	constructor(public readonly queueName: string, public readonly opts: Readonly<Record<string, unknown>>) {
+	constructor(
+		public readonly queueName: string,
+		public readonly opts: Readonly<Record<string, unknown>>
+	) {
 		FakeQueue.instances.push(this);
 	}
 

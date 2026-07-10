@@ -406,9 +406,7 @@ export class TriggerService
             : stamp.tenantId;
         const existingTags = Array.isArray(options.tags) ? (options.tags as string[]) : [];
         const tenantTag = `tenant:${stamp.tenantId}`;
-        const tags = existingTags.includes(tenantTag)
-            ? existingTags
-            : [tenantTag, ...existingTags];
+        const tags = existingTags.includes(tenantTag) ? existingTags : [tenantTag, ...existingTags];
         return { ...options, concurrencyKey, tags } as O;
     }
 
@@ -782,11 +780,7 @@ export class TriggerService
             const handle = await kbTranscribeTask.trigger(
                 payload,
                 this.stampTenantOptions({
-                    tags: [
-                        'kb-transcribe',
-                        `work:${payload.workId}`,
-                        `upload:${payload.uploadId}`,
-                    ],
+                    tags: ['kb-transcribe', `work:${payload.workId}`, `upload:${payload.uploadId}`],
                     machine: this.machine() as any,
                     concurrencyKey: `kb-transcribe:${payload.workId}`,
                 }),

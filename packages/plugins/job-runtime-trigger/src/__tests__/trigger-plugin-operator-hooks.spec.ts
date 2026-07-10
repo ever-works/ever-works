@@ -6,12 +6,7 @@ import {
 	TriggerJobRuntimePlugin,
 	mapTriggerStatus
 } from '../index.js';
-import type {
-	TriggerClient,
-	TriggerRunHandle,
-	TriggerRunRecord,
-	TriggerTaskOptions
-} from '../trigger-types.js';
+import type { TriggerClient, TriggerRunHandle, TriggerRunRecord, TriggerTaskOptions } from '../trigger-types.js';
 
 class StubTrigger implements TriggerClient {
 	triggeredTasks: string[] = [];
@@ -47,9 +42,7 @@ class StubTrigger implements TriggerClient {
 	};
 }
 
-const snapshot = (
-	overrides: Partial<TenantCredentialSnapshot> = {}
-): TenantCredentialSnapshot => ({
+const snapshot = (overrides: Partial<TenantCredentialSnapshot> = {}): TenantCredentialSnapshot => ({
 	tenantId: '00000000-0000-0000-0000-00000000aaaa',
 	providerId: 'trigger',
 	credentialVersion: 1,
@@ -62,8 +55,7 @@ describe('TriggerJobRuntimePlugin — operator hooks', () => {
 		const client = new StubTrigger();
 		const factory = new TriggerDispatcherFactory({ client });
 		const plugin = new TriggerJobRuntimePlugin().useDispatchers({
-			dispatchKbEmbedDocument: (payload: unknown) =>
-				factory.dispatch('kb-embed-document', payload)
+			dispatchKbEmbedDocument: (payload: unknown) => factory.dispatch('kb-embed-document', payload)
 		});
 		const d = plugin.dispatchers as unknown as {
 			dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;
@@ -213,8 +205,7 @@ describe('TriggerJobRuntimePlugin — operator hooks', () => {
 		it('view uses tenant-built dispatchers when builder is set', async () => {
 			const plugin = new TriggerJobRuntimePlugin({
 				dispatchersBuilder: (snap): JobRuntimeDispatchers => ({
-					dispatchKbEmbedDocument: () =>
-						Promise.resolve(`tenant:${snap.credentials.projectAccessToken}`)
+					dispatchKbEmbedDocument: () => Promise.resolve(`tenant:${snap.credentials.projectAccessToken}`)
 				})
 			});
 			const view = plugin.bindToTenant(snapshot());

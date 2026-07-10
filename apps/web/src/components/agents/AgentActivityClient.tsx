@@ -365,7 +365,10 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                 <th scope="col" className={`whitespace-nowrap ${TH_CLASS}`}>
                                     Duration
                                 </th>
-                                <th scope="col" className={`w-[9rem] whitespace-nowrap ${TH_CLASS}`}>
+                                <th
+                                    scope="col"
+                                    className={`w-[9rem] whitespace-nowrap ${TH_CLASS}`}
+                                >
                                     Status
                                 </th>
                             </tr>
@@ -387,7 +390,10 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                     const e = item.event;
                                     const p = eventPresentation(e.actionType);
                                     return (
-                                        <tr key={`evt-${e.id}`} className="bg-card dark:bg-transparent">
+                                        <tr
+                                            key={`evt-${e.id}`}
+                                            className="bg-card dark:bg-transparent"
+                                        >
                                             <td className="px-3 py-3" />
                                             <td className="px-4 py-3 text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
                                                 <Timestamp value={e.createdAt} variant="stacked" />
@@ -395,7 +401,10 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                             <td className="px-4 py-3">
                                                 <TypePill label={p.label} className={p.className} />
                                             </td>
-                                            <td className="px-4 py-3 text-xs text-text dark:text-text-dark" colSpan={2}>
+                                            <td
+                                                className="px-4 py-3 text-xs text-text dark:text-text-dark"
+                                                colSpan={2}
+                                            >
                                                 Agent {p.label}{' '}
                                                 <Timestamp
                                                     value={e.createdAt}
@@ -489,7 +498,11 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                                 <RunStatusBadge status={r.status} />
                                             </td>
                                         </tr>
-                                        <tr className={isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''}>
+                                        <tr
+                                            className={
+                                                isExpanded ? 'bg-muted/20 dark:bg-muted/10' : ''
+                                            }
+                                        >
                                             <td colSpan={6} style={{ padding: 0 }}>
                                                 <div
                                                     style={{
@@ -497,8 +510,7 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                                         gridTemplateRows: isExpanded
                                                             ? '1fr'
                                                             : '0fr',
-                                                        transition:
-                                                            'grid-template-rows 300ms ease',
+                                                        transition: 'grid-template-rows 300ms ease',
                                                     }}
                                                 >
                                                     <div className="overflow-hidden">

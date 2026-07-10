@@ -160,9 +160,7 @@ export function TaskDetailClient({
                     setDescription(updated.description ?? '');
                     setEditingDesc(false);
                 } catch (err) {
-                    setDescError(
-                        err instanceof Error ? err.message : t('saveDescriptionError'),
-                    );
+                    setDescError(err instanceof Error ? err.message : t('saveDescriptionError'));
                 }
             })();
         });

@@ -421,13 +421,15 @@ describe('OperatorTenantRuntimeAllowlistController — integration (EW-742 P5.1 
             );
 
             // Tenant A flipped to the new set.
-            expect(
-                store.filter((r) => r.tenantId === tenantA).map((r) => r.providerId),
-            ).toEqual(['inngest', 'pgboss']);
+            expect(store.filter((r) => r.tenantId === tenantA).map((r) => r.providerId)).toEqual([
+                'inngest',
+                'pgboss',
+            ]);
             // Tenant B unchanged — same 2 rows, in the same order.
-            expect(
-                store.filter((r) => r.tenantId === tenantB).map((r) => r.providerId),
-            ).toEqual(['temporal', 'bullmq']);
+            expect(store.filter((r) => r.tenantId === tenantB).map((r) => r.providerId)).toEqual([
+                'temporal',
+                'bullmq',
+            ]);
             // Audit row tagged with tenant A, not tenant B.
             const payload = auditRepo.create.mock.calls[0][0];
             expect(payload.tenantId).toBe(tenantA);
@@ -557,14 +559,12 @@ describe('OperatorTenantRuntimeAllowlistController — integration (EW-742 P5.1 
         it('echoes the gating flag on the post-delete response', async () => {
             process.env[PER_TENANT_GATING_ENV] = 'true';
             const tenantId = randomUUID();
-            store.push(
-                {
-                    tenantId,
-                    providerId: 'trigger',
-                    createdBy: null,
-                    createdAt: new Date('2026-06-18T00:00:01.000Z'),
-                } as AllowlistRow,
-            );
+            store.push({
+                tenantId,
+                providerId: 'trigger',
+                createdBy: null,
+                createdAt: new Date('2026-06-18T00:00:01.000Z'),
+            } as AllowlistRow);
 
             const result = await controller.removeEntry(tenantId, 'trigger', buildAuth());
 

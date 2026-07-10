@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JobRuntimeDispatchers, TenantCredentialSnapshot } from '@ever-works/plugin';
-import {
-	InngestDispatcherFactory,
-	InngestDispatcherNotConfiguredError,
-	InngestJobRuntimePlugin
-} from '../index.js';
+import { InngestDispatcherFactory, InngestDispatcherNotConfiguredError, InngestJobRuntimePlugin } from '../index.js';
 import type { InngestClient, InngestSendEvent, InngestSendResult, InngestFunction } from '../inngest-types.js';
 
 class StubInngest implements InngestClient {
@@ -36,8 +32,7 @@ describe('InngestJobRuntimePlugin — operator hooks', () => {
 		const client = new StubInngest();
 		const factory = new InngestDispatcherFactory({ client, eventNamespace: 'ever.works' });
 		const plugin = new InngestJobRuntimePlugin().useDispatchers({
-			dispatchKbEmbedDocument: (payload: unknown) =>
-				factory.send('kb-embed-document', payload)
+			dispatchKbEmbedDocument: (payload: unknown) => factory.send('kb-embed-document', payload)
 		});
 		const d = plugin.dispatchers as unknown as {
 			dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;

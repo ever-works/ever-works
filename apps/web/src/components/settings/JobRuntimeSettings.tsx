@@ -8,10 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import {
-    JobRuntimeCredentialsForm,
-    validateCredentialFields,
-} from './JobRuntimeCredentialsForm';
+import { JobRuntimeCredentialsForm, validateCredentialFields } from './JobRuntimeCredentialsForm';
 import {
     JOB_RUNTIME_PROVIDER_MODE_BANNERS,
     PROVIDERS_WITHOUT_CREDENTIALS,
@@ -390,10 +387,7 @@ export function JobRuntimeSettings({
                             className="flex items-start gap-2 p-3 bg-info/10 border border-info/20 rounded-lg"
                             data-testid={`job-runtime-mode-banner-${providerId}-${mode}`}
                         >
-                            <Info
-                                className="w-4 h-4 text-info flex-shrink-0 mt-0.5"
-                                aria-hidden
-                            />
+                            <Info className="w-4 h-4 text-info flex-shrink-0 mt-0.5" aria-hidden />
                             <p className="text-xs text-text dark:text-text-dark">
                                 {JOB_RUNTIME_PROVIDER_MODE_BANNERS[providerId]?.[mode]}
                             </p>

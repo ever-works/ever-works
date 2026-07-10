@@ -33,9 +33,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * boot-audit rows exist by then. Down is provided for completeness; in
  * practice we never roll this back once the boot writer ships.
  */
-export class RelaxTenantJobRuntimeAuditTenantNullable1781200000000
-    implements MigrationInterface
-{
+export class RelaxTenantJobRuntimeAuditTenantNullable1781200000000 implements MigrationInterface {
     name = 'RelaxTenantJobRuntimeAuditTenantNullable1781200000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {

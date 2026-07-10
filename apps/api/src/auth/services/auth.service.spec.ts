@@ -103,7 +103,8 @@ describe('AuthService', () => {
     describe('grantPlatformAdminIfBootstrapped', () => {
         const ORIGINAL = process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
         afterEach(() => {
-            if (ORIGINAL === undefined) delete process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
+            if (ORIGINAL === undefined)
+                delete process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS;
             else process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS = ORIGINAL;
         });
 
@@ -172,10 +173,7 @@ describe('AuthService', () => {
             process.env.EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS =
                 'exact@b.co, e2e-seed-*@test.local';
             userRepo.update.mockResolvedValue(undefined as any);
-            const grantedExact = await service.grantPlatformAdminIfBootstrapped(
-                'u5',
-                'exact@b.co',
-            );
+            const grantedExact = await service.grantPlatformAdminIfBootstrapped('u5', 'exact@b.co');
             const grantedGlob = await service.grantPlatformAdminIfBootstrapped(
                 'u6',
                 'e2e-seed-secondary-xyz@test.local',

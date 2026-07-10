@@ -77,9 +77,7 @@ export class PgBossDispatcherFactory {
 	): Promise<string | null> {
 		const { sendOptions, metaForPayload } = mapEnqueueOptions(enqueueOptions);
 		const mergedPayload =
-			Object.keys(metaForPayload).length > 0
-				? { ...(payload ?? {}), ...metaForPayload }
-				: (payload ?? {});
+			Object.keys(metaForPayload).length > 0 ? { ...(payload ?? {}), ...metaForPayload } : (payload ?? {});
 		const baseOpts = this.opts.defaultSendOptions
 			? { ...this.opts.defaultSendOptions, ...sendOptions }
 			: sendOptions;

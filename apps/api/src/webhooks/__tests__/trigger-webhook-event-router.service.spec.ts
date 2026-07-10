@@ -108,7 +108,10 @@ describe('TriggerWebhookEventRouterService', () => {
     });
 
     it.each([
-        ['missing payload', { event_type: 'alert.run.failed', tenant_id: TENANT_ID, created_at: 'x' }],
+        [
+            'missing payload',
+            { event_type: 'alert.run.failed', tenant_id: TENANT_ID, created_at: 'x' },
+        ],
         [
             'payload is an array (not an object)',
             {

@@ -51,7 +51,10 @@ export class TemporalDispatcherFactory {
 	 * can decide whether to map its `workflowId` onto the agent's
 	 * dispatcher-return value (typical) or block on completion.
 	 */
-	async start(workflowType: string, options: Partial<TemporalStartWorkflowOptions> & { workflowId: string }): Promise<TemporalWorkflowHandle> {
+	async start(
+		workflowType: string,
+		options: Partial<TemporalStartWorkflowOptions> & { workflowId: string }
+	): Promise<TemporalWorkflowHandle> {
 		const taskQueue = options.taskQueue ?? this.opts.defaultTaskQueue;
 		if (!taskQueue) {
 			throw new Error(

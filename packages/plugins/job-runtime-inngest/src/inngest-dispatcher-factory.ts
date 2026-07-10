@@ -63,10 +63,12 @@ export class InngestDispatcherFactory {
 	 * back with one id). Returns `null` if Inngest's response is
 	 * shaped unexpectedly.
 	 */
-	async send(eventName: string, data: unknown, overrides?: Partial<Omit<InngestSendEvent, 'name' | 'data'>>): Promise<string | null> {
-		const fullName = this.opts.eventNamespace
-			? `${this.opts.eventNamespace}/${eventName}`
-			: eventName;
+	async send(
+		eventName: string,
+		data: unknown,
+		overrides?: Partial<Omit<InngestSendEvent, 'name' | 'data'>>
+	): Promise<string | null> {
+		const fullName = this.opts.eventNamespace ? `${this.opts.eventNamespace}/${eventName}` : eventName;
 		const event: InngestSendEvent = {
 			name: fullName,
 			data,
@@ -102,11 +104,8 @@ export class InngestDispatcherFactory {
 		extraOverrides?: Partial<Omit<InngestSendEvent, 'name' | 'data'>>
 	): Promise<string | null> {
 		const { topLevel, dataMeta } = mapEnqueueOptions(enqueueOptions);
-		const fullName = this.opts.eventNamespace
-			? `${this.opts.eventNamespace}/${eventName}`
-			: eventName;
-		const mergedData =
-			Object.keys(dataMeta).length > 0 ? { ...data, _ew: dataMeta } : data;
+		const fullName = this.opts.eventNamespace ? `${this.opts.eventNamespace}/${eventName}` : eventName;
+		const mergedData = Object.keys(dataMeta).length > 0 ? { ...data, _ew: dataMeta } : data;
 		const event: InngestSendEvent = {
 			name: fullName,
 			data: mergedData,

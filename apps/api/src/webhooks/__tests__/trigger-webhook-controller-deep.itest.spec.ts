@@ -42,9 +42,7 @@ function signBody(body: string, secret: string): string {
     return `sha256=${hex}`;
 }
 
-function buildOverlayRow(
-    overrides: Partial<TenantJobRuntimeConfig> = {},
-): TenantJobRuntimeConfig {
+function buildOverlayRow(overrides: Partial<TenantJobRuntimeConfig> = {}): TenantJobRuntimeConfig {
     return {
         tenantId: TENANT_ID,
         providerId: 'trigger',
@@ -189,11 +187,7 @@ describe('TriggerWebhookController — deep edge-case coverage', () => {
 
             // Empty-string header is treated as missing → 400, not 401.
             await expect(
-                controller.receive(
-                    TENANT_ID,
-                    { rawBody: '{}' },
-                    { 'x-trigger-signature': '' },
-                ),
+                controller.receive(TENANT_ID, { rawBody: '{}' }, { 'x-trigger-signature': '' }),
             ).rejects.toBeInstanceOf(BadRequestException);
         });
     });

@@ -93,8 +93,8 @@ describe('InngestDispatcherFactory', () => {
 			}
 		};
 		const factory = new InngestDispatcherFactory({ client: minimal });
-		expect(() =>
-			factory.defineFunction({ id: 'x' }, { event: 'x' }, async () => undefined)
-		).toThrow(/createFunction is unavailable/);
+		expect(() => factory.defineFunction({ id: 'x' }, { event: 'x' }, async () => undefined)).toThrow(
+			/createFunction is unavailable/
+		);
 	});
 });

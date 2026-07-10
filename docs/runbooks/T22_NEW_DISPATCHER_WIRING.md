@@ -24,12 +24,12 @@ default (byte-identical to the pre-overlay path).
 
 ## The 4 ingredients
 
-| Ingredient | Where |
-|---|---|
-| Payload type | `packages/agent/src/tasks/<name>.types.ts` |
-| Dispatcher interface | `packages/agent/src/tasks/<name>-dispatcher.ts` |
-| Producer (enqueue site) | Wherever the service / event handler / API endpoint constructs the payload and calls `dispatcher.dispatch...()` |
-| Consumer (Trigger.dev task) | `packages/tasks/src/tasks/trigger/<name>.task.ts` |
+| Ingredient                  | Where                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Payload type                | `packages/agent/src/tasks/<name>.types.ts`                                                                      |
+| Dispatcher interface        | `packages/agent/src/tasks/<name>-dispatcher.ts`                                                                 |
+| Producer (enqueue site)     | Wherever the service / event handler / API endpoint constructs the payload and calls `dispatcher.dispatch...()` |
+| Consumer (Trigger.dev task) | `packages/tasks/src/tasks/trigger/<name>.task.ts`                                                               |
 
 ## Step 1 — extend the payload type
 
@@ -86,10 +86,10 @@ Then in the enqueue path:
 ```ts
 const binding = await this.stampForWork(workId);
 await this.dispatcher.dispatch<Name>({
-    workId,
-    // ... existing ...
-    providerId: binding.providerId,
-    credentialVersion: binding.credentialVersion,
+	workId,
+	// ... existing ...
+	providerId: binding.providerId,
+	credentialVersion: binding.credentialVersion
 });
 ```
 
@@ -104,34 +104,32 @@ The 4-line block at the top of the Trigger.dev task's `run()`:
 import { TenantRuntimeBindingResolverService } from '../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 
 // inside run():
-const binding = await appContext
-    .get(TenantRuntimeBindingResolverService)
-    .resolveForWork(payload, payload.workId);  // or resolveForOrganization / resolveForCustomization / resolveForSubscription
+const binding = await appContext.get(TenantRuntimeBindingResolverService).resolveForWork(payload, payload.workId); // or resolveForOrganization / resolveForCustomization / resolveForSubscription
 if (binding.status === 'drained') {
-    logger.warn('<task-name>: credentials drained, skipping run', {
-        workId: payload.workId,
-        providerId: binding.providerId,
-        credentialVersion: binding.credentialVersion,
-        tenantId: binding.tenantId,
-    });
-    return {
-        status: 'skipped' as const,
-        reason: 'credentials-drained' as const,
-        workId: payload.workId,
-    };
+	logger.warn('<task-name>: credentials drained, skipping run', {
+		workId: payload.workId,
+		providerId: binding.providerId,
+		credentialVersion: binding.credentialVersion,
+		tenantId: binding.tenantId
+	});
+	return {
+		status: 'skipped' as const,
+		reason: 'credentials-drained' as const,
+		workId: payload.workId
+	};
 }
 // rest of the task...
 ```
 
 ### Picking the right resolver helper
 
-| Payload field | Helper | Tenant lookup path |
-|---|---|---|
-| `workId` | `resolveForWork(payload, workId)` | `WorkRepository.findById → Work.tenantId` |
-| `organizationId` | `resolveForOrganization(payload, organizationId)` | `OrganizationRepository.findById → Organization.tenantId` |
-| `customizationId` | `resolveForCustomization(payload, customizationId)` | `TemplateCustomizationRepository.findById → TemplateCustomization.tenantId` |
-| `subscriptionId` | `resolveForSubscription(payload, subscriptionId)` | `WebhookSubscriptionRepository.findById → WebhookSubscription.tenantId` |
-| Anything else | `resolve(payload, tenantId)` with task-specific tenantId resolution inline | varies |
+| Payload field     | Helper                                                                     | Tenant lookup path                                                          |
+| ----------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `workId`          | `resolveForWork(payload, workId)`                                          | `WorkRepository.findById → Work.tenantId`                                   |
+| `organizationId`  | `resolveForOrganization(payload, organizationId)`                          | `OrganizationRepository.findById → Organization.tenantId`                   |
+| `customizationId` | `resolveForCustomization(payload, customizationId)`                        | `TemplateCustomizationRepository.findById → TemplateCustomization.tenantId` |
+| `subscriptionId`  | `resolveForSubscription(payload, subscriptionId)`                          | `WebhookSubscriptionRepository.findById → WebhookSubscription.tenantId`     |
+| Anything else     | `resolve(payload, tenantId)` with task-specific tenantId resolution inline | varies                                                                      |
 
 ### Why skip-and-ack on `'drained'`?
 

@@ -200,12 +200,7 @@ describe('TenantAwarePgBossWorkerHostFactory', () => {
 		// cache); but plugin.bindToTenant memoises so the returned view
 		// instance is shared across same-tenant calls.
 		expect(resolveSnapshot).toHaveBeenCalledTimes(4);
-		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([
-			tenantA,
-			tenantA,
-			tenantB,
-			tenantA
-		]);
+		expect(resolveSnapshot.mock.calls.map((c) => c[0])).toEqual([tenantA, tenantA, tenantB, tenantA]);
 
 		// Same tenantA snapshot → identical view returned by the plugin.
 		expect(seen[0]).toBe(seen[1]);

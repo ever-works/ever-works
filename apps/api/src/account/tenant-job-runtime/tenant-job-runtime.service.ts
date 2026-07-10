@@ -580,9 +580,7 @@ export class TenantJobRuntimeService {
      *      the platform-wide list and any tenant overlay that
      *      referenced a removed provider just stops resolving it).
      */
-    async getAvailableProvidersForTenant(
-        tenantId: string,
-    ): Promise<TenantJobRuntimeProviderId[]> {
+    async getAvailableProvidersForTenant(tenantId: string): Promise<TenantJobRuntimeProviderId[]> {
         const global = this.getAvailableProviders();
         if (!config.tenantJobRuntime.isPerTenantGatingEnabled()) {
             return global;

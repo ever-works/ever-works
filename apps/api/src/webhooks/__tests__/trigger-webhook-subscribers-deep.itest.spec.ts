@@ -135,25 +135,22 @@ describe('Trigger.dev subscribers — deep integration', () => {
                 event: TRIGGER_WEBHOOK_EVENTS.RUN_CANCELLED,
                 terminal: GenerateStatusType.CANCELLED,
             },
-        ])(
-            'GENERATING → $terminal on $event',
-            async ({ event, terminal }) => {
-                history.findByTriggerRunId.mockResolvedValue({
-                    id: 'hist-1',
-                    status: GenerateStatusType.GENERATING,
-                } as never);
-                history.updateEntry.mockResolvedValue({ id: 'hist-1' } as never);
+        ])('GENERATING → $terminal on $event', async ({ event, terminal }) => {
+            history.findByTriggerRunId.mockResolvedValue({
+                id: 'hist-1',
+                status: GenerateStatusType.GENERATING,
+            } as never);
+            history.updateEntry.mockResolvedValue({ id: 'hist-1' } as never);
 
-                emitter.emit(event, envelope(event));
-                await settle();
+            emitter.emit(event, envelope(event));
+            await settle();
 
-                expect(history.updateEntry).toHaveBeenCalledTimes(1);
-                const [id, updates] = history.updateEntry.mock.calls[0];
-                expect(id).toBe('hist-1');
-                expect(updates.status).toBe(terminal);
-                expect(updates.finishedAt).toBeInstanceOf(Date);
-            },
-        );
+            expect(history.updateEntry).toHaveBeenCalledTimes(1);
+            const [id, updates] = history.updateEntry.mock.calls[0];
+            expect(id).toBe('hist-1');
+            expect(updates.status).toBe(terminal);
+            expect(updates.finishedAt).toBeInstanceOf(Date);
+        });
 
         it('finishedAt uses event.createdAt (not Date.now)', async () => {
             history.findByTriggerRunId.mockResolvedValue({
@@ -188,9 +185,7 @@ describe('Trigger.dev subscribers — deep integration', () => {
             expect(history.updateEntry).not.toHaveBeenCalled();
             expect(debugSpy).toHaveBeenCalled();
             expect(
-                debugSpy.mock.calls.some((c) =>
-                    String(c[0] ?? '').includes('already terminal'),
-                ),
+                debugSpy.mock.calls.some((c) => String(c[0] ?? '').includes('already terminal')),
             ).toBe(true);
         });
 
@@ -246,9 +241,9 @@ describe('Trigger.dev subscribers — deep integration', () => {
             ).not.toThrow();
             await settle();
 
-            expect(
-                errorSpy.mock.calls.some((c) => String(c[0] ?? '').includes('db down')),
-            ).toBe(true);
+            expect(errorSpy.mock.calls.some((c) => String(c[0] ?? '').includes('db down'))).toBe(
+                true,
+            );
         });
 
         it('repo.updateEntry throws → caught + logged, does not propagate', async () => {
@@ -267,9 +262,7 @@ describe('Trigger.dev subscribers — deep integration', () => {
             await settle();
 
             expect(
-                errorSpy.mock.calls.some((c) =>
-                    String(c[0] ?? '').includes('unique constraint'),
-                ),
+                errorSpy.mock.calls.some((c) => String(c[0] ?? '').includes('unique constraint')),
             ).toBe(true);
         });
 
@@ -496,9 +489,7 @@ describe('Trigger.dev subscribers — deep integration', () => {
             await settle();
 
             // Persistence subscriber swallowed its error (logged).
-            expect(
-                errorSpy.mock.calls.some((c) => String(c[0] ?? '').includes('db')),
-            ).toBe(true);
+            expect(errorSpy.mock.calls.some((c) => String(c[0] ?? '').includes('db'))).toBe(true);
             // Sentry still got called — independent subscriber.
             expect(sentry.error).toHaveBeenCalledTimes(1);
         });

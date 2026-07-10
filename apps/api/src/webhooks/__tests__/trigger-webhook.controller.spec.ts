@@ -1,4 +1,9 @@
-import { BadRequestException, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Logger,
+    NotFoundException,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'crypto';
 
 // Stub the @Public decorator and entity imports so loading the
@@ -154,9 +159,9 @@ describe('TriggerWebhookController', () => {
     });
 
     it('rejects a request with no X-Trigger-Signature header (400)', async () => {
-        await expect(
-            controller.receive(TENANT_ID, { rawBody: '{}' }, {}),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(controller.receive(TENANT_ID, { rawBody: '{}' }, {})).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
         expect(tenantRepo.findOne).not.toHaveBeenCalled();
         expect(secretStore.resolve).not.toHaveBeenCalled();
     });

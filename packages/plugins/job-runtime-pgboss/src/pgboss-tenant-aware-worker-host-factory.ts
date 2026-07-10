@@ -164,9 +164,7 @@ export class TenantAwarePgBossWorkerHostFactory {
 			if (hostOpts.concurrency !== undefined && merged['teamSize'] === undefined) {
 				merged['teamSize'] = hostOpts.concurrency;
 			}
-			const processor = async (
-				jobOrJobs: PgBossJobView | readonly PgBossJobView[]
-			): Promise<unknown> => {
+			const processor = async (jobOrJobs: PgBossJobView | readonly PgBossJobView[]): Promise<unknown> => {
 				if (Array.isArray(jobOrJobs)) {
 					const results: unknown[] = [];
 					for (const j of jobOrJobs) {
@@ -206,9 +204,7 @@ export class TenantAwarePgBossWorkerHostFactory {
 		if (!tenantId) {
 			return this.plugin;
 		}
-		const snapshot = this.resolveSnapshot
-			? await this.resolveSnapshot(tenantId)
-			: syntheticSnapshot(tenantId);
+		const snapshot = this.resolveSnapshot ? await this.resolveSnapshot(tenantId) : syntheticSnapshot(tenantId);
 		const bound = this.plugin.bindToTenant(snapshot);
 		return bound ?? this.plugin;
 	}

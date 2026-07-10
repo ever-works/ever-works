@@ -17,18 +17,14 @@
  * already a dev-dep in every `packages/plugins/*` package; consumers
  * outside the workspace need to add it themselves).
  */
-export {
-	runJobRuntimeContractSuite
-} from '../contracts/__tests__/job-runtime-conformance.spec.js';
+export { runJobRuntimeContractSuite } from '../contracts/__tests__/job-runtime-conformance.spec.js';
 export type { JobRuntimeContractOptions } from '../contracts/__tests__/job-runtime-conformance.spec.js';
 
 // EW-742 P6 T36-T40 — tenant-overlay layer on top of the base
 // job-runtime contract. Covers cross-tenant isolation, graceful drain
 // on credentialVersion bump, and force-invalidate eviction semantics
 // — all without requiring live Redis/Postgres/Temporal/Inngest.
-export {
-	runJobRuntimeTenantContractSuite
-} from '../contracts/__tests__/job-runtime-tenant-conformance.spec.js';
+export { runJobRuntimeTenantContractSuite } from '../contracts/__tests__/job-runtime-tenant-conformance.spec.js';
 export type { JobRuntimeTenantContractOptions } from '../contracts/__tests__/job-runtime-tenant-conformance.spec.js';
 export {
 	InMemoryJobRuntimeProvider,
@@ -38,9 +34,7 @@ export {
 // EW-742 P3.2 / P6 — secret-store contract suite, sibling of the
 // job-runtime one. See `secret-store-conformance.spec.ts` for the 6
 // fail-open invariants every ISecretStoreProvider must satisfy.
-export {
-	runSecretStoreContractSuite
-} from '../contracts/__tests__/secret-store-conformance.spec.js';
+export { runSecretStoreContractSuite } from '../contracts/__tests__/secret-store-conformance.spec.js';
 export type { SecretStoreContractOptions } from '../contracts/__tests__/secret-store-conformance.spec.js';
 export {
 	InMemorySecretStoreProvider,

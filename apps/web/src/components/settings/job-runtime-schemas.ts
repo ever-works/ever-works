@@ -43,168 +43,173 @@
  *     mTLS cert/key pairs
  */
 import type {
-	TenantJobRuntimeMode,
-	TenantJobRuntimeProviderId
+    TenantJobRuntimeMode,
+    TenantJobRuntimeProviderId,
 } from '@/lib/api/tenant-job-runtime';
 
 export interface JobRuntimeCredentialField {
-	readonly name: string;
-	readonly label: string;
-	readonly description: string;
-	readonly secret: boolean;
-	readonly required: boolean;
-	readonly requiredWhen?: { readonly mode: readonly TenantJobRuntimeMode[] };
-	readonly envVar?: string;
-	readonly placeholder?: string;
-	readonly multiline?: boolean;
+    readonly name: string;
+    readonly label: string;
+    readonly description: string;
+    readonly secret: boolean;
+    readonly required: boolean;
+    readonly requiredWhen?: { readonly mode: readonly TenantJobRuntimeMode[] };
+    readonly envVar?: string;
+    readonly placeholder?: string;
+    readonly multiline?: boolean;
 }
 
-export const JOB_RUNTIME_CREDENTIAL_SCHEMAS: Record<TenantJobRuntimeProviderId, readonly JobRuntimeCredentialField[]> = {
-	trigger: [
-		{
-			name: 'accessToken',
-			label: 'Personal Access Token (PAT)',
-			description:
-				'Trigger.dev management PAT (tr_pat_…) from your Trigger.dev account. Required for BYO / Override; unused in Inherit mode.',
-			secret: true,
-			required: false,
-			requiredWhen: { mode: ['byo', 'override'] },
-			envVar: 'TRIGGER_ACCESS_TOKEN',
-			placeholder: 'tr_pat_…'
-		},
-		{
-			name: 'secretKey',
-			label: 'Project Secret Key',
-			description:
-				'Project-scoped server secret (tr_dev_… or tr_prod_…) used by the SDK to authenticate tasks.trigger calls. Required for BYO / Override.',
-			secret: true,
-			required: false,
-			requiredWhen: { mode: ['byo', 'override'] },
-			envVar: 'TRIGGER_SECRET_KEY',
-			placeholder: 'tr_prod_…'
-		},
-		{
-			name: 'projectRef',
-			label: 'Project Ref',
-			description:
-				'Trigger.dev project reference (e.g. proj_abc123). Required for BYO / Override.',
-			secret: false,
-			required: false,
-			requiredWhen: { mode: ['byo', 'override'] },
-			envVar: 'TRIGGER_PROJECT_REF',
-			placeholder: 'proj_…'
-		},
-		{
-			name: 'apiUrl',
-			label: 'API URL (self-hosted only)',
-			description:
-				'Override the Trigger.dev API endpoint for a self-hosted instance. Leave blank to use https://api.trigger.dev.',
-			secret: false,
-			required: false,
-			envVar: 'TRIGGER_API_URL',
-			placeholder: 'https://api.trigger.dev'
-		}
-	],
-	bullmq: [
-		{
-			name: 'redisUrl',
-			label: 'Redis URL',
-			description: 'BullMQ Redis connection string. Required for byo/override modes.',
-			secret: true,
-			required: true,
-			envVar: 'BULLMQ_REDIS_URL',
-			placeholder: 'redis://default:password@host:6379'
-		},
-		{
-			name: 'queuePrefix',
-			label: 'Queue prefix',
-			description:
-				'Per-tenant Redis key prefix for queue isolation. Falls back to a tenant-derived default when blank.',
-			secret: false,
-			required: false,
-			envVar: 'BULLMQ_QUEUE_PREFIX',
-			placeholder: 'tenant-acme'
-		}
-	],
-	pgboss: [
-		{
-			name: 'connectionString',
-			label: 'Postgres connection string',
-			description: 'pg-boss connection string. Required for byo/override modes.',
-			secret: true,
-			required: true,
-			envVar: 'PGBOSS_CONNECTION_STRING',
-			placeholder: 'postgres://user:password@host:5432/db'
-		},
-		{
-			name: 'schema',
-			label: 'pg-boss schema',
-			description:
-				'Per-tenant Postgres schema for queue isolation (ADR-017 Q2). Falls back to instance default when blank.',
-			secret: false,
-			required: false,
-			envVar: 'PGBOSS_SCHEMA',
-			placeholder: 'tenant_acme'
-		}
-	],
-	temporal: [
-		{
-			name: 'namespace',
-			label: 'Temporal namespace',
-			description: 'Per-tenant Temporal namespace (ADR-017 Q1 namespace-per-tenant).',
-			secret: false,
-			required: true,
-			envVar: 'TEMPORAL_NAMESPACE',
-			placeholder: 'tenant-acme'
-		},
-		{
-			name: 'address',
-			label: 'Temporal address',
-			description: 'gRPC endpoint for the tenant\'s Temporal cluster.',
-			secret: false,
-			required: false,
-			envVar: 'TEMPORAL_ADDRESS',
-			placeholder: 'temporal.tenant-acme.svc:7233'
-		},
-		{
-			name: 'tlsCert',
-			label: 'TLS client certificate (PEM)',
-			description: 'mTLS client cert for connecting to a tenant cluster. Paste the full PEM block.',
-			secret: true,
-			required: false,
-			envVar: 'TEMPORAL_TLS_CERT',
-			multiline: true,
-			placeholder: '-----BEGIN CERTIFICATE-----\n...'
-		},
-		{
-			name: 'tlsKey',
-			label: 'TLS client key (PEM)',
-			description: 'mTLS client key paired with the cert above.',
-			secret: true,
-			required: false,
-			envVar: 'TEMPORAL_TLS_KEY',
-			multiline: true,
-			placeholder: '-----BEGIN PRIVATE KEY-----\n...'
-		}
-	],
-	inngest: [
-		{
-			name: 'eventKey',
-			label: 'Inngest event key',
-			description: 'Used by `inngest.send()` to publish events to the tenant\'s Inngest project. SaaS only.',
-			secret: true,
-			required: true,
-			envVar: 'INNGEST_EVENT_KEY'
-		},
-		{
-			name: 'signingKey',
-			label: 'Inngest signing key',
-			description: 'Used to verify inbound webhook requests from Inngest. SaaS only.',
-			secret: true,
-			required: true,
-			envVar: 'INNGEST_SIGNING_KEY'
-		}
-	]
+export const JOB_RUNTIME_CREDENTIAL_SCHEMAS: Record<
+    TenantJobRuntimeProviderId,
+    readonly JobRuntimeCredentialField[]
+> = {
+    trigger: [
+        {
+            name: 'accessToken',
+            label: 'Personal Access Token (PAT)',
+            description:
+                'Trigger.dev management PAT (tr_pat_…) from your Trigger.dev account. Required for BYO / Override; unused in Inherit mode.',
+            secret: true,
+            required: false,
+            requiredWhen: { mode: ['byo', 'override'] },
+            envVar: 'TRIGGER_ACCESS_TOKEN',
+            placeholder: 'tr_pat_…',
+        },
+        {
+            name: 'secretKey',
+            label: 'Project Secret Key',
+            description:
+                'Project-scoped server secret (tr_dev_… or tr_prod_…) used by the SDK to authenticate tasks.trigger calls. Required for BYO / Override.',
+            secret: true,
+            required: false,
+            requiredWhen: { mode: ['byo', 'override'] },
+            envVar: 'TRIGGER_SECRET_KEY',
+            placeholder: 'tr_prod_…',
+        },
+        {
+            name: 'projectRef',
+            label: 'Project Ref',
+            description:
+                'Trigger.dev project reference (e.g. proj_abc123). Required for BYO / Override.',
+            secret: false,
+            required: false,
+            requiredWhen: { mode: ['byo', 'override'] },
+            envVar: 'TRIGGER_PROJECT_REF',
+            placeholder: 'proj_…',
+        },
+        {
+            name: 'apiUrl',
+            label: 'API URL (self-hosted only)',
+            description:
+                'Override the Trigger.dev API endpoint for a self-hosted instance. Leave blank to use https://api.trigger.dev.',
+            secret: false,
+            required: false,
+            envVar: 'TRIGGER_API_URL',
+            placeholder: 'https://api.trigger.dev',
+        },
+    ],
+    bullmq: [
+        {
+            name: 'redisUrl',
+            label: 'Redis URL',
+            description: 'BullMQ Redis connection string. Required for byo/override modes.',
+            secret: true,
+            required: true,
+            envVar: 'BULLMQ_REDIS_URL',
+            placeholder: 'redis://default:password@host:6379',
+        },
+        {
+            name: 'queuePrefix',
+            label: 'Queue prefix',
+            description:
+                'Per-tenant Redis key prefix for queue isolation. Falls back to a tenant-derived default when blank.',
+            secret: false,
+            required: false,
+            envVar: 'BULLMQ_QUEUE_PREFIX',
+            placeholder: 'tenant-acme',
+        },
+    ],
+    pgboss: [
+        {
+            name: 'connectionString',
+            label: 'Postgres connection string',
+            description: 'pg-boss connection string. Required for byo/override modes.',
+            secret: true,
+            required: true,
+            envVar: 'PGBOSS_CONNECTION_STRING',
+            placeholder: 'postgres://user:password@host:5432/db',
+        },
+        {
+            name: 'schema',
+            label: 'pg-boss schema',
+            description:
+                'Per-tenant Postgres schema for queue isolation (ADR-017 Q2). Falls back to instance default when blank.',
+            secret: false,
+            required: false,
+            envVar: 'PGBOSS_SCHEMA',
+            placeholder: 'tenant_acme',
+        },
+    ],
+    temporal: [
+        {
+            name: 'namespace',
+            label: 'Temporal namespace',
+            description: 'Per-tenant Temporal namespace (ADR-017 Q1 namespace-per-tenant).',
+            secret: false,
+            required: true,
+            envVar: 'TEMPORAL_NAMESPACE',
+            placeholder: 'tenant-acme',
+        },
+        {
+            name: 'address',
+            label: 'Temporal address',
+            description: "gRPC endpoint for the tenant's Temporal cluster.",
+            secret: false,
+            required: false,
+            envVar: 'TEMPORAL_ADDRESS',
+            placeholder: 'temporal.tenant-acme.svc:7233',
+        },
+        {
+            name: 'tlsCert',
+            label: 'TLS client certificate (PEM)',
+            description:
+                'mTLS client cert for connecting to a tenant cluster. Paste the full PEM block.',
+            secret: true,
+            required: false,
+            envVar: 'TEMPORAL_TLS_CERT',
+            multiline: true,
+            placeholder: '-----BEGIN CERTIFICATE-----\n...',
+        },
+        {
+            name: 'tlsKey',
+            label: 'TLS client key (PEM)',
+            description: 'mTLS client key paired with the cert above.',
+            secret: true,
+            required: false,
+            envVar: 'TEMPORAL_TLS_KEY',
+            multiline: true,
+            placeholder: '-----BEGIN PRIVATE KEY-----\n...',
+        },
+    ],
+    inngest: [
+        {
+            name: 'eventKey',
+            label: 'Inngest event key',
+            description:
+                "Used by `inngest.send()` to publish events to the tenant's Inngest project. SaaS only.",
+            secret: true,
+            required: true,
+            envVar: 'INNGEST_EVENT_KEY',
+        },
+        {
+            name: 'signingKey',
+            label: 'Inngest signing key',
+            description: 'Used to verify inbound webhook requests from Inngest. SaaS only.',
+            secret: true,
+            required: true,
+            envVar: 'INNGEST_SIGNING_KEY',
+        },
+    ],
 };
 
 /**
@@ -214,7 +219,8 @@ export const JOB_RUNTIME_CREDENTIAL_SCHEMAS: Record<TenantJobRuntimeProviderId, 
  * `override` mode. Reserved for future provider plugins that remain
  * operator-only.
  */
-export const PROVIDERS_WITHOUT_CREDENTIALS: ReadonlySet<TenantJobRuntimeProviderId> = new Set<TenantJobRuntimeProviderId>();
+export const PROVIDERS_WITHOUT_CREDENTIALS: ReadonlySet<TenantJobRuntimeProviderId> =
+    new Set<TenantJobRuntimeProviderId>();
 
 /**
  * EW-743 — per-provider, per-mode helper banner shown above the
@@ -224,18 +230,15 @@ export const PROVIDERS_WITHOUT_CREDENTIALS: ReadonlySet<TenantJobRuntimeProvider
  * intent). Other providers can opt in by adding an entry here.
  */
 export const JOB_RUNTIME_PROVIDER_MODE_BANNERS: Partial<
-	Record<
-		TenantJobRuntimeProviderId,
-		Readonly<Record<TenantJobRuntimeMode, string>>
-	>
+    Record<TenantJobRuntimeProviderId, Readonly<Record<TenantJobRuntimeMode, string>>>
 > = {
-	trigger: {
-		inherit:
-			"Using the platform's shared Trigger.dev project. No tenant credentials are required — jobs dispatch through the operator-default project.",
-		byo: 'Bring your own Trigger.dev account + project. Paste the PAT, project secret key, and project ref from your Trigger.dev dashboard.',
-		override:
-			"Override the platform default with your own Trigger.dev project. Same credential shape as BYO — choose this when you're explicitly opting out of the platform default rather than supplementing it."
-	}
+    trigger: {
+        inherit:
+            "Using the platform's shared Trigger.dev project. No tenant credentials are required — jobs dispatch through the operator-default project.",
+        byo: 'Bring your own Trigger.dev account + project. Paste the PAT, project secret key, and project ref from your Trigger.dev dashboard.',
+        override:
+            "Override the platform default with your own Trigger.dev project. Same credential shape as BYO — choose this when you're explicitly opting out of the platform default rather than supplementing it.",
+    },
 };
 
 /**
@@ -245,13 +248,13 @@ export const JOB_RUNTIME_PROVIDER_MODE_BANNERS: Partial<
  * falls back to the field's static `required` flag.
  */
 export function isFieldRequired(
-	field: JobRuntimeCredentialField,
-	mode: TenantJobRuntimeMode
+    field: JobRuntimeCredentialField,
+    mode: TenantJobRuntimeMode,
 ): boolean {
-	if (field.requiredWhen?.mode) {
-		return field.requiredWhen.mode.includes(mode);
-	}
-	return field.required;
+    if (field.requiredWhen?.mode) {
+        return field.requiredWhen.mode.includes(mode);
+    }
+    return field.required;
 }
 
 /**
@@ -268,11 +271,11 @@ export function isFieldRequired(
  * being rendered.
  */
 export function isFieldVisibleForMode(
-	field: JobRuntimeCredentialField,
-	mode: TenantJobRuntimeMode
+    field: JobRuntimeCredentialField,
+    mode: TenantJobRuntimeMode,
 ): boolean {
-	if (field.requiredWhen?.mode) {
-		return field.requiredWhen.mode.includes(mode);
-	}
-	return true;
+    if (field.requiredWhen?.mode) {
+        return field.requiredWhen.mode.includes(mode);
+    }
+    return true;
 }

@@ -77,7 +77,9 @@ const getAuthFromCookieImpl = async (): Promise<AuthUser | null> => {
     } catch (error) {
         if (await clearAuthCookieOnUnauthorized(error)) return null;
         if (isNetworkError(error)) {
-            console.warn('API unreachable during auth validation (opaque token); treating session as unauthenticated.');
+            console.warn(
+                'API unreachable during auth validation (opaque token); treating session as unauthenticated.',
+            );
             return null;
         }
         throw error;

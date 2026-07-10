@@ -189,11 +189,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
         const sig = opts.tamper
             ? 'sha256=' + '0'.repeat(64)
             : signBody(body, opts.secret ?? SECRET);
-        return controller.receive(
-            TENANT_ID,
-            { rawBody: body },
-            { 'x-trigger-signature': sig },
-        );
+        return controller.receive(TENANT_ID, { rawBody: body }, { 'x-trigger-signature': sig });
     }
 
     describe('happy path per event type (5 events)', () => {
@@ -405,9 +401,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
             expect(attrs).toMatchObject({ tenantId: TENANT_ID });
             // Router logged the mismatch.
             expect(
-                warnSpy.mock.calls.some((c) =>
-                    String(c[0] ?? '').includes('tenantId mismatch'),
-                ),
+                warnSpy.mock.calls.some((c) => String(c[0] ?? '').includes('tenantId mismatch')),
             ).toBe(true);
         });
 
@@ -437,13 +431,14 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
             arrangeKnownTenant();
             // Round-robin different runIds — each one has its own
             // history row in GENERATING state.
-            history.findByTriggerRunId.mockImplementation(async (runId: string) => ({
-                id: `hist-${runId}`,
-                status: GenerateStatusType.GENERATING,
-            }) as never);
-            history.updateEntry.mockImplementation(
-                async (id: string) => ({ id }) as never,
+            history.findByTriggerRunId.mockImplementation(
+                async (runId: string) =>
+                    ({
+                        id: `hist-${runId}`,
+                        status: GenerateStatusType.GENERATING,
+                    }) as never,
             );
+            history.updateEntry.mockImplementation(async (id: string) => ({ id }) as never);
 
             const deliveries = Array.from({ length: 10 }, (_, i) =>
                 deliver('alert.run.succeeded', { runId: `run_${i}` }),
@@ -465,10 +460,13 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
             // persisted state-machine view by flipping the mock's
             // return value once the first write resolves.
             let observedStatus = GenerateStatusType.GENERATING;
-            history.findByTriggerRunId.mockImplementation(async () => ({
-                id: 'hist-storm',
-                status: observedStatus,
-            }) as never);
+            history.findByTriggerRunId.mockImplementation(
+                async () =>
+                    ({
+                        id: 'hist-storm',
+                        status: observedStatus,
+                    }) as never,
+            );
             history.updateEntry.mockImplementation(async () => {
                 observedStatus = GenerateStatusType.GENERATED;
                 return { id: 'hist-storm' } as never;
@@ -507,9 +505,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
             expect(history.findByTriggerRunId).not.toHaveBeenCalled();
             expect(sentry.error).not.toHaveBeenCalled();
             expect(
-                warnSpy.mock.calls.some((c) =>
-                    String(c[0] ?? '').includes('malformed envelope'),
-                ),
+                warnSpy.mock.calls.some((c) => String(c[0] ?? '').includes('malformed envelope')),
             ).toBe(true);
         });
 
@@ -612,9 +608,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
                 credentialsSecretRef: POINTER,
             });
 
-            await expect(
-                controller.receive(TENANT_ID, { rawBody: '{}' }, {}),
-            ).rejects.toThrow();
+            await expect(controller.receive(TENANT_ID, { rawBody: '{}' }, {})).rejects.toThrow();
             await settle();
 
             expect(tenantRepo.findOne).not.toHaveBeenCalled();
@@ -627,9 +621,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
         it('tenant repo returns null → 404 + NO secret resolve + NO subscriber fires', async () => {
             tenantRepo.findOne.mockResolvedValue(null);
 
-            await expect(
-                deliver('alert.run.failed', { runId: 'run_404' }),
-            ).rejects.toThrow();
+            await expect(deliver('alert.run.failed', { runId: 'run_404' })).rejects.toThrow();
             await settle();
 
             expect(secretStore.resolve).not.toHaveBeenCalled();
@@ -644,9 +636,7 @@ describe('Trigger.dev webhook — controller → router → subscribers (end-to-
             });
             secretStore.resolve.mockResolvedValue({ apiKey: 'something-else' });
 
-            await expect(
-                deliver('alert.run.failed', { runId: 'run_no_secret' }),
-            ).rejects.toThrow();
+            await expect(deliver('alert.run.failed', { runId: 'run_no_secret' })).rejects.toThrow();
             await settle();
 
             expect(history.findByTriggerRunId).not.toHaveBeenCalled();

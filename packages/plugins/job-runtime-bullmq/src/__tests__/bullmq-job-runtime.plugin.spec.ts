@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TenantCredentialSnapshot } from '@ever-works/plugin';
-import {
-	BullMqDispatcherNotConfiguredError,
-	BullMqJobRuntimePlugin
-} from '../bullmq-job-runtime.plugin.js';
+import { BullMqDispatcherNotConfiguredError, BullMqJobRuntimePlugin } from '../bullmq-job-runtime.plugin.js';
 
 describe('BullMqJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 	let plugin: BullMqJobRuntimePlugin;
@@ -46,9 +43,7 @@ describe('BullMqJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 
 	it('stub dispatchers throw BullMqDispatcherNotConfiguredError', () => {
 		const d = plugin.dispatchers as unknown as { dispatchKbEmbedDocument: () => unknown };
-		expect(() => d.dispatchKbEmbedDocument()).toThrowError(
-			BullMqDispatcherNotConfiguredError
-		);
+		expect(() => d.dispatchKbEmbedDocument()).toThrowError(BullMqDispatcherNotConfiguredError);
 	});
 
 	it('lifecycle methods return safe defaults', async () => {

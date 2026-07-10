@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { TenantCredentialSnapshot } from '@ever-works/plugin';
-import {
-	TemporalDispatcherNotConfiguredError,
-	TemporalJobRuntimePlugin
-} from '../temporal-job-runtime.plugin.js';
+import { TemporalDispatcherNotConfiguredError, TemporalJobRuntimePlugin } from '../temporal-job-runtime.plugin.js';
 
 describe('TemporalJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 	let plugin: TemporalJobRuntimePlugin;
@@ -54,9 +51,7 @@ describe('TemporalJobRuntimePlugin (EW-742 P3.2 follow-up)', () => {
 			const dispatcher = plugin.dispatchers as unknown as {
 				dispatchKbEmbedDocument: (p: unknown) => unknown;
 			};
-			expect(() => dispatcher.dispatchKbEmbedDocument({})).toThrowError(
-				TemporalDispatcherNotConfiguredError
-			);
+			expect(() => dispatcher.dispatchKbEmbedDocument({})).toThrowError(TemporalDispatcherNotConfiguredError);
 		});
 	});
 
