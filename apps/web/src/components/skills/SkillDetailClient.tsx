@@ -2,8 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Link2, Sparkles, Trash2 } from 'lucide-react';
+import {
+    ArrowLeft,
+    Bot,
+    Briefcase,
+    Building2,
+    Check,
+    ChevronDown,
+    FileText,
+    Lightbulb,
+    Link2,
+    Plus,
+    Search,
+    Sparkles,
+    Target,
+    Trash2,
+    type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
@@ -23,10 +42,12 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
  * Agents/Skills/Tasks PR #1017 — Phase 9.4 client.
  *
  * Sectioned scroll: header → body editor → bindings list + add
- * form → danger zone (delete). v1 uses a plain textarea for the
- * body with 800ms autosave + error banner; Tiptap upgrade arrives
- * once the shared KbEditor toolbar is extracted (same posture as
- * the Agent Instructions editor at Phase 5.6).
+ * form → danger zone (delete). The body is a Write/Preview markdown
+ * editor: a plain textarea with 800ms autosave + error banner, plus
+ * a rendered preview tab reusing the shared lazy-loaded
+ * MarkdownPreview. Tiptap upgrade arrives once the shared KbEditor
+ * toolbar is extracted (same posture as the Agent Instructions
+ * editor at Phase 5.6).
  */
 export function SkillDetailClient({
     skill,
@@ -35,32 +56,46 @@ export function SkillDetailClient({
     skill: Skill;
     initialBindings: SkillBinding[];
 }) {
+    const t = useTranslations('dashboard.skillsPage.detail');
+    const OwnerTypeIcon = TARGET_TYPE_ICONS[skill.ownerType];
+
     return (
         <div className="max-w-screen-2xl mx-auto p-6 space-y-6">
             <Link
                 href={ROUTES.DASHBOARD_SKILLS}
-                className="text-xs text-text-muted hover:text-text"
+                className="inline-flex items-center gap-1.5 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
             >
-                ← Skills
+                <ArrowLeft className="w-4 h-4" />
+                {t('backToSkills')}
             </Link>
-            <header className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-                <div className="flex items-start gap-3">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-success/10 border border-success/20 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-success" />
+            <header className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-6">
+                <div className="flex items-start gap-4">
+                    <div className="shrink-0 w-12 h-12 rounded-xl bg-success/10 border border-success/20 flex items-center justify-center">
+                        <Sparkles className="w-5 h-5 text-success" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 text-[11px] text-text-muted font-mono">
-                            <span>{skill.slug}</span>
-                            <span>·</span>
-                            <span className="uppercase tracking-wide">{skill.ownerType}</span>
-                            <span>·</span>
-                            <span>v{skill.version}</span>
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <h1
+                                className="text-xl font-semibold text-text dark:text-text-dark truncate"
+                                title={skill.title}
+                            >
+                                {skill.title}
+                            </h1>
+                            <span className="text-xs font-mono text-text-muted dark:text-text-muted-dark bg-surface-secondary dark:bg-surface-secondary-dark px-1.5 py-0.5 rounded">
+                                v{skill.version}
+                            </span>
+                            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                <OwnerTypeIcon className="w-3 h-3" />
+                                {t(skill.ownerType)}
+                            </span>
                         </div>
-                        <h1 className="text-2xl font-semibold text-text dark:text-text-dark mt-1">
-                            {skill.title}
-                        </h1>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1">
-                            {skill.description}
+                        {skill.description && (
+                            <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-2 leading-relaxed">
+                                {skill.description}
+                            </p>
+                        )}
+                        <p className="text-xs font-mono text-text-muted dark:text-text-muted-dark mt-2">
+                            {skill.slug}
                         </p>
                     </div>
                 </div>
@@ -74,6 +109,7 @@ export function SkillDetailClient({
 }
 
 function BodyEditor({ skill }: { skill: Skill }) {
+    const t = useTranslations('dashboard.skillsPage.detail');
     const [body, setBody] = useState(skill.instructionsMd);
     const [status, setStatus] = useState<SaveStatus>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -107,29 +143,44 @@ function BodyEditor({ skill }: { skill: Skill }) {
 
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
-            <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">Body</h2>
-                <span className="text-xs text-text-muted">
-                    {status === 'saving' && '…saving'}
-                    {status === 'saved' && '✓ saved'}
-                    {status === 'error' && <span className="text-danger">save failed</span>}
-                </span>
-            </div>
             {error && (
                 <p className="text-xs text-danger" role="alert">
                     {error}
                 </p>
             )}
-            <textarea
+            <SkillMarkdownEditor
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                rows={20}
-                spellCheck={false}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 font-mono text-xs text-text dark:text-text-dark"
+                idPrefix="skill-body"
+                label={
+                    <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-success" />
+                        {t('instructions')}
+                    </h2>
+                }
+                headerExtra={
+                    <span className="text-[11px] text-text-muted" aria-live="polite">
+                        {status === 'saving' && t('body.saving')}
+                        {status === 'saved' && t('body.saved')}
+                        {status === 'error' && (
+                            <span className="text-danger">{t('body.saveFailed')}</span>
+                        )}
+                    </span>
+                }
             />
         </section>
     );
 }
+
+// Icon per binding target type — badges stay neutral (surface tokens) so the
+// panel reads calmly next to the colored priority/injection pills.
+const TARGET_TYPE_ICONS: Record<SkillBindingTargetType, LucideIcon> = {
+    tenant: Building2,
+    agent: Bot,
+    work: Briefcase,
+    mission: Target,
+    idea: Lightbulb,
+};
 
 function BindingsPanel({
     skillId,
@@ -185,96 +236,144 @@ function BindingsPanel({
 
     const sorted = useMemo(() => [...bindings].sort((a, b) => a.priority - b.priority), [bindings]);
 
+    // Prefix icon inside the "Bind to" trigger — tracks the selected type.
+    const TargetTypeIcon = TARGET_TYPE_ICONS[targetType];
+
     return (
         <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
-            <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
-                <Link2 className="w-4 h-4 text-info" />
-                {t('bindings')}
-            </h2>
+            <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                    <Link2 className="w-4 h-4 text-info" />
+                    {t('bindings')}
+                </h2>
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
+                    {sorted.length}
+                </span>
+            </div>
             <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
                 {t('bindingHelper')}
             </p>
             {sorted.length === 0 ? (
-                <p className="text-xs text-text-muted">No bindings yet. Add one below.</p>
+                <div className="rounded-lg border border-dashed border-border/60 dark:border-border-dark/60 px-4 py-6 text-center">
+                    <p className="text-xs text-text-muted">{t('noBindings')}</p>
+                </div>
             ) : (
                 <ul className="space-y-2">
-                    {sorted.map((b) => (
-                        <li
-                            key={b.id}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-border/40 dark:border-border-dark/40 p-2 text-xs"
-                        >
-                            <span className="flex items-center gap-2">
-                                <span className="uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary">
-                                    {b.targetType}
-                                </span>
-                                {b.targetId && (
-                                    <span className="font-mono text-text-muted">
-                                        {b.targetId.slice(0, 8)}…
-                                    </span>
-                                )}
-                                <span className="text-text-muted">priority {b.priority}</span>
-                                {!b.injectIntoAgent && (
-                                    <span className="text-warning">agent: off</span>
-                                )}
-                                {b.injectIntoGenerator && (
-                                    <span className="text-info">generator: on</span>
-                                )}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => handleDelete(b.id)}
-                                className="text-text-muted hover:text-danger"
-                                aria-label="Remove binding"
+                    {sorted.map((b) => {
+                        const TypeIcon = TARGET_TYPE_ICONS[b.targetType];
+                        return (
+                            <li
+                                key={b.id}
+                                className="flex items-center justify-between gap-3 rounded-lg border border-border/40 dark:border-border-dark/40 bg-surface-secondary/30 dark:bg-surface-secondary-dark/30 px-3 py-2 text-xs"
                             >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                        </li>
-                    ))}
+                                <span className="flex items-center gap-2 min-w-0 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 uppercase tracking-wide text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-border/40 dark:border-border-dark/40 bg-card dark:bg-card-primary-dark text-text-secondary dark:text-text-secondary-dark">
+                                        <TypeIcon className="w-3 h-3" />
+                                        {t(b.targetType)}
+                                    </span>
+                                    {b.targetId && (
+                                        <span className="font-mono text-[11px] text-text-muted">
+                                            {b.targetId.slice(0, 8)}…
+                                        </span>
+                                    )}
+                                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-info/10 text-info border border-info/20">
+                                        {t('priority')} {b.priority}
+                                    </span>
+                                    {!b.injectIntoAgent && (
+                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-warning/10 text-warning border border-warning/20">
+                                            {t('agentOff')}
+                                        </span>
+                                    )}
+                                    {b.injectIntoGenerator && (
+                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-success/10 text-success border border-success/20">
+                                            {t('generatorOn')}
+                                        </span>
+                                    )}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDelete(b.id)}
+                                    className="shrink-0 p-1.5 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                                    aria-label={t('removeBinding')}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </li>
+                        );
+                    })}
                 </ul>
             )}
-            <form
-                onSubmit={handleAdd}
-                className="grid grid-cols-1 @md/main:grid-cols-[auto_1fr_auto_auto] gap-2 items-end pt-3 border-t border-border/40 dark:border-border-dark/40"
-            >
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Target type</label>
-                    <select
-                        value={targetType}
-                        onChange={(e) => setTargetType(e.target.value as SkillBindingTargetType)}
-                        className="rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                    >
-                        <option value="tenant">workspace</option>
-                        <option value="agent">agent</option>
-                        <option value="work">work</option>
-                        <option value="mission">mission</option>
-                        <option value="idea">idea</option>
-                    </select>
-                </div>
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">
-                        {targetType === 'tenant' ? 'Target (auto-filled)' : `Pick a ${targetType}`}
-                    </label>
-                    <SkillBindingTargetPicker
-                        targetType={targetType}
-                        value={targetId}
-                        onChange={setTargetId}
-                    />
-                </div>
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Priority</label>
-                    <input
-                        type="number"
-                        value={priority}
-                        onChange={(e) => setPriority(parseInt(e.target.value, 10) || 100)}
-                        min={1}
-                        max={9999}
-                        className="w-20 rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                    />
-                </div>
-                <Button type="submit" size="sm" disabled={pending}>
-                    {pending ? '…' : 'Add'}
-                </Button>
-            </form>
+            <div className="pt-3 border-t border-border/40 dark:border-border-dark/40 space-y-2">
+                <h3 className="text-xs font-medium text-text dark:text-text-dark">
+                    {t('addBindingTitle')}
+                </h3>
+                <form
+                    onSubmit={handleAdd}
+                    className="grid grid-cols-1 @md/main:grid-cols-[auto_1fr_auto_auto] gap-2 items-end"
+                >
+                    <div>
+                        <label
+                            htmlFor="skill-binding-target-type"
+                            className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1"
+                        >
+                            {t('targetType')}
+                        </label>
+                        <div className="relative w-32">
+                            <TargetTypeIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+                            <Select
+                                id="skill-binding-target-type"
+                                size="xs"
+                                value={targetType}
+                                onValueChange={(v) => setTargetType(v as SkillBindingTargetType)}
+                                className="w-32 [&>button]:pl-7"
+                            >
+                                <option value="tenant">{t('tenant')}</option>
+                                <option value="agent">{t('agent')}</option>
+                                <option value="work">{t('work')}</option>
+                                <option value="mission">{t('mission')}</option>
+                                <option value="idea">{t('idea')}</option>
+                            </Select>
+                        </div>
+                    </div>
+                    <div>
+                        {/* Tenant scope renders a static readout (no input), so only
+                            reference the picker input's id when one exists. */}
+                        <label
+                            htmlFor={targetType === 'tenant' ? undefined : 'skill-binding-target'}
+                            className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1"
+                        >
+                            {t('target')}
+                        </label>
+                        <SkillBindingTargetPicker
+                            targetType={targetType}
+                            value={targetId}
+                            onChange={setTargetId}
+                        />
+                    </div>
+                    <div>
+                        <label
+                            htmlFor="skill-binding-priority"
+                            className="block text-[11px] text-text-secondary dark:text-text-secondary-dark mb-1"
+                        >
+                            {t('priority')}
+                        </label>
+                        <Input
+                            id="skill-binding-priority"
+                            variant="form"
+                            type="number"
+                            value={priority}
+                            onChange={(e) => setPriority(parseInt(e.target.value, 10) || 100)}
+                            min={1}
+                            max={9999}
+                            className="w-24 h-8 px-2 text-xs"
+                        />
+                    </div>
+                    <Button type="submit" size="sm" disabled={pending}>
+                        <Plus className="w-3.5 h-3.5 mr-1" />
+                        {pending ? t('adding') : t('add')}
+                    </Button>
+                </form>
+            </div>
             {error && (
                 <p className="text-xs text-danger" role="alert">
                     {error}
@@ -286,8 +385,10 @@ function BindingsPanel({
 
 /**
  * FU-8 — searchable target picker. Replaces the raw UUID textbox with
- * a dropdown that loads the user's own entities for the chosen
- * targetType. Tenant scope auto-fills (no picker needed); agent /
+ * a combobox that loads the user's own entities for the chosen
+ * targetType: one input that shows the selected option and filters
+ * the dropdown as you type (arrow keys + Enter to pick, Escape to
+ * close). Tenant scope auto-fills (no picker needed); agent /
  * mission / idea / work load via the existing list endpoints.
  *
  * Falls back to a plain text input when the list endpoint isn't
@@ -304,10 +405,14 @@ function SkillBindingTargetPicker({
     onChange: (v: string) => void;
 }) {
     type Option = { id: string; label: string };
+    const t = useTranslations('dashboard.skillsPage.detail.picker');
     const [options, setOptions] = useState<Option[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
-    const [filter, setFilter] = useState('');
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState('');
+    const [activeIndex, setActiveIndex] = useState(0);
+    const listRef = useRef<HTMLUListElement | null>(null);
     // FU-8 review fix (greptile P2): stash `onChange` in a ref so the
     // effect doesn't re-fire (or worse, infinite-loop) when a parent
     // passes an inline arrow function. The effect should only re-run
@@ -318,6 +423,9 @@ function SkillBindingTargetPicker({
     }, [onChange]);
 
     useEffect(() => {
+        setOpen(false);
+        setQuery('');
+        setActiveIndex(0);
         if (targetType === 'tenant') {
             setOptions([]);
             onChangeRef.current('');
@@ -347,61 +455,146 @@ function SkillBindingTargetPicker({
         return () => {
             cancelled = true;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetType]);
+
+    // Keep the keyboard-highlighted option visible while arrowing
+    // through a list longer than the dropdown's max height.
+    useEffect(() => {
+        listRef.current
+            ?.querySelector('[data-active="true"]')
+            ?.scrollIntoView({ block: 'nearest' });
+    }, [activeIndex, open]);
 
     if (targetType === 'tenant') {
         return (
-            <input
-                type="text"
-                value=""
-                disabled
-                placeholder="auto"
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono disabled:opacity-50"
-            />
+            <div className="flex items-center gap-1.5 h-8 px-2 rounded-lg border border-border/40 dark:border-border-dark/40 bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 text-xs text-text-muted">
+                <Building2 className="w-3.5 h-3.5 shrink-0" />
+                {t('workspaceWide')}
+            </div>
         );
     }
 
-    const filtered =
-        filter.trim().length === 0
-            ? options
-            : options.filter((o) => o.label.toLowerCase().includes(filter.trim().toLowerCase()));
-
-    if (loadError || options.length === 0) {
+    if (loadError || (!loading && options.length === 0)) {
         return (
-            <input
+            <Input
+                id="skill-binding-target"
+                variant="form"
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                placeholder={loadError ? 'paste a uuid' : `no ${targetType}s — paste uuid`}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                placeholder={loadError ? t('pasteUuid') : t('noOptionsPasteUuid')}
+                autoComplete="off"
+                spellCheck={false}
+                className="h-8 px-2 text-xs font-mono"
+                data-testid="skill-binding-target-picker"
             />
         );
     }
+
+    const normalized = query.trim().toLowerCase();
+    const filtered =
+        normalized.length === 0
+            ? options
+            : options.filter((o) => o.label.toLowerCase().includes(normalized));
+    const selected = options.find((o) => o.id === value);
+
+    const select = (o: Option) => {
+        onChange(o.id);
+        setOpen(false);
+        setQuery('');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!open) setOpen(true);
+            else setActiveIndex((i) => Math.min(i + 1, filtered.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex((i) => Math.max(i - 1, 0));
+        } else if (e.key === 'Enter') {
+            if (open && filtered[activeIndex]) {
+                e.preventDefault();
+                select(filtered[activeIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            setOpen(false);
+        }
+    };
 
     return (
-        <div className="space-y-1">
-            <input
+        <div
+            className="relative"
+            onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+            }}
+        >
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+            <Input
+                id="skill-binding-target"
+                variant="form"
                 type="text"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                placeholder={`Search ${targetType}s`}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                disabled={loading}
+                role="combobox"
+                aria-expanded={open}
+                aria-controls="skill-binding-target-listbox"
+                aria-autocomplete="list"
+                autoComplete="off"
+                spellCheck={false}
+                value={open ? query : (selected?.label ?? '')}
+                onFocus={() => {
+                    setOpen(true);
+                    setQuery('');
+                    setActiveIndex(0);
+                }}
+                onChange={(e) => {
+                    setQuery(e.target.value);
+                    setOpen(true);
+                    setActiveIndex(0);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={selected ? selected.label : t('searchPlaceholder')}
+                className="h-8 pl-7 pr-7 text-xs"
+                data-testid="skill-binding-target-picker"
             />
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
-                size={Math.min(5, Math.max(2, filtered.length + 1))}
-            >
-                <option value="">— pick a {targetType} —</option>
-                {filtered.map((o) => (
-                    <option key={o.id} value={o.id}>
-                        {o.label}
-                    </option>
-                ))}
-            </select>
+            <ChevronDown
+                className={`absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+            {open && (
+                <ul
+                    id="skill-binding-target-listbox"
+                    role="listbox"
+                    ref={listRef}
+                    className="absolute z-50 mt-1 w-full max-h-56 overflow-auto rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark shadow-lg p-1"
+                >
+                    {loading ? (
+                        <li className="px-2 py-1.5 text-xs text-text-muted">{t('loading')}</li>
+                    ) : filtered.length === 0 ? (
+                        <li className="px-2 py-1.5 text-xs text-text-muted">{t('noMatches')}</li>
+                    ) : (
+                        filtered.map((o, i) => (
+                            <li key={o.id} role="option" aria-selected={o.id === value}>
+                                <button
+                                    type="button"
+                                    data-active={i === activeIndex}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => select(o)}
+                                    onMouseEnter={() => setActiveIndex(i)}
+                                    className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-left text-xs transition-colors ${
+                                        i === activeIndex
+                                            ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark'
+                                            : 'text-text-secondary dark:text-text-secondary-dark'
+                                    }`}
+                                >
+                                    <span className="truncate">{o.label}</span>
+                                    {o.id === value && (
+                                        <Check className="w-3.5 h-3.5 shrink-0 text-success" />
+                                    )}
+                                </button>
+                            </li>
+                        ))
+                    )}
+                </ul>
+            )}
         </div>
     );
 }
@@ -446,12 +639,7 @@ function DangerZone({ skillId }: { skillId: string }) {
                     >
                         Cancel
                     </Button>
-                    <Button
-                        size="sm"
-                        onClick={handleDelete}
-                        disabled={pending}
-                        className="bg-danger text-white hover:bg-danger/90"
-                    >
+                    <Button size="sm" variant="danger" onClick={handleDelete} disabled={pending}>
                         {pending ? '…' : 'Confirm delete'}
                     </Button>
                 </div>

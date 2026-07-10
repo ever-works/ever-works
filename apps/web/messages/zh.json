@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ 新任务",
+                "noDescription": "暂无描述",
                 "kanban": "看板",
                 "list": "列表",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "优先级",
                 "labels": "标签",
                 "labelsPlaceholder": "用逗号分隔",
+                "workScopedTask": "限定于 Work 的任务",
+                "missionScopedTask": "限定于 Mission 的任务",
+                "ideaScopedTask": "限定于 Idea 的任务",
+                "prefillPromptNotice": "此表单已根据 URL 链接预填充。请在创建任务前检查内容。",
+                "prefillTemplateNotice": "已根据模板 <name>{slug}</name> 预填充。请在创建任务前检查内容。",
+                "priorityP0": "P0 — 紧急",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — 默认",
+                "priorityP4": "P4 — 低",
+                "createError": "创建任务失败",
                 "cancel": "取消",
                 "create": "创建"
             },
@@ -680,8 +692,25 @@
                 "browse": "浏览",
                 "uploading": "上传中…",
                 "detach": "分离",
+                "attachmentsWorkOnly": "附件仅在限定于 Work 的任务中可用。请从某个 Work 创建任务以附加文件。",
                 "labels": "标签",
-                "edited": "已编辑"
+                "edited": "已编辑",
+                "description": "描述",
+                "edit": "编辑",
+                "save": "保存",
+                "cancel": "取消",
+                "descriptionPlaceholder": "添加描述…",
+                "noDescription": "暂无描述。",
+                "saveDescriptionError": "保存描述失败",
+                "details": "详细信息",
+                "status": "状态",
+                "priority": "优先级",
+                "scope": "范围",
+                "created": "创建时间",
+                "updated": "更新时间",
+                "scopeWork": "工作",
+                "scopeMission": "任务",
+                "scopeIdea": "想法"
             },
             "recurring": {
                 "section": "重复计划",
@@ -705,6 +734,13 @@
                 "blocked": "受阻",
                 "done": "完成",
                 "cancelled": "已取消"
+            },
+            "priority": {
+                "p0": "紧急",
+                "p1": "高",
+                "p2": "中",
+                "p3": "普通",
+                "p4": "低"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "技能将在代理/技能/任务推出的后期阶段提供。该页面已保留，以便侧边栏导航路由能够解析。"
             },
             "list": {
-                "newSkill": "+ 新技能",
+                "newSkill": "新技能",
                 "filter": {
                     "scope": "范围",
                     "all": "全部"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "该创意已不可用。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "帮助与资源",
                 "subtitle": "快速提示和有用链接，帮助您入门",
+                "tabs": {
+                    "tips": "提示",
+                    "shortcuts": "快捷键",
+                    "faq": "常见问题",
+                    "resources": "资源"
+                },
                 "onboarding": {
                     "title": "入门",
                     "description": "随时重新打开引导设置，并从您停止的地方继续。",
@@ -935,7 +978,8 @@
                     "title": "快速提示",
                     "tip1": "通过点击仪表板上的“创建作品”按钮创建您的第一个作品。",
                     "tip2": "使用 AI 生成器自动用相关项目填充您的作品。",
-                    "tip3": "连接您的 GitHub 帐户，以将作品作为仓库同步和部署。"
+                    "tip3": "连接您的 GitHub 帐户，以将作品作为仓库同步和部署。",
+                    "tip4": "随时按 ? 键即可重新打开此“帮助与资源”面板。"
                 },
                 "shortcuts": {
                     "title": "键盘快捷键",
@@ -949,9 +993,39 @@
                     "github": "GitHub 仓库",
                     "issues": "报告问题",
                     "docs": "文档",
-                    "comingSoon": "即将推出"
+                    "comingSoon": "即将推出",
+                    "community": "社区讨论"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "需要更多帮助？",
+                    "description": "查阅文档或向社区提问——我们通常会很快回复。",
+                    "action": "加入讨论"
+                },
+                "faq": {
+                    "title": "常见问题",
+                    "q1": "AI 生成是如何工作的？",
+                    "a1": "它以一个简短的引导式流程运行:",
+                    "a1s1": "用一两句话描述你的 Work：主题、受众和目标。",
+                    "a1s2": "AI 研究资料，并起草条目、分类和标签。",
+                    "a1s3": "查看后，在发布前随意编辑或重新生成。",
+                    "q2": "如何连接 GitHub？",
+                    "a2": "连接后即可将 works 作为仓库同步和部署:",
+                    "a2s1": "打开 设置 → 集成，在 GitHub 处点击连接。",
+                    "a2s2": "授权 Ever Works，并选择账户或组织。",
+                    "a2s3": "在 Work 中选择要同步或部署的仓库。",
+                    "q3": "生成后还能编辑条目吗？",
+                    "a3": "可以——每个条目始终可完全编辑:",
+                    "a3s1": "打开条目以编辑其标题、内容或元数据。",
+                    "a3s2": "或重新生成单个条目以获得新的 AI 草稿。",
+                    "a3s3": "保存后，更改会立即生效。",
+                    "learnMore": "了解更多"
+                },
+                "system": {
+                    "title": "系统",
+                    "operational": "所有系统运行正常",
+                    "environment": "环境"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "创建作品"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "代理",
+                "heading": "此工作的代理",
+                "emptyTitle": "还没有代理",
+                "emptySubtitle": "创建一个代理来自动化此工作。",
+                "pause": "暂停代理",
+                "activate": "激活代理",
+                "pausedToast": "代理已暂停",
+                "activatedToast": "代理已激活",
+                "statusUpdateFailed": "无法更新状态",
+                "newAgent": "新代理",
+                "moreAgents": "还有 {count} 个"
+            },
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
             "generationCancelled": "生成已取消",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "例如，Awesome AI Tools",
                 "workNameHelp": "如果留空，AI 将建议一个名称",
                 "promptLabel": "描述您的作品",
+                "slugChecking": "正在检查可用性…",
+                "slugAvailable": "{slug} 可用",
+                "slugTakenName": "{slug} 已存在于你的作品中",
+                "slugUseSuggestion": "使用 {suggestion}",
+                "slugCheckError": "无法检查可用性 — 你仍可继续",
                 "githubRequired": "请先连接您的 GitHub 账户。",
                 "promptPlaceholder": "描述您想要创建什么样的作品，它应该包含什么项目，以及任何具体要求...",
                 "inspirationText": "需要灵感？试试这些：",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "可持续时尚",
                         "prompt": "创建一个可持续时尚品牌集合"
+                    },
+                    "4": {
+                        "name": "自托管应用",
+                        "prompt": "创建一个可自托管的开源应用目录，作为流行 SaaS 工具的替代品"
+                    },
+                    "5": {
+                        "name": "AI 编程智能体",
+                        "prompt": "创建一个精选的 AI 编程智能体和助手目录，包含价格和 IDE 支持"
+                    },
+                    "6": {
+                        "name": "独立开发者工具",
+                        "prompt": "构建一个编录面向独立开发者和单人创始人的工具与服务的作品"
+                    },
+                    "7": {
+                        "name": "设计灵感",
+                        "prompt": "创建一个面向落地页和作品集的设计灵感网站集合"
                     }
                 },
                 "featuresTitle": "AI 将为您做什么：",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} 未配置。请访问设置 → 插件在生成前进行设置。",
                     "nameRequired": "作品名称是必填的",
                     "slugRequired": "作品 slug 是必填的",
+                    "slugTaken": "该 slug 已存在于你的作品中。请选择其他。",
                     "descriptionRequired": "作品描述是必填的",
                     "githubRequired": "请先连接您的 GitHub 账户。",
                     "createFailed": "创建作品失败"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "该创意已不可用。"
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "任意状态",
                 "apply": "应用",
                 "reset": "重置"
+            },
+            "newPage": {
+                "link": "手动创建",
+                "or": "或",
+                "title": "新建 Idea",
+                "subtitle": "撰写你自己的 Idea。描述你想创建的 Work — 之后即可将其加入构建队列。",
+                "nameLabel": "标题",
+                "namePlaceholder": "可选 — 留空则根据描述自动生成",
+                "descriptionLabel": "描述",
+                "descriptionPlaceholder": "描述这个 Idea 将要变成的 Work — 例如“一个精选的开源 AI 智能体框架目录，按框架类型和许可证组织。”",
+                "descriptionHint": "至少 10 个字符。",
+                "cancel": "取消",
+                "create": "创建 Idea",
+                "creating": "正在创建…",
+                "minLength": "描述至少需要 10 个字符。",
+                "error": "无法创建 Idea，请重试。"
             }
         },
         "discover": {

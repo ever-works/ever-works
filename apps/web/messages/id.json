@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Tugas Baru",
+                "noDescription": "Belum ada deskripsi",
                 "kanban": "Kanban",
                 "list": "Daftar",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Prioritas",
                 "labels": "Label",
                 "labelsPlaceholder": "dipisahkan koma",
+                "workScopedTask": "Tugas terbatas pada Work",
+                "missionScopedTask": "Tugas terbatas pada Mission",
+                "ideaScopedTask": "Tugas terbatas pada Idea",
+                "prefillPromptNotice": "Formulir ini telah diisi sebelumnya dari tautan URL. Tinjau konten sebelum membuat tugas.",
+                "prefillTemplateNotice": "Diisi sebelumnya dari templat <name>{slug}</name>. Tinjau konten sebelum membuat tugas.",
+                "priorityP0": "P0 — mendesak",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — default",
+                "priorityP4": "P4 — rendah",
+                "createError": "Gagal membuat tugas",
                 "cancel": "Batal",
                 "create": "Buat"
             },
@@ -680,8 +692,25 @@
                 "browse": "Telusuri",
                 "uploading": "Mengunggah…",
                 "detach": "Lepas",
+                "attachmentsWorkOnly": "Lampiran hanya tersedia pada tugas yang terkait dengan Work. Buat tugas dari sebuah Work untuk melampirkan file.",
                 "labels": "Label",
-                "edited": "diedit"
+                "edited": "diedit",
+                "description": "Deskripsi",
+                "edit": "Edit",
+                "save": "Simpan",
+                "cancel": "Batal",
+                "descriptionPlaceholder": "Tambahkan deskripsi…",
+                "noDescription": "Tidak ada deskripsi.",
+                "saveDescriptionError": "Gagal menyimpan deskripsi",
+                "details": "Detail",
+                "status": "Status",
+                "priority": "Prioritas",
+                "scope": "Cakupan",
+                "created": "Dibuat",
+                "updated": "Diperbarui",
+                "scopeWork": "Karya",
+                "scopeMission": "Misi",
+                "scopeIdea": "Ide"
             },
             "recurring": {
                 "section": "Jadwal berulang",
@@ -705,6 +734,13 @@
                 "blocked": "Diblokir",
                 "done": "Selesai",
                 "cancelled": "Dibatalkan"
+            },
+            "priority": {
+                "p0": "Mendesak",
+                "p1": "Tinggi",
+                "p2": "Sedang",
+                "p3": "Normal",
+                "p4": "Rendah"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "Keterampilan akan tersedia di fase berikutnya dari peluncuran Agen/Keterampilan/Tugas. Halaman ini telah disiapkan agar rute navigasi sidebar dapat teratasi."
             },
             "list": {
-                "newSkill": "+ Keterampilan Baru",
+                "newSkill": "Keterampilan Baru",
                 "filter": {
                     "scope": "Cakupan",
                     "all": "Semua"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ide ini sudah tidak tersedia lagi."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "Bantuan & Sumber Daya",
                 "subtitle": "Tips cepat dan tautan berguna untuk membantu Anda memulai",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Pintasan",
+                    "faq": "FAQ",
+                    "resources": "Sumber Daya"
+                },
                 "onboarding": {
                     "title": "Onboarding",
                     "description": "Buka kembali pengaturan terpandu kapan saja dan lanjutkan dari tempat Anda berhenti.",
@@ -935,7 +978,8 @@
                     "title": "Tips Cepat",
                     "tip1": "Buat karya pertama Anda dengan mengklik tombol 'Buat Karya' di dasbor.",
                     "tip2": "Gunakan generator AI untuk mengisi karya Anda secara otomatis dengan item relevan.",
-                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori."
+                    "tip3": "Hubungkan akun GitHub Anda untuk menyinkronkan dan menerapkan karya Anda sebagai repositori.",
+                    "tip4": "Tekan ? kapan saja untuk membuka kembali panel Bantuan & Sumber Daya ini."
                 },
                 "shortcuts": {
                     "title": "Pintasan Keyboard",
@@ -949,9 +993,39 @@
                     "github": "Repositori GitHub",
                     "issues": "Laporkan Masalah",
                     "docs": "Dokumentasi",
-                    "comingSoon": "Segera hadir"
+                    "comingSoon": "Segera hadir",
+                    "community": "Diskusi Komunitas"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Butuh bantuan lebih?",
+                    "description": "Jelajahi dokumentasi atau tanyakan kepada komunitas — kami biasanya membalas dengan cepat.",
+                    "action": "Gabung diskusi"
+                },
+                "faq": {
+                    "title": "Pertanyaan Umum",
+                    "q1": "Bagaimana cara kerja pembuatan dengan AI?",
+                    "a1": "Ini berjalan sebagai alur terpandu yang singkat:",
+                    "a1s1": "Jelaskan Work Anda — topik, audiens, dan tujuannya.",
+                    "a1s2": "AI meneliti sumber dan menyusun item, kategori, dan tag.",
+                    "a1s3": "Tinjau, lalu edit atau buat ulang apa pun sebelum menerbitkan.",
+                    "q2": "Bagaimana cara menghubungkan GitHub?",
+                    "a2": "Hubungkan untuk menyinkronkan dan men-deploy works sebagai repositori:",
+                    "a2s1": "Buka Pengaturan → Integrasi dan klik Hubungkan pada GitHub.",
+                    "a2s2": "Otorisasi Ever Works dan pilih akun atau organisasi.",
+                    "a2s3": "Pilih repositori untuk disinkronkan atau di-deploy dari Work Anda.",
+                    "q3": "Bisakah saya mengedit item setelah dibuat?",
+                    "a3": "Ya — setiap item tetap sepenuhnya dapat diedit:",
+                    "a3s1": "Buka item untuk mengedit judul, konten, atau metadatanya.",
+                    "a3s2": "Atau buat ulang satu item untuk mendapatkan draf AI baru.",
+                    "a3s3": "Simpan dan perubahan Anda langsung diterapkan.",
+                    "learnMore": "Pelajari selengkapnya"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Semua sistem beroperasi",
+                    "environment": "Lingkungan"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "Buat Karya"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agen",
+                "heading": "Agen untuk Karya ini",
+                "emptyTitle": "Belum ada Agen",
+                "emptySubtitle": "Buat Agen untuk mengotomatiskan Karya ini.",
+                "pause": "Jeda Agen",
+                "activate": "Aktifkan Agen",
+                "pausedToast": "Agen dijeda",
+                "activatedToast": "Agen diaktifkan",
+                "statusUpdateFailed": "Tidak dapat memperbarui status",
+                "newAgent": "Agen Baru",
+                "moreAgents": "+{count} lainnya"
+            },
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",
             "generationCancelled": "Generasi dibatalkan",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "misalnya, Awesome AI Tools",
                 "workNameHelp": "AI akan menyarankan nama jika Anda biarkan kosong",
                 "promptLabel": "Jelaskan Karya Anda",
+                "slugChecking": "Memeriksa ketersediaan…",
+                "slugAvailable": "{slug} tersedia",
+                "slugTakenName": "{slug} sudah ada di karya Anda",
+                "slugUseSuggestion": "Gunakan {suggestion}",
+                "slugCheckError": "Tidak dapat memeriksa ketersediaan — Anda tetap bisa melanjutkan",
                 "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
                 "promptPlaceholder": "Jelaskan jenis karya yang ingin Anda buat, item apa yang harus dikandung, dan persyaratan khusus apa pun...",
                 "inspirationText": "Butuh inspirasi? Coba salah satu ini:",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "Fashion Berkelanjutan",
                         "prompt": "Buat koleksi merek fashion berkelanjutan"
+                    },
+                    "4": {
+                        "name": "Aplikasi Self-Hosted",
+                        "prompt": "Buat direktori alternatif open-source yang dapat di-host sendiri untuk alat SaaS populer"
+                    },
+                    "5": {
+                        "name": "Agen Pengkodean AI",
+                        "prompt": "Buat direktori terkurasi agen dan asisten pengkodean AI dengan harga dan dukungan IDE"
+                    },
+                    "6": {
+                        "name": "Alat Pembuat Indie",
+                        "prompt": "Bangun karya yang mengatalogkan alat dan layanan untuk pembuat indie dan pendiri solo"
+                    },
+                    "7": {
+                        "name": "Inspirasi Desain",
+                        "prompt": "Buat koleksi situs inspirasi desain untuk landing page dan portofolio"
                     }
                 },
                 "featuresTitle": "Apa yang akan dilakukan AI untuk Anda:",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} belum dikonfigurasi. Kunjungi Pengaturan → Plugin untuk menyiapkan sebelum membuat.",
                     "nameRequired": "Nama karya wajib",
                     "slugRequired": "Slug karya wajib",
+                    "slugTaken": "Slug ini sudah ada di karya Anda. Pilih yang lain.",
                     "descriptionRequired": "Deskripsi karya wajib",
                     "githubRequired": "Harap hubungkan akun GitHub Anda terlebih dahulu.",
                     "createFailed": "Gagal membuat karya"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ide ini sudah tidak tersedia lagi."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "Semua status",
                 "apply": "Terapkan",
                 "reset": "Reset"
+            },
+            "newPage": {
+                "link": "Buat manual",
+                "or": "Atau",
+                "title": "Idea Baru",
+                "subtitle": "Tulis Idea Anda sendiri. Jelaskan Work yang ingin Anda buat — Anda bisa mengantrekannya untuk dibangun setelahnya.",
+                "nameLabel": "Judul",
+                "namePlaceholder": "Opsional — biarkan kosong untuk menurunkannya dari deskripsi",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Jelaskan Work yang akan menjadi Idea ini — mis. “Direktori terkurasi framework agen AI sumber terbuka, diatur menurut jenis framework dan lisensi.”",
+                "descriptionHint": "Minimal 10 karakter.",
+                "cancel": "Batal",
+                "create": "Buat Idea",
+                "creating": "Membuat…",
+                "minLength": "Deskripsi harus minimal 10 karakter.",
+                "error": "Tidak dapat membuat Idea. Silakan coba lagi."
             }
         },
         "discover": {

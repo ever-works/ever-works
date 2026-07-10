@@ -1,4 +1,4 @@
-name: Deploy MCP to DO Dev
+﻿name: Deploy MCP to DO Dev
 
 on:
   workflow_run:
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   deploy-mcp-dev:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment:
       name: dev
@@ -49,3 +49,4 @@ jobs:
       - name: Restart Pods to pick up :latest tag version
         run: |
           kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-mcp-dev
+

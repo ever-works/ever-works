@@ -1,7 +1,17 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { Paperclip, Trash2, Upload } from 'lucide-react';
+import {
+    File as FileIcon,
+    FileArchive,
+    FileAudio,
+    FileSpreadsheet,
+    FileText,
+    FileVideo,
+    Image as ImageIcon,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
@@ -35,12 +45,102 @@ interface UploadedFileMeta {
     filename: string;
     sizeBytes: number;
     contentType: string;
+    /** API-served URL, present for in-session uploads — enables image previews. */
+    url?: string;
+}
+
+/**
+ * Maps a file to a preview affordance: an icon + accent tint, and whether
+ * it can render an inline image thumbnail. Server-loaded rows may carry
+ * joined upload metadata (filename/mime) on the row itself; rows without
+ * either source fall back to the generic icon.
+ */
+interface FileKind {
+    icon: typeof FileIcon;
+    /** Icon/label text tint. */
+    tint: string;
+    /** Tinted background for the Drive-style preview area. */
+    previewBg: string;
+    /** Short label shown on the preview tile (e.g. PDF, MP4). */
+    label: string;
+    isImage: boolean;
+}
+
+function fileKind(filename: string, contentType?: string): FileKind {
+    const ct = (contentType ?? '').toLowerCase();
+    const ext = filename.includes('.') ? (filename.split('.').pop() ?? '').toLowerCase() : '';
+    const inExt = (list: string[]) => list.includes(ext);
+    const label = (fallback: string) => (ext ? ext.toUpperCase() : fallback);
+
+    if (ct.startsWith('image/') || inExt(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']))
+        return {
+            icon: ImageIcon,
+            tint: 'text-info',
+            previewBg: 'bg-info/10',
+            label: label('IMG'),
+            isImage: true,
+        };
+    if (ct === 'application/pdf' || ext === 'pdf')
+        return {
+            icon: FileText,
+            tint: 'text-danger',
+            previewBg: 'bg-danger/10',
+            label: 'PDF',
+            isImage: false,
+        };
+    if (ct.startsWith('video/') || inExt(['mp4', 'mov', 'webm', 'mkv', 'avi']))
+        return {
+            icon: FileVideo,
+            tint: 'text-primary',
+            previewBg: 'bg-primary/10',
+            label: label('VIDEO'),
+            isImage: false,
+        };
+    if (ct.startsWith('audio/') || inExt(['mp3', 'wav', 'ogg', 'flac', 'm4a']))
+        return {
+            icon: FileAudio,
+            tint: 'text-warning',
+            previewBg: 'bg-warning/10',
+            label: label('AUDIO'),
+            isImage: false,
+        };
+    if (inExt(['zip', 'tar', 'gz', 'rar', '7z']))
+        return {
+            icon: FileArchive,
+            tint: 'text-text-muted',
+            previewBg: 'bg-surface-secondary dark:bg-surface-secondary-dark',
+            label: label('ZIP'),
+            isImage: false,
+        };
+    if (inExt(['csv', 'xls', 'xlsx', 'ods']))
+        return {
+            icon: FileSpreadsheet,
+            tint: 'text-success',
+            previewBg: 'bg-success/10',
+            label: label('SHEET'),
+            isImage: false,
+        };
+    return {
+        icon: FileIcon,
+        tint: 'text-text-muted',
+        previewBg: 'bg-surface-secondary dark:bg-surface-secondary-dark',
+        label: label('FILE'),
+        isImage: false,
+    };
 }
 
 export interface EntityAttachmentRow {
     readonly id: string;
     readonly uploadId: string;
     readonly createdAt: string;
+    // Optional joined upload metadata. When the entity's list endpoint
+    // enriches rows server-side (agents do), refreshed pages keep the
+    // type-aware icon/label/size instead of the generic-file fallback.
+    readonly filename?: string | null;
+    readonly mimeType?: string | null;
+    readonly sizeBytes?: number | null;
+    /** API-routed serve URL — makes the tile openable after a refresh. */
+    readonly url?: string | null;
 }
 
 export interface EntityAttachmentsSectionProps<TRow extends EntityAttachmentRow> {
@@ -73,6 +173,9 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
 }: EntityAttachmentsSectionProps<TRow>) {
     const [rows, setRows] = useState<TRow[]>([...initial]);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
+    // Attachment ids whose <img> failed to load — those tiles fall back
+    // to the type icon instead of showing a broken-image glyph.
+    const [brokenThumbs, setBrokenThumbs] = useState<Record<string, true>>({});
     const [pending, startTransition] = useTransition();
     const [dragOver, setDragOver] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -96,6 +199,7 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                 filename: file.name,
                                 sizeBytes: file.size,
                                 contentType: file.type,
+                                url: res.url,
                             },
                         }));
                     } catch (err) {
@@ -212,47 +316,119 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
             )}
 
             {rows.length > 0 && (
-                <ul className="mt-4 space-y-2" data-testid={testId ? `${testId}-list` : undefined}>
+                <ul
+                    className="mt-4 grid grid-cols-2 sm:grid-cols-3 @2xl/main:grid-cols-4 gap-3"
+                    data-testid={testId ? `${testId}-list` : undefined}
+                >
                     {rows.map((r) => {
+                        // In-session upload meta wins (it has the URL); fall
+                        // back to the server-joined row metadata on refresh.
                         const m = meta[r.id] ?? null;
-                        const filename = m?.filename ?? r.uploadId;
-                        const size = m ? formatSize(m.sizeBytes) : null;
+                        const filename = m?.filename ?? r.filename ?? r.uploadId;
+                        const sizeBytes = m?.sizeBytes ?? r.sizeBytes ?? null;
+                        const size = sizeBytes == null ? null : formatSize(sizeBytes);
+                        const kind = fileKind(filename, m?.contentType ?? r.mimeType ?? undefined);
+                        const KindIcon = kind.icon;
+                        // In-session uploads carry the URL in local meta;
+                        // server-listed rows carry it on the row itself.
+                        const openUrl = m?.url ?? r.url ?? undefined;
+                        // Images render a real thumbnail (served same-origin via
+                        // the auth proxy); everything else — and any image that
+                        // fails to load — gets the type-aware icon tile. Plain
+                        // <img>, not next/image: the optimizer fetches server-side
+                        // without the viewer's session cookie, which the
+                        // owner-gated serve proxy rejects with a 401.
+                        const PreviewInner =
+                            kind.isImage && openUrl && !brokenThumbs[r.id] ? (
+                                <img
+                                    src={openUrl}
+                                    alt={filename}
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                    onError={() =>
+                                        setBrokenThumbs((prev) => ({ ...prev, [r.id]: true }))
+                                    }
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-1.5">
+                                    <KindIcon
+                                        className={cn('w-8 h-8', kind.tint)}
+                                        aria-hidden="true"
+                                    />
+                                    <span
+                                        className={cn(
+                                            'text-[10px] font-semibold tracking-wide',
+                                            kind.tint,
+                                        )}
+                                    >
+                                        {kind.label}
+                                    </span>
+                                </div>
+                            );
                         return (
                             <li
                                 key={r.id}
-                                className="flex items-center gap-3 rounded-md border border-border/40 dark:border-border-dark/40 p-2.5"
+                                className="group relative rounded-lg border border-border/50 dark:border-border-dark/50 bg-card dark:bg-card-primary-dark overflow-hidden hover:border-border dark:hover:border-border-dark hover:shadow-sm transition-all"
                             >
-                                <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                    {/* Download wiring pending — the upload
-                                        URL needs the user id, which we don't
-                                        carry on this row. Surface filename as
-                                        plain text + a tooltip until a
-                                        uploadId-only resolver lands (same
-                                        constraint TaskAttachmentsSection
-                                        documents). */}
-                                    <span
-                                        className="text-sm text-text dark:text-text-dark truncate block"
-                                        title="Download wiring pending"
+                                {/* Preview tile — Drive-style. Clickable when we
+                                    have a URL (in-session or server-provided);
+                                    otherwise a static thumbnail/type tile. */}
+                                {openUrl ? (
+                                    <a
+                                        href={openUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        title={`Open ${filename}`}
+                                        className={cn(
+                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            kind.previewBg,
+                                        )}
                                     >
-                                        {filename}
-                                    </span>
-                                    <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                        {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
-                                        {new Date(r.createdAt).toLocaleString()}
+                                        {PreviewInner}
+                                    </a>
+                                ) : (
+                                    <div
+                                        className={cn(
+                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            kind.previewBg,
+                                        )}
+                                    >
+                                        {PreviewInner}
+                                    </div>
+                                )}
+
+                                {/* Footer — filename + meta */}
+                                <div className="flex items-center gap-2 p-2.5 border-t border-border/40 dark:border-border-dark/40">
+                                    <KindIcon
+                                        className={cn('w-3.5 h-3.5 shrink-0', kind.tint)}
+                                        aria-hidden="true"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <span
+                                            className="block truncate text-xs font-medium text-text dark:text-text-dark"
+                                            title={filename}
+                                        >
+                                            {filename}
+                                        </span>
+                                        <span className="block truncate text-[10px] text-text-muted dark:text-text-muted-dark">
+                                            {size ? `${size} · ` : ''}
+                                            {new Date(r.createdAt).toLocaleDateString()}
+                                        </span>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+
+                                {/* Detach — reveals on hover, Drive-style */}
+                                <button
+                                    type="button"
                                     onClick={() => handleRemove(r.id)}
                                     disabled={pending}
-                                    className="text-danger hover:text-danger gap-1.5"
                                     title="Detach"
+                                    aria-label={`Detach ${filename}`}
                                     data-testid={testId ? `${testId}-detach-${r.id}` : undefined}
+                                    className="absolute top-1.5 right-1.5 grid h-7 w-7 place-items-center rounded-md bg-card/90 dark:bg-card-primary-dark/90 text-text-muted opacity-0 shadow-sm backdrop-blur transition-opacity hover:text-danger group-hover:opacity-100 focus-visible:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
+                                </button>
                             </li>
                         );
                     })}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle2, ChevronRight, X } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
+import { STATUS_STYLES } from './idea-status';
 
 /**
  * Phase 5 PR M — `IdeaCard` is the canonical name for what used
@@ -28,34 +29,44 @@ import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
 interface IdeaCardProps {
     proposal: WorkProposal;
     onDismissed?: (id: string) => void;
-    onQueueBuild?: (id: string) => void;
 }
 
-export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps) {
+export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
     const t = useTranslations('dashboard.proposals');
+    const tPage = useTranslations('dashboard.ideasPage');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
-    // Phase 5 PR P — Done state CTA. When the Idea has been
-    // accepted AND the platform has a Work id to point at (the
-    // common case post-Phase 1 PR B build flow), swap the
-    // "Build" CTA for "View Work →" linking directly to the
-    // /works/<id> detail page. ACCEPTED Ideas without a Work id
-    // (legacy pre-PR-B accepts, or in-flight accepts where the
-    // back-FK didn't land yet) keep the Build CTA so the user
-    // can still kick off a new build cycle.
-    const isDone =
-        proposal.status === 'accepted' &&
-        typeof proposal.acceptedWorkId === 'string' &&
-        proposal.acceptedWorkId.length > 0;
+    // "View Work" CTA. Whenever the Idea already points at a generated
+    // Work — regardless of its status — the "Build" CTA is swapped for
+    // "View Work →" linking directly to the /works/<id> detail page. This
+    // covers a Done (accepted) Idea, but also a queued/building/failed
+    // Idea whose earlier build already produced a Work: there's no point
+    // re-building something that already exists, so we send the user
+    // straight to it. Ideas without a Work id keep the Build CTA.
+    const hasWork =
+        typeof proposal.acceptedWorkId === 'string' && proposal.acceptedWorkId.length > 0;
+
+    // Status marks shown on the CTA label. Derived purely from the
+    // Idea's persisted status (server truth) so the "Queued"/"Building"
+    // text is correct on first paint and survives reloads. These no
+    // longer disable the button — every status stays clickable.
+    const isBuilding = !hasWork && proposal.status === 'building';
+    const isQueued = !hasWork && proposal.status === 'queued';
 
     const handleAccept = () => {
-        if (isDone && proposal.acceptedWorkId) {
+        // If a Work already exists for this Idea, jump straight to it.
+        // Every other status opens the manual build flow at /works/new
+        // (pre-filled from this Idea).
+        //
+        // We deliberately do NOT call the build endpoint directly from
+        // the card. That endpoint (a) rejects any status other than
+        // pending/failed and (b) needs git/provider config that only the
+        // /works/new form collects — so an in-place queue attempt errors
+        // for un-configured accounts and for queued/building Ideas.
+        // Routing to /works/new is reliable for every status.
+        if (hasWork && proposal.acceptedWorkId) {
             router.push(ROUTES.DASHBOARD_WORK(proposal.acceptedWorkId));
-            return;
-        }
-        if (onQueueBuild && (proposal.status === 'pending' || proposal.status === 'failed')) {
-            onQueueBuild(proposal.id);
             return;
         }
         router.push(`/works/new?proposal=${proposal.id}`);
@@ -74,15 +85,17 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
 
     const topCategories = proposal.suggestedCategories.slice(0, 4);
     const topPlugins = proposal.recommendedPlugins.slice(0, 3);
+    const statusStyle = STATUS_STYLES[proposal.status] ?? STATUS_STYLES.pending;
 
     return (
         <div
             className={cn(
-                'group relative flex min-h-[17rem] flex-col overflow-hidden rounded-lg p-4 shadow-xs',
+                'group relative flex min-h-62 flex-col overflow-hidden rounded-lg p-5',
                 'bg-card dark:bg-card-primary-dark/70',
-                'border border-card-border dark:border-white/9',
-                'hover:border-primary-500/50 dark:hover:border-white/20',
-                'transition-colors',
+                'border border-card-border dark:border-white/10',
+                'shadow-sm hover:shadow-lg dark:shadow-black/20',
+                'hover:border-primary-500/40 dark:hover:border-white/20',
+                'transition-all duration-200',
             )}
         >
             <button
@@ -90,18 +103,43 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                 onClick={handleDismiss}
                 disabled={isPending}
                 aria-label={t('actions.dismissAria')}
-                className="absolute top-3 right-3 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
+                className="absolute top-3.5 right-3.5 z-10 p-1 rounded-md text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface dark:hover:bg-surface-dark transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40"
             >
                 <X className="w-4 h-4" aria-hidden="true" />
             </button>
 
-            <div className="flex items-center gap-3 mb-2 pr-6 min-w-0">
-                <div className="min-h-[lh] flex items-center min-w-0">
-                    <h3 className="text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
-                        {proposal.title}
-                    </h3>
-                </div>
+            {/* Full-card click target → Idea detail page. Rendered as an
+                absolutely-positioned overlay (the "card link" pattern) so
+                the whole card is a single accessible link. It sits at
+                `z-0`; the dismiss button and the footer actions below are
+                lifted to `z-10` so they stay independently clickable and
+                aren't swallowed by this overlay. */}
+            <Link
+                href={ROUTES.DASHBOARD_IDEA(proposal.id)}
+                aria-label={proposal.title}
+                className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            />
+
+            {/* Status badge — meaningful now that the home preview surfaces
+                Ideas of every status (pending / building / accepted / …). */}
+            <div className="mb-3 pr-7">
+                <span
+                    className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
+                        statusStyle.badge,
+                    )}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
+                    />
+                    {tPage(`filters.${proposal.status}`)}
+                </span>
             </div>
+
+            <h3 className="mb-2 pr-1 min-w-0 text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
+                {proposal.title}
+            </h3>
 
             <p className="text-xs leading-4.5 text-text-secondary dark:text-text-secondary-dark line-clamp-3 min-h-[3lh] mb-3">
                 {proposal.description}
@@ -112,7 +150,7 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                     {topCategories.map((cat) => (
                         <span
                             key={cat.slug}
-                            className="inline-flex items-center rounded-full bg-primary-400/10 dark:bg-white/10 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-200"
+                            className="inline-flex items-center rounded-full border border-border/60 dark:border-white/10 bg-surface-secondary/60 dark:bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary dark:text-gray-300"
                         >
                             {cat.name}
                         </span>
@@ -130,7 +168,7 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
             )}
 
             {proposal.reasoning && (
-                <p className="text-xs italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-4">
+                <p className="text-[10px] italic text-text-secondary dark:text-text-secondary-dark line-clamp-2 mb-2 border-l-2 border-border/60 dark:border-white/10 pl-2.5">
                     &quot;{proposal.reasoning}&quot;
                 </p>
             )}
@@ -169,25 +207,40 @@ export function IdeaCard({ proposal, onDismissed, onQueueBuild }: IdeaCardProps)
                 </div>
             )}
 
-            <div className="mt-auto flex items-center gap-2">
+            {/* `relative z-10` lifts the action row above the full-card
+                link overlay so these controls handle their own clicks. */}
+            <div className="relative z-10 mt-auto flex items-center gap-2">
                 <button
                     type="button"
                     onClick={handleAccept}
                     className={cn(
-                        'flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98]',
-                        // Phase 5 PR P — Done state uses the success
-                        // color and a checkmark icon. Visually distinct
-                        // from the primary-blue Build CTA so a finished
-                        // Idea reads as "completed" at a glance.
-                        isDone
+                        'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer',
+                        // The "View Work" state uses the success color and
+                        // a checkmark icon. Visually distinct from the
+                        // primary Build CTA so an Idea that already has a
+                        // Work reads as "completed" at a glance. Every
+                        // other status (pending/queued/building/failed)
+                        // shares the Build styling and stays clickable —
+                        // clicking opens the /works/new build flow.
+                        hasWork
                             ? 'bg-success hover:bg-success/90'
                             : 'bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10',
                     )}
                 >
-                    {isDone ? (
+                    {hasWork ? (
                         <>
                             <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                             {t('actions.viewWork')}
+                        </>
+                    ) : isBuilding ? (
+                        <>
+                            {tPage('filters.building')}
+                            <ChevronRight className="w-4 h-4" aria-hidden="true" />
+                        </>
+                    ) : isQueued ? (
+                        <>
+                            {tPage('filters.queued')}
+                            <ChevronRight className="w-4 h-4" aria-hidden="true" />
                         </>
                     ) : (
                         <>

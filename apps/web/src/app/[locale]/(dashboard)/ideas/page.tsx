@@ -38,7 +38,10 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 function normalizeStatusFilter(value?: string): IdeasStatusFilter {
     if (value === 'all' || value === 'done' || value === 'actionable') return value;
     if (IDEA_STATUSES.includes(value as WorkProposalStatus)) return value as WorkProposalStatus;
-    return 'actionable';
+    // Default to 'all' so the catalog surfaces every Idea (incl.
+    // accepted / dismissed) on first load — consistent with the home
+    // Ideas preview, which also shows all statuses.
+    return 'all';
 }
 
 function statusesForFilter(filter: IdeasStatusFilter): WorkProposalStatus[] {
@@ -54,7 +57,9 @@ function buildIdeasHref(input: {
     offset?: number;
 }): string {
     const params = new URLSearchParams();
-    if (input.status && input.status !== 'actionable') params.set('status', input.status);
+    // 'all' is the default now, so omit it from the URL to keep the
+    // canonical /ideas link clean.
+    if (input.status && input.status !== 'all') params.set('status', input.status);
     if (input.search) params.set('search', input.search);
     if (input.offset && input.offset > 0) params.set('offset', String(input.offset));
     const qs = params.toString();

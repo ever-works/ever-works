@@ -340,6 +340,21 @@ export class ActivityLogService {
         return this.repository.findByWork(options);
     }
 
+    /**
+     * Per-Agent lifecycle events (paused / resumed / …) for the Agent
+     * activity feed. User-scoped; matches rows stamped with
+     * `details.resourceId = agentId` by the agents controller.
+     */
+    async findAgentEvents(options: {
+        userId: string;
+        agentId: string;
+        actionTypes: ActivityActionType[];
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        return this.repository.findAgentEvents(options);
+    }
+
     async countRunning(userId: string): Promise<number> {
         return this.repository.countByStatus(userId, 'in_progress' as ActivityStatus);
     }

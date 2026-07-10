@@ -23,6 +23,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
     AgentFileService,
     AGENT_FILE_NAMES,
+    AgentRunLogRepository,
     AgentRunRepository,
     AgentScheduleDispatcherService,
     AGENT_HEARTBEAT_TRIGGER,
@@ -84,6 +85,22 @@ import {
  * Cross-user reads return 404 (architecture/security §9 — no
  * existence leak via 403).
  */
+/**
+ * Activity-log action types surfaced as "lifecycle events" in the
+ * per-Agent activity feed (GET :id/events). Rows are matched by
+ * `details.resourceId = agentId`, so adding a type here is enough to
+ * surface any future tryLog() emitter.
+ */
+const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
+    ActivityActionType.AGENT_CREATED,
+    ActivityActionType.AGENT_PAUSED,
+    ActivityActionType.AGENT_RESUMED,
+    ActivityActionType.AGENT_ARCHIVED,
+    ActivityActionType.AGENT_EXPORTED,
+    ActivityActionType.AGENT_IMPORTED,
+    ActivityActionType.AGENT_BUDGET_EXCEEDED,
+];
+
 @ApiTags('agents')
 @Controller('api/agents')
 export class AgentsController {
@@ -99,6 +116,7 @@ export class AgentsController {
         // layer because the surface stays read-mostly + tightly scoped.
         private readonly dispatcher: AgentScheduleDispatcherService,
         private readonly agentRuns: AgentRunRepository,
+        private readonly agentRunLogs: AgentRunLogRepository,
         private readonly skillBindings: SkillBindingRepository,
         private readonly pluginUsage: PluginUsageRepository,
         private readonly tasks: TasksService,
@@ -229,7 +247,17 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        return this.service.pause(auth.userId, id);
+        const dto = await this.service.pause(auth.userId, id);
+        // agents/spec.md — status transitions MUST leave an activity
+        // trail; surfaced in the /agents/[id]/activity feed via
+        // GET :id/events.
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_PAUSED,
+            details: { status: dto.status },
+        });
+        return dto;
     }
 
     @Post(':id/resume')
@@ -240,7 +268,14 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        return this.service.resume(auth.userId, id);
+        const dto = await this.service.resume(auth.userId, id);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_RESUMED,
+            details: { status: dto.status },
+        });
+        return dto;
     }
 
     // ── Phase 4 — Agent file storage (5 canonical MD files + agent.yml) ─
@@ -436,6 +471,114 @@ export class AgentsController {
                 errorMessage: r.errorMessage ?? null,
                 taskId: r.taskId ?? null,
                 createdAt: r.createdAt.toISOString(),
+            })),
+            meta: { total, limit, offset },
+        };
+    }
+
+    @Get(':id/runs/:runId')
+    @ApiOperation({
+        summary: 'Full detail for one AgentRun, including its structured step logs.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async getRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+    ): Promise<{
+        id: string;
+        status: string;
+        triggerKind: string;
+        startedAt: string | null;
+        finishedAt: string | null;
+        durationMs: number | null;
+        summary: string | null;
+        errorMessage: string | null;
+        taskId: string | null;
+        chatMessageId: string | null;
+        memorySessionId: string | null;
+        createdAt: string;
+        logs: Array<{
+            id: string;
+            level: 'INFO' | 'WARN' | 'ERROR';
+            step: string;
+            message: string;
+            metadata: Record<string, unknown> | null;
+            createdAt: string;
+        }>;
+    }> {
+        await this.service.getOne(auth.userId, id);
+        // Security: user-scoped lookup + agentId match — cross-user or
+        // cross-agent runIds 404 (architecture/security §9, no-existence-leak).
+        const run = await this.agentRuns.findByIdAndUser(runId, auth.userId);
+        if (!run || run.agentId !== id) {
+            throw new NotFoundException(`AgentRun ${runId} not found.`);
+        }
+        const logs = await this.agentRunLogs.findByRun(runId, 500);
+        return {
+            id: run.id,
+            status: run.status,
+            triggerKind: run.triggerKind,
+            startedAt: run.startedAt?.toISOString() ?? null,
+            finishedAt: run.finishedAt?.toISOString() ?? null,
+            durationMs: run.durationMs ?? null,
+            summary: run.summary ?? null,
+            errorMessage: run.errorMessage ?? null,
+            taskId: run.taskId ?? null,
+            chatMessageId: run.chatMessageId ?? null,
+            memorySessionId: run.memorySessionId ?? null,
+            createdAt: run.createdAt.toISOString(),
+            logs: logs.map((l) => ({
+                id: l.id,
+                level: l.level,
+                step: l.step,
+                message: l.message,
+                metadata: l.metadata ?? null,
+                createdAt: l.createdAt.toISOString(),
+            })),
+        };
+    }
+
+    @Get(':id/events')
+    @ApiOperation({
+        summary:
+            'Paginated Agent lifecycle events (paused / resumed / created / archived / …) from the activity log.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listEvents(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: ListAgentRunsQueryDto,
+    ): Promise<{
+        data: Array<{
+            id: string;
+            actionType: string;
+            details: Record<string, unknown> | null;
+            createdAt: string;
+        }>;
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        await this.service.getOne(auth.userId, id);
+        const limit = query.limit ?? 25;
+        const offset = query.offset ?? 0;
+        // ActivityLogService is @Optional — when unbound the feed simply
+        // has no lifecycle rows (mirrors tryLog's best-effort posture).
+        if (!this.activityLog) {
+            return { data: [], meta: { total: 0, limit, offset } };
+        }
+        const { activities, total } = await this.activityLog.findAgentEvents({
+            userId: auth.userId,
+            agentId: id,
+            actionTypes: AGENT_LIFECYCLE_EVENT_TYPES,
+            limit,
+            offset,
+        });
+        return {
+            data: activities.map((a) => ({
+                id: a.id,
+                actionType: a.actionType,
+                details: a.details ?? null,
+                createdAt: a.createdAt.toISOString(),
             })),
             meta: { total, limit, offset },
         };

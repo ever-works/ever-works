@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Yeni Görev",
+                "noDescription": "Henüz açıklama yok",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Öncelik",
                 "labels": "Etiketler",
                 "labelsPlaceholder": "virgülle ayrılmış",
+                "workScopedTask": "Work kapsamına alınmış görev",
+                "missionScopedTask": "Mission kapsamına alınmış görev",
+                "ideaScopedTask": "Idea kapsamına alınmış görev",
+                "prefillPromptNotice": "Bu form bir URL bağlantısından önceden dolduruldu. Görevi oluşturmadan önce içeriği gözden geçirin.",
+                "prefillTemplateNotice": "<name>{slug}</name> şablonundan önceden dolduruldu. Görevi oluşturmadan önce içeriği gözden geçirin.",
+                "priorityP0": "P0 — acil",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — varsayılan",
+                "priorityP4": "P4 — düşük",
+                "createError": "Görev oluşturulamadı",
                 "cancel": "İptal",
                 "create": "Oluştur"
             },
@@ -680,8 +692,25 @@
                 "browse": "Gözat",
                 "uploading": "Yükleniyor…",
                 "detach": "Ayır",
+                "attachmentsWorkOnly": "Ekler yalnızca Work kapsamındaki görevlerde kullanılabilir. Dosya eklemek için görevi bir Work üzerinden oluşturun.",
                 "labels": "Etiketler",
-                "edited": "düzenlendi"
+                "edited": "düzenlendi",
+                "description": "Açıklama",
+                "edit": "Düzenle",
+                "save": "Kaydet",
+                "cancel": "İptal",
+                "descriptionPlaceholder": "Bir açıklama ekleyin…",
+                "noDescription": "Açıklama girilmedi.",
+                "saveDescriptionError": "Açıklama kaydedilemedi",
+                "details": "Ayrıntılar",
+                "status": "Durum",
+                "priority": "Öncelik",
+                "scope": "Kapsam",
+                "created": "Oluşturulma",
+                "updated": "Güncellenme",
+                "scopeWork": "İş",
+                "scopeMission": "Görev",
+                "scopeIdea": "Fikir"
             },
             "recurring": {
                 "section": "Tekrarlayan zamanlama",
@@ -705,6 +734,13 @@
                 "blocked": "Engellendi",
                 "done": "Tamamlandı",
                 "cancelled": "İptal edildi"
+            },
+            "priority": {
+                "p0": "Acil",
+                "p1": "Yüksek",
+                "p2": "Orta",
+                "p3": "Normal",
+                "p4": "Düşük"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "Yetenekler, Ajanlar/Yetenekler/Görevler dağıtımının daha sonraki bir aşamasında gelecek. Sayfa, kenar çubuğu gezinme rotasının çözülmesi için ayrılmıştır."
             },
             "list": {
-                "newSkill": "+ Yeni Yetenek",
+                "newSkill": "Yeni Yetenek",
                 "filter": {
                     "scope": "Kapsam",
                     "all": "Tümü"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "Yardım & Kaynaklar",
                 "subtitle": "Başlamanıza yardımcı olacak hızlı ipuçları ve faydalı bağlantılar",
+                "tabs": {
+                    "tips": "İpuçları",
+                    "shortcuts": "Kısayollar",
+                    "faq": "SSS",
+                    "resources": "Kaynaklar"
+                },
                 "onboarding": {
                     "title": "Başlangıç",
                     "description": "Yönlendirmeli kurulumun her zaman yeniden açın ve bıraktığınız yerden devam edin.",
@@ -935,7 +978,8 @@
                     "title": "Hızlı İpuçları",
                     "tip1": "Panodaki 'İş Oluştur' düğmesine tıklayarak ilk işinizi oluşturun.",
                     "tip2": "İşizi ilgili öğelerle otomatik olarak doldurmak için AI üretecisini kullanın.",
-                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın."
+                    "tip3": "İşlerinizi depolar olarak senkronize etmek ve dağıtmak için GitHub hesabınızı bağlayın.",
+                    "tip4": "Bu Yardım ve Kaynaklar panelini yeniden açmak için istediğiniz zaman ? tuşuna basın."
                 },
                 "shortcuts": {
                     "title": "Klavye Kısayolları",
@@ -949,9 +993,39 @@
                     "github": "GitHub Deposu",
                     "issues": "Sorun Bildir",
                     "docs": "Belgeler",
-                    "comingSoon": "Yakında"
+                    "comingSoon": "Yakında",
+                    "community": "Topluluk Tartışmaları"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Daha fazla yardıma mı ihtiyacınız var?",
+                    "description": "Belgelere göz atın veya topluluğa sorun — genellikle hızlı yanıt veriyoruz.",
+                    "action": "Tartışmaya katıl"
+                },
+                "faq": {
+                    "title": "Sıkça Sorulan Sorular",
+                    "q1": "Yapay zeka üretimi nasıl çalışır?",
+                    "a1": "Kısa, yönlendirilmiş bir işlem hattı olarak çalışır:",
+                    "a1s1": "Work’ünüzü tanımlayın — konusu, hedef kitlesi ve amacı.",
+                    "a1s2": "Yapay zekâ kaynakları araştırır; öğeler, kategoriler ve etiketler oluşturur.",
+                    "a1s3": "İnceleyin, sonra yayımlamadan önce dilediğinizi düzenleyin veya yeniden oluşturun.",
+                    "q2": "GitHub'ı nasıl bağlarım?",
+                    "a2": "works’lerinizi depo olarak eşitlemek ve dağıtmak için bağlayın:",
+                    "a2s1": "Ayarlar → Entegrasyonlar’ı açın ve GitHub’da Bağla’ya tıklayın.",
+                    "a2s2": "Ever Works’e izin verin ve bir hesap ya da kuruluş seçin.",
+                    "a2s3": "Work’ünüzden eşitlenecek veya dağıtılacak depoyu seçin.",
+                    "q3": "Öğeleri ürettikten sonra düzenleyebilir miyim?",
+                    "a3": "Evet — her öğe tamamen düzenlenebilir kalır:",
+                    "a3s1": "Başlığını, içeriğini veya meta verisini düzenlemek için öğeyi açın.",
+                    "a3s2": "Veya yeni bir yapay zekâ taslağı için tek bir öğeyi yeniden oluşturun.",
+                    "a3s3": "Kaydedin; değişiklikleriniz anında uygulanır.",
+                    "learnMore": "Daha fazla bilgi"
+                },
+                "system": {
+                    "title": "Sistem",
+                    "operational": "Tüm sistemler çalışıyor",
+                    "environment": "Ortam"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "İş Oluştur"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Ajanlar",
+                "heading": "Bu İşin Ajanları",
+                "emptyTitle": "Henüz hiç Ajan yok",
+                "emptySubtitle": "Bu İşi otomatikleştirmek için bir Ajan oluşturun.",
+                "pause": "Ajanı duraklat",
+                "activate": "Ajanı etkinleştir",
+                "pausedToast": "Ajan duraklatıldı",
+                "activatedToast": "Ajan etkinleştirildi",
+                "statusUpdateFailed": "Durum güncellenemedi",
+                "newAgent": "Yeni Ajan",
+                "moreAgents": "+{count} daha"
+            },
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",
             "generationCancelled": "Oluşturma iptal edildi",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "ör. Harika AI Araçları",
                 "workNameHelp": "Bu alanı boş bırakırsanız AI bir ad önerir",
                 "promptLabel": "İşini Tarif Et",
+                "slugChecking": "Uygunluk kontrol ediliyor…",
+                "slugAvailable": "{slug} kullanılabilir",
+                "slugTakenName": "{slug} işlerinizde zaten mevcut",
+                "slugUseSuggestion": "{suggestion} kullan",
+                "slugCheckError": "Uygunluk kontrol edilemedi — yine de devam edebilirsiniz",
                 "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
                 "promptPlaceholder": "Oluşturmak istediğiniz iş türünü, içermesi gereken öğeleri ve özel gereksinimleri tarif edin...",
                 "inspirationText": "İlham mı lazım? Bunlardan birini deneyin:",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "Sürdürülebilir Moda",
                         "prompt": "Sürdürülebilir moda markalarının koleksiyonunu oluştur"
+                    },
+                    "4": {
+                        "name": "Kendi Sunucunda Barındırılan Uygulamalar",
+                        "prompt": "Popüler SaaS araçlarına kendi sunucunda barındırılabilen açık kaynak alternatiflerin dizinini oluştur"
+                    },
+                    "5": {
+                        "name": "AI Kodlama Ajanları",
+                        "prompt": "Fiyatlandırma ve IDE desteğiyle AI kodlama ajanları ve asistanlarının seçkin dizinini oluştur"
+                    },
+                    "6": {
+                        "name": "Indie Üretici Araçları",
+                        "prompt": "Indie üreticiler ve tek kişilik kurucular için araç ve hizmetleri kataloglayan işini oluştur"
+                    },
+                    "7": {
+                        "name": "Tasarım İlhamı",
+                        "prompt": "Açılış sayfaları ve portföyler için tasarım ilham sitelerinin koleksiyonunu oluştur"
                     }
                 },
                 "featuresTitle": "AI sizin için şunları yapacak:",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} yapılandırılmamış. Üretmeden önce Ayarlar → Eklentiler'e gidin.",
                     "nameRequired": "İş adı gerekli",
                     "slugRequired": "İş slug'ı gerekli",
+                    "slugTaken": "Bu slug işlerinizde zaten mevcut. Başka bir tane seçin.",
                     "descriptionRequired": "İş açıklaması gerekli",
                     "githubRequired": "Lütfen önce GitHub hesabınızı bağlayın.",
                     "createFailed": "İş oluşturulamadı"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Bu fikir artık kullanılamıyor."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "Herhangi bir durum",
                 "apply": "Uygula",
                 "reset": "Sıfırla"
+            },
+            "newPage": {
+                "link": "Manuel oluştur",
+                "or": "Veya",
+                "title": "Yeni Idea",
+                "subtitle": "Kendi Idea'nı yaz. Oluşturmak istediğin Work'ü tanımla — daha sonra derleme için sıraya alabilirsin.",
+                "nameLabel": "Başlık",
+                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu Idea'nın dönüşmesi gereken Work'ü tanımlayın — örneğin “Framework türüne ve lisansa göre düzenlenmiş, açık kaynaklı YZ ajan framework'lerinin özenle seçilmiş bir dizini.”",
+                "descriptionHint": "En az 10 karakter.",
+                "cancel": "İptal",
+                "create": "Idea oluştur",
+                "creating": "Oluşturuluyor…",
+                "minLength": "Açıklama en az 10 karakter olmalıdır.",
+                "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             }
         },
         "discover": {

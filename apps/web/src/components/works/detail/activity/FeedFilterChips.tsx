@@ -35,11 +35,14 @@ export function FeedFilterChips({ value, onChange, directorySiteDisabled }: Feed
                         disabled={isDimmed}
                         onClick={() => onChange(cat)}
                         className={cn(
-                            'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                            'border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                            // Mirrors the category filter pills on /plugins
+                            // (PluginCategoryFilter.tsx) so filters look the
+                            // same across dashboard pages.
+                            'inline-flex items-center px-3 py-1 rounded-full text-xs transition-colors cursor-pointer',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                             isActive
-                                ? 'bg-primary text-primary-foreground border-primary'
-                                : 'bg-card dark:bg-card-primary-dark/30 text-text-secondary dark:text-text-secondary-dark border-border dark:border-border-dark hover:bg-muted/30 dark:hover:bg-muted/10',
+                                ? 'bg-button-primary dark:bg-button-primary-dark text-white dark:text-black'
+                                : 'bg-surface-secondary dark:bg-white/9 text-text-secondary dark:text-text-secondary-dark hover:bg-surface-tertiary dark:hover:bg-white/20',
                             isDimmed && 'opacity-50 cursor-not-allowed',
                         )}
                     >

@@ -1,4 +1,4 @@
-name: Build and Publish Docker Images MCP Stage
+﻿name: Build and Publish Docker Images MCP Stage
 
 on:
   push:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   ever-works-mcp:
-    runs-on: ubicloud-standard-8
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,6 +47,7 @@ jobs:
           cache-to: type=inline
           build-args: |
             NODE_ENV=production
+            VERDACCIO_REGISTRY=${{ vars.VERDACCIO_REGISTRY }}
 
       - name: Docker images list
         run: |
@@ -97,3 +98,4 @@ jobs:
           registry: ${{ secrets.CW_DOCKER_REGISTRY }}
           username: ${{ secrets.CW_DOCKER_USER }}
           password: ${{ secrets.CW_DOCKER_USER_PASSWORD }}
+

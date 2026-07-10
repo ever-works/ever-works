@@ -32,7 +32,7 @@ export function LogoEverWorkImage({
 }: LogoEverWorkProps) {
     const siteConfig = getSiteConfig(configProps);
     return (
-        <span className={cn('relative flex items-center', className)}>
+        <span className={cn('relative flex items-center justify-center', className)}>
             <Image
                 src={siteConfig.logo.light}
                 alt={siteConfig.name}

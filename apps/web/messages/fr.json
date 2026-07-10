@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Nouvelle Tâche",
+                "noDescription": "Pas encore de description",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priorité",
                 "labels": "Étiquettes",
                 "labelsPlaceholder": "séparées par des virgules",
+                "workScopedTask": "Tâche limitée à un Work",
+                "missionScopedTask": "Tâche limitée à une Mission",
+                "ideaScopedTask": "Tâche limitée à une Idea",
+                "prefillPromptNotice": "Ce formulaire a été pré-rempli à partir d'un lien URL. Vérifiez le contenu avant de créer la tâche.",
+                "prefillTemplateNotice": "Pré-rempli à partir du modèle <name>{slug}</name>. Vérifiez le contenu avant de créer la tâche.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — par défaut",
+                "priorityP4": "P4 — faible",
+                "createError": "Échec de la création de la tâche",
                 "cancel": "Annuler",
                 "create": "Créer"
             },
@@ -738,8 +750,25 @@
                 "browse": "Parcourir",
                 "uploading": "Téléchargement en cours…",
                 "detach": "Détacher",
+                "attachmentsWorkOnly": "Les pièces jointes ne sont disponibles que sur les tâches liées à un Work. Créez une tâche depuis un Work pour joindre des fichiers.",
                 "labels": "Étiquettes",
-                "edited": "modifié"
+                "edited": "modifié",
+                "description": "Description",
+                "edit": "Modifier",
+                "save": "Enregistrer",
+                "cancel": "Annuler",
+                "descriptionPlaceholder": "Ajouter une description…",
+                "noDescription": "Aucune description fournie.",
+                "saveDescriptionError": "Échec de l'enregistrement de la description",
+                "details": "Détails",
+                "status": "Statut",
+                "priority": "Priorité",
+                "scope": "Étendue",
+                "created": "Créé",
+                "updated": "Mis à jour",
+                "scopeWork": "Travail",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idée"
             },
             "recurring": {
                 "section": "Calendrier récurrent",
@@ -763,6 +792,13 @@
                 "blocked": "Bloqué",
                 "done": "Terminé",
                 "cancelled": "Annulé"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "Élevée",
+                "p2": "Moyenne",
+                "p3": "Normale",
+                "p4": "Basse"
             }
         },
         "skillsPage": {
@@ -820,7 +856,7 @@
                 "next": "Suivant"
             },
             "list": {
-                "newSkill": "+ Nouvelle Compétence",
+                "newSkill": "Nouvelle Compétence",
                 "filter": {
                     "scope": "Étendue",
                     "all": "Tous"
@@ -839,6 +875,43 @@
                 "idea": "Idée",
                 "work": "Work",
                 "tenant": "Locataire"
+            },
+            "newPage": {
+                "title": "Nouvelle compétence",
+                "templateStepTitle": "Partir d’un modèle (facultatif)",
+                "startFromScratch": "Partir de zéro",
+                "scopeStepTitle": "Où cette compétence doit-elle vivre ?",
+                "scopeTenantLabel": "Espace de travail",
+                "scopeTenantDesc": "Disponible dans tout votre espace de travail.",
+                "scopeMissionDesc": "Limitée à une seule mission.",
+                "scopeWorkDesc": "Limitée à un seul travail.",
+                "scopeIdeaDesc": "Limitée à une seule idée.",
+                "scopeAgentDesc": "Détenue par un seul agent.",
+                "noMissions": "Pas encore de missions — créez-en une d’abord ou choisissez une autre portée.",
+                "noWorks": "Pas encore de travaux — créez-en un d’abord ou choisissez une autre portée.",
+                "noIdeas": "Pas encore d’idées — créez-en une d’abord ou choisissez une autre portée.",
+                "noAgents": "Pas encore d’agents — créez-en un d’abord ou choisissez une autre portée.",
+                "parentLabel": "Quel {scope} ?",
+                "parentPlaceholder": "Sélectionner…",
+                "pickParentHint": "Choisissez un {scope} pour continuer, ou choisissez la portée espace de travail.",
+                "nextDisabledReason": "Sélectionnez un parent pour continuer",
+                "scopeSuffix": "portée —",
+                "detailsStepTitle": "Décrivez la compétence",
+                "titleLabel": "Titre",
+                "titlePlaceholder": "p. ex. Checklist de revue de code",
+                "descriptionLabel": "Description (facultatif)",
+                "descriptionPlaceholder": "Résumé d’une ligne que les agents voient au chargement de cette compétence.",
+                "instructionsLabel": "Instructions (Markdown, facultatif)",
+                "instructionsPlaceholder": "# Ma compétence\n\nQue doit savoir ou faire l’agent ?",
+                "instructionsHint": "Vous pourrez affiner le contenu plus tard sur la page de détails.",
+                "back": "Retour",
+                "next": "Suivant",
+                "cancel": "Annuler",
+                "create": "Créer la compétence",
+                "creating": "Création...",
+                "titleRequired": "Le titre est obligatoire.",
+                "parentRequired": "Choisissez un parent pour cette portée.",
+                "createFailed": "Échec de la création de la compétence"
             }
         },
         "templatesPage": {
@@ -991,7 +1064,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Cette idée n'est plus disponible."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1079,22 @@
                 "anyStatus": "Tout statut",
                 "apply": "Appliquer",
                 "reset": "Réinitialiser"
+            },
+            "newPage": {
+                "link": "Créer manuellement",
+                "or": "Ou",
+                "title": "Nouvelle Idea",
+                "subtitle": "Rédigez votre propre Idea. Décrivez le Work que vous voulez créer — vous pourrez ensuite le mettre en file d'attente pour la génération.",
+                "nameLabel": "Titre",
+                "namePlaceholder": "Facultatif — laissez vide pour le déduire de la description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Décrivez le Work que cette Idea doit devenir — par ex. « Un répertoire organisé de frameworks d'agents IA open source, classés par type de framework et par licence. »",
+                "descriptionHint": "Au moins 10 caractères.",
+                "cancel": "Annuler",
+                "create": "Créer l'Idea",
+                "creating": "Création…",
+                "minLength": "La description doit comporter au moins 10 caractères.",
+                "error": "Impossible de créer l'Idea. Veuillez réessayer."
             }
         },
         "discover": {
@@ -1031,6 +1121,12 @@
             "help": {
                 "title": "Aide & Ressources",
                 "subtitle": "Conseils rapides et liens utiles pour vous aider à démarrer",
+                "tabs": {
+                    "tips": "Astuces",
+                    "shortcuts": "Raccourcis",
+                    "faq": "FAQ",
+                    "resources": "Ressources"
+                },
                 "onboarding": {
                     "title": "Initiation",
                     "description": "Rouvrez la configuration guidée à tout moment et continuez là où vous vous êtes arrêté.",
@@ -1040,7 +1136,8 @@
                     "title": "Conseils rapides",
                     "tip1": "Créez votre premier travail en cliquant sur le bouton « Créer un travail » dans le tableau de bord.",
                     "tip2": "Utilisez le générateur IA pour peupler automatiquement votre travail avec des éléments pertinents.",
-                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels."
+                    "tip3": "Connectez votre compte GitHub pour synchroniser et déployer vos travaux en tant que référentiels.",
+                    "tip4": "Appuyez sur ? à tout moment pour rouvrir ce panneau Aide & Ressources."
                 },
                 "shortcuts": {
                     "title": "Raccourcis clavier",
@@ -1054,9 +1151,39 @@
                     "github": "Dépôt GitHub",
                     "issues": "Signaler un problème",
                     "docs": "Documentation",
-                    "comingSoon": "Bientôt disponible"
+                    "comingSoon": "Bientôt disponible",
+                    "community": "Discussions de la communauté"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Besoin d'aide supplémentaire ?",
+                    "description": "Consultez la documentation ou demandez à la communauté — nous répondons généralement rapidement.",
+                    "action": "Rejoindre la discussion"
+                },
+                "faq": {
+                    "title": "Questions fréquentes",
+                    "q1": "Comment fonctionne la génération par IA ?",
+                    "a1": "Cela fonctionne comme un court pipeline guidé :",
+                    "a1s1": "Décrivez votre Work : son sujet, son public et son objectif.",
+                    "a1s2": "L’IA recherche des sources et rédige éléments, catégories et tags.",
+                    "a1s3": "Vérifiez, puis modifiez ou régénérez ce que vous voulez avant publication.",
+                    "q2": "Comment connecter GitHub ?",
+                    "a2": "Connectez-le pour synchroniser et déployer vos works en dépôts :",
+                    "a2s1": "Ouvrez Paramètres → Intégrations et cliquez sur Connecter pour GitHub.",
+                    "a2s2": "Autorisez Ever Works et choisissez un compte ou une organisation.",
+                    "a2s3": "Choisissez le dépôt à synchroniser ou déployer depuis votre Work.",
+                    "q3": "Puis-je modifier les éléments après la génération ?",
+                    "a3": "Oui : chaque élément reste entièrement modifiable :",
+                    "a3s1": "Ouvrez l’élément pour modifier son titre, son contenu ou ses métadonnées.",
+                    "a3s2": "Ou régénérez un seul élément pour obtenir un nouveau brouillon IA.",
+                    "a3s3": "Enregistrez et vos modifications s’appliquent immédiatement.",
+                    "learnMore": "En savoir plus"
+                },
+                "system": {
+                    "title": "Système",
+                    "operational": "Tous les systèmes sont opérationnels",
+                    "environment": "Environnement"
+                }
             }
         },
         "activity": {
@@ -1676,6 +1803,19 @@
             "createButton": "Créer un travail"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents de ce Work",
+                "emptyTitle": "Aucun Agent pour l'instant",
+                "emptySubtitle": "Créez un Agent pour automatiser ce Work.",
+                "pause": "Mettre l'Agent en pause",
+                "activate": "Activer l'Agent",
+                "pausedToast": "Agent mis en pause",
+                "activatedToast": "Agent activé",
+                "statusUpdateFailed": "Impossible de mettre à jour le statut",
+                "newAgent": "Nouvel Agent",
+                "moreAgents": "+{count} de plus"
+            },
             "failedToGenerateItems": "Échec de la génération des éléments. Veuillez réessayer.",
             "generationCompleted": "Génération terminée avec succès",
             "generationCancelled": "Génération annulée",
@@ -3540,6 +3680,11 @@
                 "slugLabel": "Slug du Travail",
                 "slugPlaceholder": "outils-ai-formidables",
                 "slugHelp": "Identifiant convivial pour l'URL. Généré automatiquement à partir du nom — modifier pour remplacer.",
+                "slugChecking": "Vérification de la disponibilité…",
+                "slugAvailable": "{slug} est disponible",
+                "slugTakenName": "{slug} existe déjà dans vos travaux",
+                "slugUseSuggestion": "Utiliser {suggestion}",
+                "slugCheckError": "Impossible de vérifier la disponibilité — vous pouvez tout de même continuer",
                 "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                 "promptPlaceholder": "Décrivez le type d'travail que vous souhaitez créer, les éléments qu'il doit contenir et toute exigence spécifique...",
                 "inspirationText": "Besoin d'inspiration ? Essayez l'un de ces :",
@@ -3559,6 +3704,22 @@
                     "3": {
                         "name": "Mode durable",
                         "prompt": "Créer une collection de marques de mode durable"
+                    },
+                    "4": {
+                        "name": "Applications auto-hébergées",
+                        "prompt": "Créer un répertoire d'alternatives open source auto-hébergeables aux outils SaaS populaires"
+                    },
+                    "5": {
+                        "name": "Agents de codage IA",
+                        "prompt": "Créer un répertoire sélectionné d'agents et assistants de codage IA avec tarifs et prise en charge des IDE"
+                    },
+                    "6": {
+                        "name": "Outils pour créateurs indépendants",
+                        "prompt": "Créer un travail répertoriant les outils et services pour les créateurs indépendants et fondateurs solo"
+                    },
+                    "7": {
+                        "name": "Inspiration design",
+                        "prompt": "Créer une collection de sites d'inspiration design pour landing pages et portfolios"
                     }
                 },
                 "featuresTitle": "Ce que l'IA fera pour vous :",
@@ -3578,6 +3739,7 @@
                     "unconfiguredProviders": "{providers} non configurés. Visitez Paramètres → Plugins pour les configurer avant de générer.",
                     "nameRequired": "Le nom de l'travail est requis",
                     "slugRequired": "Le slug de l'travail est requis",
+                    "slugTaken": "Ce slug existe déjà dans vos travaux. Choisissez-en un autre.",
                     "descriptionRequired": "La description de l'travail est requise",
                     "githubRequired": "Veuillez connecter votre compte GitHub en premier.",
                     "createFailed": "Échec de la création de l'travail"

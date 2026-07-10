@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { Paperclip, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -36,6 +37,7 @@ interface Props {
  * 400 message instead of a generic toast.
  */
 export function TaskAttachmentsSection({ taskId, workId, initial, initialError = null }: Props) {
+    const t = useTranslations('dashboard.tasksPage.detail');
     const [rows, setRows] = useState<TaskAttachmentRow[]>(initial);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
     const [pending, startTransition] = useTransition();
@@ -178,7 +180,7 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
             ) : (
                 <div className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        Attachments are available after the task is scoped to a Work.
+                        {t('attachmentsWorkOnly')}
                     </p>
                 </div>
             )}
@@ -205,20 +207,27 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
                             >
                                 <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    {/* FU-5 review fix (greptile + codex P1):
-                                        the previous `<a href="/api/uploads/{uploadId}">`
-                                        404'd because the existing backend GET is
-                                        `/:userId/:filename` and there's no resolver
-                                        that turns an uploadId alone into a download.
-                                        Surface filename as plain text + a tooltip
-                                        until the resolver lands — upload + detach
-                                        still work end-to-end. */}
-                                    <span
-                                        className="text-sm text-text dark:text-text-dark truncate block"
-                                        title="Download wiring pending — see FOLLOWUP-PROGRESS"
-                                    >
-                                        {filename}
-                                    </span>
+                                    {/* Download streams the raw bytes through the
+                                        KB upload download proxy
+                                        (/api/works/:id/kb/uploads/:uploadId/download),
+                                        which forwards to the owner/viewer-gated
+                                        NestJS route. Only Work-scoped tasks carry a
+                                        workId, which is also the only case an
+                                        attachment can exist. */}
+                                    {workId ? (
+                                        <a
+                                            href={`/api/works/${workId}/kb/uploads/${r.uploadId}/download`}
+                                            download={filename}
+                                            className="text-sm text-primary hover:underline truncate block"
+                                            title={`Download ${filename}`}
+                                        >
+                                            {filename}
+                                        </a>
+                                    ) : (
+                                        <span className="text-sm text-text dark:text-text-dark truncate block">
+                                            {filename}
+                                        </span>
+                                    )}
                                     <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                         {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
                                         {new Date(r.createdAt).toLocaleString()}

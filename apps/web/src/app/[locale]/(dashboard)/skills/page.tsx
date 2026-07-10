@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { Sparkles } from 'lucide-react';
+import { Plus, Sparkles } from 'lucide-react';
 import { skillsAPI } from '@/lib/api/skills';
 import type { Skill, SkillCatalogEntry } from '@/lib/api/skills';
 import { SkillsPageClient } from '@/components/skills/SkillsPageClient';
 import { PageHeader } from '@/components/common/PageHeader';
+import { Button } from '@/components/ui/button';
+import { ROUTES } from '@/lib/constants';
 
 const PAGE_SIZE = 50;
 const SECTIONS = ['installed', 'available', 'custom'] as const;
@@ -82,6 +84,16 @@ export default async function SkillsPage({
                 title={t('title')}
                 subtitle={t('subtitle')}
                 tone="success"
+                actions={
+                    <Button
+                        href={ROUTES.DASHBOARD_SKILL_NEW}
+                        size="sm"
+                        className="gap-1.5 shrink-0"
+                    >
+                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                        {t('list.newSkill')}
+                    </Button>
+                }
             />
             <SkillsPageClient
                 installed={installed.result.data ?? []}

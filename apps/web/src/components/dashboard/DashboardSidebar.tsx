@@ -165,7 +165,7 @@ export function DashboardSidebar({
                         <div
                             className={cn(
                                 'flex items-center',
-                                isCollapsed ? 'justify-center' : 'pr-6',
+                                isCollapsed ? 'justify-center ml-2' : 'pr-6',
                             )}
                         >
                             <WorkspaceSwitcher config={config} isCollapsed={isCollapsed} />

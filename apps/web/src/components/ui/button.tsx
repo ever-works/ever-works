@@ -26,20 +26,28 @@ type ButtonLinkProps = {
 
 const LinkComponent = Link as unknown as React.ComponentType<ButtonLinkProps>;
 
+/**
+ * Colour tokens per variant. Radius, sizing, focus, and disabled
+ * treatment live in the shared base classes below so every variant
+ * renders the same control shape — heights and focus ring match the
+ * Input/Select primitives (h-8/h-9, focus-visible ring), with a
+ * slightly tighter rounded-md radius for buttons.
+ */
 const buttonVariants = {
     primary:
-        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-button-primary-foreground dark:text-button-primary-foreground-dark rounded-sm',
+        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark text-button-primary-foreground dark:text-button-primary-foreground-dark',
     secondary:
-        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-button-primary-foreground dark:text-button-primary-foreground-dark rounded-sm',
-    ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark rounded-sm',
-    danger: 'bg-danger hover:bg-danger/90 text-white rounded-sm',
+        'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark border border-border dark:border-border-dark text-button-primary-foreground dark:text-button-primary-foreground-dark',
+    ghost: 'bg-transparent hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark text-text dark:text-text-dark',
+    danger: 'bg-danger hover:bg-danger/90 text-white',
     unstyled: '',
 };
 
+/** Control heights aligned with the Input (h-8/h-9) and Select (h-8/h-9) primitives. */
 const buttonSizes = {
-    sm: 'px-3 py-2 text-sm',
-    md: 'px-4 py-2',
-    lg: 'px-6 py-3',
+    sm: 'h-8 px-3 text-xs',
+    md: 'h-9 px-4 text-sm',
+    lg: 'h-11 px-6 text-base',
     icon: 'p-2',
 };
 
@@ -62,15 +70,23 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         },
         ref,
     ) => {
-        const classes = cn(
-            'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-colors',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            buttonVariants[variant],
-            buttonSizes[size],
-            fullWidth && 'w-full',
-            className,
-        );
+        const classes =
+            variant === 'unstyled'
+                ? cn(className)
+                : cn(
+                      'inline-flex cursor-pointer select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:focus-visible:ring-white/20',
+                      'disabled:opacity-50 disabled:cursor-not-allowed',
+                      '[&_svg]:shrink-0',
+                      buttonVariants[variant],
+                      buttonSizes[size],
+                      fullWidth && 'w-full',
+                      className,
+                  );
         const content = children as React.ReactNode;
+        const spinner = loading ? (
+            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+        ) : null;
 
         // Security: prevent reverse tabnapping — automatically inject noopener/noreferrer when target="_blank"
         const safeRel =
@@ -78,15 +94,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
         if (href && !disabled) {
             return (
-                <LinkComponent
-                    href={href}
-                    className={cn(variant === 'unstyled' ? '' : classes, className)}
-                    target={target}
-                    rel={safeRel}
-                >
-                    {loading && (
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    )}
+                <LinkComponent href={href} className={classes} target={target} rel={safeRel}>
+                    {spinner}
                     {content}
                 </LinkComponent>
             );
@@ -96,13 +105,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             <button
                 ref={ref}
                 disabled={disabled || loading}
-                className={cn(variant === 'unstyled' ? '' : classes, className)}
+                className={classes}
                 type={type || 'button'}
                 {...props}
             >
-                {loading && (
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                )}
+                {spinner}
                 {content}
             </button>
         );

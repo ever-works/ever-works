@@ -634,6 +634,7 @@
             },
             "list": {
                 "newTask": "+ Nowe Zadanie",
+                "noDescription": "Brak opisu",
                 "kanban": "Kanban",
                 "list": "Lista",
                 "filter": {
@@ -664,6 +665,17 @@
                 "priority": "Priorytet",
                 "labels": "Etykiety",
                 "labelsPlaceholder": "oddzielone przecinkami",
+                "workScopedTask": "Zadanie ograniczone do Work",
+                "missionScopedTask": "Zadanie ograniczone do Mission",
+                "ideaScopedTask": "Zadanie ograniczone do Idea",
+                "prefillPromptNotice": "Ten formularz został wstępnie wypełniony z linku URL. Sprawdź treść przed utworzeniem zadania.",
+                "prefillTemplateNotice": "Wstępnie wypełniono z szablonu <name>{slug}</name>. Sprawdź treść przed utworzeniem zadania.",
+                "priorityP0": "P0 — pilne",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — domyślne",
+                "priorityP4": "P4 — niskie",
+                "createError": "Nie udało się utworzyć zadania",
                 "cancel": "Anuluj",
                 "create": "Utwórz"
             },
@@ -680,8 +692,25 @@
                 "browse": "Przeglądaj",
                 "uploading": "Wysyłanie…",
                 "detach": "Odłącz",
+                "attachmentsWorkOnly": "Załączniki są dostępne tylko w zadaniach powiązanych z Work. Utwórz zadanie z poziomu Work, aby dołączyć pliki.",
                 "labels": "Etykiety",
-                "edited": "edytowano"
+                "edited": "edytowano",
+                "description": "Opis",
+                "edit": "Edytuj",
+                "save": "Zapisz",
+                "cancel": "Anuluj",
+                "descriptionPlaceholder": "Dodaj opis…",
+                "noDescription": "Nie podano opisu.",
+                "saveDescriptionError": "Nie udało się zapisać opisu",
+                "details": "Szczegóły",
+                "status": "Status",
+                "priority": "Priorytet",
+                "scope": "Zasięg",
+                "created": "Utworzono",
+                "updated": "Zaktualizowano",
+                "scopeWork": "Praca",
+                "scopeMission": "Misja",
+                "scopeIdea": "Pomysł"
             },
             "recurring": {
                 "section": "Cykliczne harmonogramy",
@@ -705,6 +734,13 @@
                 "blocked": "Zablokowany",
                 "done": "Zrobione",
                 "cancelled": "Anulowano"
+            },
+            "priority": {
+                "p0": "Pilne",
+                "p1": "Wysoki",
+                "p2": "Średni",
+                "p3": "Normalny",
+                "p4": "Niski"
             }
         },
         "skillsPage": {
@@ -715,7 +751,7 @@
                 "subtitle": "Umiejętności będą dostępne w późniejszej fazie wdrożenia Agentów/Umiejętności/Zadań. Strona jest zarezerwowana, aby trasa nawigacji paska bocznego była dostępna."
             },
             "list": {
-                "newSkill": "+ Nowa Umiejętność",
+                "newSkill": "Nowa Umiejętność",
                 "filter": {
                     "scope": "Zasięg",
                     "all": "Wszystkie"
@@ -886,7 +922,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ten pomysł nie jest już dostępny."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -926,6 +963,12 @@
             "help": {
                 "title": "Pomoc i zasoby",
                 "subtitle": "Szybkie wskazówki i przydatne linki, aby pomóc Ci zacząć",
+                "tabs": {
+                    "tips": "Wskazówki",
+                    "shortcuts": "Skróty",
+                    "faq": "FAQ",
+                    "resources": "Zasoby"
+                },
                 "onboarding": {
                     "title": "Wprowadzenie",
                     "description": "Otwórz ponownie przewodnik w dowolnym momencie i kontynuuj od miejsca, w którym przerwałeś.",
@@ -935,7 +978,8 @@
                     "title": "Szybkie wskazówki",
                     "tip1": "Utwórz swój pierwszy praca, klikając przycisk „Utwórz praca” na pulpicie.",
                     "tip2": "Użyj generatora AI, aby automatycznie wypełnić praca odpowiednimi elementami.",
-                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria."
+                    "tip3": "Połącz konto GitHub, aby synchronizować i wdrażać prace jako repozytoria.",
+                    "tip4": "Naciśnij ? w dowolnym momencie, aby ponownie otworzyć ten panel Pomoc i zasoby."
                 },
                 "shortcuts": {
                     "title": "Skróty klawiaturowe",
@@ -949,9 +993,39 @@
                     "github": "Repozytorium GitHub",
                     "issues": "Zgłoś problem",
                     "docs": "Dokumentacja",
-                    "comingSoon": "Wkrótce"
+                    "comingSoon": "Wkrótce",
+                    "community": "Dyskusje społeczności"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Potrzebujesz więcej pomocy?",
+                    "description": "Przejrzyj dokumentację lub zapytaj społeczność — zwykle odpowiadamy szybko.",
+                    "action": "Dołącz do dyskusji"
+                },
+                "faq": {
+                    "title": "Najczęstsze pytania",
+                    "q1": "Jak działa generowanie przez SI?",
+                    "a1": "Działa jak krótki, prowadzony potok:",
+                    "a1s1": "Opisz swój Work — temat, odbiorców i cel.",
+                    "a1s2": "AI bada źródła i tworzy elementy, kategorie i tagi.",
+                    "a1s3": "Sprawdź, a potem edytuj lub wygeneruj ponownie cokolwiek przed publikacją.",
+                    "q2": "Jak połączyć GitHub?",
+                    "a2": "Połącz go, aby synchronizować i wdrażać swoje works jako repozytoria:",
+                    "a2s1": "Otwórz Ustawienia → Integracje i kliknij Połącz przy GitHub.",
+                    "a2s2": "Autoryzuj Ever Works i wybierz konto lub organizację.",
+                    "a2s3": "Wybierz repozytorium do synchronizacji lub wdrożenia ze swojego Work.",
+                    "q3": "Czy mogę edytować elementy po wygenerowaniu?",
+                    "a3": "Tak — każdy element pozostaje w pełni edytowalny:",
+                    "a3s1": "Otwórz element, aby edytować tytuł, treść lub metadane.",
+                    "a3s2": "Albo wygeneruj ponownie pojedynczy element, aby uzyskać nowy szkic AI.",
+                    "a3s3": "Zapisz, a zmiany zostaną zastosowane natychmiast.",
+                    "learnMore": "Dowiedz się więcej"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Wszystkie systemy działają",
+                    "environment": "Środowisko"
+                }
             }
         },
         "activity": {
@@ -1565,6 +1639,19 @@
             "createButton": "Utwórz praca"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenci",
+                "heading": "Agenci tej Pracy",
+                "emptyTitle": "Brak Agentów",
+                "emptySubtitle": "Utwórz Agenta, aby zautomatyzować tę Pracę.",
+                "pause": "Wstrzymaj Agenta",
+                "activate": "Aktywuj Agenta",
+                "pausedToast": "Agent wstrzymany",
+                "activatedToast": "Agent aktywowany",
+                "statusUpdateFailed": "Nie udało się zaktualizować statusu",
+                "newAgent": "Nowy Agent",
+                "moreAgents": "+{count} więcej"
+            },
             "failedToGenerateItems": "Nie udało się wygenerować elementów. Spróbuj ponownie.",
             "generationCompleted": "Wygenerowano pomyślnie",
             "generationCancelled": "Generowanie zostało anulowane",
@@ -3396,6 +3483,11 @@
                 "workNamePlaceholder": "np. Świetne narzędzia AI",
                 "workNameHelp": "AI zasugeruje nazwę, jeśli zostawisz to puste",
                 "promptLabel": "Opisz swój praca",
+                "slugChecking": "Sprawdzanie dostępności…",
+                "slugAvailable": "{slug} jest dostępny",
+                "slugTakenName": "{slug} już istnieje w Twoich pracach",
+                "slugUseSuggestion": "Użyj {suggestion}",
+                "slugCheckError": "Nie udało się sprawdzić dostępności — możesz mimo to kontynuować",
                 "githubRequired": "Najpierw połącz konto GitHub.",
                 "promptPlaceholder": "Opisz, jaki praca chcesz utworzyć, jakie elementy powinien zawierać i wszelkie konkretne wymagania...",
                 "inspirationText": "Potrzebujesz inspiracji? Wypróbuj jedną z tych:",
@@ -3415,6 +3507,22 @@
                     "3": {
                         "name": "Zrównoważona moda",
                         "prompt": "Utwórz kolekcję zrównoważonych marek modowych"
+                    },
+                    "4": {
+                        "name": "Aplikacje self-hosted",
+                        "prompt": "Utwórz katalog możliwych do samodzielnego hostowania, open-source alternatyw dla popularnych narzędzi SaaS"
+                    },
+                    "5": {
+                        "name": "Agenci AI do kodowania",
+                        "prompt": "Utwórz wyselekcjonowany katalog agentów i asystentów AI do kodowania z cenami i wsparciem IDE"
+                    },
+                    "6": {
+                        "name": "Narzędzia dla twórców indie",
+                        "prompt": "Utwórz praca katalogujące narzędzia i usługi dla twórców indie i samodzielnych założycieli"
+                    },
+                    "7": {
+                        "name": "Inspiracje projektowe",
+                        "prompt": "Utwórz kolekcję stron z inspiracjami projektowymi dla landing pages i portfolio"
                     }
                 },
                 "featuresTitle": "Co AI zrobi dla Ciebie:",
@@ -3434,6 +3542,7 @@
                     "unconfiguredProviders": "{providers} nie skonfigurowane. Odwiedź Ustawienia → Wtyczki, aby skonfigurować przed generowaniem.",
                     "nameRequired": "Nazwa pracy jest wymagana",
                     "slugRequired": "Slug pracy jest wymagany",
+                    "slugTaken": "Ten slug już istnieje w Twoich pracach. Wybierz inny.",
                     "descriptionRequired": "Opis pracy jest wymagany",
                     "githubRequired": "Najpierw połącz konto GitHub.",
                     "createFailed": "Nie udało się utworzyć pracy"
@@ -4585,7 +4694,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Ten pomysł nie jest już dostępny."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -4599,6 +4709,22 @@
                 "anyStatus": "Dowolny status",
                 "apply": "Zastosuj",
                 "reset": "Resetuj"
+            },
+            "newPage": {
+                "link": "Utwórz ręcznie",
+                "or": "Lub",
+                "title": "Nowa Idea",
+                "subtitle": "Napisz własną Idea. Opisz Work, który chcesz utworzyć — później możesz dodać go do kolejki budowania.",
+                "nameLabel": "Tytuł",
+                "namePlaceholder": "Opcjonalnie — pozostaw puste, aby wygenerować na podstawie opisu",
+                "descriptionLabel": "Opis",
+                "descriptionPlaceholder": "Opisz Work, w który ma się przekształcić ta Idea — np. „Wyselekcjonowany katalog otwartoźródłowych frameworków agentów AI, uporządkowany według typu frameworka i licencji.”",
+                "descriptionHint": "Co najmniej 10 znaków.",
+                "cancel": "Anuluj",
+                "create": "Utwórz Idea",
+                "creating": "Tworzenie…",
+                "minLength": "Opis musi mieć co najmniej 10 znaków.",
+                "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             }
         },
         "discover": {

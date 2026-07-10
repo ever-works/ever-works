@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "+ Neue Aufgabe",
+                "noDescription": "Noch keine Beschreibung",
                 "kanban": "Kanban",
                 "list": "Liste",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priorität",
                 "labels": "Labels",
                 "labelsPlaceholder": "durch Komma getrennt",
+                "workScopedTask": "Auf einen Work begrenzte Aufgabe",
+                "missionScopedTask": "Auf eine Mission begrenzte Aufgabe",
+                "ideaScopedTask": "Auf eine Idea begrenzte Aufgabe",
+                "prefillPromptNotice": "Dieses Formular wurde aus einem URL-Link vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "prefillTemplateNotice": "Aus Vorlage <name>{slug}</name> vorausgefüllt. Überprüfe den Inhalt, bevor du die Aufgabe erstellst.",
+                "priorityP0": "P0 — dringend",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — Standard",
+                "priorityP4": "P4 — niedrig",
+                "createError": "Aufgabe konnte nicht erstellt werden",
                 "cancel": "Abbrechen",
                 "create": "Erstellen"
             },
@@ -738,8 +750,25 @@
                 "browse": "Durchsuchen",
                 "uploading": "Hochladen…",
                 "detach": "Trennen",
+                "attachmentsWorkOnly": "Anhänge sind nur bei Work-bezogenen Aufgaben verfügbar. Erstelle eine Aufgabe aus einem Work, um Dateien anzuhängen.",
                 "labels": "Labels",
-                "edited": "bearbeitet"
+                "edited": "bearbeitet",
+                "description": "Beschreibung",
+                "edit": "Bearbeiten",
+                "save": "Speichern",
+                "cancel": "Abbrechen",
+                "descriptionPlaceholder": "Beschreibung hinzufügen…",
+                "noDescription": "Keine Beschreibung vorhanden.",
+                "saveDescriptionError": "Beschreibung konnte nicht gespeichert werden",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priorität",
+                "scope": "Bereich",
+                "created": "Erstellt",
+                "updated": "Aktualisiert",
+                "scopeWork": "Arbeit",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idee"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -763,6 +792,13 @@
                 "blocked": "Blockiert",
                 "done": "Erledigt",
                 "cancelled": "Abgebrochen"
+            },
+            "priority": {
+                "p0": "Dringend",
+                "p1": "Hoch",
+                "p2": "Mittel",
+                "p3": "Normal",
+                "p4": "Niedrig"
             }
         },
         "skillsPage": {
@@ -820,7 +856,7 @@
                 "next": "Nächste"
             },
             "list": {
-                "newSkill": "+ Neue Fähigkeit",
+                "newSkill": "Neue Fähigkeit",
                 "filter": {
                     "scope": "Bereich",
                     "all": "Alle"
@@ -839,6 +875,43 @@
                 "idea": "Idee",
                 "work": "Aufgabe",
                 "tenant": "Mandant"
+            },
+            "newPage": {
+                "title": "Neuer Skill",
+                "templateStepTitle": "Mit einer Vorlage starten (optional)",
+                "startFromScratch": "Von Grund auf neu beginnen",
+                "scopeStepTitle": "Wo soll dieser Skill leben?",
+                "scopeTenantLabel": "Arbeitsbereich",
+                "scopeTenantDesc": "Im gesamten Arbeitsbereich verfügbar.",
+                "scopeMissionDesc": "Auf eine einzelne Mission beschränkt.",
+                "scopeWorkDesc": "Auf ein einzelnes Work beschränkt.",
+                "scopeIdeaDesc": "Auf eine einzelne Idee beschränkt.",
+                "scopeAgentDesc": "Gehört einem einzelnen Agent.",
+                "noMissions": "Noch keine Missionen — erstelle zuerst eine oder wähle einen anderen Bereich.",
+                "noWorks": "Noch keine Works — erstelle zuerst eines oder wähle einen anderen Bereich.",
+                "noIdeas": "Noch keine Ideen — erstelle zuerst eine oder wähle einen anderen Bereich.",
+                "noAgents": "Noch keine Agents — erstelle zuerst einen oder wähle einen anderen Bereich.",
+                "parentLabel": "Welche(r) {scope}?",
+                "parentPlaceholder": "Auswählen…",
+                "pickParentHint": "Wähle eine(n) {scope}, um fortzufahren, oder wähle den Arbeitsbereich.",
+                "nextDisabledReason": "Wähle ein übergeordnetes Element, um fortzufahren",
+                "scopeSuffix": "Bereich —",
+                "detailsStepTitle": "Beschreibe den Skill",
+                "titleLabel": "Titel",
+                "titlePlaceholder": "z. B. Code-Review-Checkliste",
+                "descriptionLabel": "Beschreibung (optional)",
+                "descriptionPlaceholder": "Einzeiler, den Agents sehen, wenn sie diesen Skill laden.",
+                "instructionsLabel": "Anweisungen (Markdown, optional)",
+                "instructionsPlaceholder": "# Mein Skill\n\nWas soll der Agent wissen oder tun?",
+                "instructionsHint": "Du kannst den Inhalt später auf der Skill-Detailseite verfeinern.",
+                "back": "Zurück",
+                "next": "Weiter",
+                "cancel": "Abbrechen",
+                "create": "Skill erstellen",
+                "creating": "Wird erstellt...",
+                "titleRequired": "Titel ist erforderlich.",
+                "parentRequired": "Wähle ein übergeordnetes Element für diesen Bereich.",
+                "createFailed": "Skill konnte nicht erstellt werden"
             }
         },
         "templatesPage": {
@@ -991,7 +1064,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "Diese Idee ist nicht mehr verfügbar."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1079,22 @@
                 "anyStatus": "Beliebiger Status",
                 "apply": "Übernehmen",
                 "reset": "Zurücksetzen"
+            },
+            "newPage": {
+                "link": "Manuell erstellen",
+                "or": "Oder",
+                "title": "Neue Idea",
+                "subtitle": "Schreibe deine eigene Idea. Beschreibe das Work, das du erstellen möchtest — du kannst es anschließend zur Generierung einreihen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optional — leer lassen, um ihn aus der Beschreibung abzuleiten",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Beschreibe das Work, das aus dieser Idea werden soll — z. B. „Ein kuratiertes Verzeichnis quelloffener KI-Agenten-Frameworks, geordnet nach Framework-Typ und Lizenz.“",
+                "descriptionHint": "Mindestens 10 Zeichen.",
+                "cancel": "Abbrechen",
+                "create": "Idea erstellen",
+                "creating": "Wird erstellt…",
+                "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
+                "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             }
         },
         "discover": {
@@ -1031,6 +1121,12 @@
             "help": {
                 "title": "Hilfe & Ressourcen",
                 "subtitle": "Schnelle Tipps und nützliche Links, um Sie beim Einstieg zu unterstützen",
+                "tabs": {
+                    "tips": "Tipps",
+                    "shortcuts": "Tastenkürzel",
+                    "faq": "FAQ",
+                    "resources": "Ressourcen"
+                },
                 "onboarding": {
                     "title": "Einführung",
                     "description": "Öffnen Sie die geführte Einrichtung jederzeit erneut und setzen Sie dort fort, wo Sie aufgehört haben.",
@@ -1040,7 +1136,8 @@
                     "title": "Schnelle Tipps",
                     "tip1": "Erstellen Sie Ihr erstes Werk, indem Sie die Schaltfläche „Werk erstellen“ auf der Übersicht klicken.",
                     "tip2": "Verwenden Sie den KI-Generator, um Ihr Werk automatisch mit relevanten Elementen zu füllen.",
-                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen."
+                    "tip3": "Verbinden Sie Ihr GitHub-Konto, um Ihre Werke als Repositories zu synchronisieren und bereitzustellen.",
+                    "tip4": "Drücken Sie jederzeit ?, um dieses Hilfe- & Ressourcen-Panel erneut zu öffnen."
                 },
                 "shortcuts": {
                     "title": "Tastaturkürzel",
@@ -1054,9 +1151,39 @@
                     "github": "GitHub-Repository",
                     "issues": "Problem melden",
                     "docs": "Dokumentation",
-                    "comingSoon": "Bald verfügbar"
+                    "comingSoon": "Bald verfügbar",
+                    "community": "Community-Diskussionen"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Brauchen Sie weitere Hilfe?",
+                    "description": "Durchsuchen Sie die Dokumentation oder fragen Sie die Community — wir antworten meist schnell.",
+                    "action": "An der Diskussion teilnehmen"
+                },
+                "faq": {
+                    "title": "Häufige Fragen",
+                    "q1": "Wie funktioniert die KI-Generierung?",
+                    "a1": "Es läuft als kurze, geführte Pipeline ab:",
+                    "a1s1": "Beschreibe deinen Work – Thema, Zielgruppe und Ziel.",
+                    "a1s2": "Die KI recherchiert Quellen und erstellt Einträge, Kategorien und Tags.",
+                    "a1s3": "Prüfe und bearbeite oder regeneriere alles vor dem Veröffentlichen.",
+                    "q2": "Wie verbinde ich GitHub?",
+                    "a2": "Verbinde ihn, um deine works als Repositorys zu synchronisieren und bereitzustellen:",
+                    "a2s1": "Öffne Einstellungen → Integrationen und klicke bei GitHub auf Verbinden.",
+                    "a2s2": "Autorisiere Ever Works und wähle ein Konto oder eine Organisation.",
+                    "a2s3": "Wähle das Repository zum Synchronisieren oder Bereitstellen aus deinem Work.",
+                    "q3": "Kann ich Elemente nach der Generierung bearbeiten?",
+                    "a3": "Ja – jeder Eintrag bleibt jederzeit bearbeitbar:",
+                    "a3s1": "Öffne den Eintrag, um Titel, Inhalt oder Metadaten zu bearbeiten.",
+                    "a3s2": "Oder regeneriere einen einzelnen Eintrag für einen neuen KI-Entwurf.",
+                    "a3s3": "Speichere und deine Änderungen werden sofort übernommen.",
+                    "learnMore": "Mehr erfahren"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "Alle Systeme betriebsbereit",
+                    "environment": "Umgebung"
+                }
             }
         },
         "activity": {
@@ -1676,6 +1803,19 @@
             "createButton": "Werk erstellen"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agenten",
+                "heading": "Agenten für diese Aufgabe",
+                "emptyTitle": "Noch keine Agenten",
+                "emptySubtitle": "Erstellen Sie einen Agenten, um diese Aufgabe zu automatisieren.",
+                "pause": "Agent pausieren",
+                "activate": "Agent aktivieren",
+                "pausedToast": "Agent pausiert",
+                "activatedToast": "Agent aktiviert",
+                "statusUpdateFailed": "Status konnte nicht aktualisiert werden",
+                "newAgent": "Neuer Agent",
+                "moreAgents": "+{count} weitere"
+            },
             "failedToGenerateItems": "Fehler beim Generieren der Elemente. Bitte versuchen Sie es erneut.",
             "generationCompleted": "Generierung erfolgreich abgeschlossen",
             "generationCancelled": "Generierung wurde abgebrochen",
@@ -3540,6 +3680,11 @@
                 "slugLabel": "Arbeit-Slug",
                 "slugPlaceholder": "awesome-ki-tools",
                 "slugHelp": "URL-freundlicher Bezeichner. Wird automatisch aus dem Namen generiert — zum Überschreiben bearbeiten.",
+                "slugChecking": "Verfügbarkeit wird geprüft…",
+                "slugAvailable": "{slug} ist verfügbar",
+                "slugTakenName": "{slug} existiert bereits in deinen Werken",
+                "slugUseSuggestion": "{suggestion} verwenden",
+                "slugCheckError": "Verfügbarkeit konnte nicht geprüft werden – du kannst trotzdem fortfahren",
                 "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
                 "promptPlaceholder": "Beschreiben Sie, welches Werk Sie erstellen möchten, welche Einträge es enthalten soll und spezifische Anforderungen…",
                 "inspirationText": "Brauchen Sie Inspiration? Probieren Sie eines davon aus:",
@@ -3559,6 +3704,22 @@
                     "3": {
                         "name": "Nachhaltige Mode",
                         "prompt": "Erstellen Sie eine Sammlung nachhaltiger Mode-Marken"
+                    },
+                    "4": {
+                        "name": "Selbstgehostete Apps",
+                        "prompt": "Erstellen Sie ein Verzeichnis selbst hostbarer, quelloffener Alternativen zu beliebten SaaS-Tools"
+                    },
+                    "5": {
+                        "name": "KI-Coding-Agenten",
+                        "prompt": "Erstellen Sie ein kuratiertes Verzeichnis von KI-Coding-Agenten und -Assistenten mit Preisen und IDE-Unterstützung"
+                    },
+                    "6": {
+                        "name": "Tools für Indie-Maker",
+                        "prompt": "Erstellen Sie ein Werk, das Tools und Dienste für Indie-Maker und Solo-Gründer katalogisiert"
+                    },
+                    "7": {
+                        "name": "Design-Inspiration",
+                        "prompt": "Erstellen Sie eine Sammlung von Design-Inspirationsseiten für Landingpages und Portfolios"
                     }
                 },
                 "featuresTitle": "Was KI für Sie tun wird:",
@@ -3578,6 +3739,7 @@
                     "unconfiguredProviders": "{providers} nicht konfiguriert. Besuchen Sie Einstellungen → Plugins, um es vor der Generierung einzurichten.",
                     "nameRequired": "Werkname ist erforderlich",
                     "slugRequired": "Werkslug ist erforderlich",
+                    "slugTaken": "Dieser Slug existiert bereits in deinen Werken. Wähle einen anderen.",
                     "descriptionRequired": "Werkbeschreibung ist erforderlich",
                     "githubRequired": "Bitte verbinden Sie zuerst Ihr GitHub-Konto.",
                     "createFailed": "Fehler beim Erstellen des Werks"

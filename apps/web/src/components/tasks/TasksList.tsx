@@ -173,6 +173,7 @@ export function TasksList({
 }
 
 function TaskCard({ task }: { task: Task }) {
+    const t = useTranslations('dashboard.tasksPage');
     return (
         <Link
             href={ROUTES.DASHBOARD_TASK(task.id)}
@@ -189,9 +190,13 @@ function TaskCard({ task }: { task: Task }) {
             <h3 className="text-sm font-semibold text-text dark:text-text-dark mt-2 truncate">
                 {task.title}
             </h3>
-            {task.description && (
+            {task.description ? (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 line-clamp-2">
                     {task.description}
+                </p>
+            ) : (
+                <p className="text-xs text-text-muted/70 dark:text-text-muted-dark/70 mt-1 italic">
+                    {t('list.noDescription')}
                 </p>
             )}
             <div className="flex items-center gap-2 mt-3 flex-wrap">

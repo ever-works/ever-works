@@ -84,7 +84,11 @@ See the [plugin documentation][uri_docs] for how to build and publish your own.
 
 ### Web UI
 
-![overview](https://docs.ever.works/overview.png)
+<img width="1929" height="1159" alt="image" src="https://github.com/user-attachments/assets/f2ac9ba6-b365-4c6f-bc31-6ff51d6fe3c1" />
+
+<img width="1929" height="1159" alt="image" src="https://github.com/user-attachments/assets/8083e078-cc8a-42c2-b596-b0906053bfed" />
+
+<img width="1929" height="1159" alt="image" src="https://github.com/user-attachments/assets/d99901f2-95a2-4811-80b4-43c40f61f6a2" />
 
 </details>
 

@@ -692,6 +692,7 @@
             },
             "list": {
                 "newTask": "New Task",
+                "noDescription": "No description yet",
                 "kanban": "Kanban",
                 "list": "List",
                 "filter": {
@@ -722,6 +723,17 @@
                 "priority": "Priority",
                 "labels": "Labels",
                 "labelsPlaceholder": "comma-separated",
+                "workScopedTask": "Work-scoped task",
+                "missionScopedTask": "Mission-scoped task",
+                "ideaScopedTask": "Idea-scoped task",
+                "prefillPromptNotice": "This form was pre-filled from a URL link. Review the content before creating the task.",
+                "prefillTemplateNotice": "Pre-filled from template <name>{slug}</name>. Review the content before creating the task.",
+                "priorityP0": "P0 — urgent",
+                "priorityP1": "P1",
+                "priorityP2": "P2",
+                "priorityP3": "P3 — default",
+                "priorityP4": "P4 — low",
+                "createError": "Failed to create Task",
                 "cancel": "Cancel",
                 "create": "Create"
             },
@@ -738,8 +750,25 @@
                 "browse": "Browse",
                 "uploading": "Uploading…",
                 "detach": "Detach",
+                "attachmentsWorkOnly": "Attachments are only available on Work-scoped tasks. Create a task from a Work to attach files.",
                 "labels": "Labels",
-                "edited": "edited"
+                "edited": "edited",
+                "description": "Description",
+                "edit": "Edit",
+                "save": "Save",
+                "cancel": "Cancel",
+                "descriptionPlaceholder": "Add a description…",
+                "noDescription": "No description provided.",
+                "saveDescriptionError": "Failed to save description",
+                "details": "Details",
+                "status": "Status",
+                "priority": "Priority",
+                "scope": "Scope",
+                "created": "Created",
+                "updated": "Updated",
+                "scopeWork": "Work",
+                "scopeMission": "Mission",
+                "scopeIdea": "Idea"
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -763,6 +792,13 @@
                 "blocked": "Blocked",
                 "done": "Done",
                 "cancelled": "Cancelled"
+            },
+            "priority": {
+                "p0": "Urgent",
+                "p1": "High",
+                "p2": "Medium",
+                "p3": "Normal",
+                "p4": "Low"
             }
         },
         "skillsPage": {
@@ -820,25 +856,91 @@
                 "next": "Next"
             },
             "list": {
-                "newSkill": "+ New Skill",
+                "newSkill": "New Skill",
                 "filter": {
                     "scope": "Scope",
                     "all": "All"
                 }
             },
             "detail": {
+                "backToSkills": "Back to Skills",
                 "instructions": "Instructions",
+                "body": {
+                    "write": "Write",
+                    "preview": "Preview",
+                    "saving": "Saving…",
+                    "saved": "Saved",
+                    "saveFailed": "Save failed",
+                    "placeholder": "# What this Skill does\n\nDescribe the steps, conventions, and examples the Agent should follow when this Skill is pulled into a run.",
+                    "emptyPreview": "Nothing to preview yet — click here to start writing.",
+                    "clickToEdit": "Click to edit",
+                    "markdownHint": "Markdown supported, including tables and task lists (GFM).",
+                    "words": "{count, plural, =1 {1 word} other {# words}}",
+                    "characters": "{count, plural, =1 {1 character} other {# characters}}"
+                },
                 "bindings": "Bindings",
                 "bindingHelper": "Bind this Skill to an Agent, Mission, Idea, or Work. Priority 1 = highest precedence.",
                 "addBinding": "+ Add binding",
-                "removeBinding": "Remove",
+                "addBindingTitle": "Add binding",
+                "removeBinding": "Remove binding",
+                "noBindings": "No bindings yet — attach this Skill to a target below.",
                 "targetType": "Bind to",
+                "target": "Target",
                 "priority": "Priority",
+                "picker": {
+                    "searchPlaceholder": "Search by name…",
+                    "workspaceWide": "Applies to the entire workspace",
+                    "pasteUuid": "Options unavailable — paste a UUID",
+                    "noOptionsPasteUuid": "Nothing to pick yet — paste a UUID",
+                    "loading": "Loading…",
+                    "noMatches": "No matches"
+                },
+                "agentOff": "Agent: off",
+                "generatorOn": "Generator: on",
+                "add": "Add",
+                "adding": "Adding…",
                 "agent": "Agent",
                 "mission": "Mission",
                 "idea": "Idea",
                 "work": "Work",
                 "tenant": "Workspace"
+            },
+            "newPage": {
+                "title": "New Skill",
+                "templateStepTitle": "Start from a template (optional)",
+                "startFromScratch": "Start from scratch",
+                "scopeStepTitle": "Where should this Skill live?",
+                "scopeTenantLabel": "Workspace",
+                "scopeTenantDesc": "Available across your whole workspace.",
+                "scopeMissionDesc": "Scoped to a single Mission.",
+                "scopeWorkDesc": "Scoped to a single Work.",
+                "scopeIdeaDesc": "Scoped to a single Idea.",
+                "scopeAgentDesc": "Owned by a single Agent.",
+                "noMissions": "No Missions yet — create one first, or pick another scope.",
+                "noWorks": "No Works yet — create one first, or pick another scope.",
+                "noIdeas": "No Ideas yet — create one first, or pick another scope.",
+                "noAgents": "No Agents yet — create one first, or pick another scope.",
+                "parentLabel": "Which {scope}?",
+                "parentPlaceholder": "Select…",
+                "pickParentHint": "Pick a {scope} to continue, or choose Workspace scope.",
+                "nextDisabledReason": "Select a parent to continue",
+                "scopeSuffix": "scope —",
+                "detailsStepTitle": "Describe the Skill",
+                "titleLabel": "Title",
+                "titlePlaceholder": "e.g. Code review checklist",
+                "descriptionLabel": "Description (optional)",
+                "descriptionPlaceholder": "One-line summary Agents see when deciding to load this Skill.",
+                "instructionsLabel": "Instructions (Markdown, optional)",
+                "instructionsPlaceholder": "# My Skill\n\nWhat should the Agent know or do?",
+                "instructionsHint": "You can refine the body later on the Skill detail page.",
+                "back": "Back",
+                "next": "Next",
+                "cancel": "Cancel",
+                "create": "Create Skill",
+                "creating": "Creating...",
+                "titleRequired": "Title is required.",
+                "parentRequired": "Pick a parent for this scope.",
+                "createFailed": "Failed to create Skill"
             }
         },
         "templatesPage": {
@@ -991,7 +1093,8 @@
                 "ideaCreated": "Idea added",
                 "ideaCreateError": "Couldn't add idea. Please try again.",
                 "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again."
+                "ideaQueueError": "Couldn't queue build. Please try again.",
+                "ideaGone": "This Idea is no longer available."
             },
             "empty": {
                 "title": "No Ideas match these filters.",
@@ -1005,6 +1108,22 @@
                 "reset": "Reset",
                 "status": "Status",
                 "anyStatus": "Any status"
+            },
+            "newPage": {
+                "link": "Create manually",
+                "or": "Or",
+                "title": "New Idea",
+                "subtitle": "Write your own Idea. Describe the Work you want to build — you can queue it for build afterward.",
+                "nameLabel": "Title",
+                "namePlaceholder": "Optional — leave blank to derive one from the description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Describe the Work this Idea should become — e.g. \"A curated directory of open-source AI agent frameworks, organized by framework type and license.\"",
+                "descriptionHint": "At least 10 characters.",
+                "cancel": "Cancel",
+                "create": "Create Idea",
+                "creating": "Creating…",
+                "minLength": "Description must be at least 10 characters.",
+                "error": "Couldn't create the Idea. Please try again."
             }
         },
         "discover": {
@@ -1031,6 +1150,12 @@
             "help": {
                 "title": "Help & Resources",
                 "subtitle": "Quick tips and useful links to help you get started",
+                "tabs": {
+                    "tips": "Tips",
+                    "shortcuts": "Shortcuts",
+                    "faq": "FAQ",
+                    "resources": "Resources"
+                },
                 "onboarding": {
                     "title": "Onboarding",
                     "description": "Reopen the guided setup anytime and continue where you left off.",
@@ -1040,7 +1165,8 @@
                     "title": "Quick Tips",
                     "tip1": "Create your first Work by clicking the '+ New Work' button on the dashboard.",
                     "tip2": "Use the AI generator to automatically populate your Work with relevant items.",
-                    "tip3": "Connect your GitHub account to sync and deploy your works as repositories."
+                    "tip3": "Connect your GitHub account to sync and deploy your works as repositories.",
+                    "tip4": "Press ? anytime to reopen this Help & Resources panel."
                 },
                 "shortcuts": {
                     "title": "Keyboard Shortcuts",
@@ -1054,9 +1180,39 @@
                     "github": "GitHub Repository",
                     "issues": "Report an Issue",
                     "docs": "Documentation",
-                    "comingSoon": "Coming soon"
+                    "comingSoon": "Coming soon",
+                    "community": "Community Discussions"
                 },
-                "version": "Ever Works v{version}"
+                "version": "Ever Works v{version}",
+                "support": {
+                    "title": "Need more help?",
+                    "description": "Browse the docs or ask the community — we usually reply quickly.",
+                    "action": "Join the discussion"
+                },
+                "faq": {
+                    "title": "Frequently Asked",
+                    "q1": "How does AI generation work?",
+                    "a1": "It runs as a short, guided pipeline:",
+                    "a1s1": "Describe your Work — its topic, audience, and goal.",
+                    "a1s2": "The AI researches sources and drafts items, categories, and tags.",
+                    "a1s3": "Review, then edit or regenerate anything before publishing.",
+                    "q2": "How do I connect GitHub?",
+                    "a2": "Connect it to sync and deploy your works as repositories:",
+                    "a2s1": "Open Settings → Integrations and click Connect on GitHub.",
+                    "a2s2": "Authorize Ever Works and choose an account or organization.",
+                    "a2s3": "Pick the repository to sync or deploy from your Work.",
+                    "q3": "Can I edit items after generating?",
+                    "a3": "Yes — every item stays fully editable:",
+                    "a3s1": "Open the item to edit its title, content, or metadata.",
+                    "a3s2": "Or regenerate a single item for a fresh AI draft.",
+                    "a3s3": "Save and your changes apply instantly.",
+                    "learnMore": "Learn more"
+                },
+                "system": {
+                    "title": "System",
+                    "operational": "All systems operational",
+                    "environment": "Environment"
+                }
             }
         },
         "activity": {
@@ -1792,6 +1948,19 @@
             "createButton": "New Work"
         },
         "workDetail": {
+            "agentsDropdown": {
+                "trigger": "Agents",
+                "heading": "Agents for this Work",
+                "emptyTitle": "No Agents yet",
+                "emptySubtitle": "Create one to automate this Work.",
+                "pause": "Pause Agent",
+                "activate": "Activate Agent",
+                "pausedToast": "Agent paused",
+                "activatedToast": "Agent activated",
+                "statusUpdateFailed": "Could not update status",
+                "newAgent": "New Agent",
+                "moreAgents": "+{count} more"
+            },
             "failedToGenerateItems": "Failed to generate items. Please try again.",
             "generationCompleted": "Generation completed successfully",
             "generationCancelled": "Generation was cancelled",
@@ -3812,6 +3981,11 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override.",
+                "slugChecking": "Checking availability…",
+                "slugAvailable": "{slug} is available",
+                "slugTakenName": "{slug} already exists in your works",
+                "slugUseSuggestion": "Use {suggestion}",
+                "slugCheckError": "Couldn't check availability — you can still continue",
                 "githubRequired": "Please connect your GitHub account first.",
                 "promptPlaceholder": "Describe what kind of Work you want to create, what items it should contain, and any specific requirements...",
                 "inspirationText": "Need inspiration? Try one of these:",
@@ -3831,6 +4005,22 @@
                     "3": {
                         "name": "Sustainable Fashion",
                         "prompt": "Make a collection of sustainable fashion brands"
+                    },
+                    "4": {
+                        "name": "Self-Hosted Apps",
+                        "prompt": "Build a directory of self-hostable, open-source alternatives to popular SaaS tools"
+                    },
+                    "5": {
+                        "name": "AI Coding Agents",
+                        "prompt": "Create a curated directory of AI coding agents and assistants with pricing and IDE support"
+                    },
+                    "6": {
+                        "name": "Indie Maker Tools",
+                        "prompt": "Build a Work cataloguing tools and services for indie makers and solo founders"
+                    },
+                    "7": {
+                        "name": "Design Inspiration",
+                        "prompt": "Make a collection of design-inspiration sites for landing pages and portfolios"
                     }
                 },
                 "featuresTitle": "What AI will do for you:",
@@ -3850,6 +4040,7 @@
                     "unconfiguredProviders": "{providers} not configured. Visit Settings → Plugins to set up before generating.",
                     "nameRequired": "Work name is required",
                     "slugRequired": "Work slug is required",
+                    "slugTaken": "This slug already exists in your works. Choose another.",
                     "descriptionRequired": "Work description is required",
                     "githubRequired": "Please connect your GitHub account first.",
                     "createFailed": "Failed to create Work"
