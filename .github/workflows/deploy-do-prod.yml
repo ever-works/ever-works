@@ -24,20 +24,24 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install doctl
+        if: ${{ vars.DO_ENABLED == 'true' }}
         uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f  # v2
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
       - name: Save DigitalOcean kubeconfig with short-lived credentials
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: doctl kubernetes cluster kubeconfig save --expiry-seconds 600 k8s-gauzy
 
       - name: Write PostgreSQL Certificate file
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: |
           echo "$DB_CA_CERT" | base64 --decode > ${HOME}/ca-certificate.crt
         env:
           DB_CA_CERT: '${{ secrets.DATABASE_CA_CERT }}'
 
       - name: Generate TLS Secrets
+        if: ${{ vars.DO_ENABLED == 'true' }}
         # M-13: pass secrets via `env:` and double-quote `"$VAR"` instead of
         # interpolating `${{ secrets.X }}` directly into the shell. Inline
         # interpolation expands client-side and a secret containing shell
@@ -58,6 +62,7 @@ jobs:
           INGRESS_WEBAPP_CERT_KEY: ${{ secrets.INGRESS_WEBAPP_CERT_KEY }}
 
       - name: Apply k8s manifests changes in DigitalOcean k8s cluster (if any)
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: |
           envsubst < $GITHUB_WORKSPACE/.deploy/k8s/k8s-manifest.prod.yaml | kubectl --context do-sfo2-k8s-gauzy apply -f -
         env:
@@ -210,6 +215,7 @@ jobs:
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version
+        if: ${{ vars.DO_ENABLED == 'true' }}
         run: |
           kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-api
           kubectl --context do-sfo2-k8s-gauzy rollout restart deployment/ever-works-web
