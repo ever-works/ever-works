@@ -10,8 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 // actually opens the Preview tab. The chunk is shared with the items
 // MarkdownBodyField and ChatMarkdown.
 const MarkdownPreview = dynamic(
-    () =>
-        import('@/components/works/detail/items/MarkdownPreview').then((m) => m.MarkdownPreview),
+    () => import('@/components/works/detail/items/MarkdownPreview').then((m) => m.MarkdownPreview),
     { ssr: false },
 );
 
@@ -148,8 +147,7 @@ export function SkillMarkdownEditor({
             <div className="flex items-center justify-between gap-3 text-[11px] text-text-muted pt-1 border-t border-border/40 dark:border-border-dark/40">
                 <span>{t('markdownHint')}</span>
                 <span>
-                    {t('words', { count: wordCount })} ·{' '}
-                    {t('characters', { count: value.length })}
+                    {t('words', { count: wordCount })} · {t('characters', { count: value.length })}
                 </span>
             </div>
         </div>

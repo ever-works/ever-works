@@ -36,9 +36,7 @@ import {
  * one obvious place; the corresponding `dispatchKbBackfillSkeleton`
  * JSDoc on `TriggerService` cross-references this list.
  */
-const FLEET_WIDE_DISPATCH_METHODS: ReadonlySet<string> = new Set([
-    'dispatchKbBackfillSkeleton',
-]);
+const FLEET_WIDE_DISPATCH_METHODS: ReadonlySet<string> = new Set(['dispatchKbBackfillSkeleton']);
 
 /**
  * EW-686 P1 — adapter that exposes the existing {@link TriggerService}
@@ -154,8 +152,7 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         },
     ) {
         this.clientFactory = opts?.clientFactory ?? createTenantTriggerClient;
-        this.dispatchersFromClient =
-            opts?.dispatchersFromClient ?? dispatchersFromTenantClient;
+        this.dispatchersFromClient = opts?.dispatchersFromClient ?? dispatchersFromTenantClient;
     }
 
     /**

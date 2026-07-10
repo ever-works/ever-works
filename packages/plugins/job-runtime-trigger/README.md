@@ -6,15 +6,15 @@ Trigger.dev `IJobRuntimeProvider` plugin for the Ever Works platform — canonic
 
 ## Plugin metadata
 
-| Field        | Value                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| ID           | `job-runtime-trigger`                                                                                                       |
-| Category     | `job-runtime`                                                                                                               |
-| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant`        |
-| Runtime id   | `trigger` (selected via `EVER_WORKS_JOB_RUNTIME=trigger`)                                                                   |
-| License      | AGPL-3.0                                                                                                                    |
-| Built-in     | yes                                                                                                                         |
-| Auto-enable  | no                                                                                                                          |
+| Field        | Value                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| ID           | `job-runtime-trigger`                                                                                                |
+| Category     | `job-runtime`                                                                                                        |
+| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant` |
+| Runtime id   | `trigger` (selected via `EVER_WORKS_JOB_RUNTIME=trigger`)                                                            |
+| License      | AGPL-3.0                                                                                                             |
+| Built-in     | yes                                                                                                                  |
+| Auto-enable  | no                                                                                                                   |
 
 ## What this plugin ships
 
@@ -29,58 +29,54 @@ Trigger.dev is the **push-model** member of the family — Trigger.dev's cloud i
 ## Operator setup
 
 1. Install peer dep:
-   ```bash
-   pnpm add @trigger.dev/sdk
-   ```
+    ```bash
+    pnpm add @trigger.dev/sdk
+    ```
 2. Configure env vars:
-   - `TRIGGER_SECRET_KEY` — server-side prod secret (`tr_prod_*`) used by `tasks.trigger`
-   - `TRIGGER_PROJECT_REF` — Trigger.dev project reference (e.g. `proj_abc123`)
-   - `TRIGGER_API_URL` (optional) — override for self-hosted Trigger.dev
+    - `TRIGGER_SECRET_KEY` — server-side prod secret (`tr_prod_*`) used by `tasks.trigger`
+    - `TRIGGER_PROJECT_REF` — Trigger.dev project reference (e.g. `proj_abc123`)
+    - `TRIGGER_API_URL` (optional) — override for self-hosted Trigger.dev
 3. Set `EVER_WORKS_JOB_RUNTIME=trigger` on the API (this is the default).
 4. Build a `TriggerDispatcherFactory` from the SDK's module-level `tasks` / `runs` namespaces and wire dispatchers:
 
-   ```ts
-   import { runs, tasks } from '@trigger.dev/sdk';
-   import {
-       TriggerJobRuntimePlugin,
-       TriggerDispatcherFactory
-   } from '@ever-works/job-runtime-trigger-plugin';
+    ```ts
+    import { runs, tasks } from '@trigger.dev/sdk';
+    import { TriggerJobRuntimePlugin, TriggerDispatcherFactory } from '@ever-works/job-runtime-trigger-plugin';
 
-   // Trigger.dev v4 — the SDK reads TRIGGER_SECRET_KEY from env, and the
-   // `tasks` / `runs` namespaces are imported as module-level objects.
-   // The plugin only needs a structural { tasks, runs } client.
-   const client = { tasks, runs };
-   const factory = new TriggerDispatcherFactory({
-       client,
-       defaultTaskQueue: 'platform-default'
-   });
+    // Trigger.dev v4 — the SDK reads TRIGGER_SECRET_KEY from env, and the
+    // `tasks` / `runs` namespaces are imported as module-level objects.
+    // The plugin only needs a structural { tasks, runs } client.
+    const client = { tasks, runs };
+    const factory = new TriggerDispatcherFactory({
+    	client,
+    	defaultTaskQueue: 'platform-default'
+    });
 
-   const plugin = new TriggerJobRuntimePlugin({ client })
-       .useDispatchers({
-           dispatchKbEmbedDocument: (payload) =>
-               factory.enqueue('kb-embed-document', payload, { tags: ['kb'] })
-       })
-       .useDispatcherFactory(factory);
-   ```
+    const plugin = new TriggerJobRuntimePlugin({ client })
+    	.useDispatchers({
+    		dispatchKbEmbedDocument: (payload) => factory.enqueue('kb-embed-document', payload, { tags: ['kb'] })
+    	})
+    	.useDispatcherFactory(factory);
+    ```
 
-   The plugin's own `cancel` / `getRunStatus` calls into `client.runs.cancel` / `client.runs.retrieve` when the optional `client` opt is set; without it they return safe defaults (`false` / `'unknown'`) and operators call `factory.cancel(runId)` directly.
+    The plugin's own `cancel` / `getRunStatus` calls into `client.runs.cancel` / `client.runs.retrieve` when the optional `client` opt is set; without it they return safe defaults (`false` / `'unknown'`) and operators call `factory.cancel(runId)` directly.
 
 ## Tenant overlay (EW-742)
 
 > **Per-tenant projects required for BYO/override.** Per [`providers.md` § Trigger.dev](../../../docs/specs/features/tenant-job-runtime-overlay/providers.md#triggerdev), the Trigger.dev SDK is project-scoped — there's no in-process per-call project switching. BYO and override modes both require the operator to maintain one Trigger.dev project per tenant (auto-provisioned in `inherit / per-tenant`, tenant-supplied in `byo`).
 
-| Mode       | Behaviour                                                                                                                   |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Mode       | Behaviour                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `inherit`  | (default) Use the operator's instance-default Trigger.dev project. In `shared` sub-mode, tenant id stamps onto `metadata.tenantId` / run tag for demultiplexing. |
-| `byo`      | Tenant supplies their own `projectRef` + `projectAccessToken`. Per-tenant webhook URL: `POST /api/jobs/webhook/<tenant-id>/trigger-dev`. |
-| `override` | Same data plane as BYO — UI distinction only (one-click "use my own Trigger.dev project").                                  |
+| `byo`      | Tenant supplies their own `projectRef` + `projectAccessToken`. Per-tenant webhook URL: `POST /api/jobs/webhook/<tenant-id>/trigger-dev`.                         |
+| `override` | Same data plane as BYO — UI distinction only (one-click "use my own Trigger.dev project").                                                                       |
 
 ### Tenant credential bag shape
 
 ```jsonc
 {
-    "projectRef": "proj_...",           // tenant project reference
-    "projectAccessToken": "tr_prod_..." // tenant prod secret (server-side)
+	"projectRef": "proj_...", // tenant project reference
+	"projectAccessToken": "tr_prod_..." // tenant prod secret (server-side)
 }
 ```
 

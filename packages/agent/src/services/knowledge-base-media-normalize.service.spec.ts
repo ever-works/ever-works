@@ -290,23 +290,23 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
             const workRepoMock = {
                 findById: opts.workFindThrows
                     ? jest.fn().mockRejectedValue(new Error('db boom'))
-                    : jest.fn().mockResolvedValue(
-                          opts.workTenantId === undefined
-                              ? null
-                              : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
-                      ),
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.workTenantId === undefined
+                                  ? null
+                                  : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                          ),
             };
             const stamperMock = {
                 stamp: opts.stamperThrows
                     ? jest.fn().mockRejectedValue(new Error('stamper boom'))
-                    : jest
-                          .fn()
-                          .mockResolvedValue(
-                              opts.stamperResult ?? {
-                                  providerId: null,
-                                  credentialVersion: null,
-                              },
-                          ),
+                    : jest.fn().mockResolvedValue(
+                          opts.stamperResult ?? {
+                              providerId: null,
+                              credentialVersion: null,
+                          },
+                      ),
             };
             const module: TestingModule = await Test.createTestingModule({
                 providers: [
@@ -330,7 +330,11 @@ describe('KnowledgeBaseMediaNormalizeService', () => {
         }
 
         it('stamps transcribe payload with stamper result when overlay is active', async () => {
-            const { service: svc, workRepoMock, stamperMock } = await buildWithStamper({
+            const {
+                service: svc,
+                workRepoMock,
+                stamperMock,
+            } = await buildWithStamper({
                 workTenantId: TENANT_ID,
                 stamperResult: { providerId: 'trigger', credentialVersion: 17 },
             });

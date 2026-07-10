@@ -312,9 +312,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
 
         it('does not log when the transition throws', async () => {
             service.pause = jest.fn().mockRejectedValue(new ConflictException('raced'));
-            await expect(controller.pause(auth, agentId)).rejects.toBeInstanceOf(
-                ConflictException,
-            );
+            await expect(controller.pause(auth, agentId)).rejects.toBeInstanceOf(ConflictException);
             expect(activityLog.log).not.toHaveBeenCalled();
         });
     });

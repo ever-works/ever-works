@@ -52,7 +52,9 @@ describe('TriggerRunStatusSubscriber', () => {
 
     beforeEach(() => {
         history = makeHistoryMock();
-        subscriber = new TriggerRunStatusSubscriber(history as unknown as WorkGenerationHistoryRepository);
+        subscriber = new TriggerRunStatusSubscriber(
+            history as unknown as WorkGenerationHistoryRepository,
+        );
 
         logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
         debugSpy = jest.spyOn(Logger.prototype, 'debug').mockImplementation();
@@ -83,25 +85,22 @@ describe('TriggerRunStatusSubscriber', () => {
                 name: TRIGGER_WEBHOOK_EVENTS.RUN_CANCELLED,
                 terminal: GenerateStatusType.CANCELLED,
             },
-        ])(
-            'flips history row to "$terminal" via $handler',
-            async ({ handler, name, terminal }) => {
-                history.findByTriggerRunId.mockResolvedValue({
-                    id: 'hist-1',
-                    status: GenerateStatusType.GENERATING,
-                } as never);
-                history.updateEntry.mockResolvedValue({ id: 'hist-1' } as never);
+        ])('flips history row to "$terminal" via $handler', async ({ handler, name, terminal }) => {
+            history.findByTriggerRunId.mockResolvedValue({
+                id: 'hist-1',
+                status: GenerateStatusType.GENERATING,
+            } as never);
+            history.updateEntry.mockResolvedValue({ id: 'hist-1' } as never);
 
-                await subscriber[handler](envelope(name));
+            await subscriber[handler](envelope(name));
 
-                expect(history.findByTriggerRunId).toHaveBeenCalledWith('run_abc');
-                expect(history.updateEntry).toHaveBeenCalledTimes(1);
-                const [id, updates] = history.updateEntry.mock.calls[0];
-                expect(id).toBe('hist-1');
-                expect(updates.status).toBe(terminal);
-                expect(updates.finishedAt).toBeInstanceOf(Date);
-            },
-        );
+            expect(history.findByTriggerRunId).toHaveBeenCalledWith('run_abc');
+            expect(history.updateEntry).toHaveBeenCalledTimes(1);
+            const [id, updates] = history.updateEntry.mock.calls[0];
+            expect(id).toBe('hist-1');
+            expect(updates.status).toBe(terminal);
+            expect(updates.finishedAt).toBeInstanceOf(Date);
+        });
     });
 
     it('persists errorMessage from payload.run.error.message on RUN_FAILED', async () => {
@@ -154,7 +153,9 @@ describe('TriggerRunStatusSubscriber', () => {
 
         expect(history.updateEntry).not.toHaveBeenCalled();
         expect(debugSpy).toHaveBeenCalled();
-        expect(String(debugSpy.mock.calls.at(-1)?.[0] ?? '')).toContain('no work_generation_history');
+        expect(String(debugSpy.mock.calls.at(-1)?.[0] ?? '')).toContain(
+            'no work_generation_history',
+        );
     });
 
     it('drops payload missing run.id without throwing', async () => {

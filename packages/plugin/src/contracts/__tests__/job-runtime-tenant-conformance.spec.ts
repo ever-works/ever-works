@@ -38,10 +38,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type {
-	IJobRuntimeProvider,
-	TenantCredentialSnapshot
-} from '../capabilities/job-runtime.interface.js';
+import type { IJobRuntimeProvider, TenantCredentialSnapshot } from '../capabilities/job-runtime.interface.js';
 import {
 	InMemoryJobRuntimeProvider,
 	createInMemoryJobRuntimeProvider

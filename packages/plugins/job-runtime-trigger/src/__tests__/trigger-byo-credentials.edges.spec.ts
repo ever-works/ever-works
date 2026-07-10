@@ -6,12 +6,7 @@ import {
 	TriggerJobRuntimePlugin,
 	type TriggerTenantCredentials
 } from '../trigger-job-runtime.plugin.js';
-import type {
-	TriggerClient,
-	TriggerRunHandle,
-	TriggerRunRecord,
-	TriggerTaskOptions
-} from '../trigger-types.js';
+import type { TriggerClient, TriggerRunHandle, TriggerRunRecord, TriggerTaskOptions } from '../trigger-types.js';
 
 /**
  * EW-742 P3.2 T22 — deep edge coverage on top of the happy-path
@@ -46,11 +41,7 @@ class FakeTenantClient implements TriggerClient {
 	readonly triggerCalls: TriggerCall[] = [];
 
 	readonly tasks = {
-		trigger: async (
-			taskId: string,
-			payload: unknown,
-			options?: TriggerTaskOptions
-		): Promise<TriggerRunHandle> => {
+		trigger: async (taskId: string, payload: unknown, options?: TriggerTaskOptions): Promise<TriggerRunHandle> => {
 			this.triggerCalls.push({ taskId, payload, options });
 			return { id: `${this.id}:run` };
 		}
@@ -65,9 +56,7 @@ class FakeTenantClient implements TriggerClient {
 	};
 }
 
-const snapshot = (
-	overrides: Partial<TenantCredentialSnapshot> = {}
-): TenantCredentialSnapshot => ({
+const snapshot = (overrides: Partial<TenantCredentialSnapshot> = {}): TenantCredentialSnapshot => ({
 	tenantId: '00000000-0000-0000-0000-00000000aaaa',
 	providerId: 'trigger',
 	credentialVersion: 1,
@@ -240,9 +229,7 @@ describe('TriggerJobRuntimePlugin — BYO credentials EDGE cases (EW-742 P3.2 T2
 			const plugin = new TriggerJobRuntimePlugin({ clientFactory });
 			const snap = snapshot();
 			const views = await Promise.all(
-				Array.from({ length: 100 }, () =>
-					Promise.resolve().then(() => plugin.bindToTenant(snap))
-				)
+				Array.from({ length: 100 }, () => Promise.resolve().then(() => plugin.bindToTenant(snap)))
 			);
 			// All 100 returned the cached view (reference equality).
 			const first = views[0];
@@ -324,9 +311,7 @@ describe('TriggerJobRuntimePlugin — BYO credentials EDGE cases (EW-742 P3.2 T2
 		});
 
 		it('clientFactory returns undefined → view falls through (no per-tenant client surfaced)', () => {
-			const clientFactory = vi.fn(
-				() => undefined as unknown as TriggerClient
-			);
+			const clientFactory = vi.fn(() => undefined as unknown as TriggerClient);
 			const plugin = new TriggerJobRuntimePlugin({ clientFactory });
 			const view = plugin.bindToTenant(snapshot());
 			// undefined → !tenantClient → dispatchersFromClient branch not
@@ -370,9 +355,7 @@ describe('TriggerJobRuntimePlugin — BYO credentials EDGE cases (EW-742 P3.2 T2
 					throw new Error('boom in dispatchersFromClient');
 				}
 			});
-			expect(() => plugin.bindToTenant(snapshot())).toThrow(
-				'boom in dispatchersFromClient'
-			);
+			expect(() => plugin.bindToTenant(snapshot())).toThrow('boom in dispatchersFromClient');
 		});
 	});
 

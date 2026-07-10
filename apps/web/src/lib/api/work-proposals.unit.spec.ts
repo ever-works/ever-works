@@ -50,10 +50,13 @@ describe('workProposalsAPI.get — null only for gone/unauthorized, rethrow tran
         await expect(workProposalsAPI.get('p1')).resolves.toBeNull();
     });
 
-    it.each([500, 502, 429])('rethrows a transient %s so pollers keep retrying', async (statusCode) => {
-        serverFetchMock.mockRejectedValueOnce(new ApiResponseError('boom', statusCode));
-        await expect(workProposalsAPI.get('p1')).rejects.toBeInstanceOf(ApiResponseError);
-    });
+    it.each([500, 502, 429])(
+        'rethrows a transient %s so pollers keep retrying',
+        async (statusCode) => {
+            serverFetchMock.mockRejectedValueOnce(new ApiResponseError('boom', statusCode));
+            await expect(workProposalsAPI.get('p1')).rejects.toBeInstanceOf(ApiResponseError);
+        },
+    );
 
     it('rethrows a non-HTTP failure (network blip) instead of swallowing it', async () => {
         serverFetchMock.mockRejectedValueOnce(new Error('fetch failed'));

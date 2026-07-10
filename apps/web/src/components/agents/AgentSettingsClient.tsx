@@ -238,9 +238,7 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                         </label>
                         <Select
                             value={idleBehavior}
-                            onValueChange={(value) =>
-                                setIdleBehavior(value as AgentIdleBehavior)
-                            }
+                            onValueChange={(value) => setIdleBehavior(value as AgentIdleBehavior)}
                         >
                             {idleBehaviorOptions.map((option) => (
                                 <option key={option.value} value={option.value}>

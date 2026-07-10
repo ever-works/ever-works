@@ -1,9 +1,5 @@
 import type { JobEnqueueOptions } from '@ever-works/plugin';
-import type {
-	TriggerClient,
-	TriggerDispatcherFactoryOptions,
-	TriggerTaskOptions
-} from './trigger-types.js';
+import type { TriggerClient, TriggerDispatcherFactoryOptions, TriggerTaskOptions } from './trigger-types.js';
 import { mapEnqueueOptions } from './trigger-enqueue-options.js';
 
 /**
@@ -58,15 +54,9 @@ export class TriggerDispatcherFactory {
 	 * `extraOptions` shallow-merges OVER the factory default queue so
 	 * operator-supplied per-call overrides win.
 	 */
-	async dispatch(
-		taskId: string,
-		payload: unknown,
-		extraOptions?: TriggerTaskOptions
-	): Promise<string | null> {
+	async dispatch(taskId: string, payload: unknown, extraOptions?: TriggerTaskOptions): Promise<string | null> {
 		const options: TriggerTaskOptions = {
-			...(this.opts.defaultTaskQueue !== undefined
-				? { queue: this.opts.defaultTaskQueue }
-				: {}),
+			...(this.opts.defaultTaskQueue !== undefined ? { queue: this.opts.defaultTaskQueue } : {}),
 			...(extraOptions ?? {})
 		};
 		const handle = await this.opts.client.tasks.trigger(taskId, payload, options);
@@ -104,9 +94,7 @@ export class TriggerDispatcherFactory {
 	): Promise<string | null> {
 		const { options: mapped } = mapEnqueueOptions(enqueueOptions);
 		const merged: TriggerTaskOptions = {
-			...(this.opts.defaultTaskQueue !== undefined
-				? { queue: this.opts.defaultTaskQueue }
-				: {}),
+			...(this.opts.defaultTaskQueue !== undefined ? { queue: this.opts.defaultTaskQueue } : {}),
 			...mapped,
 			...(extraOptions ?? {})
 		};

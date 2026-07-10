@@ -51,10 +51,8 @@ export function loadSeed(path: string = SEED_PATH): E2ESeed | null {
     return {
         apiBase: process.env.PLAYWRIGHT_API_BASE_URL ?? parsed.apiBase,
         tenantId: process.env.TEST_TENANT_ID || parsed.tenantId,
-        webhookSecret:
-            process.env.TEST_TRIGGER_WEBHOOK_SECRET || parsed.webhookSecret,
-        tenantIdNoSecret:
-            process.env.TEST_TENANT_ID_NO_SECRET || parsed.tenantIdNoSecret,
+        webhookSecret: process.env.TEST_TRIGGER_WEBHOOK_SECRET || parsed.webhookSecret,
+        tenantIdNoSecret: process.env.TEST_TENANT_ID_NO_SECRET || parsed.tenantIdNoSecret,
         primaryUser: parsed.primaryUser,
         secondaryUser: parsed.secondaryUser,
         generatedAt: parsed.generatedAt,

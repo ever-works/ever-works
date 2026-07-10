@@ -2,12 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JobEnqueueOptions } from '@ever-works/plugin';
 import { mapEnqueueOptions } from '../trigger-enqueue-options.js';
 import { TriggerDispatcherFactory } from '../trigger-dispatcher-factory.js';
-import type {
-	TriggerClient,
-	TriggerRunHandle,
-	TriggerRunRecord,
-	TriggerTaskOptions
-} from '../trigger-types.js';
+import type { TriggerClient, TriggerRunHandle, TriggerRunRecord, TriggerTaskOptions } from '../trigger-types.js';
 
 describe('mapEnqueueOptions (EW-742 P4 T31 Trigger.dev stamping)', () => {
 	it('idempotencyKey → idempotencyKey', () => {
@@ -82,11 +77,7 @@ class FakeTrigger implements TriggerClient {
 	calls: TriggerCall[] = [];
 	private nextId = 1;
 	readonly tasks = {
-		trigger: async (
-			taskId: string,
-			payload: unknown,
-			options?: TriggerTaskOptions
-		): Promise<TriggerRunHandle> => {
+		trigger: async (taskId: string, payload: unknown, options?: TriggerTaskOptions): Promise<TriggerRunHandle> => {
 			this.calls.push({ taskId, payload, options });
 			return { id: `run_${this.nextId++}` };
 		}

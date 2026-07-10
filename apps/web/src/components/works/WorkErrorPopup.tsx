@@ -101,14 +101,17 @@ export function WorkErrorPopup({
             e.stopPropagation();
             const text = message ?? warnings?.join('\n') ?? '';
             if (!text) return;
-            navigator.clipboard.writeText(text).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-            }).catch(() => {
-                // Clipboard unavailable (non-HTTPS, permissions denied, old browser) — no-op.
-                // The icon stays in its default state; no feedback is shown because
-                // surfacing a toast or error here would be disproportionate to the action.
-            });
+            navigator.clipboard
+                .writeText(text)
+                .then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                })
+                .catch(() => {
+                    // Clipboard unavailable (non-HTTPS, permissions denied, old browser) — no-op.
+                    // The icon stays in its default state; no feedback is shown because
+                    // surfacing a toast or error here would be disproportionate to the action.
+                });
         },
         [message, warnings],
     );

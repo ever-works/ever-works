@@ -9,7 +9,10 @@ import {
 import type { TemporalWorker, TemporalWorkflowClient, TemporalWorkflowHandle } from '../temporal-types.js';
 
 class StubHandle implements TemporalWorkflowHandle {
-	constructor(public readonly workflowId: string, public readonly statusName: string = 'RUNNING') {}
+	constructor(
+		public readonly workflowId: string,
+		public readonly statusName: string = 'RUNNING'
+	) {}
 	async cancel() {
 		// noop
 	}

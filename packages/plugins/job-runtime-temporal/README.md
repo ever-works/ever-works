@@ -4,15 +4,15 @@ Temporal `IJobRuntimeProvider` plugin for the Ever Works platform.
 
 ## Plugin metadata
 
-| Field        | Value                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| ID           | `job-runtime-temporal`                                                                                                      |
-| Category     | `job-runtime`                                                                                                               |
-| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant`        |
-| Runtime id   | `temporal` (selected via `EVER_WORKS_JOB_RUNTIME=temporal`)                                                                 |
-| License      | AGPL-3.0                                                                                                                    |
-| Built-in     | yes                                                                                                                         |
-| Auto-enable  | no                                                                                                                          |
+| Field        | Value                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| ID           | `job-runtime-temporal`                                                                                               |
+| Category     | `job-runtime`                                                                                                        |
+| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant` |
+| Runtime id   | `temporal` (selected via `EVER_WORKS_JOB_RUNTIME=temporal`)                                                          |
+| License      | AGPL-3.0                                                                                                             |
+| Built-in     | yes                                                                                                                  |
+| Auto-enable  | no                                                                                                                   |
 
 ## What this plugin ships
 
@@ -24,73 +24,74 @@ Temporal `IJobRuntimeProvider` plugin for the Ever Works platform.
 ## Operator setup
 
 1. Install peer deps in your worker app:
-   ```bash
-   pnpm add @temporalio/client @temporalio/worker
-   ```
+    ```bash
+    pnpm add @temporalio/client @temporalio/worker
+    ```
 2. Configure env vars:
-   - `TEMPORAL_ADDRESS` — gRPC endpoint (e.g. `temporal.tenant-acme.svc:7233`)
-   - `TEMPORAL_NAMESPACE` — instance-default namespace
-   - `TEMPORAL_TLS_CERT` + `TEMPORAL_TLS_KEY` — mTLS pair (recommended)
+    - `TEMPORAL_ADDRESS` — gRPC endpoint (e.g. `temporal.tenant-acme.svc:7233`)
+    - `TEMPORAL_NAMESPACE` — instance-default namespace
+    - `TEMPORAL_TLS_CERT` + `TEMPORAL_TLS_KEY` — mTLS pair (recommended)
 3. Set `EVER_WORKS_JOB_RUNTIME=temporal` on the API.
 4. Wire the operator factories. Worker construction goes through a `build()` callback so `@temporalio/worker`'s heavy deps stay operator-owned:
 
-   ```ts
-   import { Connection, WorkflowClient } from '@temporalio/client';
-   import { Worker, NativeConnection } from '@temporalio/worker';
-   import * as activities from './activities';
-   import {
-       TemporalJobRuntimePlugin,
-       TemporalDispatcherFactory,
-       TemporalWorkerHostFactory
-   } from '@ever-works/job-runtime-temporal-plugin';
+    ```ts
+    import { Connection, WorkflowClient } from '@temporalio/client';
+    import { Worker, NativeConnection } from '@temporalio/worker';
+    import * as activities from './activities';
+    import {
+    	TemporalJobRuntimePlugin,
+    	TemporalDispatcherFactory,
+    	TemporalWorkerHostFactory
+    } from '@ever-works/job-runtime-temporal-plugin';
 
-   const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS! });
-   const client = new WorkflowClient({ connection, namespace: process.env.TEMPORAL_NAMESPACE! });
+    const connection = await Connection.connect({ address: process.env.TEMPORAL_ADDRESS! });
+    const client = new WorkflowClient({ connection, namespace: process.env.TEMPORAL_NAMESPACE! });
 
-   const dispatchers = new TemporalDispatcherFactory({ client, defaultTaskQueue: 'ew' });
-   const workerHost = new TemporalWorkerHostFactory();
+    const dispatchers = new TemporalDispatcherFactory({ client, defaultTaskQueue: 'ew' });
+    const workerHost = new TemporalWorkerHostFactory();
 
-   workerHost.register({
-       taskQueue: 'ew',
-       build: () => Worker.create({
-           connection: await NativeConnection.connect({ address: process.env.TEMPORAL_ADDRESS! }),
-           namespace: process.env.TEMPORAL_NAMESPACE!,
-           taskQueue: 'ew',
-           workflowsPath: require.resolve('./workflows'),
-           activities
-       })
-   });
+    workerHost.register({
+    	taskQueue: 'ew',
+    	build: () =>
+    		Worker.create({
+    			connection: await NativeConnection.connect({ address: process.env.TEMPORAL_ADDRESS! }),
+    			namespace: process.env.TEMPORAL_NAMESPACE!,
+    			taskQueue: 'ew',
+    			workflowsPath: require.resolve('./workflows'),
+    			activities
+    		})
+    });
 
-   const plugin = new TemporalJobRuntimePlugin()
-       .useDispatchers({
-           dispatchKbEmbedDocument: async (payload) => {
-               const handle = await dispatchers.start('kbEmbedDocumentWorkflow', {
-                   workflowId: `kb-embed:${payload.workId}`,
-                   args: [payload]
-               });
-               return handle.workflowId;
-           }
-       })
-       .useDispatcherFactory(dispatchers)
-       .useWorkerHostFactory(workerHost);
-   ```
+    const plugin = new TemporalJobRuntimePlugin()
+    	.useDispatchers({
+    		dispatchKbEmbedDocument: async (payload) => {
+    			const handle = await dispatchers.start('kbEmbedDocumentWorkflow', {
+    				workflowId: `kb-embed:${payload.workId}`,
+    				args: [payload]
+    			});
+    			return handle.workflowId;
+    		}
+    	})
+    	.useDispatcherFactory(dispatchers)
+    	.useWorkerHostFactory(workerHost);
+    ```
 
 ## Tenant overlay (EW-742)
 
-| Mode       | Behaviour                                                                                                              |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `inherit`  | (default) Use the instance-default Temporal namespace.                                                                 |
-| `byo`      | Tenant supplies their own namespace, address, and mTLS pair; runs execute against their isolated namespace.            |
-| `override` | Same data plane as BYO; differs only by intent.                                                                        |
+| Mode       | Behaviour                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| `inherit`  | (default) Use the instance-default Temporal namespace.                                                      |
+| `byo`      | Tenant supplies their own namespace, address, and mTLS pair; runs execute against their isolated namespace. |
+| `override` | Same data plane as BYO; differs only by intent.                                                             |
 
 ### Tenant credential bag shape
 
 ```jsonc
 {
-    "namespace": "tenant-acme",   // per-tenant Temporal namespace (ADR-017 Q1)
-    "address": "temporal.tenant-acme.svc:7233",  // optional — dedicated cluster
-    "tlsCert": "-----BEGIN CERTIFICATE-----...",
-    "tlsKey": "-----BEGIN PRIVATE KEY-----..."
+	"namespace": "tenant-acme", // per-tenant Temporal namespace (ADR-017 Q1)
+	"address": "temporal.tenant-acme.svc:7233", // optional — dedicated cluster
+	"tlsCert": "-----BEGIN CERTIFICATE-----...",
+	"tlsKey": "-----BEGIN PRIVATE KEY-----..."
 }
 ```
 

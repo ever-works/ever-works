@@ -329,11 +329,7 @@ export function IdeasPageClient({
                                 new Date(a.generatedAt).getTime(),
                         )
                         .map((idea) => (
-                            <IdeaCard
-                                key={idea.id}
-                                proposal={idea}
-                                onDismissed={handleDismissed}
-                            />
+                            <IdeaCard key={idea.id} proposal={idea} onDismissed={handleDismissed} />
                         ))}
                 </div>
             ) : null}

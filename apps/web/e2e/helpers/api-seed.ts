@@ -57,9 +57,7 @@ export async function registerSeedUser(
     });
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(
-            `[api-seed] register(${label}) failed ${res.status}: ${body}`,
-        );
+        throw new Error(`[api-seed] register(${label}) failed ${res.status}: ${body}`);
     }
     const json = (await res.json()) as { access_token: string };
     return { username, email, password: PASSWORD, accessToken: json.access_token };
@@ -83,9 +81,7 @@ export async function createOrganization(
     });
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(
-            `[api-seed] createOrg(${label}) failed ${res.status}: ${body}`,
-        );
+        throw new Error(`[api-seed] createOrg(${label}) failed ${res.status}: ${body}`);
     }
     const json = (await res.json()) as { tenantId: string };
     if (!json.tenantId) {
@@ -124,9 +120,7 @@ export async function putTriggerWebhookConfig(
     });
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(
-            `[api-seed] putConfig failed ${res.status}: ${body}`,
-        );
+        throw new Error(`[api-seed] putConfig failed ${res.status}: ${body}`);
     }
 }
 
@@ -173,8 +167,6 @@ export async function putTriggerEmptyBagConfig(
     });
     if (!res.ok) {
         const body = await res.text();
-        throw new Error(
-            `[api-seed] putEmptyBagConfig failed ${res.status}: ${body}`,
-        );
+        throw new Error(`[api-seed] putEmptyBagConfig failed ${res.status}: ${body}`);
     }
 }

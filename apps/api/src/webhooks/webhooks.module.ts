@@ -10,10 +10,7 @@ import {
     WebhookSubscriptionDeliveryService,
     WorkModule,
 } from '@ever-works/agent/services';
-import {
-    InProcessSecretStoreResolver,
-    SECRET_STORE_RESOLVER,
-} from '@ever-works/agent/tasks';
+import { InProcessSecretStoreResolver, SECRET_STORE_RESOLVER } from '@ever-works/agent/tasks';
 import { TriggerModule as TasksTriggerModule } from '@ever-works/trigger-tasks';
 import { AuthModule } from '../auth/auth.module';
 import { WebhooksController } from './webhooks.controller';

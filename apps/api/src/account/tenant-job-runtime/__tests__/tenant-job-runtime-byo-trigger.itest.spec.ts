@@ -255,7 +255,10 @@ describe('Trigger.dev BYO 3-mode flow (integration)', () => {
         it('byo → inherit drops the ref and bumps the version', async () => {
             const { controller, configRepo } = await bootstrap();
             configRepo.findOne.mockResolvedValue(
-                buildConfigRow({ credentialsSecretRef: buildTriggerRef('proj_a', 'aaaa'), credentialVersion: 4 }),
+                buildConfigRow({
+                    credentialsSecretRef: buildTriggerRef('proj_a', 'aaaa'),
+                    credentialVersion: 4,
+                }),
             );
             const result = await controller.upsertConfig(buildAuth(), {
                 providerId: 'trigger',
@@ -272,7 +275,11 @@ describe('Trigger.dev BYO 3-mode flow (integration)', () => {
             const { controller, configRepo } = await bootstrap();
             // Existing row was reverted to inherit (ref=null, version=5).
             configRepo.findOne.mockResolvedValue(
-                buildConfigRow({ mode: 'inherit', credentialsSecretRef: null, credentialVersion: 5 }),
+                buildConfigRow({
+                    mode: 'inherit',
+                    credentialsSecretRef: null,
+                    credentialVersion: 5,
+                }),
             );
             const result = await controller.upsertConfig(buildAuth(), {
                 providerId: 'trigger',

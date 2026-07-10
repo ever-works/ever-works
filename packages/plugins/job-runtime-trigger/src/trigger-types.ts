@@ -71,11 +71,7 @@ export interface TriggerRunRecord {
  * the plugin makes are typed.
  */
 export interface TriggerTasksApi {
-	trigger(
-		taskId: string,
-		payload: unknown,
-		options?: TriggerTaskOptions
-	): Promise<TriggerRunHandle>;
+	trigger(taskId: string, payload: unknown, options?: TriggerTaskOptions): Promise<TriggerRunHandle>;
 }
 
 /**

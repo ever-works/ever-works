@@ -38,7 +38,11 @@ export default async function RootLayout({
     return (
         <html lang={locale} suppressHydrationWarning>
             <body className="antialiased" suppressHydrationWarning>
-                <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+                <Script
+                    id="theme-init"
+                    strategy="beforeInteractive"
+                    dangerouslySetInnerHTML={{ __html: themeInitScript }}
+                />
                 <TopLoader />
                 <NextIntlClientProvider>
                     <PostHogProvider>

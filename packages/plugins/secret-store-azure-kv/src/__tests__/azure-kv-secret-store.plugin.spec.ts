@@ -73,9 +73,7 @@ describe('AzureKvSecretStorePlugin (EW-742 P3.2 T20.10c plugin package)', () => 
 
 	it('returns parsed bag from JSON-encoded value', async () => {
 		const credentials = { accessToken: 'tr_dev_xxx', region: 'westus' };
-		fetchSpy.mockResolvedValue(
-			mockResponse({ ok: true, body: { value: JSON.stringify(credentials) } })
-		);
+		fetchSpy.mockResolvedValue(mockResponse({ ok: true, body: { value: JSON.stringify(credentials) } }));
 		expect(await plugin.resolveSecret('azure-kv:my-vault/tenants-acme')).toEqual(credentials);
 	});
 
@@ -90,9 +88,7 @@ describe('AzureKvSecretStorePlugin (EW-742 P3.2 T20.10c plugin package)', () => 
 		fetchSpy.mockResolvedValue(mockResponse({ ok: true, body: { value: '{"k":"v"}' } }));
 		await plugin.resolveSecret('azure-kv:my-vault/my-secret');
 		const [calledUrl] = fetchSpy.mock.calls[0] as [string];
-		expect(calledUrl).toBe(
-			'https://my-vault.vault.azure.net/secrets/my-secret?api-version=7.4'
-		);
+		expect(calledUrl).toBe('https://my-vault.vault.azure.net/secrets/my-secret?api-version=7.4');
 	});
 
 	it('sends Bearer token in Authorization header', async () => {

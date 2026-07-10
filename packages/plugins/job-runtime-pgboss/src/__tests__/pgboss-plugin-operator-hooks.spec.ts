@@ -115,12 +115,8 @@ describe('PgBossJobRuntimePlugin — operator hooks', () => {
 		const boss = new FakeBoss();
 		const factory = new PgBossDispatcherFactory({ boss });
 		const plugin = new PgBossJobRuntimePlugin().useDispatcherFactory(factory);
-		await plugin.registerSchedules([
-			{ id: 'work-schedule-dispatcher', cron: '* * * * *', payload: { x: 1 } }
-		]);
-		expect(boss.scheduled).toEqual([
-			{ name: 'work-schedule-dispatcher', cron: '* * * * *', data: { x: 1 } }
-		]);
+		await plugin.registerSchedules([{ id: 'work-schedule-dispatcher', cron: '* * * * *', payload: { x: 1 } }]);
+		expect(boss.scheduled).toEqual([{ name: 'work-schedule-dispatcher', cron: '* * * * *', data: { x: 1 } }]);
 	});
 
 	describe('dispatchersBuilder', () => {

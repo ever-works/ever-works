@@ -1,9 +1,5 @@
 import type { JobEnqueueOptions } from '@ever-works/plugin';
-import type {
-	BullMqDeps,
-	BullMqFactoryOptions,
-	BullMqQueueAdapter
-} from './bullmq-types.js';
+import type { BullMqDeps, BullMqFactoryOptions, BullMqQueueAdapter } from './bullmq-types.js';
 import { mapEnqueueOptions } from './bullmq-enqueue-options.js';
 
 /**

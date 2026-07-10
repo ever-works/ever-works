@@ -178,8 +178,9 @@ export class CredentialVersionService {
             // detect-and-swallow on the natural-key conflict so the
             // method stays idempotent.
             const message = err instanceof Error ? err.message : String(err);
-            const isUniqueViolation =
-                /duplicate key|unique constraint|UNIQUE constraint/i.test(message);
+            const isUniqueViolation = /duplicate key|unique constraint|UNIQUE constraint/i.test(
+                message,
+            );
             if (!isUniqueViolation) {
                 throw err;
             }

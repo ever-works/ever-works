@@ -10,7 +10,10 @@ import type {
 
 class FakeHandle implements TemporalWorkflowHandle {
 	cancelCount = 0;
-	constructor(public readonly workflowId: string, public readonly statusName: string = 'RUNNING') {}
+	constructor(
+		public readonly workflowId: string,
+		public readonly statusName: string = 'RUNNING'
+	) {}
 	async cancel(): Promise<void> {
 		this.cancelCount += 1;
 	}

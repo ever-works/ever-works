@@ -1748,14 +1748,12 @@ describe('KnowledgeBaseService', () => {
             const stamperMock = {
                 stamp: opts.stamperThrows
                     ? jest.fn().mockRejectedValue(new Error('stamper boom'))
-                    : jest
-                          .fn()
-                          .mockResolvedValue(
-                              opts.stamperResult ?? {
-                                  providerId: null,
-                                  credentialVersion: null,
-                              },
-                          ),
+                    : jest.fn().mockResolvedValue(
+                          opts.stamperResult ?? {
+                              providerId: null,
+                              credentialVersion: null,
+                          },
+                      ),
             };
 
             const module: TestingModule = await Test.createTestingModule({
@@ -1810,9 +1808,7 @@ describe('KnowledgeBaseService', () => {
             });
 
             expect(workRepoMock.findById).toHaveBeenCalledWith(WORK_ID);
-            expect(stamperMock.stamp).toHaveBeenCalledWith(
-                '00000000-0000-0000-0000-00000000aaaa',
-            );
+            expect(stamperMock.stamp).toHaveBeenCalledWith('00000000-0000-0000-0000-00000000aaaa');
             expect(embedDispatcherMock.dispatchKbEmbedDocument).toHaveBeenCalledWith({
                 workId: WORK_ID,
                 documentId: 'doc-t22-a',
@@ -1855,10 +1851,7 @@ describe('KnowledgeBaseService', () => {
         });
 
         it('fails open on stamper throw — payload ships with null/null, embed still enqueues', async () => {
-            const {
-                service: svc,
-                embedDispatcherMock,
-            } = await buildWithStamper({
+            const { service: svc, embedDispatcherMock } = await buildWithStamper({
                 workTenantId: '00000000-0000-0000-0000-00000000aaaa',
                 stamperThrows: true,
             });
@@ -1945,31 +1938,33 @@ describe('KnowledgeBaseService', () => {
                 dispatchKbOrgOverlayFanout: jest.fn().mockResolvedValue('fanout-run-id'),
             };
             const workRepoMock = {
-                findById: jest.fn().mockResolvedValue(
-                    opts.workTenantId === undefined
-                        ? null
-                        : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
-                ),
+                findById: jest
+                    .fn()
+                    .mockResolvedValue(
+                        opts.workTenantId === undefined
+                            ? null
+                            : ({ id: WORK_ID, tenantId: opts.workTenantId } as any),
+                    ),
                 findIdsByOrganization: jest.fn().mockResolvedValue(['work-a', 'work-b']),
             };
             const orgRepoMock = {
                 findById: opts.orgFindThrows
                     ? jest.fn().mockRejectedValue(new Error('db boom'))
-                    : jest.fn().mockResolvedValue(
-                          opts.orgTenantId === undefined
-                              ? null
-                              : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
-                      ),
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              opts.orgTenantId === undefined
+                                  ? null
+                                  : ({ id: ORG_ID, tenantId: opts.orgTenantId } as any),
+                          ),
             };
             const stamperMock = {
-                stamp: jest
-                    .fn()
-                    .mockResolvedValue(
-                        opts.stamperResult ?? {
-                            providerId: null,
-                            credentialVersion: null,
-                        },
-                    ),
+                stamp: jest.fn().mockResolvedValue(
+                    opts.stamperResult ?? {
+                        providerId: null,
+                        credentialVersion: null,
+                    },
+                ),
             };
 
             const module: TestingModule = await Test.createTestingModule({

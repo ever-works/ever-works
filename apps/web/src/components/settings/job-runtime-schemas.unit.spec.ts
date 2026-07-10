@@ -152,12 +152,7 @@ describe('JOB_RUNTIME_CREDENTIAL_SCHEMAS — temporal mTLS surface', () => {
     const temporal = JOB_RUNTIME_CREDENTIAL_SCHEMAS.temporal;
 
     it('exposes namespace + address + tlsCert + tlsKey', () => {
-        expect(temporal.map((f) => f.name)).toEqual([
-            'namespace',
-            'address',
-            'tlsCert',
-            'tlsKey',
-        ]);
+        expect(temporal.map((f) => f.name)).toEqual(['namespace', 'address', 'tlsCert', 'tlsKey']);
     });
 
     it('renders PEM material as multiline secrets (paste-the-whole-block UX)', () => {
@@ -210,9 +205,12 @@ describe('PROVIDERS_WITHOUT_CREDENTIALS', () => {
         expect(PROVIDERS_WITHOUT_CREDENTIALS.has('trigger')).toBe(false);
     });
 
-    it.each(ALL_PROVIDERS)('does not include %s (every shipped provider exposes credentials)', (p) => {
-        expect(PROVIDERS_WITHOUT_CREDENTIALS.has(p)).toBe(false);
-    });
+    it.each(ALL_PROVIDERS)(
+        'does not include %s (every shipped provider exposes credentials)',
+        (p) => {
+            expect(PROVIDERS_WITHOUT_CREDENTIALS.has(p)).toBe(false);
+        },
+    );
 });
 
 describe('JOB_RUNTIME_PROVIDER_MODE_BANNERS', () => {
@@ -316,9 +314,7 @@ describe('isFieldVisibleForMode', () => {
     });
 
     it('Trigger.dev apiUrl is visible in every mode (always-optional override field)', () => {
-        const apiUrl = JOB_RUNTIME_CREDENTIAL_SCHEMAS.trigger.find(
-            (f) => f.name === 'apiUrl',
-        )!;
+        const apiUrl = JOB_RUNTIME_CREDENTIAL_SCHEMAS.trigger.find((f) => f.name === 'apiUrl')!;
         for (const m of ALL_MODES) expect(isFieldVisibleForMode(apiUrl, m)).toBe(true);
     });
 });
