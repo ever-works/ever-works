@@ -18,17 +18,23 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { redirectMock, revalidatePathMock, getAuthFromCookieMock, getProfileMock, replaceMock, deleteEntryMock } =
-    vi.hoisted(() => ({
-        redirectMock: vi.fn((_path: string) => {
-            throw new Error('__REDIRECT__');
-        }),
-        revalidatePathMock: vi.fn(),
-        getAuthFromCookieMock: vi.fn(),
-        getProfileMock: vi.fn(),
-        replaceMock: vi.fn(),
-        deleteEntryMock: vi.fn(),
-    }));
+const {
+    redirectMock,
+    revalidatePathMock,
+    getAuthFromCookieMock,
+    getProfileMock,
+    replaceMock,
+    deleteEntryMock,
+} = vi.hoisted(() => ({
+    redirectMock: vi.fn((_path: string) => {
+        throw new Error('__REDIRECT__');
+    }),
+    revalidatePathMock: vi.fn(),
+    getAuthFromCookieMock: vi.fn(),
+    getProfileMock: vi.fn(),
+    replaceMock: vi.fn(),
+    deleteEntryMock: vi.fn(),
+}));
 
 vi.mock('next/cache', () => ({
     revalidatePath: revalidatePathMock,
@@ -111,7 +117,9 @@ describe('replaceTenantRuntimeAllowlistAction', () => {
     it('redirects to the login route when getAuthFromCookie returns null (unauthenticated)', async () => {
         getAuthFromCookieMock.mockResolvedValue(null);
         const { replaceTenantRuntimeAllowlistAction } = await importActions();
-        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow('__REDIRECT__');
+        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow(
+            '__REDIRECT__',
+        );
         expect(redirectMock).toHaveBeenCalledTimes(1);
         const target = redirectMock.mock.calls[0]![0] as string;
         expect(target.toLowerCase()).toContain('login');
@@ -121,7 +129,9 @@ describe('replaceTenantRuntimeAllowlistAction', () => {
     it('redirects to "/" when the fresh profile is not a platform admin (route-not-found posture)', async () => {
         getProfileMock.mockResolvedValue({ isPlatformAdmin: false, id: 'op-1' });
         const { replaceTenantRuntimeAllowlistAction } = await importActions();
-        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow('__REDIRECT__');
+        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow(
+            '__REDIRECT__',
+        );
         expect(redirectMock).toHaveBeenCalledWith('/');
         expect(replaceMock).not.toHaveBeenCalled();
     });
@@ -129,7 +139,9 @@ describe('replaceTenantRuntimeAllowlistAction', () => {
     it('treats a rejected getProfile() as non-admin (.catch(() => null) path)', async () => {
         getProfileMock.mockRejectedValue(new Error('upstream down'));
         const { replaceTenantRuntimeAllowlistAction } = await importActions();
-        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow('__REDIRECT__');
+        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow(
+            '__REDIRECT__',
+        );
         expect(redirectMock).toHaveBeenCalledWith('/');
         expect(replaceMock).not.toHaveBeenCalled();
     });

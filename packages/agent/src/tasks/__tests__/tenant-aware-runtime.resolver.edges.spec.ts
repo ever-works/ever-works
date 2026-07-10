@@ -119,8 +119,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
         }
         const configRepo: ConfigRepoMock = {
             findOne:
-                opts.repoFindOneImpl ??
-                jest.fn().mockResolvedValue(opts.repoFindOneReturn ?? null),
+                opts.repoFindOneImpl ?? jest.fn().mockResolvedValue(opts.repoFindOneReturn ?? null),
         };
         const credentialVersionService: CredentialVersionServiceMock = {
             getCurrentVersion: jest.fn().mockResolvedValue(opts.credentialVersion ?? null),
@@ -202,9 +201,9 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
             // each one calls `bindToTenant` — that's the documented
             // single-writer-wins behaviour for this service.)
             const tenantId = randomUUID();
-            const bindToTenant = jest.fn().mockImplementation(() =>
-                mockProvider({ which: 'tenant-bound' }),
-            );
+            const bindToTenant = jest
+                .fn()
+                .mockImplementation(() => mockProvider({ which: 'tenant-bound' }));
             const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
             const { resolver, secretStoreResolver, configRepo } = buildResolver({
                 provider: instanceProvider,
@@ -318,10 +317,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
                 .mockImplementation(() => undefined);
             try {
                 const bindToTenant = jest.fn();
-                const instanceProvider = mockProvider(
-                    { which: 'instance-default' },
-                    bindToTenant,
-                );
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
                 const tenantId = randomUUID();
                 // mode === 'inherit' branch is hit only for the literal
                 // 'inherit'; an unknown value drops through to the byo/
@@ -357,10 +353,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
             const tenantId = randomUUID();
             const boundProvider = mockProvider({ which: 'tenant-bound' });
             const bindToTenant = jest.fn().mockReturnValue(boundProvider);
-            const instanceProvider = mockProvider(
-                { which: 'instance-default' },
-                bindToTenant,
-            );
+            const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
             const { resolver } = buildResolver({
                 provider: instanceProvider,
                 repoFindOneReturn: buildConfigRow({
@@ -387,10 +380,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
                 .mockImplementation(() => undefined);
             try {
                 const bindToTenant = jest.fn();
-                const instanceProvider = mockProvider(
-                    { which: 'instance-default' },
-                    bindToTenant,
-                );
+                const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
                 const tenantId = randomUUID();
                 const pointer = `vault:secret/tenants/${tenantId}/trigger`;
                 const { resolver } = buildResolver({
@@ -552,7 +542,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
             expect(credentialVersionService.getCurrentVersion).not.toHaveBeenCalled();
         });
 
-        it("returns provider=null when no provider is registered (preserves EW-683 dev fallback)", async () => {
+        it('returns provider=null when no provider is registered (preserves EW-683 dev fallback)', async () => {
             const { resolver } = buildResolver({ provider: null });
             await expect(resolver.getEffectiveBinding(null)).resolves.toEqual({
                 provider: null,
@@ -582,7 +572,7 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
     });
 
     describe('mixed-tenant cache isolation', () => {
-        it("a cached binding for tenant A is NOT served to tenant B", async () => {
+        it('a cached binding for tenant A is NOT served to tenant B', async () => {
             const tenantA = randomUUID();
             const tenantB = randomUUID();
             const boundA = mockProvider({ which: 'bound-a' });
@@ -591,13 +581,12 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
                 .fn<IJobRuntimeProvider, [{ tenantId: string }]>()
                 .mockImplementation(({ tenantId }) => (tenantId === tenantA ? boundA : boundB));
             const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
-            const repoFindOneImpl = jest.fn(
-                async ({ where }: { where: { tenantId: string } }) =>
-                    buildConfigRow({
-                        tenantId: where.tenantId,
-                        mode: 'byo',
-                        enabled: true,
-                    }),
+            const repoFindOneImpl = jest.fn(async ({ where }: { where: { tenantId: string } }) =>
+                buildConfigRow({
+                    tenantId: where.tenantId,
+                    mode: 'byo',
+                    enabled: true,
+                }),
             );
             const { resolver } = buildResolver({
                 provider: instanceProvider,
@@ -619,20 +608,14 @@ describe('TenantAwareRuntimeResolver — edge cases (EW-742 P3 / EW-747)', () =>
 
         it('100 concurrent resolves across 10 tenants each hit bind exactly once after warmup', async () => {
             const tenants = Array.from({ length: 10 }, () => randomUUID());
-            const bindToTenant = jest
-                .fn()
-                .mockImplementation(() => mockProvider({ which: 'tb' }));
-            const instanceProvider = mockProvider(
-                { which: 'instance-default' },
-                bindToTenant,
-            );
-            const repoFindOneImpl = jest.fn(
-                async ({ where }: { where: { tenantId: string } }) =>
-                    buildConfigRow({
-                        tenantId: where.tenantId,
-                        mode: 'byo',
-                        enabled: true,
-                    }),
+            const bindToTenant = jest.fn().mockImplementation(() => mockProvider({ which: 'tb' }));
+            const instanceProvider = mockProvider({ which: 'instance-default' }, bindToTenant);
+            const repoFindOneImpl = jest.fn(async ({ where }: { where: { tenantId: string } }) =>
+                buildConfigRow({
+                    tenantId: where.tenantId,
+                    mode: 'byo',
+                    enabled: true,
+                }),
             );
             const { resolver } = buildResolver({
                 provider: instanceProvider,

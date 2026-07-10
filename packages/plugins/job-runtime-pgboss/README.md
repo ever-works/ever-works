@@ -4,15 +4,15 @@ pg-boss `IJobRuntimeProvider` plugin for the Ever Works platform.
 
 ## Plugin metadata
 
-| Field        | Value                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| ID           | `job-runtime-pgboss`                                                                                                        |
-| Category     | `job-runtime`                                                                                                               |
-| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant`        |
-| Runtime id   | `pgboss` (selected via `EVER_WORKS_JOB_RUNTIME=pgboss`)                                                                     |
-| License      | AGPL-3.0                                                                                                                    |
-| Built-in     | yes                                                                                                                         |
-| Auto-enable  | no                                                                                                                          |
+| Field        | Value                                                                                                                |
+| ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| ID           | `job-runtime-pgboss`                                                                                                 |
+| Category     | `job-runtime`                                                                                                        |
+| Capabilities | `job-runtime-enqueue`, `job-runtime-cancel`, `job-runtime-status`, `job-runtime-schedule`, `job-runtime-bind-tenant` |
+| Runtime id   | `pgboss` (selected via `EVER_WORKS_JOB_RUNTIME=pgboss`)                                                              |
+| License      | AGPL-3.0                                                                                                             |
+| Built-in     | yes                                                                                                                  |
+| Auto-enable  | no                                                                                                                   |
 
 ## What this plugin ships
 
@@ -25,60 +25,60 @@ pg-boss `IJobRuntimeProvider` plugin for the Ever Works platform.
 ## Operator setup
 
 1. Install peer dep in your worker app:
-   ```bash
-   pnpm add pg-boss
-   ```
+    ```bash
+    pnpm add pg-boss
+    ```
 2. Configure env vars:
-   - `PGBOSS_CONNECTION_STRING` — Postgres connection string
-   - `PGBOSS_SCHEMA` — instance-default Postgres schema
+    - `PGBOSS_CONNECTION_STRING` — Postgres connection string
+    - `PGBOSS_SCHEMA` — instance-default Postgres schema
 3. Set `EVER_WORKS_JOB_RUNTIME=pgboss` on the API.
 4. Wire the operator factories into the plugin:
 
-   ```ts
-   import PgBoss from 'pg-boss';
-   import {
-       PgBossJobRuntimePlugin,
-       PgBossDispatcherFactory,
-       PgBossWorkerHostFactory
-   } from '@ever-works/job-runtime-pgboss-plugin';
+    ```ts
+    import PgBoss from 'pg-boss';
+    import {
+    	PgBossJobRuntimePlugin,
+    	PgBossDispatcherFactory,
+    	PgBossWorkerHostFactory
+    } from '@ever-works/job-runtime-pgboss-plugin';
 
-   const boss = new PgBoss({
-       connectionString: process.env.PGBOSS_CONNECTION_STRING!,
-       schema: process.env.PGBOSS_SCHEMA ?? 'ew'
-   });
-   await boss.start();
+    const boss = new PgBoss({
+    	connectionString: process.env.PGBOSS_CONNECTION_STRING!,
+    	schema: process.env.PGBOSS_SCHEMA ?? 'ew'
+    });
+    await boss.start();
 
-   const dispatchers = new PgBossDispatcherFactory({ boss });
-   const workerHost = new PgBossWorkerHostFactory({ boss });
+    const dispatchers = new PgBossDispatcherFactory({ boss });
+    const workerHost = new PgBossWorkerHostFactory({ boss });
 
-   workerHost.register('kb-embed-document', { teamSize: 4 }, async (job) => {
-       // operator-defined handler
-   });
+    workerHost.register('kb-embed-document', { teamSize: 4 }, async (job) => {
+    	// operator-defined handler
+    });
 
-   const plugin = new PgBossJobRuntimePlugin()
-       .useDispatchers({
-           dispatchKbEmbedDocument: (payload) => dispatchers.send('kb-embed-document', payload)
-       })
-       .useDispatcherFactory(dispatchers)
-       .useWorkerHostFactory(workerHost);
-   ```
+    const plugin = new PgBossJobRuntimePlugin()
+    	.useDispatchers({
+    		dispatchKbEmbedDocument: (payload) => dispatchers.send('kb-embed-document', payload)
+    	})
+    	.useDispatcherFactory(dispatchers)
+    	.useWorkerHostFactory(workerHost);
+    ```
 
 ## Tenant overlay (EW-742)
 
 This plugin participates in the tenant-scoped job-runtime overlay defined in [`docs/specs/features/tenant-job-runtime-overlay/`](../../../docs/specs/features/tenant-job-runtime-overlay/spec.md).
 
-| Mode       | Behaviour                                                                                                                    |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `inherit`  | (default) Use the instance-default Postgres schema. Byte-identical to the pre-overlay path.                                  |
-| `byo`      | Tenant supplies their own Postgres connection string and/or schema; runs execute against their isolated schema.              |
-| `override` | Same data plane as BYO; differs only by intent.                                                                              |
+| Mode       | Behaviour                                                                                                       |
+| ---------- | --------------------------------------------------------------------------------------------------------------- |
+| `inherit`  | (default) Use the instance-default Postgres schema. Byte-identical to the pre-overlay path.                     |
+| `byo`      | Tenant supplies their own Postgres connection string and/or schema; runs execute against their isolated schema. |
+| `override` | Same data plane as BYO; differs only by intent.                                                                 |
 
 ### Tenant credential bag shape
 
 ```jsonc
 {
-    "schema": "tenant_acme",                 // per-tenant Postgres schema (ADR-017 Q2)
-    "connectionString": "postgres://..."     // optional — dedicated per-tenant DB
+	"schema": "tenant_acme", // per-tenant Postgres schema (ADR-017 Q2)
+	"connectionString": "postgres://..." // optional — dedicated per-tenant DB
 }
 ```
 

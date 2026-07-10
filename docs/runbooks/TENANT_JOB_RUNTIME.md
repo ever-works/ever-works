@@ -275,11 +275,11 @@ plan was originally chasing.
 
 When you pick `byo` or `override`, the credentials form collects:
 
-| Field         | Required | Notes                                                                                                  |
-| ------------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `accessToken` | yes      | Trigger.dev personal/management access token (`tr_pat_*`); used by the SDK at dispatch.                |
-| `secretKey`   | yes      | Server-side env secret (`tr_prod_*` for prod env, `tr_dev_*` for dev); pairs with `projectRef`.        |
-| `projectRef`  | yes      | Trigger.dev project reference (`proj_*`) shown on the Trigger.dev dashboard's project settings page.   |
+| Field         | Required | Notes                                                                                                   |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `accessToken` | yes      | Trigger.dev personal/management access token (`tr_pat_*`); used by the SDK at dispatch.                 |
+| `secretKey`   | yes      | Server-side env secret (`tr_prod_*` for prod env, `tr_dev_*` for dev); pairs with `projectRef`.         |
+| `projectRef`  | yes      | Trigger.dev project reference (`proj_*`) shown on the Trigger.dev dashboard's project settings page.    |
 | `apiUrl`      | optional | Defaults to `https://api.trigger.dev` (Trigger.dev Cloud). Override **only** for self-hosted instances. |
 
 All four values come from the Trigger.dev dashboard, not from a

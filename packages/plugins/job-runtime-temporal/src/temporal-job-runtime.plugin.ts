@@ -210,9 +210,7 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 
 		const base = this;
 		const tenantNamespace =
-			typeof snapshot.credentials.namespace === 'string'
-				? snapshot.credentials.namespace
-				: null;
+			typeof snapshot.credentials.namespace === 'string' ? snapshot.credentials.namespace : null;
 
 		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
 			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
@@ -229,8 +227,7 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 			get dispatchers(): JobRuntimeDispatchers {
 				return dispatchersForView;
 			},
-			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
-				base.registerSchedules(schedules),
+			registerSchedules: (schedules: readonly ScheduleSpec[]) => base.registerSchedules(schedules),
 			cancel: (runId: string) => base.cancel(runId),
 			getRunStatus: (runId: string) => base.getRunStatus(runId),
 			isEnabled: () => base.isEnabled(),
@@ -238,10 +235,7 @@ export class TemporalJobRuntimePlugin implements IJobRuntimeProvider {
 			onLoad: (context: PluginContext) => base.onLoad(context),
 			onUnload: () => base.onUnload(),
 			bindToTenant: (other: TenantCredentialSnapshot) => {
-				if (
-					other.tenantId === snapshot.tenantId &&
-					other.credentialVersion === snapshot.credentialVersion
-				) {
+				if (other.tenantId === snapshot.tenantId && other.credentialVersion === snapshot.credentialVersion) {
 					return view;
 				}
 				return base.bindToTenant(other);

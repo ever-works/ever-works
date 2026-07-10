@@ -3933,14 +3933,12 @@ describe('WorkGenerationService', () => {
             const stamperMock = {
                 stamp: opts.stamperThrows
                     ? jest.fn().mockRejectedValue(new Error('stamper boom'))
-                    : jest
-                          .fn()
-                          .mockResolvedValue(
-                              opts.stamperResult ?? {
-                                  providerId: null,
-                                  credentialVersion: null,
-                              },
-                          ),
+                    : jest.fn().mockResolvedValue(
+                          opts.stamperResult ?? {
+                              providerId: null,
+                              credentialVersion: null,
+                          },
+                      ),
             };
             const service = buildService({
                 withDispatcher: true,

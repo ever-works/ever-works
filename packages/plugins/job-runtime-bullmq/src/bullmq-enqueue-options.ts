@@ -29,9 +29,7 @@ import type { JobEnqueueOptions } from '@ever-works/plugin';
  * The translator is intentionally a pure function — easy to unit-test
  * and to compose with a per-call `extraOpts` spread.
  */
-export function mapEnqueueOptions(
-	opts: JobEnqueueOptions
-): Readonly<Record<string, unknown>> {
+export function mapEnqueueOptions(opts: JobEnqueueOptions): Readonly<Record<string, unknown>> {
 	const out: Record<string, unknown> = {};
 	if (opts.idempotencyKey !== undefined) out['jobId'] = opts.idempotencyKey;
 	if (opts.tenantId !== undefined) out['tenantId'] = opts.tenantId;

@@ -12,10 +12,7 @@
 
 import { randomUUID } from 'crypto';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
-import type {
-    TenantCredentialSnapshot,
-    TenantJobRuntimeConfig,
-} from '@ever-works/agent/entities';
+import type { TenantCredentialSnapshot, TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 
 type RepoMock = {
     create: jest.Mock;
@@ -81,11 +78,7 @@ describe('CredentialVersionService (integration via controller-touching paths)',
             } as TenantJobRuntimeConfig);
             const next = await service.bumpVersion(tenantId);
             expect(next).toBe(11);
-            expect(configRepo.increment).toHaveBeenCalledWith(
-                { tenantId },
-                'credentialVersion',
-                1,
-            );
+            expect(configRepo.increment).toHaveBeenCalledWith({ tenantId }, 'credentialVersion', 1);
         });
 
         it('returns null when no overlay row exists (caller surfaces 404)', async () => {
@@ -188,9 +181,9 @@ describe('CredentialVersionService (integration via controller-touching paths)',
         });
 
         it('swallows duplicate-key violations as a no-op (idempotent contract)', async () => {
-            const execute = jest.fn().mockRejectedValue(
-                new Error('duplicate key value violates unique constraint'),
-            );
+            const execute = jest
+                .fn()
+                .mockRejectedValue(new Error('duplicate key value violates unique constraint'));
             snapshotRepo.createQueryBuilder.mockReturnValue(buildQueryBuilder(execute));
             await expect(
                 service.captureSnapshot(randomUUID(), 'trigger', 7, { x: 1 }),

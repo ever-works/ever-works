@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TriggerDispatcherFactory } from '../trigger-dispatcher-factory.js';
-import type {
-	TriggerClient,
-	TriggerRunHandle,
-	TriggerRunRecord,
-	TriggerTaskOptions
-} from '../trigger-types.js';
+import type { TriggerClient, TriggerRunHandle, TriggerRunRecord, TriggerTaskOptions } from '../trigger-types.js';
 
 interface TriggerCall {
 	readonly taskId: string;
@@ -20,11 +15,7 @@ class FakeTrigger implements TriggerClient {
 	private nextId = 1;
 
 	readonly tasks = {
-		trigger: async (
-			taskId: string,
-			payload: unknown,
-			options?: TriggerTaskOptions
-		): Promise<TriggerRunHandle> => {
+		trigger: async (taskId: string, payload: unknown, options?: TriggerTaskOptions): Promise<TriggerRunHandle> => {
 			this.triggerCalls.push({ taskId, payload, options });
 			return { id: `run_${this.nextId++}` };
 		}
@@ -49,9 +40,7 @@ describe('TriggerDispatcherFactory', () => {
 		const factory = new TriggerDispatcherFactory({ client });
 		const id = await factory.dispatch('kb-embed-document', { workId: 'w1' });
 		expect(id).toBe('run_1');
-		expect(client.triggerCalls).toEqual([
-			{ taskId: 'kb-embed-document', payload: { workId: 'w1' }, options: {} }
-		]);
+		expect(client.triggerCalls).toEqual([{ taskId: 'kb-embed-document', payload: { workId: 'w1' }, options: {} }]);
 	});
 
 	it('dispatch applies defaultTaskQueue when no extra options', async () => {
@@ -70,11 +59,7 @@ describe('TriggerDispatcherFactory', () => {
 			client,
 			defaultTaskQueue: 'platform-default'
 		});
-		await factory.dispatch(
-			'kb-embed-document',
-			{ workId: 'w1' },
-			{ queue: 'override-q', tags: ['kb'] }
-		);
+		await factory.dispatch('kb-embed-document', { workId: 'w1' }, { queue: 'override-q', tags: ['kb'] });
 		expect(client.triggerCalls[0].options).toEqual({
 			queue: 'override-q',
 			tags: ['kb']

@@ -67,12 +67,12 @@ These three were documented as punted in `docs/internal/dependabot-moderate-tria
 
 ## Summary
 
-| Block | Count | Action |
-|---|---|---|
-| A — additive transitive overrides | 2 advisories, 2 overrides | applied |
-| B — override + manifest catch-up | 0 | n/a |
-| C — punted (postcss / uuid older-majors / gray-matter js-yaml) | 3 advisories | carried-forward from #1532; dismiss as deferred / false-positive |
-| **Total in scope** | **5 advisories → 2 overrides** | |
+| Block                                                          | Count                          | Action                                                           |
+| -------------------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------- |
+| A — additive transitive overrides                              | 2 advisories, 2 overrides      | applied                                                          |
+| B — override + manifest catch-up                               | 0                              | n/a                                                              |
+| C — punted (postcss / uuid older-majors / gray-matter js-yaml) | 3 advisories                   | carried-forward from #1532; dismiss as deferred / false-positive |
+| **Total in scope**                                             | **5 advisories → 2 overrides** |                                                                  |
 
 ### Audit delta (post-apply, `pnpm audit --prod --audit-level=low`)
 

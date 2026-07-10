@@ -165,9 +165,7 @@ export function runJobRuntimeContractSuite(
 		it('6. registerSchedules is idempotent (re-registering same id does not error)', async () => {
 			const p = await buildProvider();
 			await p.registerSchedules([{ id: 'foo', cron: '*/5 * * * *' }]);
-			await expect(
-				p.registerSchedules([{ id: 'foo', cron: '*/10 * * * *' }])
-			).resolves.toBeUndefined();
+			await expect(p.registerSchedules([{ id: 'foo', cron: '*/10 * * * *' }])).resolves.toBeUndefined();
 		});
 
 		it('7. isEnabled returns a boolean', async () => {

@@ -50,10 +50,7 @@ function buildBootServiceWithStore() {
         const matches = store
             .filter((r) => r.action === 'operator_allowlist_boot')
             .slice()
-            .sort(
-                (a, b) =>
-                    (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0),
-            );
+            .sort((a, b) => (b.occurredAt?.getTime() ?? 0) - (a.occurredAt?.getTime() ?? 0));
         return matches[0] ?? null;
     });
 

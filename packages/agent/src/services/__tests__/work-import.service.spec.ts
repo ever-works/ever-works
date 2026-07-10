@@ -767,14 +767,12 @@ describe('WorkImportService.dispatchImportTask — T22 tenant runtime binding ca
         const stamperMock = {
             stamp: opts.stamperThrows
                 ? jest.fn().mockRejectedValue(new Error('stamper boom'))
-                : jest
-                      .fn()
-                      .mockResolvedValue(
-                          opts.stamperResult ?? {
-                              providerId: null,
-                              credentialVersion: null,
-                          },
-                      ),
+                : jest.fn().mockResolvedValue(
+                      opts.stamperResult ?? {
+                          providerId: null,
+                          credentialVersion: null,
+                      },
+                  ),
         };
 
         const service = new WorkImportService(
@@ -808,15 +806,7 @@ describe('WorkImportService.dispatchImportTask — T22 tenant runtime binding ca
         const history: any = { id: 'h-1', startedAt: new Date() };
         const context: any = { triggeredBy: 'user' };
 
-        await (service as any).dispatchImportTask(
-            work,
-            user,
-            dto,
-            parsed,
-            history,
-            context,
-            null,
-        );
+        await (service as any).dispatchImportTask(work, user, dto, parsed, history, context, null);
 
         return {
             payload: importDispatcher.dispatchWorkImport.mock.calls.at(-1)?.[0] as any,

@@ -10,9 +10,7 @@ export type {
 	TriggerTenantCredentials
 } from './trigger-job-runtime.plugin.js';
 export { TriggerDispatcherFactory } from './trigger-dispatcher-factory.js';
-export {
-	mapEnqueueOptions as mapTriggerEnqueueOptions
-} from './trigger-enqueue-options.js';
+export { mapEnqueueOptions as mapTriggerEnqueueOptions } from './trigger-enqueue-options.js';
 export type { MappedTriggerEnqueue } from './trigger-enqueue-options.js';
 export type {
 	TriggerClient,

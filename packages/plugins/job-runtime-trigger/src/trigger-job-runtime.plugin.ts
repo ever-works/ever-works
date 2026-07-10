@@ -220,8 +220,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 			accessToken: {
 				type: 'string',
 				title: 'Trigger.dev Personal Access Token (PAT)',
-				description:
-					'Tenant-supplied management PAT (tr_pat_*). Required when mode is `byo` or `override`.',
+				description: 'Tenant-supplied management PAT (tr_pat_*). Required when mode is `byo` or `override`.',
 				'x-secret': true,
 				'x-scope': 'tenant'
 			},
@@ -245,8 +244,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 			apiUrl: {
 				type: 'string',
 				title: 'Trigger.dev API URL',
-				description:
-					'Override for self-hosted Trigger.dev (default https://api.trigger.dev).',
+				description: 'Override for self-hosted Trigger.dev (default https://api.trigger.dev).',
 				default: 'https://api.trigger.dev',
 				'x-scope': 'tenant',
 				'x-envVar': 'TRIGGER_API_URL'
@@ -424,9 +422,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 		// operators can build a client downstream.
 		const tenantCredentials = this.extractTenantCredentials(snapshot);
 		const tenantClient: TriggerClient | null =
-			tenantCredentials && this.opts.clientFactory
-				? this.safeBuildClient(snapshot, tenantCredentials)
-				: null;
+			tenantCredentials && this.opts.clientFactory ? this.safeBuildClient(snapshot, tenantCredentials) : null;
 
 		// The PAT we surface for the operator-built per-tenant client.
 		// Back-compat: snapshots that used the historical
@@ -468,8 +464,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 			get dispatchers(): JobRuntimeDispatchers {
 				return dispatchersForView;
 			},
-			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
-				base.registerSchedules(schedules),
+			registerSchedules: (schedules: readonly ScheduleSpec[]) => base.registerSchedules(schedules),
 			cancel: (runId: string) => base.cancel(runId),
 			getRunStatus: (runId: string) => base.getRunStatus(runId),
 			isEnabled: () => base.isEnabled(),
@@ -477,10 +472,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 			onLoad: (context: PluginContext) => base.onLoad(context),
 			onUnload: () => base.onUnload(),
 			bindToTenant: (other: TenantCredentialSnapshot) => {
-				if (
-					other.tenantId === snapshot.tenantId &&
-					other.credentialVersion === snapshot.credentialVersion
-				) {
+				if (other.tenantId === snapshot.tenantId && other.credentialVersion === snapshot.credentialVersion) {
 					return view;
 				}
 				return base.bindToTenant(other);
@@ -512,9 +504,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 	 * The warn fires only when there's at least one Trigger.dev-shaped
 	 * key but the bundle is incomplete.
 	 */
-	private extractTenantCredentials(
-		snapshot: TenantCredentialSnapshot
-	): TriggerTenantCredentials | null {
+	private extractTenantCredentials(snapshot: TenantCredentialSnapshot): TriggerTenantCredentials | null {
 		const bag = snapshot.credentials;
 		const accessToken = typeof bag.accessToken === 'string' ? bag.accessToken : null;
 		const secretKey = typeof bag.secretKey === 'string' ? bag.secretKey : null;
@@ -530,11 +520,7 @@ export class TriggerJobRuntimePlugin implements IJobRuntimeProvider {
 		// This is operator misconfiguration: warn loudly so it's visible,
 		// then fail-open to the platform default.
 		if (!accessToken || !secretKey || !projectRef) {
-			const missing = [
-				!accessToken && 'accessToken',
-				!secretKey && 'secretKey',
-				!projectRef && 'projectRef'
-			]
+			const missing = [!accessToken && 'accessToken', !secretKey && 'secretKey', !projectRef && 'projectRef']
 				.filter(Boolean)
 				.join(', ');
 			this.warn(

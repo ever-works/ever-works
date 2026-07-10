@@ -658,27 +658,25 @@ describe('TemplateCustomizationService.start — T22 tenant runtime binding capt
         // Patch the customization repo `findById` for the stamper lookup.
         (mocks.customizationRepository as any).findById = opts.rowFindThrows
             ? jest.fn().mockRejectedValue(new Error('db boom'))
-            : jest.fn().mockResolvedValue(
-                  opts.rowTenantId === undefined
-                      ? null
-                      : ({ id: 'cust-1', tenantId: opts.rowTenantId } as any),
-              );
+            : jest
+                  .fn()
+                  .mockResolvedValue(
+                      opts.rowTenantId === undefined
+                          ? null
+                          : ({ id: 'cust-1', tenantId: opts.rowTenantId } as any),
+                  );
         const stamperMock = {
             stamp: opts.stamperThrows
                 ? jest.fn().mockRejectedValue(new Error('stamper boom'))
-                : jest
-                      .fn()
-                      .mockResolvedValue(
-                          opts.stamperResult ?? {
-                              providerId: null,
-                              credentialVersion: null,
-                          },
-                      ),
+                : jest.fn().mockResolvedValue(
+                      opts.stamperResult ?? {
+                          providerId: null,
+                          credentialVersion: null,
+                      },
+                  ),
         };
         // Replace the service with one wired to the stamper.
-        const TenantService = service.constructor as new (
-            ...args: unknown[]
-        ) => typeof service;
+        const TenantService = service.constructor as new (...args: unknown[]) => typeof service;
         const wired = new TenantService(
             mocks.templateRepository as any,
             mocks.customizationRepository as any,
@@ -693,7 +691,11 @@ describe('TemplateCustomizationService.start — T22 tenant runtime binding capt
     }
 
     it('stamps payload with stamper result when overlay is active', async () => {
-        const { service: svc, mocks, stamperMock } = buildWithStamper({
+        const {
+            service: svc,
+            mocks,
+            stamperMock,
+        } = buildWithStamper({
             rowTenantId: '00000000-0000-0000-0000-00000000aaaa',
             stamperResult: { providerId: 'trigger', credentialVersion: 9 },
         });
@@ -711,7 +713,11 @@ describe('TemplateCustomizationService.start — T22 tenant runtime binding capt
     });
 
     it('ships null/null when customization row has no tenantId', async () => {
-        const { service: svc, mocks, stamperMock } = buildWithStamper({
+        const {
+            service: svc,
+            mocks,
+            stamperMock,
+        } = buildWithStamper({
             rowTenantId: null,
             stamperResult: { providerId: null, credentialVersion: null },
         });
@@ -726,7 +732,11 @@ describe('TemplateCustomizationService.start — T22 tenant runtime binding capt
     });
 
     it('fails open on customizationRepository.findById throw', async () => {
-        const { service: svc, mocks, stamperMock } = buildWithStamper({
+        const {
+            service: svc,
+            mocks,
+            stamperMock,
+        } = buildWithStamper({
             rowFindThrows: true,
         });
         const result = await svc.createAndStart('user-1', baseInput);

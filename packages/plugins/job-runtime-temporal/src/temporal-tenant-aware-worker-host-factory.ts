@@ -63,9 +63,7 @@ export interface TenantAwareTemporalWorkerHostFactoryOptions {
 	 * dev wiring still pass through `plugin.bindToTenant`. Production
 	 * operators are expected to supply this from their secrets store.
 	 */
-	readonly resolveSnapshot?: (
-		tenantId: string
-	) => TenantCredentialSnapshot | Promise<TenantCredentialSnapshot>;
+	readonly resolveSnapshot?: (tenantId: string) => TenantCredentialSnapshot | Promise<TenantCredentialSnapshot>;
 }
 
 export class TenantAwareTemporalWorkerHostFactory {

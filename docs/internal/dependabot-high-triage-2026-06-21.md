@@ -60,6 +60,7 @@ Insertions only — no removals, no edits to existing entries:
 ```
 
 Plus a manifest edit in `apps/api/package.json`:
+
 ```diff
 -"nodemailer": "^8.0.9",
 +"nodemailer": "^9.0.1",

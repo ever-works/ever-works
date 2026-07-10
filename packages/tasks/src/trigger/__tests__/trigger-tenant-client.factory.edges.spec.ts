@@ -77,7 +77,9 @@ describe('createTenantTriggerClient — apiUrl boundary cases', () => {
     });
 
     it('credentials.apiUrl with no scheme → passed verbatim (SDK / operator handles or fails)', async () => {
-        const client = createTenantTriggerClient(baseCreds({ apiUrl: 'trigger.tenant-x.internal' }));
+        const client = createTenantTriggerClient(
+            baseCreds({ apiUrl: 'trigger.tenant-x.internal' }),
+        );
         await client.tasks.trigger('t', {});
         const requestOptions = tasksTriggerMock.mock.calls[0][3];
         expect(requestOptions.clientConfig.baseURL).toBe('trigger.tenant-x.internal');
@@ -139,9 +141,7 @@ describe('createTenantTriggerClient — concurrent multi-tenant dispatch isolati
             // Map dispatch # → expected tenant by the parity rule above.
             const expectedSecret = payload.i % 2 === 0 ? 'tr_dev_a' : 'tr_dev_b';
             const expectedBase =
-                payload.i % 2 === 0
-                    ? DEFAULT_TRIGGER_API_URL
-                    : 'https://trigger.tenant-b.internal';
+                payload.i % 2 === 0 ? DEFAULT_TRIGGER_API_URL : 'https://trigger.tenant-b.internal';
             expect(cfg.accessToken).toBe(expectedSecret);
             expect(cfg.baseURL).toBe(expectedBase);
         }

@@ -13,7 +13,10 @@ class FakeQueue implements BullMqQueueAdapter {
 	static instances: FakeQueue[] = [];
 	readonly calls: QueueCall[] = [];
 	private nextId = 1;
-	constructor(public readonly name: string, public readonly ctorOpts: Readonly<Record<string, unknown>>) {
+	constructor(
+		public readonly name: string,
+		public readonly ctorOpts: Readonly<Record<string, unknown>>
+	) {
 		FakeQueue.instances.push(this);
 	}
 	async add(name: string, data: unknown, opts?: Readonly<Record<string, unknown>>) {

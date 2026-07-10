@@ -5,12 +5,7 @@ import {
 	TriggerJobRuntimePlugin,
 	type TriggerTenantCredentials
 } from '../trigger-job-runtime.plugin.js';
-import type {
-	TriggerClient,
-	TriggerRunHandle,
-	TriggerRunRecord,
-	TriggerTaskOptions
-} from '../trigger-types.js';
+import type { TriggerClient, TriggerRunHandle, TriggerRunRecord, TriggerTaskOptions } from '../trigger-types.js';
 
 /**
  * EW-742 P3.2 T22 — BYO / override Trigger.dev credentials test plan.
@@ -53,11 +48,7 @@ class FakeTenantClient implements TriggerClient {
 	readonly triggerCalls: TriggerCall[] = [];
 
 	readonly tasks = {
-		trigger: async (
-			taskId: string,
-			payload: unknown,
-			options?: TriggerTaskOptions
-		): Promise<TriggerRunHandle> => {
+		trigger: async (taskId: string, payload: unknown, options?: TriggerTaskOptions): Promise<TriggerRunHandle> => {
 			this.triggerCalls.push({ taskId, payload, options });
 			return { id: `${this.id}:run` };
 		}
@@ -72,9 +63,7 @@ class FakeTenantClient implements TriggerClient {
 	};
 }
 
-const snapshot = (
-	overrides: Partial<TenantCredentialSnapshot> = {}
-): TenantCredentialSnapshot => ({
+const snapshot = (overrides: Partial<TenantCredentialSnapshot> = {}): TenantCredentialSnapshot => ({
 	tenantId: '00000000-0000-0000-0000-00000000aaaa',
 	providerId: 'trigger',
 	credentialVersion: 1,
@@ -93,9 +82,7 @@ describe('TriggerJobRuntimePlugin — BYO credentials (EW-742 P3.2 T22)', () => 
 			const platformDispatchers: JobRuntimeDispatchers = Object.freeze({
 				dispatchKbEmbedDocument: () => Promise.resolve('platform-default')
 			});
-			const plugin = new TriggerJobRuntimePlugin({ logger: { warn } }).useDispatchers(
-				platformDispatchers
-			);
+			const plugin = new TriggerJobRuntimePlugin({ logger: { warn } }).useDispatchers(platformDispatchers);
 			const view = plugin.bindToTenant(snapshot({ credentials: {} }));
 			expect(view.tenantClient).toBeNull();
 			expect(view.tenantProjectAccessToken).toBeNull();

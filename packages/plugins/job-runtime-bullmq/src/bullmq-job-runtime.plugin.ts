@@ -238,13 +238,8 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 
 		const base = this;
 		const tenantQueuePrefix =
-			typeof snapshot.credentials.queuePrefix === 'string'
-				? snapshot.credentials.queuePrefix
-				: null;
-		const tenantRedisUrl =
-			typeof snapshot.credentials.redisUrl === 'string'
-				? snapshot.credentials.redisUrl
-				: null;
+			typeof snapshot.credentials.queuePrefix === 'string' ? snapshot.credentials.queuePrefix : null;
+		const tenantRedisUrl = typeof snapshot.credentials.redisUrl === 'string' ? snapshot.credentials.redisUrl : null;
 
 		const dispatchersForView: JobRuntimeDispatchers = this.opts.dispatchersBuilder
 			? Object.freeze({ ...this.opts.dispatchersBuilder(snapshot) })
@@ -261,8 +256,7 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 			get dispatchers(): JobRuntimeDispatchers {
 				return dispatchersForView;
 			},
-			registerSchedules: (schedules: readonly ScheduleSpec[]) =>
-				base.registerSchedules(schedules),
+			registerSchedules: (schedules: readonly ScheduleSpec[]) => base.registerSchedules(schedules),
 			cancel: (runId: string) => base.cancel(runId),
 			getRunStatus: (runId: string) => base.getRunStatus(runId),
 			isEnabled: () => base.isEnabled(),
@@ -270,10 +264,7 @@ export class BullMqJobRuntimePlugin implements IJobRuntimeProvider {
 			onLoad: (context: PluginContext) => base.onLoad(context),
 			onUnload: () => base.onUnload(),
 			bindToTenant: (other: TenantCredentialSnapshot) => {
-				if (
-					other.tenantId === snapshot.tenantId &&
-					other.credentialVersion === snapshot.credentialVersion
-				) {
+				if (other.tenantId === snapshot.tenantId && other.credentialVersion === snapshot.credentialVersion) {
 					return view;
 				}
 				return base.bindToTenant(other);

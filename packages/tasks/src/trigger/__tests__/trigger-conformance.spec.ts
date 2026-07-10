@@ -21,23 +21,23 @@ import { TriggerJobRuntimeProvider } from '../trigger-job-runtime.provider';
 import type { TriggerService } from '../trigger.service';
 
 function buildStubService(): TriggerService {
-	return {
-		// IJobRuntimeProvider methods the adapter delegates to.
-		// All return safe defaults — the conformance suite expects
-		// cancel(unknownId)→false, getRunStatus(unknownId)→'unknown',
-		// registerSchedules to no-op, isEnabled to return a boolean.
-		isEnabled: vi.fn(() => true),
-		cancel: vi.fn(async () => false),
-		getRunStatus: vi.fn(async () => 'unknown' as const),
-		registerSchedules: vi.fn(async () => undefined),
-		startWorkerHost: vi.fn(async () => ({ stop: async () => undefined })),
-		// `dispatchers` is a Record<string, unknown> on the real service —
-		// the conformance suite probes property access (must not throw)
-		// and treats undefined return values as valid.
-		dispatchers: {} as Readonly<Record<string, unknown>>
-	} as unknown as TriggerService;
+    return {
+        // IJobRuntimeProvider methods the adapter delegates to.
+        // All return safe defaults — the conformance suite expects
+        // cancel(unknownId)→false, getRunStatus(unknownId)→'unknown',
+        // registerSchedules to no-op, isEnabled to return a boolean.
+        isEnabled: vi.fn(() => true),
+        cancel: vi.fn(async () => false),
+        getRunStatus: vi.fn(async () => 'unknown' as const),
+        registerSchedules: vi.fn(async () => undefined),
+        startWorkerHost: vi.fn(async () => ({ stop: async () => undefined })),
+        // `dispatchers` is a Record<string, unknown> on the real service —
+        // the conformance suite probes property access (must not throw)
+        // and treats undefined return values as valid.
+        dispatchers: {} as Readonly<Record<string, unknown>>,
+    } as unknown as TriggerService;
 }
 
 describe('TriggerJobRuntimeProvider — IJobRuntimeProvider conformance', () => {
-	runJobRuntimeContractSuite(() => new TriggerJobRuntimeProvider(buildStubService()));
+    runJobRuntimeContractSuite(() => new TriggerJobRuntimeProvider(buildStubService()));
 });

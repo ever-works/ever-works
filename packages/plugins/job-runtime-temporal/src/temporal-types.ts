@@ -43,10 +43,7 @@ export interface TemporalWorkflowExecutionDescription {
  * Only the methods the plugin/factories use are typed.
  */
 export interface TemporalWorkflowClient {
-	start(
-		workflowType: string,
-		options: TemporalStartWorkflowOptions
-	): Promise<TemporalWorkflowHandle>;
+	start(workflowType: string, options: TemporalStartWorkflowOptions): Promise<TemporalWorkflowHandle>;
 	getHandle(workflowId: string): TemporalWorkflowHandle;
 }
 

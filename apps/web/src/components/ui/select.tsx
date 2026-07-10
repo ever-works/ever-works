@@ -236,10 +236,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                         {selected?.dotClass && (
                             <span
                                 aria-hidden="true"
-                                className={cn(
-                                    'size-1.5 shrink-0 rounded-full',
-                                    selected.dotClass,
-                                )}
+                                className={cn('size-1.5 shrink-0 rounded-full', selected.dotClass)}
                             />
                         )}
                         <span

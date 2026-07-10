@@ -211,7 +211,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                             <span className="font-medium text-text dark:text-text-dark">
                                 {chunks}
                             </span>
-                        )
+                        ),
                     })}
                 </div>
             )}

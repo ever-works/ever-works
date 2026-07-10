@@ -135,9 +135,7 @@ export function TenantRuntimeAllowlistManager({
     // on/off + saved-list empty/populated — so resolve it once here
     // rather than scattering ternaries through JSX.
     const gatingDisabled = !saved.perTenantGatingEnabled;
-    const savedList = saved.providerIds
-        .map((id) => PROVIDER_LABELS[id] ?? id)
-        .join(', ');
+    const savedList = saved.providerIds.map((id) => PROVIDER_LABELS[id] ?? id).join(', ');
 
     return (
         <div className="space-y-8">

@@ -79,9 +79,13 @@ describe('createTenantTriggerClient', () => {
         tasksTriggerMock.mockResolvedValueOnce({ id: 'run_a1' });
         const client = createTenantTriggerClient(tenantA);
 
-        const handle = await client.tasks.trigger('work-generation', { foo: 'bar' }, {
-            tags: ['a-tag'],
-        });
+        const handle = await client.tasks.trigger(
+            'work-generation',
+            { foo: 'bar' },
+            {
+                tags: ['a-tag'],
+            },
+        );
 
         expect(handle).toEqual({ id: 'run_a1' });
         expect(tasksTriggerMock).toHaveBeenCalledTimes(1);
@@ -164,9 +168,7 @@ describe('createTenantTriggerClient', () => {
         await c1.tasks.trigger('t', {});
         await c2.tasks.trigger('t', {});
 
-        expect(tasksTriggerMock.mock.calls[0][3]).toEqual(
-            tasksTriggerMock.mock.calls[1][3],
-        );
+        expect(tasksTriggerMock.mock.calls[0][3]).toEqual(tasksTriggerMock.mock.calls[1][3]);
     });
 });
 

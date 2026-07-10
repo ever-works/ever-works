@@ -147,9 +147,7 @@ import { TriggerJobRuntimeProvider } from '../trigger-job-runtime.provider';
  * would emit. The stamping behaviour under test doesn't depend on
  * which inherit shape the snapshot uses.
  */
-const SNAPSHOT = (
-    overrides: Partial<{ tenantId: string; credentialVersion: number }> = {},
-) => ({
+const SNAPSHOT = (overrides: Partial<{ tenantId: string; credentialVersion: number }> = {}) => ({
     tenantId: '00000000-0000-0000-0000-00000000aaaa',
     providerId: 'trigger' as const,
     credentialVersion: 1,
@@ -171,9 +169,18 @@ describe('TriggerService stamping EDGE cases (EW-742 P3.2 T22)', () => {
         provider = new TriggerJobRuntimeProvider(service);
         // Silence Nest Logger noise (both the service's logger and the
         // provider's separate Logger instance).
-        vi.spyOn((service as unknown as { logger: { error: () => void } }).logger, 'error').mockImplementation(() => {});
-        vi.spyOn((service as unknown as { logger: { warn: () => void } }).logger, 'warn').mockImplementation(() => {});
-        vi.spyOn((service as unknown as { logger: { debug: () => void } }).logger, 'debug').mockImplementation(() => {});
+        vi.spyOn(
+            (service as unknown as { logger: { error: () => void } }).logger,
+            'error',
+        ).mockImplementation(() => {});
+        vi.spyOn(
+            (service as unknown as { logger: { warn: () => void } }).logger,
+            'warn',
+        ).mockImplementation(() => {});
+        vi.spyOn(
+            (service as unknown as { logger: { debug: () => void } }).logger,
+            'debug',
+        ).mockImplementation(() => {});
         vi.spyOn(
             (provider as unknown as { logger: { warn: () => void } }).logger,
             'warn',
@@ -348,12 +355,16 @@ describe('TriggerService stamping EDGE cases (EW-742 P3.2 T22)', () => {
             const viewB = provider.bindToTenant(SNAPSHOT({ tenantId: tenantB }));
 
             await Promise.all([
-                (viewA.dispatchers as unknown as {
-                    dispatchKbBackfillSkeleton: (p: unknown) => Promise<string | null>;
-                }).dispatchKbBackfillSkeleton({ workIds: ['fleetwide'] }),
-                (viewB.dispatchers as unknown as {
-                    dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;
-                }).dispatchKbEmbedDocument({ workId: 'wB', documentId: 'dB' }),
+                (
+                    viewA.dispatchers as unknown as {
+                        dispatchKbBackfillSkeleton: (p: unknown) => Promise<string | null>;
+                    }
+                ).dispatchKbBackfillSkeleton({ workIds: ['fleetwide'] }),
+                (
+                    viewB.dispatchers as unknown as {
+                        dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;
+                    }
+                ).dispatchKbEmbedDocument({ workId: 'wB', documentId: 'dB' }),
             ]);
 
             const backfillOpts = kbBackfillSkeletonTriggerMock.mock.calls[0][1] as Record<

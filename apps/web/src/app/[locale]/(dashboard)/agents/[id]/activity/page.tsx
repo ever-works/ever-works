@@ -28,5 +28,7 @@ export default async function AgentActivityPage({ params }: { params: Params }) 
             .catch(() => ({ data: [], meta: { total: 0, limit: 100, offset: 0 } })),
     ]);
 
-    return <AgentActivityClient agentId={id} initial={initial} initialEvents={initialEvents.data} />;
+    return (
+        <AgentActivityClient agentId={id} initial={initial} initialEvents={initialEvents.data} />
+    );
 }

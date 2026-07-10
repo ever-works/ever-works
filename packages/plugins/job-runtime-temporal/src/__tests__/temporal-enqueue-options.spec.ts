@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { JobEnqueueOptions } from '@ever-works/plugin';
 import { mapEnqueueOptions } from '../temporal-enqueue-options.js';
 import { TemporalDispatcherFactory } from '../temporal-dispatcher-factory.js';
-import type { TemporalStartWorkflowOptions, TemporalWorkflowClient, TemporalWorkflowHandle } from '../temporal-types.js';
+import type {
+	TemporalStartWorkflowOptions,
+	TemporalWorkflowClient,
+	TemporalWorkflowHandle
+} from '../temporal-types.js';
 
 describe('mapEnqueueOptions (EW-742 P4 T31 Temporal stamping)', () => {
 	it('idempotencyKey surfaces as workflowIdFromIdempotency', () => {
@@ -121,12 +125,7 @@ describe('TemporalDispatcherFactory.enqueue (EW-742 P4 T31)', () => {
 	it('extraOpts.workflowId wins over idempotencyKey', async () => {
 		const client = new FakeClient();
 		const factory = new TemporalDispatcherFactory({ client, defaultTaskQueue: 'ew' });
-		await factory.enqueue(
-			'wf',
-			[],
-			{ idempotencyKey: 'idem' },
-			{ workflowId: 'explicit-id' }
-		);
+		await factory.enqueue('wf', [], { idempotencyKey: 'idem' }, { workflowId: 'explicit-id' });
 		expect(client.startCalls[0].options.workflowId).toBe('explicit-id');
 	});
 
