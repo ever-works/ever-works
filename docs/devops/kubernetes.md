@@ -372,7 +372,7 @@ When running multiple API replicas:
 
 ## Best Practices
 
-1. **Use managed databases** -- Run PostgreSQL as a managed service (RDS, Cloud SQL, Neon) rather than as a pod.
+1. **Use managed databases** -- Run PostgreSQL as a managed service (RDS, Cloud SQL, or in-cluster CloudNativePG / CNPG) rather than as a pod.
 
 2. **Separate secrets from config** -- Use Kubernetes Secrets for credentials, ConfigMaps for non-sensitive configuration.
 

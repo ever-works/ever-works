@@ -1122,7 +1122,7 @@ export class DeployService {
     /**
      * Provision the per-Work application runtime env that a k8s-deployed
      * directory site needs to boot in production. Vercel supplied these from
-     * project env + the Neon integration; k8s has no such source, so without
+     * project env + the external Postgres integration; k8s has no such source, so without
      * this the deployed site 500s (`[auth] AUTH_SECRET must be set in
      * production`). Pushed as GitHub secrets; `deploy_k8s.yaml` materializes
      * them into a `${slug}-runtime-env` k8s Secret the Deployment mounts via
@@ -1130,7 +1130,7 @@ export class DeployService {
      *
      * `AUTH_SECRET`/`COOKIE_SECRET` are generated once and persisted (stable
      * across redeploys — rotating would drop every live session). `DATABASE_URL`
-     * is the per-Work Postgres (e.g. reused Neon) connection string when
+     * is the per-Work Postgres (e.g. reused external Postgres) connection string when
      * configured. `NEXT_PUBLIC_APP_URL`/`COOKIE_DOMAIN` are derived from the
      * ingress host inside the manifest, not here.
      */

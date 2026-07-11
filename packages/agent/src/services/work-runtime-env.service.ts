@@ -17,7 +17,7 @@ const SECRET_LENGTH_BYTES = 32;
  * them so `deploy_k8s.yaml` materializes a `${slug}-runtime-env` Secret the
  * Deployment mounts via `envFrom`.
  *
- * **Why this exists**: Vercel injected these from project env + the Neon
+ * **Why this exists**: Vercel injected these from project env + the external Postgres
  * Marketplace integration. The k8s deploy path had no equivalent, so a
  * freshly-built site 500'd at first render (`[auth] AUTH_SECRET must be set in
  * production`). This service is the platform-side source of truth.
@@ -25,7 +25,7 @@ const SECRET_LENGTH_BYTES = 32;
  * **Persistence + stability**: `AUTH_SECRET` / `COOKIE_SECRET` are generated
  * once and persisted (AES-256-GCM, `PLATFORM_ENCRYPTION_KEY`) so they stay
  * stable across redeploys — rotating either would silently invalidate every
- * live session/cookie. `DATABASE_URL` is set explicitly (e.g. the reused Neon
+ * live session/cookie. `DATABASE_URL` is set explicitly (e.g. the reused external Postgres
  * connection string) rather than generated. This mirrors `WebhookSecretService`
  * / `PlatformSyncSecretService` exactly, including the race-safe conditional
  * UPDATE (`set*IfNull`) so concurrent deploys converge on one value.

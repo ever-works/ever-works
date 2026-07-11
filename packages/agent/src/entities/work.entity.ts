@@ -430,11 +430,11 @@ export class Work {
     // AES-256-GCM-encrypted per-Work runtime env injected into a k8s-deployed
     // site's container (deploy_k8s renders a `${slug}-runtime-env` Secret that
     // deployment.yaml mounts via envFrom). Vercel supplied these from project
-    // env + the Neon integration; k8s has no such source, so the deploy
+    // env + the external Postgres integration; k8s has no such source, so the deploy
     // feature provisions them (EW: k8s runtime-env). `AUTH_SECRET`/
     // `COOKIE_SECRET` are generated once and persisted so they stay stable
     // across redeploys (rotating would invalidate live sessions); the database
-    // URL is the per-Work Postgres connection string (e.g. the reused Neon DB).
+    // URL is the per-Work Postgres connection string (e.g. the reused external Postgres DB).
     // All NULL until the first k8s deploy / explicit set.
     @Column({ type: 'text', nullable: true })
     deployAuthSecretEncrypted?: string | null;
