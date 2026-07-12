@@ -17,7 +17,7 @@ interface RuntimeEnvManagementProps {
  * Per-Work runtime environment surface (Deploy tab).
  *
  * Shows + edits the one piece of deploy runtime env that is user-managed —
- * `DATABASE_URL` (e.g. the site's Postgres/Neon connection) — via the
+ * `DATABASE_URL` (e.g. the site's Postgres connection) — via the
  * `/deploy/works/:id/runtime-env` API. The value is shown **masked** (host/db
  * only, never the password) and applied on the next deploy. The auto-managed
  * secrets (AUTH_SECRET/COOKIE_SECRET) are listed read-only as "managed by

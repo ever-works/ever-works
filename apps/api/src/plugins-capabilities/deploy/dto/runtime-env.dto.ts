@@ -6,14 +6,14 @@ import { IsNotEmpty, IsString, Matches } from 'class-validator';
  *
  * Sets the per-Work `DATABASE_URL` — the one piece of deploy runtime env that
  * is NOT auto-generated (unlike `AUTH_SECRET` / `COOKIE_SECRET`, which the deploy
- * feature mints and rotates itself). On Vercel this was injected by the Neon
+ * feature mints and rotates itself). On Vercel this was injected by a managed-Postgres
  * Marketplace integration; on k8s the operator/owner supplies it here so it can
  * be seen and edited from the platform rather than set out-of-band.
  */
 export class SetRuntimeEnvDto {
     @ApiProperty({
         description: 'Postgres connection string used as the Work site DATABASE_URL',
-        example: 'postgresql://user:password@host.neon.tech/dbname?sslmode=require',
+        example: 'postgresql://user:password@your-db-host:5432/dbname?sslmode=require',
     })
     @IsString()
     @IsNotEmpty()
