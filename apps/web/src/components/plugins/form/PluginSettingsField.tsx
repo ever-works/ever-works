@@ -14,6 +14,7 @@ import { PluginSettingsObjectField } from './PluginSettingsObjectField';
 import { PluginSettingsArrayField } from './PluginSettingsArrayField';
 import { GithubPackagesOAuthButton } from './GithubPackagesOAuthButton';
 import { GithubOwnerWidget, GithubRepoWidget } from './GithubRepoWidgets';
+import { K8sClusterSourceSelect } from './K8sClusterSourceSelect';
 import { isType, getPrimaryType } from './utils';
 
 interface PluginSettingsFieldProps {
@@ -186,6 +187,22 @@ export function PluginSettingsField({
                         );
                     })}
                 </Select>
+            );
+        }
+
+        // k8s cluster-source select — MUST be handled before the generic enum
+        // branch below (the field carries both `enum` and this `widget`, and
+        // the enum branch would otherwise match first and render the raw,
+        // unfiltered options). The widget fetches the admin-filtered option
+        // list from the server so the admin-only `k8s-works` value never
+        // reaches a non-admin's dropdown.
+        if (schema.widget === 'k8s-cluster-source') {
+            return (
+                <K8sClusterSourceSelect
+                    value={String(value ?? schema.default ?? '')}
+                    defaultValue={schema.default != null ? String(schema.default) : undefined}
+                    onChange={(v) => onChange(v)}
+                />
             );
         }
 

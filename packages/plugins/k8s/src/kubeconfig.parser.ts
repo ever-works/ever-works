@@ -1,4 +1,7 @@
-import yaml from 'js-yaml';
+// js-yaml v5 is ESM-only and dropped its default export, so `import yaml from
+// 'js-yaml'` resolves to `undefined` (→ "Cannot read properties of undefined
+// (reading 'load')"). Use a namespace import to pick up the named `load` export.
+import * as yaml from 'js-yaml';
 import { createHash } from 'node:crypto';
 import { K8sPluginError } from './errors.js';
 

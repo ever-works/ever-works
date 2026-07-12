@@ -48,29 +48,39 @@ export type ResolvedImageVisibility = 'public' | 'private';
 /**
  * Where the kubeconfig used to talk to the target cluster comes from.
  *
- * - `'k8s-works'`        — Ever Works shared customer cluster. The
- *                          platform substitutes
- *                          `process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG`
- *                          for the `K8S_TOKEN` GitHub Actions secret at
- *                          deploy time. The `kubeconfig` field below is
- *                          ignored.
- * - `'k8s-gauzy'`        — Ever Works internal platform cluster. Same
- *                          shape as `'k8s-works'` but uses
- *                          `process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG`.
- *                          Only allowed when the Work's website repo is
- *                          in the `ever-works` org (admin/internal
- *                          path).
- * - `'custom-kubeconfig'`— Customer pastes their own kubeconfig in the
- *                          `kubeconfig` field below. Only allowed when
- *                          the Work's website repo is NOT in an Ever
- *                          Works-shared org (the cell C exclusion).
+ * - `'k8s-works'`         — Ever Works *internal* cluster. Admin-only:
+ *                           allowed only for platform admins whose Work's
+ *                           website repo is in the `ever-works` GitHub org.
+ *                           The platform substitutes
+ *                           `process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG`
+ *                           for the `K8S_TOKEN` GitHub Actions secret at
+ *                           deploy time. The `kubeconfig` field below is
+ *                           ignored.
+ * - `'k8s-works-shared'`  — Ever Works *shared customer* cluster — the
+ *                           default target for regular customers. Same
+ *                           shape as `'k8s-works'` but uses
+ *                           `process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG`.
+ *                           That cluster may not be provisioned yet; when the
+ *                           env var is absent the deploy layer surfaces a clear
+ *                           "not yet available" error rather than crashing.
+ * - `'custom-kubeconfig'` — Customer pastes their own kubeconfig in the
+ *                           `kubeconfig` field below. Only allowed when
+ *                           the Work's website repo is NOT in an Ever
+ *                           Works-shared org (the cross-tenant-PAT exclusion).
  *
- * Validation of the (website-repo-owner, clusterSource) combination
- * happens in `DeployService.deploy()`. See the EW-615/EW-616 tickets
+ * Legacy note: this used to be `'k8s-works' | 'k8s-gauzy' | 'custom-kubeconfig'`
+ * where `'k8s-works'` meant the shared cluster and `'k8s-gauzy'` the internal
+ * one. They were renamed — old `k8s-gauzy` → `k8s-works` (internal), old
+ * `k8s-works` → `k8s-works-shared` (shared). A one-shot data migration rewrites
+ * stored values atomically, and the deploy layer still resolves the legacy
+ * `k8s-gauzy` alias defensively.
+ *
+ * Validation of the (website-repo-owner, isPlatformAdmin, clusterSource)
+ * combination happens in `DeployService.deploy()`. See the EW-615/EW-616 tickets
  * and `Workspace/knowledge/runbooks/EVER_WORKS_K8S_DEPLOY_TROUBLESHOOTING.md`
  * for the full supported-matrix table.
  */
-export type ClusterSource = 'k8s-works' | 'k8s-gauzy' | 'custom-kubeconfig';
+export type ClusterSource = 'k8s-works' | 'k8s-works-shared' | 'custom-kubeconfig';
 
 /**
  * Plugin settings as stored in `plugin_settings`.

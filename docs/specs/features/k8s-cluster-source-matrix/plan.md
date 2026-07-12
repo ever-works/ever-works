@@ -5,8 +5,15 @@
 
 **Feature ID**: `k8s-cluster-source-matrix`
 **Spec**: `./spec.md`
-**Status**: `Done`
+**Status**: `Done` (superseded in part by the cluster-source rename — see [`spec.md` §0](./spec.md#0-revision--cluster-source-rename--admin-gating))
 **Last updated**: 2026-05-14
+
+> **Revision note:** the values were later renamed (`k8s-gauzy` → `k8s-works`
+> internal, `k8s-works` → `k8s-works-shared` shared), `k8s-works` was gated to
+> platform admins in the `ever-works` org, a `GET /api/deploy/cluster-sources`
+> endpoint + `k8s-cluster-source` widget were added for the admin-aware dropdown,
+> a one-shot `RenameK8sClusterSource` data migration was added, and Kubernetes
+> became the default provider when Vercel is unconnected. See [`spec.md` §0](./spec.md#0-revision--cluster-source-rename--admin-gating).
 
 ---
 
