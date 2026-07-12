@@ -29,11 +29,11 @@
 
 **Renamed values** (the name now matches the physical cluster):
 
-| Old value     | New value          | Cluster                                   | Kubeconfig env var                        |
-| ------------- | ------------------ | ----------------------------------------- | ----------------------------------------- |
-| `k8s-gauzy`   | `k8s-works`        | Ever Works **internal** cluster (admin)   | `EVER_WORKS_K8S_WORKS_KUBECONFIG`         |
-| `k8s-works`   | `k8s-works-shared` | Ever Works **shared customer** cluster    | `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG`  |
-| `custom-kubeconfig` | `custom-kubeconfig` | Bring-your-own                      | user-pasted                               |
+| Old value           | New value           | Cluster                                 | Kubeconfig env var                       |
+| ------------------- | ------------------- | --------------------------------------- | ---------------------------------------- |
+| `k8s-gauzy`         | `k8s-works`         | Ever Works **internal** cluster (admin) | `EVER_WORKS_K8S_WORKS_KUBECONFIG`        |
+| `k8s-works`         | `k8s-works-shared`  | Ever Works **shared customer** cluster  | `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` |
+| `custom-kubeconfig` | `custom-kubeconfig` | Bring-your-own                          | user-pasted                              |
 
 Because the string `k8s-works` meant "shared" before and means "internal" after,
 the migration MUST run before any post-rename code reads a stored value; the
@@ -45,13 +45,13 @@ non-colliding legacy `k8s-gauzy` alias (never `k8s-works`).
 must not see `k8s-works` in the settings dropdown and must not be able to deploy
 to it via the API/CLI. The updated matrix (`allowed` = may pick):
 
-| isPlatformAdmin | Website owner      | k8s-works | k8s-works-shared | custom-kubeconfig |
-| --------------- | ------------------ | --------- | ---------------- | ----------------- |
-| yes             | `ever-works`       | ✅        | ✅               | ❌ (shared org)   |
-| yes             | `ever-works-cloud` | ❌ (org)  | ✅               | ❌ (shared org)   |
-| yes             | customer-owned     | ❌ (org)  | ✅               | ✅                |
-| no              | `ever-works`       | ❌ (admin)| ✅               | ❌ (shared org)   |
-| no              | customer-owned     | ❌ (admin)| ✅               | ✅                |
+| isPlatformAdmin | Website owner      | k8s-works  | k8s-works-shared | custom-kubeconfig |
+| --------------- | ------------------ | ---------- | ---------------- | ----------------- |
+| yes             | `ever-works`       | ✅         | ✅               | ❌ (shared org)   |
+| yes             | `ever-works-cloud` | ❌ (org)   | ✅               | ❌ (shared org)   |
+| yes             | customer-owned     | ❌ (org)   | ✅               | ✅                |
+| no              | `ever-works`       | ❌ (admin) | ✅               | ❌ (shared org)   |
+| no              | customer-owned     | ❌ (admin) | ✅               | ✅                |
 
 **UI enforcement.** `isPlatformAdmin` is deliberately stripped from the client
 profile, so the dropdown cannot be filtered client-side. `GET /api/deploy/cluster-sources`

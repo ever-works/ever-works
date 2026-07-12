@@ -35,17 +35,17 @@ Use the Kubernetes provider when you need to host on your own infrastructure —
 2. Find the **Kubernetes** card and click **Configure**.
 3. Fill in the form:
 
-| Field                    | Required | Notes                                                                                                                                                                                    |
-| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Target cluster**       | yes      | Where to deploy — see [Target cluster](#target-cluster) below. Defaults to `k8s-works-shared`, the Ever Works shared customer cluster.                                                   |
+| Field                    | Required                     | Notes                                                                                                                                                                                          |
+| ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target cluster**       | yes                          | Where to deploy — see [Target cluster](#target-cluster) below. Defaults to `k8s-works-shared`, the Ever Works shared customer cluster.                                                         |
 | **kubeconfig**           | only for `custom-kubeconfig` | Paste the contents of your `~/.kube/config` (or a service-account-scoped equivalent). Stored encrypted, never returned by the API. Only needed when **Target cluster** is `custom-kubeconfig`. |
-| **Context**              | no       | Defaults to the kubeconfig's `current-context`. Set this if you want to target a non-default context without editing the file.                                                           |
-| **Namespace**            | no       | Defaults to `ever-works`. The namespace must already exist or your kubeconfig must have permission to create it.                                                                         |
-| **Registry**             | no       | Defaults to **GitHub Container Registry** using your connected GitHub account. Switch to **Docker Hub** or **Generic** to use a different registry. See [Registries](#registries) below. |
-| **Ingress class**        | no       | Populated from your cluster's `IngressClass` resources. Leave blank to use the cluster default.                                                                                          |
-| **Default ingress host** | no       | Used when a work has no custom domain configured.                                                                                                                                        |
-| **TLS issuer**           | no       | Name of a cert-manager `ClusterIssuer`. Adds the necessary annotations on the Ingress.                                                                                                   |
-| **Replicas**             | no       | Defaults to `1`. Min 1, max 10 in v1.                                                                                                                                                    |
+| **Context**              | no                           | Defaults to the kubeconfig's `current-context`. Set this if you want to target a non-default context without editing the file.                                                                 |
+| **Namespace**            | no                           | Defaults to `ever-works`. The namespace must already exist or your kubeconfig must have permission to create it.                                                                               |
+| **Registry**             | no                           | Defaults to **GitHub Container Registry** using your connected GitHub account. Switch to **Docker Hub** or **Generic** to use a different registry. See [Registries](#registries) below.       |
+| **Ingress class**        | no                           | Populated from your cluster's `IngressClass` resources. Leave blank to use the cluster default.                                                                                                |
+| **Default ingress host** | no                           | Used when a work has no custom domain configured.                                                                                                                                              |
+| **TLS issuer**           | no                           | Name of a cert-manager `ClusterIssuer`. Adds the necessary annotations on the Ingress.                                                                                                         |
+| **Replicas**             | no                           | Defaults to `1`. Min 1, max 10 in v1.                                                                                                                                                          |
 
 4. Click **Save & verify**. For `custom-kubeconfig`, the platform validates the kubeconfig against the cluster API and reports back the cluster name, server URL, Kubernetes server version, and the list of ingress controllers it detected. For the platform-managed clusters there is nothing to validate against your session — the platform owns those credentials.
 
@@ -53,11 +53,11 @@ Use the Kubernetes provider when you need to host on your own infrastructure —
 
 The **Target cluster** setting decides where your work is published:
 
-| Option              | What it is                                                                                                                                                            | Who can pick it                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `k8s-works-shared`  | The **Ever Works shared customer cluster** — the default. No cluster credentials to manage; the platform runs it for you.                                            | Everyone (the customer default).                                                                    |
-| `k8s-works`         | The **Ever Works internal cluster**. Admin-only, and the work's website repo must live in the `ever-works` GitHub org.                                               | **Platform admins only** — this option is hidden from everyone else, and the deploy API rejects it. |
-| `custom-kubeconfig` | **Bring your own cluster** — paste your own kubeconfig (see the field table above). Not available when the website repo is in an Ever Works-shared GitHub org.        | Anyone whose website repo is in their own GitHub org.                                                |
+| Option              | What it is                                                                                                                                                     | Who can pick it                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `k8s-works-shared`  | The **Ever Works shared customer cluster** — the default. No cluster credentials to manage; the platform runs it for you.                                      | Everyone (the customer default).                                                                    |
+| `k8s-works`         | The **Ever Works internal cluster**. Admin-only, and the work's website repo must live in the `ever-works` GitHub org.                                         | **Platform admins only** — this option is hidden from everyone else, and the deploy API rejects it. |
+| `custom-kubeconfig` | **Bring your own cluster** — paste your own kubeconfig (see the field table above). Not available when the website repo is in an Ever Works-shared GitHub org. | Anyone whose website repo is in their own GitHub org.                                               |
 
 Notes:
 
