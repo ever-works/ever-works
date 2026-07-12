@@ -44,7 +44,7 @@ import type {
 	ResolvedImageVisibility
 } from './types.js';
 
-const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works', 'k8s-gauzy', 'custom-kubeconfig'];
+const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = ['k8s-works-shared', 'k8s-works', 'custom-kubeconfig'];
 
 function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
@@ -148,11 +148,27 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		properties: {
 			clusterSource: {
 				type: 'string',
-				enum: ['k8s-works', 'k8s-gauzy', 'custom-kubeconfig'],
+				// `k8s-works-shared` (shared customer cluster) is listed first as the
+				// customer default. `k8s-works` (internal cluster) is admin-only and is
+				// hidden from non-admins by the `k8s-cluster-source` widget + the
+				// server-side deploy gate; it stays in the enum so platform admins can
+				// still persist it (schema validation must accept it). `default` stays
+				// `custom-kubeconfig` so pre-existing Works with a pasted kubeconfig and
+				// no explicit clusterSource keep deploying exactly as before.
+				enum: ['k8s-works-shared', 'k8s-works', 'custom-kubeconfig'],
 				default: 'custom-kubeconfig',
 				title: 'Target cluster',
+				// Non-admin-safe copy (no mention of the admin-only `k8s-works`). The
+				// `k8s-cluster-source` widget renders the full admin copy for platform
+				// admins. Keep these two in sync with the owner-provided wording.
 				description:
-					"Where to deploy. 'k8s-works' = Ever Works shared customer cluster. 'k8s-gauzy' = Ever Works internal cluster (admin-only, requires the website repo to live in the 'ever-works' GitHub org). 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org that owns the website repo."
+					"Where to deploy. 'k8s-works-shared' = Ever Works shared customer cluster. 'custom-kubeconfig' = paste your own kubeconfig below. Allowed values depend on the GitHub org that owns the website repo.",
+				// EW: admin-aware dropdown. The widget fetches the caller's allowed
+				// cluster sources from `GET /api/deploy/cluster-sources` (filtered by
+				// `isPlatformAdmin` server-side, since the client is never told the
+				// admin flag) and renders human labels. Falls back to the raw `enum`
+				// in renderers that don't know the widget.
+				'x-widget': 'k8s-cluster-source'
 			},
 			kubeconfig: {
 				type: 'string',

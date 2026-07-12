@@ -77,22 +77,28 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         env?: NodeJS.ProcessEnv;
         /** Token that `DeployFacade.getPluginAndTokenAndSettings` would
          *  return for this Work. Defaults to whatever's in
-         *  `userSettings.kubeconfig`, or the EW-616 sentinel when the
-         *  user picked a platform-managed source without a saved
+         *  `userSettings.kubeconfig`, or the platform-managed sentinel when
+         *  the user picked a platform-managed source without a saved
          *  kubeconfig. */
         facadeToken?: string;
+        /** Whether the Work owner is a platform admin — gates `k8s-works`. */
+        isPlatformAdmin?: boolean;
     }) => {
         // The real k8s plugin — its coerceSettings + getDeploymentSecrets
         // are exercised through DeployService.setRequiredSecrets.
         const k8sPlugin = new KubernetesPlugin();
 
         // Decide what token the (mocked) facade would have produced for
-        // this combination, matching the real facade's logic.
+        // this combination, matching the real facade's logic (platform-managed
+        // cluster sources — `k8s-works` / `k8s-works-shared`, or the legacy
+        // `k8s-gauzy` alias — yield the sentinel when no kubeconfig is saved).
         const kubeconfig = opts.userSettings.kubeconfig as string | undefined;
         const clusterSource = opts.userSettings.clusterSource as string | undefined;
         const facadeToken =
             opts.facadeToken ??
-            (clusterSource === 'k8s-works' || clusterSource === 'k8s-gauzy'
+            (clusterSource === 'k8s-works' ||
+            clusterSource === 'k8s-works-shared' ||
+            clusterSource === 'k8s-gauzy'
                 ? kubeconfig || SENTINEL
                 : kubeconfig || '');
 
@@ -119,7 +125,11 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
             slug: 'my-site',
             deployProvider: 'k8s',
             gitProvider: 'github',
-            user: { id: 'user-1', username: 'evereq' },
+            user: {
+                id: 'user-1',
+                username: 'evereq',
+                isPlatformAdmin: opts.isPlatformAdmin ?? false,
+            },
             getRepoOwner: () => opts.websiteOwner,
             getDataRepo: () => `${opts.websiteOwner}/data`,
             getWebsiteRepo: () => `${opts.websiteOwner}-site`,
@@ -186,6 +196,7 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
 
         const prevEnv = { ...process.env };
         delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+        delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
         delete process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG;
         Object.assign(process.env, opts.env ?? {});
 
@@ -220,21 +231,22 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
 
     afterEach(() => {
         delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+        delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
         delete process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG;
     });
 
-    it('ever-works-cloud Work + clusterSource=k8s-works (sentinel from facade) → env kubeconfig pushed as K8S_TOKEN, sentinel never leaks', async () => {
+    it('ever-works-cloud Work + clusterSource=k8s-works-shared (sentinel from facade) → env kubeconfig pushed as K8S_TOKEN, sentinel never leaks', async () => {
         const { service, capturedSecrets, restoreEnv } = buildHarness({
             websiteOwner: 'ever-works-cloud',
-            userSettings: { clusterSource: 'k8s-works' /* no kubeconfig */ },
-            env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'platform-cluster-yaml' },
+            userSettings: { clusterSource: 'k8s-works-shared' /* no kubeconfig */ },
+            env: { EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG: 'shared-cluster-yaml' },
         });
 
         try {
             await service.deploy('work-1', 'user-1', {});
             const secrets = capturedSecrets();
             const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
-            expect(k8sToken?.value).toBe('platform-cluster-yaml');
+            expect(k8sToken?.value).toBe('shared-cluster-yaml');
             for (const s of secrets) {
                 expect(s.value).not.toBe(SENTINEL);
             }
@@ -243,11 +255,12 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         }
     });
 
-    it('ever-works Work + clusterSource=k8s-gauzy → admin path uses EVER_WORKS_K8S_GAUZY_KUBECONFIG', async () => {
+    it('ever-works Work + admin + clusterSource=k8s-works → internal path uses EVER_WORKS_K8S_WORKS_KUBECONFIG', async () => {
         const { service, capturedSecrets, restoreEnv } = buildHarness({
             websiteOwner: 'ever-works',
-            userSettings: { clusterSource: 'k8s-gauzy' },
-            env: { EVER_WORKS_K8S_GAUZY_KUBECONFIG: 'internal-cluster-yaml' },
+            isPlatformAdmin: true,
+            userSettings: { clusterSource: 'k8s-works' },
+            env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'internal-cluster-yaml' },
         });
         try {
             await service.deploy('work-1', 'user-1', {});
@@ -275,26 +288,29 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
         }
     });
 
-    it('customer-owned Work + clusterSource=k8s-gauzy → 400 BadRequest (admin-only cluster)', async () => {
+    it('non-admin picking clusterSource=k8s-works → 400 BadRequest (admin-only cluster)', async () => {
         const { service, restoreEnv } = buildHarness({
-            websiteOwner: 'acme',
-            userSettings: { clusterSource: 'k8s-gauzy' },
+            websiteOwner: 'ever-works',
+            isPlatformAdmin: false,
+            userSettings: { clusterSource: 'k8s-works' },
+            env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'internal-cluster-yaml' },
         });
         try {
             await expect(service.deploy('work-1', 'user-1', {})).rejects.toBeInstanceOf(
                 BadRequestException,
             );
             await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
-                /'k8s-gauzy' is the Ever Works internal platform cluster/,
+                /restricted to platform admins/i,
             );
         } finally {
             restoreEnv();
         }
     });
 
-    it('clusterSource=k8s-works but platform env var missing → 500 InternalServerError', async () => {
+    it('admin picking k8s-works but platform env var missing → 500 InternalServerError', async () => {
         const { service, restoreEnv } = buildHarness({
-            websiteOwner: 'ever-works-cloud',
+            websiteOwner: 'ever-works',
+            isPlatformAdmin: true,
             userSettings: { clusterSource: 'k8s-works' },
             // intentionally no env
         });
@@ -326,9 +342,10 @@ describe.skip('EW-616 deploy pipeline — real KubernetesPlugin + real matrix + 
 
     it('real KubernetesPlugin contributes K8S_CLUSTER_SOURCE reflecting user choice', async () => {
         const { service, capturedSecrets, restoreEnv } = buildHarness({
-            websiteOwner: 'ever-works-cloud',
+            websiteOwner: 'ever-works',
+            isPlatformAdmin: true,
             userSettings: { clusterSource: 'k8s-works' },
-            env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'platform-yaml' },
+            env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'internal-yaml' },
         });
         try {
             await service.deploy('work-1', 'user-1', {});

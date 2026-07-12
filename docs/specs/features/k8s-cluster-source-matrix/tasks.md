@@ -2,8 +2,14 @@
 
 > Backlog of discrete, completable units of work that implement [`./plan.md`](./plan.md).
 
-**Status**: `Done`
+**Status**: `Done` (plus a later cluster-source rename — see [`spec.md` §0](./spec.md#0-revision--cluster-source-rename--admin-gating))
 **Last updated**: 2026-05-14
+
+> **Revision note:** a follow-up renamed the cluster-source values, admin-gated
+> `k8s-works`, added the `GET /api/deploy/cluster-sources` endpoint +
+> `k8s-cluster-source` widget, added the `RenameK8sClusterSource` migration, and
+> made k8s the default provider when Vercel is unconnected. See
+> [`spec.md` §0](./spec.md#0-revision--cluster-source-rename--admin-gating).
 
 ---
 

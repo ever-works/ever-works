@@ -206,7 +206,18 @@ describe('DeployFacadeService', () => {
             ).resolves.toBe(true);
         });
 
-        it('returns the sentinel for k8s + clusterSource=k8s-gauzy when no kubeconfig is saved', async () => {
+        it('returns the sentinel for k8s + clusterSource=k8s-works-shared when no kubeconfig is saved', async () => {
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works-shared' } },
+            });
+
+            await expect(
+                service.getDeployToken({ userId: 'user-1', workId: 'work-1' }),
+            ).resolves.toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
+        });
+
+        it('returns the sentinel for the legacy k8s-gauzy alias (rolling-deploy defense-in-depth)', async () => {
             const { service } = createService({
                 deployProvider: 'k8s',
                 settings: { clusterSource: { value: 'k8s-gauzy' } },

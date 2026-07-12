@@ -68,6 +68,8 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         githubPluginOverrides?: Record<string, unknown>;
         /** Work's public `website` URL — drives the per-Work k8s Ingress host. */
         website?: string;
+        /** Whether the Work owner is a platform admin — gates `k8s-works`. */
+        isPlatformAdmin?: boolean;
     }) => {
         const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
@@ -78,7 +80,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             gitProvider: 'github',
             websiteTemplateId: 'directory-web-template',
             activitySyncMode: overrides.activitySyncMode ?? 'push',
-            user: { id: 'user-1' },
+            user: { id: 'user-1', isPlatformAdmin: overrides.isPlatformAdmin ?? false },
             getRepoOwner: () => websiteOwner,
             getDataRepo: () => `${websiteOwner}/data`,
             getWebsiteRepo: () => `${websiteOwner}-site`,
@@ -1058,6 +1060,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         beforeEach(() => {
             process.env = { ...originalEnv };
             delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+            delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
             delete process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG;
         });
 
@@ -1080,12 +1083,12 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             expect(k8sToken?.value).toBe('user-pasted-yaml');
         });
 
-        it('k8s-works + ever-works-cloud → substitutes EVER_WORKS_K8S_WORKS_KUBECONFIG as K8S_TOKEN', async () => {
-            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'platform-yaml';
+        it('k8s-works-shared + ever-works-cloud → substitutes EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG as K8S_TOKEN', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-yaml';
             const { service, githubPlugin } = buildService({
                 plugin: k8sPlugin,
                 token: 'user-pasted-yaml-should-be-ignored',
-                settings: { clusterSource: 'k8s-works' },
+                settings: { clusterSource: 'k8s-works-shared' },
                 websiteOwner: 'ever-works-cloud',
             });
 
@@ -1093,22 +1096,67 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
             const { secrets } = captureCalls(githubPlugin);
             const k8sToken = secrets.find((s: any) => s.key === 'K8S_TOKEN');
-            expect(k8sToken?.value).toBe('platform-yaml');
+            expect(k8sToken?.value).toBe('shared-yaml');
         });
 
-        it('k8s-gauzy + ever-works → substitutes EVER_WORKS_K8S_GAUZY_KUBECONFIG (admin path)', async () => {
-            process.env.EVER_WORKS_K8S_GAUZY_KUBECONFIG = 'gauzy-yaml';
+        it('k8s-works + admin + ever-works → substitutes EVER_WORKS_K8S_WORKS_KUBECONFIG (internal/admin path)', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-yaml';
             const { service, githubPlugin } = buildService({
                 plugin: k8sPlugin,
                 token: 'user-yaml-ignored',
-                settings: { clusterSource: 'k8s-gauzy' },
+                settings: { clusterSource: 'k8s-works' },
                 websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
             });
 
             await service.deploy('work-1', 'user-1', {});
 
             const { secrets } = captureCalls(githubPlugin);
-            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')?.value).toBe('gauzy-yaml');
+            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')?.value).toBe('internal-yaml');
+        });
+
+        it('legacy k8s-gauzy + admin + ever-works → still resolves via EVER_WORKS_K8S_WORKS_KUBECONFIG', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin,
+                token: 'user-yaml-ignored',
+                settings: { clusterSource: 'k8s-gauzy' },
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const { secrets } = captureCalls(githubPlugin);
+            expect(secrets.find((s: any) => s.key === 'K8S_TOKEN')?.value).toBe('internal-yaml');
+        });
+
+        it('rejects a non-admin picking k8s-works with a BadRequest (admin-only cluster)', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-yaml';
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: false,
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /restricted to platform admins/i,
+            );
+        });
+
+        it('rejects an admin picking k8s-works for a non-ever-works Work (wrong org)', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-yaml';
+            const { service } = buildService({
+                plugin: k8sPlugin,
+                settings: { clusterSource: 'k8s-works' },
+                websiteOwner: 'acme',
+                isPlatformAdmin: true,
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
+                /requires the website repo to live in the 'ever-works' GitHub org/,
+            );
         });
 
         it('rejects ever-works-cloud + custom-kubeconfig with a BadRequest (cell C)', async () => {
@@ -1123,24 +1171,32 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             );
         });
 
-        it('rejects customer-owned + k8s-gauzy with a BadRequest (admin-only)', async () => {
+        it('surfaces a clear "not available yet" error for k8s-works-shared before its cluster is provisioned', async () => {
+            // EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG intentionally absent.
             const { service } = buildService({
                 plugin: k8sPlugin,
-                settings: { clusterSource: 'k8s-gauzy' },
+                settings: { clusterSource: 'k8s-works-shared' },
                 websiteOwner: 'acme',
             });
 
+            const InternalServerErrorException =
+                require('@nestjs/common').InternalServerErrorException;
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toBeInstanceOf(
+                InternalServerErrorException,
+            );
             await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(
-                /'k8s-gauzy' is the Ever Works internal platform cluster/,
+                /not available yet/i,
             );
         });
 
         it('rejects k8s-works with InternalServerError when EVER_WORKS_K8S_WORKS_KUBECONFIG is not provisioned (operator gap, not user error)', async () => {
-            // env var intentionally absent
+            // env var intentionally absent; admin + ever-works passes validation
+            // so the flow reaches the (failing) env-var resolution.
             const { service } = buildService({
                 plugin: k8sPlugin,
                 settings: { clusterSource: 'k8s-works' },
-                websiteOwner: 'ever-works-cloud',
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
             });
 
             const InternalServerErrorException =
@@ -1164,7 +1220,8 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                 plugin: k8sPlugin,
                 token: sentinel,
                 settings: { clusterSource: 'k8s-works' },
-                websiteOwner: 'ever-works-cloud',
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
             });
 
             await service.deploy('work-1', 'user-1', {});
@@ -1186,9 +1243,11 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                     getWorkflowFilenames: () => ['deploy_vercel.yaml'],
                     getDeploymentSecrets: jest.fn().mockResolvedValue({}),
                 },
-                // these would trip the k8s matrix but vercel must not care
-                settings: { clusterSource: 'k8s-gauzy' },
+                // a non-admin picking k8s-works WOULD trip the k8s matrix, but
+                // vercel is not k8s so the matrix must not be consulted at all.
+                settings: { clusterSource: 'k8s-works' },
                 websiteOwner: 'ever-works-cloud',
+                isPlatformAdmin: false,
                 token: 'vercel-deploy-token',
             });
 

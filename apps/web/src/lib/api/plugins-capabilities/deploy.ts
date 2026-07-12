@@ -132,10 +132,32 @@ export interface SubdomainState {
 
 export type SubdomainResponseDto = APIResponse<SubdomainState>;
 
+/**
+ * One selectable Kubernetes `clusterSource` option, as returned by
+ * `GET /api/deploy/cluster-sources`. `label`/`description` are human copy;
+ * the admin-only `k8s-works` option is omitted server-side for non-admins.
+ */
+export interface ClusterSourceOption {
+    value: string;
+    label: string;
+    description?: string;
+}
+
+export type ClusterSourcesResponseDto = APIResponse<{
+    isPlatformAdmin: boolean;
+    clusterSources: ClusterSourceOption[];
+}>;
+
 export const deployAPI = {
     // Get available deployment providers
     getProviders: async () => {
         return serverFetch<DeployProvidersResponseDto>('/deploy/providers');
+    },
+
+    // List the k8s clusterSource options the current user may select
+    // (admin-filtered server-side).
+    getClusterSources: async () => {
+        return serverFetch<ClusterSourcesResponseDto>('/deploy/cluster-sources');
     },
 
     // Check if a provider is configured for the current user

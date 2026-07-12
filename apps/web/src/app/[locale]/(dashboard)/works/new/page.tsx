@@ -31,6 +31,7 @@ interface NewWorkPageProps {
     searchParams: Promise<{ proposal?: string; mode?: string; prompt?: string; kind?: string }>;
 }
 
+const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const VALID_CREATION_MODES: CreationMode[] = ['ai', 'manual', 'import'];
 const VALID_WORK_KINDS = ['website', 'landing-page', 'blog', 'directory', 'awesome-repo'] as const;
 type InitialWorkKind = (typeof VALID_WORK_KINDS)[number];
@@ -95,8 +96,17 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
         if (deployProvidersResult.providers) {
             deployProviders = deployProvidersResult.providers;
             const firstConfigured = deployProviders.find((p) => p.enabled && p.configured);
+            // When nothing is configured, default to Kubernetes (the shared
+            // customer cluster) rather than Vercel — k8s needs no external
+            // account, so it's the deterministic zero-config fallback. Vercel
+            // remains available and becomes the default the moment its token is
+            // connected (it is `configured`, so `firstConfigured` wins).
+            const enabledK8s = deployProviders.find(
+                (p) => p.enabled && p.id === KUBERNETES_DEPLOY_PROVIDER_ID,
+            );
             const firstEnabled = deployProviders.find((p) => p.enabled);
-            defaultDeployProviderId = firstConfigured?.id || firstEnabled?.id || null;
+            defaultDeployProviderId =
+                firstConfigured?.id || enabledK8s?.id || firstEnabled?.id || null;
         }
     } catch (error) {
         console.error('Failed to fetch deploy providers:', error);

@@ -81,6 +81,7 @@ describe('DeployController', () => {
     let activityLogService: { log: jest.Mock };
     let workRuntimeEnvService: { getDatabaseUrl: jest.Mock; setDatabaseUrl: jest.Mock };
     let managedSubdomainService: { getState: jest.Mock; update: jest.Mock };
+    let userRepository: { findById: jest.Mock };
     let controller: DeployController;
 
     const buildWork = (overrides: Record<string, unknown> = {}) => ({
@@ -137,6 +138,10 @@ describe('DeployController', () => {
             update: jest.fn(),
         };
 
+        userRepository = {
+            findById: jest.fn().mockResolvedValue({ id: 'caller-1', isPlatformAdmin: false }),
+        };
+
         controller = new DeployController(
             deployService as unknown as DeployService,
             deployFacade as unknown as DeployFacadeService,
@@ -146,7 +151,45 @@ describe('DeployController', () => {
             activityLogService as unknown as ActivityLogService,
             workRuntimeEnvService as never,
             managedSubdomainService as never,
+            userRepository as never,
         );
+    });
+
+    describe('getClusterSources (admin-aware k8s clusterSource list)', () => {
+        it('omits the admin-only k8s-works option for a non-admin caller', async () => {
+            userRepository.findById.mockResolvedValue({ id: 'caller-1', isPlatformAdmin: false });
+
+            const res: any = await controller.getClusterSources(auth);
+
+            expect(res.status).toBe('success');
+            expect(res.isPlatformAdmin).toBe(false);
+            const values = res.clusterSources.map((c: any) => c.value);
+            expect(values).toEqual(['k8s-works-shared', 'custom-kubeconfig']);
+            expect(values).not.toContain('k8s-works');
+            // Every returned option carries a human label.
+            for (const option of res.clusterSources) {
+                expect(option.label).toBeTruthy();
+            }
+        });
+
+        it('includes k8s-works for a platform-admin caller', async () => {
+            userRepository.findById.mockResolvedValue({ id: 'caller-1', isPlatformAdmin: true });
+
+            const res: any = await controller.getClusterSources(auth);
+
+            expect(res.isPlatformAdmin).toBe(true);
+            const values = res.clusterSources.map((c: any) => c.value);
+            expect(values).toEqual(['k8s-works', 'k8s-works-shared', 'custom-kubeconfig']);
+        });
+
+        it('fails closed to non-admin when the user row cannot be loaded', async () => {
+            userRepository.findById.mockResolvedValue(null);
+
+            const res: any = await controller.getClusterSources(auth);
+
+            expect(res.isPlatformAdmin).toBe(false);
+            expect(res.clusterSources.map((c: any) => c.value)).not.toContain('k8s-works');
+        });
     });
 
     describe('runtime-env (per-Work DATABASE_URL)', () => {
