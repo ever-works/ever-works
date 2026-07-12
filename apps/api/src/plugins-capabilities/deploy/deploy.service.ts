@@ -41,24 +41,25 @@ import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 import {
     ClusterSource,
+    normalizeClusterSource,
     resolveKubeconfigForClusterSource,
     validateClusterSourceForOwner,
 } from './cluster-source-matrix';
-
-const VALID_CLUSTER_SOURCES: readonly ClusterSource[] = [
-    'k8s-works',
-    'k8s-gauzy',
-    'custom-kubeconfig',
-];
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
 
 function coerceClusterSource(value: unknown): ClusterSource {
-    if (typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value)) {
-        return value as ClusterSource;
+    if (typeof value === 'string') {
+        // `normalizeClusterSource` accepts the current values and remaps the
+        // unambiguous legacy `k8s-gauzy` alias → `k8s-works`. It deliberately
+        // does NOT remap `k8s-works` → `k8s-works-shared` (that stored-value
+        // rewrite is done once, atomically, by the RenameK8sClusterSource
+        // migration); doing it here would silently break admin selections.
+        const normalized = normalizeClusterSource(value);
+        if (normalized) return normalized;
     }
-    // Back-compat: Works that pre-date the EW-616 dropdown have no
+    // Back-compat: Works that pre-date the cluster-source dropdown have no
     // `clusterSource` set in their plugin settings. Treat them as
     // `custom-kubeconfig` so they keep working as long as their
     // website repo is not in an Ever Works-shared org.
@@ -205,7 +206,8 @@ export class DeployService {
         const websiteRepo = work.getWebsiteRepo();
 
         // EW-616: enforce the deploy matrix for k8s deploys.
-        // - `k8s-gauzy` is admin-only (ever-works org).
+        // - `k8s-works` (internal cluster) is admin-only: requires BOTH
+        //   `user.isPlatformAdmin` AND a website repo in the `ever-works` org.
         // - Ever Works-shared GHCR + customer-provided cluster is rejected
         //   to avoid cross-tenant credential exposure.
         // The resolved kubeconfig replaces the user-pasted one for
@@ -216,6 +218,7 @@ export class DeployService {
             websiteOwner,
             settings ?? {},
             token,
+            Boolean(user.isPlatformAdmin),
         );
 
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
@@ -438,6 +441,7 @@ export class DeployService {
         websiteOwner: string,
         settings: Record<string, unknown>,
         userToken: string,
+        isPlatformAdmin: boolean,
     ): string {
         if (!this.isKubernetesDeploy(deployProvider, pluginId)) {
             return userToken;
@@ -453,6 +457,7 @@ export class DeployService {
         const clusterSource = coerceClusterSource(settings.clusterSource);
         const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
             hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
+            isPlatformAdmin,
         });
         if (failure) {
             this.logger.warn(`Deploy-matrix violation [${failure.code}]: ${failure.message}`);
@@ -464,7 +469,7 @@ export class DeployService {
         } catch (error: any) {
             // The only failure path here is a missing platform-managed
             // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
-            // `EVER_WORKS_K8S_GAUZY_KUBECONFIG`). The user picked a
+            // `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG`). The user picked a
             // valid option — this is a platform-provisioning gap, so
             // surface it as 5xx, not 4xx, so on-call can distinguish it
             // from genuine user-input errors.

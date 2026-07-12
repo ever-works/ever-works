@@ -1,6 +1,7 @@
 'use server';
 
 import { pluginsAPI } from '@/lib/api/plugins';
+import { deployAPI, type ClusterSourceOption } from '@/lib/api/plugins-capabilities/deploy';
 import {
     deviceAuthAPI,
     type PluginDeviceAuthStatus,
@@ -172,6 +173,24 @@ export async function fetchModels(pluginId: string): Promise<ActionResult<any[]>
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to fetch models',
+        };
+    }
+}
+
+/**
+ * List the Kubernetes `clusterSource` options the current user may pick.
+ * Admin-filtered server-side (the admin-only `k8s-works` option is omitted for
+ * non-admins), so the client never learns the admin flag.
+ */
+export async function fetchClusterSources(): Promise<ActionResult<ClusterSourceOption[]>> {
+    try {
+        const result = await deployAPI.getClusterSources();
+        return { success: true, data: result.clusterSources ?? [] };
+    } catch (error) {
+        console.error('Failed to fetch cluster sources:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to fetch cluster sources',
         };
     }
 }

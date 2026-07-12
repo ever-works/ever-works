@@ -125,10 +125,21 @@ describe('KubernetesPlugin metadata', () => {
 		expect(allOf?.[0].then?.required).toEqual(['kubeconfig']);
 	});
 
-	it('exposes the cluster-source dropdown enum (EW-616)', () => {
+	it('exposes the cluster-source dropdown enum + admin-aware widget', () => {
 		const cs = plugin.settingsSchema.properties?.clusterSource as Record<string, unknown>;
-		expect(cs?.enum).toEqual(['k8s-works', 'k8s-gauzy', 'custom-kubeconfig']);
+		// `k8s-works-shared` (shared customer cluster) is listed first as the
+		// customer default; `k8s-works` (internal cluster) is admin-only.
+		expect(cs?.enum).toEqual(['k8s-works-shared', 'k8s-works', 'custom-kubeconfig']);
 		expect(cs?.default).toBe('custom-kubeconfig');
+		// The dropdown is rendered by the admin-aware `k8s-cluster-source` widget,
+		// which hides `k8s-works` from non-admins.
+		expect(cs?.['x-widget']).toBe('k8s-cluster-source');
+		// The static description must NOT mention the admin-only `k8s-works` as a
+		// selectable option (note: `k8s-works-shared` legitimately contains that
+		// substring, so match the quoted option token / "internal cluster" copy).
+		expect(String(cs?.description)).not.toContain("'k8s-works'");
+		expect(String(cs?.description)).not.toMatch(/internal cluster/i);
+		expect(String(cs?.description)).toContain('k8s-works-shared');
 	});
 
 	it('hides kubeconfig + kubeContext when clusterSource is platform-managed (EW-616 UI)', () => {
@@ -182,15 +193,15 @@ describe('KubernetesPlugin.validateConnection', () => {
 		expect(r.message).toMatch(/paste a kubeconfig/i);
 	});
 
-	it('skips kubeconfig validation for platform-managed cluster sources (EW-616)', async () => {
-		const works = await plugin.validateConnection({ clusterSource: 'k8s-works' });
-		expect(works.success).toBe(true);
-		expect(works.message).toMatch(/platform-managed cluster 'k8s-works'/);
-		expect((works.details as { clusterSource?: string })?.clusterSource).toBe('k8s-works');
+	it('skips kubeconfig validation for platform-managed cluster sources', async () => {
+		const shared = await plugin.validateConnection({ clusterSource: 'k8s-works-shared' });
+		expect(shared.success).toBe(true);
+		expect(shared.message).toMatch(/platform-managed cluster 'k8s-works-shared'/);
+		expect((shared.details as { clusterSource?: string })?.clusterSource).toBe('k8s-works-shared');
 
-		const gauzy = await plugin.validateConnection({ clusterSource: 'k8s-gauzy' });
-		expect(gauzy.success).toBe(true);
-		expect(gauzy.message).toMatch(/platform-managed cluster 'k8s-gauzy'/);
+		const internal = await plugin.validateConnection({ clusterSource: 'k8s-works' });
+		expect(internal.success).toBe(true);
+		expect(internal.message).toMatch(/platform-managed cluster 'k8s-works'/);
 	});
 
 	it('returns rich cluster details on success', async () => {
@@ -239,15 +250,17 @@ describe('KubernetesPlugin.getDeploymentSecrets', () => {
 		expect(out.K8S_NAMESPACE).toBe('ever-works');
 	});
 
-	it('emits K8S_CLUSTER_SOURCE (defaulting to custom-kubeconfig for back-compat) (EW-616)', async () => {
+	it('emits K8S_CLUSTER_SOURCE (defaulting to custom-kubeconfig for back-compat)', async () => {
 		expect((await plugin.getDeploymentSecrets({})).K8S_CLUSTER_SOURCE).toBe('custom-kubeconfig');
+		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-works-shared' })).K8S_CLUSTER_SOURCE).toBe(
+			'k8s-works-shared'
+		);
 		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-works' })).K8S_CLUSTER_SOURCE).toBe(
 			'k8s-works'
 		);
-		expect((await plugin.getDeploymentSecrets({ clusterSource: 'k8s-gauzy' })).K8S_CLUSTER_SOURCE).toBe(
-			'k8s-gauzy'
-		);
-		// Garbage values fall through to the back-compat default.
+		// Garbage values (and the retired legacy `k8s-gauzy` spelling) fall
+		// through to the back-compat default — the plugin only knows the
+		// current values; the API-side migration rewrites stored legacy values.
 		expect((await plugin.getDeploymentSecrets({ clusterSource: 'nope' })).K8S_CLUSTER_SOURCE).toBe(
 			'custom-kubeconfig'
 		);
