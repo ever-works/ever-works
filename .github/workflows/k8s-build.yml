@@ -28,6 +28,9 @@ jobs:
             dockerfile: .deploy/docker/mcp/Dockerfile
             context: .
             pkg: apps/mcp/package.json
+          # docs.ever.works (Docusaurus). Was served from a stale ever-works-docs
+          # image that no active workflow rebuilt; build it here so it gets fresh
+          # :prod + sha-<sha> tags (docs-ever-works-prod ArgoCD app tracks :prod by digest).
           - image: ever-works-docs
             dockerfile: .deploy/docker/docs/Dockerfile
             context: .
