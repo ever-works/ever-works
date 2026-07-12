@@ -20,6 +20,65 @@
 
 ---
 
+## 0. Revision — cluster-source rename + admin gating
+
+> The sections below describe the **original EW-616** behaviour. This revision
+> renames the values and tightens the gate; where they conflict, this section
+> wins. A one-shot data migration (`*-RenameK8sClusterSource`) rewrites stored
+> values atomically on API startup.
+
+**Renamed values** (the name now matches the physical cluster):
+
+| Old value           | New value           | Cluster                                 | Kubeconfig env var                       |
+| ------------------- | ------------------- | --------------------------------------- | ---------------------------------------- |
+| `k8s-gauzy`         | `k8s-works`         | Ever Works **internal** cluster (admin) | `EVER_WORKS_K8S_WORKS_KUBECONFIG`        |
+| `k8s-works`         | `k8s-works-shared`  | Ever Works **shared customer** cluster  | `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` |
+| `custom-kubeconfig` | `custom-kubeconfig` | Bring-your-own                          | user-pasted                              |
+
+Because the string `k8s-works` meant "shared" before and means "internal" after,
+the migration MUST run before any post-rename code reads a stored value; the
+runtime `coerceClusterSource`/`normalizeClusterSource` only remaps the
+non-colliding legacy `k8s-gauzy` alias (never `k8s-works`).
+
+**Admin gating.** `k8s-works` (internal cluster) now requires **BOTH**
+`User.isPlatformAdmin` **AND** a website repo in the `ever-works` org. Non-admins
+must not see `k8s-works` in the settings dropdown and must not be able to deploy
+to it via the API/CLI. The updated matrix (`allowed` = may pick):
+
+| isPlatformAdmin | Website owner      | k8s-works  | k8s-works-shared | custom-kubeconfig |
+| --------------- | ------------------ | ---------- | ---------------- | ----------------- |
+| yes             | `ever-works`       | ✅         | ✅               | ❌ (shared org)   |
+| yes             | `ever-works-cloud` | ❌ (org)   | ✅               | ❌ (shared org)   |
+| yes             | customer-owned     | ❌ (org)   | ✅               | ✅                |
+| no              | `ever-works`       | ❌ (admin) | ✅               | ❌ (shared org)   |
+| no              | customer-owned     | ❌ (admin) | ✅               | ✅                |
+
+**UI enforcement.** `isPlatformAdmin` is deliberately stripped from the client
+profile, so the dropdown cannot be filtered client-side. `GET /api/deploy/cluster-sources`
+computes the allowed list server-side (via `allowedClusterSourcesFor(isPlatformAdmin, websiteOwner?)`)
+and the `k8s-cluster-source` widget renders exactly that. Server-side
+`validateClusterSourceForOwner` is the authoritative gate regardless of the UI.
+
+**Graceful "not yet available".** `k8s-works-shared`'s cluster may not be
+provisioned; when `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` is unset the deploy
+fails with a clear "not available yet" message (500) rather than crashing.
+
+**Default provider.** When no deploy provider is connected, Kubernetes (not
+Vercel) is the default; Vercel becomes the default the moment its token is saved.
+
+---
+
+> ⛔ **Sections 1–7 below are the ORIGINAL EW-616 specification (shipped May
+> 2026), preserved for history.** They still use the pre-rename value names
+> (`k8s-gauzy`, the old meaning of `k8s-works`), the old env-var mapping
+> (`EVER_WORKS_K8S_GAUZY_KUBECONFIG`), and the org-only (non-admin-gated) matrix.
+> **§0 above is authoritative** — wherever it differs from a scenario or
+> requirement below (value names, env vars, the admin gate, the default
+> provider, the UI endpoint/widget), §0 wins. Read the sections below as the
+> record of what EW-616 originally did, not as the current contract.
+
+---
+
 ## 1. Overview
 
 Before EW-616, the k8s deploy plugin had a single way to configure a cluster: paste a `kubeconfig` YAML. That conflated three different operational paths into one form field:

@@ -15,8 +15,13 @@ import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
 import { DeployFacadeService } from '@ever-works/agent/facades';
 import { WorkOwnershipService, WorkRuntimeEnvService } from '@ever-works/agent/services';
-import { WorkDeploymentRepository } from '@ever-works/agent/database';
+import { UserRepository, WorkDeploymentRepository } from '@ever-works/agent/database';
 import { DeployService } from './deploy.service';
+import {
+    allowedClusterSourcesFor,
+    CLUSTER_SOURCE_DESCRIPTIONS,
+    CLUSTER_SOURCE_LABELS,
+} from './cluster-source-matrix';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import {
@@ -77,6 +82,7 @@ export class DeployController {
         private readonly activityLogService: ActivityLogService,
         private readonly workRuntimeEnvService: WorkRuntimeEnvService,
         private readonly managedSubdomainService: ManagedSubdomainService,
+        private readonly userRepository: UserRepository,
     ) {}
 
     private getProviderName(deployProvider: string | undefined): string {
@@ -151,6 +157,46 @@ export class DeployController {
             message: configured
                 ? `Provider '${providerId}' is configured.`
                 : `Provider '${providerId}' is available but not configured.`,
+        };
+    }
+
+    /**
+     * List the k8s `clusterSource` options the current user is allowed to pick.
+     *
+     * The client is never told `isPlatformAdmin` (it is stripped from the
+     * profile response), so the admin-aware dropdown cannot be built on the
+     * client. This endpoint computes the allowed list server-side — the admin-
+     * only `k8s-works` option is omitted for non-admins — and the
+     * `k8s-cluster-source` widget renders exactly what it returns. This is
+     * cosmetic; the authoritative gate is `validateClusterSourceForOwner` at
+     * deploy time, so a non-admin still cannot deploy to `k8s-works` via the
+     * API/CLI even if they craft the request by hand.
+     */
+    @Get('/cluster-sources')
+    @ApiOperation({
+        summary: 'List allowed k8s cluster sources',
+        description:
+            'Returns the Kubernetes clusterSource options the current user may select, filtered by platform-admin status server-side.',
+    })
+    @ApiResponse({ status: 200, description: 'Allowed cluster sources' })
+    async getClusterSources(@CurrentUser() auth: AuthenticatedUser) {
+        const user = await this.userRepository.findById(auth.userId);
+        const isPlatformAdmin = Boolean(user?.isPlatformAdmin);
+        // No Work context on the user-global plugin-settings page, so filter on
+        // admin status alone. The per-Work org rules stay enforced at deploy time.
+        //
+        // Note: `isPlatformAdmin` is used only to compute the list and is
+        // deliberately NOT returned — the flag is stripped from the client
+        // elsewhere for the same reason, and the presence/absence of `k8s-works`
+        // in the list is all the widget needs.
+        const values = allowedClusterSourcesFor(isPlatformAdmin);
+        return {
+            status: 'success',
+            clusterSources: values.map((value) => ({
+                value,
+                label: CLUSTER_SOURCE_LABELS[value],
+                description: CLUSTER_SOURCE_DESCRIPTIONS[value],
+            })),
         };
     }
 

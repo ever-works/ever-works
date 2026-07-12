@@ -950,16 +950,21 @@ export class DeployFacadeService implements IDeployFacade {
             });
 
             // EW-616: for the k8s plugin, when the user picked a
-            // platform-managed cluster (`k8s-works` / `k8s-gauzy`) the
-            // pasted kubeconfig is intentionally empty —
-            // `DeployService.resolveDeployToken()` substitutes the
-            // platform's kubeconfig from `EVER_WORKS_K8S_*_KUBECONFIG`
-            // env vars at deploy time. Return a non-empty sentinel here
-            // so the facade considers the work "configured" and lets the
-            // deploy proceed; the sentinel is discarded downstream.
+            // platform-managed cluster (`k8s-works` / `k8s-works-shared`, or
+            // the legacy `k8s-gauzy` alias) the pasted kubeconfig is
+            // intentionally empty — `DeployService.resolveDeployToken()`
+            // substitutes the platform's kubeconfig from
+            // `EVER_WORKS_K8S_*_KUBECONFIG` env vars at deploy time. Return a
+            // non-empty sentinel here so the facade considers the work
+            // "configured" and lets the deploy proceed; the sentinel is
+            // discarded downstream.
             if (pluginId === 'k8s') {
                 const clusterSource = settings.clusterSource?.value as string | undefined;
-                if (clusterSource === 'k8s-works' || clusterSource === 'k8s-gauzy') {
+                if (
+                    clusterSource === 'k8s-works' ||
+                    clusterSource === 'k8s-works-shared' ||
+                    clusterSource === 'k8s-gauzy'
+                ) {
                     return (
                         (settings.kubeconfig?.value as string) ||
                         PLATFORM_MANAGED_KUBECONFIG_SENTINEL
@@ -985,7 +990,7 @@ export class DeployFacadeService implements IDeployFacade {
 
 /**
  * Sentinel value returned by `getTokenFromSettings` for k8s deploys
- * targeting a platform-managed cluster (`k8s-works` / `k8s-gauzy`).
+ * targeting a platform-managed cluster (`k8s-works` / `k8s-works-shared`).
  * The deploy facade only checks that a token is non-empty before
  * deciding the work is "configured", so any unique string works.
  * `DeployService.resolveDeployToken()` discards this sentinel and
