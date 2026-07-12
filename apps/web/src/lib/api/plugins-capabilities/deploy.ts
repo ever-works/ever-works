@@ -144,7 +144,6 @@ export interface ClusterSourceOption {
 }
 
 export type ClusterSourcesResponseDto = APIResponse<{
-    isPlatformAdmin: boolean;
     clusterSources: ClusterSourceOption[];
 }>;
 

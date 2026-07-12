@@ -184,10 +184,14 @@ export class DeployController {
         const isPlatformAdmin = Boolean(user?.isPlatformAdmin);
         // No Work context on the user-global plugin-settings page, so filter on
         // admin status alone. The per-Work org rules stay enforced at deploy time.
+        //
+        // Note: `isPlatformAdmin` is used only to compute the list and is
+        // deliberately NOT returned — the flag is stripped from the client
+        // elsewhere for the same reason, and the presence/absence of `k8s-works`
+        // in the list is all the widget needs.
         const values = allowedClusterSourcesFor(isPlatformAdmin);
         return {
             status: 'success',
-            isPlatformAdmin,
             clusterSources: values.map((value) => ({
                 value,
                 label: CLUSTER_SOURCE_LABELS[value],

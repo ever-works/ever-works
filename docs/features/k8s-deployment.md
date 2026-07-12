@@ -62,7 +62,7 @@ The **Target cluster** setting decides where your work is published:
 Notes:
 
 - The dropdown only shows the options you're allowed to pick, and the server enforces the same rules at deploy time — a non-admin can never deploy to `k8s-works`, even via the API or CLI.
-- `k8s-works-shared` is a separate cluster from the internal one and may still be getting provisioned. If it isn't available yet, a deploy to it fails with a clear "not yet available" message rather than silently going elsewhere — pick `custom-kubeconfig` in the meantime, or try again later.
+- `k8s-works-shared` is a separate cluster from the internal one and may still be getting provisioned. If it isn't available yet, a deploy to it fails with a clear "not yet available" message rather than silently going elsewhere. If your website repo is in your own GitHub org you can switch to `custom-kubeconfig` in the meantime; if it's in an Ever Works-shared org (where `custom-kubeconfig` isn't allowed), wait until the shared cluster is provisioned.
 - Existing works that were configured before this rename keep deploying to the same tier automatically (their stored value is migrated once, on the platform's next startup).
 - Kubernetes is the **default deployment provider** when you haven't connected Vercel — it needs no external account. Connect Vercel and it becomes the default the moment its token is saved.
 

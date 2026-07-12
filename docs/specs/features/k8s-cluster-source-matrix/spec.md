@@ -68,6 +68,17 @@ Vercel) is the default; Vercel becomes the default the moment its token is saved
 
 ---
 
+> ⛔ **Sections 1–7 below are the ORIGINAL EW-616 specification (shipped May
+> 2026), preserved for history.** They still use the pre-rename value names
+> (`k8s-gauzy`, the old meaning of `k8s-works`), the old env-var mapping
+> (`EVER_WORKS_K8S_GAUZY_KUBECONFIG`), and the org-only (non-admin-gated) matrix.
+> **§0 above is authoritative** — wherever it differs from a scenario or
+> requirement below (value names, env vars, the admin gate, the default
+> provider, the UI endpoint/widget), §0 wins. Read the sections below as the
+> record of what EW-616 originally did, not as the current contract.
+
+---
+
 ## 1. Overview
 
 Before EW-616, the k8s deploy plugin had a single way to configure a cluster: paste a `kubeconfig` YAML. That conflated three different operational paths into one form field:

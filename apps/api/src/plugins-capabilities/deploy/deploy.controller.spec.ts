@@ -162,7 +162,8 @@ describe('DeployController', () => {
             const res: any = await controller.getClusterSources(auth);
 
             expect(res.status).toBe('success');
-            expect(res.isPlatformAdmin).toBe(false);
+            // The admin flag itself must NOT be returned to the client.
+            expect(res).not.toHaveProperty('isPlatformAdmin');
             const values = res.clusterSources.map((c: any) => c.value);
             expect(values).toEqual(['k8s-works-shared', 'custom-kubeconfig']);
             expect(values).not.toContain('k8s-works');
@@ -177,7 +178,7 @@ describe('DeployController', () => {
 
             const res: any = await controller.getClusterSources(auth);
 
-            expect(res.isPlatformAdmin).toBe(true);
+            expect(res).not.toHaveProperty('isPlatformAdmin');
             const values = res.clusterSources.map((c: any) => c.value);
             expect(values).toEqual(['k8s-works', 'k8s-works-shared', 'custom-kubeconfig']);
         });
@@ -187,7 +188,6 @@ describe('DeployController', () => {
 
             const res: any = await controller.getClusterSources(auth);
 
-            expect(res.isPlatformAdmin).toBe(false);
             expect(res.clusterSources.map((c: any) => c.value)).not.toContain('k8s-works');
         });
     });

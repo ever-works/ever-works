@@ -25,29 +25,21 @@ const FALLBACK_OPTIONS: readonly ClusterSourceOption[] = [
     { value: 'custom-kubeconfig', label: 'Custom — paste your own kubeconfig' },
 ];
 
-// Module-level cache + de-dupe so every field instance and re-render reuses one
-// round-trip (mirrors PluginModelSelect's caching).
-let clusterSourceCache: ClusterSourceOption[] | null = null;
-let inFlightRequest: Promise<ClusterSourceOption[]> | null = null;
-
+// The allowed list is PER-USER (a platform admin sees `k8s-works`; nobody else
+// does), so — unlike PluginModelSelect's provider-scoped model list — it must
+// NOT be memoised at module scope. Caching across users (or seeding SSR/initial
+// render from a module value) could leak one user's list to the next. We fetch
+// fresh on each mount, client-side only.
 async function loadClusterSources(): Promise<ClusterSourceOption[]> {
-    if (clusterSourceCache) return clusterSourceCache;
-    if (inFlightRequest) return inFlightRequest;
-
-    inFlightRequest = fetchClusterSources()
-        .then((response) => {
-            if (response.success && Array.isArray(response.data) && response.data.length > 0) {
-                clusterSourceCache = response.data;
-                return response.data;
-            }
-            return [...FALLBACK_OPTIONS];
-        })
-        .catch(() => [...FALLBACK_OPTIONS])
-        .finally(() => {
-            inFlightRequest = null;
-        });
-
-    return inFlightRequest;
+    try {
+        const response = await fetchClusterSources();
+        if (response.success && Array.isArray(response.data) && response.data.length > 0) {
+            return response.data;
+        }
+    } catch {
+        // fall through to the fail-closed fallback below
+    }
+    return [...FALLBACK_OPTIONS];
 }
 
 interface K8sClusterSourceSelectProps {
@@ -62,7 +54,9 @@ export function K8sClusterSourceSelect({
     onChange,
     defaultValue,
 }: K8sClusterSourceSelectProps) {
-    const [options, setOptions] = useState<ClusterSourceOption[] | null>(clusterSourceCache);
+    // Start empty (null) so SSR and the first client render never seed from a
+    // module-level value; the client-side effect fetches the per-user list.
+    const [options, setOptions] = useState<ClusterSourceOption[] | null>(null);
 
     useEffect(() => {
         let cancelled = false;
