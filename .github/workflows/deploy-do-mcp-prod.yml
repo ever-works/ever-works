@@ -13,6 +13,10 @@ permissions:
 
 jobs:
   deploy-mcp-prod:
+    # DO is retired (registry 403); we don't deploy to DigitalOcean now. Gate the
+    # whole job at job level (not just per-step) so it SKIPS without consuming an ARC
+    # runner. Kept (no-removal) — set the DO_ENABLED repo/org var to 'true' to re-enable.
+    if: ${{ vars.DO_ENABLED == 'true' }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment:

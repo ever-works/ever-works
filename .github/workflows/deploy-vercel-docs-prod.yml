@@ -25,6 +25,11 @@ concurrency:
 
 jobs:
   deploy:
+    # Vercel is decommissioned; docs.ever.works is served from ever-k8s
+    # (ghcr.io/ever-works/ever-works-docs via the docs-ever-works-prod ArgoCD app).
+    # Gate (don't delete) this legacy Vercel deploy: it stays bypassed unless the
+    # owner re-enables it by setting the VERCEL_ENABLED repo/org var to 'true'.
+    if: ${{ vars.VERCEL_ENABLED == 'true' }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment:

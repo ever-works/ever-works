@@ -199,7 +199,7 @@ describe('DeployController', () => {
                 isCreator: true,
             });
             workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
-                'postgresql://neondb_owner:supersecret@ep-x-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
+                'postgresql://dbowner:supersecret@ep-x-pooler.us-east-1.aws.example.com/appdb?sslmode=require',
             );
 
             const res: any = await controller.getRuntimeEnv(
@@ -209,7 +209,7 @@ describe('DeployController', () => {
 
             expect(ownershipService.ensureCanEdit).toHaveBeenCalledWith('work-1', 'user-1');
             expect(res.databaseUrl.configured).toBe(true);
-            expect(res.databaseUrl.masked).toContain('neondb_owner:***@');
+            expect(res.databaseUrl.masked).toContain('dbowner:***@');
             expect(res.databaseUrl.masked).not.toContain('supersecret');
             expect(res.managed).toEqual(expect.arrayContaining(['AUTH_SECRET', 'COOKIE_SECRET']));
         });
@@ -235,20 +235,20 @@ describe('DeployController', () => {
                 isCreator: true,
             });
             workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
-                'postgresql://u:p@host.neon.tech/db',
+                'postgresql://u:p@host.example.com/db',
             );
 
             const res: any = await controller.setRuntimeEnv(
                 { userId: 'user-1' } as never,
                 'work-1',
                 {
-                    databaseUrl: 'postgresql://u:p@host.neon.tech/db',
+                    databaseUrl: 'postgresql://u:p@host.example.com/db',
                 },
             );
 
             expect(workRuntimeEnvService.setDatabaseUrl).toHaveBeenCalledWith(
                 'work-1',
-                'postgresql://u:p@host.neon.tech/db',
+                'postgresql://u:p@host.example.com/db',
             );
             expect(res.status).toBe('success');
             expect(res.databaseUrl.configured).toBe(true);
