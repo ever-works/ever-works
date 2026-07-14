@@ -57,7 +57,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -67,7 +67,7 @@ jobs:
           version: 10.33.3
 
       - name: Setup Node.js 22.x
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
           cache: 'pnpm'
@@ -97,7 +97,7 @@ jobs:
           "
 
       - name: Upload built packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plugins-dist
           path: |
@@ -119,7 +119,7 @@ jobs:
       ))
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -129,7 +129,7 @@ jobs:
           version: 10.33.3
 
       - name: Setup Node.js (npmjs.org auth)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
           registry-url: 'https://registry.npmjs.org'
@@ -139,7 +139,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Restore built packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: plugins-dist
           path: .
@@ -177,7 +177,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -187,7 +187,7 @@ jobs:
           version: 10.33.3
 
       - name: Setup Node.js (GitHub Packages auth)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22.x
           registry-url: 'https://npm.pkg.github.com'
@@ -198,7 +198,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Restore built packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: plugins-dist
           path: .
