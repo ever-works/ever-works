@@ -110,12 +110,16 @@ describe('tenantJobRuntimeAPI — endpoint URL shape (no /api double-prefix)', (
 
     it('NONE of the six verbs ever passes an endpoint starting with /api', async () => {
         const { tenantJobRuntimeAPI } = await importApi();
-        await tenantJobRuntimeAPI.getConfig();
-        await tenantJobRuntimeAPI.getAvailableProviders();
-        await tenantJobRuntimeAPI.upsertConfig({ providerId: 'trigger', mode: 'byo' });
-        await tenantJobRuntimeAPI.rotate();
-        await tenantJobRuntimeAPI.forceInvalidate();
-        await tenantJobRuntimeAPI.revertToInherit();
+        // Independent calls — fire concurrently (we only assert the set of
+        // endpoints hit, not their order).
+        await Promise.all([
+            tenantJobRuntimeAPI.getConfig(),
+            tenantJobRuntimeAPI.getAvailableProviders(),
+            tenantJobRuntimeAPI.upsertConfig({ providerId: 'trigger', mode: 'byo' }),
+            tenantJobRuntimeAPI.rotate(),
+            tenantJobRuntimeAPI.forceInvalidate(),
+            tenantJobRuntimeAPI.revertToInherit(),
+        ]);
 
         const fetchEndpoints = serverFetchMock.mock.calls.map((c) => c[0] as string);
         const mutationEndpoints = serverMutationMock.mock.calls.map(
