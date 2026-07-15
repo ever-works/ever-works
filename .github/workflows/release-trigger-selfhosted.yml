@@ -41,22 +41,39 @@ jobs:
           (github.event_name == 'workflow_dispatch' ||
            github.event.workflow_run.conclusion == 'success') }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    # Record the deployment under the matching GitHub environment for governance
+    # parity with the legacy cloud workflows (prod/stage). These environments
+    # currently carry no protection rules, so this does not add an approval gate;
+    # it makes any future protection apply to the self-hosted path too.
+    environment: >-
+      ${{ (github.event.inputs.environment == 'staging' ||
+           github.event.workflow_run.head_branch == 'stage') && 'stage' || 'prod' }}
 
     steps:
       - uses: actions/checkout@v7
         with:
           # For workflow_run, check out the exact commit CI validated.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Build/deploy only — no push back to the repo, so don't leave the
+          # GitHub token in the local git config.
+          persist-credentials: false
 
       - name: Resolve target Trigger.dev environment
         id: env
         shell: bash
+        # Map GitHub context into env vars first, then use the vars in the
+        # script — never interpolate ${{ github.event... }} straight into bash
+        # (a maliciously named branch/input could otherwise inject shell code).
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TRIGGER_ENV="${{ github.event.inputs.environment }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TRIGGER_ENV="$INPUT_ENV"
           else
             # workflow_run: map the head branch to a Trigger.dev env.
-            case "${{ github.event.workflow_run.head_branch }}" in
+            case "$HEAD_BRANCH" in
               main)  TRIGGER_ENV="prod" ;;
               stage) TRIGGER_ENV="staging" ;;
               *)     TRIGGER_ENV="" ;;
@@ -107,4 +124,4 @@ jobs:
           TRIGGER_API_URL: https://trigger.ever.co
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
-        run: pnpm dlx trigger.dev@4.5.4 deploy --env ${{ steps.env.outputs.trigger_env }}
+        run: pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
