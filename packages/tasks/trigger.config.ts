@@ -6,7 +6,11 @@ import { collectPluginDependencies } from './src/build/collect-plugin-deps';
 const canRetry = process.env.TRIGGER_DEV_ENABLE_RETRIES === 'true';
 
 export default defineConfig({
-    project: 'proj_uevrbfmpvojzzazvhffy',
+    // Project ref is read from the environment so the same task bundle can be
+    // deployed to either the Trigger.dev CLOUD project or our self-hosted
+    // instance (trigger.ever.co, org "Ever"). Falls back to the original cloud
+    // project ref when TRIGGER_PROJECT_REF is unset (e.g. legacy cloud CI).
+    project: process.env.TRIGGER_PROJECT_REF || 'proj_uevrbfmpvojzzazvhffy',
     runtime: 'node-22',
     logLevel: 'log',
     // The max compute seconds a task is allowed to run. If the task run exceeds this duration, it will be stopped.
