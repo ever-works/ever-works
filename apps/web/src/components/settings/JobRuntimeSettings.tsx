@@ -13,6 +13,7 @@ import {
     JOB_RUNTIME_PROVIDER_MODE_BANNERS,
     PROVIDERS_WITHOUT_CREDENTIALS,
 } from './job-runtime-schemas';
+import { ProviderBrandIcon, providerIconMap } from './job-runtime-provider-icons';
 import {
     Dialog,
     DialogClose,
@@ -113,6 +114,11 @@ export function JobRuntimeSettings({
         () => availableProviders.map((value) => ({ value, label: PROVIDER_LABELS[value] })),
         [availableProviders],
     );
+
+    // EW-742 — brand-mark badges for the picker, keyed by provider id and fed
+    // to the Select via `iconMap`; each <option> opts in with `data-icon`.
+    // Static (provider set is fixed), so build once.
+    const providerIcons = useMemo(() => providerIconMap(18), []);
 
     // Form-local state mirrors the editable shape of the upsert payload.
     // We initialise providerId with a sane default when the row is the
@@ -329,9 +335,10 @@ export function JobRuntimeSettings({
                         }
                         disabled={noProvidersAvailable}
                         data-testid="job-runtime-provider-picker"
+                        iconMap={providerIcons}
                     >
                         {providerOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
+                            <option key={opt.value} value={opt.value} data-icon={opt.value}>
                                 {opt.label}
                             </option>
                         ))}
