@@ -70,8 +70,16 @@ jobs:
           if [ "$code" -eq 0 ]; then
             exit 0
           fi
-          if printf '%s' "$output" | grep -qiE 'ERR_PNPM_AUDIT_BAD_RESPONSE|being retired|responded with 410|no_such_endpoint'; then
-            echo "::warning title=Dependency audit skipped::npm's audit endpoint is unavailable (HTTP 410 — legacy audit API retired). The high/critical audit gate is soft for this run and will re-arm automatically once a working endpoint is restored."
+          # Detect the endpoint outage by pnpm's OWN error CODE only — not by
+          # human-language phrases like "410"/"retired", which could legitimately
+          # appear inside a real CVE advisory description and wrongly soft-pass a
+          # run that has actual vulnerabilities. `ERR_PNPM_AUDIT_BAD_RESPONSE` is
+          # emitted only when the audit endpoint returns an unusable response; a
+          # genuine high/critical finding never prints this token, so it still
+          # hard-fails below. Any other non-endpoint error (e.g. a network blip)
+          # also hard-fails — the conservative default.
+          if printf '%s' "$output" | grep -qF 'ERR_PNPM_AUDIT_BAD_RESPONSE'; then
+            echo "::warning title=Dependency audit skipped::npm's audit endpoint is unavailable (ERR_PNPM_AUDIT_BAD_RESPONSE — legacy audit API retired, HTTP 410). The high/critical audit gate is soft for this run and re-arms automatically once a working endpoint is restored."
             exit 0
           fi
           echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
