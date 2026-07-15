@@ -1,0 +1,127 @@
+name: Deploy to Self-hosted Trigger.dev
+
+# Deploys the packages/tasks bundle to our SELF-HOSTED Trigger.dev instance
+# (https://trigger.ever.co, org "Ever" / ever-2a3b) instead of Trigger.dev cloud.
+#
+# Additive + reversible: this whole workflow is gated behind the repo/org var
+# `TRIGGER_SELFHOSTED`. While that flag is unset/`false` this file is a no-op and
+# the legacy cloud deploys (release-trigger-{prod,stage}.yml) run as before. Flip
+# `TRIGGER_SELFHOSTED=true` to migrate onto self-hosted; flip it back to roll back.
+#
+# Auth: the self-hosted Personal Access Token lives in the repo Actions secret
+# `TRIGGER_SELFHOSTED_ACCESS_TOKEN`. The project ref is injected via env so the
+# shared trigger.config.ts targets the self-hosted project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Trigger.dev environment to deploy to"
+        type: choice
+        options:
+          - prod
+          - staging
+        default: prod
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main, stage]
+    types:
+      - completed
+
+# M-12: minimum default permissions. Individual jobs can elevate where needed.
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # Only run when the self-hosted migration flag is on AND the trigger is valid
+    # (a manual dispatch, or a CI run that actually succeeded).
+    if: >-
+      ${{ vars.TRIGGER_SELFHOSTED == 'true' &&
+          (github.event_name == 'workflow_dispatch' ||
+           github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    # Record the deployment under the matching GitHub environment for governance
+    # parity with the legacy cloud workflows (prod/stage). These environments
+    # currently carry no protection rules, so this does not add an approval gate;
+    # it makes any future protection apply to the self-hosted path too.
+    environment: >-
+      ${{ (github.event.inputs.environment == 'staging' ||
+           github.event.workflow_run.head_branch == 'stage') && 'stage' || 'prod' }}
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # For workflow_run, check out the exact commit CI validated.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Build/deploy only — no push back to the repo, so don't leave the
+          # GitHub token in the local git config.
+          persist-credentials: false
+
+      - name: Resolve target Trigger.dev environment
+        id: env
+        shell: bash
+        # Map GitHub context into env vars first, then use the vars in the
+        # script — never interpolate ${{ github.event... }} straight into bash
+        # (a maliciously named branch/input could otherwise inject shell code).
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TRIGGER_ENV="$INPUT_ENV"
+          else
+            # workflow_run: map the head branch to a Trigger.dev env.
+            case "$HEAD_BRANCH" in
+              main)  TRIGGER_ENV="prod" ;;
+              stage) TRIGGER_ENV="staging" ;;
+              *)     TRIGGER_ENV="" ;;
+            esac
+          fi
+          if [ -z "$TRIGGER_ENV" ]; then
+            echo "No self-hosted Trigger.dev env for this trigger; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Deploying to self-hosted Trigger.dev env: $TRIGGER_ENV"
+            echo "trigger_env=$TRIGGER_ENV" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install pnpm
+        if: steps.env.outputs.skip != 'true'
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        with:
+          version: 10.33.3
+
+      - name: Use Node.js 22.x
+        if: steps.env.outputs.skip != 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.x"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        if: steps.env.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        if: steps.env.outputs.skip != 'true'
+        run: pnpm build --filter './packages/**'
+
+      - name: Prepare plugins for Trigger.dev
+        if: steps.env.outputs.skip != 'true'
+        working-directory: packages/tasks
+        run: pnpm prepare:plugins
+
+      - name: 🚀 Deploy Trigger.dev (self-hosted)
+        if: steps.env.outputs.skip != 'true'
+        working-directory: packages/tasks
+        env:
+          # Self-hosted PAT (repo Actions secret). Keep the cloud token
+          # (TRIGGER_ACCESS_TOKEN) untouched for the legacy cloud workflows.
+          TRIGGER_ACCESS_TOKEN: ${{ secrets.TRIGGER_SELFHOSTED_ACCESS_TOKEN }}
+          # Public origin of our self-hosted instance (used by the CLI to deploy).
+          TRIGGER_API_URL: https://trigger.ever.co
+          # Pin the shared trigger.config.ts to the self-hosted project ref.
+          TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
+        run: pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
