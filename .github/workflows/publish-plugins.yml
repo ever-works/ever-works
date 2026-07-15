@@ -1,4 +1,4 @@
-﻿name: Publish Plugins
+name: Publish Plugins
 
 # EW-693 â€” Dynamic plugin distribution publish pipeline.
 #
@@ -62,7 +62,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
         with:
           version: 10.33.3
 
@@ -124,7 +124,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
         with:
           version: 10.33.3
 
@@ -182,7 +182,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
         with:
           version: 10.33.3
 
