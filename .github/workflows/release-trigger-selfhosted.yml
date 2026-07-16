@@ -104,9 +104,13 @@ jobs:
         if: steps.env.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
+      - name: Build the tasks' workspace dependency closure
         if: steps.env.outputs.skip != 'true'
-        run: pnpm build --filter './packages/**'
+        # Build ONLY what @ever-works/trigger-tasks depends on (its dist/ output),
+        # serialized (--concurrency=1). Building ALL packages in parallel spikes the
+        # ARC runner's CPU/memory and stalls it (a full-monorepo turbo build hung the
+        # runner for 48min+). The CLI compiles the tasks package itself from source.
+        run: pnpm turbo run build --filter=@ever-works/trigger-tasks^... --concurrency=1
 
       - name: Prepare plugins for Trigger.dev
         if: steps.env.outputs.skip != 'true'
