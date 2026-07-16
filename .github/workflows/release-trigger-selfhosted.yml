@@ -104,9 +104,13 @@ jobs:
         if: steps.env.outputs.skip != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Build all packages
+      - name: Build the tasks' workspace dependency closure
         if: steps.env.outputs.skip != 'true'
-        run: pnpm build --filter './packages/**'
+        # Build ONLY what @ever-works/trigger-tasks depends on (its dist/ output),
+        # serialized (--concurrency=1). Building ALL packages in parallel spikes the
+        # ARC runner's CPU/memory and stalls it (a full-monorepo turbo build hung the
+        # runner for 48min+). The CLI compiles the tasks package itself from source.
+        run: pnpm turbo run build --filter=@ever-works/trigger-tasks^... --concurrency=1
 
       - name: Prepare plugins for Trigger.dev
         if: steps.env.outputs.skip != 'true'
@@ -124,4 +128,15 @@ jobs:
           TRIGGER_API_URL: https://trigger.ever.co
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
-        run: pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
+          # GHCR push token (evereq classic PAT, write:packages). The self-hosted
+          # deploy builds the image locally and pushes it with the runner's OWN
+          # docker login — the instance only mints registry creds for AWS ECR.
+          GHCR_DEPLOY_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+        run: |
+          echo "${GHCR_DEPLOY_TOKEN}" | docker login ghcr.io -u evereq --password-stdin
+          # Pin the CLI to the INSTALLED @trigger.dev/sdk version (repo pins ^4.4.6,
+          # which the lockfile resolves to a specific version) — the v4 CLI aborts
+          # in CI on any CLI/SDK version mismatch.
+          CLI_VER="$(node -p "require('@trigger.dev/sdk/package.json').version" 2>/dev/null)"
+          echo "Using trigger.dev CLI ${CLI_VER}"
+          pnpm dlx "trigger.dev@${CLI_VER}" deploy --env "${{ steps.env.outputs.trigger_env }}"
