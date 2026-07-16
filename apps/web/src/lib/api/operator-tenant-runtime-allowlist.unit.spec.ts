@@ -2,7 +2,7 @@
 // operator-scoped per-tenant runtime allow-list API wrapper.
 //
 // Targets: apps/web/src/lib/api/operator-tenant-runtime-allowlist.ts
-//   - URL construction (`/api/operator/tenants/:tenantId/runtime-allowlist`)
+//   - URL construction (`/operator/tenants/:tenantId/runtime-allowlist`)
 //   - .list() uses serverFetch (GET)
 //   - .replace() uses serverMutation with PUT + { providerIds } body + wrapInData: false
 //   - .deleteEntry() uses serverMutation with DELETE + /:providerId suffix
@@ -11,6 +11,12 @@
 //
 // Before: 0 spec lines covering this module. After: ~15 cases pinning the
 // URL shape and the request envelope for all three verbs.
+//
+// NOTE: these assertions were stale — they expected a leading `/api`, but
+// commit 52e590a4 already dropped it from `base()` (serverFetch prepends
+// API_URL, which ends in `/api`, so `/api/...` would double to `/api/api/`).
+// The spec was not updated in that commit and had been failing since.
+// Realigned here to the shipped `/operator/...` paths.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,9 +52,7 @@ describe('operatorTenantRuntimeAllowlistAPI.list', () => {
         const { operatorTenantRuntimeAllowlistAPI } = await importApi();
         await operatorTenantRuntimeAllowlistAPI.list('t-abc');
         expect(serverFetchMock).toHaveBeenCalledTimes(1);
-        expect(serverFetchMock).toHaveBeenCalledWith(
-            '/api/operator/tenants/t-abc/runtime-allowlist',
-        );
+        expect(serverFetchMock).toHaveBeenCalledWith('/operator/tenants/t-abc/runtime-allowlist');
     });
 
     it('returns the parsed response verbatim (no client-side reshaping)', async () => {
@@ -83,7 +87,7 @@ describe('operatorTenantRuntimeAllowlistAPI.replace', () => {
         await operatorTenantRuntimeAllowlistAPI.replace('t-7', ['trigger', 'bullmq']);
         expect(serverMutationMock).toHaveBeenCalledTimes(1);
         expect(serverMutationMock).toHaveBeenCalledWith({
-            endpoint: '/api/operator/tenants/t-7/runtime-allowlist',
+            endpoint: '/operator/tenants/t-7/runtime-allowlist',
             data: { providerIds: ['trigger', 'bullmq'] },
             method: 'PUT',
             wrapInData: false,
@@ -131,7 +135,7 @@ describe('operatorTenantRuntimeAllowlistAPI.deleteEntry', () => {
         await operatorTenantRuntimeAllowlistAPI.deleteEntry('t-7', 'trigger');
         expect(serverMutationMock).toHaveBeenCalledTimes(1);
         expect(serverMutationMock).toHaveBeenCalledWith({
-            endpoint: '/api/operator/tenants/t-7/runtime-allowlist/trigger',
+            endpoint: '/operator/tenants/t-7/runtime-allowlist/trigger',
             data: {},
             method: 'DELETE',
             wrapInData: false,
@@ -163,9 +167,7 @@ describe('convenience aliases', () => {
     it('getTenantRuntimeAllowlist delegates to .list(tenantId)', async () => {
         const { getTenantRuntimeAllowlist } = await importApi();
         await getTenantRuntimeAllowlist('t-99');
-        expect(serverFetchMock).toHaveBeenCalledWith(
-            '/api/operator/tenants/t-99/runtime-allowlist',
-        );
+        expect(serverFetchMock).toHaveBeenCalledWith('/operator/tenants/t-99/runtime-allowlist');
     });
 
     it('replaceTenantRuntimeAllowlist delegates to .replace(tenantId, providerIds)', async () => {
@@ -173,7 +175,7 @@ describe('convenience aliases', () => {
         await replaceTenantRuntimeAllowlist('t-99', ['trigger']);
         expect(serverMutationMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                endpoint: '/api/operator/tenants/t-99/runtime-allowlist',
+                endpoint: '/operator/tenants/t-99/runtime-allowlist',
                 method: 'PUT',
                 data: { providerIds: ['trigger'] },
             }),
@@ -185,7 +187,7 @@ describe('convenience aliases', () => {
         await deleteTenantRuntimeAllowlistEntry('t-99', 'inngest');
         expect(serverMutationMock).toHaveBeenCalledWith(
             expect.objectContaining({
-                endpoint: '/api/operator/tenants/t-99/runtime-allowlist/inngest',
+                endpoint: '/operator/tenants/t-99/runtime-allowlist/inngest',
                 method: 'DELETE',
             }),
         );

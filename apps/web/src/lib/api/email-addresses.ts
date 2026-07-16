@@ -57,15 +57,13 @@ export interface EmailMessageDetail extends EmailMessageListItem {
 export const emailAddressesAPI = {
     list: async (direction?: EmailAddressDirection) => {
         const query = direction ? `?direction=${direction}` : '';
-        const data = await serverFetch<{ addresses: EmailAddress[] }>(
-            `/api/email/addresses${query}`,
-        );
+        const data = await serverFetch<{ addresses: EmailAddress[] }>(`/email/addresses${query}`);
         return data.addresses;
     },
     create: async (input: CreateEmailAddressDto) => {
         const data = await serverMutation<{ address: EmailAddress }>({
             method: 'POST',
-            endpoint: '/api/email/addresses',
+            endpoint: '/email/addresses',
             data: input,
             wrapInData: false,
         });
@@ -74,7 +72,7 @@ export const emailAddressesAPI = {
     update: async (id: string, input: Partial<CreateEmailAddressDto> & { disabled?: boolean }) => {
         const data = await serverMutation<{ address: EmailAddress }>({
             method: 'PATCH',
-            endpoint: `/api/email/addresses/${id}`,
+            endpoint: `/email/addresses/${id}`,
             data: input,
             wrapInData: false,
         });
@@ -83,7 +81,7 @@ export const emailAddressesAPI = {
     remove: async (id: string) => {
         await serverMutation<void>({
             method: 'DELETE',
-            endpoint: `/api/email/addresses/${id}`,
+            endpoint: `/email/addresses/${id}`,
             data: {},
             wrapInData: false,
         });
@@ -91,7 +89,7 @@ export const emailAddressesAPI = {
     triggerVerification: async (id: string) => {
         const data = await serverMutation<{ messageRef: string }>({
             method: 'POST',
-            endpoint: `/api/email/addresses/${id}/verify`,
+            endpoint: `/email/addresses/${id}/verify`,
             data: {},
             wrapInData: false,
         });
@@ -99,14 +97,12 @@ export const emailAddressesAPI = {
     },
     listMessagesForAgent: async (agentId: string, limit = 50, offset = 0) => {
         const data = await serverFetch<{ messages: EmailMessageListItem[] }>(
-            `/api/email/messages?agentId=${agentId}&limit=${limit}&offset=${offset}`,
+            `/email/messages?agentId=${agentId}&limit=${limit}&offset=${offset}`,
         );
         return data.messages;
     },
     getMessage: async (id: string) => {
-        const data = await serverFetch<{ message: EmailMessageDetail }>(
-            `/api/email/messages/${id}`,
-        );
+        const data = await serverFetch<{ message: EmailMessageDetail }>(`/email/messages/${id}`);
         return data.message;
     },
     sendMessage: async (input: {
@@ -122,7 +118,7 @@ export const emailAddressesAPI = {
             result: { providerMessageId: string; accepted: string[]; rejected: unknown[] };
         }>({
             method: 'POST',
-            endpoint: '/api/email/messages',
+            endpoint: '/email/messages',
             data: input,
             wrapInData: false,
         });
