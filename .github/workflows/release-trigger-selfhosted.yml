@@ -134,4 +134,9 @@ jobs:
           GHCR_DEPLOY_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
         run: |
           echo "${GHCR_DEPLOY_TOKEN}" | docker login ghcr.io -u evereq --password-stdin
-          pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
+          # Pin the CLI to the INSTALLED @trigger.dev/sdk version (repo pins ^4.4.6,
+          # which the lockfile resolves to a specific version) — the v4 CLI aborts
+          # in CI on any CLI/SDK version mismatch.
+          CLI_VER="$(node -p "require('@trigger.dev/sdk/package.json').version" 2>/dev/null)"
+          echo "Using trigger.dev CLI ${CLI_VER}"
+          pnpm dlx "trigger.dev@${CLI_VER}" deploy --env "${{ steps.env.outputs.trigger_env }}"
