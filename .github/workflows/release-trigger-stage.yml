@@ -13,6 +13,10 @@ permissions:
 
 jobs:
   deploy:
+    # Legacy Trigger.dev CLOUD deploy. Skipped once we migrate to self-hosted
+    # (TRIGGER_SELFHOSTED=true -> release-trigger-selfhosted.yml handles it).
+    # Flip the flag back to re-enable this cloud path.
+    if: ${{ vars.TRIGGER_SELFHOSTED != 'true' }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment: stage
