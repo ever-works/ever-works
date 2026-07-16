@@ -13,7 +13,7 @@ import {
     JOB_RUNTIME_PROVIDER_MODE_BANNERS,
     PROVIDERS_WITHOUT_CREDENTIALS,
 } from './job-runtime-schemas';
-import { ProviderBrandIcon, providerIconMap } from './job-runtime-provider-icons';
+import { providerIconMap } from './job-runtime-provider-icons';
 import {
     Dialog,
     DialogClose,
