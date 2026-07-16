@@ -124,4 +124,10 @@ jobs:
           TRIGGER_API_URL: https://trigger.ever.co
           # Pin the shared trigger.config.ts to the self-hosted project ref.
           TRIGGER_PROJECT_REF: proj_ixrpwdtsfolfxlbkgkle
-        run: pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
+          # GHCR push token (evereq classic PAT, write:packages). The self-hosted
+          # deploy builds the image locally and pushes it with the runner's OWN
+          # docker login — the instance only mints registry creds for AWS ECR.
+          GHCR_DEPLOY_TOKEN: ${{ secrets.GHCR_DEPLOY_TOKEN }}
+        run: |
+          echo "${GHCR_DEPLOY_TOKEN}" | docker login ghcr.io -u evereq --password-stdin
+          pnpm dlx trigger.dev@4.5.4 deploy --env "${{ steps.env.outputs.trigger_env }}"
