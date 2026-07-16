@@ -19,6 +19,10 @@ interface OptionData {
     /** Tailwind bg-* class rendered as a small colored dot before the label.
      *  Set via `data-dot` on the `<option>` (e.g. status color chips). */
     dotClass?: string;
+    /** Key into the Select's `iconMap`, rendered as a leading icon before the
+     *  label (in both the trigger and each row). Set via `data-icon` on the
+     *  `<option>` (e.g. provider brand marks). */
+    iconKey?: string;
 }
 
 interface GroupData {
@@ -49,6 +53,14 @@ export interface SelectProps {
      * Mirrors the same prop on native shadcn primitives.
      */
     'data-testid'?: string;
+    /**
+     * Optional leading icons, keyed by an option's `data-icon` value. When an
+     * option declares `data-icon="foo"` and `iconMap.foo` is provided, that
+     * node renders before the label in both the trigger and the dropdown row.
+     * Keeps the Select generic — callers own the actual icon nodes (e.g.
+     * provider brand marks).
+     */
+    iconMap?: Record<string, React.ReactNode>;
 }
 
 // ---- helpers ------------------------------------------------------ //
@@ -61,12 +73,14 @@ function parseItems(children: React.ReactNode): FlatItem[] {
         if (child.type === 'option') {
             const p = child.props as React.OptionHTMLAttributes<HTMLOptionElement>;
             const dot = (p as Record<string, unknown>)['data-dot'];
+            const icon = (p as Record<string, unknown>)['data-icon'];
             items.push({
                 type: 'option',
                 value: String(p.value ?? ''),
                 label: nodeText(p.children),
                 disabled: !!p.disabled,
                 ...(typeof dot === 'string' && dot ? { dotClass: dot } : {}),
+                ...(typeof icon === 'string' && icon ? { iconKey: icon } : {}),
             });
         } else if (child.type === 'optgroup') {
             const p = child.props as React.OptgroupHTMLAttributes<HTMLOptGroupElement>;
@@ -74,11 +88,13 @@ function parseItems(children: React.ReactNode): FlatItem[] {
             React.Children.forEach(p.children as React.ReactNode, (opt) => {
                 if (!React.isValidElement(opt) || opt.type !== 'option') return;
                 const op = opt.props as React.OptionHTMLAttributes<HTMLOptionElement>;
+                const opIcon = (op as Record<string, unknown>)['data-icon'];
                 opts.push({
                     type: 'option',
                     value: String(op.value ?? ''),
                     label: nodeText(op.children),
                     disabled: !!op.disabled,
+                    ...(typeof opIcon === 'string' && opIcon ? { iconKey: opIcon } : {}),
                 });
             });
             items.push({ type: 'group', label: String(p.label ?? ''), options: opts });
@@ -116,6 +132,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             id,
             name,
             'data-testid': dataTestId,
+            iconMap,
         },
         ref,
     ) => {
@@ -233,6 +250,11 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     )}
                 >
                     <span className="flex min-w-0 items-center gap-1.5">
+                        {selected?.iconKey && iconMap?.[selected.iconKey] ? (
+                            <span aria-hidden="true" className="flex shrink-0 items-center">
+                                {iconMap[selected.iconKey]}
+                            </span>
+                        ) : null}
                         {selected?.dotClass && (
                             <span
                                 aria-hidden="true"
@@ -289,6 +311,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                                         selected={item.value === value}
                                         size={size}
                                         onPick={pick}
+                                        iconMap={iconMap}
                                     />
                                 ) : (
                                     <div key={`group-${item.label}-${idx}`}>
@@ -304,6 +327,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                                                 size={size}
                                                 onPick={pick}
                                                 indent
+                                                iconMap={iconMap}
                                             />
                                         ))}
                                     </div>
@@ -326,12 +350,14 @@ function OptionRow({
     size,
     onPick,
     indent,
+    iconMap,
 }: {
     opt: OptionData;
     selected: boolean;
     size: 'xs' | 'sm' | 'default';
     onPick: (opt: OptionData) => void;
     indent?: boolean;
+    iconMap?: Record<string, React.ReactNode>;
 }) {
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (opt.disabled) {
@@ -395,6 +421,11 @@ function OptionRow({
                     'opacity-50 cursor-not-allowed pointer-events-none text-text-muted dark:text-text-muted-dark',
             )}
         >
+            {opt.iconKey && iconMap?.[opt.iconKey] ? (
+                <span aria-hidden="true" className="flex shrink-0 items-center">
+                    {iconMap[opt.iconKey]}
+                </span>
+            ) : null}
             {opt.dotClass && (
                 <span
                     aria-hidden="true"
