@@ -56,10 +56,7 @@ export class EverWorksK8sDeployProvider {
      */
     getNamespaceForUser(userId: string, override?: string): string {
         const base = override ?? config.everWorks.deploy.getNamespace();
-        const sanitisedUserId = sanitiseDnsLabel(userId);
-        const candidate = `${base}-${sanitisedUserId}`;
-        // K8s namespace names must be ≤ 63 chars (RFC 1123).
-        return candidate.length > 63 ? candidate.slice(0, 63).replace(/-+$/, '') : candidate;
+        return buildEverWorksTenantNamespace(userId, base);
     }
 
     /**
@@ -97,12 +94,43 @@ export class EverWorksK8sDeployProvider {
             throw new EverWorksDeployDisabledError();
         }
 
-        const inlineKubeconfig = env?.kubeconfig ?? config.everWorks.deploy.getKubeconfig();
-        const pathKubeconfig = env?.kubeconfigPath ?? config.everWorks.deploy.getKubeconfigPath();
+        const kubeconfig = await this.resolveKubeconfig({
+            kubeconfig: env?.kubeconfig,
+            kubeconfigPath: env?.kubeconfigPath,
+            readFile: options.readFile,
+        });
+
+        return {
+            kubeconfig,
+            namespace: this.getNamespaceForUser(options.work.userId, env?.namespace),
+            ingressHost: this.resolveIngressHost(options.work, env?.ingressHostTemplate),
+            ingressClass: env?.ingressClass ?? config.everWorks.deploy.getIngressClass(),
+            tlsIssuer: env?.tlsIssuer ?? config.everWorks.deploy.getTlsIssuer(),
+            registry: (env?.registry ?? config.everWorks.deploy.getRegistry()) || undefined,
+        };
+    }
+
+    /**
+     * Resolve just the platform-held kubeconfig for the dedicated Ever Works
+     * deploy cluster (Path A). Reads `EVER_WORKS_DEPLOY_KUBECONFIG` inline, or
+     * `EVER_WORKS_DEPLOY_KUBECONFIG_PATH` from disk, matching `buildConfig`.
+     * Throws `EverWorksDeployMisconfiguredError` when neither is set or the
+     * file read fails. Exposed so the deploy facade can source the `K8S_TOKEN`
+     * for a `deployProvider === 'ever-works'` deploy without also templating
+     * an ingress host it doesn't need at credential-resolution time.
+     */
+    async resolveKubeconfig(source?: {
+        readonly kubeconfig?: string;
+        readonly kubeconfigPath?: string;
+        readonly readFile?: EverWorksKubeconfigReader;
+    }): Promise<string> {
+        const inlineKubeconfig = source?.kubeconfig ?? config.everWorks.deploy.getKubeconfig();
+        const pathKubeconfig =
+            source?.kubeconfigPath ?? config.everWorks.deploy.getKubeconfigPath();
 
         let kubeconfig = inlineKubeconfig;
         if (!kubeconfig && pathKubeconfig) {
-            const reader = options.readFile ?? ((path: string) => fs.readFile(path, 'utf-8'));
+            const reader = source?.readFile ?? ((path: string) => fs.readFile(path, 'utf-8'));
             try {
                 kubeconfig = await reader(pathKubeconfig);
             } catch (cause) {
@@ -118,18 +146,27 @@ export class EverWorksK8sDeployProvider {
             );
         }
 
-        return {
-            kubeconfig,
-            namespace: this.getNamespaceForUser(options.work.userId, env?.namespace),
-            ingressHost: this.resolveIngressHost(options.work, env?.ingressHostTemplate),
-            ingressClass: env?.ingressClass ?? config.everWorks.deploy.getIngressClass(),
-            tlsIssuer: env?.tlsIssuer ?? config.everWorks.deploy.getTlsIssuer(),
-            registry: (env?.registry ?? config.everWorks.deploy.getRegistry()) || undefined,
-        };
+        return kubeconfig;
     }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Deterministic per-tenant Kubernetes namespace for a user: `{base}-{userId}`,
+ * DNS-label-sanitised and capped at the RFC-1123 63-char limit.
+ *
+ * Exported as the single source of truth for the per-tenant namespace scheme
+ * so the authoritative server-side enforcement in the API deploy service
+ * (`DeployService.resolveDeployNamespace`) and this provider's
+ * `getNamespaceForUser` can never drift apart.
+ */
+export function buildEverWorksTenantNamespace(userId: string, base: string): string {
+    const sanitisedUserId = sanitiseDnsLabel(userId);
+    const candidate = `${base}-${sanitisedUserId}`;
+    // K8s namespace names must be ≤ 63 chars (RFC 1123).
+    return candidate.length > 63 ? candidate.slice(0, 63).replace(/-+$/, '') : candidate;
+}
 
 function sanitiseDnsLabel(input: string): string {
     return input

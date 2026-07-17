@@ -193,7 +193,21 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			namespace: {
 				type: 'string',
 				title: 'Namespace',
-				default: DEFAULT_NAMESPACE
+				// `DEFAULT_NAMESPACE` (`ever-works`) is kept for back-compat with
+				// pre-existing custom-kubeconfig Works that rely on it on their OWN
+				// cluster. It is intentionally NOT surfaced/used for shared or
+				// managed sources: the server (`DeployService.resolveDeployNamespace`)
+				// OVERRIDES it with a deterministic per-tenant namespace on shared
+				// clusters and REJECTS reserved namespaces on every source, so this
+				// default can never reach a platform-owned namespace.
+				default: DEFAULT_NAMESPACE,
+				description:
+					"Only used when 'Target cluster' is 'custom-kubeconfig' (your own cluster). On platform-managed clusters the namespace is assigned automatically per tenant and this field is ignored.",
+				// Defense-in-depth for the server-side namespace enforcement:
+				// hide/lock the field for platform-managed sources so a shared- or
+				// internal-cluster tenant cannot even attempt to type a foreign or
+				// system namespace. The server remains authoritative regardless.
+				'x-showIf': { field: 'clusterSource', value: 'custom-kubeconfig' }
 			},
 			registry: REGISTRY_SCHEMA,
 			ingressClass: {

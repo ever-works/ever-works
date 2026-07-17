@@ -29,7 +29,11 @@ import {
     WorkRuntimeEnvService,
     ZeroFrictionFunnelService,
 } from '@ever-works/agent/services';
-import { EverWorksDnsService, SubdomainAllocator } from '@ever-works/agent/ever-works-providers';
+import {
+    EverWorksDnsService,
+    SubdomainAllocator,
+    buildEverWorksTenantNamespace,
+} from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -41,6 +45,8 @@ import type { IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 import {
     ClusterSource,
+    isReservedDeployNamespace,
+    isSharedClusterSource,
     normalizeClusterSource,
     resolveKubeconfigForClusterSource,
     validateClusterSourceForOwner,
@@ -236,7 +242,24 @@ export class DeployService {
         // the user's directory is reachable at that subdomain without any
         // manual DNS. If env vars are missing the DNS service no-ops; the
         // k8s plugin's default LB hostname remains the fallback.
-        const deploySettings = await this.applyManagedSubdomain(work, settings);
+        let deploySettings = await this.applyManagedSubdomain(work, settings);
+
+        // EW (owner item #3b) — authoritative, server-side namespace policy.
+        // The k8s `namespace` field is free-text with no client-side guarantee;
+        // enforce the per-tenant override (shared clusters) + reserved-namespace
+        // blocklist HERE, before the plugin's `getDeploymentSecrets` turns it
+        // into the pushed `K8S_NAMESPACE`. A user-supplied `ever-works` /
+        // `kube-system` / other-tenant namespace can never reach the cluster.
+        const enforcedNamespace = this.resolveDeployNamespace(
+            work.deployProvider,
+            plugin?.id,
+            work,
+            settings ?? {},
+        );
+        if (enforcedNamespace !== undefined) {
+            deploySettings = { ...(deploySettings ?? {}), namespace: enforcedNamespace };
+        }
+
         await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
         await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
@@ -447,6 +470,20 @@ export class DeployService {
             return userToken;
         }
 
+        // Task 10 — the managed `ever-works` provider deploys to a
+        // platform-OWNED cluster using a platform-HELD kubeconfig that the
+        // deploy facade already resolved from `EVER_WORKS_DEPLOY_*` (dedicated,
+        // Path A) or `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` (shared, Path B).
+        // The user-cluster deploy matrix (`validateClusterSourceForOwner`)
+        // exists to stop a USER's own cluster from receiving a shared-org PAT —
+        // it does not apply here, and applying it would wrongly reject managed
+        // deploys whose website repo lives in the `ever-works-cloud` storage
+        // org (rule 2). Pass the platform kubeconfig straight through; strip
+        // the sentinel so it can never leak into `K8S_TOKEN`.
+        if (deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID) {
+            return userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
+        }
+
         // EW-616: the deploy facade returns a sentinel string when the
         // user picked a platform-managed cluster without pasting a
         // kubeconfig. Treat it as "no kubeconfig" for the validator and
@@ -477,6 +514,68 @@ export class DeployService {
             this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
             throw new InternalServerErrorException(message);
         }
+    }
+
+    /**
+     * EW (owner item #3b) — authoritative per-tenant namespace resolution for
+     * the k8s deploy path. Mirrors `resolveDeployToken`: a no-op pass-through
+     * (returns `undefined`) for non-k8s providers, so Vercel and friends are
+     * untouched.
+     *
+     * Policy (see `cluster-source-matrix`):
+     *  - **Shared, platform-owned clusters** (`k8s-works-shared`, any shared
+     *    source) AND the managed `ever-works` provider: OVERRIDE whatever the
+     *    user typed with a deterministic per-tenant namespace
+     *    (`{base}-{ownerUserId}`). The namespace field is never user-editable
+     *    to a foreign/system namespace on a cluster shared with other tenants.
+     *  - **All other k8s sources** (`custom-kubeconfig` = user's own cluster,
+     *    `k8s-works` = admin internal): the user's namespace passes through,
+     *    but a platform-reserved namespace (`ever-works`, `kube-system`, …,
+     *    any `kube-*`) is rejected with a clear 400. An empty namespace returns
+     *    `undefined` so the k8s plugin keeps its existing default.
+     *
+     * Returns the namespace to force onto `deploySettings.namespace`, or
+     * `undefined` to leave the plugin's own resolution in place.
+     */
+    private resolveDeployNamespace(
+        deployProvider: string | undefined,
+        pluginId: string | undefined,
+        work: Work,
+        settings: Record<string, unknown>,
+    ): string | undefined {
+        if (!this.isKubernetesDeploy(deployProvider, pluginId)) {
+            return undefined;
+        }
+
+        const clusterSource = coerceClusterSource(settings.clusterSource);
+        const isManagedShared =
+            deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID ||
+            isSharedClusterSource(clusterSource);
+
+        if (isManagedShared) {
+            // Cross-tenant isolation: ignore user input entirely and derive a
+            // deterministic per-tenant namespace from the Work owner.
+            const owner = work.user as User | undefined;
+            const tenantId = owner?.id || work.id;
+            const base = process.env.EVER_WORKS_DEPLOY_NAMESPACE?.trim() || 'ever-works-tenants';
+            return buildEverWorksTenantNamespace(tenantId, base);
+        }
+
+        // custom-kubeconfig (user's own cluster) / k8s-works (admin internal):
+        // honour the user's namespace, but never a platform-reserved one.
+        const requested = typeof settings.namespace === 'string' ? settings.namespace.trim() : '';
+        if (!requested) {
+            return undefined;
+        }
+        if (isReservedDeployNamespace(requested)) {
+            const message =
+                `Namespace '${requested}' is reserved and cannot be used as a deploy target. ` +
+                `Choose a different namespace (reserved: ever-works, default, kube-*, argocd, ` +
+                `cert-manager, ingress-nginx, monitoring).`;
+            this.logger.warn(`Deploy namespace rejected for work ${work.id}: ${message}`);
+            throw new BadRequestException(message);
+        }
+        return requested;
     }
 
     private async createRepoContext(
