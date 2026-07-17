@@ -1,0 +1,592 @@
+# Instincts generated from https://github.com/ever-works/ever-works
+# Generated: 2026-07-17T22:20:42.845Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: ever-works-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, docs, i18n
+
+## Evidence
+
+- 8 commits analyzed
+- Detected conventional commit pattern
+- Examples: docs(specs): Teams & Prebuilt Companies spec (agentcompanies/v1 support), feat(teams): Team + TeamMember entities, org-nested Teams API, org-chart payload, agent reportsTo
+
+---
+id: ever-works-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Commit Length
+
+## Action
+
+Write moderate-length commit messages (~80 characters)
+
+## Evidence
+
+- Average commit message length: 80 chars
+- Based on 8 commits
+
+---
+id: ever-works-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: ever-works-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: ever-works-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: ever-works-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: ever-works-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Test Framework
+
+## Action
+
+Use vitest as the test framework
+
+## Evidence
+
+- Test framework detected: vitest
+- File pattern: *.spec.ts
+
+---
+id: ever-works-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Test Naming
+
+## Action
+
+Name test files using the pattern: *.spec.ts
+
+## Evidence
+
+- File pattern: *.spec.ts
+- Consistent across test files
+
+---
+id: ever-works-test-mocking
+trigger: "when mocking dependencies in tests"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Test Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Mocking pattern detected: vi.mock
+- Consistent across test files
+
+---
+id: ever-works-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: no
+
+---
+id: ever-works-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~19x per month
+- Files: apps/api/src/agents/*, apps/api/src/agents/dto/*, apps/api/src/*
+
+---
+id: ever-works-workflow-feature-spec-planning
+trigger: "when doing feature spec planning"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Workflow Feature Spec Planning
+
+## Action
+
+Follow the feature-spec-planning workflow:
+1. Create or update docs/specs/features/[feature]/spec.md
+2. Create or update docs/specs/features/[feature]/plan.md
+3. Create or update docs/specs/features/[feature]/tasks.md
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: docs/specs/features/*/spec.md, docs/specs/features/*/plan.md, docs/specs/features/*/tasks.md
+
+---
+id: ever-works-workflow-add-or-update-i18n-strings
+trigger: "when doing add or update i18n strings"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Workflow Add Or Update I18n Strings
+
+## Action
+
+Follow the add-or-update-i18n-strings workflow:
+1. Edit or add keys in apps/web/messages/en.json (source locale)
+2. Edit or add corresponding keys in other locale JSON files (e.g., ar.json, de.json, etc.)
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: apps/web/messages/en.json, apps/web/messages/*.json
+
+---
+id: ever-works-workflow-feature-development-api-and-web
+trigger: "when doing feature development api and web"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Workflow Feature Development Api And Web
+
+## Action
+
+Follow the feature-development-api-and-web workflow:
+1. Add or update backend files: controllers, services, DTOs, migrations, entities, and tests
+2. Add or update frontend files: API client, server actions, routes, sidebar entries, UI components, and tests
+3. Update shared types and constants as needed
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: apps/api/src/**/*.ts, apps/api/src/migrations/*.ts, packages/agent/src/**/*.ts
+
+---
+id: ever-works-instinct-camelcase-files
+trigger: "When creating or renaming a file in the codebase."
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Camelcase Files
+
+## Action
+
+Name the file using camelCase (e.g., agentController.ts).
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: ever-works-instinct-camelcase-functions
+trigger: "When defining a function."
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Camelcase Functions
+
+## Action
+
+Name the function using camelCase (e.g., getAgentData).
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: ever-works-instinct-pascalcase-classes
+trigger: "When defining a class."
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Pascalcase Classes
+
+## Action
+
+Name the class using PascalCase (e.g., AgentController).
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: ever-works-instinct-screaming-constants
+trigger: "When defining a constant."
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Screaming Constants
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE (e.g., DEFAULT_TIMEOUT).
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: ever-works-instinct-relative-imports
+trigger: "When importing modules within the project."
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Relative Imports
+
+## Action
+
+Use relative import paths (e.g., import { X } from '../utils').
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: ever-works-instinct-named-exports
+trigger: "When exporting functions, classes, or constants."
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Named Exports
+
+## Action
+
+Use named exports instead of default exports.
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: ever-works-instinct-vitest-spec-pattern
+trigger: "When creating a test file."
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Vitest Spec Pattern
+
+## Action
+
+Name the test file with the .spec.ts suffix (e.g., agent.spec.ts).
+
+## Evidence
+
+- Pattern in testing.filePattern: *.spec.ts
+
+---
+id: ever-works-instinct-vi-mock
+trigger: "When mocking dependencies in tests."
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Vi Mock
+
+## Action
+
+Use vi.mock for mocking in Vitest.
+
+## Evidence
+
+- Pattern in testing.mockingStyle: vi.mock
+
+---
+id: ever-works-instinct-unit-integration-tests
+trigger: "When writing tests for a feature."
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Unit Integration Tests
+
+## Action
+
+Write both unit and integration tests as appropriate.
+
+## Evidence
+
+- Pattern in testing.testTypes: unit, integration
+
+---
+id: ever-works-instinct-conventional-commits
+trigger: "When writing a commit message."
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Conventional Commits
+
+## Action
+
+Format the commit message using the conventional commit style: <type>(<scope>): <description>.
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Examples: 'feat(teams): Team + TeamMember entities...'
+
+---
+id: ever-works-instinct-commit-prefixes
+trigger: "When choosing a commit type prefix."
+confidence: 0.8
+domain: git
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Commit Prefixes
+
+## Action
+
+Use one of the allowed prefixes: feat, docs, i18n.
+
+## Evidence
+
+- Pattern in commits.prefixes: ['feat', 'docs', 'i18n']
+- Examples: 'docs(specs): ...', 'i18n(web): ...'
+
+---
+id: ever-works-instinct-commit-length
+trigger: "When writing a commit message."
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Commit Length
+
+## Action
+
+Keep the commit message around 80 characters on average.
+
+## Evidence
+
+- Pattern in commits.averageLength: 80
+
+---
+id: ever-works-instinct-feature-spec-planning
+trigger: "When someone wants to define or update the requirements and implementation plan for a feature."
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Feature Spec Planning
+
+## Action
+
+Create or update docs/specs/features/[feature]/spec.md, plan.md, and tasks.md.
+
+## Evidence
+
+- Workflow: feature-spec-planning
+- Pattern in files: docs/specs/features/*/spec.md, plan.md, tasks.md
+
+---
+id: ever-works-instinct-add-update-i18n
+trigger: "When someone adds a new UI feature or modifies existing text requiring translation."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Add Update I18n
+
+## Action
+
+Edit or add keys in apps/web/messages/en.json and corresponding keys in other locale JSON files.
+
+## Evidence
+
+- Workflow: add-or-update-i18n-strings
+- Pattern in files: apps/web/messages/en.json, apps/web/messages/*.json
+
+---
+id: ever-works-instinct-feature-development-api-web
+trigger: "When someone wants to add a new major feature that spans backend and frontend."
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Feature Development Api Web
+
+## Action
+
+Add or update backend files (controllers, services, DTOs, migrations, entities, tests) and frontend files (API client, server actions, routes, sidebar entries, UI components, tests); update shared types/constants as needed.
+
+## Evidence
+
+- Workflow: feature-development-api-and-web
+- Pattern in files: apps/api/src/**/*.ts, apps/web/src/**/*.tsx, etc.
+
