@@ -547,17 +547,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "เริ่มภารกิจใหม่",
-                "submitTitle": "สร้างภารกิจ",
-                "minLength": "คำบรรยายต้องมีอย่างน้อย 10 ตัวอักษร",
-                "created": "สร้างภารกิจเรียบร้อยแล้ว",
-                "error": "ไม่สามารถสร้างภารกิจได้ กรุณาลองใหม่อีกครั้ง"
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "เปิดสร้างสรรค์รวม"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -569,14 +561,6 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "ค้นหา",
-                "searchPlaceholder": "ชื่อหรือคำอธิบาย",
-                "status": "สถานะ",
-                "anyStatus": "สถานะใดก็ได้",
-                "apply": "นำไปใช้",
-                "reset": "รีเซ็ต"
             }
         },
         "agentsPage": {
@@ -623,7 +607,22 @@
                 "cancel": "ยกเลิก",
                 "back": "ย้อนกลับ",
                 "next": "ถัดไป",
-                "create": "สร้างเอเจนต์"
+                "create": "สร้างเอเจนต์",
+                "teamLabel": "ทีม",
+                "teamNone": "ไม่มีทีม",
+                "reportsToLabel": "รายงานต่อ",
+                "reportsToNone": "ไม่มีผู้จัดการ"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "องค์กร",
+                    "teamLabel": "ทีม",
+                    "teamNone": "ไม่มีทีม",
+                    "reportsToLabel": "รายงานต่อ",
+                    "reportsToNone": "ไม่มีผู้จัดการ",
+                    "save": "บันทึก",
+                    "saving": "กำลังบันทึก…"
+                }
             }
         },
         "tasksPage": {
@@ -894,7 +893,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "เพิ่มความคิด",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -938,6 +936,22 @@
                 "anyStatus": "สถานะใดก็ได้",
                 "apply": "นำไปใช้",
                 "reset": "รีเซ็ต"
+            },
+            "newPage": {
+                "link": "สร้างด้วยตนเอง",
+                "or": "หรือ",
+                "title": "Idea ใหม่",
+                "subtitle": "เขียน Idea ของคุณเอง อธิบาย Work ที่คุณต้องการสร้าง — จากนั้นคุณสามารถจัดคิวเพื่อสร้างได้",
+                "nameLabel": "ชื่อเรื่อง",
+                "namePlaceholder": "ไม่บังคับ — เว้นว่างไว้เพื่อให้สร้างจากคำอธิบาย",
+                "descriptionLabel": "คำอธิบาย",
+                "descriptionPlaceholder": "อธิบาย Work ที่ Idea นี้ควรจะกลายเป็น — เช่น “ไดเรกทอรีที่คัดสรรของเฟรมเวิร์กเอเจนต์ AI โอเพนซอร์ส จัดระเบียบตามประเภทเฟรมเวิร์กและสัญญาอนุญาต”",
+                "descriptionHint": "อย่างน้อย 10 ตัวอักษร",
+                "cancel": "ยกเลิก",
+                "create": "สร้าง Idea",
+                "creating": "กำลังสร้าง…",
+                "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
+                "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
             }
         },
         "discover": {
@@ -3395,7 +3409,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3410,19 +3424,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "เป้าหมายที่ดำเนินต่อไป — สร้างความคิดตามกำหนดการหรือครั้งเดียว",
-                "idea": "คำอธิบายครั้งเดียวที่เอเจนต์แปลงเป็นแผนงานที่คุณสามารถสร้างต่อได้",
-                "website": "เว็บไซต์หลายหน้าสำหรับธุรกิจ บริการ หรือแบรนด์ — เนื้อหา + โค้ดที่สร้างขึ้น",
-                "landing-page": "หน้าเดียวที่มุ่งเน้น — รายชื่อรอ การเปิดตัวผลิตภัณฑ์ การลงทะเบียนเวบินาร์ การดึงลูกค้า",
-                "blog": "บล็อกที่มีหมวดหมู่ RSS การเน้นโค้ด และเนื้อหาที่พร้อมใช้กับ SEO",
-                "directory": "เว็บไดเรกทอรี่ที่คัดสรรมาแล้ว พร้อมค้นหา ตัวกรอง และข้อมูลรายการที่มโนรม",
-                "awesome-repo": "เรโพซิทอรี่อะไรก็ได้ที่น่าทึ่ง — ดัชนี markdown ลิงก์ที่จัดหมวดหมู่ และเมตาดาทาที่รีเฟรชได้",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "สร้าง",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3947,7 +3963,8 @@
                 "plugins": "ปลั๊กอิน",
                 "skills": "ทักษะ",
                 "templates": "เทมเพลต",
-                "settings": "การตั้งค่า"
+                "settings": "การตั้งค่า",
+                "teams": "ทีม"
             },
             "tooltips": {
                 "expandSidebar": "ขยายแถบด้านข้าง",
@@ -4488,332 +4505,93 @@
             "system": "ระบบ",
             "goToPluginSettings": "ไปที่การตั้งค่าส่วนเสริม"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
+        "teamsPage": {
+            "title": "ทีม",
+            "subtitle": "จัดระเบียบเอเจนต์และสมาชิกของคุณเป็นทีมภายในองค์กรนี้",
+            "orgChartCta": "แผนผังองค์กร",
+            "newTeamCta": "ทีมใหม่",
             "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
+                "title": "ยังไม่มีทีม",
+                "description": "สร้างทีมแรกของคุณเพื่อจัดกลุ่มเอเจนต์และสมาชิก จากนั้นจัดวางบนแผนผังองค์กร",
+                "cta": "สร้างทีม"
             },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            "noOrg": {
+                "title": "ทีมอยู่ภายในองค์กร",
+                "description": "สร้างองค์กรก่อน จากนั้นคุณจะจัดกลุ่มเอเจนต์และสมาชิกขององค์กรเป็นทีมได้",
+                "cta": "สร้างองค์กร"
             },
             "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
+                "agents": "{count, plural, other {เอเจนต์ #}}",
+                "members": "{count, plural, other {สมาชิก # คน}}",
+                "subTeams": "{count, plural, other {ทีมย่อย # ทีม}}"
             },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "ไอเดียนี้ไม่พร้อมใช้งานอีกต่อไป"
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "ค้นหา",
-                "searchPlaceholder": "ชื่อหรือคำอธิบาย",
-                "status": "สถานะ",
-                "anyStatus": "สถานะใดก็ได้",
-                "apply": "นำไปใช้",
-                "reset": "รีเซ็ต"
-            },
-            "newPage": {
-                "link": "สร้างด้วยตนเอง",
-                "or": "หรือ",
-                "title": "Idea ใหม่",
-                "subtitle": "เขียน Idea ของคุณเอง อธิบาย Work ที่คุณต้องการสร้าง — จากนั้นคุณสามารถจัดคิวเพื่อสร้างได้",
-                "nameLabel": "ชื่อเรื่อง",
-                "namePlaceholder": "ไม่บังคับ — เว้นว่างไว้เพื่อให้สร้างจากคำอธิบาย",
+            "newDialog": {
+                "title": "ทีมใหม่",
+                "nameLabel": "ชื่อ",
+                "namePlaceholder": "เช่น วิศวกรรม",
                 "descriptionLabel": "คำอธิบาย",
-                "descriptionPlaceholder": "อธิบาย Work ที่ Idea นี้ควรจะกลายเป็น — เช่น “ไดเรกทอรีที่คัดสรรของเฟรมเวิร์กเอเจนต์ AI โอเพนซอร์ส จัดระเบียบตามประเภทเฟรมเวิร์กและสัญญาอนุญาต”",
-                "descriptionHint": "อย่างน้อย 10 ตัวอักษร",
-                "cancel": "ยกเลิก",
-                "create": "สร้าง Idea",
+                "descriptionPlaceholder": "ทีมนี้รับผิดชอบอะไร (ไม่บังคับ)",
+                "parentLabel": "ทีมหลัก",
+                "parentNone": "ไม่มีทีมหลัก (ระดับบนสุด)",
+                "managerLabel": "เอเจนต์ผู้จัดการ",
+                "managerNone": "ไม่มีผู้จัดการ",
+                "submit": "สร้างทีม",
                 "creating": "กำลังสร้าง…",
-                "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
-                "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
+                "cancel": "ยกเลิก"
+            },
+            "detail": {
+                "overviewTab": "ภาพรวม",
+                "settingsTab": "การตั้งค่า",
+                "rosterTitle": "รายชื่อสมาชิก",
+                "subTeamsTitle": "ทีมย่อย",
+                "managerLabel": "ผู้จัดการ",
+                "parentLabel": "ทีมหลัก",
+                "addMemberCta": "เพิ่มสมาชิก",
+                "addMemberTypeLabel": "ประเภท",
+                "addMemberAgent": "เอเจนต์",
+                "addMemberUser": "สมาชิก",
+                "addMemberSelectLabel": "ใคร",
+                "addMemberSubmit": "เพิ่ม",
+                "adding": "กำลังเพิ่ม…",
+                "removeMember": "นำออก",
+                "roleLead": "หัวหน้าทีม",
+                "roleMember": "สมาชิก",
+                "emptyRoster": "ยังไม่มีสมาชิก — เพิ่มเอเจนต์หรือเพื่อนร่วมทีมในทีมนี้"
+            },
+            "settings": {
+                "title": "การตั้งค่าทีม",
+                "nameLabel": "ชื่อ",
+                "descriptionLabel": "คำอธิบาย",
+                "parentLabel": "ทีมหลัก",
+                "managerLabel": "เอเจนต์ผู้จัดการ",
+                "save": "บันทึกการเปลี่ยนแปลง",
+                "saving": "กำลังบันทึก…",
+                "saved": "อัปเดตทีมแล้ว",
+                "deleteTitle": "โซนอันตราย",
+                "deleteDescription": "การลบทีมจะย้ายทีมย่อยขึ้นไปหนึ่งระดับและนำรายชื่อสมาชิกออก เอเจนต์และสมาชิกจะไม่ถูกลบ",
+                "deleteCta": "ลบทีม",
+                "deleteConfirm": "ลบทีมนี้หรือไม่? ทีมย่อยจะเลื่อนขึ้นหนึ่งระดับ ส่วนเอเจนต์และสมาชิกจะยังคงอยู่",
+                "deleting": "กำลังลบ…"
+            },
+            "errors": {
+                "createFailed": "ไม่สามารถสร้างทีมได้",
+                "updateFailed": "ไม่สามารถอัปเดตทีมได้",
+                "deleteFailed": "ไม่สามารถลบทีมได้",
+                "memberAddFailed": "ไม่สามารถเพิ่มสมาชิกได้",
+                "memberRemoveFailed": "ไม่สามารถนำสมาชิกออกได้"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
-            },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
+        "orgChartPage": {
+            "title": "แผนผังองค์กร",
+            "subtitle": "ทีม เอเจนต์ และสมาชิกขององค์กรนี้",
+            "backToTeams": "ทีม",
+            "zoomIn": "ซูมเข้า",
+            "zoomOut": "ซูมออก",
+            "fitView": "พอดีหน้าจอ",
+            "unassignedGroup": "ยังไม่ได้กำหนด",
+            "membersBadge": "{count, plural, other {สมาชิก # คน}}",
+            "empty": "ยังไม่มีอะไรให้แสดง — สร้างทีมหรือเอเจนต์ในองค์กรนี้ก่อน",
+            "noOrg": "สร้างองค์กรเพื่อดูแผนผังองค์กร"
         }
     },
     "layout": {
@@ -5100,6 +4878,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "เริ่มจาก",
+                "blankTitle": "องค์กรว่างเปล่า",
+                "blankDescription": "เริ่มจากศูนย์ — เพิ่มทีมและเอเจนต์ภายหลัง",
+                "meta": "{agents, plural, other {เอเจนต์ #}} · {teams, plural, other {# ทีม}}",
+                "submitImport": "สร้างจากเทมเพลต",
+                "importError": "ไม่สามารถสร้างองค์กรจากเทมเพลตนี้ได้"
             }
         },
         "upgrade": {
