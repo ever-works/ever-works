@@ -81,6 +81,7 @@ export class TeamsService {
             parentTeamId: input.parentTeamId ?? null,
             managerAgentId: input.managerAgentId ?? null,
             avatarIcon: input.avatarIcon ?? null,
+            metadata: input.metadata ?? null,
             // Explicit stamp (not left to the ALS subscriber): raw
             // `/api/organizations/:orgId/...` routes run with EMPTY_SCOPE,
             // so the ambient scope may not carry this org.

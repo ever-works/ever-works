@@ -12,6 +12,8 @@ export interface CreateTeamInput {
     parentTeamId?: string | null;
     managerAgentId?: string | null;
     avatarIcon?: string | null;
+    /** Importer-only provenance (spec §6.2) — not exposed on the HTTP DTO. */
+    metadata?: import('../entities/team.entity').TeamMetadata | null;
 }
 
 export interface UpdateTeamInput {

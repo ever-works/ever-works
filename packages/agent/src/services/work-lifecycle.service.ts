@@ -438,6 +438,36 @@ export class WorkLifecycleService {
     }
 
     /**
+     * Teams & Prebuilt Companies (spec §6.2) — bare DRAFT Work row with
+     * zero repo/git/generation side-effects. The company-template importer
+     * maps each `PROJECT.md` in a package onto one of these; a later
+     * "activation" reuses `transitionStatus(workId, 'active')`. Mirrors
+     * `createCompanyWork` (same quota-safe `deployProvider: null`) but
+     * keeps `kind: 'default'` — these are ordinary Works, not company
+     * registration records.
+     */
+    async createDraftWork(
+        user: User,
+        params: { name: string; slug: string; description?: string },
+    ): Promise<Work> {
+        const workData: Partial<Work> = {
+            slug: params.slug,
+            name: params.name,
+            description: params.description ?? params.name,
+            userId: user.id,
+            kind: 'default',
+            status: 'draft',
+            deployProvider: null,
+        };
+
+        try {
+            return await this.workRepository.create(workData, user);
+        } catch (error) {
+            rethrowAsNormalized(error, this.logger, 'creating draft work');
+        }
+    }
+
+    /**
      * EW-665 (Tenants & Organizations Phase 13) — transition a Work's
      * lifecycle `status` and emit `work.status.changed` when (and only
      * when) the status actually changes.
