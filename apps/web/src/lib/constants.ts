@@ -164,6 +164,11 @@ export const ROUTES = {
     // be in PUBLIC_ROUTES — otherwise the proxy auth gate bounces it to
     // /login and clears the cookie before the redeem can run.
     AUTH_MAGIC_LINK: '/login/magic-link',
+    // EW-617 zero-friction onboarding. Public landing target for the marketing
+    // site's prompt hand-off (`/onboarding#prompt=…&corrId=…`). Reached
+    // UNAUTHENTICATED by fresh visitors — the page mints an anonymous session
+    // client-side, so it MUST be in PUBLIC_ROUTES (mirrors AUTH_MAGIC_LINK).
+    ONBOARDING: '/onboarding',
 
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
@@ -197,6 +202,9 @@ export const PUBLIC_ROUTES = [
     // client-side redeem can set the session cookie (mirrors the other
     // token-landing pages above).
     ROUTES.AUTH_MAGIC_LINK,
+    // EW-617 zero-friction onboarding landing page — public so anonymous
+    // visitors from the marketing site can mint a guest session client-side.
+    ROUTES.ONBOARDING,
     '/about',
     '/contact',
     '/privacy',
