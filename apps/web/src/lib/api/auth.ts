@@ -55,6 +55,14 @@ export interface RedeemMagicLinkDto {
     token: string;
 }
 
+// EW-617 G2 — zero-friction anonymous session. Mints a temporary (email-less)
+// user so onboarding can run before sign-up. Captcha-gated in production; the
+// browser supplies a fresh Turnstile token. `correlationId` must be a UUID v4.
+export interface CreateAnonymousDto {
+    captchaToken?: string;
+    correlationId?: string;
+}
+
 // Response Types
 export interface AuthResponse {
     access_token: string;
@@ -262,6 +270,16 @@ export const authAPI = {
     redeemMagicLink: async (data: RedeemMagicLinkDto) => {
         return serverMutation<AuthResponse>({
             endpoint: '/auth/magic-link/redeem',
+            data,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+    // EW-617 G2 — mint a temporary anonymous session. API_URL already ends in
+    // `/api`, so this resolves to POST https://api.ever.works/api/auth/anonymous.
+    createAnonymous: async (data: CreateAnonymousDto) => {
+        return serverMutation<AuthResponse>({
+            endpoint: '/auth/anonymous',
             data,
             method: 'POST',
             wrapInData: false,

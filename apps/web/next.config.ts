@@ -55,7 +55,10 @@ const CSP = [
     "media-src 'self' https:",
     "font-src 'self' data:",
     "style-src 'self' 'unsafe-inline'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://challenges.cloudflare.com",
+    // EW-617 — Cloudflare Turnstile widget script + challenge iframe. Keep in
+    // lock-step with proxy.ts's buildCsp() (its byte-twin).
+    "frame-src 'self' https://challenges.cloudflare.com",
     // dotlottie-web fetches its WASM blob from jsdelivr (primary) or unpkg
     // (backup). Both are essential for the on-page Lottie animations that
     // boot on /login and /register; without them the E2E suite trips on
