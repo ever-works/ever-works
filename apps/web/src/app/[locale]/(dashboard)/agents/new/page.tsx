@@ -2,12 +2,16 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { NewAgentDialog } from '@/components/agents';
 import { createAgentAction } from '@/app/actions/agents';
+import { agentsAPI } from '@/lib/api/agents';
 import { missionsAPI } from '@/lib/api/missions';
+import { teamsAPI } from '@/lib/api/teams';
 import { workAPI } from '@/lib/api/work';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { AstTemplateEntry } from '@/lib/api/agent-templates';
 import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
+import type { Agent } from '@/lib/api/agents';
 import type { Mission } from '@/lib/api/missions';
+import type { Team, TeamsOrganization } from '@/lib/api/teams';
 import type { Work } from '@/lib/api/work';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
@@ -25,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
  * tenant-scope only.
  */
 export default async function NewAgentPage() {
-    const [missions, worksResp, ideas, templates] = await Promise.all([
+    const [missions, worksResp, ideas, templates, orgs] = await Promise.all([
         missionsAPI.list().catch(() => [] as Mission[]),
         workAPI.getAll({ limit: 100 }).catch(
             () =>
@@ -40,6 +44,10 @@ export default async function NewAgentPage() {
         // Optional template-pick step (spec FR-23). Defensive so a cold
         // catalog never 500s the create page.
         fetchAgentTemplateCatalog('agent').catch(() => [] as AstTemplateEntry[]),
+        // Teams & Companies spec §4.2/§4.3 — active-org resolution v1:
+        // orgs[0] is the active Organization. Defensive: no orgs (or a
+        // flaky API) simply hides the Team / Reports-to selects.
+        teamsAPI.listOrganizations().catch(() => [] as TeamsOrganization[]),
     ]);
 
     const missionOptions = missions.map((m) => ({ id: m.id, label: m.title }));
@@ -52,6 +60,27 @@ export default async function NewAgentPage() {
         label: idea.title ?? idea.description?.slice(0, 80) ?? idea.id,
     }));
 
+    // Teams & Companies spec §4.3 — the Team / Reports-to catalogs are
+    // org-gated: without an active Organization the dialog renders
+    // exactly as before (both selects hidden). Reports-to candidates
+    // are the user's existing non-archived Agents.
+    const activeOrg = orgs[0];
+    let teamOptions: Array<{ id: string; label: string }> = [];
+    let agentOptions: Array<{ id: string; label: string }> = [];
+    if (activeOrg) {
+        const [teams, agentsResp] = await Promise.all([
+            teamsAPI.list(activeOrg.id).catch(() => [] as Team[]),
+            agentsAPI.list({ limit: 100 }).catch(() => ({
+                data: [] as Agent[],
+                meta: { total: 0, limit: 100, offset: 0 },
+            })),
+        ]);
+        teamOptions = teams.map((team) => ({ id: team.id, label: team.name }));
+        agentOptions = agentsResp.data
+            .filter((a) => a.status !== 'archived')
+            .map((a) => ({ id: a.id, label: a.name }));
+    }
+
     return (
         <NewAgentDialog
             createAgent={createAgentAction}
@@ -59,6 +88,9 @@ export default async function NewAgentPage() {
             works={workOptions}
             ideas={ideaOptions}
             templates={templates}
+            activeOrgId={activeOrg?.id}
+            teams={teamOptions}
+            agentOptions={agentOptions}
         />
     );
 }

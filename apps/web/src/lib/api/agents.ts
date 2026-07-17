@@ -52,6 +52,12 @@ export interface Agent {
     status: AgentStatus;
     permissions: AgentPermissions;
     targets: AgentTarget[] | null;
+    /**
+     * Teams & Companies spec §1.2 — direct-manager edge for the org
+     * chart (additive, descriptive-only in v1; same-org enforced by
+     * the API service).
+     */
+    reportsToAgentId: string | null;
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: string | null;
@@ -119,6 +125,8 @@ export interface UpdateAgentInput {
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
+    /** Teams & Companies spec §3 — additive PATCH field (null clears the manager edge). */
+    reportsToAgentId?: string | null;
 }
 
 export interface AgentFileBody {

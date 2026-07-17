@@ -275,7 +275,7 @@ ever-works/orgs
     ├── projects/<slug>/PROJECT.md  (+ projects/<slug>/tasks/<slug>/TASK.md)
     ├── skills/<slug>/SKILL.md      # standard Agent Skills, never redefined
     ├── images/org-chart.svg
-    └── .everworks.yaml      # OUR vendor extension (schema: everworks/v1) — see §6.3
+    └── .works/company.yml      # OUR vendor extension (schema: everworks/v1) — see §6.3
 ```
 
 `manifest.json` (v1) mirrors the agents-repo pattern:
@@ -303,7 +303,7 @@ ever-works/orgs
 | `AGENTS.md skills:` shortnames | **Skill** rows + `SkillBinding(targetType='agent')` | resolved against the package's `skills/` dir; unknown shortnames skipped with a warning in the import report |
 | `projects/*/PROJECT.md` | **draft Work** | new `createDraftWork` sibling of `createCompanyWork` (bare row, `kind:'default'`, `status:'draft'`, no repo/generation side-effects); body → Work description |
 | `projects/*/tasks/*/TASK.md`, `tasks/*` | **Task** rows | `assignee:` slug → `TaskAssignee(actorType='agent')`; `project:` → the created Work's `workId` |
-| `.everworks.yaml` | hints | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat |
+| `.works/company.yml` | hints | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat |
 
 Fetching uses the existing `GitFacadeService.getFileContent` path with the platform
 GitHub App / `EVER_WORKS_ORGS_TOKEN` / `GITHUB_TOKEN` fallback chain, ref pinned via
@@ -317,7 +317,7 @@ fails validation, the import **continues** and returns a per-entity report
 (`created[] / skipped[{path, reason}]`) — the Paperclip preview/report pattern without
 the preview round-trip in v1 (Q2 covers adding a preview step).
 
-### 6.3 `.everworks.yaml` (vendor extension, `schema: everworks/v1`)
+### 6.3 `.works/company.yml` (vendor extension, `schema: everworks/v1`)
 
 The spec reserves vendor sidecars; ours carries only platform mapping hints, never
 secrets:

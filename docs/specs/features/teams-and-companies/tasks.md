@@ -25,7 +25,7 @@ Phase 2 — web UI
 Phase 3 — ever-works/orgs
 - [ ] T19 repo scaffold (README+credits, LICENSE MIT, CONTRIBUTING, manifest, schema, CI)
 - [ ] T20 flagship `ever-starter` company (starter-template agents, 2 teams, project+tasks)
-- [ ] T21 adapted-concept companies (≥ 8, original prose, `.everworks.yaml`, org-chart.svg)
+- [ ] T21 adapted-concept companies (≥ 8, original prose, `.works/company.yml`, org-chart.svg)
 - [ ] T22 validate workflow green; tag v1.0.0
 
 Phase 4 — catalog + import + wizard

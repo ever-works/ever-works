@@ -36,7 +36,7 @@ branch e2e) and is independently mergeable.
 
 - Bootstrap repo: README (credits), MIT LICENSE, CONTRIBUTING, `manifest.json`,
   `schema/orgs-manifest.schema.json`, validate workflow.
-- Author v1 companies (original prose, agentcompanies/v1 layout, `.everworks.yaml`):
+- Author v1 companies (original prose, agentcompanies/v1 layout, `.works/company.yml`):
   `ever-starter` (flagship, built on the `ever-works/agents` starter templates) plus a
   spread of adapted-concept companies (engineering, dev-shop, research-lab, game-studio,
   creative-agency, review-board, consulting, security, capital) — each ≤ 12 agents,
