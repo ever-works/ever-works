@@ -1,4 +1,4 @@
-﻿name: Build and Publish CLIs
+name: Build and Publish CLIs
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 
@@ -233,7 +233,7 @@ jobs:
           INTERNAL_VERSION=$(node -p "require('./apps/internal-cli/package.json').version")
           echo "internal_version=$INTERNAL_VERSION" >> $GITHUB_OUTPUT
       - name: Create GitHub Release (internal)
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ github.ref_name }}
           name: Internal CLI Release ${{ github.ref_name }}
@@ -274,7 +274,7 @@ jobs:
           EXTERNAL_VERSION=$(node -p "require('./apps/cli/package.json').version")
           echo "external_version=$EXTERNAL_VERSION" >> $GITHUB_OUTPUT
       - name: Create GitHub Release (external)
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ github.ref_name }}
           name: External CLI Release ${{ github.ref_name }}
@@ -317,7 +317,7 @@ jobs:
           echo "internal_version=$INTERNAL_VERSION" >> $GITHUB_OUTPUT
           echo "external_version=$EXTERNAL_VERSION" >> $GITHUB_OUTPUT
       - name: Create GitHub Release (combined)
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228  # v3.0.2
         with:
           tag_name: ${{ github.ref_name }}
           name: CLI Release ${{ github.ref_name }}

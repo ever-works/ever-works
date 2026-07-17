@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "technicalLevel": "advanced",
+  "domains": ["typescript", "nestjs", "nextjs", "turborepo"],
+  "verbosity": "concise"
+}

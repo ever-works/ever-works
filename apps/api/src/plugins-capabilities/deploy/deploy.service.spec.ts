@@ -1414,4 +1414,165 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             expect(keys).not.toContain('K8S_EXTRA_HOSTS');
         });
     });
+
+    /**
+     * EW (owner item #3b) — authoritative, server-side namespace enforcement.
+     *
+     * The k8s `namespace` field is free-text; before this the deploy path had
+     * NO server-side check, so a shared-cluster deploy could target
+     * `ever-works` / `kube-system` / another tenant. `resolveDeployNamespace`
+     * OVERRIDES the namespace with a deterministic per-tenant one on shared /
+     * managed clusters and REJECTS any reserved namespace on every source.
+     */
+    describe('server-side namespace enforcement (owner item #3b)', () => {
+        // Reflect the namespace the orchestrator injected into the K8S_NAMESPACE
+        // secret so we can assert on what the workflow will actually receive.
+        const nsSecrets = jest
+            .fn()
+            .mockImplementation(async (settings: Record<string, unknown>) => ({
+                K8S_NAMESPACE:
+                    typeof settings.namespace === 'string' ? settings.namespace : 'ever-works',
+            }));
+
+        const k8sPlugin = () => ({
+            id: 'k8s',
+            getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+            getDeploymentSecrets: nsSecrets,
+        });
+
+        const originalEnv = process.env;
+        beforeEach(() => {
+            nsSecrets.mockClear();
+            process.env = { ...originalEnv };
+            delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+            delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+            delete process.env.EVER_WORKS_DEPLOY_NAMESPACE;
+        });
+        afterEach(() => {
+            process.env = originalEnv;
+        });
+
+        it('shared cluster (k8s-works-shared) OVERRIDES a user namespace with a per-tenant one', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-yaml';
+            const { service, githubPlugin } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'acme',
+                // A hostile user tries to target the platform's own namespace.
+                settings: { clusterSource: 'k8s-works-shared', namespace: 'kube-system' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const settingsArg = nsSecrets.mock.calls[0][0];
+            expect(settingsArg.namespace).toBe('ever-works-tenants-user-1');
+            const byKey = Object.fromEntries(
+                captureCalls(githubPlugin).secrets.map((s: any) => [s.key, s.value]),
+            );
+            // The user's `kube-system` never reaches the pushed secret.
+            expect(byKey.K8S_NAMESPACE).toBe('ever-works-tenants-user-1');
+        });
+
+        it('honours EVER_WORKS_DEPLOY_NAMESPACE as the per-tenant base', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-yaml';
+            process.env.EVER_WORKS_DEPLOY_NAMESPACE = 'tenants';
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'acme',
+                settings: { clusterSource: 'k8s-works-shared' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(nsSecrets.mock.calls[0][0].namespace).toBe('tenants-user-1');
+        });
+
+        it('the managed ever-works provider always gets a per-tenant namespace', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'ever-works',
+                websiteOwner: 'acme',
+                token: 'platform-managed-kubeconfig',
+                settings: { namespace: 'ever-works' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(nsSecrets.mock.calls[0][0].namespace).toBe('ever-works-tenants-user-1');
+        });
+
+        it('rejects a reserved namespace on custom-kubeconfig (blocklist applies to every source)', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'acme',
+                token: 'user-pasted-yaml',
+                settings: { clusterSource: 'custom-kubeconfig', namespace: 'ever-works' },
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(/reserved/i);
+        });
+
+        it('rejects a kube-* namespace on the admin internal cluster (k8s-works)', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-yaml';
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'ever-works',
+                isPlatformAdmin: true,
+                settings: { clusterSource: 'k8s-works', namespace: 'kube-flannel' },
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(/reserved/i);
+        });
+
+        it('passes a valid custom-kubeconfig namespace through unchanged', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'acme',
+                token: 'user-pasted-yaml',
+                settings: { clusterSource: 'custom-kubeconfig', namespace: 'my-team' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(nsSecrets.mock.calls[0][0].namespace).toBe('my-team');
+        });
+
+        it('leaves the namespace untouched (plugin default) when none is supplied on a user cluster', async () => {
+            const { service } = buildService({
+                plugin: k8sPlugin(),
+                deployProvider: 'k8s',
+                websiteOwner: 'acme',
+                token: 'user-pasted-yaml',
+                settings: { clusterSource: 'custom-kubeconfig' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            // No override injected → plugin falls back to its own default.
+            expect(nsSecrets.mock.calls[0][0].namespace).toBeUndefined();
+        });
+
+        it('does not touch the namespace for non-k8s providers (Vercel)', async () => {
+            const { service } = buildService({
+                deployProvider: 'vercel',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: nsSecrets,
+                },
+                token: 'vercel-token',
+                settings: { namespace: 'kube-system' },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            // Vercel has no namespace concept — the reserved value is ignored,
+            // not rejected, and no per-tenant override is applied.
+            expect(nsSecrets.mock.calls[0][0].namespace).toBe('kube-system');
+        });
+    });
 });
