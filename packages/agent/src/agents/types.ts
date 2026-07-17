@@ -50,6 +50,8 @@ export interface AgentDto {
     // email) without dropping into the database.
     committerName: string | null;
     committerEmail: string | null;
+    /** Direct manager for the Org Chart (teams-and-companies spec §1.2). */
+    reportsToAgentId: string | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -89,6 +91,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         avatarImageUploadId: agent.avatarImageUploadId ?? null,
         committerName: agent.committerName ?? null,
         committerEmail: agent.committerEmail ?? null,
+        reportsToAgentId: agent.reportsToAgentId ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

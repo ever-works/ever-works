@@ -263,6 +263,15 @@ export class UpdateAgentDto {
     @IsEmail()
     @MaxLength(254)
     committerEmail?: string | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: 'Direct manager Agent id for the Org Chart; null clears it',
+    })
+    @IsOptional()
+    @IsUUID()
+    reportsToAgentId?: string | null;
 }
 
 export class ListAgentsQueryDto {

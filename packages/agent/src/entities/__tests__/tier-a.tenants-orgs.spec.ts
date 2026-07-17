@@ -9,6 +9,7 @@ import { Notification } from '../notification.entity';
 import { OnboardingRequest } from '../onboarding-request.entity';
 import { Skill } from '../skill.entity';
 import { Task } from '../task.entity';
+import { Team } from '../team.entity';
 import { Template } from '../template.entity';
 import { TemplateCustomization } from '../template-customization.entity';
 import { UserSubscription } from '../user-subscription.entity';
@@ -48,6 +49,7 @@ describe('Tier A entities — Phase 3 scope columns', () => {
         { name: 'Task', target: Task },
         { name: 'Agent', target: Agent },
         { name: 'Skill', target: Skill },
+        { name: 'Team', target: Team },
         { name: 'Conversation', target: Conversation },
         { name: 'Notification', target: Notification },
         { name: 'ApiKey', target: ApiKey },

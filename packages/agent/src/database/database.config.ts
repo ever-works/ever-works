@@ -57,6 +57,8 @@ import {
     AgentRunLog,
     AgentBudget,
     AgentMembership,
+    Team,
+    TeamMember,
     Skill,
     SkillBinding,
     Task,
@@ -184,6 +186,9 @@ export const ENTITIES = [
     AgentBudget,
     AgentMembership,
     AgentAttachment,
+    // Teams & Prebuilt Companies (teams-and-companies spec §2)
+    Team,
+    TeamMember,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family

@@ -156,6 +156,10 @@
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
+        },
+        "./teams": {
+            "types": "./dist/teams/index.d.ts",
+            "default": "./dist/teams/index.js"
         }
     },
     "scripts": {

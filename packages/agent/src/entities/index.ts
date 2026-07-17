@@ -98,3 +98,7 @@ export * from './tenant-runtime-provider-allowlist.entity';
 // EW-742 P1 T11 follow-up — per-version credential snapshot history
 // (graceful drain per ADR-017 §3 Q4)
 export * from './tenant-credential-snapshot.entity';
+
+// Teams & Prebuilt Companies (docs/specs/features/teams-and-companies)
+export * from './team.entity';
+export * from './team-member.entity';
