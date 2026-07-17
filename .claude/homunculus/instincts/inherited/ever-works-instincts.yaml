@@ -1,0 +1,414 @@
+# Instincts generated from https://github.com/ever-works/ever-works
+# Generated: 2026-07-17T19:35:03.708Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: ever-works-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: fix
+
+## Evidence
+
+- 1 commits analyzed
+- Detected conventional commit pattern
+- Examples: fix(onboarding,templates): UI + content polish for wizard and templates
+
+---
+id: ever-works-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Commit Length
+
+## Action
+
+Write moderate-length commit messages (~71 characters)
+
+## Evidence
+
+- Average commit message length: 71 chars
+- Based on 1 commits
+
+---
+id: ever-works-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: ever-works-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: ever-works-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: ever-works-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/ever-works/ever-works
+---
+
+# Ever Works Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: ever-works-instinct-file-naming
+trigger: "When creating a new file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files
+
+---
+id: ever-works-instinct-function-naming
+trigger: "When defining a function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions
+
+---
+id: ever-works-instinct-class-naming
+trigger: "When creating a class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes
+
+---
+id: ever-works-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants
+
+---
+id: ever-works-instinct-import-alias
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Import Alias
+
+## Action
+
+Use alias-based import paths
+
+## Evidence
+
+- Pattern in importStyle: alias
+
+---
+id: ever-works-instinct-named-exports
+trigger: "When exporting from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Named Exports
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: ever-works-instinct-try-catch-error
+trigger: "When handling errors in code"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Try Catch Error
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
+---
+id: ever-works-instinct-no-custom-error-classes
+trigger: "When defining error handling logic"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct No Custom Error Classes
+
+## Action
+
+Avoid creating custom error classes
+
+## Evidence
+
+- Pattern in errorHandling.customErrorClasses: false
+
+---
+id: ever-works-instinct-no-global-error-handler
+trigger: "When considering global error handling"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct No Global Error Handler
+
+## Action
+
+Do not implement a global error handler
+
+## Evidence
+
+- Pattern in errorHandling.globalHandler: false
+
+---
+id: ever-works-instinct-no-error-boundaries
+trigger: "When considering error boundaries"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct No Error Boundaries
+
+## Action
+
+Do not implement error boundaries
+
+## Evidence
+
+- Pattern in errorHandling.errorBoundaries: false
+
+---
+id: ever-works-instinct-git-commit-format
+trigger: "When writing a git commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Git Commit Format
+
+## Action
+
+Use conventional commit format with a 'fix' prefix and scope in parentheses, followed by a colon and summary
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Pattern in commits.prefixes: fix
+- Example: fix(onboarding,templates): UI + content polish for wizard and templates
+
+---
+id: ever-works-instinct-commit-length
+trigger: "When writing a git commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, around 71 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength: 71
+
+---
+id: ever-works-instinct-monorepo-structure
+trigger: "When adding new modules or apps"
+confidence: 0.9
+domain: architecture
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Monorepo Structure
+
+## Action
+
+Place them in the 'apps' or 'packages' folders at the root
+
+## Evidence
+
+- Pattern in architecture.folderStructure.commonFolders: apps, packages
+
+---
+id: ever-works-instinct-type-based-organization
+trigger: "When organizing modules"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Type Based Organization
+
+## Action
+
+Organize modules by type
+
+## Evidence
+
+- Pattern in architecture.moduleOrganization: type-based
+
+---
+id: ever-works-instinct-test-location-mixed
+trigger: "When adding or locating tests"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: ever-works/ever-works
+---
+
+# Ever Works Instinct Test Location Mixed
+
+## Action
+
+Place tests in both source and dedicated test folders as appropriate (mixed location)
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: mixed
+
