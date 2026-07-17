@@ -87,7 +87,10 @@ function buildCsp(): string {
         "media-src 'self' https:",
         "font-src 'self' data:",
         "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://challenges.cloudflare.com",
+        // EW-617 — Cloudflare Turnstile widget script + challenge iframe. Keep
+        // in lock-step with next.config.ts's CSP array (its byte-twin).
+        "frame-src 'self' https://challenges.cloudflare.com",
         `connect-src 'self' ${apiHost} https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://api.openai.com https://cdn.jsdelivr.net https://unpkg.com ${extraConnect.join(' ')}`.trim(),
         "worker-src 'self' blob:",
     ].join('; ');
