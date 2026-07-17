@@ -263,7 +263,8 @@
             "savedSuccess": "Настройки сохранены.",
             "noSettings": "Для этого плагина не требуется настройка.",
             "getTokenPrompt": "Сначала создайте токен, затем вставьте его ниже и сохраните, чтобы проверить соединение.",
-            "loadingStatus": "Загрузка статуса соединения..."
+            "loadingStatus": "Загрузка статуса соединения...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Подключите свой ключ, чтобы разблокировать полную конфигурацию.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Выбрано значение по умолчанию",
                 "makeDefault": "Сделать значением по умолчанию",
                 "fork": "Форкнуть",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Редактировать",
                 "archive": "Архивировать",
                 "customizeAgain": "Customize again",

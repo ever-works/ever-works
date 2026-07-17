@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Save, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Save, CheckCircle2, AlertCircle, Loader2, BookOpen } from 'lucide-react';
 import type { UserPlugin } from '@/lib/api/plugins';
 import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
@@ -10,6 +10,7 @@ import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/devi
 import { updatePluginSettings } from '@/app/actions/plugins';
 import { PluginOAuthConnection } from '@/components/settings/PluginOAuthConnection';
 import { PluginOnboardingWizard } from '@/components/settings/PluginOnboardingWizard';
+import { PluginReadme } from '@/components/plugins/PluginReadme';
 import { PluginSettingsFormFields } from '@/components/plugins/PluginSettingsFormFields';
 import { Button } from '@/components/ui/button';
 import { usePluginSettings } from '@/lib/hooks/use-plugin-settings';
@@ -194,6 +195,23 @@ function FieldBasedPluginStep({
                     </span>
                 )}
             </div>
+
+            {/* EW-617 (owner #2 fallback) — surface the plugin's existing
+                readme setup steps inline beneath the token field. Opt-in via
+                `uiHints.showReadmeInOnboarding` so only documented plugins
+                (e.g. Vercel) show it. Additive; the external "Get token" link
+                above still ships. */}
+            {plugin.uiHints?.showReadmeInOnboarding && plugin.readme ? (
+                <details className="rounded-xl border border-border dark:border-border-dark bg-surface dark:bg-surface-dark">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-text dark:text-text-dark">
+                        <BookOpen className="h-4 w-4 text-text-muted dark:text-text-muted-dark" />
+                        {t('setupGuide')}
+                    </summary>
+                    <div className="border-t border-border dark:border-border-dark px-4 py-3">
+                        <PluginReadme content={plugin.readme} />
+                    </div>
+                </details>
+            ) : null}
         </div>
     );
 }

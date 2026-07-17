@@ -263,7 +263,8 @@
             "savedSuccess": "सेटिंग्स सहेजी गईं।",
             "noSettings": "इस प्लगइन के लिए कोई कॉन्फ़िगरेशन आवश्यक नहीं।",
             "getTokenPrompt": "पहले एक टोकन बनाएं, फिर इसे नीचे पेस्ट करें और कनेक्शन सत्यापित करने के लिए सहेजें।",
-            "loadingStatus": "कनेक्शन स्थिति लोड हो रही है..."
+            "loadingStatus": "कनेक्शन स्थिति लोड हो रही है...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "पूर्ण कॉन्फ़िगरेशन अनलॉक करने के लिए अपना कुंजी कनेक्ट करें।",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "डिफ़ॉल्ट चयनित",
                 "makeDefault": "डिफ़ॉल्ट बनाएं",
                 "fork": "फ़ॉर्क",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "संपादित करें",
                 "archive": "आर्काइव",
                 "customizeAgain": "Customize again",

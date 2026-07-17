@@ -25,6 +25,7 @@ import {
     Target,
     Globe,
     FolderClosed,
+    MoreVertical,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import type {
@@ -36,6 +37,12 @@ import type {
     TemplateKind,
 } from '@/lib/api/templates';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -377,6 +384,8 @@ function TemplateCard({
                                     href={`/new?type=mission&template=${encodeURIComponent(
                                         template.id,
                                     )}`}
+                                    title={t('card.useTemplateFull')}
+                                    aria-label={t('card.useTemplateFull')}
                                 >
                                     <Sparkles className="h-3.5 w-3.5" />
                                     {t('card.useTemplate')}
@@ -445,16 +454,40 @@ function TemplateCard({
                                 </Button>
                             </>
                         )}
-                        <Button
-                            variant={isDefault ? 'secondary' : 'primary'}
-                            size="sm"
-                            loading={loading}
-                            disabled={isDefault || loading}
-                            onClick={() => onSetDefault(template.id)}
-                            className="whitespace-nowrap text-xs"
-                        >
-                            {isDefault ? t('card.defaultSelected') : t('card.makeDefault')}
-                        </Button>
+                        {/* Owner feedback 2026-07-17 (#9) — the primary
+                            "Make default" action moved into a ⋮ kebab so the
+                            card action row fits on one line. Reuses the shared
+                            DropdownMenu (asChild + ghost Button, matching
+                            ItemActions); leaves room for future per-template
+                            actions in the same menu. The `w-fit` wrapper pins
+                            the menu root's `w-full` to the trigger width so it
+                            doesn't stretch this shrink-to-fit row. */}
+                        <div className="w-fit shrink-0">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label={t('card.moreActions')}
+                                        title={t('card.moreActions')}
+                                        className="text-xs"
+                                    >
+                                        <MoreVertical className="h-3.5 w-3.5" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        onClick={() => onSetDefault(template.id)}
+                                        disabled={isDefault || loading}
+                                    >
+                                        <Star className="mr-2 h-3.5 w-3.5" />
+                                        {isDefault
+                                            ? t('card.defaultSelected')
+                                            : t('card.makeDefault')}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                     </div>
                 </div>
             </div>

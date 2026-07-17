@@ -263,7 +263,8 @@
             "savedSuccess": "บันทึกการตั้งค่าแล้ว",
             "noSettings": "ไม่ต้องตั้งค่าสำหรับปลั๊กอินนี้",
             "getTokenPrompt": "สร้างโทเค็นก่อน จากนั้นวางด้านล่างและบันทึกเพื่อยืนยันการเชื่อมต่อ",
-            "loadingStatus": "กำลังโหลดสถานะการเชื่อมต่อ..."
+            "loadingStatus": "กำลังโหลดสถานะการเชื่อมต่อ...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "เชื่อมต่อคีย์ของคุณเองเพื่อปลดล็อกการตั้งค่าเต็มรูปแบบ",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "เลือกค่าเริ่มต้นแล้ว",
                 "makeDefault": "ตั้งเป็นค่าเริ่มต้น",
                 "fork": "ฟอร์ก",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "แก้ไข",
                 "archive": "จัดเก็บถาวร",
                 "customizeAgain": "Customize again",

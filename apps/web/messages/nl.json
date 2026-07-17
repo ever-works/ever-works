@@ -263,7 +263,8 @@
             "savedSuccess": "Instellingen opgeslagen.",
             "noSettings": "Geen configuratie vereist voor deze plugin.",
             "getTokenPrompt": "Maak eerst een token aan, plak het hieronder en sla op om de verbinding te verifiëren.",
-            "loadingStatus": "Verbindingsstatus laden..."
+            "loadingStatus": "Verbindingsstatus laden...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Verbind je eigen sleutel om de volledige configuratie te ontgrendelen.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Standaard geselecteerd",
                 "makeDefault": "Maak standaard",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Bewerken",
                 "archive": "Archiveren",
                 "customizeAgain": "Customize again",

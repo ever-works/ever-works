@@ -815,10 +815,10 @@ test.describe('Onboarding wizard UI — a BYOK AI choice inserts a config step i
                 ).toHaveCount(0);
             }
 
-            // The "Create your first work" final step is always present, and the
+            // The "Create your first Work" final step is always present, and the
             // total rendered SideNav step buttons equal the server-derived count.
             await expect(
-                wizard.getByRole('button', { name: 'Create your first work' }),
+                wizard.getByRole('button', { name: 'Create your first Work' }),
             ).toBeVisible({
                 timeout: 10_000,
             });

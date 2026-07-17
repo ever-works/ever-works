@@ -201,6 +201,13 @@ export interface PluginUiHints {
 	completionFields?: string[];
 	/** User-friendly step description shown in the onboarding wizard (separate from the plugin description). */
 	onboardingDescription?: string;
+	/**
+	 * Render this plugin's `readme` (markdown setup guide) inline in the
+	 * first-time onboarding config step, beneath the settings fields. Opt-in
+	 * per plugin so we surface setup steps (e.g. "Get a Vercel token") without
+	 * dumping every plugin's readme into the wizard.
+	 */
+	showReadmeInOnboarding?: boolean;
 	/** Exposes a plugin-managed device auth flow, such as a backend-started CLI device-code session. */
 	deviceAuth?: {
 		/** Settings field that selects the auth mode when device auth is available. */

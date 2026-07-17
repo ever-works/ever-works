@@ -263,7 +263,8 @@
             "savedSuccess": "Einstellungen gespeichert.",
             "noSettings": "Keine Konfiguration für dieses Plugin erforderlich.",
             "getTokenPrompt": "Erstellen Sie zuerst ein Token, fügen Sie es unten ein und speichern Sie, um die Verbindung zu überprüfen.",
-            "loadingStatus": "Verbindungsstatus wird geladen…"
+            "loadingStatus": "Verbindungsstatus wird geladen…",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Verbinden Sie Ihren eigenen Schlüssel, um die volle Konfiguration freizuschalten.",
@@ -4437,7 +4438,9 @@
                 "defaultSelected": "Standard ausgewählt",
                 "makeDefault": "Als Standard festlegen",
                 "fork": "Forken",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Bearbeiten",
                 "archive": "Archivieren",
                 "customizeAgain": "Anpassen",
