@@ -263,7 +263,8 @@
             "savedSuccess": "Pengaturan disimpan.",
             "noSettings": "Tidak ada konfigurasi yang diperlukan untuk plugin ini.",
             "getTokenPrompt": "Buat token terlebih dahulu, lalu tempelkan di bawah ini dan simpan untuk memverifikasi koneksi.",
-            "loadingStatus": "Memuat status koneksi..."
+            "loadingStatus": "Memuat status koneksi...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Hubungkan kunci Anda sendiri untuk membuka konfigurasi lengkap.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Default dipilih",
                 "makeDefault": "Jadikan default",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Edit",
                 "archive": "Arsipkan",
                 "customizeAgain": "Customize again",

@@ -263,7 +263,8 @@
             "savedSuccess": "Impostazioni salvate.",
             "noSettings": "Nessuna configurazione richiesta per questo plugin.",
             "getTokenPrompt": "Crea prima un token, poi incollalo qui sotto e salva per verificare la connessione.",
-            "loadingStatus": "Caricamento stato connessione..."
+            "loadingStatus": "Caricamento stato connessione...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Connetti la tua chiave per sbloccare la configurazione completa.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Predefinito selezionato",
                 "makeDefault": "Imposta come predefinito",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Modifica",
                 "archive": "Archivia",
                 "customizeAgain": "Customize again",

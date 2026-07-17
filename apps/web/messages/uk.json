@@ -263,7 +263,8 @@
             "savedSuccess": "Налаштування збережено.",
             "noSettings": "Для цього плагіна не потрібне налаштування.",
             "getTokenPrompt": "Спочатку створіть токен, потім вставте його нижче та збережіть, щоб перевірити з'єднання.",
-            "loadingStatus": "Завантаження статусу з'єднання..."
+            "loadingStatus": "Завантаження статусу з'єднання...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Підключіть свій ключ, щоб розблокувати повне налаштування.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Вибрано за замовчуванням",
                 "makeDefault": "Встановити за замовчуванням",
                 "fork": "Форк",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Редагувати",
                 "archive": "Архівувати",
                 "customizeAgain": "Customize again",

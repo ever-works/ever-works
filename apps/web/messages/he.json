@@ -263,7 +263,8 @@
             "savedSuccess": "ההגדרות נשמרו.",
             "noSettings": "אין צורך בהגדרה עבור תוסף זה.",
             "getTokenPrompt": "צרו אסימון קודם, הדביקו אותו למטה ושמרו כדי לאמת את החיבור.",
-            "loadingStatus": "טוען סטטוס חיבור..."
+            "loadingStatus": "טוען סטטוס חיבור...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "חברו את המפתח שלכם כדי לפתוח את ההגדרה המלאה.",
@@ -4437,7 +4438,9 @@
                 "defaultSelected": "ברירת מחדל נבחרה",
                 "makeDefault": "הפוך לברירת מחדל",
                 "fork": "פיצול",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "עריכה",
                 "archive": "ארכיון",
                 "customizeAgain": "התאמה אישית שוב",

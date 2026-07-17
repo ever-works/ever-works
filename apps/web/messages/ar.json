@@ -263,7 +263,8 @@
             "savedSuccess": "تم حفظ الإعدادات.",
             "noSettings": "لا يتطلب هذا الملحق تكويناً.",
             "getTokenPrompt": "أنشئ رمزاً أولاً، ثم الصقه أدناه واحفظه للتحقق من الاتصال.",
-            "loadingStatus": "جاري تحميل حالة الاتصال..."
+            "loadingStatus": "جاري تحميل حالة الاتصال...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "قم بتوصيل مفتاحك الخاص لفتح التكوين الكامل.",
@@ -4437,7 +4438,9 @@
                 "defaultSelected": "تم تحديد الافتراضي",
                 "makeDefault": "اجعله افتراضيًا",
                 "fork": "شُتّت",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "تعديل",
                 "archive": "أرشفة",
                 "customizeAgain": "تخصيص مرة أخرى",
