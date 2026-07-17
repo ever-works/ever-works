@@ -275,7 +275,8 @@ ever-works/orgs
     ├── projects/<slug>/PROJECT.md  (+ projects/<slug>/tasks/<slug>/TASK.md)
     ├── skills/<slug>/SKILL.md      # standard Agent Skills, never redefined
     ├── images/org-chart.svg
-    └── .works/company.yml      # OUR vendor extension (schema: everworks/v1) — see §6.3
+    └── .works/company.yml   # OUR vendor sidecar (.works/<entity>.yml convention,
+                             # like mission.yml / agent.yml) — see §6.3
 ```
 
 `manifest.json` (v1) mirrors the agents-repo pattern:

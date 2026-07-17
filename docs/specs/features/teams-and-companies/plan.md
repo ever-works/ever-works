@@ -36,11 +36,14 @@ branch e2e) and is independently mergeable.
 
 - Bootstrap repo: README (credits), MIT LICENSE, CONTRIBUTING, `manifest.json`,
   `schema/orgs-manifest.schema.json`, validate workflow.
-- Author v1 companies (original prose, agentcompanies/v1 layout, `.works/company.yml`):
-  `ever-starter` (flagship, built on the `ever-works/agents` starter templates) plus a
-  spread of adapted-concept companies (engineering, dev-shop, research-lab, game-studio,
-  creative-agency, review-board, consulting, security, capital) — each ≤ 12 agents,
-  1–3 teams, 2–5 skills, ≤ 1 project.
+- Author v1 companies (original prose, agentcompanies/v1 layout, `.works/company.yml`
+  vendor sidecar — the `.works/<entity>.yml` house convention): `ever-starter`
+  (flagship, built on the `ever-works/agents` starter templates) plus adapted-concept
+  companies covering the FULL upstream paperclipai/companies catalog (latest-upstream
+  policy: check each original source repo, record versions in `metadata.sources`) and
+  worthwhile companies from its open PRs — caps ≤ 50 agents / ≤ 10 teams / ≤ 40 skills
+  / ≤ 2 projects (aligned with the importer's server caps), curated-down rosters noted
+  per-company README.
 - CI validation green; tag `v1.0.0` (platform default ref).
 
 ## Phase 4 — Catalog service + import + wizard step
