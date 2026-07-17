@@ -664,7 +664,11 @@
                 "templateStepTitle": "Start from a template (optional)",
                 "startFromScratch": "Start from scratch",
                 "pickParentHint": "Pick a {scope} above to continue, or choose Workspace scope.",
-                "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
+                "nextDisabledReason": "Pick a parent or choose Workspace scope to continue.",
+                "teamLabel": "Team",
+                "teamNone": "No team",
+                "reportsToLabel": "Reports to",
+                "reportsToNone": "No manager"
             },
             "orDivider": "Or",
             "createManually": "Create Agent Manually",
@@ -682,6 +686,17 @@
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
                 "openInWizard": "Open in wizard"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organization",
+                    "teamLabel": "Team",
+                    "teamNone": "No team",
+                    "reportsToLabel": "Reports to",
+                    "reportsToNone": "No manager",
+                    "save": "Save",
+                    "saving": "Saving…"
+                }
             }
         },
         "tasksPage": {
@@ -4445,7 +4460,8 @@
                 "plugins": "Plugins",
                 "skills": "Skills",
                 "templates": "Templates",
-                "settings": "Settings"
+                "settings": "Settings",
+                "teams": "Teams"
             },
             "tooltips": {
                 "expandSidebar": "Expand sidebar",
@@ -4985,6 +5001,94 @@
             "toggleError": "Failed to toggle plugin",
             "system": "System",
             "goToPluginSettings": "Go to plugin settings"
+        },
+        "teamsPage": {
+            "title": "Teams",
+            "subtitle": "Organize your Agents and members into teams inside this organization.",
+            "orgChartCta": "Org Chart",
+            "newTeamCta": "New Team",
+            "empty": {
+                "title": "No teams yet",
+                "description": "Create your first team to group Agents and members, then arrange them on the Org Chart.",
+                "cta": "Create a team"
+            },
+            "noOrg": {
+                "title": "Teams live inside an organization",
+                "description": "Create an organization first — then you can group its Agents and members into teams.",
+                "cta": "Create Organization"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agent} other {# agents}}",
+                "members": "{count, plural, one {# member} other {# members}}",
+                "subTeams": "{count, plural, one {# sub-team} other {# sub-teams}}"
+            },
+            "newDialog": {
+                "title": "New Team",
+                "nameLabel": "Name",
+                "namePlaceholder": "e.g. Engineering",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "What this team owns (optional)",
+                "parentLabel": "Parent team",
+                "parentNone": "No parent (top level)",
+                "managerLabel": "Manager agent",
+                "managerNone": "No manager",
+                "submit": "Create Team",
+                "creating": "Creating…",
+                "cancel": "Cancel"
+            },
+            "detail": {
+                "overviewTab": "Overview",
+                "settingsTab": "Settings",
+                "rosterTitle": "Roster",
+                "subTeamsTitle": "Sub-teams",
+                "managerLabel": "Manager",
+                "parentLabel": "Parent team",
+                "addMemberCta": "Add member",
+                "addMemberTypeLabel": "Type",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Member",
+                "addMemberSelectLabel": "Who",
+                "addMemberSubmit": "Add",
+                "adding": "Adding…",
+                "removeMember": "Remove",
+                "roleLead": "Lead",
+                "roleMember": "Member",
+                "emptyRoster": "No members yet — add Agents or teammates to this team."
+            },
+            "settings": {
+                "title": "Team Settings",
+                "nameLabel": "Name",
+                "descriptionLabel": "Description",
+                "parentLabel": "Parent team",
+                "managerLabel": "Manager agent",
+                "save": "Save changes",
+                "saving": "Saving…",
+                "saved": "Team updated",
+                "deleteTitle": "Danger zone",
+                "deleteDescription": "Deleting a team re-parents its sub-teams and removes its roster. Agents and members are not deleted.",
+                "deleteCta": "Delete team",
+                "deleteConfirm": "Delete this team? Sub-teams move up one level; Agents and members are kept.",
+                "deleting": "Deleting…"
+            },
+            "errors": {
+                "createFailed": "Could not create the team",
+                "updateFailed": "Could not update the team",
+                "deleteFailed": "Could not delete the team",
+                "memberAddFailed": "Could not add the member",
+                "memberRemoveFailed": "Could not remove the member"
+            }
+        },
+        "orgChartPage": {
+            "title": "Org Chart",
+            "subtitle": "Teams, Agents and members of this organization.",
+            "backToTeams": "Teams",
+            "zoomIn": "Zoom in",
+            "zoomOut": "Zoom out",
+            "fitView": "Fit",
+            "unassignedGroup": "Unassigned",
+            "membersBadge": "{count, plural, one {# member} other {# members}}",
+            "empty": "Nothing to chart yet — create teams or Agents in this organization first.",
+            "noOrg": "Create an organization to see its Org Chart."
         }
     },
     "layout": {
