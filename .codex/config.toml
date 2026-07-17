@@ -1,0 +1,31 @@
+# Codex configuration for the ever-works monorepo.
+#
+# Authoritative project rules live in AGENTS.md -> CLAUDE.md at the repo root,
+# and a verified summary is in .agents/skills/ever-works/SKILL.md. Read those
+# before making changes.
+
+# Conservative defaults: explore freely, ask before writing.
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+# --- MCP servers ---
+# No MCP servers are enabled by default, so this config carries zero
+# supply-chain surface. If you add one, PIN it to an explicit, vetted version.
+# NEVER use `npx -y` without a version, and never `@latest` — an unpinned
+# server silently pulls new, unreviewed code on every run.
+#
+# Example (commented out — uncomment and pin to a version you have vetted):
+#
+# [mcp_servers.playwright]
+# command = "npx"
+# args = ["@playwright/mcp@0.0.41"]   # exact version only — no -y, no @latest
+#
+# For the GitHub MCP server, prefer the official image pinned by tag or digest:
+#
+# [mcp_servers.github]
+# command = "docker"
+# args = [
+#   "run", "-i", "--rm",
+#   "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+#   "ghcr.io/github/github-mcp-server:v0.6.0",   # pin the tag (or use @sha256:...)
+# ]
