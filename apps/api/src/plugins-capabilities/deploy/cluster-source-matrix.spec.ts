@@ -5,7 +5,10 @@ import {
     ClusterSource,
     isAdminOnlyOrg,
     isEverWorksSharedOrg,
+    isReservedDeployNamespace,
+    isSharedClusterSource,
     normalizeClusterSource,
+    RESERVED_DEPLOY_NAMESPACES,
     resolveKubeconfigForClusterSource,
     validateClusterSourceForOwner,
 } from './cluster-source-matrix';
@@ -233,6 +236,60 @@ describe('cluster-source-matrix — deploy matrix (renamed: k8s-works internal, 
         it("only the admin-only k8s-works description mentions the 'ever-works' org requirement", () => {
             expect(CLUSTER_SOURCE_DESCRIPTIONS['k8s-works']).toMatch(/ever-works/i);
             expect(CLUSTER_SOURCE_DESCRIPTIONS['k8s-works-shared']).not.toMatch(/admin/i);
+        });
+    });
+
+    // EW (owner item #3b) — server-side namespace enforcement helpers.
+    describe('isReservedDeployNamespace', () => {
+        it.each([
+            'ever-works',
+            'kube-system',
+            'kube-public',
+            'kube-node-lease',
+            'default',
+            'argocd',
+            'cert-manager',
+            'ingress-nginx',
+            'monitoring',
+        ])('rejects the reserved namespace %s', (ns) =>
+            expect(isReservedDeployNamespace(ns)).toBe(true),
+        );
+
+        it('is case- and whitespace-insensitive', () => {
+            expect(isReservedDeployNamespace('  KUBE-System ')).toBe(true);
+            expect(isReservedDeployNamespace('Ever-Works')).toBe(true);
+        });
+
+        it('rejects any kube-* namespace (whole system family), not just the named ones', () => {
+            expect(isReservedDeployNamespace('kube-flannel')).toBe(true);
+            expect(isReservedDeployNamespace('kube-anything')).toBe(true);
+        });
+
+        it.each(['acme', 'my-team', 'ever-works-tenants-user-1', 'tenant-42'])(
+            'allows the ordinary tenant namespace %s',
+            (ns) => expect(isReservedDeployNamespace(ns)).toBe(false),
+        );
+
+        it('treats empty/blank input as not reserved (caller decides)', () => {
+            expect(isReservedDeployNamespace('')).toBe(false);
+            expect(isReservedDeployNamespace('   ')).toBe(false);
+        });
+
+        it('exposes the reserved set for reuse', () => {
+            expect(RESERVED_DEPLOY_NAMESPACES.has('ever-works')).toBe(true);
+            expect(RESERVED_DEPLOY_NAMESPACES.has('acme')).toBe(false);
+        });
+    });
+
+    describe('isSharedClusterSource', () => {
+        it('is true only for the shared customer cluster', () => {
+            expect(isSharedClusterSource('k8s-works-shared')).toBe(true);
+            expect(isSharedClusterSource('k8s-works')).toBe(false);
+            expect(isSharedClusterSource('custom-kubeconfig')).toBe(false);
+        });
+
+        it('normalises the legacy k8s-gauzy alias (→ internal, not shared)', () => {
+            expect(isSharedClusterSource('k8s-gauzy' as ClusterSource)).toBe(false);
         });
     });
 });

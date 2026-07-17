@@ -5,7 +5,11 @@ import { WebsiteGeneratorModule } from '@ever-works/agent/generators';
 import { WorkModule } from '@ever-works/agent/services';
 import { AuthModule } from '../../auth/auth.module';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
-import { EverWorksDnsService, SubdomainAllocator } from '@ever-works/agent/ever-works-providers';
+import {
+    EverWorksDnsService,
+    EverWorksK8sDeployProvider,
+    SubdomainAllocator,
+} from '@ever-works/agent/ever-works-providers';
 import { DeployController } from './deploy.controller';
 import { DeployService } from './deploy.service';
 import { DeploymentVerifierService } from './tasks/deployment-verifier.service';
@@ -25,6 +29,11 @@ import { ManagedSubdomainService } from './managed-subdomain.service';
         DeployService,
         DeploymentVerifierService,
         EverWorksDnsService,
+        // Task 10 / Path A — dedicated managed-deploy provider, registered so
+        // it is part of the deploy module's DI graph (it was registered
+        // nowhere). The facade resolves `deployProvider === 'ever-works'`
+        // credentials through it (reading `EVER_WORKS_DEPLOY_*`).
+        EverWorksK8sDeployProvider,
         SubdomainAllocator,
         ManagedSubdomainService,
     ],

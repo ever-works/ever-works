@@ -1,4 +1,4 @@
-﻿name: E2E Tests
+name: E2E Tests
 
 # Playwright e2e suite â€” auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
@@ -112,15 +112,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
         with:
           version: 10.33.3
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -419,7 +419,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           # Per-shard artifact name so the 4 parallel uploads don't clobber.
           name: playwright-report-${{ steps.tag.outputs.tag }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
@@ -431,7 +431,7 @@ jobs:
 
       - name: Upload server logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: server-logs-${{ steps.tag.outputs.tag }}-shard${{ matrix.shard }}-${{ github.run_attempt }}
           path: |
@@ -458,15 +458,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
         with:
           version: 10.33.3
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -565,7 +565,7 @@ jobs:
 
       - name: Upload Playwright prod-build report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-prod-build-report-${{ steps.tag.outputs.tag }}-${{ github.run_attempt }}
           path: |

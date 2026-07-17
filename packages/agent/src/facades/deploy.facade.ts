@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IDeploymentPlugin,
     IDeployFacade,
@@ -17,6 +17,7 @@ import { WorkPluginRepository } from '../plugins/repositories/work-plugin.reposi
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitFacadeService } from './git.facade';
 import { WorkCustomDomainRepository } from '../database/repositories/work-custom-domain.repository';
+import { EverWorksK8sDeployProvider } from '../ever-works-providers';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
 import type { Work } from '../entities/work.entity';
 import type { User } from '../entities/user.entity';
@@ -101,6 +102,13 @@ export class DeployFacadeService implements IDeployFacade {
         private readonly gitFacade: GitFacadeService,
         private readonly domainRepository: WorkCustomDomainRepository,
         private readonly workPluginRepository?: WorkPluginRepository,
+        // Task 10 / Path A — the dedicated managed-deploy provider. Optional so
+        // the many hand-constructed test fixtures (and any injector that hasn't
+        // registered it) keep working; when absent we self-instantiate the
+        // stateless provider, which reads `EVER_WORKS_DEPLOY_*` from env at call
+        // time. Registered as a real Nest provider in the work + deploy modules.
+        @Optional()
+        private readonly everWorksDeployProvider: EverWorksK8sDeployProvider = new EverWorksK8sDeployProvider(),
     ) {}
 
     resolveProviderId(providerId: string): string {
@@ -862,11 +870,25 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         // Get token from plugin settings (user-required mode)
-        const token = await this.getTokenFromSettings(
+        let token = await this.getTokenFromSettings(
             pluginProviderId,
             options.userId,
             options.workId,
         );
+
+        // Task 10 (Path A + Path B) — for the managed `ever-works` provider,
+        // source the deploy kubeconfig from the platform env (dedicated tenant
+        // cluster, or the shared customer cluster) instead of the user's k8s
+        // settings. When neither env is provisioned this returns null and we
+        // keep the existing sentinel/user-kubeconfig behaviour so nothing
+        // regresses and a downstream layer surfaces the clear "not available
+        // yet" error rather than crashing.
+        if (providerId === EVER_WORKS_DEPLOY_PROVIDER_ID) {
+            const managedKubeconfig = await this.resolveEverWorksManagedKubeconfig();
+            if (managedKubeconfig) {
+                token = managedKubeconfig;
+            }
+        }
 
         if (!token) {
             const providerName =
@@ -879,6 +901,46 @@ export class DeployFacadeService implements IDeployFacade {
             token,
             work,
         };
+    }
+
+    /**
+     * Task 10 — resolve the platform-held kubeconfig for a managed
+     * `ever-works` deploy. The owner chose BOTH managed backends; which one is
+     * live is decided purely by which env var the infra owner provisioned:
+     *
+     *   - **Path A (dedicated tenant cluster):**
+     *     `EVER_WORKS_DEPLOY_KUBECONFIG` / `EVER_WORKS_DEPLOY_KUBECONFIG_PATH`
+     *     — resolved via `EverWorksK8sDeployProvider` (preferred when enabled).
+     *   - **Path B (shared customer cluster):**
+     *     `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` — read directly here as a
+     *     fallback when the dedicated cluster is not configured.
+     *
+     * Returns `null` when neither is configured so the caller keeps the
+     * existing behaviour; this method never throws so a not-yet-provisioned
+     * managed cluster cannot crash the deploy resolution.
+     */
+    private async resolveEverWorksManagedKubeconfig(): Promise<string | null> {
+        // Path A — dedicated cluster (env-gated via DEPLOY_EVER_WORKS_ENABLED +
+        // a configured kubeconfig).
+        if (this.everWorksDeployProvider?.isEnabled()) {
+            try {
+                return await this.everWorksDeployProvider.resolveKubeconfig();
+            } catch (error) {
+                this.logger.warn(
+                    `Ever Works dedicated deploy kubeconfig is enabled but could not be resolved: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
+        // Path B — shared customer cluster.
+        const shared = process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG?.trim();
+        if (shared) {
+            return shared;
+        }
+
+        return null;
     }
 
     /**

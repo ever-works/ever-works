@@ -154,6 +154,18 @@ describe('KubernetesPlugin metadata', () => {
 		});
 	});
 
+	it('hides the namespace field for platform-managed sources (server enforces per-tenant namespace)', () => {
+		// Owner item #3b — defense-in-depth for the authoritative server-side
+		// namespace enforcement: on shared/managed clusters the namespace is
+		// assigned per tenant, so the free-text field is hidden and only shown
+		// for a user's own cluster (custom-kubeconfig).
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.namespace?.['x-showIf']).toEqual({
+			field: 'clusterSource',
+			value: 'custom-kubeconfig'
+		});
+	});
+
 	it('registry sub-form is a oneOf with three branches (github default)', () => {
 		const reg = plugin.settingsSchema.properties?.registry as { oneOf?: unknown[]; default?: { kind: string } };
 		expect(reg.oneOf).toHaveLength(3);

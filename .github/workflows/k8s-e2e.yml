@@ -1,4 +1,4 @@
-﻿name: K8s Plugin E2E
+name: K8s Plugin E2E
 
 # Spins up a kind cluster and runs `@ever-works/k8s-plugin`'s e2e suite
 # (`packages/plugins/k8s/src/__tests__/e2e/`) against it. The unit suite
@@ -62,7 +62,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 

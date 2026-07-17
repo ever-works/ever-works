@@ -516,4 +516,117 @@ describe('DeployFacadeService', () => {
             expect(failing).toHaveBeenCalled();
         });
     });
+
+    /**
+     * Task 10 — the managed `ever-works` deploy provider sources its kubeconfig
+     * from platform env, NOT from the user's k8s settings. The infra owner
+     * decides Path A vs Path B purely by which env var they provision:
+     *   - Path A: `EVER_WORKS_DEPLOY_*` (dedicated cluster, via the provider).
+     *   - Path B: `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` (shared cluster).
+     * When neither is set, resolution gracefully keeps the existing
+     * sentinel/user-kubeconfig behaviour (never crashes).
+     */
+    describe('Task 10 — managed ever-works kubeconfig resolution (Path A + Path B)', () => {
+        const ORIGINAL_SHARED = process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+        afterEach(() => {
+            if (ORIGINAL_SHARED === undefined) {
+                delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+            } else {
+                process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = ORIGINAL_SHARED;
+            }
+        });
+
+        const build = (args: {
+            everWorks: { isEnabled: () => boolean; resolveKubeconfig?: jest.Mock };
+            settings?: Record<string, { value?: unknown }>;
+        }) => {
+            const plugin = {
+                id: 'k8s',
+                name: 'Kubernetes',
+                providerName: 'kubernetes',
+                capabilities: ['deployment'],
+            };
+            const registered = {
+                plugin,
+                manifest: {
+                    id: 'k8s',
+                    name: 'Kubernetes',
+                    category: 'deployment',
+                    capabilities: ['deployment'],
+                    description: '',
+                    icon: { type: 'lucide', value: 'Container' },
+                },
+                state: 'loaded',
+            };
+            const registry = {
+                get: jest.fn((id: string) => (id === 'k8s' ? registered : undefined)),
+                getByCapability: jest.fn(() => [registered]),
+            };
+            const settingsService = {
+                getResolvedSettings: jest.fn().mockResolvedValue(args.settings ?? {}),
+                getSettings: jest.fn().mockResolvedValue({}),
+            };
+            const workRepository = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: 'work-1', deployProvider: 'ever-works' }),
+                update: jest.fn(),
+            };
+            const domainRepository = { findByWork: jest.fn().mockResolvedValue([]) };
+            const service = new DeployFacadeService(
+                registry as any,
+                settingsService as any,
+                workRepository as any,
+                {} as any,
+                domainRepository as any,
+                undefined,
+                args.everWorks as any,
+            );
+            return { service };
+        };
+
+        it('Path A — uses the dedicated cluster kubeconfig from EverWorksK8sDeployProvider when enabled', async () => {
+            const resolveKubeconfig = jest.fn().mockResolvedValue('dedicated-kubeconfig');
+            const { service } = build({ everWorks: { isEnabled: () => true, resolveKubeconfig } });
+
+            const resolved = await service.getPluginAndTokenAndSettings({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(resolveKubeconfig).toHaveBeenCalledTimes(1);
+            expect(resolved.plugin.id).toBe('k8s');
+            expect(resolved.token).toBe('dedicated-kubeconfig');
+        });
+
+        it('Path B — falls back to EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG when the dedicated provider is disabled', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-cluster-kubeconfig';
+            const resolveKubeconfig = jest.fn();
+            const { service } = build({ everWorks: { isEnabled: () => false, resolveKubeconfig } });
+
+            const resolved = await service.getPluginAndTokenAndSettings({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            // Dedicated provider is disabled → never consulted for a kubeconfig.
+            expect(resolveKubeconfig).not.toHaveBeenCalled();
+            expect(resolved.token).toBe('shared-cluster-kubeconfig');
+        });
+
+        it('gracefully keeps the platform-managed sentinel when neither managed cluster is configured', async () => {
+            delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+            const { service } = build({
+                everWorks: { isEnabled: () => false },
+                settings: { clusterSource: { value: 'k8s-works' } },
+            });
+
+            const resolved = await service.getPluginAndTokenAndSettings({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(resolved.token).toBe(PLATFORM_MANAGED_KUBECONFIG_SENTINEL);
+        });
+    });
 });

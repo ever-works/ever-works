@@ -48,6 +48,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksK8sDeployProvider,
     EverWorksDnsService,
     type EverWorksDeployQuotaCounter,
 } from '@src/ever-works-providers';
@@ -114,6 +115,13 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         // PAT, so users picking "Ever Works Git" don't need to bring their
         // own GitHub. Consumed by `WorkLifecycleService.createWork`.
         EverWorksGitProvider,
+        // Task 10 / Path A — the dedicated managed-deploy provider. It builds
+        // the per-Work k8s deploy config (kubeconfig + per-tenant namespace +
+        // ingress) from `EVER_WORKS_DEPLOY_*` env for `deployProvider ===
+        // 'ever-works'`. It exists + is unit-tested but was registered nowhere;
+        // register it here so consumers (e.g. `WorkLifecycleService`) can inject
+        // it and it participates in the DI graph.
+        EverWorksK8sDeployProvider,
         EverWorksDnsService,
         {
             // The Ever Works Deploy quota service is repo-agnostic — it
