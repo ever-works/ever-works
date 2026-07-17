@@ -7,6 +7,7 @@ export * from './types';
 export { EverWorksGitProvider, type EverWorksGitHttpFetch } from './ever-works-git.provider';
 export {
     EverWorksK8sDeployProvider,
+    buildEverWorksTenantNamespace,
     type EverWorksKubeconfigReader,
 } from './ever-works-k8s-deploy.provider';
 export {

@@ -253,3 +253,58 @@ export function resolveKubeconfigForClusterSource(
     }
     return userKubeconfig;
 }
+
+/**
+ * Namespaces a tenant deploy may NEVER target on a platform-managed cluster.
+ *
+ * EW — server-side namespace enforcement (Task 7 / owner item #3b). The k8s
+ * `namespace` field is free-text and, before this guard, had no server-side
+ * check — a shared-cluster deploy could target the platform's own
+ * `ever-works` namespace, a Kubernetes system namespace, or another tenant's
+ * space. This is the authoritative blocklist consulted by
+ * `DeployService.resolveDeployNamespace`.
+ *
+ * Any `kube-*` namespace is additionally rejected (see `isReservedDeployNamespace`)
+ * so the whole reserved `kube-system` / `kube-public` / `kube-node-lease`
+ * family is covered even if a new one is introduced upstream.
+ */
+export const RESERVED_DEPLOY_NAMESPACES: ReadonlySet<string> = new Set([
+    'ever-works',
+    'kube-system',
+    'kube-public',
+    'kube-node-lease',
+    'default',
+    'argocd',
+    'cert-manager',
+    'ingress-nginx',
+    'monitoring',
+]);
+
+/**
+ * True when `namespace` is a platform-reserved namespace that no tenant deploy
+ * may target. Matches the explicit `RESERVED_DEPLOY_NAMESPACES` set plus any
+ * `kube-*` namespace. Case- and whitespace-insensitive. An empty/blank input
+ * is NOT reserved (the caller decides how to treat "no namespace supplied").
+ */
+export function isReservedDeployNamespace(namespace: string): boolean {
+    const ns = namespace.trim().toLowerCase();
+    if (!ns) return false;
+    if (RESERVED_DEPLOY_NAMESPACES.has(ns)) return true;
+    // Cover the entire Kubernetes system-namespace family (`kube-system`,
+    // `kube-public`, `kube-node-lease`, and any future `kube-*`).
+    return ns.startsWith('kube-');
+}
+
+/**
+ * True for cluster sources that are a platform-owned SHARED cluster, where a
+ * user-supplied namespace must be ignored in favour of a deterministic
+ * per-tenant namespace (cross-tenant isolation). Today that is exactly
+ * `k8s-works-shared`; the `includes('shared')` guard keeps a future shared
+ * source (e.g. a regional `k8s-works-shared-eu`) covered without a code change.
+ * The internal admin cluster (`k8s-works`) and the user's own cluster
+ * (`custom-kubeconfig`) are NOT shared.
+ */
+export function isSharedClusterSource(clusterSource: ClusterSource): boolean {
+    const source = normalizeClusterSource(clusterSource) ?? clusterSource;
+    return source === 'k8s-works-shared' || source.includes('shared');
+}
