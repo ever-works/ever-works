@@ -467,7 +467,7 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
             timeout: 10_000,
         });
         await expect(
-            page.getByRole('button', { name: 'Create your first work' }).first(),
+            page.getByRole('button', { name: 'Create your first Work' }).first(),
         ).toBeVisible({
             timeout: 10_000,
         });

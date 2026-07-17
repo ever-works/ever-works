@@ -263,7 +263,8 @@
             "savedSuccess": "Ustawienia zapisane.",
             "noSettings": "Ten plugin nie wymaga konfiguracji.",
             "getTokenPrompt": "Najpierw utwórz token, następnie wklej go poniżej i zapisz, aby zweryfikować połączenie.",
-            "loadingStatus": "Ładowanie statusu połączenia..."
+            "loadingStatus": "Ładowanie statusu połączenia...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Połącz swój własny klucz, aby odblokować pełną konfigurację.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Domyślny wybrany",
                 "makeDefault": "Ustaw jako domyślny",
                 "fork": "Rozgałęź",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Edytuj",
                 "archive": "Archiwizuj",
                 "customizeAgain": "Customize again",

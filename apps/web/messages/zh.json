@@ -263,7 +263,8 @@
             "savedSuccess": "设置已保存。",
             "noSettings": "此插件无需配置。",
             "getTokenPrompt": "首先创建令牌，然后粘贴到下方并保存以验证连接。",
-            "loadingStatus": "正在加载连接状态..."
+            "loadingStatus": "正在加载连接状态...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "连接您自己的密钥以解锁完整配置。",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "已选默认",
                 "makeDefault": "设为默认",
                 "fork": "分派",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "编辑",
                 "archive": "归档",
                 "customizeAgain": "Customize again",

@@ -263,7 +263,8 @@
             "savedSuccess": "설정이 저장되었습니다.",
             "noSettings": "이 플러그인에 대한 구성 불필요.",
             "getTokenPrompt": "먼저 토큰을 생성한 후 아래에 붙여넣고 저장하여 연결을 확인하세요.",
-            "loadingStatus": "연결 상태 로딩 중..."
+            "loadingStatus": "연결 상태 로딩 중...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "자신의 키를 연결하여 전체 구성을 해제하세요.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "기본값 선택됨",
                 "makeDefault": "기본값으로 설정",
                 "fork": "포크",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "편집",
                 "archive": "보관",
                 "customizeAgain": "Customize again",
