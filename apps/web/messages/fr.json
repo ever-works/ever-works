@@ -263,7 +263,8 @@
             "savedSuccess": "Paramètres enregistrés.",
             "noSettings": "Aucune configuration requise pour ce plugin.",
             "getTokenPrompt": "Créez d'abord un jeton, puis collez-le ci-dessous et enregistrez pour vérifier la connexion.",
-            "loadingStatus": "Chargement du statut de connexion..."
+            "loadingStatus": "Chargement du statut de connexion...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Connectez votre propre clé pour débloquer la configuration complète.",
@@ -4437,7 +4438,9 @@
                 "defaultSelected": "Par défaut sélectionné",
                 "makeDefault": "Définir comme par défaut",
                 "fork": "Fourcher",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Modifier",
                 "archive": "Archiver",
                 "customizeAgain": "Personnaliser à nouveau",

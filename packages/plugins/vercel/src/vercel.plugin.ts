@@ -294,7 +294,8 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin {
 				includeInOnboarding: true,
 				onboardingPriority: 4,
 				completionFields: ['apiToken'],
-				onboardingDescription: 'Add a Vercel token to publish your works as live websites.'
+				onboardingDescription: 'Add a Vercel token to publish your works as live websites.',
+				showReadmeInOnboarding: true
 			},
 			icon: {
 				type: 'lucide',

@@ -263,7 +263,8 @@
             "savedSuccess": "Настройките са запазени.",
             "noSettings": "Не е нужна конфигурация за този плъгин.",
             "getTokenPrompt": "Първо създайте токен, след това го поставете по-долу и запазете, за да проверите връзката.",
-            "loadingStatus": "Зареждане на състоянието на връзката..."
+            "loadingStatus": "Зареждане на състоянието на връзката...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Свържете своя ключ, за да отключите пълната конфигурация.",
@@ -4437,7 +4438,9 @@
                 "defaultSelected": "Избрано по подразбиране",
                 "makeDefault": "Направи по подразбиране",
                 "fork": "Форк",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Редактиране",
                 "archive": "Архивиране",
                 "customizeAgain": "Персонализирайте отново",

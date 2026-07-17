@@ -263,7 +263,8 @@
             "savedSuccess": "Cài đặt đã được lưu.",
             "noSettings": "Không yêu cầu cấu hình cho plugin này.",
             "getTokenPrompt": "Tạo một token trước, sau đó dán nó bên dưới và lưu để xác minh kết nối.",
-            "loadingStatus": "Đang tải trạng thái kết nối..."
+            "loadingStatus": "Đang tải trạng thái kết nối...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Kết nối khóa của riêng bạn để mở khóa cấu hình đầy đủ.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Mặc định được chọn",
                 "makeDefault": "Đặt làm mặc định",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Chỉnh sửa",
                 "archive": "Lưu trữ",
                 "customizeAgain": "Customize again",

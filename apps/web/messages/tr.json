@@ -263,7 +263,8 @@
             "savedSuccess": "Ayarlar kaydedildi.",
             "noSettings": "Bu eklenti için yapılandırma gerekmez.",
             "getTokenPrompt": "Önce bir belirteç oluşturun, ardından aşağıya yapıştırın ve bağlantıyı doğrulamak için kaydedin.",
-            "loadingStatus": "Bağlantı durumu yükleniyor..."
+            "loadingStatus": "Bağlantı durumu yükleniyor...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Tam yapılandırmayı açmak için kendi anahtarınızı bağlayın.",
@@ -4240,7 +4241,9 @@
                 "defaultSelected": "Varsayılan seçildi",
                 "makeDefault": "Varsayılan yap",
                 "fork": "Çatalla",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Düzenle",
                 "archive": "Arşivle",
                 "customizeAgain": "Customize again",
