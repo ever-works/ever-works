@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter, Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTurnstile } from '@/components/onboarding/use-turnstile';
@@ -25,51 +25,58 @@ function readHashParam(hash: string, key: string): string | null {
 export function AnonymousOnboardingBootstrap() {
     const router = useRouter();
     const { getToken, ready } = useTurnstile();
+    const [, startTransition] = useTransition();
     const [phase, setPhase] = useState<Phase>('starting');
     const [message, setMessage] = useState<string | null>(null);
+    // Guard against React StrictMode's dev double-mount (and any remount)
+    // firing two mints and burning the throttle. Mirrors the magic-link
+    // redeem client's `redeemedTokens` ref.
     const startedRef = useRef(false);
     // If Turnstile never becomes ready (CSP-blocked / ad-blocked), attempt anyway
     // after a grace period so the user isn't stuck on a spinner — the server 400s
     // (captcha) and we fall through to the sign-up affordance.
     const [forceAttempt, setForceAttempt] = useState(false);
 
-    const run = useCallback(async () => {
-        // Defer past the effect commit so no setState runs synchronously inside
-        // an effect body (matches the use-turnstile queueMicrotask convention).
-        await Promise.resolve();
+    // Kick off the mint inside a transition so the setStates land after the
+    // await boundary, not synchronously within the effect (react-hooks/
+    // set-state-in-effect). Same shape as the magic-link redeem client.
+    const attempt = useCallback(() => {
+        startTransition(async () => {
+            let alreadyTried = false;
+            try {
+                alreadyTried = sessionStorage.getItem(SESSION_GUARD) === '1';
+                sessionStorage.setItem(SESSION_GUARD, '1');
+            } catch {
+                /* private mode — the ref guard still prevents same-mount reruns */
+            }
+            if (alreadyTried) {
+                setPhase('error');
+                setMessage('We couldn’t start a guest session. Please sign up to continue.');
+                return;
+            }
 
-        let alreadyTried = false;
-        try {
-            alreadyTried = sessionStorage.getItem(SESSION_GUARD) === '1';
-            sessionStorage.setItem(SESSION_GUARD, '1');
-        } catch {
-            /* private mode — ref guard still prevents same-mount double-run */
-        }
-        if (alreadyTried) {
+            setPhase('starting');
+            setMessage(null);
+            const corrId =
+                typeof window !== 'undefined'
+                    ? readHashParam(window.location.hash, 'corrId')
+                    : null;
+            const captchaToken = await getToken(); // '' when Turnstile unavailable
+            const result = await startAnonymousOnboarding({
+                captchaToken: captchaToken || undefined,
+                correlationId: corrId || undefined,
+            });
+            if (result.success) {
+                // Cookie is set. Re-render THIS url (hash preserved — refresh()
+                // never touches the URL) so the server page takes the authed
+                // branch and mounts the wizard, which reads #prompt from the hash.
+                router.refresh();
+                return;
+            }
             setPhase('error');
-            setMessage('We couldn’t start a guest session. Please sign up to continue.');
-            return;
-        }
-
-        setPhase('starting');
-        setMessage(null);
-        const corrId =
-            typeof window !== 'undefined' ? readHashParam(window.location.hash, 'corrId') : null;
-        const captchaToken = await getToken(); // '' when Turnstile unavailable
-        const result = await startAnonymousOnboarding({
-            captchaToken: captchaToken || undefined,
-            correlationId: corrId || undefined,
+            setMessage(result.error ?? 'Something went wrong.');
         });
-        if (result.success) {
-            // Cookie is set. Re-render THIS url (hash preserved — router.refresh
-            // never touches the URL) so the server page takes the authed branch
-            // and mounts the wizard, which then reads #prompt from the hash.
-            router.refresh();
-            return;
-        }
-        setPhase('error');
-        setMessage(result.error ?? 'Something went wrong.');
-    }, [getToken, router]);
+    }, [getToken, router, startTransition]);
 
     useEffect(() => {
         const t = setTimeout(() => setForceAttempt(true), 8000);
@@ -80,8 +87,8 @@ export function AnonymousOnboardingBootstrap() {
         if (startedRef.current) return;
         if (!ready && !forceAttempt) return;
         startedRef.current = true;
-        void run();
-    }, [ready, forceAttempt, run]);
+        attempt();
+    }, [ready, forceAttempt, attempt]);
 
     const retry = useCallback(() => {
         try {
@@ -89,11 +96,8 @@ export function AnonymousOnboardingBootstrap() {
         } catch {
             /* private mode */
         }
-        startedRef.current = true; // effect already fired; drive run() directly
-        setPhase('starting');
-        setMessage(null);
-        void run();
-    }, [run]);
+        attempt();
+    }, [attempt]);
 
     if (phase === 'error') {
         return (
