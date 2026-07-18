@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull, Not, In, MoreThan, type FindOptionsWhere } from 'typeorm';
+import { Repository, And, IsNull, Not, In, MoreThan, type FindOptionsWhere } from 'typeorm';
 import { Task } from '../entities/task.entity';
 import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
@@ -173,33 +173,38 @@ export class SchedulesService {
             const rows = await this.agentRepo.find({
                 where: {
                     ...this.scopeWhere<Agent>(scope),
-                    heartbeatCadence: Not(IsNull()),
+                    // 'manual' is stored in the cadence column but means "no
+                    // cron" — exclude it in the DB (not in-memory) so `take`
+                    // counts only real scheduled heartbeats and a page full of
+                    // manual-cadence agents can't crowd out scheduled ones.
+                    heartbeatCadence: And(Not(IsNull()), Not('manual')),
                 },
                 take: MAX_PER_SOURCE,
             });
-            return (
-                rows
-                    // 'manual' is stored in the cadence column but means "no cron".
-                    .filter((agent) => (agent.heartbeatCadence ?? '').toLowerCase() !== 'manual')
-                    .map((agent) => {
-                        const status = this.mapAgentStatus(agent.status);
-                        return {
-                            id: `agent_heartbeat:${agent.id}`,
-                            sourceType: 'agent_heartbeat',
-                            ownerType: 'agent',
-                            ownerId: agent.id,
-                            ownerName: agent.name,
-                            ownerLink: `/agents/${agent.id}`,
-                            cadenceRaw: agent.heartbeatCadence ?? null,
-                            cadenceHuman: describeCron(agent.heartbeatCadence),
-                            nextRunAt: toIso(agent.nextHeartbeatAt),
-                            lastRunAt: toIso(agent.lastRunAt),
-                            lastRunStatus: agent.lastRunStatus ?? null,
-                            status,
-                            enabled: agent.status === AgentStatus.ACTIVE,
-                        };
-                    })
-            );
+            return rows.map((agent) => {
+                const status = this.mapAgentStatus(agent.status);
+                return {
+                    id: `agent_heartbeat:${agent.id}`,
+                    sourceType: 'agent_heartbeat',
+                    ownerType: 'agent',
+                    ownerId: agent.id,
+                    ownerName: agent.name,
+                    ownerLink: `/agents/${agent.id}`,
+                    cadenceRaw: agent.heartbeatCadence ?? null,
+                    cadenceHuman: describeCron(agent.heartbeatCadence),
+                    nextRunAt: toIso(agent.nextHeartbeatAt),
+                    lastRunAt: toIso(agent.lastRunAt),
+                    lastRunStatus: agent.lastRunStatus ?? null,
+                    status,
+                    // A RUNNING agent is mid-run but still an active schedule
+                    // (it normalizes to the 'active' pill), so treat it as
+                    // enabled alongside ACTIVE — otherwise enabledOnly wrongly
+                    // drops it.
+                    enabled:
+                        agent.status === AgentStatus.ACTIVE ||
+                        agent.status === AgentStatus.RUNNING,
+                };
+            });
         } catch (error) {
             this.warn('agent_heartbeat', error);
             return [];

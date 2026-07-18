@@ -30,6 +30,15 @@ export function describeCron(expr: string | null | undefined): string {
     if (trimmed.toLowerCase() === 'manual') return 'Manual';
     const parts = trimmed.split(/\s+/);
     if (parts.length !== 5) return trimmed;
+    // Validate field ranges up-front so a malformed expression (out-of-range
+    // value, zero step, etc. — e.g. '0 9 * * 8', '*/0 * * * *', '99 99 * * *')
+    // falls back to the raw string rather than getting a plausible-but-wrong
+    // friendly label. Raw is the documented fallback.
+    try {
+        parseCron(trimmed);
+    } catch {
+        return trimmed;
+    }
     const [min, hour, dom, month, dow] = parts;
     const isLiteral = (token: string) => /^\d+$/.test(token);
 
@@ -135,17 +144,20 @@ function matchesParsed(parsed: ParsedCron, date: Date): boolean {
     return domMatch && dowMatch;
 }
 
-// Bounded forward-walk horizon. Covers minutely→monthly cadences and the
-// occasional yearly cron; a pathological Feb-29 expression that never
-// matches within the horizon returns null rather than looping forever.
-const MAX_LOOKAHEAD_MINUTES = 366 * 24 * 60;
+// Bounded forward-walk horizon. This is called per Mission (up to 500) on
+// the request thread, so the walk is hard-capped at 31 days (44,640
+// minute-steps) to keep the aggregation cheap. Every normal cadence
+// (minutely→monthly) fires well within this window; a rarer yearly/Feb-29
+// expression that doesn't match returns null — the Schedules UI tolerates a
+// null nextRunAt and renders '—'.
+const MAX_LOOKAHEAD_MINUTES = 31 * 24 * 60;
 
 /**
  * Compute the next UTC fire time strictly after `from` for a 5-field cron
  * expression, by walking forward minute-by-minute (reusing the Mission
  * tick worker's `parseCron` so the semantics match exactly). Returns an
  * ISO string, or null when the expression is invalid or does not fire
- * within a one-year horizon.
+ * within the bounded look-ahead horizon (31 days).
  */
 export function computeNextCronFire(expr: string | null | undefined, from: Date): string | null {
     if (!expr) return null;

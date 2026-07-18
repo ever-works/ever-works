@@ -38,6 +38,9 @@ describe('SchedulesService', () => {
                 recurrenceOccurredCount: 2,
             },
         ]);
+        // 'manual' heartbeats are excluded at the DB layer now (WHERE
+        // heartbeatCadence IS NOT NULL AND != 'manual'), so the mocked repo
+        // returns only the scheduled agent — mirroring the real query result.
         const agentRepo = makeRepo([
             {
                 id: 'agent-1',
@@ -46,12 +49,6 @@ describe('SchedulesService', () => {
                 nextHeartbeatAt: new Date('2026-07-18T09:00:00.000Z'),
                 lastRunAt: new Date('2026-07-17T09:00:00.000Z'),
                 lastRunStatus: 'completed',
-                status: AgentStatus.ACTIVE,
-            },
-            {
-                id: 'agent-manual',
-                name: 'Manual agent',
-                heartbeatCadence: 'manual',
                 status: AgentStatus.ACTIVE,
             },
         ]);
@@ -110,9 +107,13 @@ describe('SchedulesService', () => {
 
         const views = await service.getSchedules(SCOPE);
 
-        // Six sources, but the 'manual' agent is dropped → 6 rows.
+        // One row per source → 6 rows.
         expect(views).toHaveLength(6);
         const bySource = Object.fromEntries(views.map((v) => [v.sourceType, v]));
+
+        // The 'manual' exclusion is pushed into the heartbeat query so the
+        // MAX_PER_SOURCE limit counts only real scheduled heartbeats.
+        expect(agentRepo.find.mock.calls[0][0].where.heartbeatCadence).toBeDefined();
 
         expect(bySource.recurring_task.ownerLink).toBe('/tasks/task-1');
         expect(bySource.recurring_task.cadenceHuman.toLowerCase()).toContain('week');

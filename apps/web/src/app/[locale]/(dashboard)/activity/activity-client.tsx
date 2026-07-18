@@ -73,12 +73,28 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
     // Log | Schedules segmented view. localStorage is the primary
     // persistence; the `?view=schedules` query param enables shareable
     // links and is kept in sync by the URL-sync effect below.
+    //
+    // Initialise to a deterministic default (the URL ?view= param, else
+    // 'log') so server and first client render agree — the persisted
+    // localStorage value is restored in the mount effect below to avoid
+    // a hydration mismatch.
     const [activeTab, setActiveTab] = useState<ActivityTab>(() => {
         const fromUrl = searchParams.get('view');
-        if (fromUrl === 'schedules' || fromUrl === 'log') return fromUrl;
-        if (typeof window === 'undefined') return 'log';
-        return (localStorage.getItem('activity-tab') as ActivityTab) || 'log';
+        return fromUrl === 'schedules' || fromUrl === 'log' ? fromUrl : 'log';
     });
+
+    // Restore the persisted tab after mount (localStorage is unavailable
+    // during SSR). The URL ?view= param always wins when present.
+    useEffect(() => {
+        const fromUrl = searchParams.get('view');
+        if (fromUrl === 'schedules' || fromUrl === 'log') return;
+        const stored = localStorage.getItem('activity-tab');
+        if (stored === 'schedules' || stored === 'log') {
+            setActiveTab(stored);
+        }
+        // Mount-only restore; intentionally not reactive to searchParams.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleTabChange = (tab: ActivityTab) => {
         setActiveTab(tab);
@@ -372,6 +388,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                             <button
                                 onClick={() => handleTabChange('log')}
                                 aria-pressed={isLogTab}
+                                aria-label={t('viewToggle.log')}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
                                     isLogTab
                                         ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
@@ -386,6 +403,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                             <button
                                 onClick={() => handleTabChange('schedules')}
                                 aria-pressed={!isLogTab}
+                                aria-label={t('viewToggle.schedules')}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
                                     !isLogTab
                                         ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
