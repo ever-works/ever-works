@@ -224,10 +224,11 @@ export class TaskTransitionService {
         const generation = (task.recurrenceOccurredCount ?? 0) + 1;
         for (const assignee of agentAssignees) {
             const dedupKey = `${task.id}:${assignee.assigneeId}:${generation}`;
+            let run: { id: string } | null = null;
             try {
                 // Pre-create a queued AgentRun row so the worker can find
                 // it via findInFlightForTaskAgent (T6 chat-dedup posture).
-                const run = this.runs
+                run = this.runs
                     ? await this.runs.createQueued({
                           agentId: assignee.assigneeId,
                           userId: task.userId,
@@ -243,9 +244,19 @@ export class TaskTransitionService {
                     runId: run?.id,
                 });
             } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
                 this.logger.warn(
-                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${err}`,
+                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${message}`,
                 );
+                if (run) {
+                    try {
+                        await this.runs!.markFailed(run.id, `dispatch-failed: ${message}`);
+                    } catch (failErr) {
+                        this.logger.warn(
+                            `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,
+                        );
+                    }
+                }
             }
         }
     }

@@ -127,8 +127,9 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });
 
-    it('catches dispatcher failures so the transition still succeeds', async () => {
+    it('catches dispatcher failures, transitions AgentRun to failed, and does not fail transition', async () => {
         const svc = makeSvc();
+        runs.markFailed = jest.fn().mockResolvedValue(undefined);
         dispatcher.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
         const task = makeTask({ status: TaskStatus.TODO });
         tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
@@ -137,5 +138,20 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         ]);
         const result = await svc.transition(task, TaskStatus.IN_PROGRESS);
         expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
+        await new Promise((r) => setImmediate(r));
+        expect(runs.markFailed).toHaveBeenCalledWith('r1', expect.stringContaining('Trigger.dev down'));
+    });
+
+    it('catches dispatcher failures gracefully when runs repository is missing', async () => {
+        const svc = new TaskTransitionService(tasks, blocks, approvers, assignees, undefined, dispatcher);
+        dispatcher.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+        ]);
+        const result = await svc.transition(task, TaskStatus.IN_PROGRESS);
+        expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
+        await new Promise((r) => setImmediate(r));
     });
 });
