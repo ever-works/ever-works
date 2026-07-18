@@ -48,7 +48,8 @@
 			"version": "1.0.0",
 			"category": "deployment",
 			"capabilities": [
-				"deployment"
+				"deployment",
+				"oauth"
 			],
 			"description": "Deploy works to Vercel",
 			"author": {
