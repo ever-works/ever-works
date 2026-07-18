@@ -18,6 +18,12 @@ export * from './task-tracker.interface.js';
 // Notifications v2 (EW-650 + siblings) — email + chat channel contracts.
 export * from './email-provider.interface.js';
 export * from './notification-channel.interface.js';
+// Connectors ("Connector fabric") — first-party BIDIRECTIONAL comms
+// plugins (outbound send + inbound route-to-Agent). Additive superset of
+// the notification-channel contract; see `connector.interface.ts` and
+// `docs/specs/features/connectors/spec.md`. Interface + types only for the
+// inbound leg in this increment (routing/pairing runtime lands in P2).
+export * from './connector.interface.js';
 export * from './agent-memory.interface.js';
 // EW-642 — pluggable vector-store backends.
 export * from './vector-store.interface.js';
