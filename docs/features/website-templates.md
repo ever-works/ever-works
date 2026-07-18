@@ -25,7 +25,7 @@ Each entry is a `WebsiteTemplateConfig`:
 
 ```ts
 interface WebsiteTemplateConfig {
-	id: WebsiteTemplateId; // e.g. 'classic', 'minimal'
+	id: WebsiteTemplateId; // e.g. 'classic', 'minimal', 'web', 'web-minimal'
 	name: string; // display name
 	description: string;
 	owner: string; // GitHub org/user
@@ -68,33 +68,37 @@ Templates the Works platform supports:
   `directory-web-minimal-template` to register it in
   [`website-template.config.ts`](https://github.com/ever-works/ever-works/blob/main/packages/agent/src/generators/website-generator/config/website-template.config.ts).
 
-### 3. `web-template` — generic Next.js (planned)
+### 3. `web` — web-template (Next.js, general-purpose)
 
-- **Repo:** `ever-works/web-template` _(planned, not yet published)_
-- **Stack:** Next.js (same shape as `classic`)
-- **For:** AI-generated **general-purpose websites** that aren't directories
-  — landing pages, marketing sites, content-heavy sites — with a similar
-  rich feature set to `directory-web-template` minus the
-  directory-specific affordances (no item lists, no faceted filters by
-  default).
-- **Status:** 🗓️ Planned. Once published it will register as
-  `WebsiteTemplateId = 'web'` (or similar) and ship a default branch +
-  beta-branch contract identical to the `classic` template.
+- **Repo:** [ever-works/web-template](https://github.com/ever-works/web-template)
+- **Stack:** Next.js (App Router, React 19, Tailwind CSS v4) — same monorepo /
+  `@ever-works/web` build contract as `classic`.
+- **For:** AI-generated **general-purpose websites** that aren't directories —
+  landing pages, marketing sites, content-heavy sites. Ships a full landing
+  page (hero, features, how-it-works, testimonials, pricing, FAQ, CTA) plus
+  About / Pricing / Contact pages and a Markdown blog — no item lists, no
+  faceted filters, no directory data model.
+- **Rebrand from one file:** all copy lives in `apps/web/lib/site.config.ts`.
+- **Status:** ✅ Available; registered as `WebsiteTemplateId = 'web'`. Select it
+  for a **Landing Page**, **Blog**, or general **Website** Work.
 
-### 4. `web-minimal-template` — generic Astro minimal (planned)
+### 4. `web-minimal` — web-minimal-template (Astro, general-purpose minimal)
 
-- **Repo:** `ever-works/web-minimal-template` _(planned, not yet published)_
-- **Stack:** Astro (same shape as `directory-web-minimal-template`)
+- **Repo:** [ever-works/web-minimal-template](https://github.com/ever-works/web-minimal-template)
+- **Stack:** Astro 6 (static output) + Tailwind CSS v4, TypeScript — same
+  static / nginx-on-:3000 build contract as `directory-web-minimal-template`.
 - **For:** AI-generated **general-purpose websites** with the same
-  performance / static-output / plugin-driven philosophy as the minimal
-  directory template — minus the directory-specific affordances.
-- **Status:** 🗓️ Planned.
+  performance / static-output philosophy as the minimal directory template —
+  minus the directory-specific affordances (no item/category routes). Zero JS
+  by default; the same marketing section set as `web`, built statically.
+- **Rebrand from one file:** all copy lives in `apps/web/src/config/site.ts`.
+- **Status:** ✅ Available; registered as `WebsiteTemplateId = 'web-minimal'`.
 
 ## Roadmap
 
-The four base templates above cover the matrix of (directory vs general)
-× (full-featured Next.js vs minimal Astro). Beyond that, the platform is
-designed to host **many more** templates — each new template is a
+The four base templates above are all published and cover the matrix of
+(directory vs general) × (full-featured Next.js vs minimal Astro). Beyond
+that, the platform is designed to host **many more** templates — each new template is a
 single-row addition to `WEBSITE_TEMPLATES` plus a published GitHub repo.
 Anyone can author and contribute one; the only contract is that the repo's
 branch layout matches `WebsiteTemplateConfig` (i.e. `main` and a sensible
