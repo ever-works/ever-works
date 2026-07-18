@@ -174,6 +174,17 @@ export enum ActivityActionType {
     TASK_COMMENTED = 'task_commented',
     TASK_COMPLETED = 'task_completed',
     TASK_RECURRENCE_FIRED = 'task_recurrence_fired',
+
+    // Missions / Ideas (Schedules P2 — automated tick + idea-generation
+    // activity coverage). Both are additive members so no storage / API
+    // migration is needed (activity_log.actionType is a plain varchar).
+    //   - MISSION_TICK fires from `MissionTickService.tickDue` each time a
+    //     scheduled Mission's cron matches and the tick actually runs
+    //     (cron-no-match minutes are intentionally NOT logged).
+    //   - IDEA_GENERATED fires from `WorkProposalService.generate` when the
+    //     proposal generator persists Idea(s) for a MISSION-sourced run.
+    MISSION_TICK = 'mission_tick',
+    IDEA_GENERATED = 'idea_generated',
 }
 
 export enum ActivityStatus {

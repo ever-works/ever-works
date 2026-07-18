@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "शेड्यूल",
+            "subtitle": "आपके वर्क, एजेंट, Missions और टास्क में चलने के लिए निर्धारित सब कुछ",
+            "fetchFailed": "शेड्यूल लोड करने में विफल",
+            "retry": "पुनः प्रयास करें",
+            "columns": {
+                "owner": "मालिक",
+                "cadence": "कैडेंस",
+                "nextRun": "अगला रन",
+                "status": "स्थिति"
+            },
+            "filters": {
+                "all": "सभी",
+                "activeOnly": "केवल सक्रिय"
+            },
+            "sourceTypes": {
+                "recurringTask": "आवर्ती टास्क",
+                "agentHeartbeat": "एजेंट हार्टबीट",
+                "workSchedule": "वर्क शेड्यूल",
+                "missionTick": "Mission टिक",
+                "sourceValidation": "स्रोत सत्यापन",
+                "dataSync": "डेटा सिंक"
+            },
+            "statuses": {
+                "active": "सक्रिय",
+                "paused": "रुका हुआ",
+                "disabled": "निष्क्रिय",
+                "error": "त्रुटि",
+                "ended": "समाप्त"
+            },
+            "empty": {
+                "title": "अभी तक कुछ भी शेड्यूल नहीं किया गया",
+                "description": "आवर्ती टास्क, एजेंट हार्टबीट, वर्क शेड्यूल, Mission टिक, स्रोत सत्यापन और डेटा सिंक सेट करने के बाद यहाँ दिखाई देंगे।",
+                "noResults": "वर्तमान फ़िल्टर से मेल खाने वाला कोई शेड्यूल नहीं है।"
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "लॉग",
+                "schedules": "शेड्यूल"
+            },
             "title": "गतिविधि",
             "subtitle": "अपनी कार्य में सभी ऑपरेशनों को ट्रैक करें",
             "loading": "लोड हो रहा है...",

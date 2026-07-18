@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { FacadesModule } from '../facades/facades.module';
 import { TitlerModule } from '../titler/titler.module';
 import { WorkProposal } from '../entities/work-proposal.entity';
@@ -22,6 +23,10 @@ import {
     // deriveTitle placeholder from Phase 1 PR B).
     imports: [
         DatabaseModule,
+        // Schedules P2 — provides `ActivityLogService` so
+        // `WorkProposalService` can emit `idea_generated` rows for
+        // MISSION-sourced generation. `@Optional()`-injected downstream.
+        ActivityLogModule,
         FacadesModule,
         TitlerModule,
         TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment, UserUpload]),

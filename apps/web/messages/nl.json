@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Planningen",
+            "subtitle": "Alles wat gepland staat om uit te voeren in je werken, agenten, Missions en taken",
+            "fetchFailed": "Planningen konden niet worden geladen",
+            "retry": "Opnieuw proberen",
+            "columns": {
+                "owner": "Eigenaar",
+                "cadence": "Frequentie",
+                "nextRun": "Volgende uitvoering",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Alle",
+                "activeOnly": "Alleen actieve"
+            },
+            "sourceTypes": {
+                "recurringTask": "Terugkerende taak",
+                "agentHeartbeat": "Agent-heartbeat",
+                "workSchedule": "Werkplanning",
+                "missionTick": "Mission-tick",
+                "sourceValidation": "Bronvalidatie",
+                "dataSync": "Gegevenssynchronisatie"
+            },
+            "statuses": {
+                "active": "Actief",
+                "paused": "Gepauzeerd",
+                "disabled": "Uitgeschakeld",
+                "error": "Fout",
+                "ended": "Beëindigd"
+            },
+            "empty": {
+                "title": "Nog niets gepland",
+                "description": "Terugkerende taken, agent-heartbeats, werkplanningen, Mission-ticks, bronvalidatie en gegevenssynchronisatie verschijnen hier zodra je ze hebt ingesteld.",
+                "noResults": "Geen planningen komen overeen met het huidige filter."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Logboek",
+                "schedules": "Planningen"
+            },
             "title": "Activiteit",
             "subtitle": "Volg alle bewerkingen in je werken",
             "loading": "Laden...",

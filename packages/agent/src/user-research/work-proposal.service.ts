@@ -82,9 +82,11 @@ function extractFailureMessage(input: unknown): string {
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
+    WorkProposalSource,
     type WorkProposal,
-    type WorkProposalSource,
 } from '../entities/work-proposal.entity';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
 export interface GenerateProposalsResult {
     status:
@@ -174,6 +176,13 @@ export class WorkProposalService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
+        // Schedules P2 — `idea_generated` activity coverage for
+        // MISSION-sourced generation. `@Optional()` so the hand-rolled tests
+        // that construct this service without it keep booting; production DI
+        // provides it via `ActivityLogModule` (imported by
+        // `UserResearchModule`).
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -464,7 +473,53 @@ export class WorkProposalService {
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
         );
 
+        // Schedules P2 — surface automated Idea generation in the Activity
+        // feed. Scoped to MISSION-sourced runs (the scheduled Mission-tick
+        // path) so the manual / user-research generation paths keep their
+        // current feed footprint. One batch-level row keeps the feed
+        // readable rather than one row per Idea. Best-effort + user-scoped.
+        if (opts.source === WorkProposalSource.MISSION && saved.length > 0) {
+            void this.emitIdeaGenerated(userId, saved, opts.missionId);
+        }
+
         return { status: 'generated', proposals: saved, tokensUsed };
+    }
+
+    /**
+     * Emit a single `idea_generated` ActivityLog row for a batch of
+     * Ideas persisted by a MISSION-sourced generation run. User-scoped to
+     * the Mission owner so it lands in their Activity feed. Best-effort:
+     * wrapped so a logging failure can never fail the generation.
+     */
+    private async emitIdeaGenerated(
+        userId: string,
+        saved: WorkProposal[],
+        missionId?: string,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                actionType: ActivityActionType.IDEA_GENERATED,
+                action: 'idea.generated',
+                status: ActivityStatus.COMPLETED,
+                summary:
+                    saved.length === 1
+                        ? 'Generated 1 idea from mission'
+                        : `Generated ${saved.length} ideas from mission`,
+                details: {
+                    source: WorkProposalSource.MISSION,
+                    missionId: missionId ?? null,
+                    count: saved.length,
+                    ideaIds: saved.map((idea) => idea.id),
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to emit idea_generated activity for user ${userId}: ${message}`,
+            );
+        }
     }
 
     private proposalKey(value: string): string {

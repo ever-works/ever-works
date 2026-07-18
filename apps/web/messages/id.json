@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Jadwal",
+            "subtitle": "Semua yang dijadwalkan untuk berjalan di seluruh karya, agen, Missions, dan tugas Anda",
+            "fetchFailed": "Gagal memuat jadwal",
+            "retry": "Coba lagi",
+            "columns": {
+                "owner": "Pemilik",
+                "cadence": "Frekuensi",
+                "nextRun": "Pelaksanaan berikutnya",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Semua",
+                "activeOnly": "Hanya aktif"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tugas berulang",
+                "agentHeartbeat": "Heartbeat agen",
+                "workSchedule": "Jadwal karya",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Validasi sumber",
+                "dataSync": "Sinkronisasi data"
+            },
+            "statuses": {
+                "active": "Aktif",
+                "paused": "Dijeda",
+                "disabled": "Dinonaktifkan",
+                "error": "Kesalahan",
+                "ended": "Berakhir"
+            },
+            "empty": {
+                "title": "Belum ada yang dijadwalkan",
+                "description": "Tugas berulang, heartbeat agen, jadwal karya, tick Mission, validasi sumber, dan sinkronisasi data akan muncul di sini setelah Anda mengaturnya.",
+                "noResults": "Tidak ada jadwal yang cocok dengan filter saat ini."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Log",
+                "schedules": "Jadwal"
+            },
             "title": "Aktivitas",
             "subtitle": "Lacak semua operasi di seluruh karya Anda",
             "loading": "Memuat...",

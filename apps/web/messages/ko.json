@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "일정",
+            "subtitle": "워크, 에이전트, Missions, 작업 전반에서 실행되도록 예약된 모든 항목",
+            "fetchFailed": "일정을 불러오지 못했습니다",
+            "retry": "다시 시도",
+            "columns": {
+                "owner": "소유자",
+                "cadence": "주기",
+                "nextRun": "다음 실행",
+                "status": "상태"
+            },
+            "filters": {
+                "all": "전체",
+                "activeOnly": "활성만"
+            },
+            "sourceTypes": {
+                "recurringTask": "반복 작업",
+                "agentHeartbeat": "에이전트 하트비트",
+                "workSchedule": "워크 일정",
+                "missionTick": "Mission 틱",
+                "sourceValidation": "소스 검증",
+                "dataSync": "데이터 동기화"
+            },
+            "statuses": {
+                "active": "활성",
+                "paused": "일시중지",
+                "disabled": "비활성",
+                "error": "오류",
+                "ended": "종료됨"
+            },
+            "empty": {
+                "title": "아직 예약된 항목이 없습니다",
+                "description": "반복 작업, 에이전트 하트비트, 워크 일정, Mission 틱, 소스 검증, 데이터 동기화를 설정하면 여기에 표시됩니다.",
+                "noResults": "현재 필터와 일치하는 일정이 없습니다."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "로그",
+                "schedules": "일정"
+            },
             "title": "활동",
             "subtitle": "워크 전반의 모든 작업 추적",
             "loading": "로딩 중...",

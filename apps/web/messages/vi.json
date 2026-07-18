@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Lịch trình",
+            "subtitle": "Mọi thứ được lên lịch để chạy trên các công việc, Agents, Missions và Tasks của bạn",
+            "fetchFailed": "Không tải được lịch trình",
+            "retry": "Thử lại",
+            "columns": {
+                "owner": "Chủ sở hữu",
+                "cadence": "Chu kỳ",
+                "nextRun": "Lần chạy tiếp theo",
+                "status": "Trạng thái"
+            },
+            "filters": {
+                "all": "Tất cả",
+                "activeOnly": "Chỉ hoạt động"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tác vụ định kỳ",
+                "agentHeartbeat": "Nhịp Agent",
+                "workSchedule": "Lịch công việc",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Xác thực nguồn",
+                "dataSync": "Đồng bộ dữ liệu"
+            },
+            "statuses": {
+                "active": "Hoạt động",
+                "paused": "Tạm dừng",
+                "disabled": "Đã tắt",
+                "error": "Lỗi",
+                "ended": "Đã kết thúc"
+            },
+            "empty": {
+                "title": "Chưa có gì được lên lịch",
+                "description": "Tác vụ định kỳ, nhịp Agent, lịch công việc, tick Mission, xác thực nguồn và đồng bộ dữ liệu sẽ xuất hiện ở đây sau khi bạn thiết lập.",
+                "noResults": "Không có lịch trình nào khớp với bộ lọc hiện tại."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Nhật ký",
+                "schedules": "Lịch trình"
+            },
             "title": "Hoạt động",
             "subtitle": "Theo dõi tất cả các hoạt động trên các công việc của bạn",
             "loading": "Đang tải...",

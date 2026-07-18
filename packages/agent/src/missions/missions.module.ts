@@ -6,6 +6,7 @@ import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerModule } from '../titler/titler.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { UserResearchModule } from '../user-research/user-research.module';
 import { WorkAgentModule } from '../work-agent/work-agent.module';
 import { MissionCloneService } from './mission-clone.service';
@@ -36,6 +37,10 @@ import { MissionTickService } from './mission-tick.service';
         // UserResearchModule.
         TypeOrmModule.forFeature([Mission, MissionAttachment, WorkProposal, UserUpload]),
         TitlerModule,
+        // Schedules P2 — provides `ActivityLogService` so
+        // `MissionTickService` can emit `mission_tick` rows for fired
+        // scheduled ticks. `@Optional()`-injected downstream.
+        ActivityLogModule,
         UserResearchModule,
         WorkAgentModule,
     ],

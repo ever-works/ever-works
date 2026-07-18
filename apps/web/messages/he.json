@@ -1187,7 +1187,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "תזמונים",
+            "subtitle": "כל מה שמתוזמן לרוץ בעבודות, בסוכנים, ב-Missions ובמשימות שלך",
+            "fetchFailed": "טעינת התזמונים נכשלה",
+            "retry": "ניסיון נוסף",
+            "columns": {
+                "owner": "בעלים",
+                "cadence": "קצב",
+                "nextRun": "הרצה הבאה",
+                "status": "סטטוס"
+            },
+            "filters": {
+                "all": "הכל",
+                "activeOnly": "פעילים בלבד"
+            },
+            "sourceTypes": {
+                "recurringTask": "משימה חוזרת",
+                "agentHeartbeat": "פעימת סוכן",
+                "workSchedule": "תזמון עבודה",
+                "missionTick": "פעימת Mission",
+                "sourceValidation": "אימות מקור",
+                "dataSync": "סנכרון נתונים"
+            },
+            "statuses": {
+                "active": "פעיל",
+                "paused": "מושהה",
+                "disabled": "מושבת",
+                "error": "שגיאה",
+                "ended": "הסתיים"
+            },
+            "empty": {
+                "title": "עדיין לא תוזמן דבר",
+                "description": "משימות חוזרות, פעימות סוכנים, תזמוני עבודה, פעימות Mission, אימות מקורות וסנכרון נתונים יופיעו כאן לאחר שתגדיר אותם.",
+                "noResults": "אין תזמונים התואמים את המסנן הנוכחי."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "יומן",
+                "schedules": "תזמונים"
+            },
             "title": "פעילות",
             "subtitle": "עקוב אחר כל הפעולות בעבודות שלך",
             "loading": "טוען...",

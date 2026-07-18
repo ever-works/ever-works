@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Mission, MissionStatus, MissionType } from '../entities/mission.entity';
@@ -6,6 +6,8 @@ import { WorkProposalSource } from '../entities/work-proposal.entity';
 import { WorkAgentService } from '../work-agent/work-agent.service';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { WorkProposalService } from '../user-research/work-proposal.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { matchesCron } from './cron-matcher';
 
 /**
@@ -116,6 +118,12 @@ export class MissionTickService {
         private readonly workProposals: WorkProposalService,
         private readonly workProposalRepo: WorkProposalRepository,
         private readonly workAgent: WorkAgentService,
+        // Schedules P2 — `mission_tick` activity coverage. `@Optional()` so
+        // the hand-rolled unit-test constructors (which omit it) keep
+        // booting; production DI provides it via `ActivityLogModule`
+        // (imported by `MissionsModule`).
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -163,8 +171,53 @@ export class MissionTickService {
             if (outcome.outcome === 'spawned') summary.ran += 1;
             else if (outcome.outcome === 'failed') summary.failed += 1;
             else summary.skipped += 1;
+
+            // Schedules P2 — record every FIRED scheduled tick in the
+            // Activity feed. A tick "fires" when its cron matched this
+            // cycle (any outcome other than `cron-no-match`); the
+            // no-match minutes — the vast majority — are intentionally
+            // NOT logged so the feed isn't flooded once per minute.
+            // Best-effort + user-scoped to the Mission owner.
+            if (outcome.outcome !== 'cron-no-match') {
+                void this.emitMissionTick(mission, outcome);
+            }
         }
         return summary;
+    }
+
+    /**
+     * Emit a `mission_tick` ActivityLog row for a scheduled Mission whose
+     * cron fired this cycle. FAILED status only for the generator-threw
+     * outcome; every other fired outcome (spawned / no-ideas / cap-hit) is
+     * a COMPLETED tick. Best-effort — wrapped so a logging failure can
+     * never disrupt the tick loop.
+     */
+    private async emitMissionTick(mission: Mission, outcome: MissionTickOutcome): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: mission.userId,
+                actionType: ActivityActionType.MISSION_TICK,
+                action: 'mission.tick',
+                status:
+                    outcome.outcome === 'failed' ? ActivityStatus.FAILED : ActivityStatus.COMPLETED,
+                summary: `Mission "${mission.title}" ticked (${outcome.outcome})`,
+                details: {
+                    missionId: mission.id,
+                    outcome: outcome.outcome,
+                    ideasCreated: outcome.ideasCreated ?? 0,
+                    ideasQueued: outcome.ideasQueued ?? 0,
+                    outstanding: outcome.outstanding ?? null,
+                    cap: outcome.cap ?? null,
+                    message: outcome.message ?? null,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to emit mission_tick activity for mission ${mission.id}: ${message}`,
+            );
+        }
     }
 
     /**

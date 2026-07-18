@@ -1187,7 +1187,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "الجداول الزمنية",
+            "subtitle": "كل ما هو مُجدوَل للتشغيل عبر أعمالك ووكلائك وMissions ومهامك",
+            "fetchFailed": "فشل تحميل الجداول الزمنية",
+            "retry": "إعادة المحاولة",
+            "columns": {
+                "owner": "المالك",
+                "cadence": "التكرار",
+                "nextRun": "التشغيل التالي",
+                "status": "الحالة"
+            },
+            "filters": {
+                "all": "الكل",
+                "activeOnly": "النشطة فقط"
+            },
+            "sourceTypes": {
+                "recurringTask": "مهمة متكررة",
+                "agentHeartbeat": "نبض الوكيل",
+                "workSchedule": "جدولة العمل",
+                "missionTick": "نبضة Mission",
+                "sourceValidation": "التحقق من المصدر",
+                "dataSync": "مزامنة البيانات"
+            },
+            "statuses": {
+                "active": "نشط",
+                "paused": "موقوف",
+                "disabled": "معطلة",
+                "error": "خطأ",
+                "ended": "منتهية"
+            },
+            "empty": {
+                "title": "لا يوجد شيء مُجدوَل بعد",
+                "description": "ستظهر هنا المهام المتكررة ونبضات الوكلاء وجداول العمل ونبضات Mission والتحقق من المصادر ومزامنة البيانات بمجرد إعدادها.",
+                "noResults": "لا توجد جداول زمنية تطابق عامل التصفية الحالي."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "السجل",
+                "schedules": "الجداول الزمنية"
+            },
             "title": "النشاط",
             "subtitle": "تتبع جميع العمليات عبر أعمالك",
             "loading": "جار التحميل...",

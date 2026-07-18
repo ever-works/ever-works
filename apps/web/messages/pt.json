@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Agendamentos",
+            "subtitle": "Tudo o que está agendado para ser executado em seus trabalhos, agentes, Missions e tarefas",
+            "fetchFailed": "Falha ao carregar os agendamentos",
+            "retry": "Tentar novamente",
+            "columns": {
+                "owner": "Proprietário",
+                "cadence": "Ritmo",
+                "nextRun": "Próxima execução",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Todas",
+                "activeOnly": "Apenas ativos"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tarefa recorrente",
+                "agentHeartbeat": "Heartbeat do agente",
+                "workSchedule": "Agendamento de trabalho",
+                "missionTick": "Tick de Mission",
+                "sourceValidation": "Validação de fonte",
+                "dataSync": "Sincronização de dados"
+            },
+            "statuses": {
+                "active": "Ativo",
+                "paused": "Pausado",
+                "disabled": "Desativada",
+                "error": "Erro",
+                "ended": "Encerrada"
+            },
+            "empty": {
+                "title": "Nada agendado ainda",
+                "description": "Tarefas recorrentes, heartbeats de agentes, agendamentos de trabalho, ticks de Mission, validação de fontes e sincronização de dados aparecerão aqui assim que você os configurar.",
+                "noResults": "Nenhum agendamento corresponde ao filtro atual."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Registro",
+                "schedules": "Agendamentos"
+            },
             "title": "Atividade",
             "subtitle": "Acompanhe todas as operações em seus trabalhos",
             "loading": "Carregando...",

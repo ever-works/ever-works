@@ -738,11 +738,42 @@ export class AgentRunService {
                 .markFailed(context.runId, outcome.errorMessage ?? 'Agent run errored')
                 .catch(() => undefined);
             await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
+            // Schedules P2 — heartbeat runs previously left only an AgentRun
+            // row; nothing surfaced in the Activity feed. Emit the terminal
+            // heartbeat activity so an automated (cron-dispatched) run is
+            // visible. Gated on the heartbeat kind so task / chat runs are
+            // unaffected. Best-effort (logActivity swallows its own errors).
+            if (context.kind === 'heartbeat') {
+                void this.logActivity({
+                    userId: context.userId,
+                    agentId: context.agentId,
+                    actionType: ActivityActionType.AGENT_HEARTBEAT_FAILED,
+                    status: ActivityStatus.FAILED,
+                    details: {
+                        runId: context.runId,
+                        errorMessage: outcome.errorMessage ?? null,
+                    },
+                });
+            }
             return { runId: context.runId, status: 'failed' };
         }
 
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
         await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
+
+        // Schedules P2 — completed-heartbeat activity coverage (see the
+        // failed branch above for rationale). Heartbeat kind only.
+        if (context.kind === 'heartbeat') {
+            void this.logActivity({
+                userId: context.userId,
+                agentId: context.agentId,
+                actionType: ActivityActionType.AGENT_HEARTBEAT_COMPLETED,
+                details: {
+                    runId: context.runId,
+                    summary: summary ?? null,
+                },
+            });
+        }
 
         let postedMessageId: string | undefined;
         let finishedTaskStatus: string | undefined;
@@ -1131,6 +1162,11 @@ export class AgentRunService {
         skillId?: string;
         actionType: ActivityActionType;
         details?: Record<string, unknown>;
+        // Schedules P2 — heartbeat-run coverage needs a FAILED variant so a
+        // failed scheduled run doesn't masquerade as COMPLETED in the
+        // Activity status summary cards. Defaults to COMPLETED so every
+        // existing caller is unchanged.
+        status?: ActivityStatus;
     }): Promise<void> {
         if (!this.activityLog) return;
         try {
@@ -1143,7 +1179,7 @@ export class AgentRunService {
                 userId: args.userId,
                 action: args.actionType,
                 actionType: args.actionType,
-                status: ActivityStatus.COMPLETED,
+                status: args.status ?? ActivityStatus.COMPLETED,
                 summary: `${resourceType} ${resourceId} — ${args.actionType}`,
                 details: { ...(args.details ?? {}), resourceType, resourceId },
             });

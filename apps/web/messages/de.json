@@ -1187,7 +1187,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Zeitpläne",
+            "subtitle": "Alles, was in Ihren Werken, Agenten, Missions und Aufgaben geplant ausgeführt wird",
+            "fetchFailed": "Zeitpläne konnten nicht geladen werden",
+            "retry": "Wiederholen",
+            "columns": {
+                "owner": "Besitzer",
+                "cadence": "Intervall",
+                "nextRun": "Nächster Lauf",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Alle",
+                "activeOnly": "Nur aktive"
+            },
+            "sourceTypes": {
+                "recurringTask": "Wiederkehrende Aufgabe",
+                "agentHeartbeat": "Agent-Heartbeat",
+                "workSchedule": "Werk-Zeitplan",
+                "missionTick": "Mission-Tick",
+                "sourceValidation": "Quellenvalidierung",
+                "dataSync": "Datensynchronisierung"
+            },
+            "statuses": {
+                "active": "Aktiv",
+                "paused": "Pausiert",
+                "disabled": "Deaktiviert",
+                "error": "Fehler",
+                "ended": "Beendet"
+            },
+            "empty": {
+                "title": "Noch nichts geplant",
+                "description": "Wiederkehrende Aufgaben, Agent-Heartbeats, Werk-Zeitpläne, Mission-Ticks, Quellenvalidierung und Datensynchronisierung erscheinen hier, sobald Sie sie eingerichtet haben.",
+                "noResults": "Keine Zeitpläne entsprechen dem aktuellen Filter."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Protokoll",
+                "schedules": "Zeitpläne"
+            },
             "title": "Aktivität",
             "subtitle": "Verfolgen Sie alle Vorgänge in Ihren Werken",
             "loading": "Laden…",

@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "スケジュール",
+            "subtitle": "ワーク、エージェント、Missions、タスク全体で実行が予定されているすべて",
+            "fetchFailed": "スケジュールの読み込みに失敗しました",
+            "retry": "再試行",
+            "columns": {
+                "owner": "所有者",
+                "cadence": "間隔",
+                "nextRun": "次回の実行",
+                "status": "ステータス"
+            },
+            "filters": {
+                "all": "すべて",
+                "activeOnly": "有効のみ"
+            },
+            "sourceTypes": {
+                "recurringTask": "定期タスク",
+                "agentHeartbeat": "エージェントのハートビート",
+                "workSchedule": "ワークのスケジュール",
+                "missionTick": "Mission のティック",
+                "sourceValidation": "ソースの検証",
+                "dataSync": "データ同期"
+            },
+            "statuses": {
+                "active": "アクティブ",
+                "paused": "一時停止",
+                "disabled": "無効",
+                "error": "エラー",
+                "ended": "終了"
+            },
+            "empty": {
+                "title": "まだ何も予定されていません",
+                "description": "定期タスク、エージェントのハートビート、ワークのスケジュール、Mission のティック、ソースの検証、データ同期を設定すると、ここに表示されます。",
+                "noResults": "現在のフィルターに一致するスケジュールはありません。"
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "ログ",
+                "schedules": "スケジュール"
+            },
             "title": "アクティビティ",
             "subtitle": "ワーク全体のすべての操作を追跡",
             "loading": "読み込み中...",

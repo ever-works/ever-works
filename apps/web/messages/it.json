@@ -1028,7 +1028,47 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Pianificazioni",
+            "subtitle": "Tutto ciò che è pianificato per l'esecuzione nei tuoi lavori, agenti, Missions e task",
+            "fetchFailed": "Impossibile caricare le pianificazioni",
+            "retry": "Riprova",
+            "columns": {
+                "owner": "Proprietario",
+                "cadence": "Cadenza",
+                "nextRun": "Prossima esecuzione",
+                "status": "Stato"
+            },
+            "filters": {
+                "all": "Tutte",
+                "activeOnly": "Solo attive"
+            },
+            "sourceTypes": {
+                "recurringTask": "Task ricorrente",
+                "agentHeartbeat": "Heartbeat agente",
+                "workSchedule": "Pianificazione lavoro",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Validazione sorgente",
+                "dataSync": "Sincronizzazione dati"
+            },
+            "statuses": {
+                "active": "Attivo",
+                "paused": "In pausa",
+                "disabled": "Disattivata",
+                "error": "Errore",
+                "ended": "Terminata"
+            },
+            "empty": {
+                "title": "Ancora nulla di pianificato",
+                "description": "Task ricorrenti, heartbeat degli agenti, pianificazioni dei lavori, tick delle Mission, validazione delle sorgenti e sincronizzazione dei dati appariranno qui una volta configurati.",
+                "noResults": "Nessuna pianificazione corrisponde al filtro corrente."
+            }
+        },
         "activity": {
+            "viewToggle": {
+                "log": "Log",
+                "schedules": "Pianificazioni"
+            },
             "title": "Attività",
             "subtitle": "Monitora tutte le operazioni nelle tue lavori",
             "loading": "Caricamento...",
