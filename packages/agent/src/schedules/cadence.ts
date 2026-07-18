@@ -155,7 +155,7 @@ export function computeNextCronFire(expr: string | null | undefined, from: Date)
     } catch {
         return null;
     }
-    const cursor = new Date(from);
+    let cursor = new Date(from);
     cursor.setUTCSeconds(0, 0);
     cursor.setUTCMilliseconds(0);
     cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);

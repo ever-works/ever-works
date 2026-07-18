@@ -338,7 +338,7 @@ export class SchedulesService {
                     cadenceHuman: describeIntervalMinutes(work.syncIntervalMinutes),
                     // Never-polled Works are due "now"; clamp a stale
                     // computed next-run up to now so the UI reads sensibly.
-                    nextRunAt: toIso(nextRunAt.getTime() < nowMs && !lastPolled ? now : nextRunAt),
+                    nextRunAt: toIso(nextRunAt.getTime() < nowMs ? now : nextRunAt),
                     lastRunAt: toIso(lastPolled),
                     lastRunStatus: null,
                     status: 'active' as ScheduleStatus,
