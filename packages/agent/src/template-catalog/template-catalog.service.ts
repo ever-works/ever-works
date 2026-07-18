@@ -26,6 +26,8 @@ import {
     listMissionTemplates,
     type MissionTemplateConfig,
 } from '@src/missions/mission-template.config';
+// Work Templates catalog source — powers the "Work Templates" tab.
+import { listWorkTemplates, type WorkTemplateConfig } from '@src/works/work-template.config';
 import { randomUUID } from 'node:crypto';
 import type { TemplateKind, TemplateSourceType } from '@src/entities/template.entity';
 import { config } from '@src/config';
@@ -128,6 +130,9 @@ export class TemplateCatalogService implements OnModuleInit {
             ),
             ...listMissionTemplates().map((template) =>
                 this.toBuiltInMissionTemplateRecord(template),
+            ),
+            ...listWorkTemplates().map((template) =>
+                this.toBuiltInWorkTemplateRecord(template),
             ),
         ];
 
@@ -805,6 +810,33 @@ export class TemplateCatalogService implements OnModuleInit {
             name: template.name,
             description: template.description,
             framework: null,
+            repositoryOwner: template.owner,
+            repositoryName: template.repo,
+            repositoryUrl: `https://github.com/${template.owner}/${template.repo}`,
+            branch: template.branch,
+            syncBranches: template.syncBranches,
+            betaBranch: template.betaBranch,
+            isActive: true,
+            metadata: {},
+        };
+    }
+
+    /**
+     * Built-in Work Template record. Same upsert shape as the website /
+     * mission variants; `kind: 'work'` routes it onto the "Work
+     * Templates" tab (kind-filtered catalog reader). Unlike the website
+     * variant — which infers `framework` from the repo name — a Work
+     * Template states its framework explicitly in config, so we pass it
+     * straight through (falling back to null when unset).
+     */
+    private toBuiltInWorkTemplateRecord(template: WorkTemplateConfig) {
+        return {
+            id: template.id,
+            kind: 'work' as const,
+            sourceType: 'built_in' as const,
+            name: template.name,
+            description: template.description,
+            framework: template.framework ?? null,
             repositoryOwner: template.owner,
             repositoryName: template.repo,
             repositoryUrl: `https://github.com/${template.owner}/${template.repo}`,

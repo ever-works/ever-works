@@ -1,0 +1,7 @@
+name: ever-works
+description: >-
+  Repo-specific guide to the Ever Works monorepo — layout, per-workspace test
+  frameworks (Jest / Vitest / Playwright), file-naming and import-alias
+  conventions, the commit/branch model, and build/lint/type-check commands. Use
+  when working anywhere in ever-works/ever-works.
+allow_implicit_invocation: true
