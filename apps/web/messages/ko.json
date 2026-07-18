@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "템플릿",
             "defaultOption": "기본값 사용",
             "defaultOptionWithName": "기본값 사용 ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (기본값)",
             "changeAnywayLink": "그래도 변경",
+            "typeLabel": "템플릿 유형",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "템플릿 검색…",
+            "searchAriaLabel": "템플릿 검색",
+            "groupYourTemplates": "내 템플릿",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "추천",
+            "defaultBadge": "기본값",
+            "empty": "검색과 일치하는 템플릿이 없습니다.",
+            "resultCount": "{count, plural, =0 {템플릿 없음} other {템플릿 #개}}",
             "origin": {
                 "standard": "표준",
                 "forked": "포크됨",

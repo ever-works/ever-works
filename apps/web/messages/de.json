@@ -4613,11 +4613,30 @@
             }
         },
         "templateSelector": {
+            "label": "Vorlage",
             "defaultOption": "Standard verwenden",
             "defaultOptionWithName": "Standard verwenden ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Standard)",
             "changeAnywayLink": "Trotzdem ändern",
+            "typeLabel": "Vorlagentyp",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Vorlagen suchen…",
+            "searchAriaLabel": "Vorlagen suchen",
+            "groupYourTemplates": "Ihre Vorlagen",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Empfohlen",
+            "defaultBadge": "Standard",
+            "empty": "Keine Vorlagen entsprechen Ihrer Suche.",
+            "resultCount": "{count, plural, =0 {Keine Vorlagen} one {# Vorlage} other {# Vorlagen}}",
             "origin": {
                 "standard": "Standard",
                 "forked": "Geforkt",

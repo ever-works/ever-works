@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "Mẫu",
             "defaultOption": "Sử dụng mặc định",
             "defaultOptionWithName": "Sử dụng mặc định ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Mặc định)",
             "changeAnywayLink": "Thay đổi ngay comunque",
+            "typeLabel": "Loại mẫu",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Tìm kiếm mẫu…",
+            "searchAriaLabel": "Tìm kiếm mẫu",
+            "groupYourTemplates": "Mẫu của bạn",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Nổi bật",
+            "defaultBadge": "Mặc định",
+            "empty": "Không có mẫu nào khớp với tìm kiếm của bạn.",
+            "resultCount": "{count, plural, =0 {Không có mẫu} other {# mẫu}}",
             "origin": {
                 "standard": "Chuẩn",
                 "forked": "Đã fork",

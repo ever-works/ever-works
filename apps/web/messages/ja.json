@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "テンプレート",
             "defaultOption": "デフォルトを使用",
             "defaultOptionWithName": "デフォルトを使用 ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (デフォルト)",
             "changeAnywayLink": "それでも変更する",
+            "typeLabel": "テンプレートの種類",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "テンプレートを検索…",
+            "searchAriaLabel": "テンプレートを検索",
+            "groupYourTemplates": "あなたのテンプレート",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "注目",
+            "defaultBadge": "デフォルト",
+            "empty": "検索に一致するテンプレートはありません。",
+            "resultCount": "{count, plural, =0 {テンプレートなし} other {# 件のテンプレート}}",
             "origin": {
                 "standard": "標準",
                 "forked": "フォーク済み",

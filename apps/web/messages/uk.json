@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "Шаблон",
             "defaultOption": "Використовувати за замовчуванням",
             "defaultOptionWithName": "Використовувати за замовчуванням ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (За замовчуванням)",
             "changeAnywayLink": "Змінити в будь‑якому випадку",
+            "typeLabel": "Тип шаблону",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Пошук шаблонів…",
+            "searchAriaLabel": "Пошук шаблонів",
+            "groupYourTemplates": "Ваші шаблони",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Рекомендований",
+            "defaultBadge": "За замовчуванням",
+            "empty": "Немає шаблонів, що відповідають вашому запиту.",
+            "resultCount": "{count, plural, =0 {Немає шаблонів} one {# шаблон} few {# шаблони} many {# шаблонів} other {# шаблона}}",
             "origin": {
                 "standard": "Стандартний",
                 "forked": "Форканий",

@@ -4613,11 +4613,30 @@
             }
         },
         "templateSelector": {
+            "label": "Шаблон",
             "defaultOption": "Използвайте подразбиране",
             "defaultOptionWithName": "Използвайте подразбиране ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Подразбиране)",
             "changeAnywayLink": "Променете все пак",
+            "typeLabel": "Тип шаблон",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Търсене на шаблони…",
+            "searchAriaLabel": "Търсене на шаблони",
+            "groupYourTemplates": "Вашите шаблони",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Популярен",
+            "defaultBadge": "Подразбиране",
+            "empty": "Няма шаблони, съответстващи на търсенето ви.",
+            "resultCount": "{count, plural, =0 {Няма шаблони} one {# шаблон} other {# шаблона}}",
             "origin": {
                 "standard": "Стандартен",
                 "forked": "Форкнат",

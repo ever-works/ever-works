@@ -4613,11 +4613,30 @@
             }
         },
         "templateSelector": {
+            "label": "قالب",
             "defaultOption": "استخدم الافتراضي",
             "defaultOptionWithName": "استخدم الافتراضي ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (افتراضي)",
             "changeAnywayLink": "غير مع ذلك",
+            "typeLabel": "نوع القالب",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "البحث في القوالب…",
+            "searchAriaLabel": "البحث في القوالب",
+            "groupYourTemplates": "قوالبك",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "مميز",
+            "defaultBadge": "افتراضي",
+            "empty": "لا توجد قوالب تطابق بحثك.",
+            "resultCount": "{count, plural, =0 {لا قوالب} one {قالب واحد} two {قالبان} few {# قوالب} many {# قالبًا} other {# قالب}}",
             "origin": {
                 "standard": "قياسي",
                 "forked": "مُشَتّت",
