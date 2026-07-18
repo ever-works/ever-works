@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { parse as parseYaml } from 'yaml';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { AgentFileService, AgentScope, AgentsService } from '@ever-works/agent/agents';
@@ -138,7 +138,10 @@ export class CompanyImportService {
                         `${pkg.path}/${relPath}`,
                     );
                 }
-                if (content === null) return null;
+                if (content === null) {
+                    skipped.push({ path: relPath, reason: 'file missing or unreadable' });
+                    return null;
+                }
                 if (Buffer.byteLength(content, 'utf8') > MAX_FILE_BYTES) {
                     skipped.push({ path: relPath, reason: 'file exceeds size cap' });
                     return null;
@@ -162,36 +165,47 @@ export class CompanyImportService {
         const orgName = input.name?.trim() || str(company.fm.name) || pkg.name;
 
         // ── collect package docs by convention (inventory-driven, spec §6.1) ──
-        const byPattern = (re: RegExp) =>
-            pkg.files.filter((f) => re.test(f)).map((f) => ({ path: f, slug: f.split('/')[1] }));
-        const agentFiles = byPattern(/^agents\/[a-z0-9-]+\/AGENTS\.md$/).slice(0, MAX_AGENTS);
-        const teamFiles = byPattern(/^teams\/[a-z0-9-]+\/TEAM\.md$/).slice(0, MAX_TEAMS);
-        const skillFiles = byPattern(/^skills\/[a-z0-9-]+\/SKILL\.md$/).slice(0, MAX_SKILLS);
-        const projectFiles = byPattern(/^projects\/[a-z0-9-]+\/PROJECT\.md$/).slice(0, MAX_WORKS);
-        const taskFiles = pkg.files
+        // Cap truncation is REPORTED, never silent (PR #1647 review).
+        const byPattern = (re: RegExp, cap: number, kind: string) => {
+            const all = pkg.files.filter((f) => re.test(f)).map((f) => ({ path: f, slug: f.split('/')[1] }));
+            for (const dropped of all.slice(cap)) {
+                skipped.push({ path: dropped.path, reason: `over the ${kind} cap (${cap})` });
+            }
+            return all.slice(0, cap);
+        };
+        const agentFiles = byPattern(/^agents\/[a-z0-9-]+\/AGENTS\.md$/, MAX_AGENTS, 'agent');
+        const teamFiles = byPattern(/^teams\/[a-z0-9-]+\/TEAM\.md$/, MAX_TEAMS, 'team');
+        const skillFiles = byPattern(/^skills\/[a-z0-9-]+\/SKILL\.md$/, MAX_SKILLS, 'skill');
+        const projectFiles = byPattern(/^projects\/[a-z0-9-]+\/PROJECT\.md$/, MAX_WORKS, 'project');
+        const allTaskFiles = pkg.files
             .filter((f) => /^projects\/[a-z0-9-]+\/tasks\/[a-z0-9-]+\/TASK\.md$/.test(f))
-            .slice(0, MAX_TASKS)
             .map((f) => ({ path: f, slug: f.split('/')[3], projectSlug: f.split('/')[1] }));
+        for (const dropped of allTaskFiles.slice(MAX_TASKS)) {
+            skipped.push({ path: dropped.path, reason: `over the task cap (${MAX_TASKS})` });
+        }
+        const taskFiles = allTaskFiles.slice(0, MAX_TASKS);
 
+        // Concurrent fetches (PR #1647 review) — bounded by the caps above;
+        // unreadable files land in skipped[] via fetchFile and are dropped here.
         const parseAll = async (
             files: Array<{ path: string; slug: string }>,
         ): Promise<ParsedDoc[]> => {
+            const raws = await Promise.all(files.map((f) => fetchFile(f.path)));
             const out: ParsedDoc[] = [];
-            for (const f of files) {
-                const raw = await fetchFile(f.path);
-                if (raw === null) continue;
+            raws.forEach((raw, i) => {
+                if (raw === null) return; // fetchFile already reported it in skipped[]
                 const { fm, body } = splitFrontmatter(raw);
-                out.push({ path: f.path, slug: f.slug, fm, body });
-            }
+                out.push({ path: files[i].path, slug: files[i].slug, fm, body });
+            });
             return out;
         };
 
-        const [agentDocs, teamDocs, skillDocs, projectDocs] = [
-            await parseAll(agentFiles),
-            await parseAll(teamFiles),
-            await parseAll(skillFiles),
-            await parseAll(projectFiles),
-        ];
+        const [agentDocs, teamDocs, skillDocs, projectDocs] = await Promise.all([
+            parseAll(agentFiles),
+            parseAll(teamFiles),
+            parseAll(skillFiles),
+            parseAll(projectFiles),
+        ]);
 
         // ── pivot: create the Organization (lazy Tenant bootstrap included) ──
         const org = await this.organizationService.createOrganization(userId, orgName);
@@ -332,8 +346,15 @@ export class CompanyImportService {
                                 role: slug === managerSlug ? 'lead' : 'member',
                             });
                             created.members++;
-                        } catch {
-                            // Duplicate roster rows (manager also in includes) are fine.
+                        } catch (err) {
+                            // Duplicate roster rows (manager also in includes) are fine;
+                            // anything else is reported (PR #1647 review).
+                            if (!(err instanceof ConflictException)) {
+                                skipped.push({
+                                    path: doc.path,
+                                    reason: `roster add "${slug}" failed: ${err instanceof Error ? err.message : String(err)}`,
+                                });
+                            }
                         }
                     }
                 }
@@ -372,7 +393,12 @@ export class CompanyImportService {
                         }
                         await this.skillsService
                             .createBinding(userId, { skillId, targetType: 'agent', targetId: agentId })
-                            .catch(() => undefined);
+                            .catch((err: unknown) =>
+                                skipped.push({
+                                    path: doc.path,
+                                    reason: `skill binding "${shortname}" failed: ${err instanceof Error ? err.message : String(err)}`,
+                                }),
+                            );
                     }
                 }
 
@@ -395,6 +421,17 @@ export class CompanyImportService {
                     }
                 }
                 for (const tf of taskFiles) {
+                    // A template task is project-scoped by definition — if its
+                    // project's Work wasn't created, don't strand the task as
+                    // an unrelated top-level row (PR #1647 review).
+                    const workId = workIdByProjectSlug.get(tf.projectSlug);
+                    if (!workId) {
+                        skipped.push({
+                            path: tf.path,
+                            reason: `project "${tf.projectSlug}" work was not created — task skipped`,
+                        });
+                        continue;
+                    }
                     const raw = await fetchFile(tf.path);
                     if (raw === null) continue;
                     const { fm, body } = splitFrontmatter(raw);
@@ -402,7 +439,7 @@ export class CompanyImportService {
                         await this.tasksService.create(userId, {
                             title: str(fm.name) ?? tf.slug,
                             description: body || null,
-                            workId: workIdByProjectSlug.get(tf.projectSlug) ?? null,
+                            workId,
                             createdByType: 'user',
                             createdById: userId,
                         });

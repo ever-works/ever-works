@@ -44,6 +44,7 @@ function agent(
         name,
         title: null,
         status: 'active',
+        avatarIcon: null,
         reportsToAgentId: null,
         teamIds: [],
         ...extra,
@@ -55,7 +56,7 @@ function member(
     name: string | null,
     teamIds: string[] = [],
 ): OrgChartPayload['members'][number] {
-    return { userId, name, teamIds };
+    return { userId, name, avatarUrl: null, teamIds };
 }
 
 function labels(nodes: OrgTreeNode[]): string[] {

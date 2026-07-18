@@ -91,12 +91,14 @@ export class OrgChartService {
                 name: a.name,
                 title: a.title ?? null,
                 status: a.status,
+                avatarIcon: a.avatarIcon ?? null,
                 reportsToAgentId: a.reportsToAgentId ?? null,
                 teamIds: teamIdsByAgent.get(a.id) ?? [],
             })),
             members: humans.map((u) => ({
                 userId: u.id,
                 name: u.username ?? null,
+                avatarUrl: u.avatar ?? null,
                 teamIds: teamIdsByUser.get(u.id) ?? [],
             })),
         };

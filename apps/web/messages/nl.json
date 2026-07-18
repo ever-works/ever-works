@@ -561,6 +561,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Zoeken",
+                "searchPlaceholder": "Titel of beschrijving",
+                "anyStatus": "Elke status",
+                "apply": "Toepassen",
+                "reset": "Resetten",
+                "status": "Status"
             }
         },
         "agentsPage": {

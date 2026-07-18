@@ -2,14 +2,12 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { NewAgentDialog } from '@/components/agents';
 import { createAgentAction } from '@/app/actions/agents';
-import { agentsAPI } from '@/lib/api/agents';
 import { missionsAPI } from '@/lib/api/missions';
 import { teamsAPI } from '@/lib/api/teams';
 import { workAPI } from '@/lib/api/work';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { AstTemplateEntry } from '@/lib/api/agent-templates';
 import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
-import type { Agent } from '@/lib/api/agents';
 import type { Mission } from '@/lib/api/missions';
 import type { Team, TeamsOrganization } from '@/lib/api/teams';
 import type { Work } from '@/lib/api/work';
@@ -68,15 +66,16 @@ export default async function NewAgentPage() {
     let teamOptions: Array<{ id: string; label: string }> = [];
     let agentOptions: Array<{ id: string; label: string }> = [];
     if (activeOrg) {
-        const [teams, agentsResp] = await Promise.all([
+        // Reports-to candidates come from the ORG CHART payload — the
+        // org-scoped agent roster — not the user-wide agents list, so a
+        // multi-org user never wires a reporting line across organizations
+        // (PR #1647 review).
+        const [teams, chart] = await Promise.all([
             teamsAPI.list(activeOrg.id).catch(() => [] as Team[]),
-            agentsAPI.list({ limit: 100 }).catch(() => ({
-                data: [] as Agent[],
-                meta: { total: 0, limit: 100, offset: 0 },
-            })),
+            teamsAPI.orgChart(activeOrg.id).catch(() => null),
         ]);
         teamOptions = teams.map((team) => ({ id: team.id, label: team.name }));
-        agentOptions = agentsResp.data
+        agentOptions = (chart?.agents ?? [])
             .filter((a) => a.status !== 'archived')
             .map((a) => ({ id: a.id, label: a.name }));
     }

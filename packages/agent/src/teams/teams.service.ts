@@ -5,7 +5,7 @@ import {
     UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Agent } from '../entities/agent.entity';
 import { Organization } from '../entities/organization.entity';
 import { Team } from '../entities/team.entity';
@@ -125,14 +125,18 @@ export class TeamsService {
     /**
      * Delete a team. Children are re-parented to the deleted team's parent
      * (never deleted with it — spec §3); roster rows cascade at the DB level.
+     * Re-parent + delete run in ONE transaction so a mid-flight failure can't
+     * leave children pointing at a deleted parent (PR #1647 review).
      */
     async remove(orgId: string, teamId: string): Promise<void> {
         const team = await this.getOrThrow(orgId, teamId);
-        await this.teams.update(
-            { parentTeamId: teamId, organizationId: orgId },
-            { parentTeamId: team.parentTeamId ?? null },
-        );
-        await this.teams.delete({ id: teamId });
+        await this.teams.manager.transaction(async (em) => {
+            await em.getRepository(Team).update(
+                { parentTeamId: teamId, organizationId: orgId },
+                { parentTeamId: team.parentTeamId ?? null },
+            );
+            await em.getRepository(Team).delete({ id: teamId });
+        });
     }
 
     // ── Roster ──
@@ -214,8 +218,12 @@ export class TeamsService {
 
     /**
      * Parent must exist in the same org, must not create a cycle (walking
-     * up from the proposed parent must never reach `teamId`), and must not
-     * exceed TEAM_MAX_DEPTH.
+     * up from the proposed parent must never reach `teamId`), and the
+     * COMBINED depth — ancestors of the new parent plus the height of the
+     * subtree being moved — must stay within TEAM_MAX_DEPTH (PR #1647
+     * review: parent-chain depth alone let a deep subtree exceed the cap).
+     * Ancestor lookups are org-filtered (defense-in-depth; parents are
+     * same-org by construction at every write).
      */
     private async assertValidParent(
         orgId: string,
@@ -242,24 +250,49 @@ export class TeamsService {
                 cursor = null;
                 break;
             }
-            cursor = await this.teams.findOne({ where: { id: cursor.parentTeamId } });
+            cursor = await this.teams.findOne({
+                where: { id: cursor.parentTeamId, organizationId: orgId },
+            });
             depth++;
         }
-        if (cursor !== null || depth >= TEAM_MAX_DEPTH) {
+        const subtreeHeight = teamId ? await this.subtreeHeight(orgId, teamId) : 1;
+        if (cursor !== null || depth + subtreeHeight > TEAM_MAX_DEPTH) {
             throw new UnprocessableEntityException(
                 `Team hierarchy exceeds the maximum depth of ${TEAM_MAX_DEPTH}`,
             );
         }
     }
 
+    /** Height (in levels, >= 1) of the subtree rooted at `teamId`. BFS via the
+     *  parentTeamId index, bounded by TEAM_MAX_DEPTH so it can never run away. */
+    private async subtreeHeight(orgId: string, teamId: string): Promise<number> {
+        let frontier = [teamId];
+        let height = 1;
+        while (frontier.length > 0 && height <= TEAM_MAX_DEPTH) {
+            const children = await this.teams.find({
+                where: { parentTeamId: In(frontier), organizationId: orgId },
+                select: ['id'],
+            });
+            if (children.length === 0) break;
+            frontier = children.map((c) => c.id);
+            height++;
+        }
+        return height;
+    }
+
     /**
      * The referenced Agent must belong to the same Tenant as the org (agents
      * are stamped with tenantId; org-stamp may be NULL for pre-Org agents —
-     * tenant equality is the IDOR boundary that matters).
+     * tenant equality is the IDOR boundary that matters). An agent stamped
+     * for a DIFFERENT org of the same tenant is rejected too (PR #1647
+     * review): it belongs on that org's chart, not this one's.
      */
     private async assertAgentInOrg(org: Organization, agentId: string): Promise<Agent> {
         const agent = await this.agents.findOne({ where: { id: agentId } });
         if (!agent || (agent.tenantId && agent.tenantId !== org.tenantId)) {
+            throw new NotFoundException(`Agent ${agentId} not found`);
+        }
+        if (agent.organizationId && agent.organizationId !== org.id) {
             throw new NotFoundException(`Agent ${agentId} not found`);
         }
         if (!agent.tenantId) {
@@ -293,8 +326,8 @@ export class TeamsService {
         const agentIds = rows.filter((r) => r.memberType === 'agent').map((r) => r.memberId);
         const userIds = rows.filter((r) => r.memberType === 'user').map((r) => r.memberId);
         const [agentRows, userRows] = await Promise.all([
-            agentIds.length ? this.agents.findByIds(agentIds) : Promise.resolve([]),
-            userIds.length ? this.users.findByIds(userIds) : Promise.resolve([]),
+            agentIds.length ? this.agents.find({ where: { id: In(agentIds) } }) : Promise.resolve([]),
+            userIds.length ? this.users.find({ where: { id: In(userIds) } }) : Promise.resolve([]),
         ]);
         const agentsById = new Map(agentRows.map((a) => [a.id, a]));
         const usersById = new Map(userRows.map((u) => [u.id, u]));

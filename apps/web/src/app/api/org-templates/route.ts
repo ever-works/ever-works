@@ -24,6 +24,7 @@ export async function GET(_request: NextRequest) {
             method: 'GET',
             headers,
             cache: 'no-store',
+            signal: AbortSignal.timeout(10_000),
         });
         if (!upstream.ok) {
             return NextResponse.json([], { status: 200 });

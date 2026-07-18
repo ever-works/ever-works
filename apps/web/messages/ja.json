@@ -561,6 +561,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "検索",
+                "searchPlaceholder": "タイトルまたは説明",
+                "anyStatus": "すべてのステータス",
+                "apply": "適用",
+                "reset": "リセット",
+                "status": "ステータス"
             }
         },
         "agentsPage": {

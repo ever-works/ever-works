@@ -62,6 +62,12 @@ function build() {
     const organizations = repoMock();
     const users = repoMock();
     organizations.findOne.mockResolvedValue(ORG);
+    // remove() wraps re-parent + delete in a transaction; the mock hands the
+    // same repo back so the assertions keep observing teams.update/delete.
+    (teams as { manager?: unknown }).manager = {
+        transaction: async (fn: (em: unknown) => Promise<unknown>) =>
+            fn({ getRepository: () => teams }),
+    };
     const service = new TeamsService(
         teams as unknown as Repository<Team>,
         members as unknown as Repository<TeamMember>,
@@ -172,7 +178,7 @@ describe('TeamsService', () => {
             const { service, teams, members, agents } = build();
             teams.findOne.mockResolvedValue(makeTeam());
             agents.findOne.mockResolvedValue({ id: 'ag-1', name: 'CEO', title: null, tenantId: 'ten-1' });
-            agents.findByIds.mockResolvedValue([{ id: 'ag-1', name: 'CEO', title: null }]);
+            agents.find.mockResolvedValue([{ id: 'ag-1', name: 'CEO', title: null }]);
             members.save.mockImplementation(async (x: object) => ({ id: 'tm-1', createdAt: new Date(), ...x }));
             const view = await service.addMember('u1', 'org-1', 'team-1', {
                 memberType: 'agent',

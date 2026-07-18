@@ -95,7 +95,12 @@ export async function fetchPublicRawFile(
     if (!SAFE_REF_RE.test(ref) || path.includes('..')) return null;
     const url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`;
     try {
-        const res = await fetch(url, { headers: { 'User-Agent': 'Ever Works' } });
+        // Fail-closed deadline (PR #1647 review): a stalled raw request must
+        // not hang catalog/import requests indefinitely.
+        const res = await fetch(url, {
+            headers: { 'User-Agent': 'Ever Works' },
+            signal: AbortSignal.timeout(10_000),
+        });
         if (!res.ok) return null;
         return await res.text();
     } catch {

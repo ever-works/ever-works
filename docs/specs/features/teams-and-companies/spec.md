@@ -307,11 +307,15 @@ ever-works/orgs
 | `.works/company.yml` | hints | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat |
 
 Fetching uses the existing `GitFacadeService.getFileContent` path with the platform
-GitHub App / `EVER_WORKS_ORGS_TOKEN` / `GITHUB_TOKEN` fallback chain, ref pinned via
-`EVER_WORKS_ORGS_REF`, 1h `cache_entries` TTL (catalog + per-company package), and the
-same sanitization the agent-template service applies (slug regex allowlist, `stripHtml`,
-length caps). Server-side caps: ≤ 50 agents, ≤ 20 teams, ≤ 20 works, ≤ 200 tasks, ≤ 60
-skills per import; catalog v1 companies stay far below these.
+GitHub App / `EVER_WORKS_ORGS_TOKEN` / `GITHUB_TOKEN` fallback chain (tokenless →
+raw.githubusercontent.com, the repos are public), ref pinned via `EVER_WORKS_ORGS_REF`,
+1h `cache_entries` TTL (catalog + per-company package), and the same sanitization the
+agent-template service applies (slug regex allowlist, `stripHtml`, length caps).
+Server-side caps: ≤ 50 agents, ≤ 20 teams, ≤ 20 works, ≤ 200 tasks, ≤ 60 skills per
+import. The CATALOG's own validation caps (50 agents / 10 teams / 40 skills / 2
+projects, `ever-works/orgs` `scripts/validate.mjs`) are deliberately a strict subset of
+these importer caps, so every published company always imports whole; over-cap content
+in a hand-built package is truncated AND reported in `skipped[]`, never silent.
 
 Failure model: Organization creation is the pivot. If it succeeds and a later entity
 fails validation, the import **continues** and returns a per-entity report

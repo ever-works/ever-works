@@ -81,7 +81,12 @@ export function AgentSettingsClient({
     // isSubmitting (house rule for detached-async submits), '' = none.
     const tOrg = useTranslations('dashboard.agentsPage.settings.orgCard');
     const [teamId, setTeamId] = useState(organization?.currentTeamIds[0] ?? '');
-    const [savedTeamId, setSavedTeamId] = useState(organization?.currentTeamIds[0] ?? '');
+    // ALL current memberships — the select is single-team by design (v1),
+    // but an agent may hold several roster rows (imports, API); saving
+    // consolidates onto the selection (PR #1647 review).
+    const [savedTeamIds, setSavedTeamIds] = useState<string[]>(
+        organization?.currentTeamIds ?? [],
+    );
     const [reportsToId, setReportsToId] = useState(agent.reportsToAgentId ?? '');
     const [isOrgSaving, setIsOrgSaving] = useState(false);
 
@@ -96,22 +101,28 @@ export function AgentSettingsClient({
                 });
                 setAgent(updated);
             }
-            if (teamId !== savedTeamId) {
-                if (savedTeamId) {
-                    await removeTeamMemberAction(
-                        organization.activeOrgId,
-                        savedTeamId,
-                        'agent',
-                        agent.id,
-                    );
-                }
-                if (teamId) {
+            const membershipChanged =
+                teamId !== (savedTeamIds[0] ?? '') || savedTeamIds.length > (teamId ? 1 : 0);
+            if (membershipChanged) {
+                // Add first, remove after — a mid-flight failure never leaves
+                // the agent teamless; every stale membership is removed.
+                if (teamId && !savedTeamIds.includes(teamId)) {
                     await addTeamMemberAction(organization.activeOrgId, teamId, {
                         memberType: 'agent',
                         memberId: agent.id,
                     });
                 }
-                setSavedTeamId(teamId);
+                for (const oldTeamId of savedTeamIds) {
+                    if (oldTeamId !== teamId) {
+                        await removeTeamMemberAction(
+                            organization.activeOrgId,
+                            oldTeamId,
+                            'agent',
+                            agent.id,
+                        );
+                    }
+                }
+                setSavedTeamIds(teamId ? [teamId] : []);
             }
             toast.success('Organization settings saved');
             router.refresh();

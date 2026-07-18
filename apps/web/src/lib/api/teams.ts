@@ -71,10 +71,11 @@ export interface OrgChartPayload {
         name: string;
         title: string | null;
         status: string;
+        avatarIcon: string | null;
         reportsToAgentId: string | null;
         teamIds: string[];
     }>;
-    members: Array<{ userId: string; name: string | null; teamIds: string[] }>;
+    members: Array<{ userId: string; name: string | null; avatarUrl: string | null; teamIds: string[] }>;
 }
 
 /** Minimal org shape the teams pages need (mirror of OrganizationResponse). */

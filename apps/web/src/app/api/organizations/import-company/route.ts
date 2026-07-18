@@ -28,11 +28,13 @@ export async function POST(request: NextRequest) {
     headers.set('Content-Type', 'application/json');
 
     try {
+        // Generous deadline: an import materializes up to ~100 files + rows.
         const upstream = await fetch(`${API_URL}/organizations/import-company`, {
             method: 'POST',
             headers,
             body: JSON.stringify(body),
             cache: 'no-store',
+            signal: AbortSignal.timeout(120_000),
         });
         const payload = await upstream.json().catch(() => ({}));
         return NextResponse.json(payload, { status: upstream.status });
