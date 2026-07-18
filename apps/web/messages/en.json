@@ -1217,7 +1217,7 @@
             }
         },
         "activity": {
-            "title": "Activity Log",
+            "title": "Activity",
             "subtitle": "Track all operations across your works",
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
@@ -5053,7 +5053,7 @@
             "resetPassword": "Reset Password",
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
-            "activity": "Activity Log",
+            "activity": "Activity",
             "works": "Works",
             "discover": "Discover",
             "newWork": "New Work",

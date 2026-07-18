@@ -547,17 +547,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "नई मिशन शुरू करें",
-                "submitTitle": "मिशन बनाएं",
-                "minLength": "विवरण कम से कम 10 अक्षरों का होना चाहिए।",
-                "created": "मिशन बनाया गया",
-                "error": "मिशन बनाने में असमर्थ। कृपया पुनः प्रयास करें।"
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "एकीकृत निर्माता खोलें"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -569,14 +561,6 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "खोजें",
-                "searchPlaceholder": "शीर्षक या विवरण",
-                "status": "स्थिति",
-                "anyStatus": "कोई भी स्थिति",
-                "apply": "लागू करें",
-                "reset": "रीसेट करें"
             }
         },
         "agentsPage": {
@@ -894,7 +878,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "विचार जोड़ें",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -938,6 +921,22 @@
                 "anyStatus": "कोई भी स्थिति",
                 "apply": "लागू करें",
                 "reset": "रीसेट करें"
+            },
+            "newPage": {
+                "link": "मैन्युअल रूप से बनाएँ",
+                "or": "या",
+                "title": "नया Idea",
+                "subtitle": "अपना खुद का Idea लिखें। वह Work बताएँ जिसे आप बनाना चाहते हैं — उसके बाद आप उसे बिल्ड के लिए कतार में लगा सकते हैं।",
+                "nameLabel": "शीर्षक",
+                "namePlaceholder": "वैकल्पिक — विवरण से प्राप्त करने के लिए खाली छोड़ें",
+                "descriptionLabel": "विवरण",
+                "descriptionPlaceholder": "वह Work बताएँ जो यह Idea बनना चाहिए — जैसे “ओपन-सोर्स AI एजेंट फ्रेमवर्क की एक संकलित निर्देशिका, जो फ्रेमवर्क प्रकार और लाइसेंस के अनुसार व्यवस्थित है।”",
+                "descriptionHint": "कम से कम 10 अक्षर।",
+                "cancel": "रद्द करें",
+                "create": "Idea बनाएँ",
+                "creating": "बना रहे हैं…",
+                "minLength": "विवरण कम से कम 10 अक्षरों का होना चाहिए।",
+                "error": "Idea नहीं बनाया जा सका। कृपया पुनः प्रयास करें।"
             }
         },
         "discover": {
@@ -1030,7 +1029,7 @@
             }
         },
         "activity": {
-            "title": "गतिविधि लॉग",
+            "title": "गतिविधि",
             "subtitle": "अपनी कार्य में सभी ऑपरेशनों को ट्रैक करें",
             "loading": "लोड हो रहा है...",
             "fetchFailed": "गतिविधियां लोड करने में विफल",
@@ -3395,7 +3394,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3410,19 +3409,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "एक निरंतर लक्ष्य जिस पर एजेंट लगातार काम करता है — अनुसूची या एक बार पर विचार उत्पन्न करता है।",
-                "idea": "एक एक-बार की संक्षिप्त जानकारी जिसे एजेंट एक काया योजना में बदल देता है जिसे आप बना सकते हैं।",
-                "website": "एक व्यवसाय, सेवा, या ब्रांड के लिए बहु-पृष्ठ साइट — उत्पन्न सामग्री + कोड।",
-                "landing-page": "एक केंद्रित एक-पृष्ठ — इंतजार सूचियां, उत्पाद लॉन्च, वेबिनार साइनअप, लीड कैप्चर।",
-                "blog": "श्रेणियों, RSS, कोड हाइलाइटिंग, और SEO-तैयार सामग्री के साथ एक ब्लॉग।",
-                "directory": "खोज, फ़िल्टर, और संरचित आइटम डेटा के साथ एक क्यूरेटेड निर्देशित साइट।",
-                "awesome-repo": "एक अवसर-सूची रेपो — मार्कडाउन इंडेक्स, श्रेणीबद्ध लिंक, और ताज़ा होने योग्य मेटाडेटा।",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "बनाएं",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -4487,333 +4488,6 @@
             "toggleError": "प्लगइन टॉगल करने में विफल",
             "system": "सिस्टम",
             "goToPluginSettings": "प्लगइन सेटिंग्स पर जाएँ"
-        },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "यह आइडिया अब उपलब्ध नहीं है।"
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "खोजें",
-                "searchPlaceholder": "शीर्षक या विवरण",
-                "status": "स्थिति",
-                "anyStatus": "कोई भी स्थिति",
-                "apply": "लागू करें",
-                "reset": "रीसेट करें"
-            },
-            "newPage": {
-                "link": "मैन्युअल रूप से बनाएँ",
-                "or": "या",
-                "title": "नया Idea",
-                "subtitle": "अपना खुद का Idea लिखें। वह Work बताएँ जिसे आप बनाना चाहते हैं — उसके बाद आप उसे बिल्ड के लिए कतार में लगा सकते हैं।",
-                "nameLabel": "शीर्षक",
-                "namePlaceholder": "वैकल्पिक — विवरण से प्राप्त करने के लिए खाली छोड़ें",
-                "descriptionLabel": "विवरण",
-                "descriptionPlaceholder": "वह Work बताएँ जो यह Idea बनना चाहिए — जैसे “ओपन-सोर्स AI एजेंट फ्रेमवर्क की एक संकलित निर्देशिका, जो फ्रेमवर्क प्रकार और लाइसेंस के अनुसार व्यवस्थित है।”",
-                "descriptionHint": "कम से कम 10 अक्षर।",
-                "cancel": "रद्द करें",
-                "create": "Idea बनाएँ",
-                "creating": "बना रहे हैं…",
-                "minLength": "विवरण कम से कम 10 अक्षरों का होना चाहिए।",
-                "error": "Idea नहीं बनाया जा सका। कृपया पुनः प्रयास करें।"
-            }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
-            },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
         }
     },
     "layout": {
@@ -4882,7 +4556,7 @@
             "resetPassword": "पासवर्ड रीसेट करें",
             "authError": "प्रमाणीकरण त्रुटि",
             "dashboard": "डैशबोर्ड",
-            "activity": "गतिविधि लॉग",
+            "activity": "गतिविधि",
             "works": "कार्यज़",
             "discover": "Discover",
             "newWork": "नई कार्य",

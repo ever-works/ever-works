@@ -1188,7 +1188,7 @@
             }
         },
         "activity": {
-            "title": "יומן פעילות",
+            "title": "פעילות",
             "subtitle": "עקוב אחר כל הפעולות בעבודות שלך",
             "loading": "טוען...",
             "fetchFailed": "נכשל בטעינת הפעילויות",
@@ -4752,7 +4752,7 @@
             "resetPassword": "אפס סיסמה",
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
-            "activity": "יומן פעילות",
+            "activity": "פעילות",
             "works": "עבודות",
             "discover": "גלה",
             "newWork": "עבודה חדשה",

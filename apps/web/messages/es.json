@@ -1188,7 +1188,7 @@
             }
         },
         "activity": {
-            "title": "Registro de actividad",
+            "title": "Actividad",
             "subtitle": "Sigue todas las operaciones en tus trabajos",
             "loading": "Cargando...",
             "fetchFailed": "Error al cargar actividades",
@@ -4752,7 +4752,7 @@
             "resetPassword": "Restablecer contraseña",
             "authError": "Error de autenticación",
             "dashboard": "Panel",
-            "activity": "Registro de actividad",
+            "activity": "Actividad",
             "works": "Trabajos",
             "discover": "Descubrir",
             "newWork": "Nuevo trabajo",

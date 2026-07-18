@@ -1188,7 +1188,7 @@
             }
         },
         "activity": {
-            "title": "Aktivitätsprotokoll",
+            "title": "Aktivität",
             "subtitle": "Verfolgen Sie alle Vorgänge in Ihren Werken",
             "loading": "Laden…",
             "fetchFailed": "Aktivitäten konnten nicht geladen werden",
@@ -4752,7 +4752,7 @@
             "resetPassword": "Passwort zurücksetzen",
             "authError": "Authentifizierungsfehler",
             "dashboard": "Dashboard",
-            "activity": "Aktivitätsprotokoll",
+            "activity": "Aktivität",
             "works": "Werke",
             "discover": "Entdecken",
             "newWork": "Neues Werk",

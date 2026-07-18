@@ -1188,7 +1188,7 @@
             }
         },
         "activity": {
-            "title": "Journal d'activité",
+            "title": "Activité",
             "subtitle": "Suivez toutes les opérations sur vos travaux",
             "loading": "Chargement...",
             "fetchFailed": "Échec du chargement des activités",
@@ -4752,7 +4752,7 @@
             "resetPassword": "Réinitialiser le mot de passe",
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
-            "activity": "Journal d'activité",
+            "activity": "Activité",
             "works": "Travaux",
             "discover": "Découvrir",
             "newWork": "Nouvel travail",
