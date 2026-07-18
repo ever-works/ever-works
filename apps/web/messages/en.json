@@ -610,6 +610,37 @@
                 "status": "Status"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Everything your organization knows, in one place — aggregated across every Work's Knowledge Base.",
+            "searchPlaceholder": "Search across everything the organization knows…",
+            "newDocument": "New",
+            "documentsIndexed": "{count, plural, =0 {No documents indexed} one {# document indexed} other {# documents indexed}}",
+            "worksCovered": "{count, plural, =0 {no Works} one {# Work} other {# Works}}",
+            "filters": {
+                "type": "Type",
+                "work": "Work",
+                "source": "Source",
+                "status": "Status",
+                "clearAll": "Clear all"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Nothing in Memory yet.",
+                "subtitle": "As your Works build up their Knowledge Base — brand docs, personas, research, style guides — everything shows up here, searchable across the whole organization.",
+                "noOrg": "Select or create an Organization to see its aggregated Memory. Memory spans every Work in the active Organization.",
+                "noResults": "No documents match your search and filters."
+            },
+            "orgScoped": "Organization",
+            "openInWork": "Open in Work"
+        },
         "agentsPage": {
             "title": "Agents",
             "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole Workspace.",
@@ -4442,6 +4473,7 @@
                 "works": "Works",
                 "tasks": "Tasks",
                 "agents": "Agents",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Skills",
                 "templates": "Templates",

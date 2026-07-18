@@ -19,6 +19,12 @@ export * from './task-tracker.interface.js';
 export * from './email-provider.interface.js';
 export * from './notification-channel.interface.js';
 export * from './agent-memory.interface.js';
+// Org-wide Memory (Cortex P2) — pluggable ORG memory framework +
+// multi-doc-type RAG pipeline contracts. Additive, beside the existing
+// `agent-memory` / `vector-store` / `content-extractor` seams. See
+// `docs/specs/features/memory/spec.md` §5.
+export * from './memory.interface.js';
+export * from './rag.interface.js';
 // EW-642 — pluggable vector-store backends.
 export * from './vector-store.interface.js';
 // EW-734 / EW-735 — pluggable DNS providers (Cloudflare today; BYO Cloudflare

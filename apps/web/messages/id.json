@@ -3944,6 +3944,7 @@
                 "works": "Karya",
                 "tasks": "Tugas",
                 "agents": "Agen",
+                "memory": "Memory",
                 "plugins": "Plugin",
                 "skills": "Keterampilan",
                 "templates": "Template",

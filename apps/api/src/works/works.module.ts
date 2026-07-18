@@ -20,6 +20,7 @@ import { InvitationsController } from './invitations.controller';
 import { BulkItemsController } from './bulk-items.controller';
 import { KbController } from './kb.controller';
 import { OrgKbController } from './org-kb.controller';
+import { OrgMemoryController } from './org-memory.controller';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -99,6 +100,10 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         BulkItemsController,
         KbController,
         OrgKbController,
+        // Org-wide Memory (Cortex P1) — read-mostly aggregation over the
+        // per-Work KB across the active Organization. Shares this module's
+        // KnowledgeBaseModule + OrganizationsModule (membership guard) wiring.
+        OrgMemoryController,
     ],
 })
 export class WorksModule {}

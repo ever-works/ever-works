@@ -18,7 +18,10 @@ import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.servi
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { KbUploadExtractionStatus } from '../entities/kb-types';
-import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
+import {
+    WorkKnowledgeDocumentRepository,
+    type OrgMemoryFacetCount,
+} from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
@@ -116,6 +119,76 @@ interface ListOptions {
     q?: string;
     limit?: number;
     offset?: number;
+}
+
+/**
+ * Org-wide Memory (Cortex P1) — query shape for `aggregateOrgMemory`.
+ * Every field is a facet the Memory page exposes as a chip (Type /
+ * Status / Source), plus lexical search and paging. The org itself is
+ * resolved by the caller (controller reads it from the scope context)
+ * and is NOT part of this query — Memory is org-bounded by construction.
+ */
+export interface OrgMemoryAggregateQuery {
+    classes?: KbDocumentClass[];
+    statuses?: KbDocumentStatus[];
+    sources?: KbDocumentSource[];
+    /**
+     * Work facet selection. Narrows the feed to these Works. Values are
+     * intersected with the active org's Work ids server-side, so a
+     * caller-supplied id outside the org is ignored (never leaks another
+     * org's documents). When present, org-scoped (`workId IS NULL`)
+     * documents are excluded — a specific-Work selection is about Work
+     * documents.
+     */
+    workIds?: string[];
+    q?: string;
+    limit?: number;
+    offset?: number;
+}
+
+/**
+ * Org-wide Memory (Cortex P1) — one row in the aggregated feed. A thin
+ * projection of `WorkKnowledgeDocument` metadata plus the resolved
+ * source-Work name (for the provenance link). No document body is
+ * carried here — the list view is metadata-only.
+ */
+export interface OrgMemoryDocumentItem {
+    id: string;
+    title: string;
+    description: string | null;
+    path: string;
+    /** Null for org-scoped documents (`workId IS NULL`). */
+    workId: string | null;
+    /** Display name of the source Work; null for org-scoped documents. */
+    workName: string | null;
+    class: KbDocumentClass;
+    status: KbDocumentStatus;
+    source: KbDocumentSource;
+    updatedAt: string;
+    lastIndexedAt: string | null;
+}
+
+/** A facet bucket for a Memory chip; `label` is a human-readable name. */
+export interface OrgMemoryFacet {
+    value: string;
+    label: string;
+    count: number;
+}
+
+/**
+ * Org-wide Memory (Cortex P1) — the `GET /api/memory` payload shape.
+ * `counts.documents` is the header "documents indexed" number (the true
+ * total, not the page size). `facets` back the filter chips.
+ */
+export interface OrgMemoryAggregateResult {
+    documents: OrgMemoryDocumentItem[];
+    counts: { documents: number };
+    facets: {
+        types: OrgMemoryFacet[];
+        works: OrgMemoryFacet[];
+        statuses: OrgMemoryFacet[];
+        sources: OrgMemoryFacet[];
+    };
 }
 
 /**
@@ -1521,6 +1594,113 @@ export class KnowledgeBaseService {
             classes: opts.class ? [opts.class] : undefined,
         });
         return { items: items.map((d) => this.toDto(d)), total };
+    }
+
+    /**
+     * Org-wide Memory (Cortex P1) — the aggregated feed backing
+     * `GET /api/memory`. Fans in every KB document across the active
+     * Organization: all documents belonging to any Work in the org
+     * (`WorkRepository.findIdsByOrganization`) UNION the org's own
+     * org-scoped documents, faceted by Type / Work / Source / Status and
+     * lexically searchable.
+     *
+     * Security: this reuses the existing per-Work KB tables read-only —
+     * NO new embedding or storage logic. The caller (org-memory
+     * controller) resolves the Organization from the request scope
+     * context and gates on org membership BEFORE this runs; this method
+     * trusts the `organizationId` it is handed. It never issues an
+     * unscoped query — the repository's mandatory-scope guard throws if
+     * both the Work-id list and `organizationId` are empty.
+     *
+     * When `WorkRepository` is not wired (isolated unit tests), the Work
+     * fan-in degrades to the org's own org-scoped documents only.
+     */
+    async aggregateOrgMemory(
+        organizationId: string,
+        query: OrgMemoryAggregateQuery = {},
+    ): Promise<OrgMemoryAggregateResult> {
+        const workRows = this.workRepository
+            ? await this.workRepository.findIdNamesByOrganization(organizationId)
+            : [];
+        const allWorkIds = workRows.map((w) => w.id);
+        const workNameById = new Map(workRows.map((w) => [w.id, w.name]));
+
+        // Work facet selection: intersect with the org's own Work ids so a
+        // caller-supplied id outside the org can never widen the scope.
+        const hasWorkFilter = !!query.workIds && query.workIds.length > 0;
+        const selectedWorkIds = hasWorkFilter ? new Set(query.workIds) : null;
+        const scopedWorkIds = selectedWorkIds
+            ? allWorkIds.filter((id) => selectedWorkIds.has(id))
+            : allWorkIds;
+        // A specific-Work selection is about Work documents — drop the
+        // org-level rows in that case.
+        const includeOrgScoped = !hasWorkFilter;
+
+        // Facets are computed over the FULL org scope (+ q) so chip counts
+        // stay stable as the user toggles selections. The org is always in
+        // scope here (a real, resolved `organizationId`), so this never
+        // trips the repository's mandatory-scope guard.
+        const facetsPromise = this.documentRepository.facetsForOrgAggregate({
+            workIds: allWorkIds,
+            organizationId,
+            q: query.q,
+        });
+
+        // The list feed uses the narrowed scope. If a Work filter resolves
+        // to nothing (no selected id belongs to the org) AND org-level rows
+        // are excluded, there is nothing to return — short-circuit to empty
+        // rather than hand the repository an unscoped query.
+        const listScopeHasRows = scopedWorkIds.length > 0 || includeOrgScoped;
+        const listPromise = listScopeHasRows
+            ? this.documentRepository.listForOrgAggregate({
+                  workIds: scopedWorkIds,
+                  organizationId: includeOrgScoped ? organizationId : undefined,
+                  classes: query.classes,
+                  statuses: query.statuses,
+                  sources: query.sources,
+                  q: query.q,
+                  limit: query.limit,
+                  offset: query.offset,
+              })
+            : Promise.resolve({ items: [], total: 0 });
+
+        const [{ items, total }, facets] = await Promise.all([listPromise, facetsPromise]);
+
+        const documents: OrgMemoryDocumentItem[] = items.map((d) => ({
+            id: d.id,
+            title: d.title,
+            description: d.description ?? null,
+            path: d.path,
+            workId: d.workId ?? null,
+            workName: d.workId ? (workNameById.get(d.workId) ?? null) : null,
+            class: d.kbDocumentClass,
+            status: d.status,
+            source: d.source,
+            updatedAt: d.updatedAt.toISOString(),
+            lastIndexedAt: d.lastIndexedAt ? d.lastIndexedAt.toISOString() : null,
+        }));
+
+        return {
+            documents,
+            counts: { documents: total },
+            facets: {
+                // Type / Status / Source facet values are their own labels.
+                types: this.labelFacets(facets.types),
+                // Work facet resolves the workId → Work display name.
+                works: facets.works.map((f) => ({
+                    value: f.value,
+                    label: workNameById.get(f.value) ?? f.value,
+                    count: f.count,
+                })),
+                statuses: this.labelFacets(facets.statuses),
+                sources: this.labelFacets(facets.sources),
+            },
+        };
+    }
+
+    /** Map `{ value, count }` buckets to `{ value, label, count }` (label = value). */
+    private labelFacets(buckets: OrgMemoryFacetCount[]): OrgMemoryFacet[] {
+        return buckets.map((b) => ({ value: b.value, label: b.value, count: b.count }));
     }
 
     async resolveInheritableDocuments(
