@@ -45,11 +45,42 @@ const MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     customizable: true,
 };
 
+const WEB_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
+    id: 'web',
+    name: 'Website',
+    description:
+        'A general-purpose website template (Next.js) for marketing, landing, and content pages — not a directory.',
+    owner: 'ever-works',
+    // See docs/features/website-templates.md for the full template catalogue.
+    repo: 'web-template',
+    branch: 'main',
+    syncBranches: ['main', 'stage', 'develop'],
+    betaBranch: null,
+    // Clean marketing/landing starter; no agent-customization prompt yet, so
+    // forks are edited manually (see template-catalog/customization-prompts/).
+    customizable: false,
+};
+
+const WEB_MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
+    id: 'web-minimal',
+    name: 'Website (Minimal)',
+    description:
+        'A minimal general-purpose website template (Astro, static) for marketing, landing, and content pages — not a directory.',
+    owner: 'ever-works',
+    repo: 'web-minimal-template',
+    branch: 'main',
+    syncBranches: ['main', 'stage', 'develop'],
+    betaBranch: null,
+    customizable: false,
+};
+
 export const DEFAULT_WEBSITE_TEMPLATE_ID: WebsiteTemplateId = 'classic';
 
 export const WEBSITE_TEMPLATES: WebsiteTemplateConfig[] = [
     CLASSIC_WEBSITE_TEMPLATE,
     MINIMAL_WEBSITE_TEMPLATE,
+    WEB_WEBSITE_TEMPLATE,
+    WEB_MINIMAL_WEBSITE_TEMPLATE,
 ];
 
 export function listWebsiteTemplates(): WebsiteTemplateConfig[] {
