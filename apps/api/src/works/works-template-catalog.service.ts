@@ -262,19 +262,6 @@ export class WorksTemplateCatalogService {
      */
     async list(chipType?: string): Promise<WorkBlueprintEntry[]> {
         const ref = process.env.EVER_WORKS_WORKS_REF || 'main';
-        // Security: warn operators when a mutable branch ref (not a pinned
-        // commit SHA or semver tag) is used, so they know to set
-        // EVER_WORKS_WORKS_REF to a commit SHA (40 hex chars) or a version tag
-        // (vX.Y.Z) in production to prevent supply-chain substitution after
-        // cache expiry.
-        const isPinnedRef = /^[0-9a-f]{40}$/.test(ref) || /^v\d+\.\d+(\.\d+)?$/.test(ref);
-        if (!isPinnedRef) {
-            this.logger.warn(
-                `EVER_WORKS_WORKS_REF is set to a mutable ref '${ref}'. ` +
-                    'Pin to a commit SHA (40 hex chars) or a version tag (vX.Y.Z) in production ' +
-                    'to prevent supply-chain substitution after cache expiry.',
-            );
-        }
 
         // Single cache entry for the whole (unfiltered) catalog, keyed by ref;
         // chipType filtering happens in-memory so a ref change invalidates
@@ -283,6 +270,21 @@ export class WorksTemplateCatalogService {
         let catalog = await this.cache.get<WorkBlueprintEntry[]>(cacheKey).catch(() => undefined);
 
         if (!Array.isArray(catalog)) {
+            // Security: warn operators when a mutable branch ref (not a pinned
+            // commit SHA or semver tag) is used, so they know to set
+            // EVER_WORKS_WORKS_REF to a commit SHA (40 hex chars) or a version
+            // tag (vX.Y.Z) in production to prevent supply-chain substitution
+            // after cache expiry. Warn only on this uncached fetch path (an
+            // actual repo read) so routine cache hits don't spam the logs.
+            const isPinnedRef = /^[0-9a-f]{40}$/.test(ref) || /^v\d+\.\d+(\.\d+)?$/.test(ref);
+            if (!isPinnedRef) {
+                this.logger.warn(
+                    `EVER_WORKS_WORKS_REF is set to a mutable ref '${ref}'. ` +
+                        'Pin to a commit SHA (40 hex chars) or a version tag (vX.Y.Z) in production ' +
+                        'to prevent supply-chain substitution after cache expiry.',
+                );
+            }
+
             catalog = await this.fetchCatalog(ref);
             // Only cache non-empty results so a transient failure doesn't pin
             // [] for an hour.

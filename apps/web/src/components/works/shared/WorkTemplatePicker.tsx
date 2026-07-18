@@ -151,7 +151,17 @@ export function WorkTemplatePicker({
         });
     }, [blueprints, currentChipType]);
 
+    // Keep the selected chip in sync with the current Work kind: when the
+    // parent changes `workKind` (→ currentChipType), reset the chip so the
+    // highlight + blueprintOptions follow. Adjusting state during render (the
+    // React-recommended alternative to a useEffect) avoids the extra effect
+    // pass + a flash of the stale chip.
     const [selectedChip, setSelectedChip] = useState(currentChipType);
+    const [lastChipType, setLastChipType] = useState(currentChipType);
+    if (currentChipType !== lastChipType) {
+        setLastChipType(currentChipType);
+        setSelectedChip(currentChipType);
+    }
     const [query, setQuery] = useState('');
 
     // Custom rows always lead ("Your templates"), on every chip.
