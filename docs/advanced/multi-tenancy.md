@@ -9,6 +9,10 @@ sidebar_position: 8
 
 Ever Works isolates data and configuration at the work level. Each work acts as an independent workspace with its own plugin settings, capability routing, member permissions, and generated content. This page documents the isolation boundaries, role-based access control, and settings scoping that make multi-tenancy work.
 
+:::note Account-level scope lives elsewhere
+This page covers the **per-Work** boundary: the RBAC (`WorkMemberRole`), settings, and cache scoping _inside_ a single Work. The **account-level** boundary above it — the internal `Tenant`, user-facing `Organization`s, the register-company flow, and the ownership guard — is documented in [Teams & Organizations](./teams-and-organizations.md). An Organization owns Works; each Work then has its own members and roles as described below.
+:::
+
 **Key sources:**
 
 - `packages/agent/src/services/work-ownership.service.ts` -- Role-based access control
