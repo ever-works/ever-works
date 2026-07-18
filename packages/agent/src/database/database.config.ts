@@ -59,6 +59,7 @@ import {
     AgentMembership,
     Team,
     TeamMember,
+    TeamResource,
     Skill,
     SkillBinding,
     Task,
@@ -189,6 +190,8 @@ export const ENTITIES = [
     // Teams & Prebuilt Companies (teams-and-companies spec §2)
     Team,
     TeamMember,
+    // Team ↔ resource association (Works/Agents/Missions/Ideas/Tasks belong to Teams)
+    TeamResource,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family

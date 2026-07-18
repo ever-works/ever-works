@@ -39,6 +39,32 @@ export interface TeamDetail extends Team {
     childTeamIds: string[];
 }
 
+export type TeamResourceType = 'work' | 'task' | 'agent' | 'mission' | 'idea';
+
+export interface TeamResourceItem {
+    id: string;
+    resourceType: TeamResourceType;
+    resourceId: string;
+    name: string | null;
+    slug: string | null;
+    addedById: string | null;
+    createdAt: string;
+}
+
+export interface TeamResourcesGrouped {
+    work: TeamResourceItem[];
+    task: TeamResourceItem[];
+    agent: TeamResourceItem[];
+    mission: TeamResourceItem[];
+    idea: TeamResourceItem[];
+}
+
+export interface ResourceTeamRef {
+    teamId: string;
+    name: string;
+    slug: string;
+}
+
 export interface CreateTeamInput {
     name: string;
     slug?: string;
@@ -170,6 +196,59 @@ export const teamsAPI = {
             });
         } catch {
             return null;
+        }
+    },
+
+    async listResources(orgId: string, teamId: string): Promise<TeamResourcesGrouped> {
+        try {
+            return await serverFetch<TeamResourcesGrouped>(
+                `/organizations/${orgId}/teams/${teamId}/resources`,
+                { method: 'GET' },
+            );
+        } catch {
+            return { work: [], task: [], agent: [], mission: [], idea: [] };
+        }
+    },
+
+    async attachResource(
+        orgId: string,
+        teamId: string,
+        input: { resourceType: TeamResourceType; resourceId: string },
+    ): Promise<TeamResourceItem> {
+        return serverMutation<TeamResourceItem>({
+            endpoint: `/organizations/${orgId}/teams/${teamId}/resources`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async detachResource(
+        orgId: string,
+        teamId: string,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<void> {
+        await serverMutation<void>({
+            endpoint: `/organizations/${orgId}/teams/${teamId}/resources/${resourceType}/${resourceId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    async resourceTeams(
+        orgId: string,
+        resourceType: TeamResourceType,
+        resourceId: string,
+    ): Promise<ResourceTeamRef[]> {
+        try {
+            return await serverFetch<ResourceTeamRef[]>(
+                `/organizations/${orgId}/resource-teams?resourceType=${resourceType}&resourceId=${resourceId}`,
+                { method: 'GET' },
+            );
+        } catch {
+            return [];
         }
     },
 };
