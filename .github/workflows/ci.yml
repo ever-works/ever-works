@@ -148,6 +148,10 @@ jobs:
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
+    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
+    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:
@@ -287,6 +291,10 @@ jobs:
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
+    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
+    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:

@@ -103,9 +103,9 @@ describe('TriggerInternalApiClient', () => {
             process.env.NODE_ENV = originalNodeEnv;
         });
 
-        it('throws in production when the base URL is plaintext http://', () => {
+        it('throws in production when the base URL is plaintext http:// on a PUBLIC host', () => {
             process.env.NODE_ENV = 'production';
-            triggerConfig.getInternalBaseUrl.mockReturnValue('http://api:3100');
+            triggerConfig.getInternalBaseUrl.mockReturnValue('http://api.example.com:3100');
             triggerConfig.getInternalSecret.mockReturnValue('s');
 
             expect(() => new TriggerInternalApiClient()).toThrow(
@@ -119,6 +119,21 @@ describe('TriggerInternalApiClient', () => {
             triggerConfig.getInternalSecret.mockReturnValue('s');
 
             expect(() => new TriggerInternalApiClient()).not.toThrow();
+        });
+
+        it('allows plaintext http:// to an in-cluster host in production (trusted pod network)', () => {
+            process.env.NODE_ENV = 'production';
+            triggerConfig.getInternalSecret.mockReturnValue('s');
+
+            for (const url of [
+                'http://ever-works-api.ever-works-app-prod.svc.cluster.local:3100/internal/trigger',
+                'http://ever-works-api:3100',
+                'http://localhost:3100',
+                'http://10.42.1.7:3100',
+            ]) {
+                triggerConfig.getInternalBaseUrl.mockReturnValue(url);
+                expect(() => new TriggerInternalApiClient()).not.toThrow();
+            }
         });
 
         it('still allows plaintext http:// outside production (local dev / in-cluster)', () => {
