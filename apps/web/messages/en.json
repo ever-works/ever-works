@@ -5522,7 +5522,24 @@
                 "removeMember": "Remove",
                 "roleLead": "Lead",
                 "roleMember": "Member",
-                "emptyRoster": "No members yet — add Agents or teammates to this team."
+                "emptyRoster": "No members yet — add Agents or teammates to this team.",
+                "resourcesTitle": "Resources",
+                "resourcesSubtitle": "Works, agents and more that belong to this team.",
+                "emptyResources": "No resources attached yet — attach Works or Agents this team owns.",
+                "addResourceCta": "Attach a resource",
+                "addResourceTypeLabel": "Type",
+                "addResourceSelectLabel": "Resource",
+                "addResourceSearchPlaceholder": "Search…",
+                "addResourceSubmit": "Attach",
+                "attaching": "Attaching…",
+                "removeResource": "Remove",
+                "resourceTypeWork": "Work",
+                "resourceTypeAgent": "Agent",
+                "resourceGroupWork": "Works",
+                "resourceGroupAgent": "Agents",
+                "resourceGroupMission": "Missions",
+                "resourceGroupIdea": "Ideas",
+                "resourceGroupTask": "Tasks"
             },
             "settings": {
                 "title": "Team Settings",
@@ -5544,7 +5561,9 @@
                 "updateFailed": "Could not update the team",
                 "deleteFailed": "Could not delete the team",
                 "memberAddFailed": "Could not add the member",
-                "memberRemoveFailed": "Could not remove the member"
+                "memberRemoveFailed": "Could not remove the member",
+                "resourceAttachFailed": "Could not attach the resource",
+                "resourceDetachFailed": "Could not remove the resource"
             }
         },
         "orgChartPage": {

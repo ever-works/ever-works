@@ -1,4 +1,5 @@
 import type { TeamMemberRole, TeamMemberType } from '../entities/team-member.entity';
+import type { TeamResourceType } from '../entities/team-resource.entity';
 
 /**
  * Teams & Prebuilt Companies — service-layer input/output types
@@ -73,3 +74,41 @@ export interface OrgChartPayload {
 /** Service-enforced structural limits (spec §1.1). */
 export const TEAM_MAX_DEPTH = 10;
 export const TEAM_HIERARCHY_WALK_LIMIT = 50;
+
+// ── Team ↔ resource association ("some Works belong to some Teams") ──
+
+export interface AttachTeamResourceInput {
+    resourceType: TeamResourceType;
+    resourceId: string;
+}
+
+/** One resolved resource attached to a Team. */
+export interface TeamResourceItem {
+    /** The `team_resources` row id (used as the remove handle). */
+    id: string;
+    resourceType: TeamResourceType;
+    resourceId: string;
+    /** Resolved display name (work/agent name, or mission/idea/task title). */
+    name: string | null;
+    /** Resolved slug when the resource has one (works/agents/tasks/ideas). */
+    slug: string | null;
+    addedById: string | null;
+    createdAt: Date;
+}
+
+/** Attached resources grouped by type (`listForTeam`). Empty arrays, never
+ *  missing keys, so the web can render every section unconditionally. */
+export interface TeamResourcesGrouped {
+    work: TeamResourceItem[];
+    task: TeamResourceItem[];
+    agent: TeamResourceItem[];
+    mission: TeamResourceItem[];
+    idea: TeamResourceItem[];
+}
+
+/** A Team that owns a given resource (`listTeamsForResource`). */
+export interface ResourceTeamRef {
+    teamId: string;
+    name: string;
+    slug: string;
+}

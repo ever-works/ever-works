@@ -1,12 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from '../entities/agent.entity';
+import { Mission } from '../entities/mission.entity';
 import { Organization } from '../entities/organization.entity';
+import { Task } from '../entities/task.entity';
 import { Team } from '../entities/team.entity';
 import { TeamMember } from '../entities/team-member.entity';
+import { TeamResource } from '../entities/team-resource.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { User } from '../entities/user.entity';
+import { Work } from '../entities/work.entity';
+import { WorkProposal } from '../entities/work-proposal.entity';
 import { OrgChartService } from './org-chart.service';
+import { TeamResourcesService } from './team-resources.service';
 import { TeamsService } from './teams.service';
 
 /**
@@ -18,8 +24,22 @@ import { TeamsService } from './teams.service';
  * company-template importer can reuse them.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([Team, TeamMember, Agent, Organization, Tenant, User])],
-    providers: [TeamsService, OrgChartService],
-    exports: [TeamsService, OrgChartService],
+    imports: [
+        TypeOrmModule.forFeature([
+            Team,
+            TeamMember,
+            TeamResource,
+            Agent,
+            Organization,
+            Tenant,
+            User,
+            Work,
+            Mission,
+            WorkProposal,
+            Task,
+        ]),
+    ],
+    providers: [TeamsService, OrgChartService, TeamResourcesService],
+    exports: [TeamsService, OrgChartService, TeamResourcesService],
 })
 export class AgentTeamsModule {}

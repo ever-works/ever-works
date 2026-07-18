@@ -111,3 +111,4 @@ export * from './tenant-credential-snapshot.entity';
 // Teams & Prebuilt Companies (docs/specs/features/teams-and-companies)
 export * from './team.entity';
 export * from './team-member.entity';
+export * from './team-resource.entity';
