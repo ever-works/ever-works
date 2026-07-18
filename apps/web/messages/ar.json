@@ -610,6 +610,37 @@
                 "reset": "إعادة تعيين"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "كل ما تعرفه منظمتك، في مكان واحد — مُجمَّع من Knowledge Base لكل عمل.",
+            "searchPlaceholder": "ابحث في كل ما تعرفه المنظمة…",
+            "newDocument": "جديد",
+            "documentsIndexed": "{count, plural, =0 {لا مستندات مفهرسة} one {مستند واحد مفهرس} two {مستندان مفهرسان} few {# مستندات مفهرسة} many {# مستندًا مفهرسًا} other {# مستند مفهرس}}",
+            "worksCovered": "{count, plural, =0 {لا أعمال} one {عمل واحد} two {عملان} few {# أعمال} many {# عملًا} other {# عمل}}",
+            "filters": {
+                "type": "النوع",
+                "work": "العمل",
+                "source": "المصدر",
+                "status": "الحالة",
+                "clearAll": "مسح الكل"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "لا يوجد شيء في Memory بعد.",
+                "subtitle": "مع بناء أعمالك لـ Knowledge Base الخاصة بها — مستندات العلامة التجارية والشخصيات والأبحاث وأدلة الأسلوب — يظهر كل شيء هنا، قابلاً للبحث عبر المنظمة بأكملها.",
+                "noOrg": "حدد أو أنشئ منظمة لعرض Memory المُجمَّعة الخاصة بها. تمتد Memory عبر كل عمل في المنظمة النشطة.",
+                "noResults": "لا توجد مستندات تطابق بحثك والفلاتر."
+            },
+            "orgScoped": "المنظمة",
+            "openInWork": "فتح في العمل"
+        },
         "agentsPage": {
             "title": "الوكلاء",
             "subtitle": "زملائك الذكاء الاصطناعي. يحمل كل منهم روحًا (من هم)، تعليمات، وميزانية — ويعمل على المهام، الأعمال، أو مستأجرك بأكمله.",

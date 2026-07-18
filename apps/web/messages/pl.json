@@ -579,6 +579,37 @@
                 "reset": "Resetuj"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Wszystko, co wie Twoja organizacja, w jednym miejscu — zagregowane z Knowledge Base każdej Pracy.",
+            "searchPlaceholder": "Szukaj we wszystkim, co wie organizacja…",
+            "newDocument": "Nowy",
+            "documentsIndexed": "{count, plural, =0 {Brak zindeksowanych dokumentów} one {# dokument zindeksowany} few {# dokumenty zindeksowane} many {# dokumentów zindeksowanych} other {# dokumentów zindeksowanych}}",
+            "worksCovered": "{count, plural, =0 {brak Prac} one {# Praca} few {# Prace} many {# Prac} other {# Prac}}",
+            "filters": {
+                "type": "Typ",
+                "work": "Praca",
+                "source": "Źródło",
+                "status": "Status",
+                "clearAll": "Wyczyść wszystko"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Nic jeszcze w Memory.",
+                "subtitle": "W miarę jak Twoje Prace budują swoją Knowledge Base — dokumenty marki, persony, badania, przewodniki stylu — wszystko pojawia się tutaj, z możliwością wyszukiwania w całej organizacji.",
+                "noOrg": "Wybierz lub utwórz Organizację, aby zobaczyć jej zagregowaną Memory. Memory obejmuje każdą Pracę w aktywnej Organizacji.",
+                "noResults": "Żadne dokumenty nie pasują do Twojego wyszukiwania i filtrów."
+            },
+            "orgScoped": "Organizacja",
+            "openInWork": "Otwórz w Pracy"
+        },
         "agentsPage": {
             "title": "Agenci",
             "subtitle": "Twoi koledzy AI. Każdy z nich ma duszę (kim jest), instrukcje i budżet — i działa w Misjach, Pracach lub na całej przestrzeni Twojej organizacji.",

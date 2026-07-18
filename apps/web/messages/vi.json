@@ -579,6 +579,37 @@
                 "reset": "Đặt lại"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Mọi thứ tổ chức của bạn biết, ở cùng một nơi — được tổng hợp từ Knowledge Base của mọi Công việc.",
+            "searchPlaceholder": "Tìm kiếm trong mọi thứ tổ chức biết…",
+            "newDocument": "Mới",
+            "documentsIndexed": "{count, plural, =0 {Chưa lập chỉ mục tài liệu nào} other {Đã lập chỉ mục # tài liệu}}",
+            "worksCovered": "{count, plural, =0 {không có Công việc} other {# Công việc}}",
+            "filters": {
+                "type": "Loại",
+                "work": "Công việc",
+                "source": "Nguồn",
+                "status": "Trạng thái",
+                "clearAll": "Xóa tất cả"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Chưa có gì trong Memory.",
+                "subtitle": "Khi các Công việc của bạn xây dựng Knowledge Base của chúng — tài liệu thương hiệu, chân dung người dùng, nghiên cứu, hướng dẫn phong cách — mọi thứ sẽ xuất hiện ở đây, có thể tìm kiếm trên toàn tổ chức.",
+                "noOrg": "Chọn hoặc tạo một Tổ chức để xem Memory tổng hợp của nó. Memory trải rộng trên mọi Công việc trong Tổ chức đang hoạt động.",
+                "noResults": "Không có tài liệu nào khớp với tìm kiếm và bộ lọc của bạn."
+            },
+            "orgScoped": "Tổ chức",
+            "openInWork": "Mở trong Công việc"
+        },
         "agentsPage": {
             "title": "Agents",
             "subtitle": "Đội ngũ AI của bạn. Mỗi Agent mang một linh hồn (bản sắc), hướng dẫn và ngân sách - và hành động trên các Nhiệm vụ, Công việc, hoặc toàn bộ tenant của bạn.",

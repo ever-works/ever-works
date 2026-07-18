@@ -610,6 +610,37 @@
                 "reset": "Zurücksetzen"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Alles, was Ihre Organisation weiß, an einem Ort — aggregiert aus der Knowledge Base jedes Werks.",
+            "searchPlaceholder": "Durchsuchen Sie alles, was die Organisation weiß…",
+            "newDocument": "Neu",
+            "documentsIndexed": "{count, plural, =0 {Keine Dokumente indexiert} one {# Dokument indexiert} other {# Dokumente indexiert}}",
+            "worksCovered": "{count, plural, =0 {keine Werke} one {# Werk} other {# Werke}}",
+            "filters": {
+                "type": "Typ",
+                "work": "Werk",
+                "source": "Quelle",
+                "status": "Status",
+                "clearAll": "Alle löschen"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Noch nichts in Memory.",
+                "subtitle": "Während Ihre Werke ihre Knowledge Base aufbauen — Markendokumente, Personas, Recherchen, Styleguides — erscheint alles hier, durchsuchbar in der gesamten Organisation.",
+                "noOrg": "Wählen oder erstellen Sie eine Organisation, um deren aggregierte Memory zu sehen. Memory umfasst jedes Werk in der aktiven Organisation.",
+                "noResults": "Keine Dokumente entsprechen Ihrer Suche und Ihren Filtern."
+            },
+            "orgScoped": "Organisation",
+            "openInWork": "Im Werk öffnen"
+        },
         "agentsPage": {
             "title": "Agenten",
             "subtitle": "Ihre KI-Kollegen. Jeder trägt eine Seele (wer er/sie ist), Anweisungen und ein Budget - und agiert bei Missionen, Aufgaben oder Ihrem gesamten Mandanten.",

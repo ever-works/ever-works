@@ -610,6 +610,37 @@
                 "reset": "Réinitialiser"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Tout ce que votre organisation sait, au même endroit — agrégé depuis la Knowledge Base de chaque Travail.",
+            "searchPlaceholder": "Rechercher dans tout ce que l'organisation sait…",
+            "newDocument": "Nouveau",
+            "documentsIndexed": "{count, plural, =0 {Aucun document indexé} one {# document indexé} other {# documents indexés}}",
+            "worksCovered": "{count, plural, =0 {aucun Travail} one {# Travail} other {# Travaux}}",
+            "filters": {
+                "type": "Type",
+                "work": "Travail",
+                "source": "Source",
+                "status": "Statut",
+                "clearAll": "Tout effacer"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Rien dans Memory pour l'instant.",
+                "subtitle": "À mesure que vos Travaux enrichissent leur Knowledge Base — documents de marque, personas, recherches, guides de style — tout apparaît ici, consultable dans toute l’organisation.",
+                "noOrg": "Sélectionnez ou créez une Organisation pour voir sa Memory agrégée. Memory couvre chaque Travail de l’Organisation active.",
+                "noResults": "Aucun document ne correspond à votre recherche et à vos filtres."
+            },
+            "orgScoped": "Organisation",
+            "openInWork": "Ouvrir dans le Travail"
+        },
         "agentsPage": {
             "title": "Agents",
             "subtitle": "Vos coéquipiers IA. Chacun porte une âme (qui il est), des instructions et un budget — et agit sur des Missions, des Works ou votre locataire entier.",

@@ -610,6 +610,37 @@
                 "reset": "אפס"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "כל מה שהארגון שלך יודע, במקום אחד — מרוכז מתוך ה-Knowledge Base של כל עבודה.",
+            "searchPlaceholder": "חפש בכל מה שהארגון יודע…",
+            "newDocument": "חדש",
+            "documentsIndexed": "{count, plural, =0 {אין מסמכים באינדקס} one {מסמך אחד באינדקס} two {שני מסמכים באינדקס} other {# מסמכים באינדקס}}",
+            "worksCovered": "{count, plural, =0 {אין עבודות} one {עבודה אחת} two {שתי עבודות} other {# עבודות}}",
+            "filters": {
+                "type": "סוג",
+                "work": "עבודה",
+                "source": "מקור",
+                "status": "סטטוס",
+                "clearAll": "נקה הכול"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "עדיין אין כלום ב-Memory.",
+                "subtitle": "ככל שהעבודות שלך בונות את ה-Knowledge Base שלהן — מסמכי מותג, פרסונות, מחקר, מדריכי סגנון — הכול מופיע כאן, ניתן לחיפוש בכל הארגון.",
+                "noOrg": "בחר או צור ארגון כדי לראות את ה-Memory המרוכזת שלו. Memory משתרעת על פני כל עבודה בארגון הפעיל.",
+                "noResults": "אין מסמכים שתואמים את החיפוש והמסננים שלך."
+            },
+            "orgScoped": "ארגון",
+            "openInWork": "פתח בעבודה"
+        },
         "agentsPage": {
             "title": "סוכנים",
             "subtitle": "החברים המלאכותיים שלך. כל אחד נושא נשמה (מי הוא/היא), הוראות, ותקציב - ופועל על משימות, עבודות, או כל הדייר שלך.",

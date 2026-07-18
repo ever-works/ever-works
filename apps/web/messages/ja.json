@@ -579,6 +579,37 @@
                 "reset": "リセット"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "組織が知るすべてを一か所に — すべてのワークの Knowledge Base から集約されます。",
+            "searchPlaceholder": "組織が知るすべてを検索…",
+            "newDocument": "新規",
+            "documentsIndexed": "{count, plural, =0 {インデックスされたドキュメントはありません} other {# 件のドキュメントをインデックス済み}}",
+            "worksCovered": "{count, plural, =0 {ワークなし} other {# 件のワーク}}",
+            "filters": {
+                "type": "タイプ",
+                "work": "ワーク",
+                "source": "ソース",
+                "status": "ステータス",
+                "clearAll": "すべてクリア"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory にはまだ何もありません。",
+                "subtitle": "ワークが Knowledge Base（ブランド資料、ペルソナ、リサーチ、スタイルガイド）を構築するにつれて、すべてがここに表示され、組織全体で検索できます。",
+                "noOrg": "集約された Memory を表示するには、組織を選択または作成してください。Memory はアクティブな組織のすべてのワークにまたがります。",
+                "noResults": "検索とフィルターに一致するドキュメントはありません。"
+            },
+            "orgScoped": "組織",
+            "openInWork": "ワークで開く"
+        },
         "agentsPage": {
             "title": "エージェント",
             "subtitle": "あなたのAIチームメンバー。各々は魂（彼らの存在）、指示、予算を持ち、ミッション、作業、またはあなたの全テナントで行動します。",
