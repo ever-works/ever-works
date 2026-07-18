@@ -17,15 +17,63 @@ export class TriggerInternalApiClient {
         }
 
         // The x-trigger-secret header and decrypted plugin-secret payloads transit this
-        // connection. In production, refuse plaintext HTTP so they can't leak on the wire.
-        // Non-production (local dev / in-cluster http://api) keeps working unchanged.
-        if (process.env.NODE_ENV === 'production' && !this.baseUrl.startsWith('https://')) {
+        // connection. In production, refuse plaintext HTTP over UNTRUSTED (public) networks
+        // so they can't leak on the wire. In-cluster service-to-service traffic (the
+        // Kubernetes pod network) is exempt: it never leaves the cluster and TLS is
+        // terminated at the ingress, so http://<svc>.<ns>.svc.cluster.local is plaintext by
+        // design. Non-production (local dev) keeps working unchanged.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            !this.baseUrl.startsWith('https://') &&
+            !TriggerInternalApiClient.isInClusterUrl(this.baseUrl)
+        ) {
             throw new Error('TRIGGER_INTERNAL_API_URL must use HTTPS');
         }
 
         if (!this.secret) {
             throw new Error('TRIGGER_INTERNAL_SECRET is not configured');
         }
+    }
+
+    /**
+     * True when the base URL targets an in-cluster / loopback host, where plaintext
+     * http:// is acceptable because the traffic never leaves the trusted pod network:
+     * Kubernetes service DNS (a bare single-label service name, *.svc, *.svc.cluster.local),
+     * *.local, localhost/loopback, or an RFC1918 / link-local private IP. Public hosts
+     * (always fully-qualified) still require https://.
+     */
+    private static isInClusterUrl(rawUrl: string): boolean {
+        let host: string;
+        try {
+            host = new URL(rawUrl).hostname;
+        } catch {
+            return false;
+        }
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+            return true;
+        }
+        if (
+            host.endsWith('.svc') ||
+            host.endsWith('.svc.cluster.local') ||
+            host.endsWith('.local')
+        ) {
+            return true;
+        }
+        // A bare single-label hostname (no dot) can only be an in-cluster/local name;
+        // public hosts are always fully-qualified.
+        if (!host.includes('.')) {
+            return true;
+        }
+        // RFC1918 / link-local private IPv4 ranges.
+        if (
+            /^10\./.test(host) ||
+            /^192\.168\./.test(host) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+            /^169\.254\./.test(host)
+        ) {
+            return true;
+        }
+        return false;
     }
 
     async fetchWorkContext(workId: string, userId: string): Promise<WorkContextResponse> {
