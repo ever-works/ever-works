@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { parse as parseYaml } from 'yaml';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { AgentFileService, AgentScope, AgentsService } from '@ever-works/agent/agents';
@@ -11,10 +11,10 @@ import type { Organization } from '@ever-works/agent/entities';
 import { ScopeContextService } from '../scope/scope-context.service';
 import { OrganizationService } from './organization.service';
 import {
+    fetchPublicRawFile,
     ORGS_REPO_NAME,
     ORGS_REPO_OWNER,
     OrgTemplateCatalogService,
-    OrgTemplatePackage,
 } from './org-template-catalog.service';
 
 /**
@@ -111,27 +111,39 @@ export class CompanyImportService {
         if (!pkg) {
             throw new NotFoundException(`Company template ${input.templateSlug} not found`);
         }
+        // ever-works/orgs is public: a resolved token routes through the git
+        // facade (rate-limit headroom); tokenless falls back to
+        // raw.githubusercontent.com, which has no meaningful anonymous cap —
+        // load-bearing here, since one import reads up to ~100+ files.
         const token = await this.catalog.resolveToken();
-        if (!token) {
-            throw new ServiceUnavailableException('Company templates are unavailable right now');
-        }
 
         const skipped: Array<{ path: string; reason: string }> = [];
         const fetchFile = async (relPath: string): Promise<string | null> => {
             try {
-                const file = await this.git.getFileContent(
-                    ORGS_REPO_OWNER,
-                    ORGS_REPO_NAME,
-                    `${pkg.path}/${relPath}`,
-                    { token, providerId: 'github' },
-                    this.catalog.ref(),
-                );
-                if (!file) return null;
-                if (Buffer.byteLength(file.content, 'utf8') > MAX_FILE_BYTES) {
+                let content: string | null;
+                if (token) {
+                    const file = await this.git.getFileContent(
+                        ORGS_REPO_OWNER,
+                        ORGS_REPO_NAME,
+                        `${pkg.path}/${relPath}`,
+                        { token, providerId: 'github' },
+                        this.catalog.ref(),
+                    );
+                    content = file?.content ?? null;
+                } else {
+                    content = await fetchPublicRawFile(
+                        ORGS_REPO_OWNER,
+                        ORGS_REPO_NAME,
+                        this.catalog.ref(),
+                        `${pkg.path}/${relPath}`,
+                    );
+                }
+                if (content === null) return null;
+                if (Buffer.byteLength(content, 'utf8') > MAX_FILE_BYTES) {
                     skipped.push({ path: relPath, reason: 'file exceeds size cap' });
                     return null;
                 }
-                return file.content;
+                return content;
             } catch (err) {
                 skipped.push({
                     path: relPath,

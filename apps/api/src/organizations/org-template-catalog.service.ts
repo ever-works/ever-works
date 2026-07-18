@@ -73,6 +73,36 @@ function stripHtml(value: string): string {
     return value.replace(/<[^>]*>/g, '');
 }
 
+// Refs are operator-controlled env values (tag/sha/branch); reject anything
+// that couldn't be a git ref before it reaches a URL.
+const SAFE_REF_RE = /^[A-Za-z0-9._/-]{1,100}$/;
+
+/**
+ * Tokenless read of a file from a PUBLIC ever-works catalog repo via
+ * raw.githubusercontent.com. Used when no GitHub App installation / token
+ * resolves: raw serving has no meaningful anonymous rate cap (unlike the
+ * 60 req/h/IP contents API), which matters for multi-file company imports.
+ * Explicit User-Agent — GitHub 403s raw `fetch` calls without one.
+ * Callers pass paths already validated against SAFE_FILE_RE / SLUG
+ * conventions; the ref is validated here.
+ */
+export async function fetchPublicRawFile(
+    owner: string,
+    repo: string,
+    ref: string,
+    path: string,
+): Promise<string | null> {
+    if (!SAFE_REF_RE.test(ref) || path.includes('..')) return null;
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`;
+    try {
+        const res = await fetch(url, { headers: { 'User-Agent': 'Ever Works' } });
+        if (!res.ok) return null;
+        return await res.text();
+    } catch {
+        return null;
+    }
+}
+
 function kebabToPascal(value: string): string {
     return value
         .split(/[-_\s]+/)
@@ -178,27 +208,35 @@ export class OrgTemplateCatalogService {
     }
 
     private async fetchFromRepo(ref: string): Promise<OrgTemplatePackage[]> {
+        // ever-works/orgs is a PUBLIC community catalog — a token is an
+        // optimization (higher rate limits), never a requirement. When none
+        // resolves we read unauthenticated (createOctokit omits auth for a
+        // falsy token); the 1h manifest cache keeps us far under the
+        // 60 req/h/IP anonymous cap.
         const token = await this.resolveToken();
-        if (!token) {
-            if (!this.warnedNoToken) {
-                this.warnedNoToken = true;
-                this.logger.warn(
-                    'No GitHub App installation on the ever-works org and no EVER_WORKS_ORGS_TOKEN / GITHUB_TOKEN set — org-template catalog is unavailable; the Create-Organization wizard skips its template step.',
-                );
-            }
-            return [];
+        if (!token && !this.warnedNoToken) {
+            this.warnedNoToken = true;
+            this.logger.log(
+                'org-template catalog: no GitHub App installation / token resolved — reading the public ever-works/orgs repo unauthenticated.',
+            );
         }
 
         try {
-            const file = await this.git.getFileContent(
-                ORGS_REPO_OWNER,
-                ORGS_REPO_NAME,
-                MANIFEST_PATH,
-                { token, providerId: 'github' },
-                ref,
-            );
-            if (!file) return [];
-            const manifest = JSON.parse(file.content) as { companies?: RawManifestCompany[] };
+            let content: string | null;
+            if (token) {
+                const file = await this.git.getFileContent(
+                    ORGS_REPO_OWNER,
+                    ORGS_REPO_NAME,
+                    MANIFEST_PATH,
+                    { token, providerId: 'github' },
+                    ref,
+                );
+                content = file?.content ?? null;
+            } else {
+                content = await fetchPublicRawFile(ORGS_REPO_OWNER, ORGS_REPO_NAME, ref, MANIFEST_PATH);
+            }
+            if (!content) return [];
+            const manifest = JSON.parse(content) as { companies?: RawManifestCompany[] };
             const rows = Array.isArray(manifest.companies) ? manifest.companies : [];
             return rows
                 .map(mapCompany)

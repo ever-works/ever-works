@@ -26,8 +26,7 @@ export class CompanyImportController {
             'Materializes an agentcompanies/v1 package from the ever-works/orgs catalog: Organization + Teams + paused Agents + Skills + draft Works + Tasks. Per-entity failures are reported in `skipped[]`, not thrown.',
     })
     @ApiResponse({ status: 201, description: 'Organization imported' })
-    @ApiResponse({ status: 404, description: 'Unknown template slug' })
-    @ApiResponse({ status: 503, description: 'Catalog unavailable' })
+    @ApiResponse({ status: 404, description: 'Unknown template slug or catalog unreachable' })
     async importCompany(
         @Req() req: { user: { userId: string } },
         @Body() dto: ImportCompanyDto,
