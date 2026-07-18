@@ -45,6 +45,7 @@ import { MissionsModule } from './missions/missions.module';
 import { AgentsModule } from './agents/agents.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
+import { SchedulesModule } from './schedules/schedules.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -156,6 +157,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Schedules ("Cadence") — read-only aggregation of every
+        // user-owned scheduled source into GET /api/schedules. Additive;
+        // reuses existing entity tables (no new schema).
+        SchedulesModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
