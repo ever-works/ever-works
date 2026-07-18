@@ -137,7 +137,7 @@ function AttentionCard({
             >
                 <Icon className="w-4 h-4" strokeWidth={1.6} />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
                 <p
                     className={cn(
                         'text-sm font-medium leading-snug truncate',
@@ -150,6 +150,16 @@ function AttentionCard({
                     {subtitle}
                 </p>
             </div>
+            {item.count != null && (
+                <span
+                    className={cn(
+                        'shrink-0 self-start rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                        isDanger ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning',
+                    )}
+                >
+                    {item.count}
+                </span>
+            )}
         </Link>
     );
 }

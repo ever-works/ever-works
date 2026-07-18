@@ -68,21 +68,23 @@ export async function getTeamsTotal(): Promise<number | undefined> {
         return undefined;
     }
 
+    // Probe every org's `/teams` concurrently — they're independent, so
+    // there's no reason to pay the round-trips sequentially.
+    const results = await Promise.allSettled(
+        orgs.map((org) => serverFetch<unknown>(`/organizations/${org.id}/teams`, { method: 'GET' })),
+    );
+
     let total = 0;
     let anyWired = false;
-    for (const org of orgs) {
-        try {
-            const res = await serverFetch<unknown>(`/organizations/${org.id}/teams`, {
-                method: 'GET',
-            });
-            const arr = pickArray(res);
-            // Endpoint responded (feature is wired) — count what we got.
-            anyWired = true;
-            if (arr) total += arr.length;
-        } catch {
-            // 404 (endpoint not shipped yet) or a transient failure — skip
-            // this org; if EVERY org fails we fall through to `undefined`.
-        }
+    for (const result of results) {
+        // A rejection is a 404 (endpoint not shipped yet) or a transient
+        // failure — skip that org; if EVERY probe fails we fall through to
+        // `undefined`.
+        if (result.status !== 'fulfilled') continue;
+        const arr = pickArray(result.value);
+        // Endpoint responded (feature is wired) — count what we got.
+        anyWired = true;
+        if (arr) total += arr.length;
     }
 
     return anyWired ? total : undefined;
@@ -128,7 +130,7 @@ export function composeAttentionItems(input: {
     accountWide: AccountWideUsage | null;
 }): AttentionItem[] {
     const { erroredAgents, blockedTasks, allIdeas, accountWide } = input;
-    const items: AttentionItem[] = [];
+    let items: AttentionItem[] = [];
 
     // Errored agents — auto-paused after `pauseAfterFailures` (danger).
     for (const agent of erroredAgents) {
@@ -196,6 +198,7 @@ export function composeAttentionItems(input: {
         const bt = b.occurredAt ? Date.parse(b.occurredAt) : 0;
         return bt - at;
     });
+    items = items.slice(0, ATTENTION_MAX);
 
-    return items.slice(0, ATTENTION_MAX);
+    return items;
 }

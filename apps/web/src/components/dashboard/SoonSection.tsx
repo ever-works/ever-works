@@ -60,41 +60,51 @@ export function SoonSection({ items, total }: { items: SoonRunItem[]; total: num
             </div>
 
             <ul className="rounded-xl overflow-hidden border border-card-border dark:border-white/8 divide-y divide-border/40 dark:divide-white/6">
-                {preview.map((run) => (
-                    <li
-                        key={run.id}
-                        className="bg-card dark:bg-card-primary-dark/60 first:rounded-t-xl last:rounded-b-xl"
-                    >
-                        <Link
-                            href={run.href}
-                            className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-card-hover dark:hover:bg-white/3 transition-colors no-underline"
+                {preview.map((run) => {
+                    // A malformed `nextRunAt` (upstream aggregation) yields an
+                    // Invalid Date, which throws a RangeError inside
+                    // `format.dateTime`. Guard it so one bad row can't crash
+                    // the whole block — fall back to an em dash.
+                    const nextRun = new Date(run.nextRunAt);
+                    const nextRunLabel = Number.isNaN(nextRun.getTime())
+                        ? '—'
+                        : format.dateTime(nextRun, {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                          });
+                    return (
+                        <li
+                            key={run.id}
+                            className="bg-card dark:bg-card-primary-dark/60 first:rounded-t-xl last:rounded-b-xl"
                         >
-                            <div className="min-w-0 flex-1 flex items-center gap-2.5">
-                                <span className="text-xs text-text dark:text-text-dark truncate">
-                                    {run.title}
+                            <Link
+                                href={run.href}
+                                className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-card-hover dark:hover:bg-white/3 transition-colors no-underline"
+                            >
+                                <div className="min-w-0 flex-1 flex items-center gap-2.5">
+                                    <span className="text-xs text-text dark:text-text-dark truncate">
+                                        {run.title}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+                                            'bg-surface-secondary text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark',
+                                        )}
+                                    >
+                                        {run.sourceKind === 'mission'
+                                            ? t('source.mission')
+                                            : t('source.work')}
+                                    </span>
+                                </div>
+                                <span className="shrink-0 text-[11px] tabular-nums text-text-muted dark:text-text-muted-dark">
+                                    {nextRunLabel}
                                 </span>
-                                <span
-                                    className={cn(
-                                        'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
-                                        'bg-surface-secondary text-text-secondary dark:bg-white/6 dark:text-text-secondary-dark',
-                                    )}
-                                >
-                                    {run.sourceKind === 'mission'
-                                        ? t('source.mission')
-                                        : t('source.work')}
-                                </span>
-                            </div>
-                            <span className="shrink-0 text-[11px] tabular-nums text-text-muted dark:text-text-muted-dark">
-                                {format.dateTime(new Date(run.nextRunAt), {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: 'numeric',
-                                    minute: '2-digit',
-                                })}
-                            </span>
-                        </Link>
-                    </li>
-                ))}
+                            </Link>
+                        </li>
+                    );
+                })}
             </ul>
         </section>
     );
