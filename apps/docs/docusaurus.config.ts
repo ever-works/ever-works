@@ -8,6 +8,18 @@ const ALGOLIA_API_KEY = process.env.ALGOLIA_API_KEY || null;
 const ALGOLIA_INDEX_NAME = process.env.ALGOLIA_INDEX_NAME || null;
 const HAS_ALGOLIA_CREDENTIALS = ALGOLIA_APP_ID && ALGOLIA_API_KEY && ALGOLIA_INDEX_NAME;
 require('dotenv').config();
+
+// Locales to BUILD. Docusaurus builds a full copy of the site per locale, so building
+// the untranslated locales (only `fr` has any translations under apps/docs/i18n/) produced
+// ~7,800 pages of en-duplicate content and overflowed the CI docker tmpfs (ENOSPC), failing
+// the ever-works-docs build leg. Build only locales that have real content; override with
+// DOCS_BUILD_LOCALES (comma-separated) to add a locale back once it's translated. The full
+// aspirational set is kept below for reference so nothing is lost.
+const ALL_LOCALES = ['en', 'fr', 'ar', 'bg', 'zh', 'nl', 'de', 'he', 'it', 'pl', 'pt', 'ru', 'es'];
+const DOCS_BUILD_LOCALES = (process.env.DOCS_BUILD_LOCALES || 'en,fr')
+	.split(',')
+	.map((s) => s.trim())
+	.filter((s) => ALL_LOCALES.includes(s));
 /** @type {import('@docusaurus/types').Config} */
 const config: Config = {
 	themes: [
@@ -26,6 +38,12 @@ const config: Config = {
 		'@docusaurus/theme-mermaid'
 	],
 	plugins: [
+		// Disable webpack's persistent filesystem cache for the one-shot CI build — with
+		// multiple locales it accumulates GBs and contributed to the docker tmpfs ENOSPC.
+		() => ({
+			name: 'disable-webpack-persistent-cache',
+			configureWebpack: () => ({ cache: false })
+		}),
 		SENTRY_DNS &&
 			process.env.NODE_ENV === 'production' && [
 				'docusaurus-plugin-sentry',
@@ -69,7 +87,9 @@ const config: Config = {
 	i18n: {
 		path: 'i18n',
 		defaultLocale: 'en',
-		locales: ['en', 'fr', 'ar', 'bg', 'zh', 'nl', 'de', 'he', 'it', 'pl', 'pt', 'ru', 'es']
+		// Build only locales with real content (see DOCS_BUILD_LOCALES above). Full set:
+		// ['en','fr','ar','bg','zh','nl','de','he','it','pl','pt','ru','es']
+		locales: DOCS_BUILD_LOCALES
 	},
 	presets: [
 		[
