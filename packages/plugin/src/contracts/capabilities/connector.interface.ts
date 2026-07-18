@@ -247,12 +247,47 @@ export interface ConnectorSessionKeyParts {
 }
 
 /**
- * Build the composite `{platformUserId}:{connectorId}:{externalConversationId}`
- * session key. Pure helper so both the routing service and tests
- * derive the key the same way.
+ * Build the composite session key from its three parts.
+ *
+ * Wire format: each part is `encodeURIComponent`-encoded and the encoded
+ * parts are joined with a literal `:` separator, i.e.
+ * `enc(platformUserId):enc(connectorId):enc(externalConversationId)`.
+ *
+ * Encoding each segment first is required for the key to be reversible:
+ * `externalConversationId` can itself contain `:` (e.g. a Slack
+ * `channel:thread_ts`), so a naive `a:b:c` join could not be split back
+ * unambiguously. `encodeURIComponent` percent-escapes `:` (and every
+ * other separator/delimiter) inside a segment, guaranteeing the raw `:`
+ * separators are the only ones present — so {@link parseConnectorSessionKey}
+ * can split on `:` into exactly three parts and decode each.
+ *
+ * Pure helper so both the routing service and tests derive the key the
+ * same way.
  */
 export function buildConnectorSessionKey(parts: ConnectorSessionKeyParts): string {
-	return `${parts.platformUserId}:${parts.connectorId}:${parts.externalConversationId}`;
+	return [parts.platformUserId, parts.connectorId, parts.externalConversationId]
+		.map((part) => encodeURIComponent(part))
+		.join(':');
+}
+
+/**
+ * Reverse of {@link buildConnectorSessionKey} — split a composite session
+ * key back into its three parts. Splits on the (unescaped) `:` separators
+ * and `decodeURIComponent`-decodes each segment.
+ *
+ * Returns `undefined` for a malformed key (not exactly three segments).
+ */
+export function parseConnectorSessionKey(key: string): ConnectorSessionKeyParts | undefined {
+	const segments = key.split(':');
+	if (segments.length !== 3) {
+		return undefined;
+	}
+	const [platformUserId, connectorId, externalConversationId] = segments;
+	return {
+		platformUserId: decodeURIComponent(platformUserId),
+		connectorId: decodeURIComponent(connectorId),
+		externalConversationId: decodeURIComponent(externalConversationId)
+	};
 }
 
 /**
