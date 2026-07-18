@@ -1574,7 +1574,45 @@
             "totalItems": "Totaal items",
             "activeWebsites": "Actieve websites",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "van afgelopen maand"
+            "fromLastMonth": "van afgelopen maand",
+            "teams": "Teams"
+        },
+        "attention": {
+            "title": "Vereist aandacht",
+            "kinds": {
+                "agentError": {
+                    "title": "Fout bij agent “{name}”",
+                    "subtitle": "Automatisch gepauzeerd na herhaalde fouten"
+                },
+                "scheduleFailed": {
+                    "title": "Geplande uitvoering mislukt",
+                    "subtitle": "Laatste uitvoering van “{name}” is niet voltooid"
+                },
+                "schedulePaused": {
+                    "title": "Planning gepauzeerd",
+                    "subtitle": "“{name}” gepauzeerd na herhaalde fouten"
+                },
+                "generationFailed": {
+                    "title": "Generatie mislukt",
+                    "subtitle": "“{name}” kon niet worden gebouwd"
+                },
+                "taskBlocked": {
+                    "title": "Taak geblokkeerd",
+                    "subtitle": "“{name}” heeft invoer nodig om door te gaan"
+                },
+                "budgetExceeded": {
+                    "title": "Budget overschreden",
+                    "subtitle": "De accountuitgaven hebben hun limiet bereikt"
+                }
+            }
+        },
+        "soon": {
+            "title": "Binnenkort",
+            "more": "+{n} meer",
+            "source": {
+                "work": "Werk",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

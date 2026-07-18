@@ -1574,7 +1574,45 @@
             "totalItems": "총 항목",
             "activeWebsites": "활성 웹사이트",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "전월 대비"
+            "fromLastMonth": "전월 대비",
+            "teams": "팀"
+        },
+        "attention": {
+            "title": "주의 필요",
+            "kinds": {
+                "agentError": {
+                    "title": "에이전트 “{name}”에 오류가 발생했습니다",
+                    "subtitle": "반복된 실패 후 자동으로 일시중지됨"
+                },
+                "scheduleFailed": {
+                    "title": "예약 실행 실패",
+                    "subtitle": "“{name}”의 마지막 실행이 완료되지 않았습니다"
+                },
+                "schedulePaused": {
+                    "title": "예약이 일시중지됨",
+                    "subtitle": "반복된 실패 후 “{name}”이(가) 일시중지됨"
+                },
+                "generationFailed": {
+                    "title": "생성 실패",
+                    "subtitle": "“{name}”을(를) 빌드할 수 없습니다"
+                },
+                "taskBlocked": {
+                    "title": "작업이 차단됨",
+                    "subtitle": "계속하려면 “{name}”에 입력이 필요합니다"
+                },
+                "budgetExceeded": {
+                    "title": "예산 초과",
+                    "subtitle": "계정 지출이 한도에 도달했습니다"
+                }
+            }
+        },
+        "soon": {
+            "title": "예정됨",
+            "more": "외 {n}개",
+            "source": {
+                "work": "워크",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

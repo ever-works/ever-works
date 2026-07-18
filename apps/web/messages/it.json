@@ -1574,7 +1574,45 @@
             "totalItems": "Totale elementi",
             "activeWebsites": "Siti web attivi",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "rispetto al mese scorso"
+            "fromLastMonth": "rispetto al mese scorso",
+            "teams": "Team"
+        },
+        "attention": {
+            "title": "Richiede attenzione",
+            "kinds": {
+                "agentError": {
+                    "title": "L’agente “{name}” ha generato un errore",
+                    "subtitle": "Messo in pausa automaticamente dopo ripetuti errori"
+                },
+                "scheduleFailed": {
+                    "title": "Esecuzione pianificata non riuscita",
+                    "subtitle": "L’ultima esecuzione di “{name}” non è stata completata"
+                },
+                "schedulePaused": {
+                    "title": "Pianificazione in pausa",
+                    "subtitle": "“{name}” in pausa dopo ripetuti errori"
+                },
+                "generationFailed": {
+                    "title": "Generazione non riuscita",
+                    "subtitle": "Impossibile creare “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Task bloccato",
+                    "subtitle": "“{name}” richiede un input per continuare"
+                },
+                "budgetExceeded": {
+                    "title": "Budget superato",
+                    "subtitle": "La spesa dell’account ha raggiunto il limite"
+                }
+            }
+        },
+        "soon": {
+            "title": "Prossimamente",
+            "more": "+{n} altri",
+            "source": {
+                "work": "Lavoro",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

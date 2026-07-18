@@ -1574,7 +1574,45 @@
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "từ tháng trước"
+            "fromLastMonth": "từ tháng trước",
+            "teams": "Nhóm"
+        },
+        "attention": {
+            "title": "Cần chú ý",
+            "kinds": {
+                "agentError": {
+                    "title": "Agent “{name}” gặp lỗi",
+                    "subtitle": "Tự động tạm dừng sau nhiều lần thất bại"
+                },
+                "scheduleFailed": {
+                    "title": "Chạy theo lịch thất bại",
+                    "subtitle": "Lần chạy gần nhất của “{name}” chưa hoàn tất"
+                },
+                "schedulePaused": {
+                    "title": "Lịch đã tạm dừng",
+                    "subtitle": "“{name}” đã tạm dừng sau nhiều lần thất bại"
+                },
+                "generationFailed": {
+                    "title": "Tạo thất bại",
+                    "subtitle": "Không thể tạo “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Task bị chặn",
+                    "subtitle": "“{name}” cần dữ liệu nhập để tiếp tục"
+                },
+                "budgetExceeded": {
+                    "title": "Vượt ngân sách",
+                    "subtitle": "Chi tiêu tài khoản đã đạt giới hạn"
+                }
+            }
+        },
+        "soon": {
+            "title": "Sắp tới",
+            "more": "+{n} khác",
+            "source": {
+                "work": "Công việc",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

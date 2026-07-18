@@ -1738,7 +1738,45 @@
             "tasksInFlight": "משימות בתהליך",
             "tasksBlocked": "{count} חסומות",
             "tasksNoBlockers": "ללא מכשולים",
-            "fromLastMonth": "מהחודש שעבר"
+            "fromLastMonth": "מהחודש שעבר",
+            "teams": "צוותים"
+        },
+        "attention": {
+            "title": "דורש תשומת לב",
+            "kinds": {
+                "agentError": {
+                    "title": "הסוכן “{name}” נכשל",
+                    "subtitle": "הושהה אוטומטית לאחר כשלים חוזרים"
+                },
+                "scheduleFailed": {
+                    "title": "הרצת התזמון נכשלה",
+                    "subtitle": "ההרצה האחרונה של “{name}” לא הושלמה"
+                },
+                "schedulePaused": {
+                    "title": "התזמון הושהה",
+                    "subtitle": "“{name}” הושהה לאחר כשלים חוזרים"
+                },
+                "generationFailed": {
+                    "title": "היצירה נכשלה",
+                    "subtitle": "לא ניתן היה לבנות את “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "המשימה חסומה",
+                    "subtitle": "“{name}” זקוק לקלט כדי להמשיך"
+                },
+                "budgetExceeded": {
+                    "title": "התקציב חרג",
+                    "subtitle": "הוצאות החשבון הגיעו לתקרה"
+                }
+            }
+        },
+        "soon": {
+            "title": "בקרוב",
+            "more": "+{n} נוספים",
+            "source": {
+                "work": "עבודה",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "שימוש בפלטפורמה",

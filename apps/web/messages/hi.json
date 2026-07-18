@@ -1574,7 +1574,45 @@
             "totalItems": "कुल आइटम",
             "activeWebsites": "सक्रिय वेबसाइटें",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "पिछले महीने से"
+            "fromLastMonth": "पिछले महीने से",
+            "teams": "टीमें"
+        },
+        "attention": {
+            "title": "ध्यान देने की आवश्यकता",
+            "kinds": {
+                "agentError": {
+                    "title": "एजेंट “{name}” में त्रुटि",
+                    "subtitle": "बार-बार विफलताओं के बाद स्वतः रोका गया"
+                },
+                "scheduleFailed": {
+                    "title": "शेड्यूल रन विफल",
+                    "subtitle": "“{name}” का पिछला रन पूरा नहीं हुआ"
+                },
+                "schedulePaused": {
+                    "title": "शेड्यूल रोका गया",
+                    "subtitle": "बार-बार विफलताओं के बाद “{name}” रोका गया"
+                },
+                "generationFailed": {
+                    "title": "जनरेशन विफल",
+                    "subtitle": "“{name}” नहीं बनाया जा सका"
+                },
+                "taskBlocked": {
+                    "title": "कार्य अवरुद्ध",
+                    "subtitle": "जारी रखने के लिए “{name}” को इनपुट चाहिए"
+                },
+                "budgetExceeded": {
+                    "title": "बजट पार हो गया",
+                    "subtitle": "खाते का खर्च अपनी सीमा तक पहुँच गया"
+                }
+            }
+        },
+        "soon": {
+            "title": "जल्द आ रहा है",
+            "more": "+{n} और",
+            "source": {
+                "work": "कार्य",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

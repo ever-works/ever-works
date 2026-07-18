@@ -1574,7 +1574,45 @@
             "totalItems": "項目の合計",
             "activeWebsites": "アクティブなウェブサイト",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "先月から"
+            "fromLastMonth": "先月から",
+            "teams": "チーム"
+        },
+        "attention": {
+            "title": "要対応",
+            "kinds": {
+                "agentError": {
+                    "title": "エージェント “{name}” でエラーが発生しました",
+                    "subtitle": "繰り返し失敗したため自動的に一時停止しました"
+                },
+                "scheduleFailed": {
+                    "title": "スケジュール実行に失敗しました",
+                    "subtitle": "“{name}” の前回の実行が完了しませんでした"
+                },
+                "schedulePaused": {
+                    "title": "スケジュールを一時停止しました",
+                    "subtitle": "繰り返し失敗したため “{name}” を一時停止しました"
+                },
+                "generationFailed": {
+                    "title": "生成に失敗しました",
+                    "subtitle": "“{name}” を構築できませんでした"
+                },
+                "taskBlocked": {
+                    "title": "タスクがブロックされています",
+                    "subtitle": "続行するには “{name}” に入力が必要です"
+                },
+                "budgetExceeded": {
+                    "title": "予算を超過しました",
+                    "subtitle": "アカウントの支出が上限に達しました"
+                }
+            }
+        },
+        "soon": {
+            "title": "近日予定",
+            "more": "他 {n} 件",
+            "source": {
+                "work": "ワーク",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
