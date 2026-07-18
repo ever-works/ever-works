@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Brain, Search, Plus, FileText, FolderClosed, Building2, X, Loader2 } from 'lucide-react';
+import { Brain, Search, FileText, FolderClosed, Building2, X, Loader2 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import { Button } from '@/components/ui/button';
 import {
     buildMemoryQuery,
     type MemoryFacet,
@@ -65,6 +64,11 @@ export function MemoryShell({ initial }: MemoryShellProps) {
     // initial payload, so an immediate refetch would be wasted work.
     const didMount = useRef(false);
 
+    // Tracks the in-flight request so a newer fetch can cancel an older
+    // one — otherwise a slower earlier response could resolve last and
+    // overwrite fresher data (stale-data race on rapid search/filter).
+    const inflightRef = useRef<AbortController | null>(null);
+
     const runFetch = useCallback(async (nextQuery: string, nextFilters: typeof filters) => {
         const qs = buildMemoryQuery({
             q: nextQuery || undefined,
@@ -74,20 +78,34 @@ export function MemoryShell({ initial }: MemoryShellProps) {
             source: nextFilters.source,
             limit: DEFAULT_LIMIT,
         });
+        // Abort any request still in flight and become the current one.
+        inflightRef.current?.abort();
+        const controller = new AbortController();
+        inflightRef.current = controller;
         setIsLoading(true);
         try {
             const res = await fetch(`/api/memory${qs}`, {
                 method: 'GET',
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
+                signal: controller.signal,
             });
             if (!res.ok) return;
             const body = (await res.json()) as MemoryResponse;
+            // Guard against a late resolve that lost the race (defensive —
+            // an aborted fetch rejects, but this also covers a superseded
+            // request whose body read finishes after a newer one started).
+            if (inflightRef.current !== controller) return;
             setData(body);
         } catch {
-            // Best-effort — keep the last good payload on a transient error.
+            // Best-effort — keep the last good payload on a transient error
+            // (an aborted request lands here too and is intentionally a no-op).
         } finally {
-            setIsLoading(false);
+            // Only the current request owns the loading flag; a superseded
+            // one must not clear it out from under its replacement.
+            if (inflightRef.current === controller) {
+                setIsLoading(false);
+            }
         }
     }, []);
 
@@ -144,10 +162,13 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                         </p>
                     </div>
                 </div>
-                <Button href={ROUTES.DASHBOARD_WORKS} variant="primary" size="sm">
-                    <Plus className="w-4 h-4" />
-                    <span>{t('newDocument')}</span>
-                </Button>
+                {/*
+                 * TODO(Cortex P1): restore a "New document" action once a
+                 * dedicated org-memory doc-create flow exists. It previously
+                 * linked to ROUTES.DASHBOARD_WORKS (the Works list), which is
+                 * unrelated to creating a KB document — hidden for now rather
+                 * than mis-navigating the user.
+                 */}
             </div>
 
             {/* Search */}
@@ -181,7 +202,7 @@ export function MemoryShell({ initial }: MemoryShellProps) {
             {/* Header counts */}
             <div className="flex items-center gap-2 text-sm text-text-muted dark:text-text-muted-dark">
                 <span className="font-medium text-text dark:text-text-dark">
-                    {t('documentsIndexed', { count: counts.documents })}
+                    {t('documentsIndexed', { count: counts.indexed })}
                 </span>
                 {facets.works.length > 0 && (
                     <>

@@ -325,6 +325,25 @@ export class WorkKnowledgeDocumentRepository {
     }
 
     /**
+     * Org-wide Memory (Cortex P1) — the org-wide total document count.
+     *
+     * Counts every KB document across the org scope (its Works ∪ its own
+     * org-scoped rows) IGNORING the facet selections AND the lexical `q`,
+     * so the "documents indexed" header stays stable while the user
+     * searches or toggles chips. Only the mandatory scope predicate is
+     * applied — `q`, `classes`, `statuses` and `sources` are deliberately
+     * dropped by not forwarding them to {@link applyOrgAggregateScope}.
+     */
+    async countForOrgScope(opts: OrgMemoryAggregateOptions): Promise<number> {
+        const qb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(qb, {
+            workIds: opts.workIds,
+            organizationId: opts.organizationId,
+        });
+        return qb.getCount();
+    }
+
+    /**
      * Org-wide Memory (Cortex P1) — per-facet value counts for the chips.
      *
      * Computed over the SCOPE (+ lexical `q`) only, NOT the chip

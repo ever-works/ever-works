@@ -1,7 +1,7 @@
 import { Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { KnowledgeBaseService } from '@ever-works/agent/services';
 import type {
     KbDocumentClass,
@@ -33,6 +33,16 @@ function toStringArray(value: unknown): string[] {
         .map((v) => v.trim())
         .filter((v) => v.length > 0);
 }
+
+/**
+ * Upper bound (and server-side default) for the Memory feed page size.
+ *
+ * Bounds the `limit` param so a caller can't request an unbounded page
+ * and force the API to materialize every KB document across the org
+ * into memory at once (OOM vector). Matches the web shell's default page
+ * size (`MemoryShell.DEFAULT_LIMIT`) so the app's own requests validate.
+ */
+export const MEMORY_MAX_LIMIT = 200;
 
 /**
  * Query params for `GET /api/memory` (Org-wide Memory, Cortex P1).
@@ -71,6 +81,7 @@ export class MemoryQueryDto {
     @IsOptional()
     @IsInt()
     @Min(1)
+    @Max(MEMORY_MAX_LIMIT)
     @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
     limit?: number;
 
@@ -141,7 +152,7 @@ export class OrgMemoryController {
             // cross-tenant scan — Memory is org-bounded by construction.
             return {
                 documents: [],
-                counts: { documents: 0 },
+                counts: { documents: 0, indexed: 0 },
                 facets: { types: [], works: [], statuses: [], sources: [] },
             };
         }
@@ -160,7 +171,10 @@ export class OrgMemoryController {
             sources: query.source,
             workIds: query.work,
             q: query.q,
-            limit: query.limit,
+            // Default the page size server-side so an omitted `limit` can't
+            // fall through to an unbounded scan of the whole org's KB (the
+            // repository skips its LIMIT clause when `limit` is undefined).
+            limit: query.limit ?? MEMORY_MAX_LIMIT,
             offset: query.offset,
         });
     }

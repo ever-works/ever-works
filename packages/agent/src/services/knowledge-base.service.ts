@@ -177,12 +177,16 @@ export interface OrgMemoryFacet {
 
 /**
  * Org-wide Memory (Cortex P1) — the `GET /api/memory` payload shape.
- * `counts.documents` is the header "documents indexed" number (the true
- * total, not the page size). `facets` back the filter chips.
+ *
+ * `counts.documents` is the total number of documents matching the
+ * active filters + search (the true match total, not the page size) —
+ * it drives the empty-state copy. `counts.indexed` is the org-wide total
+ * IGNORING filters + search, so the "documents indexed" header stays
+ * stable as the user searches or toggles chips. `facets` back the chips.
  */
 export interface OrgMemoryAggregateResult {
     documents: OrgMemoryDocumentItem[];
-    counts: { documents: number };
+    counts: { documents: number; indexed: number };
     facets: {
         types: OrgMemoryFacet[];
         works: OrgMemoryFacet[];
@@ -1646,6 +1650,14 @@ export class KnowledgeBaseService {
             q: query.q,
         });
 
+        // The "documents indexed" header shows the org-wide total, computed
+        // over the FULL org scope with NO facet filters and NO `q`, so it
+        // stays stable while the user searches / filters the feed below.
+        const indexedTotalPromise = this.documentRepository.countForOrgScope({
+            workIds: allWorkIds,
+            organizationId,
+        });
+
         // The list feed uses the narrowed scope. If a Work filter resolves
         // to nothing (no selected id belongs to the org) AND org-level rows
         // are excluded, there is nothing to return — short-circuit to empty
@@ -1664,7 +1676,11 @@ export class KnowledgeBaseService {
               })
             : Promise.resolve({ items: [], total: 0 });
 
-        const [{ items, total }, facets] = await Promise.all([listPromise, facetsPromise]);
+        const [{ items, total }, facets, indexedTotal] = await Promise.all([
+            listPromise,
+            facetsPromise,
+            indexedTotalPromise,
+        ]);
 
         const documents: OrgMemoryDocumentItem[] = items.map((d) => ({
             id: d.id,
@@ -1682,7 +1698,7 @@ export class KnowledgeBaseService {
 
         return {
             documents,
-            counts: { documents: total },
+            counts: { documents: total, indexed: indexedTotal },
             facets: {
                 // Type / Status / Source facet values are their own labels.
                 types: this.labelFacets(facets.types),

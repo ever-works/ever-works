@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
         body ?? {
             documents: [],
-            counts: { documents: 0 },
+            counts: { documents: 0, indexed: 0 },
             facets: { types: [], works: [], statuses: [], sources: [] },
         },
         { status: 200 },

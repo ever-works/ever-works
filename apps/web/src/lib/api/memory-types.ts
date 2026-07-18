@@ -39,7 +39,12 @@ export interface MemoryFacet {
 /** The `GET /api/memory` response payload. */
 export interface MemoryResponse {
     documents: MemoryDocument[];
-    counts: { documents: number };
+    /**
+     * `documents` = total matching the active filters + search (drives the
+     * empty-state copy). `indexed` = org-wide total ignoring filters +
+     * search (drives the stable "documents indexed" header count).
+     */
+    counts: { documents: number; indexed: number };
     facets: {
         types: MemoryFacet[];
         works: MemoryFacet[];
@@ -62,7 +67,7 @@ export interface MemoryFilters {
 /** The empty payload rendered when there is no active Organization. */
 export const EMPTY_MEMORY_RESPONSE: MemoryResponse = {
     documents: [],
-    counts: { documents: 0 },
+    counts: { documents: 0, indexed: 0 },
     facets: { types: [], works: [], statuses: [], sources: [] },
 };
 
