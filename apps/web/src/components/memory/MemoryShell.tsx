@@ -432,12 +432,21 @@ function ConsolidatePanel({
     const titleFor = (id: string) => titleById.get(id) ?? id;
 
     const MAX_LISTED = 3;
-    const promotedTitles = report.details.promotedIds.slice(0, MAX_LISTED).map(titleFor);
-    const promotedMore = report.details.promotedIds.length - promotedTitles.length;
-    const supersededTitles = report.details.supersededPairs
+    // Key on the source id, not the resolved title — near-duplicate detection
+    // groups on similar titles, so two entries can share a title string and a
+    // title-keyed list would silently drop rows. The loser id is unique per
+    // superseded pair (a doc is superseded at most once).
+    const promotedEntries = report.details.promotedIds
         .slice(0, MAX_LISTED)
-        .map(([loserId, survivorId]) => `${titleFor(loserId)} → ${titleFor(survivorId)}`);
-    const supersededMore = report.details.supersededPairs.length - supersededTitles.length;
+        .map((id) => ({ id, title: titleFor(id) }));
+    const promotedMore = report.details.promotedIds.length - promotedEntries.length;
+    const supersededEntries = report.details.supersededPairs
+        .slice(0, MAX_LISTED)
+        .map(([loserId, survivorId]) => ({
+            key: loserId,
+            label: `${titleFor(loserId)} → ${titleFor(survivorId)}`,
+        }));
+    const supersededMore = report.details.supersededPairs.length - supersededEntries.length;
 
     return (
         <div
@@ -470,15 +479,15 @@ function ConsolidatePanel({
                     {t('consolidation.superseded', { count: report.superseded })}
                 </span>
             </div>
-            {promotedTitles.length > 0 && (
+            {promotedEntries.length > 0 && (
                 <div className="text-xs text-text-muted dark:text-text-muted-dark">
                     <span className="font-medium text-text dark:text-text-dark">
                         {t('consolidation.promotedHeading')}
                     </span>
                     <ul className="mt-1 flex flex-col gap-0.5">
-                        {promotedTitles.map((title) => (
-                            <li key={title} className="truncate">
-                                {title}
+                        {promotedEntries.map((entry) => (
+                            <li key={entry.id} className="truncate">
+                                {entry.title}
                             </li>
                         ))}
                         {promotedMore > 0 && (
@@ -487,15 +496,15 @@ function ConsolidatePanel({
                     </ul>
                 </div>
             )}
-            {supersededTitles.length > 0 && (
+            {supersededEntries.length > 0 && (
                 <div className="text-xs text-text-muted dark:text-text-muted-dark">
                     <span className="font-medium text-text dark:text-text-dark">
                         {t('consolidation.supersededHeading')}
                     </span>
                     <ul className="mt-1 flex flex-col gap-0.5">
-                        {supersededTitles.map((entry) => (
-                            <li key={entry} className="truncate">
-                                {entry}
+                        {supersededEntries.map((entry) => (
+                            <li key={entry.key} className="truncate">
+                                {entry.label}
                             </li>
                         ))}
                         {supersededMore > 0 && (
