@@ -454,9 +454,12 @@ describe('MetricsFacadeService', () => {
                     capability: PluginUsageCapability.METRICS,
                     units: 1,
                     costCents: 0,
-                    currency: undefined,
                 }),
             );
+            // Greptile P2: with no pricing the `currency` key is OMITTED
+            // (not passed as `undefined`) so the usage-event column stays clean.
+            const recorded = pluginUsageService.record.mock.calls[0][0];
+            expect('currency' in recorded).toBe(false);
         });
 
         it('propagates agentId/taskId attribution into the usage event (Phase 15.6)', async () => {

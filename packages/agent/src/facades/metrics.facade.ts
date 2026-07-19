@@ -179,7 +179,11 @@ export class MetricsFacadeService extends BaseFacadeService {
         currency: string | undefined,
         metadata: Record<string, unknown>,
     ): Promise<void> {
-        await this.pluginUsageService?.record({
+        // Build the record explicitly rather than passing `currency: undefined`
+        // through — omit the key when unknown (free/discovery calls, or
+        // providers with no pricing). Explicit assignment, NOT a conditional
+        // spread (`...cond && {}`), per the DTS conditional-spread gotcha.
+        const record: Parameters<NonNullable<typeof this.pluginUsageService>['record']>[0] = {
             workId: facadeOptions.workId,
             userId: facadeOptions.userId,
             // Phase 15.6 — Agent/Task attribution propagation.
@@ -189,8 +193,11 @@ export class MetricsFacadeService extends BaseFacadeService {
             capability: PluginUsageCapability.METRICS,
             units: 1,
             costCents,
-            currency,
             metadata,
-        });
+        };
+        if (currency !== undefined) {
+            record.currency = currency;
+        }
+        await this.pluginUsageService?.record(record);
     }
 }
