@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PortableDateColumn } from './_types';
 import type { WorkAgentGuardrails } from './work-agent-preference.entity';
 
 /**
@@ -134,8 +135,10 @@ export class Mission {
     @Column({ type: 'varchar', length: 24, nullable: true })
     outcome?: MissionOutcome | null;
 
-    /** PR-3 — when the Mission was (last) completed. NULL while active/paused. */
-    @Column({ type: 'timestamp', nullable: true })
+    /** PR-3 — when the Mission was (last) completed. NULL while active/paused.
+     *  PortableDateColumn: raw `type: 'timestamp'` breaks the better-sqlite3
+     *  test/CLI driver at entity-metadata validation. */
+    @PortableDateColumn({ nullable: true })
     completedAt?: Date | null;
 
     /**
