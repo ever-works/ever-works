@@ -6,6 +6,8 @@ import {
     Optional,
 } from '@nestjs/common';
 import { AiFacadeService } from '../facades/ai.facade';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -174,7 +176,42 @@ export class WorkProposalService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
+        // PR-3 - Idea lifecycle activity logging (mirrors MissionsService).
+        // TRAILING `@Optional()` param: hand-rolled tests construct this
+        // service positionally, so existing params must keep their order.
+        // Best-effort at call sites - an activity failure never fails the op.
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
+
+    /**
+     * PR-3 - best-effort Idea activity write (never fails the operation;
+     * no-ops when the service isn't wired, e.g. hand-rolled tests).
+     */
+    private async recordIdeaActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        action: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                actionType,
+                action,
+                status: ActivityStatus.COMPLETED,
+                summary: `Idea ${action}`,
+                details: details as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to write idea activity (${actionType}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     /**
      * List the Upload edges attached to an Idea. Validates ownership
@@ -464,6 +501,13 @@ export class WorkProposalService {
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
         );
 
+        // PR-3 - ONE activity row per generation batch (not per Idea).
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_GENERATED, 'generate', {
+            count: saved.length,
+            source: opts.source,
+            missionId: opts.missionId ?? null,
+        });
+
         return { status: 'generated', proposals: saved, tokensUsed };
     }
 
@@ -527,7 +571,13 @@ export class WorkProposalService {
     }
 
     async dismiss(userId: string, proposalId: string): Promise<boolean> {
-        return this.repo.markDismissed(proposalId, userId);
+        const ok = await this.repo.markDismissed(proposalId, userId);
+        if (ok) {
+            await this.recordIdeaActivity(userId, ActivityActionType.IDEA_DISMISSED, 'dismiss', {
+                proposalId,
+            });
+        }
+        return ok;
     }
 
     async markAccepted(userId: string, proposalId: string, workId: string): Promise<boolean> {
@@ -564,7 +614,14 @@ export class WorkProposalService {
         // Work owned by this user, so the legitimate path is unaffected.
         const work = await this.works.findById(workId);
         if (!work || work.userId !== userId) return false;
-        return this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        const ok = await this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        if (ok) {
+            await this.recordIdeaActivity(userId, ActivityActionType.IDEA_ACCEPTED, 'accept', {
+                proposalId,
+                workId,
+            });
+        }
+        return ok;
     }
 
     /**
@@ -576,6 +633,9 @@ export class WorkProposalService {
     async queueForBuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
         const ok = await this.repo.markQueuedForBuild(proposalId, userId);
         if (!ok) return null;
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_QUEUED, 'queue', {
+            proposalId,
+        });
         return this.repo.findByIdForUser(proposalId, userId);
     }
 
@@ -637,6 +697,9 @@ export class WorkProposalService {
     async beginRebuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
         const ok = await this.repo.markRebuildingFromAccepted(proposalId, userId);
         if (!ok) return null;
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_REBUILD_STARTED, 'rebuild', {
+            proposalId,
+        });
         return this.repo.findByIdForUser(proposalId, userId);
     }
 
@@ -731,6 +794,10 @@ export class WorkProposalService {
         // Terminal failure — either non-transient or retry budget
         // exhausted. Mark FAILED with the classified kind + message.
         await this.repo.markFailed(input.ideaId, input.userId, message, kind);
+        await this.recordIdeaActivity(input.userId, ActivityActionType.IDEA_FAILED, 'fail', {
+            ideaId: input.ideaId,
+            kind,
+        });
         return { outcome: 'failed', ideaId: input.ideaId, kind, message };
     }
 

@@ -15,12 +15,32 @@ import { serverFetch, serverMutation } from './server-api';
 export type MissionStatus = 'active' | 'paused' | 'completed' | 'failed';
 export type MissionType = 'one-shot' | 'scheduled';
 
+/**
+ * PR-3 — human-recorded conclusion verdict, mirroring the agent-side
+ * `MissionOutcome` enum (`packages/agent/src/entities/mission.entity.ts`).
+ * NULL until a human records one at Complete.
+ */
+export type MissionOutcome =
+    | 'succeeded'
+    | 'partially_succeeded'
+    | 'failed'
+    | 'cancelled'
+    | 'superseded';
+
 export interface Mission {
     id: string;
     title: string;
     description: string;
     type: MissionType;
     status: MissionStatus;
+    /**
+     * PR-3 — conclusion verdict; NULL until recorded at Complete.
+     * Optional (not just nullable) so payloads serialized before the
+     * outcome column existed remain assignable.
+     */
+    outcome?: MissionOutcome | null;
+    /** PR-3 — set when the Mission transitions to COMPLETED; cleared on revival. */
+    completedAt?: string | null;
     schedule: string | null;
     autoBuildWorks: boolean;
     outstandingIdeasCap: number | null;
@@ -172,10 +192,10 @@ export const missionsAPI = {
         });
     },
 
-    async complete(id: string): Promise<Mission> {
+    async complete(id: string, outcome?: MissionOutcome): Promise<Mission> {
         return serverMutation<Mission>({
             endpoint: `/me/missions/${id}/complete`,
-            data: {},
+            data: outcome ? { outcome } : {},
             method: 'POST',
             wrapInData: false,
         });

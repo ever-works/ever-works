@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { TitlerModule } from '../titler/titler.module';
@@ -21,6 +22,7 @@ import {
     // WorkProposalService.createUserManual (replaces its inline
     // deriveTitle placeholder from Phase 1 PR B).
     imports: [
+        ActivityLogModule,
         DatabaseModule,
         FacadesModule,
         TitlerModule,

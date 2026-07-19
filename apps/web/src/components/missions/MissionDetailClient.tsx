@@ -39,7 +39,12 @@ import {
     runMissionNowAction,
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
-import type { Mission, MissionAttachmentRow, OwnerBudgetSummary } from '@/lib/api/missions';
+import type {
+    Mission,
+    MissionAttachmentRow,
+    MissionOutcome,
+    OwnerBudgetSummary,
+} from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { BudgetSummaryCard } from '@/components/budgets';
@@ -52,6 +57,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { ShowDateTime } from '@/components/ui/show-datetime';
 
 export interface MissionDetailClientProps {
     mission: Mission;
@@ -64,8 +71,30 @@ export interface MissionDetailClientProps {
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
 const PAUSABLE_STATUSES = new Set(['active']);
-const RESUMABLE_STATUSES = new Set(['paused']);
+// PR-3 — FAILED Missions can be revived (mirrors the agent-side
+// RESUMABLE_STATUSES in packages/agent/src/missions/missions.service.ts).
+const RESUMABLE_STATUSES = new Set(['paused', 'failed']);
 const COMPLETABLE_STATUSES = new Set(['active', 'paused']);
+
+// PR-3 — the 5 recordable conclusion verdicts (MissionOutcome), in the
+// order the Complete dialog offers them. '' = "no verdict" (default).
+const MISSION_OUTCOMES: readonly MissionOutcome[] = [
+    'succeeded',
+    'partially_succeeded',
+    'failed',
+    'cancelled',
+    'superseded',
+];
+
+// Outcome-badge recoloring, mirroring the STATUS_STYLES palette used
+// by StatusPill so verdict pills read consistently next to status pills.
+const OUTCOME_STYLES: Record<MissionOutcome, string> = {
+    succeeded: 'bg-success/10 text-success border-success/20',
+    partially_succeeded: 'bg-warning/10 text-warning border-warning/20',
+    failed: 'bg-danger/10 text-danger border-danger/20',
+    cancelled: 'bg-surface-secondary text-text-muted border-border/70',
+    superseded: 'bg-info/10 text-info border-info/20',
+};
 
 // ─── Shared button classes ────────────────────────────────────────────────
 
@@ -138,6 +167,10 @@ export function MissionDetailClient({
     const [cloneOpen, setCloneOpen] = useState(false);
     const [cloneTitleDraft, setCloneTitleDraft] = useState('');
 
+    // PR-3 — Complete dialog: outcome verdict select ('' = no verdict).
+    const [completeOpen, setCompleteOpen] = useState(false);
+    const [outcomeDraft, setOutcomeDraft] = useState<'' | MissionOutcome>('');
+
     const [scheduleDraft, setScheduleDraft] = useState<string>(mission.schedule ?? '');
     const [autoBuildDraft, setAutoBuildDraft] = useState<boolean>(mission.autoBuildWorks);
     const [capInherit, setCapInherit] = useState<boolean>(mission.outstandingIdeasCap === null);
@@ -203,6 +236,26 @@ export function MissionDetailClient({
                 toast.success(t(`toasts.${verb}d`));
             } catch (err) {
                 toast.error(err instanceof Error ? err.message : t(`toasts.${verb}Error`));
+            }
+        });
+    };
+
+    // PR-3 — Complete goes through the dialog so the human can record an
+    // optional conclusion verdict. '' ("no verdict") sends no outcome,
+    // which is exactly today's behavior.
+    const handleComplete = () => {
+        startLifecycle(async () => {
+            try {
+                const updated = await completeMissionAction(
+                    mission.id,
+                    outcomeDraft === '' ? undefined : outcomeDraft,
+                );
+                setMission(updated);
+                setCompleteOpen(false);
+                setOutcomeDraft('');
+                toast.success(t('toasts.completed'));
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : t('toasts.completeError'));
             }
         });
     };
@@ -288,6 +341,24 @@ export function MissionDetailClient({
                             </h1>
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                 <StatusPill status={mission.status} />
+                                {mission.outcome && (
+                                    <span
+                                        title={t('outcomeTooltip')}
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                            OUTCOME_STYLES[mission.outcome],
+                                        )}
+                                    >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        {t(`outcomes.${mission.outcome}`)}
+                                    </span>
+                                )}
+                                {mission.completedAt && (
+                                    <span className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark">
+                                        {t('completedAtLabel')}{' '}
+                                        <ShowDateTime value={mission.completedAt} />
+                                    </span>
+                                )}
                                 <span
                                     className={cn(
                                         'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
@@ -359,9 +430,7 @@ export function MissionDetailClient({
                         {canComplete && (
                             <button
                                 type="button"
-                                onClick={() =>
-                                    transition('complete', () => completeMissionAction(mission.id))
-                                }
+                                onClick={() => setCompleteOpen(true)}
                                 disabled={pendingLifecycle}
                                 className={btn}
                             >
@@ -653,6 +722,55 @@ export function MissionDetailClient({
                         >
                             <Copy className="w-3.5 h-3.5" />
                             {t('clone.confirm')}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Complete modal (PR-3 — optional outcome verdict) ─────────── */}
+            <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t('completeDialog.title')}</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('completeDialog.description')}
+                    </p>
+                    <label className="block mt-3 space-y-1.5">
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('completeDialog.outcomeLabel')}
+                        </span>
+                        <Select
+                            value={outcomeDraft}
+                            onValueChange={(v) => setOutcomeDraft(v as '' | MissionOutcome)}
+                            data-testid="mission-complete-outcome-select"
+                        >
+                            <option value="">{t('completeDialog.noVerdict')}</option>
+                            {MISSION_OUTCOMES.map((o) => (
+                                <option key={o} value={o}>
+                                    {t(`outcomes.${o}`)}
+                                </option>
+                            ))}
+                        </Select>
+                    </label>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setCompleteOpen(false)}
+                            disabled={pendingLifecycle}
+                            className={btn}
+                        >
+                            {t('completeDialog.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleComplete}
+                            disabled={pendingLifecycle}
+                            className={btn}
+                            data-testid="mission-complete-confirm"
+                        >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {t('completeDialog.confirm')}
                         </button>
                     </DialogFooter>
                 </DialogContent>

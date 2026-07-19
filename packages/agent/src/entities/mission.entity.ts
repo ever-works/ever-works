@@ -40,6 +40,23 @@ export enum MissionType {
 }
 
 /**
+ * PR-3 (domain-model evolution, review §23.2) — the Mission's
+ * CONCLUSION verdict, separate from its workflow `status`.
+ * NULL until (and unless) the human completing the Mission picks one;
+ * all pre-existing COMPLETED rows keep NULL (verdicts are never
+ * invented in backfill). Only humans set this — the autonomous agent
+ * runtime never gains a complete-mission tool (standing rule
+ * alongside invariant I-4).
+ */
+export enum MissionOutcome {
+    SUCCEEDED = 'succeeded',
+    PARTIALLY_SUCCEEDED = 'partially_succeeded',
+    FAILED = 'failed',
+    CANCELLED = 'cancelled',
+    SUPERSEDED = 'superseded',
+}
+
+/**
  * Per-Mission policy overrides for the Idea→Work build pipeline.
  *
  * Falls through to the user's global `WorkAgentPreference` for any
@@ -108,6 +125,18 @@ export class Mission {
 
     @Column({ type: 'varchar', length: 16, default: MissionStatus.ACTIVE })
     status: MissionStatus;
+
+    /**
+     * PR-3 — conclusion verdict, set (optionally) when a human
+     * completes the Mission. NULL = no verdict recorded (includes
+     * every pre-existing completed Mission). See `MissionOutcome`.
+     */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    outcome?: MissionOutcome | null;
+
+    /** PR-3 — when the Mission was (last) completed. NULL while active/paused. */
+    @Column({ type: 'timestamp', nullable: true })
+    completedAt?: Date | null;
 
     /**
      * Cron expression; required when `type = SCHEDULED`, must be NULL

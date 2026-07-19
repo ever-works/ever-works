@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
     IsBoolean,
+    IsIn,
     IsEnum,
     IsInt,
     IsOptional,
@@ -246,6 +247,17 @@ export class UpdateMissionDto {
     // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
     @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
+}
+
+/**
+ * PR-3 (domain-model evolution, review §23.2) - optional conclusion
+ * verdict recorded when a human completes a Mission. Omitting it keeps
+ * today's behavior exactly (outcome stays NULL).
+ */
+export class CompleteMissionDto {
+    @IsOptional()
+    @IsIn(['succeeded', 'partially_succeeded', 'failed', 'cancelled', 'superseded'])
+    outcome?: 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled' | 'superseded' | null;
 }
 
 export class AddMissionAttachmentDto {
