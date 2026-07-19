@@ -75,17 +75,17 @@ from the current state (`computeStepList` in `useOnboardingFlow.ts`), so
 Ever Works default for a bucket (which needs no per-user config), that
 bucket's config step is skipped entirely.
 
-| # | Step               | Purpose                                                        |
-| - | ------------------ | -------------------------------------------------------------- |
-| 1 | `welcome`          | Intro + preview of the upcoming steps                          |
-| 2 | `ai-choice`        | Pick the AI provider bucket (Ever Works default, or your own)  |
-| 3 | `ai-config`*       | Configure the chosen AI provider (skipped for the default)     |
-| 4 | `storage-choice`   | Pick storage (Ever Works default, or your own GitHub)          |
-| 5 | `storage-config`*  | Connect GitHub (shown only for `user-github`)                  |
-| 6 | `deploy-choice`    | Pick a deploy target (Ever Works default, Vercel, or k8s)      |
-| 7 | `deploy-config`*   | Configure the target (shown only for `vercel` / `k8s`)         |
-| 8 | `plugins-catalog`  | Review and enable optional plugins                             |
-| 9 | `create-work`      | Enter/confirm the prompt and **Generate** the first Work       |
+| #   | Step               | Purpose                                                       |
+| --- | ------------------ | ------------------------------------------------------------- |
+| 1   | `welcome`          | Intro + preview of the upcoming steps                         |
+| 2   | `ai-choice`        | Pick the AI provider bucket (Ever Works default, or your own) |
+| 3   | `ai-config`\*      | Configure the chosen AI provider (skipped for the default)    |
+| 4   | `storage-choice`   | Pick storage (Ever Works default, or your own GitHub)         |
+| 5   | `storage-config`\* | Connect GitHub (shown only for `user-github`)                 |
+| 6   | `deploy-choice`    | Pick a deploy target (Ever Works default, Vercel, or k8s)     |
+| 7   | `deploy-config`\*  | Configure the target (shown only for `vercel` / `k8s`)        |
+| 8   | `plugins-catalog`  | Review and enable optional plugins                            |
+| 9   | `create-work`      | Enter/confirm the prompt and **Generate** the first Work      |
 
 _\* Config steps are conditional. `ai-config` is dropped when the AI
 choice is the Ever Works default; `storage-config` appears only for the

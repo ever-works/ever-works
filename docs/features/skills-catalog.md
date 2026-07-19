@@ -37,14 +37,14 @@ from the catalog (`skills/check-pr/SKILL.md`):
 ---
 name: check-pr
 description: >
-  Check a GitHub, GitLab, or Perforce PR/MR/CL for review comments,
-  failing checks, and PR-body gaps. Use when asked to inspect, fix, or
-  prepare a change for submission.
+    Check a GitHub, GitLab, or Perforce PR/MR/CL for review comments,
+    failing checks, and PR-body gaps. Use when asked to inspect, fix, or
+    prepare a change for submission.
 license: MIT
 compatibility: Requires git and gh, glab, or p4 installed and authenticated.
 metadata:
-  author: greptileai
-  version: "1.3"
+    author: greptileai
+    version: '1.3'
 allowed-tools: Bash(gh:*) Bash(glab:*) Bash(git:*) Bash(p4:*)
 ---
 
@@ -114,15 +114,15 @@ manifest with:
 
 ```json
 {
-  "everworks": {
-    "plugin": {
-      "id": "everworks-skills",
-      "capabilities": ["skills-provider"],
-      "autoEnable": true,
-      "defaultForCapabilities": ["skills-provider"],
-      "distribution": "registry"
-    }
-  }
+	"everworks": {
+		"plugin": {
+			"id": "everworks-skills",
+			"capabilities": ["skills-provider"],
+			"autoEnable": true,
+			"defaultForCapabilities": ["skills-provider"],
+			"distribution": "registry"
+		}
+	}
 }
 ```
 
@@ -149,15 +149,15 @@ in the wizard). A real example (`templates/starter-coder/skills.yml`):
 
 ```yaml
 required:
-  - slug: git
-    why: The Coder branches, commits, and pushes for every Task.
-  - slug: github-pr
-    why: Opening the PR, polling reviewers, and replying to inline comments.
-  - slug: test-runner
-    why: The Coder must run lint, type-check, and tests locally before pushing.
+    - slug: git
+      why: The Coder branches, commits, and pushes for every Task.
+    - slug: github-pr
+      why: Opening the PR, polling reviewers, and replying to inline comments.
+    - slug: test-runner
+      why: The Coder must run lint, type-check, and tests locally before pushing.
 recommended:
-  - slug: code-search
-    why: Read first, edit second. A fast repo-wide search makes the read step cheap.
+    - slug: code-search
+      why: Read first, edit second. A fast repo-wide search makes the read step cheap.
 ```
 
 :::note Unknown slugs are ignored, not rejected
