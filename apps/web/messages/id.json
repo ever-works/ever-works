@@ -5018,7 +5018,8 @@
                 "workSchedule": "Jadwal karya",
                 "missionTick": "Tick Mission",
                 "sourceValidation": "Validasi sumber",
-                "dataSync": "Sinkronisasi data"
+                "dataSync": "Sinkronisasi data",
+                "inboundTrigger": "Pemicu masuk"
             },
             "statuses": {
                 "active": "Aktif",
@@ -5031,6 +5032,57 @@
                 "title": "Belum ada yang dijadwalkan",
                 "description": "Tugas berulang, heartbeat agen, jadwal karya, tick Mission, validasi sumber, dan sinkronisasi data akan muncul di sini setelah Anda mengaturnya.",
                 "noResults": "Tidak ada jadwal yang cocok dengan filter saat ini."
+            }
+        },
+        "triggers": {
+            "title": "Pemicu masuk",
+            "subtitle": "Webhook dan panggilan API bertanda tangan yang membuat Tugas saat dipicu.",
+            "new": "Pemicu baru",
+            "empty": "Belum ada pemicu. Buat satu untuk menerima webhook bertanda tangan.",
+            "firedCount": "{count} kali dipicu",
+            "lastFired": "terakhir dipicu",
+            "status": {
+                "active": "Aktif",
+                "paused": "Dijeda"
+            },
+            "createTitle": "Pemicu masuk baru",
+            "createDescription": "Anda mendapat URL webhook bertanda tangan dan rahasia. Sistem eksternal mengirim POST untuk membuat Tugas.",
+            "form": {
+                "name": "Nama",
+                "namePlaceholder": "Notifikasi deploy",
+                "description": "Deskripsi",
+                "descriptionPlaceholder": "Apa yang memicu ini?",
+                "taskTitle": "Templat judul tugas",
+                "taskTitlePlaceholder": "Pemicu: {name}",
+                "taskTitleHint": "{name} diganti dengan nama pemicu."
+            },
+            "actions": {
+                "pause": "Jeda",
+                "resume": "Lanjutkan",
+                "rotate": "Putar rahasia",
+                "delete": "Hapus",
+                "cancel": "Batal",
+                "create": "Buat"
+            },
+            "reveal": {
+                "title": "Rahasia pemicu",
+                "warning": "Salin rahasia sekarang — Anda tidak akan bisa melihatnya lagi.",
+                "url": "URL webhook",
+                "secret": "Rahasia penandatanganan",
+                "curl": "Contoh permintaan bertanda tangan",
+                "copy": "Salin",
+                "done": "Selesai"
+            },
+            "toast": {
+                "created": "Pemicu dibuat",
+                "createFailed": "Tidak dapat membuat pemicu",
+                "rotated": "Rahasia diputar",
+                "rotateFailed": "Tidak dapat memutar rahasia",
+                "toggleFailed": "Tidak dapat memperbarui pemicu",
+                "deleted": "Pemicu dihapus",
+                "deleteFailed": "Tidak dapat menghapus pemicu",
+                "loadFailed": "Tidak dapat memuat pemicu",
+                "copyFailed": "Tidak dapat menyalin ke papan klip"
             }
         }
     },

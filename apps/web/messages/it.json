@@ -5018,7 +5018,8 @@
                 "workSchedule": "Pianificazione lavoro",
                 "missionTick": "Tick Mission",
                 "sourceValidation": "Validazione sorgente",
-                "dataSync": "Sincronizzazione dati"
+                "dataSync": "Sincronizzazione dati",
+                "inboundTrigger": "Trigger in entrata"
             },
             "statuses": {
                 "active": "Attivo",
@@ -5031,6 +5032,57 @@
                 "title": "Ancora nulla di pianificato",
                 "description": "Task ricorrenti, heartbeat degli agenti, pianificazioni dei lavori, tick delle Mission, validazione delle sorgenti e sincronizzazione dei dati appariranno qui una volta configurati.",
                 "noResults": "Nessuna pianificazione corrisponde al filtro corrente."
+            }
+        },
+        "triggers": {
+            "title": "Trigger in entrata",
+            "subtitle": "Webhook e chiamate API firmati che creano un’Attività quando attivati.",
+            "new": "Nuovo trigger",
+            "empty": "Ancora nessun trigger. Creane uno per ricevere webhook firmati.",
+            "firedCount": "{count} attivazioni",
+            "lastFired": "ultima attivazione",
+            "status": {
+                "active": "Attivo",
+                "paused": "In pausa"
+            },
+            "createTitle": "Nuovo trigger in entrata",
+            "createDescription": "Ottieni un URL webhook firmato e un segreto. I sistemi esterni inviano un POST per creare un’Attività.",
+            "form": {
+                "name": "Nome",
+                "namePlaceholder": "Notifiche di deploy",
+                "description": "Descrizione",
+                "descriptionPlaceholder": "Cosa attiva questo trigger?",
+                "taskTitle": "Modello del titolo dell’attività",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} viene sostituito con il nome del trigger."
+            },
+            "actions": {
+                "pause": "Pausa",
+                "resume": "Riprendi",
+                "rotate": "Ruota segreto",
+                "delete": "Elimina",
+                "cancel": "Annulla",
+                "create": "Crea"
+            },
+            "reveal": {
+                "title": "Segreto del trigger",
+                "warning": "Copia subito il segreto: non potrai vederlo di nuovo.",
+                "url": "URL webhook",
+                "secret": "Segreto di firma",
+                "curl": "Esempio di richiesta firmata",
+                "copy": "Copia",
+                "done": "Fatto"
+            },
+            "toast": {
+                "created": "Trigger creato",
+                "createFailed": "Impossibile creare il trigger",
+                "rotated": "Segreto ruotato",
+                "rotateFailed": "Impossibile ruotare il segreto",
+                "toggleFailed": "Impossibile aggiornare il trigger",
+                "deleted": "Trigger eliminato",
+                "deleteFailed": "Impossibile eliminare il trigger",
+                "loadFailed": "Impossibile caricare i trigger",
+                "copyFailed": "Impossibile copiare negli appunti"
             }
         }
     },

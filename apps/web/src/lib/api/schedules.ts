@@ -8,9 +8,10 @@ export type ScheduleSourceType =
     | 'work_schedule'
     | 'mission_tick'
     | 'source_validation'
-    | 'data_sync';
+    | 'data_sync'
+    | 'inbound_trigger';
 
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission';
+export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger';
 
 export type ScheduleStatus = 'active' | 'paused' | 'disabled' | 'error' | 'ended';
 

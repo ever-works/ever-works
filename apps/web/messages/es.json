@@ -1376,7 +1376,8 @@
                 "workSchedule": "Programación de trabajo",
                 "missionTick": "Tick de Mission",
                 "sourceValidation": "Validación de fuente",
-                "dataSync": "Sincronización de datos"
+                "dataSync": "Sincronización de datos",
+                "inboundTrigger": "Disparador entrante"
             },
             "statuses": {
                 "active": "Activo",
@@ -5228,6 +5229,57 @@
         "discover": {
             "title": "Descubrir",
             "subtitle": "Ideas de trabajo seleccionadas por IA adaptadas para ti."
+        },
+        "triggers": {
+            "title": "Disparadores entrantes",
+            "subtitle": "Webhooks y llamadas de API firmados que crean una Tarea al activarse.",
+            "new": "Nuevo disparador",
+            "empty": "Aún no hay disparadores. Crea uno para recibir webhooks firmados.",
+            "firedCount": "{count} activaciones",
+            "lastFired": "última activación",
+            "status": {
+                "active": "Activo",
+                "paused": "En pausa"
+            },
+            "createTitle": "Nuevo disparador entrante",
+            "createDescription": "Obtienes una URL de webhook firmada y un secreto. Los sistemas externos envían un POST para crear una Tarea.",
+            "form": {
+                "name": "Nombre",
+                "namePlaceholder": "Notificaciones de despliegue",
+                "description": "Descripción",
+                "descriptionPlaceholder": "¿Qué activa este disparador?",
+                "taskTitle": "Plantilla del título de la tarea",
+                "taskTitlePlaceholder": "Disparador: {name}",
+                "taskTitleHint": "{name} se reemplaza por el nombre del disparador."
+            },
+            "actions": {
+                "pause": "Pausar",
+                "resume": "Reanudar",
+                "rotate": "Rotar secreto",
+                "delete": "Eliminar",
+                "cancel": "Cancelar",
+                "create": "Crear"
+            },
+            "reveal": {
+                "title": "Secreto del disparador",
+                "warning": "Copia el secreto ahora: no podrás verlo de nuevo.",
+                "url": "URL del webhook",
+                "secret": "Secreto de firma",
+                "curl": "Ejemplo de solicitud firmada",
+                "copy": "Copiar",
+                "done": "Listo"
+            },
+            "toast": {
+                "created": "Disparador creado",
+                "createFailed": "No se pudo crear el disparador",
+                "rotated": "Secreto rotado",
+                "rotateFailed": "No se pudo rotar el secreto",
+                "toggleFailed": "No se pudo actualizar el disparador",
+                "deleted": "Disparador eliminado",
+                "deleteFailed": "No se pudo eliminar el disparador",
+                "loadFailed": "No se pudieron cargar los disparadores",
+                "copyFailed": "No se pudo copiar al portapapeles"
+            }
         }
     },
     "layout": {

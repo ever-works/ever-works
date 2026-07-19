@@ -5018,7 +5018,8 @@
                 "workSchedule": "Harmonogram pracy",
                 "missionTick": "Takt Mission",
                 "sourceValidation": "Walidacja źródła",
-                "dataSync": "Synchronizacja danych"
+                "dataSync": "Synchronizacja danych",
+                "inboundTrigger": "Wyzwalacz przychodzący"
             },
             "statuses": {
                 "active": "Aktywny",
@@ -5031,6 +5032,57 @@
                 "title": "Nic jeszcze nie zaplanowano",
                 "description": "Zadania cykliczne, pulsy agentów, harmonogramy pracy, takty Mission, walidacja źródeł i synchronizacja danych pojawią się tutaj po ich skonfigurowaniu.",
                 "noResults": "Żadne harmonogramy nie pasują do bieżącego filtra."
+            }
+        },
+        "triggers": {
+            "title": "Wyzwalacze przychodzące",
+            "subtitle": "Podpisane webhooki i wywołania API, które tworzą Zadanie po uruchomieniu.",
+            "new": "Nowy wyzwalacz",
+            "empty": "Brak wyzwalaczy. Utwórz jeden, aby odbierać podpisane webhooki.",
+            "firedCount": "{count} uruchomień",
+            "lastFired": "ostatnie uruchomienie",
+            "status": {
+                "active": "Aktywny",
+                "paused": "Wstrzymany"
+            },
+            "createTitle": "Nowy wyzwalacz przychodzący",
+            "createDescription": "Otrzymasz podpisany adres webhooka i sekret. Systemy zewnętrzne wysyłają POST, aby utworzyć Zadanie.",
+            "form": {
+                "name": "Nazwa",
+                "namePlaceholder": "Powiadomienia o wdrożeniu",
+                "description": "Opis",
+                "descriptionPlaceholder": "Co uruchamia ten wyzwalacz?",
+                "taskTitle": "Szablon tytułu zadania",
+                "taskTitlePlaceholder": "Wyzwalacz: {name}",
+                "taskTitleHint": "{name} rozwija się do nazwy wyzwalacza."
+            },
+            "actions": {
+                "pause": "Wstrzymaj",
+                "resume": "Wznów",
+                "rotate": "Zmień sekret",
+                "delete": "Usuń",
+                "cancel": "Anuluj",
+                "create": "Utwórz"
+            },
+            "reveal": {
+                "title": "Sekret wyzwalacza",
+                "warning": "Skopiuj sekret teraz — nie zobaczysz go ponownie.",
+                "url": "Adres webhooka",
+                "secret": "Sekret podpisu",
+                "curl": "Przykład podpisanego żądania",
+                "copy": "Kopiuj",
+                "done": "Gotowe"
+            },
+            "toast": {
+                "created": "Wyzwalacz utworzony",
+                "createFailed": "Nie udało się utworzyć wyzwalacza",
+                "rotated": "Sekret zmieniony",
+                "rotateFailed": "Nie udało się zmienić sekretu",
+                "toggleFailed": "Nie udało się zaktualizować wyzwalacza",
+                "deleted": "Wyzwalacz usunięty",
+                "deleteFailed": "Nie udało się usunąć wyzwalacza",
+                "loadFailed": "Nie udało się wczytać wyzwalaczy",
+                "copyFailed": "Nie udało się skopiować do schowka"
             }
         }
     },

@@ -172,6 +172,10 @@
         "./schedules": {
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"
+        },
+        "./triggers": {
+            "types": "./dist/triggers/index.d.ts",
+            "default": "./dist/triggers/index.js"
         }
     },
     "scripts": {

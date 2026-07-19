@@ -10,9 +10,10 @@ const SOURCE_TYPES = [
     'mission_tick',
     'source_validation',
     'data_sync',
+    'inbound_trigger',
 ] as const;
 
-const OWNER_TYPES = ['task', 'agent', 'work', 'mission'] as const;
+const OWNER_TYPES = ['task', 'agent', 'work', 'mission', 'trigger'] as const;
 
 /**
  * Query filters for `GET /api/schedules`. Validated by the global
@@ -32,7 +33,7 @@ export class ScheduleQueryDto {
 
     @ApiPropertyOptional({
         enum: OWNER_TYPES,
-        description: 'Filter to one owning entity kind (task | agent | work | mission)',
+        description: 'Filter to one owning entity kind (task | agent | work | mission | trigger)',
     })
     @IsOptional()
     @IsEnum(OWNER_TYPES)

@@ -5018,7 +5018,8 @@
                 "workSchedule": "作品计划",
                 "missionTick": "Mission 滴答",
                 "sourceValidation": "来源验证",
-                "dataSync": "数据同步"
+                "dataSync": "数据同步",
+                "inboundTrigger": "入站触发器"
             },
             "statuses": {
                 "active": "活跃",
@@ -5031,6 +5032,57 @@
                 "title": "暂无计划任务",
                 "description": "设置后，定期任务、代理心跳、作品计划、Mission 滴答、来源验证和数据同步将显示在此处。",
                 "noResults": "没有符合当前筛选条件的计划任务。"
+            }
+        },
+        "triggers": {
+            "title": "入站触发器",
+            "subtitle": "触发时创建任务的已签名 Webhook 和 API 调用。",
+            "new": "新建触发器",
+            "empty": "暂无触发器。创建一个即可接收已签名的 Webhook。",
+            "firedCount": "触发 {count} 次",
+            "lastFired": "最近触发",
+            "status": {
+                "active": "启用",
+                "paused": "已暂停"
+            },
+            "createTitle": "新建入站触发器",
+            "createDescription": "你会获得一个已签名的 Webhook URL 和一个密钥。外部系统向其 POST 即可创建任务。",
+            "form": {
+                "name": "名称",
+                "namePlaceholder": "部署通知",
+                "description": "描述",
+                "descriptionPlaceholder": "什么会触发它？",
+                "taskTitle": "任务标题模板",
+                "taskTitlePlaceholder": "触发器：{name}",
+                "taskTitleHint": "{name} 会替换为触发器名称。"
+            },
+            "actions": {
+                "pause": "暂停",
+                "resume": "恢复",
+                "rotate": "轮换密钥",
+                "delete": "删除",
+                "cancel": "取消",
+                "create": "创建"
+            },
+            "reveal": {
+                "title": "触发器密钥",
+                "warning": "立即复制密钥——之后将无法再次查看。",
+                "url": "Webhook URL",
+                "secret": "签名密钥",
+                "curl": "已签名请求示例",
+                "copy": "复制",
+                "done": "完成"
+            },
+            "toast": {
+                "created": "触发器已创建",
+                "createFailed": "无法创建触发器",
+                "rotated": "密钥已轮换",
+                "rotateFailed": "无法轮换密钥",
+                "toggleFailed": "无法更新触发器",
+                "deleted": "触发器已删除",
+                "deleteFailed": "无法删除触发器",
+                "loadFailed": "无法加载触发器",
+                "copyFailed": "无法复制到剪贴板"
             }
         }
     },

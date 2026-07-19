@@ -5018,7 +5018,8 @@
                 "workSchedule": "Agendamento de trabalho",
                 "missionTick": "Tick de Mission",
                 "sourceValidation": "Validação de fonte",
-                "dataSync": "Sincronização de dados"
+                "dataSync": "Sincronização de dados",
+                "inboundTrigger": "Gatilho de entrada"
             },
             "statuses": {
                 "active": "Ativo",
@@ -5031,6 +5032,57 @@
                 "title": "Nada agendado ainda",
                 "description": "Tarefas recorrentes, heartbeats de agentes, agendamentos de trabalho, ticks de Mission, validação de fontes e sincronização de dados aparecerão aqui assim que você os configurar.",
                 "noResults": "Nenhum agendamento corresponde ao filtro atual."
+            }
+        },
+        "triggers": {
+            "title": "Gatilhos de entrada",
+            "subtitle": "Webhooks e chamadas de API assinados que criam uma Tarefa quando disparados.",
+            "new": "Novo gatilho",
+            "empty": "Ainda não há gatilhos. Crie um para receber webhooks assinados.",
+            "firedCount": "{count} disparos",
+            "lastFired": "último disparo",
+            "status": {
+                "active": "Ativo",
+                "paused": "Pausado"
+            },
+            "createTitle": "Novo gatilho de entrada",
+            "createDescription": "Você recebe uma URL de webhook assinada e um segredo. Sistemas externos enviam um POST para criar uma Tarefa.",
+            "form": {
+                "name": "Nome",
+                "namePlaceholder": "Notificações de deploy",
+                "description": "Descrição",
+                "descriptionPlaceholder": "O que dispara este gatilho?",
+                "taskTitle": "Modelo de título da tarefa",
+                "taskTitlePlaceholder": "Gatilho: {name}",
+                "taskTitleHint": "{name} é substituído pelo nome do gatilho."
+            },
+            "actions": {
+                "pause": "Pausar",
+                "resume": "Retomar",
+                "rotate": "Rotacionar segredo",
+                "delete": "Excluir",
+                "cancel": "Cancelar",
+                "create": "Criar"
+            },
+            "reveal": {
+                "title": "Segredo do gatilho",
+                "warning": "Copie o segredo agora — você não poderá vê-lo novamente.",
+                "url": "URL do webhook",
+                "secret": "Segredo de assinatura",
+                "curl": "Exemplo de requisição assinada",
+                "copy": "Copiar",
+                "done": "Concluído"
+            },
+            "toast": {
+                "created": "Gatilho criado",
+                "createFailed": "Não foi possível criar o gatilho",
+                "rotated": "Segredo rotacionado",
+                "rotateFailed": "Não foi possível rotacionar o segredo",
+                "toggleFailed": "Não foi possível atualizar o gatilho",
+                "deleted": "Gatilho excluído",
+                "deleteFailed": "Não foi possível excluir o gatilho",
+                "loadFailed": "Não foi possível carregar os gatilhos",
+                "copyFailed": "Não foi possível copiar para a área de transferência"
             }
         }
     },

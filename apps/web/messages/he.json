@@ -1376,7 +1376,8 @@
                 "workSchedule": "תזמון עבודה",
                 "missionTick": "פעימת Mission",
                 "sourceValidation": "אימות מקור",
-                "dataSync": "סנכרון נתונים"
+                "dataSync": "סנכרון נתונים",
+                "inboundTrigger": "טריגר נכנס"
             },
             "statuses": {
                 "active": "פעיל",
@@ -5228,6 +5229,57 @@
         "discover": {
             "title": "גלה",
             "subtitle": "רעיונות עבודה שנבחרו על ידי AI ומותאמים אישית עבורך."
+        },
+        "triggers": {
+            "title": "טריגרים נכנסים",
+            "subtitle": "Webhooks וקריאות API חתומים שיוצרים משימה בעת הפעלה.",
+            "new": "טריגר חדש",
+            "empty": "אין טריגרים עדיין. צור אחד כדי לקבל webhooks חתומים.",
+            "firedCount": "{count} הפעלות",
+            "lastFired": "הופעל לאחרונה",
+            "status": {
+                "active": "פעיל",
+                "paused": "מושהה"
+            },
+            "createTitle": "טריגר נכנס חדש",
+            "createDescription": "תקבל כתובת webhook חתומה וסוד. מערכות חיצוניות שולחות POST כדי ליצור משימה.",
+            "form": {
+                "name": "שם",
+                "namePlaceholder": "התראות פריסה",
+                "description": "תיאור",
+                "descriptionPlaceholder": "מה מפעיל את הטריגר הזה?",
+                "taskTitle": "תבנית כותרת משימה",
+                "taskTitlePlaceholder": "טריגר: {name}",
+                "taskTitleHint": "{name} מתרחב לשם הטריגר."
+            },
+            "actions": {
+                "pause": "השהה",
+                "resume": "המשך",
+                "rotate": "החלף סוד",
+                "delete": "מחק",
+                "cancel": "ביטול",
+                "create": "צור"
+            },
+            "reveal": {
+                "title": "סוד הטריגר",
+                "warning": "העתק את הסוד עכשיו — לא תוכל לראות אותו שוב.",
+                "url": "כתובת Webhook",
+                "secret": "סוד חתימה",
+                "curl": "דוגמה לבקשה חתומה",
+                "copy": "העתק",
+                "done": "סיום"
+            },
+            "toast": {
+                "created": "הטריגר נוצר",
+                "createFailed": "לא ניתן ליצור את הטריגר",
+                "rotated": "הסוד הוחלף",
+                "rotateFailed": "לא ניתן להחליף את הסוד",
+                "toggleFailed": "לא ניתן לעדכן את הטריגר",
+                "deleted": "הטריגר נמחק",
+                "deleteFailed": "לא ניתן למחוק את הטריגר",
+                "loadFailed": "לא ניתן לטעון את הטריגרים",
+                "copyFailed": "לא ניתן להעתיק ללוח"
+            }
         }
     },
     "layout": {

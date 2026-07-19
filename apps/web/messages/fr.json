@@ -1376,7 +1376,8 @@
                 "workSchedule": "Planification de travail",
                 "missionTick": "Tick de Mission",
                 "sourceValidation": "Validation de source",
-                "dataSync": "Synchronisation des données"
+                "dataSync": "Synchronisation des données",
+                "inboundTrigger": "Déclencheur entrant"
             },
             "statuses": {
                 "active": "Active",
@@ -5228,6 +5229,57 @@
         "discover": {
             "title": "Découvrir",
             "subtitle": "Idées de Travail sélectionnées par IA pour vous."
+        },
+        "triggers": {
+            "title": "Déclencheurs entrants",
+            "subtitle": "Webhooks et appels API signés qui créent une Tâche lorsqu’ils sont déclenchés.",
+            "new": "Nouveau déclencheur",
+            "empty": "Aucun déclencheur pour l’instant. Créez-en un pour recevoir des webhooks signés.",
+            "firedCount": "{count} déclenchements",
+            "lastFired": "dernier déclenchement",
+            "status": {
+                "active": "Actif",
+                "paused": "En pause"
+            },
+            "createTitle": "Nouveau déclencheur entrant",
+            "createDescription": "Vous obtenez une URL de webhook signée et un secret. Les systèmes externes envoient un POST pour créer une Tâche.",
+            "form": {
+                "name": "Nom",
+                "namePlaceholder": "Notifications de déploiement",
+                "description": "Description",
+                "descriptionPlaceholder": "Qu’est-ce qui déclenche ce déclencheur ?",
+                "taskTitle": "Modèle de titre de tâche",
+                "taskTitlePlaceholder": "Déclencheur : {name}",
+                "taskTitleHint": "{name} est remplacé par le nom du déclencheur."
+            },
+            "actions": {
+                "pause": "Mettre en pause",
+                "resume": "Reprendre",
+                "rotate": "Faire tourner le secret",
+                "delete": "Supprimer",
+                "cancel": "Annuler",
+                "create": "Créer"
+            },
+            "reveal": {
+                "title": "Secret du déclencheur",
+                "warning": "Copiez le secret maintenant — vous ne pourrez plus le voir.",
+                "url": "URL du webhook",
+                "secret": "Secret de signature",
+                "curl": "Exemple de requête signée",
+                "copy": "Copier",
+                "done": "Terminé"
+            },
+            "toast": {
+                "created": "Déclencheur créé",
+                "createFailed": "Impossible de créer le déclencheur",
+                "rotated": "Secret renouvelé",
+                "rotateFailed": "Impossible de renouveler le secret",
+                "toggleFailed": "Impossible de mettre à jour le déclencheur",
+                "deleted": "Déclencheur supprimé",
+                "deleteFailed": "Impossible de supprimer le déclencheur",
+                "loadFailed": "Impossible de charger les déclencheurs",
+                "copyFailed": "Impossible de copier dans le presse-papiers"
+            }
         }
     },
     "layout": {
