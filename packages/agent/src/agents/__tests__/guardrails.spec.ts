@@ -164,6 +164,7 @@ describe('evaluateGuardrails (pure)', () => {
             'spawn_agent',
             'schedule_task',
             'send_message',
+            'budget_override',
             'other',
         ] as const) {
             expect(evaluateGuardrails(autonomous, actionType, [])).toBe('auto_approve');
