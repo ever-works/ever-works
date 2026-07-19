@@ -940,10 +940,6 @@
                 "reset": "重置"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "欢迎回来，{username}！",
             "subtitle": "管理您的 AI 驱动作品并跟踪其性能",
@@ -4730,10 +4726,6 @@
                 "error": "无法创建 Idea，请重试。"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "仪表板",
             "activity": "活动日志",
             "works": "作品",
-            "discover": "Discover",
             "newWork": "新作品",
             "work": "作品",
             "overview": "概览",

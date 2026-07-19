@@ -940,10 +940,6 @@
                 "reset": "Resetuj"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Witaj z powrotem, {username}!",
             "subtitle": "Zarządzaj pracaami zasilanymi AI i śledź ich wydajność",
@@ -4730,10 +4726,6 @@
                 "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "Pulpit",
             "activity": "Dziennik aktywności",
             "works": "Prace",
-            "discover": "Discover",
             "newWork": "Nowy praca",
             "work": "Praca",
             "overview": "Przegląd",

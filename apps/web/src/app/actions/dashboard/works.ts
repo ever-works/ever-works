@@ -77,7 +77,6 @@ async function markProposalAcceptedWithRetry(proposalId: string, workId: string)
         try {
             await workProposalsAPI.accept(proposalId, workId);
             revalidatePath('/[locale]/(dashboard)/(home)', 'page');
-            revalidatePath('/[locale]/(dashboard)/discover', 'page');
             return;
         } catch (error) {
             if (attempt === 2) {

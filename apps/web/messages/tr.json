@@ -940,10 +940,6 @@
                 "reset": "Sıfırla"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Tekrar hoş geldiniz, {username}!",
             "subtitle": "AI destekli işlerinizi yönetin ve performanslarını izleyin",
@@ -4730,10 +4726,6 @@
                 "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "Panel",
             "activity": "Etkinlik Günlüğü",
             "works": "İşler",
-            "discover": "Discover",
             "newWork": "Yeni İş",
             "work": "İş",
             "overview": "Genel Bakış",

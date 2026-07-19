@@ -1098,10 +1098,6 @@
                 "error": "Impossible de créer l'Idea. Veuillez réessayer."
             }
         },
-        "discover": {
-            "title": "Découvrir",
-            "subtitle": "Idées de Travail sélectionnées par IA pour vous."
-        },
         "header": {
             "welcome": "Bienvenue de retour, {username} !",
             "subtitle": "Gérez vos travaux alimentés par l'IA et suivez leurs performances",
@@ -4754,7 +4750,6 @@
             "dashboard": "Tableau de bord",
             "activity": "Journal d'activité",
             "works": "Travaux",
-            "discover": "Découvrir",
             "newWork": "Nouvel travail",
             "work": "Travail",
             "overview": "Aperçu",

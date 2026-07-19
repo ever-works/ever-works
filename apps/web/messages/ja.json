@@ -940,10 +940,6 @@
                 "reset": "リセット"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "おかえりなさい、{username}！",
             "subtitle": "AI 駆動のワークを管理し、パフォーマンスを追跡",
@@ -4730,10 +4726,6 @@
                 "error": "Idea を作成できませんでした。もう一度お試しください。"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "ダッシュボード",
             "activity": "アクティビティログ",
             "works": "ワーク",
-            "discover": "Discover",
             "newWork": "新規ワーク",
             "work": "ワーク",
             "overview": "概要",

@@ -940,10 +940,6 @@
                 "reset": "รีเซ็ต"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "ยินดีต้อนรับกลับ, {username}!",
             "subtitle": "จัดการงานที่ใช้ AI และติดตามประสิทธิภาพของ它们",
@@ -4730,10 +4726,6 @@
                 "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "แดชบอร์ด",
             "activity": "บันทึกกิจกรรม",
             "works": "งาน",
-            "discover": "Discover",
             "newWork": "งานใหม่",
             "work": "งาน",
             "overview": "ภาพรวม",

@@ -940,10 +940,6 @@
                 "reset": "Скинути"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Ласкаво просимо назад, {username}!",
             "subtitle": "Керуйте своїми роботами на базі ШІ та відстежуйте їхню продуктивність",
@@ -4730,10 +4726,6 @@
                 "error": "Не вдалося створити Idea. Будь ласка, спробуйте ще раз."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "Панель приладів",
             "activity": "Журнал активності",
             "works": "Роботи",
-            "discover": "Discover",
             "newWork": "Новий робота",
             "work": "Робота",
             "overview": "Огляд",

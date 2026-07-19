@@ -940,10 +940,6 @@
                 "reset": "Сбросить"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "С возвращением, {username}!",
             "subtitle": "Управляйте AI-работами и отслеживайте их производительность",
@@ -4730,10 +4726,6 @@
                 "error": "Не удалось создать Idea. Пожалуйста, попробуйте ещё раз."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "Панель управления",
             "activity": "Журнал активности",
             "works": "Работы",
-            "discover": "Discover",
             "newWork": "Новый работа",
             "work": "Работа",
             "overview": "Обзор",

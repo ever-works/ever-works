@@ -1098,10 +1098,6 @@
                 "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             }
         },
-        "discover": {
-            "title": "Entdecken",
-            "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
-        },
         "header": {
             "welcome": "Willkommen zurück, {username}!",
             "subtitle": "Verwalten Sie Ihre KI-gestützten Werke und verfolgen Sie deren Leistung",
@@ -4754,7 +4750,6 @@
             "dashboard": "Dashboard",
             "activity": "Aktivitätsprotokoll",
             "works": "Werke",
-            "discover": "Entdecken",
             "newWork": "Neues Werk",
             "work": "Werk",
             "overview": "Übersicht",

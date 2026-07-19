@@ -940,10 +940,6 @@
                 "reset": "Herstellen"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Welkom terug, {username}!",
             "subtitle": "Beheer je AI-aangedreven werken en volg hun prestaties",
@@ -4730,10 +4726,6 @@
                 "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "Dashboard",
             "activity": "Activiteitenlogboek",
             "works": "Werken",
-            "discover": "Discover",
             "newWork": "Nieuwe werk",
             "work": "Werk",
             "overview": "Overzicht",

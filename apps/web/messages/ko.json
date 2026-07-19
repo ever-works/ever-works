@@ -940,10 +940,6 @@
                 "reset": "초기화"
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "{username}님, 다시 오신 것을 환영합니다!",
             "subtitle": "AI 기반 워크를 관리하고 성능을 추적하세요",
@@ -4730,10 +4726,6 @@
                 "error": "Idea를 만들 수 없습니다. 다시 시도해 주세요."
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -4884,7 +4876,6 @@
             "dashboard": "대시보드",
             "activity": "활동 로그",
             "works": "워크",
-            "discover": "Discover",
             "newWork": "새 워크",
             "work": "워크",
             "overview": "개요",
