@@ -845,7 +845,9 @@ export class TemplateCustomizationService {
             'apps/web/src/app/layout.tsx', // Next.js App Router with a src/ dir
         ];
         for (const rel of layoutCandidates) {
-            const layout = await fs.readFile(path.join(workspaceDir, rel), 'utf8').catch(() => null);
+            const layout = await fs
+                .readFile(path.join(workspaceDir, rel), 'utf8')
+                .catch(() => null);
             if (layout && layout.includes('theme.css')) {
                 return;
             }

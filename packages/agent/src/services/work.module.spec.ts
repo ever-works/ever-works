@@ -105,6 +105,7 @@ jest.mock('@src/ever-works-providers', () => ({
     EVER_WORKS_DEPLOY_QUOTA_COUNTER: Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER'),
     EverWorksDeployQuotaService: class EverWorksDeployQuotaService {},
     EverWorksGitProvider: class EverWorksGitProvider {},
+    EverWorksK8sDeployProvider: class EverWorksK8sDeployProvider {},
     EverWorksDnsService: class EverWorksDnsService {},
 }));
 jest.mock('@src/database/repositories/work.repository', () => ({
@@ -116,6 +117,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksK8sDeployProvider,
     EverWorksDnsService,
 } from '@src/ever-works-providers';
 import { WorkDetailService } from './work-detail.service';
@@ -227,6 +229,7 @@ describe('WorkModule', () => {
             WebhookSecretService,
             WorkRuntimeEnvService,
             EverWorksGitProvider,
+            EverWorksK8sDeployProvider,
             EverWorksDnsService,
             ZeroFrictionFunnelService,
             DeployReadyPollerService,
@@ -287,10 +290,13 @@ describe('WorkModule', () => {
                     provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
                     provider === EverWorksGitProvider ||
+                    provider === EverWorksK8sDeployProvider ||
                     provider === EverWorksDnsService
                 ) {
                     // EW-614: EverWorksGitProvider is consumed inside the
                     // module (by WorkLifecycleService.createWork); not exported.
+                    // EverWorksK8sDeployProvider is likewise consumed internally
+                    // by DeployService and not exported through WorkModule.
                     // EW-617 G5: EverWorksDnsService is consumed by DeployService;
                     // not exported through WorkModule.
                     expect(exports).not.toContain(provider);
