@@ -20,6 +20,10 @@ export interface QuickCreateWorkRequest {
     readonly deployProvider?: string;
     readonly storageProvider?: string;
     readonly websiteTemplateId?: string;
+    /** Work-kind chip value (website, landing-page, blog, directory,
+     *  awesome-repo). Drives the kind-aware default website template;
+     *  the API coerces unknown values to 'default'. */
+    readonly kind?: string;
     readonly model?: string;
     /** EW-617 G7 — Cloudflare Turnstile token; verified server-side
      *  when `CAPTCHA_PROVIDER` is set on the API. */
