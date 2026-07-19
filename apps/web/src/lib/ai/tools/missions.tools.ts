@@ -323,10 +323,11 @@ interface MissionWorkRelationRow {
 }
 
 // These three tools hit the REST surface via `serverFetch`/`serverMutation`
-// directly (the same layer `missionsAPI` itself is built on) because the
-// missions API client has no Mission↔Work methods yet. Auth + ownership
-// stay server-side: every route is `@CurrentUser()`-gated and 404s on
-// foreign Missions/Works.
+// directly — the same wire layer `missionsAPI.listWorks/attachWork/detachWork`
+// (added in this PR) are built on — because the tools want the raw
+// `{relations}` envelope plus tool-shaped `{error}` returns rather than the
+// client methods' unwrapped shapes. Auth + ownership stay server-side:
+// every route is `@CurrentUser()`-gated and 404s on foreign Missions/Works.
 
 export const listMissionWorks = tool({
     description: [

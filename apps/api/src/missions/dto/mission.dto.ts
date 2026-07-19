@@ -257,9 +257,14 @@ export class UpdateMissionDto {
  * service layer.
  */
 export class AttachMissionWorkDto {
+    @ApiProperty({ description: 'Id of an existing Work owned by the caller', format: 'uuid' })
     @IsUUID()
     workId!: string;
 
+    @ApiProperty({
+        description: 'How the Mission relates to the Work',
+        enum: ['created', 'improves', 'operates', 'markets', 'researches', 'retires'],
+    })
     @IsIn(['created', 'improves', 'operates', 'markets', 'researches', 'retires'])
     relation!: 'created' | 'improves' | 'operates' | 'markets' | 'researches' | 'retires';
 }

@@ -188,6 +188,11 @@ export function MissionAttachedWorksPanel({
                                     </option>
                                 ))}
                             </Select>
+                            {attachableWorks.length >= 100 ? (
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {t('pickerTruncated')}
+                                </p>
+                            ) : null}
                         </label>
                         <label className="space-y-1.5 min-w-36">
                             <span className="block text-xs text-text-muted dark:text-text-muted-dark">
