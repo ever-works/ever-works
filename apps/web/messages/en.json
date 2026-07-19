@@ -457,6 +457,37 @@
     },
     "dashboard": {
         "title": "Dashboard",
+        "approvals": {
+            "header": {
+                "title": "Action approvals",
+                "subtitle": "Your agents proposed these side-effectful actions. Approve or reject each one."
+            },
+            "actions": {
+                "approve": "Approve",
+                "reject": "Reject",
+                "approveAll": "Approve all"
+            },
+            "actionType": {
+                "spawn_agent": "Spawn agent",
+                "schedule_task": "Schedule task",
+                "send_message": "Send message",
+                "budget_override": "Budget override",
+                "other": "Action"
+            },
+            "riskFlags": {
+                "budget_override": "Budget override",
+                "destructive": "Destructive",
+                "cross_scope": "Cross-scope",
+                "high_fanout": "High fan-out"
+            },
+            "toast": {
+                "approved": "Action approved",
+                "rejected": "Action rejected",
+                "bulkApproved": "Approved {count} actions",
+                "bulkPartial": "{count} actions could not be approved",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "connectGithub": {
             "title": "Connect your GitHub account",
             "description": "GitHub is required for creating and managing Work repositories. Connect your account to get started.",

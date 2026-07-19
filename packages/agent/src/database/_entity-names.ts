@@ -46,6 +46,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
+    'AgentActionProposal',
     'AgentAttachment',
     'AgentBudget',
     'AgentEmailAssignment',

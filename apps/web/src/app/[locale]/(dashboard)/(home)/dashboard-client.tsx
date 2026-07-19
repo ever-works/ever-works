@@ -16,8 +16,10 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 import type { Mission } from '@/lib/api/missions';
 import { RecentTasks } from '@/components/dashboard/RecentTasks';
 import { AgentsPreviewSection } from '@/components/dashboard/AgentsPreviewSection';
+import { ApprovalsQueue } from '@/components/approvals/ApprovalsQueue';
 import type { Task } from '@/lib/api/tasks';
 import type { Agent } from '@/lib/api/agents';
+import type { AgentActionProposal } from '@/lib/api/agent-approvals';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -57,6 +59,12 @@ interface DashboardClientProps {
     /** Dashboard polish (2026-05-27) — recent Agents for the new
      *  Agents preview section that sits below Tasks. */
     initialAgents?: Agent[];
+    /**
+     * Agent Action Approval Queue — pending proposals awaiting a
+     * human decision. Rendered as an attention block ABOVE Missions
+     * when non-empty; the block hides itself once the queue is empty.
+     */
+    initialApprovals?: AgentActionProposal[];
 }
 
 export default function DashboardClient({
@@ -81,6 +89,7 @@ export default function DashboardClient({
     tasksBlocked = 0,
     initialRecentTasks = [],
     initialAgents = [],
+    initialApprovals = [],
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -115,6 +124,14 @@ export default function DashboardClient({
 
             {/* Content sections — divided by a subtle rule for visual rhythm */}
             <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
+                {/* Agent Action Approval Queue — attention block above
+                    Missions. Self-hides when the queue empties. */}
+                {initialApprovals.length > 0 && (
+                    <div className="py-8 lg:py-10">
+                        <ApprovalsQueue initialApprovals={initialApprovals} />
+                    </div>
+                )}
+
                 <div className="py-8 lg:py-10">
                     <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
                 </div>

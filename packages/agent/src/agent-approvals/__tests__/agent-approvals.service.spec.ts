@@ -1,0 +1,146 @@
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { AgentApprovalsService } from '../agent-approvals.service';
+import type { AgentActionProposal } from '../../entities/agent-action-proposal.entity';
+
+/**
+ * Service-level tests. Mock the two raw TypeORM repositories. Focus on
+ * the business rules: agent-ownership gate on create, risk scoring
+ * pass-through, the idempotent decide (409 on re-decide), and
+ * cross-user 404 posture.
+ */
+function makeProposalsRepo() {
+    return {
+        create: jest.fn((v: Partial<AgentActionProposal>) => v as AgentActionProposal),
+        save: jest.fn(
+            async (v: AgentActionProposal) => ({ id: 'p1', ...v }) as AgentActionProposal,
+        ),
+        findOne: jest.fn(),
+        findAndCount: jest.fn(),
+    };
+}
+
+function makeAgentsRepo() {
+    return {
+        findOne: jest.fn(),
+    };
+}
+
+function makeProposal(overrides: Partial<AgentActionProposal> = {}): AgentActionProposal {
+    return {
+        id: 'p1',
+        userId: 'u1',
+        agentId: 'a1',
+        runId: null,
+        actionType: 'send_message',
+        title: 'Ping the ops channel',
+        payload: {},
+        riskFlags: [],
+        status: 'pending',
+        decidedById: null,
+        decidedAt: null,
+        tenantId: null,
+        organizationId: null,
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-01'),
+        ...overrides,
+    } as AgentActionProposal;
+}
+
+describe('AgentApprovalsService', () => {
+    let proposals: ReturnType<typeof makeProposalsRepo>;
+    let agents: ReturnType<typeof makeAgentsRepo>;
+    let svc: AgentApprovalsService;
+
+    beforeEach(() => {
+        proposals = makeProposalsRepo();
+        agents = makeAgentsRepo();
+        svc = new AgentApprovalsService(proposals as any, agents as any);
+    });
+
+    describe('createProposal', () => {
+        it('rejects an empty title', async () => {
+            await expect(
+                svc.createProposal('u1', { agentId: 'a1', actionType: 'other', title: '   ' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('404s when the agent does not belong to the caller', async () => {
+            agents.findOne.mockResolvedValue(null);
+            await expect(
+                svc.createProposal('u1', {
+                    agentId: 'a1',
+                    actionType: 'other',
+                    title: 'do a thing',
+                }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(proposals.save).not.toHaveBeenCalled();
+        });
+
+        it('computes riskFlags and persists a pending proposal', async () => {
+            agents.findOne.mockResolvedValue({ id: 'a1', userId: 'u1' });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'budget_override',
+                title: 'Bump the daily cap',
+                payload: { destructive: true },
+            });
+            expect(agents.findOne).toHaveBeenCalledWith({ where: { id: 'a1', userId: 'u1' } });
+            expect(dto.status).toBe('pending');
+            expect(dto.riskFlags).toEqual(['budget_override', 'destructive']);
+            expect(dto.decidedById).toBeNull();
+        });
+    });
+
+    describe('decide', () => {
+        it('approves a pending proposal and records the decider + timestamp', async () => {
+            proposals.findOne.mockResolvedValue(makeProposal());
+            const dto = await svc.decide('u1', 'p1', 'approved');
+            expect(dto.status).toBe('approved');
+            expect(dto.decidedById).toBe('u1');
+            expect(dto.decidedAt).toBeInstanceOf(Date);
+        });
+
+        it('rejects a pending proposal', async () => {
+            proposals.findOne.mockResolvedValue(makeProposal());
+            const dto = await svc.decide('u1', 'p1', 'rejected');
+            expect(dto.status).toBe('rejected');
+        });
+
+        it('409s when re-deciding an already-decided proposal (idempotent guard)', async () => {
+            proposals.findOne.mockResolvedValue(makeProposal({ status: 'approved' }));
+            await expect(svc.decide('u1', 'p1', 'rejected')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(proposals.save).not.toHaveBeenCalled();
+        });
+
+        it("404s (not 403) for another user's proposal", async () => {
+            proposals.findOne.mockResolvedValue(null);
+            await expect(svc.decide('u1', 'p1', 'approved')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        });
+    });
+
+    describe('listPending', () => {
+        it('returns the mapped pending rows', async () => {
+            proposals.findAndCount.mockResolvedValue([[makeProposal()], 1]);
+            const rows = await svc.listPending('u1');
+            expect(rows).toHaveLength(1);
+            expect(rows[0].id).toBe('p1');
+            expect(proposals.findAndCount).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { userId: 'u1', status: 'pending' } }),
+            );
+        });
+
+        it('narrows to an organization when organizationId is given', async () => {
+            proposals.findAndCount.mockResolvedValue([[], 0]);
+            await svc.listPending('u1', 'org-9');
+            expect(proposals.findAndCount).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: { userId: 'u1', status: 'pending', organizationId: 'org-9' },
+                }),
+            );
+        });
+    });
+});

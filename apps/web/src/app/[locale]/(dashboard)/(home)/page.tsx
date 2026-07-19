@@ -14,6 +14,7 @@ import { usageAPI } from '@/lib/api/usage';
 // the existing Work stats fetch).
 import { agentsAPI } from '@/lib/api/agents';
 import { tasksAPI } from '@/lib/api/tasks';
+import { agentApprovalsAPI } from '@/lib/api/agent-approvals';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -44,6 +45,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         tasksBlocked,
         recentTasks,
         recentAgents,
+        pendingApprovals,
     ] = await Promise.all([
         searchParams,
         getAuthFromCookie(),
@@ -89,6 +91,12 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         agentsAPI
             .list({ limit: 3 })
             .catch(() => ({ data: [], meta: { total: 0, limit: 3, offset: 0 } })),
+        // Agent Action Approval Queue — pending proposals for the
+        // attention block above Missions. Catch-defended so a flaky
+        // endpoint hides the block instead of breaking the home page.
+        agentApprovalsAPI
+            .list({ status: 'pending', limit: 50 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 50, offset: 0 } })),
     ]);
 
     // Security: defense-in-depth guard — if middleware matcher is misconfigured and
@@ -124,6 +132,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             tasksBlocked={tasksBlocked.meta.total}
             initialRecentTasks={recentTasks.data ?? []}
             initialAgents={recentAgents.data ?? []}
+            initialApprovals={pendingApprovals.data ?? []}
         />
     );
 }

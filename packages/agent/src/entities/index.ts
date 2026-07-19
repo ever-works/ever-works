@@ -54,6 +54,8 @@ export * from './kb-types';
 export * from './types';
 // Agents/Skills/Tasks (PR #1017 specs)
 export * from './agent.entity';
+// Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+export * from './agent-action-proposal.entity';
 export * from './agent-run.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
