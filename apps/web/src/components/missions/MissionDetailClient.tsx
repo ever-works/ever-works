@@ -240,6 +240,14 @@ export function MissionDetailClient({
         });
     };
 
+    // PR-3 — Closing the complete dialog without completing (Cancel, Escape,
+    // outside click) resets the draft so a stale verdict is never pre-selected
+    // the next time the dialog opens.
+    const handleCompleteOpenChange = (open: boolean) => {
+        setCompleteOpen(open);
+        if (!open) setOutcomeDraft('');
+    };
+
     // PR-3 — Complete goes through the dialog so the human can record an
     // optional conclusion verdict. '' ("no verdict") sends no outcome,
     // which is exactly today's behavior.
@@ -728,7 +736,7 @@ export function MissionDetailClient({
             </Dialog>
 
             {/* ── Complete modal (PR-3 — optional outcome verdict) ─────────── */}
-            <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+            <Dialog open={completeOpen} onOpenChange={handleCompleteOpenChange}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t('completeDialog.title')}</DialogTitle>
@@ -756,7 +764,7 @@ export function MissionDetailClient({
                     <DialogFooter>
                         <button
                             type="button"
-                            onClick={() => setCompleteOpen(false)}
+                            onClick={() => handleCompleteOpenChange(false)}
                             disabled={pendingLifecycle}
                             className={btn}
                         >
