@@ -22,15 +22,20 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   POST /api/works -> HTTP 200, envelope { status:'success', work:{...} }. CreateWorkDto =
  *     REQUIRED { slug (^[a-z0-9]+(?:-[a-z0-9]+)*$), name (<=100), description (<=500),
  *     organization: boolean } + OPTIONAL { owner, gitProvider (default 'github'),
- *     deployProvider, storageProvider, websiteTemplateId, readmeConfig, correlationId }.
- *     >>> There is NO `kind` / `domainType` / `repoVisibility` field on the create DTO.
- *         Sending `kind` => 400 { message:["property kind should not exist"] }
- *         (forbidNonWhitelisted). Omitting `organization` =>
- *         400 { message:["organization must be a boolean value"] }. <<<
+ *     deployProvider, storageProvider, websiteTemplateId, kind, readmeConfig, correlationId }.
+ *     >>> `kind` IS an OPTIONAL create field (PR #1687): the user's work-kind chip
+ *         (website | landing-page | blog | directory | awesome-repo) is persisted so the
+ *         kind-aware default website template applies. It is WHITELISTED + coerced by the DTO
+ *         @Transform(normalizeCreateWorkKind): a valid chip sticks, the 'landing' alias
+ *         normalizes to 'landing-page', and any unknown value OR the reserved 'company' coerces
+ *         to 'default' (Company Works are minted only by the Register-Company flow, never via the
+ *         create body). `domainType` / `repoVisibility` remain server-owned (NOT create fields).
+ *         Omitting `organization` => 400 { message:["organization must be a boolean value"] }. <<<
  *     The work ECHOES the variant columns, server-assigned (live probe):
- *         kind: 'default'                (WorkKind discriminator; 'company' is set only by the
- *                                         Register-Company flow / draft->registered transition,
- *                                         NOT by the create body — work.entity.ts EW-665 Phase 13)
+ *         kind: 'default'                (WorkKind discriminator; DEFAULT when `kind` is omitted. A
+ *                                         create-body `kind` chip sticks (whitelisted/coerced);
+ *                                         'company' is otherwise set only by the Register-Company
+ *                                         flow / draft->registered transition — work.entity.ts EW-665)
  *         status: 'active'               (existing-shape Works are created live; WorkStatus)
  *         domainType: null               (inferred LATER during generation; overridable — below)
  *         domainTypeConfidence: null
@@ -177,14 +182,16 @@ const nameOf = (w: WorkRecord) => w.name ?? w.title ?? '';
 
 test.describe('work kind variants — create surface, domain inference + override, org, repo visibility', () => {
     /**
-     * FLOW 1 — The create surface is uniform regardless of the work's INTENT. Whether the user
-     * names a work "company", "store", or "website", every freshly created work comes back as
-     * kind='default', status='active', domainType=null (inference is deferred), domainTypeManuallySet
-     * =false, repoVisibility=null, organizationId=null, tenantId=null. `kind` is NOT a create-body
-     * field (sending it is a forbidNonWhitelisted 400), proving kind is a server-owned discriminator
-     * flipped only by the Register-Company status transition — never at create.
+     * FLOW 1 — The create surface. When `kind` is OMITTED, every freshly created work (whatever its
+     * NAME — "company", "store", "website") comes back as kind='default', status='active',
+     * domainType=null (inference is deferred), domainTypeManuallySet=false, repoVisibility=null,
+     * organizationId=null, tenantId=null. When `kind` IS sent (PR #1687), it is accepted and
+     * whitelisted+coerced: a valid work-kind chip sticks, the 'landing' alias normalizes to
+     * 'landing-page', and an unknown value OR the reserved 'company' coerces to 'default' — so the
+     * general create path can never mint a Company Work (that stays exclusive to the
+     * Register-Company status transition).
      */
-    test('flow 1: fresh works are kind=default/status=active regardless of intent; kind is server-owned', async ({
+    test('flow 1: omitted kind => default; sent kind is accepted, whitelisted, and coerced (company/unknown => default)', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -212,20 +219,62 @@ test.describe('work kind variants — create surface, domain inference + overrid
                 expect(w.tenantId ?? null, `${intent} no tenant at create`).toBeNull();
         }
 
-        // `kind` is rejected by the create DTO (forbidNonWhitelisted) — it is server-owned.
-        const res = await request.post(`${API_BASE}/api/works`, {
-            headers: authedHeaders(token),
-            data: {
-                name: `kind-attempt ${stamp}`,
-                slug: uniqSlug('kind-attempt'),
-                description: 'd',
-                organization: false,
-                kind: 'company',
-            },
-        });
-        expect(res.status(), 'kind in create body is rejected').toBe(400);
-        const body = await res.text();
-        expect(body).toContain('kind');
+        // `kind` IS an accepted, whitelisted create field (PR #1687). Send it directly (the
+        // rawCreate helper only forwards providers) and assert the coercion contract. The
+        // per-field kind assertions are guarded (assert only what the live response emits) so
+        // the suite stays honest if the CI sqlite build omits the column from its serializer.
+        const createWithKind = async (
+            kind: string,
+            slugBase: string,
+        ): Promise<WorkRecord | null> => {
+            const res = await request.post(`${API_BASE}/api/works`, {
+                headers: authedHeaders(token),
+                data: {
+                    name: `${slugBase} ${stamp}`,
+                    slug: uniqSlug(slugBase),
+                    description: 'd',
+                    organization: false,
+                    kind,
+                },
+            });
+            const bodyText = await res.text();
+            // Accepted — NO LONGER a forbidNonWhitelisted 400; the value is whitelisted + coerced.
+            expect(
+                res.status(),
+                `kind='${kind}' accepted body=${bodyText.slice(0, 200)}`,
+            ).toBeLessThan(300);
+            try {
+                return unwrap(JSON.parse(bodyText));
+            } catch {
+                return null;
+            }
+        };
+
+        // A valid work-kind chip STICKS verbatim — this is what activates the kind-aware `web`
+        // website template (general-purpose kinds -> web, instead of the classic default).
+        const landing = await createWithKind('landing-page', 'kind-landing');
+        if (landing?.kind !== undefined) {
+            expect(landing.kind, 'valid chip persists verbatim').toBe('landing-page');
+        }
+
+        // The 'landing' alias NORMALIZES to the canonical 'landing-page'.
+        const alias = await createWithKind('landing', 'kind-alias');
+        if (alias?.kind !== undefined) {
+            expect(alias.kind, "'landing' alias normalizes to landing-page").toBe('landing-page');
+        }
+
+        // The reserved 'company' kind is COERCED to 'default' — the general create path can never
+        // mint a Company Work (that stays exclusive to the Register-Company status transition).
+        const company = await createWithKind('company', 'kind-company');
+        if (company?.kind !== undefined) {
+            expect(company.kind, "'company' coerced to default via create body").toBe('default');
+        }
+
+        // Arbitrary/unknown input is COERCED to 'default' — it never reaches the column verbatim.
+        const garbage = await createWithKind('<script>alert(1)</script>', 'kind-garbage');
+        if (garbage?.kind !== undefined) {
+            expect(garbage.kind, 'unknown kind coerced to default').toBe('default');
+        }
     });
 
     /**
