@@ -131,7 +131,9 @@ export function AnonymousOnboardingBootstrap() {
         <main className="min-h-screen grid place-items-center bg-surface dark:bg-surface-dark">
             <div className="flex flex-col items-center gap-4" role="status" aria-live="polite">
                 <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-text dark:border-border-dark dark:border-t-white" />
-                <p className="text-sm text-text/60 dark:text-text-dark/60">Setting up your workspace…</p>
+                <p className="text-sm text-text/60 dark:text-text-dark/60">
+                    Setting up your workspace…
+                </p>
             </div>
         </main>
     );

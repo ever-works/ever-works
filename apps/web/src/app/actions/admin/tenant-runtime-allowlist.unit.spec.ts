@@ -4,8 +4,9 @@
 //
 // Targets: apps/web/src/app/actions/admin/tenant-runtime-allowlist.ts
 //   - ensurePlatformAdmin() gating: missing session → redirect to login;
-//     non-admin profile → redirect to "/" (route-doesn't-exist posture);
-//     getProfile() rejection caught → still treated as non-admin.
+//     non-admin profile (explicit isPlatformAdmin === false) → redirect to "/"
+//     (route-doesn't-exist posture); getProfile() rejection → null profile
+//     PROCEEDS (the operator IsPlatformAdminGuard is the authoritative gate).
 //   - replaceTenantRuntimeAllowlistAction: happy path returns
 //     { success, data, error: null }, calls operatorTenantRuntimeAllowlistAPI.replace
 //     with ordered providerIds, revalidates the admin page route, surfaces
@@ -136,14 +137,20 @@ describe('replaceTenantRuntimeAllowlistAction', () => {
         expect(replaceMock).not.toHaveBeenCalled();
     });
 
-    it('treats a rejected getProfile() as non-admin (.catch(() => null) path)', async () => {
+    it('does NOT client-redirect when getProfile() rejects — null profile proceeds and the operator IsPlatformAdminGuard is the authoritative gate', async () => {
+        // Contract (see ensurePlatformAdmin): only an EXPLICIT
+        // `isPlatformAdmin === false` triggers the route-not-found redirect.
+        // A rejected getProfile() resolves to null via `.catch(() => null)`,
+        // which is NOT `=== false`, so the action proceeds to the REST call;
+        // a real non-admin 403s there (surfaced as success:false). Redirecting
+        // on null would bounce actual admins whenever getProfile has a
+        // transient failure.
         getProfileMock.mockRejectedValue(new Error('upstream down'));
         const { replaceTenantRuntimeAllowlistAction } = await importActions();
-        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow(
-            '__REDIRECT__',
-        );
-        expect(redirectMock).toHaveBeenCalledWith('/');
-        expect(replaceMock).not.toHaveBeenCalled();
+        const result = await replaceTenantRuntimeAllowlistAction('t-1', []);
+        expect(redirectMock).not.toHaveBeenCalled();
+        expect(replaceMock).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({ success: true, data: okResponse, error: null });
     });
 
     it('maps an ApiResponseError to { success: false, error: error.message } and skips revalidation', async () => {

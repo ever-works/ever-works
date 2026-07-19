@@ -85,11 +85,15 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             />,
         );
         const search = container.querySelector('input[name="search"]') as HTMLInputElement;
-        const status = container.querySelector('select[name="status"]') as HTMLSelectElement;
+        // Status is submitted via a hidden input mirroring the custom <Select>
+        // (the visible control is no longer a native <select>).
+        const status = container.querySelector('input[name="status"]') as HTMLInputElement;
         expect(search.value).toBe('benchmarks');
         expect(status.value).toBe('failed');
-        expect(screen.getByText('Actionable')).toBeTruthy();
-        expect(screen.getByText('filters.done')).toBeTruthy();
+        // The custom <Select> shows only the SELECTED option's label in its
+        // trigger (the full option list lives in a closed dropdown), so assert
+        // the URL-backed status surfaces as its label — 'failed' → t('filters.failed').
+        expect(screen.getByText('filters.failed')).toBeTruthy();
     });
 
     it('quick-add submit disabled until description >= 10 chars', () => {

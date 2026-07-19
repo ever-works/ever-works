@@ -220,11 +220,7 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 		return Promise.all(rows.map((row) => this.fetchEntry(repo, branch, row)));
 	}
 
-	private async fetchEntry(
-		repo: string,
-		branch: string,
-		row: SkillsManifestRow
-	): Promise<SkillCatalogEntry> {
+	private async fetchEntry(repo: string, branch: string, row: SkillsManifestRow): Promise<SkillCatalogEntry> {
 		const slug = typeof row.slug === 'string' ? row.slug.trim() : '';
 		const skillPath = typeof row.skillPath === 'string' ? row.skillPath.trim() : '';
 		if (!slug || !skillPath) {
@@ -286,11 +282,7 @@ function extractManifestRows(parsed: unknown): SkillsManifestRow[] {
  * preserving any extra keys (`allowedTools`, etc.) while guaranteeing
  * the required `name`/`description` strings.
  */
-function normalizeFrontmatter(
-	data: Record<string, unknown>,
-	slug: string,
-	row: SkillsManifestRow
-): SkillFrontmatter {
+function normalizeFrontmatter(data: Record<string, unknown>, slug: string, row: SkillsManifestRow): SkillFrontmatter {
 	const name = firstNonEmpty(asString(data.name), row.name, slug);
 	const description = firstNonEmpty(asString(data.description), row.summary, '');
 	return { ...data, name, description };
