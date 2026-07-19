@@ -74,8 +74,12 @@ describe('activity-log.types', () => {
         });
 
         it('has the expected total number of literal values (catch silent additions)', () => {
-            // 101 documented literals — pinned so any silent addition is a
-            // deliberate change. Last bumped by EW-642 D7 (added
+            // 103 documented literals — pinned so any silent addition is a
+            // deliberate change. Last bumped by the Schedules feature (added
+            // MISSION_TICK + IDEA_GENERATED so scheduled Mission ticks and
+            // generated Ideas emit Activity, on top of the EW-642 D7 baseline
+            // of 101).
+            // Previously bumped by EW-642 D7 (added
             // KB_REEMBED_STARTED, KB_REEMBED_COMPLETED, KB_REEMBED_FAILED
             // for the `kb-reembed-work` Trigger.dev task lifecycle, on
             // top of the EW-643 Phase 3 slice 4 baseline of 98).
@@ -94,7 +98,7 @@ describe('activity-log.types', () => {
             // KB_UPLOAD_TRANSCRIBED, KB_UPLOAD_TRANSCRIPTION_FAILED).
             // Previously bumped by post-PR-1019 follow-up FU-2 (84).
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(101);
+            expect(literals).toHaveLength(103);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
