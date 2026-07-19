@@ -642,6 +642,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Consolider",
+                "title": "Consolider la mémoire",
+                "previewIntro": "Aperçu de ce que fera la consolidation. Rien ne change tant que vous n’appliquez pas.",
+                "scanned": "{count} analysés",
+                "promoted": "{count} promus",
+                "synthesized": "{count} synthétisés",
+                "superseded": "{count} remplacés",
+                "promotedHeading": "Promus",
+                "supersededHeading": "Remplacés",
+                "more": "+{count} de plus",
+                "apply": "Appliquer",
+                "cancel": "Annuler",
+                "applied": "Consolidé : {promoted} promus, {synthesized} synthétisés, {superseded} remplacés",
+                "failed": "La consolidation a échoué. Veuillez réessayer.",
+                "badgePromoted": "Promu",
+                "badgeSuperseded": "Remplacé"
+            },
             "title": "Memory",
             "subtitle": "Tout ce que votre organisation sait, au même endroit — agrégé depuis la Knowledge Base de chaque Travail.",
             "searchPlaceholder": "Rechercher dans tout ce que l'organisation sait…",

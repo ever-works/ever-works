@@ -595,6 +595,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Consolida",
+                "title": "Consolida la memoria",
+                "previewIntro": "Anteprima di ciò che farà il consolidamento. Nulla cambia finché non applichi.",
+                "scanned": "{count} analizzati",
+                "promoted": "{count} promossi",
+                "synthesized": "{count} sintetizzati",
+                "superseded": "{count} sostituiti",
+                "promotedHeading": "Promossi",
+                "supersededHeading": "Sostituiti",
+                "more": "+{count} altri",
+                "apply": "Applica",
+                "cancel": "Annulla",
+                "applied": "Consolidato: {promoted} promossi, {synthesized} sintetizzati, {superseded} sostituiti",
+                "failed": "Consolidamento non riuscito. Riprova.",
+                "badgePromoted": "Promosso",
+                "badgeSuperseded": "Sostituito"
+            },
             "title": "Memory",
             "subtitle": "Tutto ciò che la tua organizzazione sa, in un unico posto — aggregato dalla Knowledge Base di ogni Lavoro.",
             "searchPlaceholder": "Cerca in tutto ciò che l'organizzazione sa…",

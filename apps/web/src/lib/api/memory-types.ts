@@ -11,6 +11,23 @@
  * strings (NestJS class-transformer default).
  */
 
+/**
+ * Memory Consolidation marker on one document. Absent / `null` = a
+ * normal document. Mirrors `KbConsolidationMarker` on the API side
+ * (`packages/agent/src/services/memory-consolidation.ts`).
+ */
+export interface MemoryConsolidationMarker {
+    state: 'promoted' | 'superseded';
+    /** The surviving document this one was superseded by. */
+    supersededById?: string;
+    /** Human-readable explanation (rendered as the badge tooltip). */
+    reason: string;
+    /** Promotion score at the time of the run (promoted only). */
+    score?: number;
+    /** ISO timestamp of the consolidation run that wrote the marker. */
+    runAt: string;
+}
+
 /** One row in the aggregated Memory feed (metadata only — no body). */
 export interface MemoryDocument {
     id: string;
@@ -27,6 +44,29 @@ export interface MemoryDocument {
     source: string;
     updatedAt: string;
     lastIndexedAt: string | null;
+    /** Consolidation marker (badges) — null/absent for normal documents. */
+    consolidation?: MemoryConsolidationMarker | null;
+}
+
+/**
+ * The `POST /api/memory/consolidate` response payload — the
+ * "N promoted / M synthesized / K superseded" report. Mirrors
+ * `MemoryConsolidationReport` on the API side.
+ */
+export interface MemoryConsolidationReport {
+    scanned: number;
+    promoted: number;
+    synthesized: number;
+    superseded: number;
+    /** True when nothing was written (preview). */
+    dryRun: boolean;
+    notes: string[];
+    details: {
+        promotedIds: string[];
+        /** `[loserId, survivorId]` pairs. */
+        supersededPairs: [string, string][];
+        synthesizedIds: string[];
+    };
 }
 
 /** A facet bucket backing a filter chip. */

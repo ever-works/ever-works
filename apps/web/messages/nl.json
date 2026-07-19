@@ -603,6 +603,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Consolideren",
+                "title": "Geheugen consolideren",
+                "previewIntro": "Voorbeeld van wat consolidatie zal doen. Er verandert niets totdat je toepast.",
+                "scanned": "{count} gescand",
+                "promoted": "{count} gepromoveerd",
+                "synthesized": "{count} samengevoegd",
+                "superseded": "{count} vervangen",
+                "promotedHeading": "Gepromoveerd",
+                "supersededHeading": "Vervangen",
+                "more": "+{count} meer",
+                "apply": "Toepassen",
+                "cancel": "Annuleren",
+                "applied": "Geconsolideerd: {promoted} gepromoveerd, {synthesized} samengevoegd, {superseded} vervangen",
+                "failed": "Consolidatie mislukt. Probeer het opnieuw.",
+                "badgePromoted": "Gepromoveerd",
+                "badgeSuperseded": "Vervangen"
+            },
             "title": "Memory",
             "subtitle": "Alles wat je organisatie weet, op één plek — samengevoegd uit de Knowledge Base van elk Werk.",
             "searchPlaceholder": "Zoek in alles wat de organisatie weet…",
