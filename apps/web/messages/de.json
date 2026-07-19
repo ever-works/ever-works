@@ -611,6 +611,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Konsolidieren",
+                "title": "Speicher konsolidieren",
+                "previewIntro": "Vorschau, was die Konsolidierung bewirkt. Es ändert sich nichts, bis Sie anwenden.",
+                "scanned": "{count} geprüft",
+                "promoted": "{count} hochgestuft",
+                "synthesized": "{count} zusammengefasst",
+                "superseded": "{count} ersetzt",
+                "promotedHeading": "Hochgestuft",
+                "supersededHeading": "Ersetzt",
+                "more": "+{count} weitere",
+                "apply": "Anwenden",
+                "cancel": "Abbrechen",
+                "applied": "Konsolidiert: {promoted} hochgestuft, {synthesized} zusammengefasst, {superseded} ersetzt",
+                "failed": "Konsolidierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+                "badgePromoted": "Hochgestuft",
+                "badgeSuperseded": "Ersetzt"
+            },
             "title": "Memory",
             "subtitle": "Alles, was Ihre Organisation weiß, an einem Ort — aggregiert aus der Knowledge Base jedes Werks.",
             "searchPlaceholder": "Durchsuchen Sie alles, was die Organisation weiß…",

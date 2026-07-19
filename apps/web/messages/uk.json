@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Консолідувати",
+                "title": "Консолідація памʼяті",
+                "previewIntro": "Попередній перегляд того, що зробить консолідація. Нічого не зміниться, доки ви не застосуєте.",
+                "scanned": "Проскановано: {count}",
+                "promoted": "Підвищено: {count}",
+                "synthesized": "Синтезовано: {count}",
+                "superseded": "Замінено: {count}",
+                "promotedHeading": "Підвищені",
+                "supersededHeading": "Замінені",
+                "more": "Ще +{count}",
+                "apply": "Застосувати",
+                "cancel": "Скасувати",
+                "applied": "Консолідовано: підвищено {promoted}, синтезовано {synthesized}, замінено {superseded}",
+                "failed": "Не вдалося виконати консолідацію. Будь ласка, спробуйте ще раз.",
+                "badgePromoted": "Підвищено",
+                "badgeSuperseded": "Замінено"
+            },
             "title": "Memory",
             "subtitle": "Усе, що знає ваша організація, в одному місці — агреговано з Knowledge Base кожної Роботи.",
             "searchPlaceholder": "Пошук по всьому, що знає організація…",

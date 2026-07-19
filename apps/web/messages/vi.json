@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Hợp nhất",
+                "title": "Hợp nhất bộ nhớ",
+                "previewIntro": "Xem trước những gì việc hợp nhất sẽ làm. Không có gì thay đổi cho đến khi bạn áp dụng.",
+                "scanned": "Đã quét {count}",
+                "promoted": "Đã đề bạt {count}",
+                "synthesized": "Đã tổng hợp {count}",
+                "superseded": "Đã thay thế {count}",
+                "promotedHeading": "Đã đề bạt",
+                "supersededHeading": "Đã thay thế",
+                "more": "+{count} nữa",
+                "apply": "Áp dụng",
+                "cancel": "Hủy",
+                "applied": "Đã hợp nhất: {promoted} đề bạt, {synthesized} tổng hợp, {superseded} thay thế",
+                "failed": "Hợp nhất thất bại. Vui lòng thử lại.",
+                "badgePromoted": "Đã đề bạt",
+                "badgeSuperseded": "Đã thay thế"
+            },
             "title": "Memory",
             "subtitle": "Mọi thứ tổ chức của bạn biết, ở cùng một nơi — được tổng hợp từ Knowledge Base của mọi Công việc.",
             "searchPlaceholder": "Tìm kiếm trong mọi thứ tổ chức biết…",

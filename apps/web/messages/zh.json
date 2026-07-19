@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "整合",
+                "title": "整合记忆",
+                "previewIntro": "整合操作的预览。在你应用之前不会有任何更改。",
+                "scanned": "已扫描 {count} 项",
+                "promoted": "已提升 {count} 项",
+                "synthesized": "已综合 {count} 项",
+                "superseded": "已替换 {count} 项",
+                "promotedHeading": "已提升",
+                "supersededHeading": "已替换",
+                "more": "还有 +{count} 项",
+                "apply": "应用",
+                "cancel": "取消",
+                "applied": "已整合：提升 {promoted} 项，综合 {synthesized} 项，替换 {superseded} 项",
+                "failed": "整合失败，请重试。",
+                "badgePromoted": "已提升",
+                "badgeSuperseded": "已替换"
+            },
             "title": "Memory",
             "subtitle": "您的组织所知道的一切，尽在一处 — 从每个作品的 Knowledge Base 中汇总。",
             "searchPlaceholder": "搜索组织所知道的一切…",

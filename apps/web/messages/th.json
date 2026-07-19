@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "รวมข้อมูล",
+                "title": "รวมหน่วยความจำ",
+                "previewIntro": "ตัวอย่างสิ่งที่การรวมข้อมูลจะทำ ไม่มีอะไรเปลี่ยนแปลงจนกว่าคุณจะนำไปใช้",
+                "scanned": "สแกนแล้ว {count}",
+                "promoted": "เลื่อนระดับ {count}",
+                "synthesized": "สังเคราะห์ {count}",
+                "superseded": "แทนที่ {count}",
+                "promotedHeading": "เลื่อนระดับแล้ว",
+                "supersededHeading": "ถูกแทนที่",
+                "more": "อีก +{count}",
+                "apply": "นำไปใช้",
+                "cancel": "ยกเลิก",
+                "applied": "รวมข้อมูลแล้ว: เลื่อนระดับ {promoted}, สังเคราะห์ {synthesized}, แทนที่ {superseded}",
+                "failed": "การรวมข้อมูลล้มเหลว โปรดลองอีกครั้ง",
+                "badgePromoted": "เลื่อนระดับแล้ว",
+                "badgeSuperseded": "ถูกแทนที่"
+            },
             "title": "Memory",
             "subtitle": "ทุกสิ่งที่องค์กรของคุณรู้ รวมไว้ในที่เดียว — รวบรวมจาก Knowledge Base ของทุกงาน",
             "searchPlaceholder": "ค้นหาทุกสิ่งที่องค์กรรู้…",

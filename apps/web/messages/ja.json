@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "統合",
+                "title": "メモリを統合",
+                "previewIntro": "統合による変更のプレビューです。適用するまで何も変更されません。",
+                "scanned": "{count} 件をスキャン",
+                "promoted": "{count} 件を昇格",
+                "synthesized": "{count} 件を統合生成",
+                "superseded": "{count} 件を置き換え",
+                "promotedHeading": "昇格",
+                "supersededHeading": "置き換え",
+                "more": "他 +{count} 件",
+                "apply": "適用",
+                "cancel": "キャンセル",
+                "applied": "統合完了: {promoted} 件を昇格、{synthesized} 件を統合生成、{superseded} 件を置き換え",
+                "failed": "統合に失敗しました。もう一度お試しください。",
+                "badgePromoted": "昇格",
+                "badgeSuperseded": "置き換え"
+            },
             "title": "Memory",
             "subtitle": "組織が知るすべてを一か所に — すべてのワークの Knowledge Base から集約されます。",
             "searchPlaceholder": "組織が知るすべてを検索…",

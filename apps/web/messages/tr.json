@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Birleştir",
+                "title": "Belleği birleştir",
+                "previewIntro": "Birleştirmenin ne yapacağının önizlemesi. Uygulayana kadar hiçbir şey değişmez.",
+                "scanned": "{count} tarandı",
+                "promoted": "{count} yükseltildi",
+                "synthesized": "{count} sentezlendi",
+                "superseded": "{count} değiştirildi",
+                "promotedHeading": "Yükseltildi",
+                "supersededHeading": "Değiştirildi",
+                "more": "+{count} daha",
+                "apply": "Uygula",
+                "cancel": "İptal",
+                "applied": "Birleştirildi: {promoted} yükseltildi, {synthesized} sentezlendi, {superseded} değiştirildi",
+                "failed": "Birleştirme başarısız oldu. Lütfen tekrar deneyin.",
+                "badgePromoted": "Yükseltildi",
+                "badgeSuperseded": "Değiştirildi"
+            },
             "title": "Memory",
             "subtitle": "Kuruluşunuzun bildiği her şey tek bir yerde — her İşin Knowledge Base'inden bir araya getirildi.",
             "searchPlaceholder": "Kuruluşun bildiği her şeyde arayın…",

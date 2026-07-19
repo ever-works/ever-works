@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Konsolidasikan",
+                "title": "Konsolidasikan memori",
+                "previewIntro": "Pratinjau apa yang akan dilakukan konsolidasi. Tidak ada yang berubah sampai Anda menerapkannya.",
+                "scanned": "{count} dipindai",
+                "promoted": "{count} dipromosikan",
+                "synthesized": "{count} disintesis",
+                "superseded": "{count} digantikan",
+                "promotedHeading": "Dipromosikan",
+                "supersededHeading": "Digantikan",
+                "more": "+{count} lainnya",
+                "apply": "Terapkan",
+                "cancel": "Batal",
+                "applied": "Dikonsolidasikan: {promoted} dipromosikan, {synthesized} disintesis, {superseded} digantikan",
+                "failed": "Konsolidasi gagal. Silakan coba lagi.",
+                "badgePromoted": "Dipromosikan",
+                "badgeSuperseded": "Digantikan"
+            },
             "title": "Memory",
             "subtitle": "Semua yang diketahui organisasi Anda, dalam satu tempat — dikumpulkan dari Knowledge Base setiap Karya.",
             "searchPlaceholder": "Cari di semua yang diketahui organisasi…",

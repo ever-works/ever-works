@@ -580,6 +580,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "समेकित करें",
+                "title": "मेमोरी समेकित करें",
+                "previewIntro": "समेकन क्या करेगा इसका पूर्वावलोकन। लागू करने तक कुछ नहीं बदलता।",
+                "scanned": "{count} स्कैन किए गए",
+                "promoted": "{count} प्रोन्नत",
+                "synthesized": "{count} संश्लेषित",
+                "superseded": "{count} प्रतिस्थापित",
+                "promotedHeading": "प्रोन्नत",
+                "supersededHeading": "प्रतिस्थापित",
+                "more": "+{count} और",
+                "apply": "लागू करें",
+                "cancel": "रद्द करें",
+                "applied": "समेकित: {promoted} प्रोन्नत, {synthesized} संश्लेषित, {superseded} प्रतिस्थापित",
+                "failed": "समेकन विफल रहा। कृपया पुनः प्रयास करें।",
+                "badgePromoted": "प्रोन्नत",
+                "badgeSuperseded": "प्रतिस्थापित"
+            },
             "title": "Memory",
             "subtitle": "आपका संगठन जो कुछ भी जानता है, सब एक ही जगह — हर कार्य के Knowledge Base से एकत्रित।",
             "searchPlaceholder": "संगठन जो कुछ भी जानता है उसमें खोजें…",

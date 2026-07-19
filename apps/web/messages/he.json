@@ -611,6 +611,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "איחוד",
+                "title": "איחוד הזיכרון",
+                "previewIntro": "תצוגה מקדימה של מה שהאיחוד יעשה. שום דבר לא משתנה עד שתחיל.",
+                "scanned": "{count} נסרקו",
+                "promoted": "{count} קודמו",
+                "synthesized": "{count} סוכמו",
+                "superseded": "{count} הוחלפו",
+                "promotedHeading": "קודמו",
+                "supersededHeading": "הוחלפו",
+                "more": "+{count} נוספים",
+                "apply": "החל",
+                "cancel": "ביטול",
+                "applied": "אוחד: {promoted} קודמו, {synthesized} סוכמו, {superseded} הוחלפו",
+                "failed": "האיחוד נכשל. נסה שוב.",
+                "badgePromoted": "קודם",
+                "badgeSuperseded": "הוחלף"
+            },
             "title": "Memory",
             "subtitle": "כל מה שהארגון שלך יודע, במקום אחד — מרוכז מתוך ה-Knowledge Base של כל עבודה.",
             "searchPlaceholder": "חפש בכל מה שהארגון יודע…",
