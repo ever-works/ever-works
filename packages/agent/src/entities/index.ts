@@ -73,6 +73,7 @@ export * from './task-kb-mention.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './work-proposal-attachment.entity';
+export * from './idea-work.entity';
 export * from './agent-attachment.entity';
 // Notifications v2 (EW-650 + siblings) — email + multi-channel + per-user prefs
 export * from './tenant-email-address.entity';

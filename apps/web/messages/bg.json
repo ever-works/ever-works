@@ -1096,6 +1096,14 @@
                 "creating": "Създаване…",
                 "minLength": "Описанието трябва да е поне 10 знака.",
                 "error": "Idea не може да бъде създадена. Моля, опитайте отново."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

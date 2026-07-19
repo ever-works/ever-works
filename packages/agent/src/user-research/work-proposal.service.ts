@@ -10,6 +10,8 @@ import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { WorkProposalRepository } from './work-proposal.repository';
+import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
+import type { IdeaWorkKind } from '../entities/idea-work.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -158,6 +160,7 @@ export class WorkProposalService {
         private readonly registry: PluginRegistryService,
         private readonly aiFacade: AiFacadeService,
         private readonly repo: WorkProposalRepository,
+        private readonly ideaWorks: IdeaWorkRepository,
         // Phase 3 PR I — shared titler service. Replaces the inline
         // `deriveTitle` placeholder from Phase 1 PR B with a real
         // service that future PRs can swap to an AI-backed impl
@@ -550,6 +553,7 @@ export class WorkProposalService {
         proposalId: string,
         workId: string,
         fromStatuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { linkKind?: IdeaWorkKind } = {},
     ): Promise<boolean> {
         const proposal = await this.repo.findByIdForUser(proposalId, userId);
         if (!proposal) return false;
@@ -564,7 +568,51 @@ export class WorkProposalService {
         // Work owned by this user, so the legitimate path is unaffected.
         const work = await this.works.findById(workId);
         if (!work || work.userId !== userId) return false;
-        return this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        const ok = await this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        if (!ok) return false;
+        // Review §23.1 — provenance is authoritative in `idea_works` (0..N),
+        // and the Work-side back-pointer is stamped first-writer-wins.
+        // `acceptedWorkId` (written by markAccepted above) stays as the
+        // denormalized "primary / most recent" pointer.
+        await this.recordProvenance(userId, proposalId, workId, opts.linkKind ?? 'linked', {
+            workAlreadyLoadedFromIdeaId: work.acceptedFromIdeaId ?? null,
+        });
+        return true;
+    }
+
+    /**
+     * Append the Idea↔Work provenance link and stamp the Work-side
+     * back-pointer (`works.acceptedFromIdeaId`) when the Work has no
+     * source Idea yet (a Work keeps at most ONE source Idea — review
+     * §23.1). Best-effort by design: the primary state transition
+     * (`markAccepted`) has already committed when this runs, so a
+     * failure here must not surface as a 5xx on an accept that DID
+     * succeed — it is logged and the backfill-shaped migration can
+     * repair stragglers.
+     */
+    private async recordProvenance(
+        userId: string,
+        ideaId: string,
+        workId: string,
+        kind: IdeaWorkKind,
+        opts: { workAlreadyLoadedFromIdeaId?: string | null } = {},
+    ): Promise<void> {
+        try {
+            await this.ideaWorks.recordLink({ ideaId, workId, userId, kind });
+            let sourceIdeaId = opts.workAlreadyLoadedFromIdeaId;
+            if (sourceIdeaId === undefined) {
+                sourceIdeaId = (await this.works.findById(workId))?.acceptedFromIdeaId ?? null;
+            }
+            if (sourceIdeaId === null) {
+                await this.works.update(workId, { acceptedFromIdeaId: ideaId });
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record Idea↔Work provenance (idea=${ideaId}, work=${workId}, kind=${kind}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**
@@ -689,6 +737,14 @@ export class WorkProposalService {
             if (!ok) {
                 return { outcome: 'noop', reason: 'idea-not-in-building' };
             }
+            // Review §23.1 — append the provenance link (history is
+            // append-only; the previous link row survives a rebuild).
+            await this.recordProvenance(
+                input.userId,
+                input.ideaId,
+                input.outcome.workId,
+                previousWorkId !== null ? 'rebuilt' : 'built',
+            );
             // Re-build flow: previousWorkId was non-null before the
             // accept overwrote it. The Decision A27 "original Work
             // is NOT deleted" guarantee is enforced by the absence
@@ -736,6 +792,17 @@ export class WorkProposalService {
 
     async getForUser(userId: string, proposalId: string) {
         return this.repo.findByIdForUser(proposalId, userId);
+    }
+
+    /**
+     * All Works linked to this Idea (review §23.1 — 0..N), newest
+     * first, with Work display fields for the "Linked Works" panel.
+     * 404-shaped `null` when the Idea doesn't exist for this user.
+     */
+    async listLinkedWorks(userId: string, proposalId: string) {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) return null;
+        return this.ideaWorks.listForIdeaWithWork(proposalId, userId);
     }
 
     async countPending(userId: string): Promise<number> {

@@ -938,6 +938,14 @@
                 "anyStatus": "任意状态",
                 "apply": "应用",
                 "reset": "重置"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {
@@ -4728,6 +4736,14 @@
                 "creating": "正在创建…",
                 "minLength": "描述至少需要 10 个字符。",
                 "error": "无法创建 Idea，请重试。"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

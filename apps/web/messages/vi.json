@@ -938,6 +938,14 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {
@@ -4728,6 +4736,14 @@
                 "creating": "Đang tạo…",
                 "minLength": "Mô tả phải có ít nhất 10 ký tự.",
                 "error": "Không thể tạo Idea. Vui lòng thử lại."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

@@ -83,13 +83,22 @@ export class WorkProposalsApiService {
     }
 
     async accept(userId: string, proposalId: string, workId: string): Promise<boolean> {
-        // Existing user-facing accept: only valid from PENDING (today's
-        // contract — preserved). The shared helper now lives on the
-        // agent-side service so PR FF's Goal-completion handler can
-        // call it with `[BUILDING]` instead.
+        // Review §23.1 ruling (ADR-009, 0..N): accept is valid from PENDING
+        // (first link — today's contract) AND from ACCEPTED (linking an
+        // ADDITIONAL Work to an already-accepted Idea; appends an
+        // `idea_works` row and re-points the denormalized `acceptedWorkId`
+        // at the newest link). The shared helper lives on the agent-side
+        // service so the Goal-completion handler can call it with
+        // `[BUILDING]` instead.
         return this.proposals.acceptInternal(userId, proposalId, workId, [
             WorkProposalStatus.PENDING,
+            WorkProposalStatus.ACCEPTED,
         ]);
+    }
+
+    /** Linked Works for the Idea (review §23.1 provenance panel). */
+    async listLinkedWorks(userId: string, proposalId: string) {
+        return this.proposals.listLinkedWorks(userId, proposalId);
     }
 
     /**

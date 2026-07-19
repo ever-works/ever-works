@@ -332,7 +332,8 @@ export class WorkProposalsController {
 
     @Post(':id/accept')
     @ApiOperation({
-        summary: 'Mark a proposal as accepted after the user creates a Work from it',
+        summary:
+            'Accept a proposal against a Work (first link from PENDING; additional links from ACCEPTED)',
     })
     @HttpCode(HttpStatus.OK)
     async accept(
@@ -348,6 +349,25 @@ export class WorkProposalsController {
             throw new NotFoundException('Proposal not found or already finalized');
         }
         return { ok: true };
+    }
+
+    /**
+     * Idea↔Work provenance links (domain-model review §23.1 / ADR-009:
+     * one Idea may link 0..N Works — accept from PENDING for the first
+     * link, from ACCEPTED for additional links; builds and rebuilds
+     * append rows too). Newest first, with Work display fields.
+     */
+    @Get(':id/works')
+    @ApiOperation({ summary: 'List the Works linked to this Idea (provenance, 0..N)' })
+    async listLinkedWorks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        const links = await this.service.listLinkedWorks(auth.userId, id);
+        if (links === null) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return { links };
     }
 
     /**

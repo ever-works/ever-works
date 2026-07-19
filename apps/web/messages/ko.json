@@ -938,6 +938,14 @@
                 "anyStatus": "모든 상태",
                 "apply": "적용",
                 "reset": "초기화"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {
@@ -4728,6 +4736,14 @@
                 "creating": "만드는 중…",
                 "minLength": "설명은 최소 10자 이상이어야 합니다.",
                 "error": "Idea를 만들 수 없습니다. 다시 시도해 주세요."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

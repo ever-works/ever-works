@@ -5,6 +5,8 @@ import { FacadesModule } from '../facades/facades.module';
 import { TitlerModule } from '../titler/titler.module';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
+import { IdeaWork } from '../entities/idea-work.entity';
+import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
 import { UserUpload } from '../entities/user-upload.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { UserResearchService } from './user-research.service';
@@ -24,12 +26,13 @@ import {
         DatabaseModule,
         FacadesModule,
         TitlerModule,
-        TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment, UserUpload]),
+        TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment, UserUpload, IdeaWork]),
     ],
     providers: [
         UserResearchService,
         WorkProposalService,
         WorkProposalRepository,
+        IdeaWorkRepository,
         WorkProposalAttachmentRepository,
         {
             provide: USER_RESEARCH_LIMITS_CONFIG,
@@ -41,6 +44,7 @@ import {
         UserResearchService,
         WorkProposalService,
         WorkProposalRepository,
+        IdeaWorkRepository,
         WorkProposalAttachmentRepository,
         UserResearchLimitsService,
     ],

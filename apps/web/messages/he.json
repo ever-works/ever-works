@@ -1096,6 +1096,14 @@
                 "creating": "יוצר…",
                 "minLength": "התיאור חייב להכיל לפחות 10 תווים.",
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

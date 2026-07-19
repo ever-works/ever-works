@@ -75,6 +75,21 @@ interface BuildApiResponse {
     goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: string };
 }
 
+// PR-1 (Idea↔Work provenance) — one row of the authoritative 0..N
+// Idea→Work link table (`idea_works`, ADR-009). `acceptedWorkId` on the
+// proposal stays as the denormalized primary/most-recent pointer; these
+// rows carry the full history, each joined with the linked Work's
+// name/slug (null when unavailable).
+export interface IdeaWorkLink {
+    id: string;
+    ideaId: string;
+    workId: string;
+    kind: 'built' | 'linked' | 'rebuilt';
+    createdAt: string;
+    workName: string | null;
+    workSlug: string | null;
+}
+
 export const workProposalsAPI = {
     async get(id: string): Promise<WorkProposal | null> {
         try {
@@ -172,6 +187,15 @@ export const workProposalsAPI = {
             data: { workId },
             method: 'POST',
             wrapInData: false,
+        });
+    },
+
+    // PR-1 (Idea↔Work provenance) — list ALL Works linked to an Idea
+    // via the authoritative `idea_works` table, newest first. 404s when
+    // the Idea doesn't exist for the caller (matching `get`).
+    async listWorks(id: string): Promise<{ links: IdeaWorkLink[] }> {
+        return serverFetch<{ links: IdeaWorkLink[] }>(`/me/work-proposals/${id}/works`, {
+            method: 'GET',
         });
     },
 

@@ -72,6 +72,7 @@ import {
     UserTaskCounter,
     MissionAttachment,
     WorkProposalAttachment,
+    IdeaWork,
     AgentAttachment,
     // Notifications v2 (EW-650 + siblings)
     TenantEmailAddress,
@@ -201,6 +202,7 @@ export const ENTITIES = [
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
     WorkProposalAttachment,
+    IdeaWork,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,

@@ -1096,6 +1096,14 @@
                 "creating": "Wird erstellt…",
                 "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
                 "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

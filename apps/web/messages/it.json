@@ -938,6 +938,14 @@
                 "anyStatus": "Qualsiasi stato",
                 "apply": "Applica",
                 "reset": "Reimposta"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {
@@ -4728,6 +4736,14 @@
                 "creating": "Creazione…",
                 "minLength": "La descrizione deve contenere almeno 10 caratteri.",
                 "error": "Impossibile creare la Idea. Riprova."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

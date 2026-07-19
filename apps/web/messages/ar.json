@@ -1096,6 +1096,14 @@
                 "creating": "جارٍ الإنشاء…",
                 "minLength": "يجب ألا يقل الوصف عن 10 أحرف.",
                 "error": "تعذّر إنشاء الـ Idea. يُرجى المحاولة مرة أخرى."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {

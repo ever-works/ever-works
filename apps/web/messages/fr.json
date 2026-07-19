@@ -1096,6 +1096,14 @@
                 "creating": "Création…",
                 "minLength": "La description doit comporter au moins 10 caractères.",
                 "error": "Impossible de créer l'Idea. Veuillez réessayer."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
         },
         "discover": {
