@@ -456,6 +456,57 @@
         }
     },
     "dashboard": {
+        "triggers": {
+            "title": "Trình kích hoạt đến",
+            "subtitle": "Webhook và lệnh gọi API đã ký tạo một Nhiệm vụ khi được kích hoạt.",
+            "new": "Trình kích hoạt mới",
+            "empty": "Chưa có trình kích hoạt. Tạo một cái để nhận webhook đã ký.",
+            "firedCount": "{count} lần kích hoạt",
+            "lastFired": "kích hoạt gần nhất",
+            "status": {
+                "active": "Hoạt động",
+                "paused": "Tạm dừng"
+            },
+            "createTitle": "Trình kích hoạt đến mới",
+            "createDescription": "Bạn nhận được URL webhook đã ký và một khóa bí mật. Hệ thống bên ngoài gửi POST để tạo Nhiệm vụ.",
+            "form": {
+                "name": "Tên",
+                "namePlaceholder": "Thông báo triển khai",
+                "description": "Mô tả",
+                "descriptionPlaceholder": "Điều gì kích hoạt trình này?",
+                "taskTitle": "Mẫu tiêu đề nhiệm vụ",
+                "taskTitlePlaceholder": "Trình kích hoạt: {name}",
+                "taskTitleHint": "{name} sẽ thành tên trình kích hoạt."
+            },
+            "actions": {
+                "pause": "Tạm dừng",
+                "resume": "Tiếp tục",
+                "rotate": "Xoay khóa bí mật",
+                "delete": "Xóa",
+                "cancel": "Hủy",
+                "create": "Tạo"
+            },
+            "reveal": {
+                "title": "Khóa bí mật của trình kích hoạt",
+                "warning": "Sao chép khóa bí mật ngay — bạn sẽ không thể xem lại.",
+                "url": "URL webhook",
+                "secret": "Khóa bí mật để ký",
+                "curl": "Ví dụ yêu cầu đã ký",
+                "copy": "Sao chép",
+                "done": "Xong"
+            },
+            "toast": {
+                "created": "Đã tạo trình kích hoạt",
+                "createFailed": "Không thể tạo trình kích hoạt",
+                "rotated": "Đã xoay khóa bí mật",
+                "rotateFailed": "Không thể xoay khóa bí mật",
+                "toggleFailed": "Không thể cập nhật trình kích hoạt",
+                "deleted": "Đã xóa trình kích hoạt",
+                "deleteFailed": "Không thể xóa trình kích hoạt",
+                "loadFailed": "Không thể tải trình kích hoạt",
+                "copyFailed": "Không thể sao chép vào bảng nhớ tạm"
+            }
+        },
         "title": "Bảng điều khiển",
         "connectGithub": {
             "title": "Kết nối tài khoản GitHub của bạn",
@@ -1044,6 +1095,7 @@
                 "activeOnly": "Chỉ hoạt động"
             },
             "sourceTypes": {
+                "inboundTrigger": "Trình kích hoạt đến",
                 "recurringTask": "Tác vụ định kỳ",
                 "agentHeartbeat": "Nhịp Agent",
                 "workSchedule": "Lịch công việc",

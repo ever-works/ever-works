@@ -4,6 +4,7 @@ import { ApiKey } from '../api-key.entity';
 import { Conversation } from '../conversation.entity';
 import { GitHubAppInstallation } from '../github-app-installation.entity';
 import { GitHubAppUserLink } from '../github-app-user-link.entity';
+import { InboundTrigger } from '../inbound-trigger.entity';
 import { Mission } from '../mission.entity';
 import { Notification } from '../notification.entity';
 import { OnboardingRequest } from '../onboarding-request.entity';
@@ -60,6 +61,7 @@ describe('Tier A entities — Phase 3 scope columns', () => {
         { name: 'WebhookSubscription', target: WebhookSubscription },
         { name: 'GitHubAppInstallation', target: GitHubAppInstallation },
         { name: 'GitHubAppUserLink', target: GitHubAppUserLink },
+        { name: 'InboundTrigger', target: InboundTrigger },
         { name: 'Work', target: Work },
         { name: 'WorkKnowledgeDocument', target: WorkKnowledgeDocument },
     ];

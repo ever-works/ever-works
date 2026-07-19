@@ -98,3 +98,6 @@ export * from './tenant-runtime-provider-allowlist.entity';
 // EW-742 P1 T11 follow-up — per-version credential snapshot history
 // (graceful drain per ADR-017 §3 Q4)
 export * from './tenant-credential-snapshot.entity';
+
+// Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
+export * from './inbound-trigger.entity';

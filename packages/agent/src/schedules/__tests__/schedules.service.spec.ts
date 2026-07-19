@@ -23,7 +23,7 @@ function makeWorkScheduleRepo(rows: unknown[]) {
 const SCOPE = { userId: 'user-1', organizationId: null };
 
 describe('SchedulesService', () => {
-    it('aggregates all six sources into a unified sorted read-model', async () => {
+    it('aggregates all seven sources into a unified sorted read-model', async () => {
         const now = new Date('2026-07-18T08:00:00.000Z');
         jest.useFakeTimers().setSystemTime(now);
 
@@ -96,6 +96,16 @@ describe('SchedulesService', () => {
                     },
                 ]),
         };
+        const inboundTriggerRepo = makeRepo([
+            {
+                id: 'trigger-1',
+                name: 'CRM lead created',
+                status: 'active',
+                targetAgentId: 'agent-7',
+                lastFiredAt: new Date('2026-07-17T22:00:00.000Z'),
+                fireCount: 12,
+            },
+        ]);
 
         const service = new SchedulesService(
             taskRepo as never,
@@ -103,12 +113,13 @@ describe('SchedulesService', () => {
             workScheduleRepo as never,
             missionRepo as never,
             workRepo as never,
+            inboundTriggerRepo as never,
         );
 
         const views = await service.getSchedules(SCOPE);
 
-        // One row per source → 6 rows.
-        expect(views).toHaveLength(6);
+        // One row per source → 7 rows.
+        expect(views).toHaveLength(7);
         const bySource = Object.fromEntries(views.map((v) => [v.sourceType, v]));
 
         // The 'manual' exclusion is pushed into the heartbeat query so the
@@ -125,6 +136,15 @@ describe('SchedulesService', () => {
         expect(bySource.mission_tick.lastRunAt).toBeNull();
         expect(bySource.source_validation.ownerLink).toBe('/works/work-2');
         expect(bySource.data_sync.cadenceHuman).toBe('Every 5 minutes');
+        // Inbound triggers are event-driven: fixed 'On event' cadence, no
+        // next-run, lastFiredAt surfaces as lastRunAt, agent owner reuse.
+        expect(bySource.inbound_trigger.cadenceHuman).toBe('On event');
+        expect(bySource.inbound_trigger.nextRunAt).toBeNull();
+        expect(bySource.inbound_trigger.lastRunAt).toBe('2026-07-17T22:00:00.000Z');
+        expect(bySource.inbound_trigger.ownerType).toBe('agent');
+        expect(bySource.inbound_trigger.ownerId).toBe('agent-7');
+        expect(bySource.inbound_trigger.ownerLink).toBe('/agents/agent-7');
+        expect(bySource.inbound_trigger.enabled).toBe(true);
 
         // Sorted ascending by nextRunAt with nulls last.
         const order = views.map((v) => v.nextRunAt);
@@ -141,6 +161,7 @@ describe('SchedulesService', () => {
         const missionRepo = makeRepo([]);
         const workRepo = { find: jest.fn().mockResolvedValue([]) };
         const workScheduleRepo = makeWorkScheduleRepo([]);
+        const inboundTriggerRepo = makeRepo([]);
 
         const service = new SchedulesService(
             taskRepo as never,
@@ -148,6 +169,7 @@ describe('SchedulesService', () => {
             workScheduleRepo as never,
             missionRepo as never,
             workRepo as never,
+            inboundTriggerRepo as never,
         );
 
         await service.getSchedules({ userId: 'user-9', organizationId: null });
@@ -157,6 +179,45 @@ describe('SchedulesService', () => {
         // IsNull() is an object with a `@instanceof` marker — assert it is not a bare value.
         expect(taskWhere.organizationId).toBeDefined();
         expect(workScheduleRepo._qb.andWhere).toHaveBeenCalledWith('ws.organizationId IS NULL');
+        // Inbound triggers share the same scope predicate.
+        const triggerWhere = inboundTriggerRepo.find.mock.calls[0][0].where;
+        expect(triggerWhere.userId).toBe('user-9');
+        expect(triggerWhere.organizationId).toBeDefined();
+    });
+
+    it('projects agent-less inbound triggers as their own trigger owner (paused → disabled-by-filter)', async () => {
+        const inboundTriggerRepo = makeRepo([
+            {
+                id: 'trigger-2',
+                name: 'Standalone hook',
+                status: 'paused',
+                targetAgentId: null,
+                lastFiredAt: null,
+                fireCount: 0,
+            },
+        ]);
+        const service = new SchedulesService(
+            makeRepo([]) as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            inboundTriggerRepo as never,
+        );
+
+        const views = await service.getSchedules(SCOPE);
+        expect(views).toHaveLength(1);
+        const row = views[0];
+        expect(row.id).toBe('inbound_trigger:trigger-2');
+        expect(row.ownerType).toBe('trigger');
+        expect(row.ownerId).toBe('trigger-2');
+        expect(row.ownerLink).toBe('/activity?view=schedules');
+        expect(row.status).toBe('paused');
+        expect(row.enabled).toBe(false);
+        expect(row.lastRunAt).toBeNull();
+
+        const enabledOnly = await service.getSchedules(SCOPE, { enabledOnly: true });
+        expect(enabledOnly).toHaveLength(0);
     });
 
     it('filters by sourceType and enabledOnly', async () => {
@@ -177,6 +238,7 @@ describe('SchedulesService', () => {
             makeWorkScheduleRepo([]) as never,
             makeRepo([]) as never,
             { find: jest.fn().mockResolvedValue([]) } as never,
+            makeRepo([]) as never,
         );
 
         const all = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });

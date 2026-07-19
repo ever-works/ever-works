@@ -93,6 +93,8 @@ import {
     TenantRuntimeProviderAllowlist,
     // Per-version credential snapshot history (EW-742 P1 T11 follow-up)
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    InboundTrigger,
 } from '../entities';
 import {
     PluginEntity,
@@ -240,6 +242,9 @@ export const ENTITIES = [
     // in-flight runs can bind to their captured credentials after a
     // rotation (ADR-017 §3 Q4).
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    // that spawn Tasks on verified HMAC deliveries.
+    InboundTrigger,
 ];
 
 /**

@@ -6,9 +6,11 @@ import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { Work } from '../entities/work.entity';
+import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { WorkScheduleStatus } from '../entities/types';
 import {
     describeCron,
+    describeEventDriven,
     describeIntervalMinutes,
     describeRrule,
     describeWorkCadence,
@@ -38,9 +40,10 @@ function toIso(value: Date | null | undefined): string | null {
 /**
  * Schedules ("Cadence") aggregation service (spec §4.3).
  *
- * Read-only. Projects the six scheduled sources — recurring Tasks, Agent
- * heartbeats, Work schedules, Mission ticks, item source-validation, and
- * data-sync polling — into one unified `ScheduleView[]`, scoped to the
+ * Read-only. Projects the seven scheduled sources — recurring Tasks, Agent
+ * heartbeats, Work schedules, Mission ticks, item source-validation,
+ * data-sync polling, and inbound triggers — into one unified
+ * `ScheduleView[]`, scoped to the
  * caller exactly like every other Tier A read (userId + active
  * Organization; personal scope filters `organizationId IS NULL`).
  *
@@ -59,6 +62,8 @@ export class SchedulesService {
         private readonly workScheduleRepo: Repository<WorkSchedule>,
         @InjectRepository(Mission) private readonly missionRepo: Repository<Mission>,
         @InjectRepository(Work) private readonly workRepo: Repository<Work>,
+        @InjectRepository(InboundTrigger)
+        private readonly inboundTriggerRepo: Repository<InboundTrigger>,
     ) {}
 
     async getSchedules(
@@ -67,7 +72,7 @@ export class SchedulesService {
     ): Promise<ScheduleView[]> {
         const now = new Date();
 
-        const [tasks, agents, workSchedules, missions, sourceValidation, dataSync] =
+        const [tasks, agents, workSchedules, missions, sourceValidation, dataSync, triggers] =
             await Promise.all([
                 this.recurringTasks(scope, now),
                 this.agentHeartbeats(scope),
@@ -75,6 +80,7 @@ export class SchedulesService {
                 this.missionTicks(scope, now),
                 this.sourceValidation(scope),
                 this.dataSync(scope, now),
+                this.inboundTriggers(scope),
             ]);
 
         let views: ScheduleView[] = [
@@ -84,6 +90,7 @@ export class SchedulesService {
             ...missions,
             ...sourceValidation,
             ...dataSync,
+            ...triggers,
         ];
 
         if (filters.sourceType) {
@@ -352,6 +359,44 @@ export class SchedulesService {
             });
         } catch (error) {
             this.warn('data_sync', error);
+            return [];
+        }
+    }
+
+    /**
+     * Inbound Triggers (Trigger Schedules) — event-driven rows. They have
+     * no cadence/next-run by definition (an external system decides when
+     * they fire), so the cadence renders the fixed 'On event' label and
+     * `nextRunAt` stays null (the UI shows '—'). When the trigger assigns
+     * spawned Tasks to an Agent the row reuses the 'agent' owner type and
+     * links there; otherwise it is its own 'trigger' owner and links back
+     * to the Schedules view (where the Triggers section lives).
+     */
+    private async inboundTriggers(scope: ScheduleScope): Promise<ScheduleView[]> {
+        try {
+            const rows = await this.inboundTriggerRepo.find({
+                where: this.scopeWhere<InboundTrigger>(scope),
+                take: MAX_PER_SOURCE,
+            });
+            return rows.map((trigger) => ({
+                id: `inbound_trigger:${trigger.id}`,
+                sourceType: 'inbound_trigger' as const,
+                ownerType: trigger.targetAgentId ? ('agent' as const) : ('trigger' as const),
+                ownerId: trigger.targetAgentId ?? trigger.id,
+                ownerName: trigger.name,
+                ownerLink: trigger.targetAgentId
+                    ? `/agents/${trigger.targetAgentId}`
+                    : '/activity?view=schedules',
+                cadenceRaw: null,
+                cadenceHuman: describeEventDriven(),
+                nextRunAt: null,
+                lastRunAt: toIso(trigger.lastFiredAt),
+                lastRunStatus: null,
+                status: (trigger.status === 'paused' ? 'paused' : 'active') as ScheduleStatus,
+                enabled: trigger.status === 'active',
+            }));
+        } catch (error) {
+            this.warn('inbound_trigger', error);
             return [];
         }
     }

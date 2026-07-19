@@ -11,6 +11,7 @@ import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState
 import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
 import { SchedulesList } from '@/components/schedules/SchedulesList';
+import { TriggersManager } from '@/components/schedules/TriggersManager';
 import { toast } from 'sonner';
 import { Activity as ActivityIcon, Download, Loader2, List, CalendarClock } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -437,7 +438,12 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 }
             />
 
-            {!isLogTab && <SchedulesList />}
+            {!isLogTab && (
+                <>
+                    <SchedulesList />
+                    <TriggersManager />
+                </>
+            )}
 
             {isLogTab && (
                 <>

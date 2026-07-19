@@ -456,6 +456,57 @@
         }
     },
     "dashboard": {
+        "triggers": {
+            "title": "수신 트리거",
+            "subtitle": "실행되면 작업을 생성하는 서명된 웹훅 및 API 호출.",
+            "new": "새 트리거",
+            "empty": "아직 트리거가 없습니다. 서명된 웹훅을 받으려면 하나 만드세요.",
+            "firedCount": "{count}회 실행",
+            "lastFired": "마지막 실행",
+            "status": {
+                "active": "활성",
+                "paused": "일시중지"
+            },
+            "createTitle": "새 수신 트리거",
+            "createDescription": "서명된 웹훅 URL과 시크릿이 발급됩니다. 외부 시스템이 POST하면 작업이 생성됩니다.",
+            "form": {
+                "name": "이름",
+                "namePlaceholder": "배포 알림",
+                "description": "설명",
+                "descriptionPlaceholder": "이 트리거를 무엇이 실행하나요?",
+                "taskTitle": "작업 제목 템플릿",
+                "taskTitlePlaceholder": "트리거: {name}",
+                "taskTitleHint": "{name}은(는) 트리거 이름으로 확장됩니다."
+            },
+            "actions": {
+                "pause": "일시중지",
+                "resume": "재개",
+                "rotate": "시크릿 교체",
+                "delete": "삭제",
+                "cancel": "취소",
+                "create": "생성"
+            },
+            "reveal": {
+                "title": "트리거 시크릿",
+                "warning": "지금 시크릿을 복사하세요. 다시 볼 수 없습니다.",
+                "url": "웹훅 URL",
+                "secret": "서명 시크릿",
+                "curl": "서명된 요청 예시",
+                "copy": "복사",
+                "done": "완료"
+            },
+            "toast": {
+                "created": "트리거가 생성되었습니다",
+                "createFailed": "트리거를 생성할 수 없습니다",
+                "rotated": "시크릿이 교체되었습니다",
+                "rotateFailed": "시크릿을 교체할 수 없습니다",
+                "toggleFailed": "트리거를 업데이트할 수 없습니다",
+                "deleted": "트리거가 삭제되었습니다",
+                "deleteFailed": "트리거를 삭제할 수 없습니다",
+                "loadFailed": "트리거를 불러올 수 없습니다",
+                "copyFailed": "클립보드에 복사할 수 없습니다"
+            }
+        },
         "title": "대시보드",
         "connectGithub": {
             "title": "GitHub 계정 연결",
@@ -1044,6 +1095,7 @@
                 "activeOnly": "활성만"
             },
             "sourceTypes": {
+                "inboundTrigger": "수신 트리거",
                 "recurringTask": "반복 작업",
                 "agentHeartbeat": "에이전트 하트비트",
                 "workSchedule": "워크 일정",
