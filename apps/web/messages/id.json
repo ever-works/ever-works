@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Hapus pemicu ini? URL webhook-nya langsung berhenti berfungsi dan ini tidak dapat dibatalkan.",
             "title": "Pemicu masuk",
             "subtitle": "Webhook dan panggilan API bertanda tangan yang membuat Tugas saat dipicu.",
             "new": "Pemicu baru",

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Bu tetikleyici silinsin mi? Webhook URL’si hemen çalışmayı durdurur ve bu işlem geri alınamaz.",
             "title": "Gelen tetikleyiciler",
             "subtitle": "Tetiklendiğinde bir Görev oluşturan imzalı webhook ve API çağrıları.",
             "new": "Yeni tetikleyici",

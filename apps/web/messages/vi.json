@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Xóa trình kích hoạt này? URL webhook của nó ngừng hoạt động ngay lập tức và không thể hoàn tác.",
             "title": "Trình kích hoạt đến",
             "subtitle": "Webhook và lệnh gọi API đã ký tạo một Nhiệm vụ khi được kích hoạt.",
             "new": "Trình kích hoạt mới",

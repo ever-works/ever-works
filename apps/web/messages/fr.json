@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Supprimer ce déclencheur ? Son URL de webhook cesse de fonctionner immédiatement et cette action est irréversible.",
             "title": "Déclencheurs entrants",
             "subtitle": "Webhooks et appels API signés qui créent une Tâche lorsqu’ils sont déclenchés.",
             "new": "Nouveau déclencheur",

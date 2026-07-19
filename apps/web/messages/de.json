@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Diesen Trigger löschen? Seine Webhook-URL funktioniert sofort nicht mehr und dies kann nicht rückgängig gemacht werden.",
             "title": "Eingehende Trigger",
             "subtitle": "Signierte Webhooks und API-Aufrufe, die beim Auslösen eine Aufgabe erstellen.",
             "new": "Neuer Trigger",

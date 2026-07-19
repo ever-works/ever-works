@@ -270,8 +270,13 @@ export class InboundTriggersService {
 			}
 		}
 
-		await this.repo.increment({ id: row.id }, 'fireCount', 1);
-		await this.repo.update(row.id, { lastFiredAt: new Date() });
+		// Single atomic row update — bumping the counter and stamping
+		// lastFiredAt together avoids a torn write if the process dies between
+		// two separate calls. The raw `"fireCount" + 1` increments in-place.
+		await this.repo.update(row.id, {
+			fireCount: () => '"fireCount" + 1',
+			lastFiredAt: new Date()
+		});
 
 		return { ok: true, taskId: task.id, taskSlug: task.slug };
 	}

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "このトリガーを削除しますか？ Webhook URL は直ちに使用できなくなり、元に戻せません。",
             "title": "受信トリガー",
             "subtitle": "発火時にタスクを生成する署名付き Webhook / API 呼び出し。",
             "new": "新規トリガー",

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "¿Eliminar este disparador? Su URL de webhook dejará de funcionar de inmediato y esto no se puede deshacer.",
             "title": "Disparadores entrantes",
             "subtitle": "Webhooks y llamadas de API firmados que crean una Tarea al activarse.",
             "new": "Nuevo disparador",

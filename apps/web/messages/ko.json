@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "이 트리거를 삭제하시겠습니까? 웹훅 URL이 즉시 작동을 멈추며 되돌릴 수 없습니다.",
             "title": "수신 트리거",
             "subtitle": "실행되면 작업을 생성하는 서명된 웹훅 및 API 호출.",
             "new": "새 트리거",

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Excluir este gatilho? Sua URL de webhook para de funcionar imediatamente e isso não pode ser desfeito.",
             "title": "Gatilhos de entrada",
             "subtitle": "Webhooks e chamadas de API assinados que criam uma Tarefa quando disparados.",
             "new": "Novo gatilho",

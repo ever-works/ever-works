@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Usunąć ten wyzwalacz? Jego adres webhooka natychmiast przestanie działać, a tej operacji nie można cofnąć.",
             "title": "Wyzwalacze przychodzące",
             "subtitle": "Podpisane webhooki i wywołania API, które tworzą Zadanie po uruchomieniu.",
             "new": "Nowy wyzwalacz",

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Deze trigger verwijderen? De webhook-URL werkt onmiddellijk niet meer en dit kan niet ongedaan worden gemaakt.",
             "title": "Inkomende triggers",
             "subtitle": "Ondertekende webhooks en API-aanroepen die een Taak aanmaken bij activering.",
             "new": "Nieuwe trigger",

@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Eliminare questo trigger? Il suo URL webhook smette di funzionare immediatamente e l’operazione è irreversibile.",
             "title": "Trigger in entrata",
             "subtitle": "Webhook e chiamate API firmati che creano un’Attività quando attivati.",
             "new": "Nuovo trigger",

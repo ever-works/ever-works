@@ -119,6 +119,9 @@ export function TriggersManager() {
 
 	const handleDelete = async (id: string) => {
 		if (busyId) return;
+		// Destructive + irreversible (drops the trigger and its webhook URL) —
+		// gate on an explicit confirm so a mis-tapped trash icon can't delete.
+		if (!window.confirm(t('confirmDelete'))) return;
 		setBusyId(id);
 		const res = await deleteInboundTriggerAction(id);
 		setBusyId(null);
@@ -192,7 +195,7 @@ export function TriggersManager() {
 									<Button
 										size="icon"
 										variant="ghost"
-										disabled={busy}
+										disabled={busyId !== null}
 										aria-label={row.status === 'active' ? t('actions.pause') : t('actions.resume')}
 										title={row.status === 'active' ? t('actions.pause') : t('actions.resume')}
 										onClick={() => handleToggle(row)}
@@ -202,7 +205,7 @@ export function TriggersManager() {
 									<Button
 										size="icon"
 										variant="ghost"
-										disabled={busy}
+										disabled={busyId !== null}
 										aria-label={t('actions.rotate')}
 										title={t('actions.rotate')}
 										onClick={() => handleRotate(row.id)}
@@ -212,7 +215,7 @@ export function TriggersManager() {
 									<Button
 										size="icon"
 										variant="ghost"
-										disabled={busy}
+										disabled={busyId !== null}
 										aria-label={t('actions.delete')}
 										title={t('actions.delete')}
 										onClick={() => handleDelete(row.id)}
