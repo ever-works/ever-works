@@ -865,7 +865,7 @@ Schedules read-model, team_resources, Evaluation/Decision records.
 
 ### 22.5 Decisions that require product-owner input
 
-> **Status: answered by the product owner on 2026-07-19** — rulings and the resulting design changes are in **§23**. Only D2 (stranded `queued` Ideas) remains open; §23.7 explains its options in full.
+> **Status: fully answered by the product owner on 2026-07-19** — rulings and the resulting design changes are in **§23**. D2 was subsequently ruled **Option A** and D7 ruled **remove** (see §23.6/§23.7); no decisions remain open.
 
 1. **Idea↔Work cardinality ruling:** keep "one current Work per Idea, history in `idea_works`" (recommended) or implement true parallel 0..N per ADR-009? Affects PR-1's shape. → **Ruled: true parallel 0..N** (§23.1).
 2. **Stranded `queued` Ideas** (pre-executor rows): revert to `pending` with a note, or auto-create build requests when the executor ships? → **OPEN** (§23.7).
@@ -873,7 +873,7 @@ Schedules read-model, team_resources, Evaluation/Decision records.
 4. **"Build request" rename** of `work_agent_goals` surfaces (UI copy now, table later) — approve freeing the "Goal" name? → **Ruled: rename UI _and_ table now** (§23.3).
 5. **Goal entity trigger:** which metrics source makes Goals real? → **Ruled: build the metrics-provider plugin system now; Goals ship with it** (§23.4).
 6. **Teams merge timing** (PR #1647) relative to org membership/roles — structure-first (recommended) or wait for the permission design? → **Ruled: structure-first, permissions deliberately out of scope** (§23.5).
-7. **`/discover` route:** retire or relink (currently orphaned). → **Explained in §23.6; recommendation: redirect to `/ideas`** (awaiting confirmation).
+7. **`/discover` route:** retire or relink (currently orphaned). → **Ruled: remove the route** (§23.6).
 
 ---
 
@@ -941,7 +941,7 @@ IMetricsProviderPlugin (packages/plugin contract, read-only by design)
 
 `/discover` is **not** an integration or customer-software surface. It is the **original home of AI-suggested Work proposals**, born with the EW-584 user-research feature on 2026-05-12 (PR #710) — before Ideas existed as a concept. It server-fetches only `pending` work-proposals plus the research status and renders them with a "suggest more" refresh (`discover/page.tsx:12-24`). When the missions-ideas-works feature shipped `/ideas` (2026-05-25) — which shows all six statuses, quick-add, filters, and detail pages — `/discover` became a strict subset, and nothing in the app has linked to it since (verified: zero inbound links; it also isn't in the sidebar). The `WorkProposalSource.DISCOVER` enum value is equally vestigial (no production writer).
 
-**Recommendation:** keep the URL but make it a redirect to `/ideas` (old bookmarks keep working; no functionality is removed). Actual deletion of the page component can ride a later cleanup release. Awaiting confirmation.
+**Ruled (2026-07-19): REMOVE.** The operator confirmed removal on the strength of the verification above (zero inbound links, superseded by `/ideas`, no writer for the `discover` source). The route (`page.tsx` + `discover-client.tsx`) and its i18n keys are deleted in PR-10; the vestigial `WorkProposalSource.DISCOVER` enum member is kept (marked deprecated) since removing an enum value is not required to remove the page and no rows carry it.
 
 ### 23.7 The one open decision — stranded `queued` Ideas (Q2, explained)
 
@@ -950,7 +950,9 @@ IMetricsProviderPlugin (packages/plugin contract, read-only by design)
 - **Option A — reset to `pending` (recommended, conservative).** A one-time backfill flips all pre-executor `queued` Ideas back to `pending` and notes it in the activity log ("build was queued before the build system was live — please re-queue if still wanted"). _Effect:_ nothing builds without a fresh human click; zero surprise spend. _Cost:_ users who clicked Build weeks ago must click it again.
 - **Option B — honor the old clicks.** The executor treats existing `queued` rows as valid intent and builds them all when it turns on. _Effect:_ the original request is fulfilled automatically. _Risk:_ a potentially large burst of builds and real AI/deploy **spend** on day one — including from Missions whose auto-build queued Ideas the user may no longer want (some are weeks old, and the user has had no reason to prune them since nothing happened).
 
-Middle path if desired: Option A for Mission-auto-queued rows (the risky bulk) + Option B for rows a human explicitly queued within the last N days. **Recommendation: Option A** (or the middle path) — re-clicking is cheap; surprise spend is not.
+Middle path if desired: Option A for Mission-auto-queued rows (the risky bulk) + Option B for rows a human explicitly queued within the last N days.
+
+**Ruled (2026-07-19): Option A.** PR-4 ships a one-time backfill flipping every pre-executor `queued` Idea back to `pending` with an activity-log note; nothing builds without a fresh human action (or a fresh Mission tick under the now-working auto-build).
 
 ### 23.8 Revised implementation sequence
 
@@ -962,13 +964,13 @@ Supersedes §22.4's ordering; every PR remains additive except the two explicit 
 | 1   | Provenance repair: stamp `acceptedFromIdeaId` + **authoritative `idea_works` (0..N)** + backfills | §23.1 shape                                                                                                                   |
 | 2   | `mission_works` relation + attach-existing-Work + panels + backfill                               | unchanged from §22.4                                                                                                          |
 | 3   | Mission `outcome` at Complete + `FAILED` writer + Mission/Idea activity logging                   | §23.2 shape                                                                                                                   |
-| 4   | Build executor wiring (flagged, dry-run first) + stranded-`queued` policy                         | needs the §23.7 ruling                                                                                                        |
+| 4   | Build executor wiring (flagged, dry-run first) + stranded-`queued` **Option A reset**             | ruled — §23.7                                                                                                                 |
 | 5   | Free "Goal": `work_build_requests` rename (table + entity + routes-with-alias + UI copy)          | §23.3                                                                                                                         |
 | 6   | Vision: org column + creation-flow field + prompt injection                                       | §23.5                                                                                                                         |
 | 7   | `metrics-provider` plugin contract + `custom-http-metrics` + first SDK provider (Stripe)          | §23.4                                                                                                                         |
 | 8   | Goal entity + samples + `mission_goals` + evaluation dispatcher + Goals UI                        | §23.4                                                                                                                         |
 | 9   | Remaining providers (PostHog, Google Analytics) + notification event types + prompt integration   | §23.4                                                                                                                         |
-| 10  | Teams merge support (PR #1647 rebase/land) + `/discover` → `/ideas` redirect (on confirmation)    | §23.5/§23.6                                                                                                                   |
+| 10  | Teams merge support (PR #1647 rebase/land) + **`/discover` removal** (ruled)                      | §23.5/§23.6                                                                                                                   |
 
 ---
 
