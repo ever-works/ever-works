@@ -44,7 +44,6 @@ import {
         UserResearchService,
         WorkProposalService,
         WorkProposalRepository,
-        IdeaWorkRepository,
         WorkProposalAttachmentRepository,
         UserResearchLimitsService,
     ],

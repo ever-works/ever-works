@@ -112,12 +112,20 @@ export class CreateIdeaWorksTable1781600000000 implements MigrationInterface {
         `);
 
         // Backfill B — stamp the dead reverse pointer (review finding P1).
-        // First-writer-wins: only rows still NULL are touched.
+        // Only rows still NULL are touched, and when several Ideas point at
+        // the same Work (a re-linked Work), the OLDEST Idea wins
+        // deterministically (DISTINCT ON + generatedAt ASC) — the earliest
+        // link is the Work's true origin (Greptile P2 on PR #1689).
         await queryRunner.query(`
             UPDATE works w
-            SET "acceptedFromIdeaId" = wp.id
-            FROM work_proposals wp
-            WHERE wp."acceptedWorkId" = w.id
+            SET "acceptedFromIdeaId" = origin.id
+            FROM (
+                SELECT DISTINCT ON ("acceptedWorkId") id, "acceptedWorkId"
+                FROM work_proposals
+                WHERE "acceptedWorkId" IS NOT NULL
+                ORDER BY "acceptedWorkId", "generatedAt" ASC, id ASC
+            ) origin
+            WHERE origin."acceptedWorkId" = w.id
               AND w."acceptedFromIdeaId" IS NULL
         `);
     }
