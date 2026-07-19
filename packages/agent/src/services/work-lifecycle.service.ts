@@ -24,7 +24,12 @@ import { WebsiteUpdateService } from '@src/generators/website-generator/website-
 import { CreateWorkDto } from '@src/dto/create-work.dto';
 import { UpdateWorkDto } from '@src/dto';
 import { DeleteWorkDto, DeleteWorkResponseDto } from '@src/items-generator/dto';
-import { Work, type WorkKind, type WorkStatus } from '@src/entities/work.entity';
+import {
+    normalizeCreateWorkKind,
+    Work,
+    type WorkKind,
+    type WorkStatus,
+} from '@src/entities/work.entity';
 import { User } from '@src/entities/user.entity';
 import { WorkOwnershipService } from './work-ownership.service';
 import { rethrowAsNormalized } from './utils/error.utils';
@@ -264,6 +269,19 @@ export class WorkLifecycleService {
             // when the caller is not a zero-friction quick-create.
             lastDeployCorrelationId: createWorkDto.correlationId ?? null,
         };
+
+        // Persist the user's work-kind choice (website / landing-page /
+        // blog / directory / awesome-repo) so
+        // `WebsiteTemplateResolverService.resolveForWork` can apply the
+        // kind-aware default website template (PR #1681). Re-normalized
+        // here because `createWork` is also invoked programmatically with
+        // plain objects that never passed through the DTO transform
+        // (quick-create controller, onboarding adapter). Omitted → the
+        // column default `'default'` applies, exactly as before.
+        const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
+        if (normalizedKind) {
+            workData.kind = normalizedKind;
+        }
 
         // EW-614 — when the user picks "Ever Works Git" AND the feature flag
         // is on, the platform provisions the GitHub repo in the
