@@ -3,7 +3,8 @@ import {
 	StripeMetricsPlugin,
 	MetricTruncatedError,
 	STRIPE_METRIC_IDS,
-	resolveWindowRange
+	resolveWindowRange,
+	clearStripeClientCache
 } from '../stripe-metrics.plugin.js';
 import { isMetricsProviderPlugin } from '@ever-works/plugin';
 import type { PluginContext, MetricQuery } from '@ever-works/plugin';
@@ -68,6 +69,9 @@ describe('StripeMetricsPlugin', () => {
 
 	beforeEach(() => {
 		vi.clearAllMocks();
+		// The client cache is module-level — reset it so each test observes
+		// its own constructor calls.
+		clearStripeClientCache();
 		// Make sure no ambient key leaks into "missing key" tests.
 		vi.stubEnv('STRIPE_SECRET_KEY', '');
 		plugin = new StripeMetricsPlugin();
@@ -149,6 +153,22 @@ describe('StripeMetricsPlugin', () => {
 			await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), SETTINGS);
 			expect(stripeCtorMock).toHaveBeenCalledWith('sk_test_123', expect.anything());
 		});
+
+		it('caches the SDK client per secret key (one construction per key)', async () => {
+			balanceRetrieveMock.mockResolvedValue({ available: [{ amount: 100, currency: 'usd' }] });
+
+			await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), SETTINGS);
+			await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), SETTINGS);
+			expect(stripeCtorMock).toHaveBeenCalledTimes(1);
+
+			// A different secret key gets its own client.
+			await plugin.getMetricValue(
+				query({ metricId: 'balance_available', window: 'point' }),
+				{ secretKey: 'sk_test_other' }
+			);
+			expect(stripeCtorMock).toHaveBeenCalledTimes(2);
+			expect(stripeCtorMock).toHaveBeenLastCalledWith('sk_test_other', expect.anything());
+		});
 	});
 
 	describe('balance_available', () => {
@@ -220,6 +240,27 @@ describe('StripeMetricsPlugin', () => {
 			const sample = await plugin.getMetricValue(query(), SETTINGS);
 			expect(sample.value).toBe(13); // (1050 + 250) / 100
 			expect(sample.unit).toBe('usd');
+		});
+
+		it('matches the currency case-insensitively (lowercases both sides)', async () => {
+			chargesListMock.mockReturnValueOnce(
+				listResult([
+					{ paid: true, currency: 'usd', amount: 1000 },
+					{ paid: true, currency: 'USD', amount: 500 },
+					{ paid: true, currency: 'eur', amount: 99999 }
+				])
+			);
+
+			const sample = await plugin.getMetricValue(query(), { ...SETTINGS, currency: 'USD' });
+			expect(sample.value).toBe(15); // (1000 + 500) / 100
+			expect(sample.unit).toBe('usd');
+		});
+
+		it('labels gross_volume as single-currency in the descriptor', async () => {
+			const metrics = await plugin.listMetrics(SETTINGS);
+			const volume = metrics.find((m) => m.id === 'gross_volume');
+			expect(volume?.label).toMatch(/single-currency/);
+			expect(volume?.label).toContain('usd');
 		});
 
 		it('queries Stripe with a UTC day range [00:00, next 00:00) and limit 100', async () => {

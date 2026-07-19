@@ -53,6 +53,7 @@ export type CustomHttpMetricsErrorCode =
 	| 'unsupported_window'
 	| 'method_not_allowed'
 	| 'ssrf_blocked'
+	| 'redirect_blocked'
 	| 'timeout'
 	| 'http_error'
 	| 'invalid_content_type'
@@ -374,6 +375,21 @@ function isTimeoutError(error: unknown): boolean {
 	return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
+/**
+ * Detect the `redirect: 'error'` rejection. Undici surfaces it as a bare
+ * `TypeError` — either directly (`unexpected redirect`) or as
+ * `TypeError: fetch failed` with the redirect reason on `cause` — so the
+ * message/cause text is the only signal available.
+ */
+function isRedirectRefusedError(error: unknown): boolean {
+	if (!(error instanceof TypeError)) {
+		return false;
+	}
+	const cause = (error as { cause?: unknown }).cause;
+	const causeMessage = cause instanceof Error ? cause.message : typeof cause === 'string' ? cause : '';
+	return /redirect/i.test(error.message) || /redirect/i.test(causeMessage);
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -597,6 +613,13 @@ export class CustomHttpMetricsPlugin implements IPlugin, IMetricsProviderPlugin 
 				throw new CustomHttpMetricsError(
 					'timeout',
 					`Endpoint "${endpoint.id}" did not respond within ${REQUEST_TIMEOUT_MS}ms.`,
+					{ cause: error }
+				);
+			}
+			if (isRedirectRefusedError(error)) {
+				throw new CustomHttpMetricsError(
+					'redirect_blocked',
+					`Endpoint "${endpoint.id}" responded with an HTTP redirect — redirects are refused because the SSRF guard does not re-validate post-redirect targets. Configure the final URL directly.`,
 					{ cause: error }
 				);
 			}

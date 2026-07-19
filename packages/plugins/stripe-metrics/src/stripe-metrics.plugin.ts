@@ -29,6 +29,20 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 const MAX_CHARGES = PAGE_SIZE * MAX_PAGES; // 2,000 charges
 
+/**
+ * Module-level Stripe client cache keyed by secret key. Constructing a
+ * Stripe client per call is wasteful (agent config parsing, retry/telemetry
+ * state). Bounded in practice without eviction: there is one entry per
+ * distinct tenant secret key — a per-tenant handful, never unbounded
+ * user-controlled input — so a plain Map is deliberately kept simple.
+ */
+const stripeClientCache = new Map<string, Stripe>();
+
+/** Test-only helper: reset the module-level Stripe client cache. */
+export function clearStripeClientCache(): void {
+	stripeClientCache.clear();
+}
+
 /** Metric ids served by this provider. */
 export const STRIPE_METRIC_IDS = {
 	BALANCE_AVAILABLE: 'balance_available',
@@ -199,7 +213,9 @@ export class StripeMetricsPlugin implements IMetricsProviderPlugin {
 			},
 			{
 				id: STRIPE_METRIC_IDS.GROSS_VOLUME,
-				label: 'Gross volume (sum of successful charges)',
+				// Single-currency by contract: only charges in the configured
+				// currency are summed; other currencies are excluded.
+				label: `Gross volume (sum of successful ${currency} charges; single-currency)`,
 				unit: currency,
 				supportedWindows: ['day', 'week', 'month']
 			}
@@ -338,24 +354,31 @@ export class StripeMetricsPlugin implements IMetricsProviderPlugin {
 		let seen = 0;
 
 		try {
-			await stripe.charges
-				.list({ created: { gte, lt }, limit: PAGE_SIZE })
-				.autoPagingEach(async (charge) => {
-					seen += 1;
-					if (seen > MAX_CHARGES) {
-						// We already summed MAX_CHARGES charges and Stripe is
-						// still feeding more — the window is too large to read
-						// accurately within the page cap. Fail loudly instead
-						// of returning a silent undercount.
-						throw new MetricTruncatedError(
-							`gross_volume window contains more than ${MAX_CHARGES} charges ` +
-								`(${MAX_PAGES} pages × ${PAGE_SIZE}); narrow the window (e.g. query per day).`
-						);
-					}
-					if (charge.paid && charge.currency === currency) {
-						totalMinorUnits += charge.amount;
-					}
-				});
+			await stripe.charges.list({ created: { gte, lt }, limit: PAGE_SIZE }).autoPagingEach(async (charge) => {
+				seen += 1;
+				if (seen > MAX_CHARGES) {
+					// We already summed MAX_CHARGES charges and Stripe is
+					// still feeding more — the window is too large to read
+					// accurately within the page cap. Fail loudly instead
+					// of returning a silent undercount.
+					throw new MetricTruncatedError(
+						`gross_volume window contains more than ${MAX_CHARGES} charges ` +
+							`(${MAX_PAGES} pages × ${PAGE_SIZE}); narrow the window (e.g. query per day).`
+					);
+				}
+				// SINGLE-CURRENCY metric: only charges in the configured
+				// currency are summed (compare lowercased on both sides —
+				// `resolveCurrency` lowercases settings; Stripe reports
+				// lowercase but we don't rely on it). NOTE: `charges.list`
+				// has no currency filter, so foreign-currency charges are
+				// still walked and count toward the page cap — unavoidable.
+				// Refunds are intentionally NOT excluded/subtracted: the
+				// metric is *gross* volume of successful (paid) charges,
+				// per the README contract.
+				if (charge.paid && charge.currency.toLowerCase() === currency) {
+					totalMinorUnits += charge.amount;
+				}
+			});
 		} catch (error) {
 			this.logError('gross_volume', error);
 			throw error;
@@ -403,10 +426,15 @@ export class StripeMetricsPlugin implements IMetricsProviderPlugin {
 
 	private getClient(settings?: PluginSettings): Stripe {
 		const secretKey = this.resolveSecretKey(settings) as string;
-		return new Stripe(secretKey, {
-			maxNetworkRetries: 2,
-			appInfo: { name: 'Ever Works', url: 'https://ever.works' }
-		});
+		let client = stripeClientCache.get(secretKey);
+		if (!client) {
+			client = new Stripe(secretKey, {
+				maxNetworkRetries: 2,
+				appInfo: { name: 'Ever Works', url: 'https://ever.works' }
+			});
+			stripeClientCache.set(secretKey, client);
+		}
+		return client;
 	}
 
 	private logError(metricId: string, error: unknown): void {
