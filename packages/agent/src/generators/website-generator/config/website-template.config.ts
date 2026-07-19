@@ -96,7 +96,7 @@ const KIND_DEFAULT_WEBSITE_TEMPLATE: Record<string, WebsiteTemplateId> = {
     website: 'web',
     'landing-page': 'web',
     landing: 'web',
-    blog: 'web'
+    blog: 'web',
 };
 
 export function getWebsiteTemplateIdForWorkKind(kind?: string | null): WebsiteTemplateId | null {
