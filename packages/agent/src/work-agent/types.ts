@@ -99,6 +99,8 @@ export interface WorkBuildRequestDto {
 export interface WorkAgentRunDto {
     id: string;
     buildRequestId: string;
+    /** @deprecated compat mirror for one release — read buildRequestId */
+    goalId: string;
     status: WorkAgentRunStatus;
     dryRun: boolean;
     progressPercent: number;

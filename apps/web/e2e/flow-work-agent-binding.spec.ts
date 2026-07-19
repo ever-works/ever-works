@@ -129,6 +129,8 @@ interface BuildRequestDto {
 interface RunDto {
     id: string;
     buildRequestId: string;
+    /** Deprecated one-release compat mirror of `buildRequestId` (review §23.3). */
+    goalId: string;
     status: string;
     dryRun: boolean;
     progressPercent: number;
@@ -828,10 +830,25 @@ test.describe('Work agent (api/me/work-agent): preferences + build-request/run l
             created.status(),
             `deprecated POST /goals alias body=${await created.text().catch(() => '')}`,
         ).toBe(202);
-        const { buildRequest } = (await created.json()) as {
-            buildRequest: BuildRequestDto;
+        // PRE-RENAME envelope: the deprecated create alias answers with the
+        // OLD `{ goal, run }` keys (NOT `{ buildRequest, run }`) so clients
+        // built before the rename keep parsing it.
+        const legacyCreateBody = (await created.json()) as {
+            goal: BuildRequestDto;
             run: RunDto;
         };
+        expect(legacyCreateBody.goal, 'alias create envelope uses the old `goal` key').toBeTruthy();
+        expect(
+            (legacyCreateBody as unknown as Record<string, unknown>).buildRequest,
+            'alias create envelope does NOT use the new `buildRequest` key',
+        ).toBeUndefined();
+        const buildRequest = legacyCreateBody.goal;
+        // Run DTOs carry the deprecated `goalId` compat mirror alongside
+        // `buildRequestId` (same value) for one release window.
+        expect(legacyCreateBody.run.goalId, 'run.goalId compat mirror is present').toBe(
+            legacyCreateBody.run.buildRequestId,
+        );
+        expect(legacyCreateBody.run.buildRequestId).toBe(buildRequest.id);
 
         // The OLD list route responds 200 and shows the same queue.
         const legacyList = await request.get(legacyGoalsUrl, {

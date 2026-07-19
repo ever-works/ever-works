@@ -69,6 +69,17 @@ export class WorkAgentController {
     // "Goal" is reserved for the upcoming measurable-outcome entity; the
     // build-request queue's old routes stay as thin aliases for one release
     // window so existing clients keep working. Remove after the window.
+    //
+    // Back-compat contract: the aliases must serve the exact PRE-RENAME
+    // response shapes (see `git show develop -- .../work-agent.controller.ts`):
+    //   - GET  /goals            → plain DTO array (field names unchanged by
+    //                              the rename, so delegation alone suffices).
+    //   - POST /goals            → `{ goal, run }` — the create envelope key
+    //                              was renamed to `buildRequest`, so we map it
+    //                              back here.
+    //   - PATCH /goals/:id/cancel → plain DTO (field names unchanged).
+    // Run DTOs additionally carry the deprecated `goalId` mirror of
+    // `buildRequestId` (populated in WorkAgentService.toRunDto).
 
     @Get('goals')
     @ApiOperation({
@@ -86,11 +97,13 @@ export class WorkAgentController {
         summary: 'DEPRECATED alias of build-requests — queue a Work agent build request',
     })
     @HttpCode(HttpStatus.ACCEPTED)
-    createGoalDeprecated(
+    async createGoalDeprecated(
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateWorkBuildRequestDto,
     ) {
-        return this.service.createBuildRequest(auth.userId, body);
+        const { buildRequest, run } = await this.service.createBuildRequest(auth.userId, body);
+        // Pre-rename clients expect the `goal` envelope key, not `buildRequest`.
+        return { goal: buildRequest, run };
     }
 
     @Patch('goals/:id/cancel')

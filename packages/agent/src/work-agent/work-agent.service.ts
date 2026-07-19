@@ -459,6 +459,8 @@ export class WorkAgentService {
         return {
             id: run.id,
             buildRequestId: run.buildRequestId,
+            // Deprecated compat mirror for one release — read buildRequestId.
+            goalId: run.buildRequestId,
             status: run.status,
             dryRun: run.dryRun,
             progressPercent: run.progressPercent,
