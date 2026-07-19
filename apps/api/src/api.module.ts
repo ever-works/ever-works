@@ -40,6 +40,7 @@ import { DataSyncModule } from './data-sync/data-sync.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { TemplateCatalogModule } from './template-catalog/template-catalog.module';
 import { WorkProposalsModule } from './work-proposals/work-proposals.module';
+import { IdeaBuildExecutorDispatchModule } from './work-proposals/idea-build-executor-dispatch.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
 import { AgentsModule } from './agents/agents.module';
@@ -141,6 +142,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         OnboardingModule,
         TemplateCatalogModule,
         WorkProposalsModule,
+        // PR-4 — @Global binding of the Idea build executor dispatch
+        // adapter (inert until EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED=true).
+        IdeaBuildExecutorDispatchModule,
         WorkAgentModule,
         // Missions/Ideas/Works (spec 2026-05-24) — Phase 3 PR G:
         // skeleton module exposing GET /me/missions. CRUD + lifecycle

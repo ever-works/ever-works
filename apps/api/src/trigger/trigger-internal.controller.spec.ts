@@ -42,6 +42,13 @@ jest.mock('@ever-works/agent/services', () => ({
 jest.mock('@ever-works/agent/missions', () => ({
     MissionTickService: class MissionTickService {},
 }));
+// PR-4 — controller now imports IdeaBuildExecutorService from the
+// work-agent barrel; mock it so the real barrel (which pulls
+// database.config → `@src/config`, unresolvable under apps/api jest)
+// is never loaded.
+jest.mock('@ever-works/agent/work-agent', () => ({
+    IdeaBuildExecutorService: class IdeaBuildExecutorService {},
+}));
 jest.mock('@ever-works/agent/notifications', () => ({
     NotificationService: class NotificationService {},
 }));
@@ -133,6 +140,9 @@ describe('TriggerInternalController', () => {
             undefined, // deployReadyPoller
             workKnowledgeDocumentRepository,
             missionTickService,
+            // PR-4 — ideaBuildExecutorService (idea-build-execute task).
+            // Not exercised by these tests; undefined is sufficient.
+            undefined, // ideaBuildExecutorService
             // Agents/Skills/Tasks PR #1017 — Phase 6 + 17 added 4 new
             // constructor args after missionTickService; tests pass
             // undefined since they don't exercise these paths.

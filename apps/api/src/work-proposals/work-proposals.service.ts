@@ -1,10 +1,15 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { config } from '@ever-works/agent/config';
 import { User, WorkAgentPreference, type WorkProposal } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
+import {
+    IDEA_BUILD_EXECUTE_DISPATCHER,
+    type IdeaBuildExecuteDispatcher,
+} from '@ever-works/agent/work-agent';
 import {
     DEFAULT_MAX_PENDING_WORK_PROPOSALS,
     UserResearchService,
@@ -53,7 +58,43 @@ export class WorkProposalsApiService {
         private readonly config: ConfigService,
         private readonly workAgent: WorkAgentService,
         private readonly taskLockService?: DistributedTaskLockService,
+        // PR-4 — Idea build executor dispatch seam. Bound to the
+        // Trigger.dev adapter by IdeaBuildExecutorDispatchModule (@Global).
+        // Optional so the service still boots (and the build endpoints
+        // still work as today) when the adapter isn't registered — e.g.
+        // in tests, or when the executor feature flag is off.
+        @Optional()
+        @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
+        private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
     ) {}
+
+    /**
+     * PR-4 — enqueue the just-created build Goal onto the Idea build
+     * executor, but ONLY when the feature flag is on. When
+     * `EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED` is off (the default) this
+     * is a strict no-op: the Goal is still created and the Idea is still
+     * QUEUED, exactly as before this PR — nothing executes. Best-effort:
+     * a dispatch failure is logged and swallowed so the HTTP response
+     * (Goal created, Idea queued) is unchanged.
+     */
+    private async maybeEnqueueBuild(userId: string, goalId: string, ideaId: string): Promise<void> {
+        if (!config.ideaBuildExecutor.isEnabled()) return;
+        if (!this.ideaBuildDispatcher) {
+            this.logger.warn(
+                `Idea build executor is enabled but no dispatcher is bound; ` +
+                    `goal ${goalId} for idea ${ideaId} will not execute.`,
+            );
+            return;
+        }
+        try {
+            await this.ideaBuildDispatcher.enqueue({ goalId, userId, ideaId });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to enqueue idea-build-execute for goal ${goalId} (idea ${ideaId}): ` +
+                    `${(err as Error).message}`,
+            );
+        }
+    }
 
     async list(
         userId: string,
@@ -147,6 +188,8 @@ export class WorkProposalsApiService {
             ideaId: proposal.id,
         });
 
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
+
         return { proposal, goal };
     }
 
@@ -176,6 +219,8 @@ export class WorkProposalsApiService {
             maxWorksPerRun: 1,
             ideaId: proposal.id,
         });
+
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
 
         return { proposal, goal };
     }
@@ -207,6 +252,8 @@ export class WorkProposalsApiService {
             maxWorksPerRun: 1,
             ideaId: proposal.id,
         });
+
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
 
         return { proposal, goal };
     }

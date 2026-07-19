@@ -41,6 +41,7 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -201,6 +202,9 @@ export class TriggerInternalController implements OnModuleInit {
         // Phase 3 PR J — exposed for the mission-tick Trigger.dev cron
         // so it can drive `tickDue()` over the internal RPC channel.
         private readonly missionTickService: MissionTickService,
+        // PR-4 — exposed for the idea-build-execute Trigger.dev task so it
+        // can drive executeBuild() over the internal RPC channel.
+        private readonly ideaBuildExecutorService: IdeaBuildExecutorService,
         // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
         // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
         // one-shot worker over the internal RPC channel.
@@ -262,6 +266,8 @@ export class TriggerInternalController implements OnModuleInit {
             WorkKnowledgeDocumentRepository: this.workKnowledgeDocumentRepository,
             // Phase 3 PR J — exposed for the mission-tick cron.
             MissionTickService: this.missionTickService,
+            // PR-4 — exposed for the idea-build-execute one-shot task.
+            IdeaBuildExecutorService: this.ideaBuildExecutorService,
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
