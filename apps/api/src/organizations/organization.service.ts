@@ -999,7 +999,7 @@ export class OrganizationService {
             throw new NotFoundException(`Organization ${organizationId} not found`);
         }
         const { vision, ...rest } = patch;
-        const updatePayload: Partial<Organization> = { ...rest };
+        let updatePayload: Partial<Organization> = { ...rest };
         if (vision !== undefined) {
             updatePayload.vision = this.normalizeVision(vision);
             updatePayload.visionUpdatedAt = new Date();

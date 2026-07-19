@@ -1193,20 +1193,26 @@ export class AgentRunService {
 
 /**
  * PR-6 (review §23.5) — neutralizer for the company-vision segment
- * appended to the assembled system message above. Mirrors the
- * assembler's `neutralizeInjectedBlock` (which is module-private to
- * `prompt-assembler.service.ts`, hence the local copy): newlines are
- * PRESERVED (the vision is legitimately multi-line prose); only the
- * two break-out vectors are defused — (1) a printed
- * `<untrusted_company_vision>` fence token that would forge the block
- * boundary (zero-width space inserted after the `<`), and (2)
- * chat-template control markers that could spoof a system/user turn.
- * Benign vision text passes through unchanged.
+ * appended to the assembled system message above. Mirrors the house
+ * multi-line neutralizers (`neutralizeInjectedBlock` in
+ * `prompt-assembler.service.ts` and `neutralizePromptBlock` in
+ * `user-research/prompts.ts`, both module-private, hence the local
+ * copy): newlines are PRESERVED (the vision is legitimately multi-line
+ * prose); only the two break-out vectors are defused — (1) a printed
+ * `<untrusted_*>` fence token that would forge a data-block boundary
+ * (zero-width space inserted after the `<`), and (2) chat-template
+ * control markers that could spoof a system/user turn. Benign vision
+ * text passes through unchanged.
  */
 const VISION_CHAT_TEMPLATE_MARKER_PATTERN =
     /\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>/gi;
 
-const VISION_FENCE_TOKEN_PATTERN = /<\/?untrusted_company_vision\b/gi;
+// KEEP IN SYNC with `DATA_FENCE_TOKEN_PATTERN` in
+// `user-research/prompts.ts` (the shared `neutralizePromptBlock`
+// pattern): defuses EVERY `<untrusted_*>` fence shape, not just this
+// segment's own tag, so a vision body cannot forge any untrusted-data
+// boundary elsewhere in the prompt.
+const VISION_FENCE_TOKEN_PATTERN = /<\/?untrusted_[a-z_]*\b/gi;
 
 function neutralizeVisionBlock(value: string): string {
     return value

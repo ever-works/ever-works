@@ -190,7 +190,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         // user left it blank so the POST body stays identical to the
         // pre-PR-6 contract for the common zero-friction path.
         const trimmedVision = vision.trim();
-        const payload: { name: string; vision?: string } = { name: trimmed };
+        let payload: { name: string; vision?: string } = { name: trimmed };
         if (trimmedVision.length > 0) {
             payload.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
         }
