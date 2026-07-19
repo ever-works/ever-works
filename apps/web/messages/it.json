@@ -5083,7 +5083,8 @@
                 "deleteFailed": "Impossibile eliminare il trigger",
                 "loadFailed": "Impossibile caricare i trigger",
                 "copyFailed": "Impossibile copiare negli appunti"
-            }
+            },
+            "confirmDelete": "Eliminare questo trigger? Il suo URL webhook smette di funzionare immediatamente e l’operazione è irreversibile."
         }
     },
     "layout": {

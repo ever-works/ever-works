@@ -5083,7 +5083,8 @@
                 "deleteFailed": "无法删除触发器",
                 "loadFailed": "无法加载触发器",
                 "copyFailed": "无法复制到剪贴板"
-            }
+            },
+            "confirmDelete": "删除此触发器？它的 Webhook URL 会立即失效，且此操作无法撤销。"
         }
     },
     "layout": {

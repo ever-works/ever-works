@@ -5083,7 +5083,8 @@
                 "deleteFailed": "Tidak dapat menghapus pemicu",
                 "loadFailed": "Tidak dapat memuat pemicu",
                 "copyFailed": "Tidak dapat menyalin ke papan klip"
-            }
+            },
+            "confirmDelete": "Hapus pemicu ini? URL webhook-nya langsung berhenti berfungsi dan ini tidak dapat dibatalkan."
         }
     },
     "layout": {

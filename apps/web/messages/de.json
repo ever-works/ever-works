@@ -5279,7 +5279,8 @@
                 "deleteFailed": "Trigger konnte nicht gelöscht werden",
                 "loadFailed": "Trigger konnten nicht geladen werden",
                 "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen"
-            }
+            },
+            "confirmDelete": "Diesen Trigger löschen? Seine Webhook-URL funktioniert sofort nicht mehr und dies kann nicht rückgängig gemacht werden."
         }
     },
     "layout": {

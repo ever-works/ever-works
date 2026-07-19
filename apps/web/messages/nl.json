@@ -5091,7 +5091,8 @@
                 "deleteFailed": "Kon de trigger niet verwijderen",
                 "loadFailed": "Kon de triggers niet laden",
                 "copyFailed": "Kon niet naar klembord kopiëren"
-            }
+            },
+            "confirmDelete": "Deze trigger verwijderen? De webhook-URL werkt onmiddellijk niet meer en dit kan niet ongedaan worden gemaakt."
         }
     },
     "layout": {

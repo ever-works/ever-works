@@ -5279,7 +5279,8 @@
                 "deleteFailed": "Impossible de supprimer le déclencheur",
                 "loadFailed": "Impossible de charger les déclencheurs",
                 "copyFailed": "Impossible de copier dans le presse-papiers"
-            }
+            },
+            "confirmDelete": "Supprimer ce déclencheur ? Son URL de webhook cesse de fonctionner immédiatement et cette action est irréversible."
         }
     },
     "layout": {

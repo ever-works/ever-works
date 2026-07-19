@@ -5279,7 +5279,8 @@
                 "deleteFailed": "No se pudo eliminar el disparador",
                 "loadFailed": "No se pudieron cargar los disparadores",
                 "copyFailed": "No se pudo copiar al portapapeles"
-            }
+            },
+            "confirmDelete": "¿Eliminar este disparador? Su URL de webhook dejará de funcionar de inmediato y esto no se puede deshacer."
         }
     },
     "layout": {

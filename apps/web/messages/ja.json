@@ -5091,7 +5091,8 @@
                 "deleteFailed": "トリガーを削除できませんでした",
                 "loadFailed": "トリガーを読み込めませんでした",
                 "copyFailed": "クリップボードにコピーできませんでした"
-            }
+            },
+            "confirmDelete": "このトリガーを削除しますか？ Webhook URL は直ちに使用できなくなり、元に戻せません。"
         }
     },
     "layout": {

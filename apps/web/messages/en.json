@@ -457,6 +457,7 @@
     },
     "dashboard": {
         "triggers": {
+            "confirmDelete": "Delete this trigger? Its webhook URL stops working immediately and this can't be undone.",
             "title": "Inbound triggers",
             "subtitle": "Signed webhooks and API calls that spawn a Task when fired.",
             "new": "New trigger",

@@ -5091,7 +5091,8 @@
                 "deleteFailed": "트리거를 삭제할 수 없습니다",
                 "loadFailed": "트리거를 불러올 수 없습니다",
                 "copyFailed": "클립보드에 복사할 수 없습니다"
-            }
+            },
+            "confirmDelete": "이 트리거를 삭제하시겠습니까? 웹훅 URL이 즉시 작동을 멈추며 되돌릴 수 없습니다."
         }
     },
     "layout": {

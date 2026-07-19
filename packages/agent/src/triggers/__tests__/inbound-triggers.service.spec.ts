@@ -42,9 +42,14 @@ function makeRepo() {
         findOne: jest.fn(async ({ where }: { where: { id: string } }) => {
             return rows.get(where.id) ?? null;
         }),
-        update: jest.fn(async (id: string, patch: Partial<InboundTrigger>) => {
-            const row = rows.get(id);
-            if (row) Object.assign(row, patch);
+        update: jest.fn(async (id: string, patch: Record<string, unknown>) => {
+            const row = rows.get(id) as unknown as Record<string, unknown> | undefined;
+            if (!row) return;
+            for (const [key, value] of Object.entries(patch)) {
+                // A function value is a TypeORM raw expression — the service
+                // uses only `"fireCount" + 1`, so model it as a +1 increment.
+                row[key] = typeof value === 'function' ? ((row[key] as number) ?? 0) + 1 : value;
+            }
         }),
         increment: jest.fn(async ({ id }: { id: string }, field: 'fireCount', by: number) => {
             const row = rows.get(id);

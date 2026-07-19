@@ -5083,7 +5083,8 @@
                 "deleteFailed": "Tetikleyici silinemedi",
                 "loadFailed": "Tetikleyiciler yüklenemedi",
                 "copyFailed": "Panoya kopyalanamadı"
-            }
+            },
+            "confirmDelete": "Bu tetikleyici silinsin mi? Webhook URL’si hemen çalışmayı durdurur ve bu işlem geri alınamaz."
         }
     },
     "layout": {

@@ -5083,7 +5083,8 @@
                 "deleteFailed": "Nie udało się usunąć wyzwalacza",
                 "loadFailed": "Nie udało się wczytać wyzwalaczy",
                 "copyFailed": "Nie udało się skopiować do schowka"
-            }
+            },
+            "confirmDelete": "Usunąć ten wyzwalacz? Jego adres webhooka natychmiast przestanie działać, a tej operacji nie można cofnąć."
         }
     },
     "layout": {

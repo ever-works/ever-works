@@ -5083,7 +5083,8 @@
                 "deleteFailed": "Không thể xóa trình kích hoạt",
                 "loadFailed": "Không thể tải trình kích hoạt",
                 "copyFailed": "Không thể sao chép vào bảng nhớ tạm"
-            }
+            },
+            "confirmDelete": "Xóa trình kích hoạt này? URL webhook của nó ngừng hoạt động ngay lập tức và không thể hoàn tác."
         }
     },
     "layout": {
