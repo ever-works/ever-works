@@ -5,6 +5,7 @@ import {
     findWebsiteTemplateConfig,
     getDefaultWebsiteTemplateId,
     getWebsiteTemplateConfig as getStaticWebsiteTemplateConfig,
+    getWebsiteTemplateIdForWorkKind,
     type WebsiteTemplateConfig,
 } from './config/website-template.config';
 import type { Work } from '@src/entities/work.entity';
@@ -104,7 +105,7 @@ export class WebsiteTemplateResolverService {
     }
 
     async resolveForWork(
-        work: Pick<Work, 'userId'> & { websiteTemplateId?: string | null },
+        work: Pick<Work, 'userId'> & { websiteTemplateId?: string | null; kind?: string | null },
     ): Promise<WebsiteTemplateConfig> {
         if (work.websiteTemplateId) {
             return this.resolve(work.websiteTemplateId);
@@ -125,6 +126,19 @@ export class WebsiteTemplateResolverService {
             );
             if (preferredTemplate) {
                 return preferredTemplate;
+            }
+        }
+
+        // No explicit template and no saved preference: pick a sensible default
+        // from the Work's kind. General-purpose kinds (website/landing-page/blog)
+        // map to the general `web` template; directory/awesome/'default'/unknown
+        // kinds return null here and fall through to the system default
+        // (classic) below — so existing behaviour is preserved.
+        const kindTemplateId = getWebsiteTemplateIdForWorkKind(work.kind);
+        if (kindTemplateId) {
+            const kindTemplate = findWebsiteTemplateConfig(kindTemplateId);
+            if (kindTemplate) {
+                return kindTemplate;
             }
         }
 

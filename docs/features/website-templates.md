@@ -80,7 +80,9 @@ Templates the Works platform supports:
   faceted filters, no directory data model.
 - **Rebrand from one file:** all copy lives in `apps/web/lib/site.config.ts`.
 - **Status:** ✅ Available; registered as `WebsiteTemplateId = 'web'`. Select it
-  for a **Landing Page**, **Blog**, or general **Website** Work.
+  for a **Landing Page**, **Blog**, or general **Website** Work. Agent-customizable
+  via a plain-CSS `apps/web/src/styles/theme.css` surface (design-token overrides +
+  `[data-component]` hooks).
 
 ### 4. `web-minimal` — web-minimal-template (Astro, general-purpose minimal)
 
@@ -93,6 +95,7 @@ Templates the Works platform supports:
   by default; the same marketing section set as `web`, built statically.
 - **Rebrand from one file:** all copy lives in `apps/web/src/config/site.ts`.
 - **Status:** ✅ Available; registered as `WebsiteTemplateId = 'web-minimal'`.
+  Agent-customizable via a plain-CSS `apps/web/src/styles/theme.css` surface.
 
 ## Roadmap
 
