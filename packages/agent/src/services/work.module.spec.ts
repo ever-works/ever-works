@@ -105,6 +105,7 @@ jest.mock('@src/ever-works-providers', () => ({
     EVER_WORKS_DEPLOY_QUOTA_COUNTER: Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER'),
     EverWorksDeployQuotaService: class EverWorksDeployQuotaService {},
     EverWorksGitProvider: class EverWorksGitProvider {},
+    EverWorksK8sDeployProvider: class EverWorksK8sDeployProvider {},
     EverWorksDnsService: class EverWorksDnsService {},
 }));
 jest.mock('@src/database/repositories/work.repository', () => ({
@@ -116,6 +117,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksK8sDeployProvider,
     EverWorksDnsService,
 } from '@src/ever-works-providers';
 import { WorkDetailService } from './work-detail.service';
@@ -230,6 +232,7 @@ describe('WorkModule', () => {
             EverWorksDnsService,
             ZeroFrictionFunnelService,
             DeployReadyPollerService,
+            EverWorksK8sDeployProvider,
         ];
 
         it.each(expectedProviders)('declares %p as a provider', (provider) => {
@@ -237,9 +240,10 @@ describe('WorkModule', () => {
         });
 
         it('keeps the providers list at the documented shape (class providers + the EverWorks quota counter factory)', () => {
-            // 30 class providers + 1 factory provider object for the
-            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 31 entries total.
-            // (EW-120 added PlatformSyncSecretService; EW-614 added EverWorksGitProvider.)
+            // 37 class providers + 1 factory provider object for the
+            // EVER_WORKS_DEPLOY_QUOTA_COUNTER token = 38 entries total.
+            // (EW-120 added PlatformSyncSecretService; EW-614 added EverWorksGitProvider;
+            // Task 10 / Path A added EverWorksK8sDeployProvider.)
             expect(meta('providers')).toHaveLength(expectedProviders.length + 1);
         });
 
@@ -287,12 +291,15 @@ describe('WorkModule', () => {
                     provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
                     provider === EverWorksGitProvider ||
+                    provider === EverWorksK8sDeployProvider ||
                     provider === EverWorksDnsService
                 ) {
                     // EW-614: EverWorksGitProvider is consumed inside the
                     // module (by WorkLifecycleService.createWork); not exported.
                     // EW-617 G5: EverWorksDnsService is consumed by DeployService;
                     // not exported through WorkModule.
+                    // Task 10 / Path A: EverWorksK8sDeployProvider is injected by
+                    // WorkLifecycleService for managed deploys; not exported.
                     expect(exports).not.toContain(provider);
                 } else {
                     expect(exports).toContain(provider);

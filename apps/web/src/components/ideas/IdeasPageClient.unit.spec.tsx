@@ -85,9 +85,16 @@ describe('IdeasPageClient (Phase 5 PR N)', () => {
             />,
         );
         const search = container.querySelector('input[name="search"]') as HTMLInputElement;
-        const status = container.querySelector('select[name="status"]') as HTMLSelectElement;
+        // Status is carried by a hidden input synced to the custom <Select>
+        // (a styled button + portal list, not a native <select>).
+        const status = container.querySelector('input[name="status"]') as HTMLInputElement;
         expect(search.value).toBe('benchmarks');
         expect(status.value).toBe('failed');
+
+        // Options ('Actionable', the 'done' filter) live in a portal that is
+        // only mounted once the trigger opens the dropdown.
+        const trigger = container.querySelector('[aria-haspopup="listbox"]') as HTMLButtonElement;
+        fireEvent.click(trigger);
         expect(screen.getByText('Actionable')).toBeTruthy();
         expect(screen.getByText('filters.done')).toBeTruthy();
     });

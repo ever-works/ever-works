@@ -26,6 +26,7 @@ describe('AuthController', () => {
         Pick<
             AuthService,
             | 'assertCanRegister'
+            | 'grantPlatformAdminIfBootstrapped'
             | 'sendVerificationEmail'
             | 'getUserProfile'
             | 'updateUserProfile'
@@ -63,6 +64,7 @@ describe('AuthController', () => {
     beforeEach(() => {
         authService = {
             assertCanRegister: jest.fn().mockResolvedValue(undefined),
+            grantPlatformAdminIfBootstrapped: jest.fn().mockResolvedValue(false),
             sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
             getUserProfile: jest.fn(),
             updateUserProfile: jest.fn(),

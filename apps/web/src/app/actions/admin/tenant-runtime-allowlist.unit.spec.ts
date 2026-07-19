@@ -4,8 +4,10 @@
 //
 // Targets: apps/web/src/app/actions/admin/tenant-runtime-allowlist.ts
 //   - ensurePlatformAdmin() gating: missing session → redirect to login;
-//     non-admin profile → redirect to "/" (route-doesn't-exist posture);
-//     getProfile() rejection caught → still treated as non-admin.
+//     explicit non-admin profile (isPlatformAdmin === false) → redirect to
+//     "/" (route-doesn't-exist posture); getProfile() rejection is caught
+//     (.catch(() => null)) and a null/undefined-flag profile proceeds to the
+//     mutation, deferring to the API tier's IsPlatformAdminGuard.
 //   - replaceTenantRuntimeAllowlistAction: happy path returns
 //     { success, data, error: null }, calls operatorTenantRuntimeAllowlistAPI.replace
 //     with ordered providerIds, revalidates the admin page route, surfaces
@@ -136,14 +138,21 @@ describe('replaceTenantRuntimeAllowlistAction', () => {
         expect(replaceMock).not.toHaveBeenCalled();
     });
 
-    it('treats a rejected getProfile() as non-admin (.catch(() => null) path)', async () => {
+    it('does NOT redirect at the action layer when getProfile() rejects (null profile → API guard is authoritative)', async () => {
         getProfileMock.mockRejectedValue(new Error('upstream down'));
         const { replaceTenantRuntimeAllowlistAction } = await importActions();
-        await expect(replaceTenantRuntimeAllowlistAction('t-1', [])).rejects.toThrow(
-            '__REDIRECT__',
-        );
-        expect(redirectMock).toHaveBeenCalledWith('/');
-        expect(replaceMock).not.toHaveBeenCalled();
+        // A rejected profile fetch is swallowed by `.catch(() => null)`. The
+        // gate fires ONLY on an EXPLICIT `isPlatformAdmin === false` (the
+        // `/api/auth/profile` whitelist projection strips the flag, so an
+        // `undefined`/null profile must not be treated as non-admin — that
+        // would lock out real admins too). So a null profile proceeds to the
+        // mutation and relies on the API tier's `IsPlatformAdminGuard` (which
+        // 403s non-admins, surfaced as `success: false`) rather than
+        // redirecting here.
+        const result = await replaceTenantRuntimeAllowlistAction('t-1', []);
+        expect(redirectMock).not.toHaveBeenCalled();
+        expect(result.success).toBe(true);
+        expect(replaceMock).toHaveBeenCalledTimes(1);
     });
 
     it('maps an ApiResponseError to { success: false, error: error.message } and skips revalidation', async () => {

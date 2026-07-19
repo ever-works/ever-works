@@ -420,15 +420,32 @@ describe('TemplateCatalogService', () => {
         // Mission repo. The mock returns ONLY the matching curated id
         // for each (owner, repo) so non-orphan curated rows aren't
         // erroneously deactivated.
-        const CURATED_BY_REPO: Record<string, string> = {
-            'ever-works/directory-web-template': 'classic',
-            'ever-works/directory-web-minimal-template': 'minimal',
-            'ever-works/starter-business-mission-template': 'starter-business',
-            'ever-works/starter-content-mission-template': 'starter-content',
+        // The real repository filters built-in rows by (kind, owner, repo).
+        // Since #1681 ("customizable web templates") the curated catalog also
+        // seeds Work Templates (`listWorkTemplates`) that reuse the SAME repos
+        // as the website templates (directory-web-template /
+        // directory-web-minimal-template) but under kind='work'. So the mock
+        // MUST key on kind — a work-kind query must never return the
+        // website-kind 'classic'/'minimal' rows, otherwise the work-template
+        // dedup loop would wrongly deactivate them.
+        const CURATED_BY_KIND_REPO: Record<string, string> = {
+            'website/ever-works/directory-web-template': 'classic',
+            'website/ever-works/web-template': 'web',
+            'website/ever-works/web-minimal-template': 'web-minimal',
+            'mission/ever-works/starter-business-mission-template': 'starter-business',
+            'mission/ever-works/starter-content-mission-template': 'starter-content',
+            'work/ever-works/directory-web-template': 'starter-directory',
+            'work/ever-works/directory-web-minimal-template': 'starter-directory-minimal',
         };
         templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
             async (kind: string, owner: string, repo: string) => {
-                if (owner === 'ever-works' && repo === 'directory-web-minimal-template') {
+                // Only the website surface has the orphan discovery row
+                // (id="<repo-name>") sitting alongside the curated 'minimal'.
+                if (
+                    kind === 'website' &&
+                    owner === 'ever-works' &&
+                    repo === 'directory-web-minimal-template'
+                ) {
                     return [
                         {
                             id: 'minimal',
@@ -448,7 +465,7 @@ describe('TemplateCatalogService', () => {
                         },
                     ];
                 }
-                const curatedId = CURATED_BY_REPO[`${owner}/${repo}`];
+                const curatedId = CURATED_BY_KIND_REPO[`${kind}/${owner}/${repo}`];
                 if (!curatedId) return [];
                 return [
                     {
