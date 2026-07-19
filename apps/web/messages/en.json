@@ -713,6 +713,31 @@
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
                 "openInWizard": "Open in wizard"
+            },
+            "guardrails": {
+                "title": "Guardrails",
+                "subtitle": "Decide which proposed actions wait for your approval, run automatically, or are blocked.",
+                "modeLabel": "Dispatch mode",
+                "modeRequireApproval": "Require approval",
+                "modeRequireApprovalHint": "Every proposed action waits in your approval queue until you decide.",
+                "modeAutonomous": "Autonomous",
+                "modeAutonomousHint": "Safe actions run without waiting. Actions with risk flags always queue for your approval.",
+                "autoApproveLabel": "Auto-approve action types",
+                "autoApproveHint": "Only the selected action types run automatically; everything else still queues.",
+                "blockedLabel": "Blocked action types",
+                "blockedHint": "Blocked actions are rejected automatically and recorded in the queue history.",
+                "actionTypes": {
+                    "spawn_agent": "Spawn agent",
+                    "schedule_task": "Schedule task",
+                    "send_message": "Send message",
+                    "budget_override": "Budget override",
+                    "other": "Other"
+                },
+                "save": "Save guardrails",
+                "reset": "Reset to default",
+                "saveSuccess": "Guardrails saved",
+                "saveError": "Could not save guardrails",
+                "resetSuccess": "Guardrails reset to default"
             }
         },
         "tasksPage": {

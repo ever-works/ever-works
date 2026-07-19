@@ -682,6 +682,31 @@
                 "yourTemplates": "Ihre Vorlagen",
                 "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
                 "openInWizard": "Assistent öffnen"
+            },
+            "guardrails": {
+                "title": "Guardrails",
+                "subtitle": "Legen Sie fest, welche vorgeschlagenen Aktionen auf Ihre Freigabe warten, automatisch ausgeführt oder blockiert werden.",
+                "modeLabel": "Dispatch-Modus",
+                "modeRequireApproval": "Freigabe erforderlich",
+                "modeRequireApprovalHint": "Jede vorgeschlagene Aktion wartet in Ihrer Freigabe-Warteschlange, bis Sie entscheiden.",
+                "modeAutonomous": "Autonom",
+                "modeAutonomousHint": "Sichere Aktionen laufen ohne Wartezeit. Aktionen mit Risiko-Markierungen landen immer in Ihrer Freigabe-Warteschlange.",
+                "autoApproveLabel": "Automatisch freigegebene Aktionstypen",
+                "autoApproveHint": "Nur die ausgewählten Aktionstypen laufen automatisch; alles andere wartet weiterhin auf Freigabe.",
+                "blockedLabel": "Blockierte Aktionstypen",
+                "blockedHint": "Blockierte Aktionen werden automatisch abgelehnt und im Verlauf der Warteschlange festgehalten.",
+                "actionTypes": {
+                    "spawn_agent": "Agent erstellen",
+                    "schedule_task": "Aufgabe planen",
+                    "send_message": "Nachricht senden",
+                    "budget_override": "Budget-Überschreibung",
+                    "other": "Sonstiges"
+                },
+                "save": "Guardrails speichern",
+                "reset": "Auf Standard zurücksetzen",
+                "saveSuccess": "Guardrails gespeichert",
+                "saveError": "Guardrails konnten nicht gespeichert werden",
+                "resetSuccess": "Guardrails auf Standard zurückgesetzt"
             }
         },
         "tasksPage": {

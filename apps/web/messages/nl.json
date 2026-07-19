@@ -624,6 +624,31 @@
                 "back": "Terug",
                 "next": "Volgende",
                 "create": "Maak Agent"
+            },
+            "guardrails": {
+                "title": "Vangrails",
+                "subtitle": "Bepaal welke voorgestelde acties op je goedkeuring wachten, automatisch worden uitgevoerd of worden geblokkeerd.",
+                "modeLabel": "Dispatch-modus",
+                "modeRequireApproval": "Goedkeuring vereist",
+                "modeRequireApprovalHint": "Elke voorgestelde actie wacht in je goedkeuringswachtrij totdat je beslist.",
+                "modeAutonomous": "Autonoom",
+                "modeAutonomousHint": "Veilige acties worden direct uitgevoerd. Acties met risicomarkeringen komen altijd in je goedkeuringswachtrij.",
+                "autoApproveLabel": "Automatisch goedgekeurde actietypes",
+                "autoApproveHint": "Alleen de geselecteerde actietypes worden automatisch uitgevoerd; al het andere blijft in de wachtrij.",
+                "blockedLabel": "Geblokkeerde actietypes",
+                "blockedHint": "Geblokkeerde acties worden automatisch afgewezen en vastgelegd in de wachtrijgeschiedenis.",
+                "actionTypes": {
+                    "spawn_agent": "Agent aanmaken",
+                    "schedule_task": "Taak inplannen",
+                    "send_message": "Bericht versturen",
+                    "budget_override": "Budgetoverschrijving",
+                    "other": "Overig"
+                },
+                "save": "Vangrails opslaan",
+                "reset": "Terugzetten naar standaard",
+                "saveSuccess": "Vangrails opgeslagen",
+                "saveError": "Kon vangrails niet opslaan",
+                "resetSuccess": "Vangrails teruggezet naar standaard"
             }
         },
         "tasksPage": {

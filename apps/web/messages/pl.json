@@ -624,6 +624,31 @@
                 "back": "Wstecz",
                 "next": "Dalej",
                 "create": "Utwórz Agenta"
+            },
+            "guardrails": {
+                "title": "Bariery ochronne",
+                "subtitle": "Zdecyduj, które proponowane akcje czekają na Twoje zatwierdzenie, wykonują się automatycznie lub są blokowane.",
+                "modeLabel": "Tryb wykonywania",
+                "modeRequireApproval": "Wymagaj zatwierdzenia",
+                "modeRequireApprovalHint": "Każda proponowana akcja czeka w Twojej kolejce zatwierdzeń, dopóki nie podejmiesz decyzji.",
+                "modeAutonomous": "Autonomiczny",
+                "modeAutonomousHint": "Bezpieczne akcje wykonują się bez czekania. Akcje z oznaczeniami ryzyka zawsze trafiają do Twojej kolejki zatwierdzeń.",
+                "autoApproveLabel": "Automatycznie zatwierdzane typy akcji",
+                "autoApproveHint": "Tylko wybrane typy akcji wykonują się automatycznie; cała reszta nadal trafia do kolejki.",
+                "blockedLabel": "Zablokowane typy akcji",
+                "blockedHint": "Zablokowane akcje są automatycznie odrzucane i zapisywane w historii kolejki.",
+                "actionTypes": {
+                    "spawn_agent": "Utwórz Agenta",
+                    "schedule_task": "Zaplanuj zadanie",
+                    "send_message": "Wyślij wiadomość",
+                    "budget_override": "Nadpisanie budżetu",
+                    "other": "Inne"
+                },
+                "save": "Zapisz bariery",
+                "reset": "Przywróć domyślne",
+                "saveSuccess": "Bariery zapisane",
+                "saveError": "Nie udało się zapisać barier",
+                "resetSuccess": "Przywrócono domyślne bariery"
             }
         },
         "tasksPage": {

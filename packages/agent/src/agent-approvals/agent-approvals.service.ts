@@ -15,6 +15,7 @@ import {
     type AgentActionProposalStatus,
 } from '../entities/agent-action-proposal.entity';
 import { Agent } from '../entities/agent.entity';
+import { evaluateGuardrails } from '../agents/guardrails';
 import { RISK_SCORER } from './risk-scorer';
 import { toAgentActionProposalDto, type AgentActionProposalDto } from './types';
 
@@ -95,6 +96,13 @@ export class AgentApprovalsService {
         const payload = input.payload ?? {};
         const riskFlags = RISK_SCORER({ actionType: input.actionType, payload });
 
+        // Agent Dispatch Guardrails — the owning Agent's policy may
+        // auto-approve an unflagged action or block a forbidden one.
+        // A missing/null policy (or a missing agent row — impossible
+        // here, the ownership gate above 404s first) queues, which is
+        // exactly the pre-guardrails behavior.
+        const decision = evaluateGuardrails(agent.guardrails ?? null, input.actionType, riskFlags);
+
         const now = new Date();
         const row = this.proposals.create({
             userId,
@@ -107,9 +115,23 @@ export class AgentApprovalsService {
             status: 'pending',
             decidedById: null,
             decidedAt: null,
+            decidedVia: null,
             createdAt: now,
             updatedAt: now,
         });
+        if (decision === 'auto_approve') {
+            // Auto-decided rows keep decidedById null — no human made
+            // the call; `decidedVia: 'guardrail'` is the audit marker.
+            row.status = 'approved';
+            row.decidedAt = now;
+            row.decidedVia = 'guardrail';
+        } else if (decision === 'block') {
+            // Durable audit trail — a blocked action is persisted as a
+            // rejected proposal, never silently dropped.
+            row.status = 'rejected';
+            row.decidedAt = now;
+            row.decidedVia = 'guardrail';
+        }
         const saved = await this.proposals.save(row);
         return toAgentActionProposalDto(saved);
     }
@@ -178,6 +200,7 @@ export class AgentApprovalsService {
         row.status = decision;
         row.decidedById = userId;
         row.decidedAt = now;
+        row.decidedVia = 'user';
         row.updatedAt = now;
         const saved = await this.proposals.save(row);
         return toAgentActionProposalDto(saved);
@@ -212,6 +235,7 @@ export class AgentApprovalsService {
             row.status = 'approved';
             row.decidedById = userId;
             row.decidedAt = now;
+            row.decidedVia = 'user';
             row.updatedAt = now;
         }
         await this.proposals.save(pending);

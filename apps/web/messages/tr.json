@@ -624,6 +624,31 @@
                 "back": "Geri",
                 "next": "İleri",
                 "create": "Ajan Oluştur"
+            },
+            "guardrails": {
+                "title": "Korkuluklar",
+                "subtitle": "Önerilen hangi eylemlerin onayınızı bekleyeceğine, otomatik çalışacağına veya engelleneceğine karar verin.",
+                "modeLabel": "Gönderim modu",
+                "modeRequireApproval": "Onay gerektir",
+                "modeRequireApprovalHint": "Önerilen her eylem, siz karar verene kadar onay kuyruğunuzda bekler.",
+                "modeAutonomous": "Otonom",
+                "modeAutonomousHint": "Güvenli eylemler beklemeden çalışır. Risk işaretli eylemler her zaman onay kuyruğunuza girer.",
+                "autoApproveLabel": "Otomatik onaylanan eylem türleri",
+                "autoApproveHint": "Yalnızca seçilen eylem türleri otomatik çalışır; geri kalan her şey kuyruğa girmeye devam eder.",
+                "blockedLabel": "Engellenen eylem türleri",
+                "blockedHint": "Engellenen eylemler otomatik olarak reddedilir ve kuyruk geçmişine kaydedilir.",
+                "actionTypes": {
+                    "spawn_agent": "Ajan oluştur",
+                    "schedule_task": "Görev planla",
+                    "send_message": "Mesaj gönder",
+                    "budget_override": "Bütçe geçersiz kılma",
+                    "other": "Diğer"
+                },
+                "save": "Korkulukları kaydet",
+                "reset": "Varsayılana sıfırla",
+                "saveSuccess": "Korkuluklar kaydedildi",
+                "saveError": "Korkuluklar kaydedilemedi",
+                "resetSuccess": "Korkuluklar varsayılana sıfırlandı"
             }
         },
         "tasksPage": {

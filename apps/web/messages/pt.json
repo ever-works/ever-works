@@ -624,6 +624,31 @@
                 "back": "Voltar",
                 "next": "Próximo",
                 "create": "Criar Agente"
+            },
+            "guardrails": {
+                "title": "Salvaguardas",
+                "subtitle": "Decida quais ações propostas aguardam sua aprovação, são executadas automaticamente ou são bloqueadas.",
+                "modeLabel": "Modo de despacho",
+                "modeRequireApproval": "Exigir aprovação",
+                "modeRequireApprovalHint": "Cada ação proposta aguarda na sua fila de aprovação até você decidir.",
+                "modeAutonomous": "Autônomo",
+                "modeAutonomousHint": "Ações seguras são executadas sem espera. Ações com sinalizações de risco sempre passam pela sua fila de aprovação.",
+                "autoApproveLabel": "Tipos de ação aprovados automaticamente",
+                "autoApproveHint": "Somente os tipos de ação selecionados são executados automaticamente; todo o resto continua indo para a fila.",
+                "blockedLabel": "Tipos de ação bloqueados",
+                "blockedHint": "Ações bloqueadas são rejeitadas automaticamente e registradas no histórico da fila.",
+                "actionTypes": {
+                    "spawn_agent": "Criar Agente",
+                    "schedule_task": "Agendar tarefa",
+                    "send_message": "Enviar mensagem",
+                    "budget_override": "Substituição de orçamento",
+                    "other": "Outro"
+                },
+                "save": "Salvar salvaguardas",
+                "reset": "Redefinir para o padrão",
+                "saveSuccess": "Salvaguardas salvas",
+                "saveError": "Não foi possível salvar as salvaguardas",
+                "resetSuccess": "Salvaguardas redefinidas para o padrão"
             }
         },
         "tasksPage": {

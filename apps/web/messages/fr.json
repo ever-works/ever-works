@@ -682,6 +682,31 @@
                 "yourTemplates": "Vos modèles",
                 "yourTemplatesEmpty": "Les Agents que vous créez apparaîtront ici comme modèles réutilisables.",
                 "openInWizard": "Ouvrir dans l'assistant"
+            },
+            "guardrails": {
+                "title": "Garde-fous",
+                "subtitle": "Décidez quelles actions proposées attendent votre approbation, s'exécutent automatiquement ou sont bloquées.",
+                "modeLabel": "Mode de dispatch",
+                "modeRequireApproval": "Approbation requise",
+                "modeRequireApprovalHint": "Chaque action proposée attend dans votre file d'approbation jusqu'à votre décision.",
+                "modeAutonomous": "Autonome",
+                "modeAutonomousHint": "Les actions sûres s'exécutent sans attendre. Les actions signalées à risque passent toujours par votre file d'approbation.",
+                "autoApproveLabel": "Types d'actions auto-approuvés",
+                "autoApproveHint": "Seuls les types d'actions sélectionnés s'exécutent automatiquement ; tout le reste passe par la file.",
+                "blockedLabel": "Types d'actions bloqués",
+                "blockedHint": "Les actions bloquées sont rejetées automatiquement et consignées dans l'historique de la file.",
+                "actionTypes": {
+                    "spawn_agent": "Créer un agent",
+                    "schedule_task": "Planifier une tâche",
+                    "send_message": "Envoyer un message",
+                    "budget_override": "Dérogation de budget",
+                    "other": "Autre"
+                },
+                "save": "Enregistrer les garde-fous",
+                "reset": "Réinitialiser par défaut",
+                "saveSuccess": "Garde-fous enregistrés",
+                "saveError": "Impossible d'enregistrer les garde-fous",
+                "resetSuccess": "Garde-fous réinitialisés par défaut"
             }
         },
         "tasksPage": {

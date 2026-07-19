@@ -624,6 +624,31 @@
                 "back": "返回",
                 "next": "下一步",
                 "create": "创建代理"
+            },
+            "guardrails": {
+                "title": "护栏",
+                "subtitle": "决定哪些提议的操作需等待您的批准、自动执行或被拦截。",
+                "modeLabel": "调度模式",
+                "modeRequireApproval": "需要批准",
+                "modeRequireApprovalHint": "每个提议的操作都会在您的审批队列中等待您的决定。",
+                "modeAutonomous": "自主",
+                "modeAutonomousHint": "安全操作无需等待即可执行。带有风险标记的操作始终进入您的审批队列。",
+                "autoApproveLabel": "自动批准的操作类型",
+                "autoApproveHint": "仅所选操作类型会自动执行；其余操作仍会进入队列。",
+                "blockedLabel": "已拦截的操作类型",
+                "blockedHint": "被拦截的操作会被自动拒绝，并记录在队列历史中。",
+                "actionTypes": {
+                    "spawn_agent": "创建代理",
+                    "schedule_task": "计划任务",
+                    "send_message": "发送消息",
+                    "budget_override": "预算覆盖",
+                    "other": "其他"
+                },
+                "save": "保存护栏",
+                "reset": "重置为默认",
+                "saveSuccess": "护栏已保存",
+                "saveError": "无法保存护栏",
+                "resetSuccess": "护栏已重置为默认"
             }
         },
         "tasksPage": {

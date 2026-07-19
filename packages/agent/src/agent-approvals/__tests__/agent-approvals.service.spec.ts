@@ -89,6 +89,89 @@ describe('AgentApprovalsService', () => {
             expect(dto.status).toBe('pending');
             expect(dto.riskFlags).toEqual(['budget_override', 'destructive']);
             expect(dto.decidedById).toBeNull();
+            expect(dto.decidedVia).toBeNull();
+        });
+    });
+
+    describe('createProposal — dispatch guardrails', () => {
+        it('queues exactly as before when the agent has no guardrails', async () => {
+            agents.findOne.mockResolvedValue({ id: 'a1', userId: 'u1', guardrails: null });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'send_message',
+                title: 'Ping the ops channel',
+            });
+            expect(dto.status).toBe('pending');
+            expect(dto.decidedById).toBeNull();
+            expect(dto.decidedAt).toBeNull();
+            expect(dto.decidedVia).toBeNull();
+        });
+
+        it('auto-approves an unflagged action for an autonomous agent (decidedVia guardrail, no decider)', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous' },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'send_message',
+                title: 'Ping the ops channel',
+            });
+            expect(dto.status).toBe('approved');
+            expect(dto.decidedVia).toBe('guardrail');
+            expect(dto.decidedAt).toBeInstanceOf(Date);
+            expect(dto.decidedById).toBeNull();
+        });
+
+        it('saves a blocked action type as rejected (audit trail, not a silent drop)', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous', blockedActionTypes: ['spawn_agent'] },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'spawn_agent',
+                title: 'Spawn a sub-agent',
+            });
+            expect(proposals.save).toHaveBeenCalledTimes(1);
+            expect(dto.status).toBe('rejected');
+            expect(dto.decidedVia).toBe('guardrail');
+            expect(dto.decidedAt).toBeInstanceOf(Date);
+            expect(dto.decidedById).toBeNull();
+        });
+
+        it('queues a risk-flagged action even for an autonomous agent', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous' },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'other',
+                title: 'Purge the cache',
+                payload: { destructive: true },
+            });
+            expect(dto.status).toBe('pending');
+            expect(dto.riskFlags).toEqual(['destructive']);
+            expect(dto.decidedVia).toBeNull();
+        });
+
+        it('queues an autonomous action outside the autoApproveActionTypes narrowing', async () => {
+            agents.findOne.mockResolvedValue({
+                id: 'a1',
+                userId: 'u1',
+                guardrails: { mode: 'autonomous', autoApproveActionTypes: ['schedule_task'] },
+            });
+            const dto = await svc.createProposal('u1', {
+                agentId: 'a1',
+                actionType: 'send_message',
+                title: 'Ping the ops channel',
+            });
+            expect(dto.status).toBe('pending');
+            expect(dto.decidedVia).toBeNull();
         });
     });
 
@@ -99,12 +182,14 @@ describe('AgentApprovalsService', () => {
             expect(dto.status).toBe('approved');
             expect(dto.decidedById).toBe('u1');
             expect(dto.decidedAt).toBeInstanceOf(Date);
+            expect(dto.decidedVia).toBe('user');
         });
 
         it('rejects a pending proposal', async () => {
             proposals.findOne.mockResolvedValue(makeProposal());
             const dto = await svc.decide('u1', 'p1', 'rejected');
             expect(dto.status).toBe('rejected');
+            expect(dto.decidedVia).toBe('user');
         });
 
         it('409s when re-deciding an already-decided proposal (idempotent guard)', async () => {
@@ -143,6 +228,7 @@ describe('AgentApprovalsService', () => {
                 expect(row.status).toBe('approved');
                 expect(row.decidedById).toBe('u1');
                 expect(row.decidedAt).toBeInstanceOf(Date);
+                expect(row.decidedVia).toBe('user');
             }
         });
 

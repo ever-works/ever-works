@@ -9,6 +9,7 @@ import type {
 } from '../entities/agent.entity';
 import type { AgentBudget, AgentBudgetIntervalUnit } from '../entities/agent-budget.entity';
 import type { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../entities/agent-run.entity';
+import type { AgentGuardrails } from './guardrails';
 
 /**
  * Wire-format projection of `Agent` returned by `AgentsService`.
@@ -35,6 +36,7 @@ export interface AgentDto {
     status: AgentStatus;
     permissions: AgentPermissions;
     targets: AgentTarget[] | null;
+    guardrails: AgentGuardrails | null;
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: Date | null;
@@ -77,6 +79,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         status: agent.status,
         permissions: agent.permissions,
         targets: agent.targets ?? null,
+        guardrails: agent.guardrails ?? null,
         heartbeatCadence: agent.heartbeatCadence ?? null,
         idleBehavior: agent.idleBehavior,
         nextHeartbeatAt: agent.nextHeartbeatAt ?? null,

@@ -624,6 +624,31 @@
                 "back": "Kembali",
                 "next": "Lanjut",
                 "create": "Buat Agen"
+            },
+            "guardrails": {
+                "title": "Pagar pengaman",
+                "subtitle": "Tentukan tindakan mana yang menunggu persetujuan Anda, berjalan otomatis, atau diblokir.",
+                "modeLabel": "Mode eksekusi",
+                "modeRequireApproval": "Wajib persetujuan",
+                "modeRequireApprovalHint": "Setiap tindakan yang diusulkan menunggu di antrean persetujuan sampai Anda memutuskan.",
+                "modeAutonomous": "Otonom",
+                "modeAutonomousHint": "Tindakan yang aman berjalan tanpa menunggu. Tindakan dengan penanda risiko selalu masuk ke antrean persetujuan Anda.",
+                "autoApproveLabel": "Jenis tindakan yang disetujui otomatis",
+                "autoApproveHint": "Hanya jenis tindakan yang dipilih yang berjalan otomatis; sisanya tetap masuk antrean.",
+                "blockedLabel": "Jenis tindakan yang diblokir",
+                "blockedHint": "Tindakan yang diblokir otomatis ditolak dan dicatat dalam riwayat antrean.",
+                "actionTypes": {
+                    "spawn_agent": "Buat Agen",
+                    "schedule_task": "Jadwalkan tugas",
+                    "send_message": "Kirim pesan",
+                    "budget_override": "Penggantian anggaran",
+                    "other": "Lainnya"
+                },
+                "save": "Simpan pagar pengaman",
+                "reset": "Atur ulang ke bawaan",
+                "saveSuccess": "Pagar pengaman disimpan",
+                "saveError": "Tidak dapat menyimpan pagar pengaman",
+                "resetSuccess": "Pagar pengaman diatur ulang ke bawaan"
             }
         },
         "tasksPage": {

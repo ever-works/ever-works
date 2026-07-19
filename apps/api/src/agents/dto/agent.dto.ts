@@ -4,6 +4,7 @@ import {
     IsBoolean,
     IsEmail,
     IsEnum,
+    IsIn,
     IsInt,
     IsNotEmpty,
     IsObject,
@@ -19,11 +20,17 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+    AGENT_GUARDRAIL_MODES,
     AgentAvatarMode,
     AgentIdleBehavior,
     AgentScope,
     AgentStatus,
+    type AgentGuardrails,
 } from '@ever-works/agent/agents';
+import {
+    AGENT_ACTION_PROPOSAL_ACTION_TYPES,
+    type AgentActionProposalActionType,
+} from '@ever-works/agent/agent-approvals';
 
 /**
  * Permissions partial sent on create/update — every flag optional;
@@ -263,6 +270,54 @@ export class UpdateAgentDto {
     @IsEmail()
     @MaxLength(254)
     committerEmail?: string | null;
+}
+
+/**
+ * Agent Dispatch Guardrails policy body — mirrors the pure
+ * `AgentGuardrails` shape (`packages/agent/src/agents/guardrails.ts`).
+ * The service re-validates via `validateGuardrails` (defense-in-depth),
+ * so this DTO only has to shape-check for the global ValidationPipe.
+ */
+export class AgentGuardrailsDto implements AgentGuardrails {
+    @ApiProperty({ enum: AGENT_GUARDRAIL_MODES as unknown as string[] })
+    @IsIn(AGENT_GUARDRAIL_MODES as unknown as string[])
+    mode: 'require_approval' | 'autonomous';
+
+    @ApiProperty({
+        required: false,
+        isArray: true,
+        enum: AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[],
+        description:
+            'Autonomous-mode narrowing: only these action types may auto-approve. Omitted = all.',
+    })
+    @IsOptional()
+    @IsArray()
+    @IsIn(AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[], { each: true })
+    autoApproveActionTypes?: AgentActionProposalActionType[];
+
+    @ApiProperty({
+        required: false,
+        isArray: true,
+        enum: AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[],
+        description: 'Action types this Agent may never take — auto-rejected with an audit row.',
+    })
+    @IsOptional()
+    @IsArray()
+    @IsIn(AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[], { each: true })
+    blockedActionTypes?: AgentActionProposalActionType[];
+}
+
+/**
+ * Body for `PUT /api/agents/:id/guardrails`. PUT semantics — the whole
+ * policy is replaced. `{"guardrails": null}` (or an omitted field)
+ * clears back to the default queue-everything posture.
+ */
+export class UpdateAgentGuardrailsDto {
+    @ApiProperty({ required: false, type: AgentGuardrailsDto, nullable: true })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => AgentGuardrailsDto)
+    guardrails?: AgentGuardrailsDto | null;
 }
 
 export class ListAgentsQueryDto {

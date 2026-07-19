@@ -682,6 +682,31 @@
                 "yourTemplates": "Tus plantillas",
                 "yourTemplatesEmpty": "Los Agentes que creas aparecerán aquí como plantillas reutilizables.",
                 "openInWizard": "Abrir en el asistente"
+            },
+            "guardrails": {
+                "title": "Salvaguardas",
+                "subtitle": "Decide qué acciones propuestas esperan tu aprobación, se ejecutan automáticamente o se bloquean.",
+                "modeLabel": "Modo de despacho",
+                "modeRequireApproval": "Requerir aprobación",
+                "modeRequireApprovalHint": "Cada acción propuesta espera en tu cola de aprobación hasta que decidas.",
+                "modeAutonomous": "Autónomo",
+                "modeAutonomousHint": "Las acciones seguras se ejecutan sin esperar. Las acciones con indicadores de riesgo siempre pasan por tu cola de aprobación.",
+                "autoApproveLabel": "Tipos de acción auto-aprobados",
+                "autoApproveHint": "Solo los tipos de acción seleccionados se ejecutan automáticamente; todo lo demás sigue pasando por la cola.",
+                "blockedLabel": "Tipos de acción bloqueados",
+                "blockedHint": "Las acciones bloqueadas se rechazan automáticamente y quedan registradas en el historial de la cola.",
+                "actionTypes": {
+                    "spawn_agent": "Crear Agente",
+                    "schedule_task": "Programar tarea",
+                    "send_message": "Enviar mensaje",
+                    "budget_override": "Anulación de presupuesto",
+                    "other": "Otro"
+                },
+                "save": "Guardar salvaguardas",
+                "reset": "Restablecer valores predeterminados",
+                "saveSuccess": "Salvaguardas guardadas",
+                "saveError": "No se pudieron guardar las salvaguardas",
+                "resetSuccess": "Salvaguardas restablecidas a los valores predeterminados"
             }
         },
         "tasksPage": {
