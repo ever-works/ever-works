@@ -2,8 +2,10 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
     IsBoolean,
     IsEnum,
+    IsIn,
     IsInt,
     IsOptional,
+    IsUUID,
     IsString,
     Matches,
     MaxLength,
@@ -246,6 +248,20 @@ export class UpdateMissionDto {
     // MissionsService.normalizeTemplateRepo so SSRF payloads are rejected up front.
     @Validate(IsMissionTemplateRepo)
     missionTemplateRepo?: string | null;
+}
+
+/**
+ * PR-2 (domain-model evolution) — attach an existing Work to a Mission
+ * with a typed relation. Relation values mirror
+ * `MISSION_WORK_RELATIONS` on the entity; validated again at the
+ * service layer.
+ */
+export class AttachMissionWorkDto {
+    @IsUUID()
+    workId!: string;
+
+    @IsIn(['created', 'improves', 'operates', 'markets', 'researches', 'retires'])
+    relation!: 'created' | 'improves' | 'operates' | 'markets' | 'researches' | 'retires';
 }
 
 export class AddMissionAttachmentDto {

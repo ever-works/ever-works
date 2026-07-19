@@ -16,6 +16,13 @@ import {
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
+import {
+    MissionWorkRepository,
+    type MissionWorkWithMission,
+    type MissionWorkWithWork,
+} from '../database/repositories/mission-work.repository';
+import { MISSION_WORK_RELATIONS, type MissionWorkRelation } from '../entities/mission-work.entity';
+import { Work } from '../entities/work.entity';
 import { TitlerService } from '../titler/titler.service';
 import { MissionTickService } from './mission-tick.service';
 import { toMissionDto, type MissionDto } from './types';
@@ -172,6 +179,14 @@ export class MissionsService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
+        // PR-2 (domain-model evolution) — the explicit Mission↔Work M:N
+        // edge + Work-ownership validation for attach. `@Optional()` for
+        // the same hand-rolled-test reason as the deps above.
+        @Optional()
+        private readonly missionWorks?: MissionWorkRepository,
+        @Optional()
+        @InjectRepository(Work)
+        private readonly worksRepo?: Repository<Work>,
     ) {}
 
     /**
@@ -494,6 +509,79 @@ export class MissionsService {
         }
         await this.missionAttachments.remove(attachmentId);
         return { deleted: true };
+    }
+
+    /**
+     * PR-2 — list the Works this Mission relates to (the explicit
+     * `mission_works` edge; review §8.1). Ownership-gated on the
+     * Mission; empty when the repo isn't wired (hand-rolled tests).
+     */
+    async listWorks(userId: string, missionId: string): Promise<MissionWorkWithWork[]> {
+        await this.findOrThrow(userId, missionId);
+        if (!this.missionWorks) return [];
+        return this.missionWorks.listForMissionWithWork(missionId, userId);
+    }
+
+    /**
+     * PR-2 — attach an EXISTING Work to this Mission with a typed
+     * relation. Both endpoints must belong to the caller (Work check
+     * mirrors the accept path's IDOR contract: foreign/unknown ids →
+     * 404, existence-leak-safe). Idempotent on duplicates. Never
+     * transfers ownership — invariant I-7: Missions never own Works.
+     */
+    async attachWork(
+        userId: string,
+        missionId: string,
+        workId: string,
+        relation: MissionWorkRelation,
+    ): Promise<MissionWorkWithWork[]> {
+        await this.findOrThrow(userId, missionId);
+        if (!MISSION_WORK_RELATIONS.includes(relation)) {
+            throw new BadRequestException(
+                `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
+            );
+        }
+        if (!this.missionWorks || !this.worksRepo) {
+            throw new BadRequestException(
+                `MissionWorkRepository is not wired — attach the provider before calling attachWork`,
+            );
+        }
+        const work = await this.worksRepo.findOne({ where: { id: workId, userId } });
+        if (!work) {
+            throw new NotFoundException(`Work not found`);
+        }
+        await this.missionWorks.attach({ missionId, workId, userId, relation });
+        return this.missionWorks.listForMissionWithWork(missionId, userId);
+    }
+
+    /**
+     * PR-2 — detach a relation. Deletes only the edge row; the Work is
+     * untouched (I-6). 404 when the edge doesn't exist for this owner.
+     */
+    async detachWork(
+        userId: string,
+        missionId: string,
+        workId: string,
+        relation: MissionWorkRelation,
+    ): Promise<{ deleted: true }> {
+        await this.findOrThrow(userId, missionId);
+        if (!this.missionWorks) {
+            throw new NotFoundException(`Relation not found`);
+        }
+        const removed = await this.missionWorks.detach({ missionId, workId, userId, relation });
+        if (!removed) {
+            throw new NotFoundException(`Relation not found`);
+        }
+        return { deleted: true };
+    }
+
+    /**
+     * PR-2 — reverse lookup: the Missions related to one of the
+     * caller's Works (drives the Work-detail "Missions" panel).
+     */
+    async listMissionsForWork(userId: string, workId: string): Promise<MissionWorkWithMission[]> {
+        if (!this.missionWorks) return [];
+        return this.missionWorks.listForWorkWithMission(workId, userId);
     }
 
     // ─── internals ──────────────────────────────────────────────────

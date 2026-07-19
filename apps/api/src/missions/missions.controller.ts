@@ -28,10 +28,12 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AddMissionAttachmentDto,
+    AttachMissionWorkDto,
     CloneMissionDto,
     CreateMissionDto,
     UpdateMissionDto,
 } from './dto/mission.dto';
+import { MISSION_WORK_RELATIONS, type MissionWorkRelation } from '@ever-works/agent/entities';
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -252,6 +254,69 @@ export class MissionsController {
         message?: string;
     }> {
         return this.service.runNow(auth.userId, id);
+    }
+
+    /**
+     * PR-2 (domain-model evolution) — the explicit Mission↔Work M:N
+     * relation surface. A Mission may relate to any number of the
+     * caller's Works (created|improves|operates|markets|researches|
+     * retires) and one Work may be related to many Missions over its
+     * lifetime. Attaching never transfers ownership and detaching /
+     * deleting the Mission never touches the Work (invariants I-6/I-7).
+     */
+    @Get(':id/works')
+    @ApiOperation({ summary: 'List the Works this Mission relates to' })
+    async listWorks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return { relations: await this.service.listWorks(auth.userId, id) };
+    }
+
+    @Post(':id/works')
+    @ApiOperation({ summary: 'Attach an existing Work to this Mission with a typed relation' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async attachWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AttachMissionWorkDto,
+    ) {
+        return {
+            relations: await this.service.attachWork(auth.userId, id, body.workId, body.relation),
+        };
+    }
+
+    @Delete(':id/works/:workId/:relation')
+    @ApiOperation({ summary: 'Detach a Mission↔Work relation (the Work is untouched)' })
+    @HttpCode(HttpStatus.OK)
+    async detachWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('workId', ParseUUIDPipe) workId: string,
+        @Param('relation') relation: string,
+    ) {
+        if (!MISSION_WORK_RELATIONS.includes(relation as MissionWorkRelation)) {
+            throw new BadRequestException(
+                `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
+            );
+        }
+        return this.service.detachWork(auth.userId, id, workId, relation as MissionWorkRelation);
+    }
+
+    /**
+     * PR-2 — reverse lookup for the Work-detail "Missions" panel:
+     * which of my Missions relate to this Work. Kept under /me/missions
+     * (owner-scoped like everything else here); declared with a static
+     * prefix so it can't shadow the ':id' param routes.
+     */
+    @Get('related-to-work/:workId')
+    @ApiOperation({ summary: 'List my Missions related to a Work' })
+    async listMissionsForWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('workId', ParseUUIDPipe) workId: string,
+    ) {
+        return { relations: await this.service.listMissionsForWork(auth.userId, workId) };
     }
 
     /**

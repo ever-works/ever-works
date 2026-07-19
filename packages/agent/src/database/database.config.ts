@@ -71,6 +71,7 @@ import {
     TaskKbMention,
     UserTaskCounter,
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
     AgentAttachment,
     // Notifications v2 (EW-650 + siblings)
@@ -200,6 +201,7 @@ export const ENTITIES = [
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
