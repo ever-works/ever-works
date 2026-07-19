@@ -48,6 +48,10 @@ import {
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
     Mission,
+    // Goals & Metrics (PR-8)
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,
@@ -174,6 +178,13 @@ export const ENTITIES = [
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Goals & Metrics (PR-8) — goals + append-only samples + Mission link.
+    // Registered here AND in entities/index.ts (bug-class: a
+    // forFeature'd-but-unregistered entity throws
+    // EntityMetadataNotFoundError → unmapped 500 on every query).
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,

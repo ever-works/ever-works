@@ -8,6 +8,8 @@ export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
+// Goals & Metrics PR-8 — per-minute Goal evaluation dispatcher.
+export * from './goal-evaluate-dispatcher.task';
 export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
 export * from './agent-task-execute.task';

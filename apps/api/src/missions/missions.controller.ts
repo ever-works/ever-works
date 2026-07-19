@@ -24,8 +24,10 @@ import {
 } from '@ever-works/agent/missions';
 import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
 import { BudgetOwnerType } from '@ever-works/agent/entities';
+import { GoalsService, type MissionGoalLinkDto } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { LinkMissionGoalDto } from '../goals/dto/goal.dto';
 import {
     AddMissionAttachmentDto,
     CloneMissionDto,
@@ -69,6 +71,10 @@ export class MissionsController {
         private readonly cloneService: MissionCloneService,
         // Phase 7 PR U — per-Mission budget summary.
         private readonly budgetService: BudgetService,
+        // Goals & Metrics PR-8 — Mission ↔ Goal link surface. The
+        // GoalsService validates ownership of BOTH sides (Mission and
+        // Goal) with 404-no-leak semantics.
+        private readonly goalsService: GoalsService,
     ) {}
 
     @Get()
@@ -294,6 +300,58 @@ export class MissionsController {
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
         return this.service.removeAttachment(auth.userId, id, attachmentId);
+    }
+
+    /**
+     * Goals & Metrics PR-8 — Mission ↔ Goal links (spec FR-11).
+     * Goals are created standalone via `POST /api/me/goals` and
+     * attached here. At most one primary Goal per Mission — linking
+     * with `isPrimary: true` demotes any existing primary.
+     *
+     * Invariant I-4 note: Goal state never feeds back into Mission
+     * status through these endpoints (or anywhere else) — a Mission
+     * is completed only by an explicit human action.
+     */
+    @Get(':id/goals')
+    @ApiOperation({ summary: "List a Mission's attached Goals (with isPrimary flags)" })
+    @HttpCode(HttpStatus.OK)
+    async listGoals(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionGoalLinkDto[]> {
+        return this.goalsService.listForMission(auth.userId, id);
+    }
+
+    @Post(':id/goals')
+    @ApiOperation({
+        summary:
+            'Attach a Goal to a Mission (idempotent; re-POST updates isPrimary; one primary per Mission)',
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async linkGoal(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: LinkMissionGoalDto,
+    ): Promise<MissionGoalLinkDto> {
+        return this.goalsService.linkToMission(
+            auth.userId,
+            id,
+            body.goalId,
+            body.isPrimary ?? false,
+        );
+    }
+
+    @Delete(':id/goals/:goalId')
+    @ApiOperation({ summary: 'Detach a Goal from a Mission (the Goal itself is untouched)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unlinkGoal(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('goalId', ParseUUIDPipe) goalId: string,
+    ): Promise<{ deleted: true }> {
+        return this.goalsService.unlinkFromMission(auth.userId, id, goalId);
     }
 
     private parseStatus(value?: string): MissionStatus | undefined {

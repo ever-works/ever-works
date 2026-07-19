@@ -41,6 +41,7 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { GoalEvaluationService } from '@ever-works/agent/goals';
 import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -201,6 +202,10 @@ export class TriggerInternalController implements OnModuleInit {
         // Phase 3 PR J — exposed for the mission-tick Trigger.dev cron
         // so it can drive `tickDue()` over the internal RPC channel.
         private readonly missionTickService: MissionTickService,
+        // Goals & Metrics PR-8 — exposed for the goal-evaluate-dispatcher
+        // Trigger.dev cron so it can drive `evaluateDue()` over the
+        // internal RPC channel.
+        private readonly goalEvaluationService: GoalEvaluationService,
         // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
         // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
         // one-shot worker over the internal RPC channel.
@@ -262,6 +267,8 @@ export class TriggerInternalController implements OnModuleInit {
             WorkKnowledgeDocumentRepository: this.workKnowledgeDocumentRepository,
             // Phase 3 PR J — exposed for the mission-tick cron.
             MissionTickService: this.missionTickService,
+            // Goals & Metrics PR-8 — exposed for the goal-evaluate-dispatcher cron.
+            GoalEvaluationService: this.goalEvaluationService,
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,

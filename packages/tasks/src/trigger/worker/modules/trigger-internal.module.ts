@@ -5,6 +5,7 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { GoalEvaluationService } from '@ever-works/agent/goals';
 import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -61,6 +62,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: MissionTickService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'MissionTickService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Goals & Metrics PR-8 — the goal-evaluate-dispatcher cron task
+        // resolves GoalEvaluationService via this proxy. The real
+        // service lives in the API (where the metrics-provider plugins
+        // are loaded); the worker only calls evaluateDue() over the
+        // internal HTTP channel each minute.
+        {
+            provide: GoalEvaluationService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'GoalEvaluationService'),
             inject: [TriggerInternalApiClient],
         },
         // Agents/Skills/Tasks PR #1017 — Phase 6. Per-Agent heartbeat
@@ -128,6 +140,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         DATA_SYNC_DISPATCHER_SERVICE,
         DeployReadyPollerService,
         MissionTickService,
+        GoalEvaluationService,
         AgentScheduleDispatcherService,
         AgentRunService,
         AgentRepository,
