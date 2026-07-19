@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
     IsBoolean,
+    IsIn,
     IsNotEmpty,
     IsOptional,
     IsString,
@@ -11,6 +12,7 @@ import {
 } from 'class-validator';
 import { MarkdownReadmeConfigDto } from './create-work.dto';
 import { sanitizeDescription, sanitizeName, sanitizePrompt } from '../utils/sanitize.util';
+import { normalizeCreateWorkKind, USER_SELECTABLE_WORK_KINDS } from '../entities/work.entity';
 
 /**
  * EW-617 G4 — payload for `POST /api/works/quick-create`.
@@ -112,6 +114,19 @@ export class QuickCreateWorkDto {
     @IsString()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     websiteTemplateId?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo). ' +
+            'Forwarded into CreateWorkDto so the kind-aware default website template applies. ' +
+            'Unknown values are coerced to "default"; omitted keeps the column default.',
+        enum: [...USER_SELECTABLE_WORK_KINDS, 'default'],
+    })
+    @IsOptional()
+    @IsString()
+    @IsIn([...USER_SELECTABLE_WORK_KINDS, 'default'])
+    @Transform(({ value }) => normalizeCreateWorkKind(value))
+    kind?: string;
 
     @ApiPropertyOptional({
         description: 'AI model override (defaults to the provider plugin default)',

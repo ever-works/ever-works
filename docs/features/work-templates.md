@@ -30,11 +30,11 @@ each surface shows only its own. The `TemplateKind` union is
 `'website' | 'work' | 'mission' | 'company'`, and the catalog reader
 filters by kind so the tabs never cross-pollute:
 
-| Kind      | Tab                | Backing config                        |
-| --------- | ------------------ | ------------------------------------- |
-| `website` | Website Templates  | `website-template.config.ts`          |
-| `work`    | **Work Templates** | `work-template.config.ts`             |
-| `mission` | Mission Templates  | `mission-template.config.ts`          |
+| Kind      | Tab                | Backing config                                                                                                  |
+| --------- | ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `website` | Website Templates  | `website-template.config.ts`                                                                                    |
+| `work`    | **Work Templates** | `work-template.config.ts`                                                                                       |
+| `mission` | Mission Templates  | `mission-template.config.ts`                                                                                    |
 | `company` | _(no seed in v1)_  | the `+ New` Company chip → [register-company](../advanced/teams-and-organizations.md#the-register-company-flow) |
 
 A Work Template config mirrors the website/mission shape (owner / repo /
@@ -50,10 +50,10 @@ heuristic.
 `TemplateCatalogService` seeds on boot as `kind: 'work'` catalog rows
 (verified in `work-template.config.ts`):
 
-| Id                          | Name                          | Repo (`ever-works/…`)             | Framework |
-| --------------------------- | ----------------------------- | --------------------------------- | --------- |
-| `starter-directory`         | Starter Directory             | `directory-web-template`          | Next.js   |
-| `starter-directory-minimal` | Starter Directory (Minimal)   | `directory-web-minimal-template`  | Astro     |
+| Id                          | Name                        | Repo (`ever-works/…`)            | Framework |
+| --------------------------- | --------------------------- | -------------------------------- | --------- |
+| `starter-directory`         | Starter Directory           | `directory-web-template`         | Next.js   |
+| `starter-directory-minimal` | Starter Directory (Minimal) | `directory-web-minimal-template` | Astro     |
 
 - **Starter Directory** — a Next.js directory boilerplate; a
   batteries-included starting point for a new directory Work.

@@ -46,7 +46,7 @@ A second template, [`directory-web-minimal-template`](https://github.com/ever-wo
 `WEBSITE_TEMPLATE_MINIMAL_REPO=directory-web-minimal-template` and chosen
 per-Work via the website-template selector.
 
-For the full template catalogue (including the planned generic
+For the full template catalogue (including the general-purpose
 `web-template` and `web-minimal-template`), see
 [**Website Templates**](../features/website-templates.md).
 
