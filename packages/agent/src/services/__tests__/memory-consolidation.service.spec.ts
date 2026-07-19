@@ -62,6 +62,7 @@ function buildMocks(items: WorkKnowledgeDocument[], total?: number) {
     const documentRepository = {
         listForOrgAggregate: jest.fn().mockResolvedValue({ items, total: total ?? items.length }),
         update: jest.fn().mockResolvedValue(null),
+        bulkSetConsolidation: jest.fn().mockResolvedValue(undefined),
         findOrgByPath: jest.fn().mockResolvedValue(null),
     };
     const kb = {
@@ -282,9 +283,8 @@ describe('MemoryConsolidationService.runConsolidation', () => {
 
             expect(report.promoted).toBe(20);
             expect(report.details.promotedIds).not.toContain(stale.id);
-            expect(documentRepository.update).toHaveBeenCalledWith(stale.id, {
-                consolidation: null,
-            });
+            // Stale-promotion clears are batched into one bulk UPDATE.
+            expect(documentRepository.bulkSetConsolidation).toHaveBeenCalledWith([stale.id], null);
         });
 
         it('re-stamps a still-deserving promoted doc instead of clearing it', async () => {
@@ -304,9 +304,8 @@ describe('MemoryConsolidationService.runConsolidation', () => {
             expect(documentRepository.update).toHaveBeenCalledWith(keeper.id, {
                 consolidation: expect.objectContaining({ state: 'promoted' }),
             });
-            expect(documentRepository.update).not.toHaveBeenCalledWith(keeper.id, {
-                consolidation: null,
-            });
+            // A still-deserving doc is re-stamped, never part of the clear batch.
+            expect(documentRepository.bulkSetConsolidation).toHaveBeenCalledWith([], null);
         });
     });
 

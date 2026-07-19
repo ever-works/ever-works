@@ -170,6 +170,12 @@ export class MemoryConsolidationService {
                         updatedAt: d.updatedAt,
                         bodyLength: this.bodyOf(d).length,
                         tagCount: d.tags?.length ?? 0,
+                        // `citationCount` is intentionally omitted here: the org-memory
+                        // aggregate list carries no citation count, and fetching one per
+                        // document would be N+1. On this path `usage` reflects only the
+                        // always-injected bonus; the scorer keeps `citationCount` as an
+                        // optional input for callers that DO have a count (batched
+                        // citation-count wiring is a tracked follow-up).
                         alwaysInject: (
                             KB_ALWAYS_INJECTED_CLASSES as ReadonlyArray<KbDocumentClass>
                         ).includes(d.kbDocumentClass),
@@ -285,9 +291,9 @@ export class MemoryConsolidationService {
             await this.documentRepository.update(promotion.id, { consolidation: marker });
         }
 
-        for (const staleId of stalePromotedIds) {
-            await this.documentRepository.update(staleId, { consolidation: null });
-        }
+        // Stale-promotion clears share one payload (null), so collapse them
+        // into a single UPDATE rather than one round-trip per document.
+        await this.documentRepository.bulkSetConsolidation(stalePromotedIds, null);
 
         const synthesizedIds: string[] = [];
         if (aiAvailable) {
