@@ -474,6 +474,14 @@ export class OrganizationService {
             registrationProvider?: OrganizationRegistrationProvider | null;
             registrationStatus?: OrganizationRegistrationStatus | null;
             linkedWorkId?: string | null;
+            /**
+             * PR-6 (review §23.5) — optional company vision statement,
+             * settable at creation time. Normalized via
+             * `normalizeVision` (trim, cap 5000 chars, empty → null);
+             * `visionUpdatedAt` is stamped iff the normalized value is
+             * non-null.
+             */
+            vision?: string | null;
         },
     ): Promise<Organization> {
         const trimmedName = name?.trim();
@@ -498,6 +506,10 @@ export class OrganizationService {
             // `{ tenantId, slug, displayName }` exactly as before. The
             // entity's column defaults handle the unspecified columns
             // (registrationStatus defaults to `'draft'`).
+            // PR-6 — vision is optional at creation; empty/whitespace
+            // collapses to null so we never stamp `visionUpdatedAt`
+            // for a blank field the modal submitted untouched.
+            const vision = this.normalizeVision(extra?.vision);
             const org = manager.getRepository<Organization>('organizations').create({
                 tenantId: tenant.id,
                 slug,
@@ -507,6 +519,8 @@ export class OrganizationService {
                 registrationProvider: extra?.registrationProvider ?? null,
                 registrationStatus: extra?.registrationStatus ?? 'draft',
                 linkedWorkId: extra?.linkedWorkId ?? null,
+                vision,
+                visionUpdatedAt: vision !== null ? new Date() : null,
             });
             const saved = await manager.getRepository<Organization>('organizations').save(org);
 
@@ -953,13 +967,28 @@ export class OrganizationService {
     }
 
     /**
-     * Update display/legal/country fields on an Organization. Verifies
-     * the caller owns the Tenant.
+     * Update display/legal/country/vision fields on an Organization.
+     * Verifies the caller owns the Tenant.
+     *
+     * PR-6 vision semantics: `vision` omitted (undefined) = unchanged.
+     * When PRESENT in the patch (any value, including explicit null),
+     * the normalized value is written AND `visionUpdatedAt = now` —
+     * including when clearing to null. The operator ruling (review
+     * §23.5) is silent on whether clearing should also null the
+     * timestamp; we deliberately stamp "now" on every change so
+     * `visionUpdatedAt` always answers "when did the vision text last
+     * change" (a clear IS a change). Consumers detect "no vision" via
+     * `vision === null`, never via the timestamp.
      */
     async update(
         userId: string,
         organizationId: string,
-        patch: { displayName?: string; legalName?: string; countryCode?: string },
+        patch: {
+            displayName?: string;
+            legalName?: string;
+            countryCode?: string;
+            vision?: string | null;
+        },
     ): Promise<Organization> {
         const user = await this.userRepository.findById(userId);
         if (!user || !user.tenantId) {
@@ -969,7 +998,13 @@ export class OrganizationService {
         if (!org || org.tenantId !== user.tenantId) {
             throw new NotFoundException(`Organization ${organizationId} not found`);
         }
-        await this.organizationRepository.update(organizationId, patch);
+        const { vision, ...rest } = patch;
+        const updatePayload: Partial<Organization> = { ...rest };
+        if (vision !== undefined) {
+            updatePayload.vision = this.normalizeVision(vision);
+            updatePayload.visionUpdatedAt = new Date();
+        }
+        await this.organizationRepository.update(organizationId, updatePayload);
         const updated = await this.organizationRepository.findById(organizationId);
         if (!updated) {
             // Race with a concurrent delete — surface as NotFound.
@@ -987,6 +1022,28 @@ export class OrganizationService {
         desired: string,
     ): Promise<{ available: boolean; normalized: string; suggestion?: string }> {
         return this.usernameAllocator.suggest(desired);
+    }
+
+    /**
+     * PR-6 (review §23.5) — normalize a caller-supplied vision value:
+     * trim, collapse empty/whitespace-only to null, hard-cap at 5000
+     * chars (the DTO's `@MaxLength(5000)` already rejects longer
+     * bodies with a 400; the slice here is defense-in-depth for
+     * internal callers that bypass the DTO). Prompt-injection sites
+     * apply their own tighter ~2000-char cap at read time
+     * (`VisionContextService` in `@ever-works/agent`).
+     */
+    private static readonly VISION_MAX_CHARS = 5000;
+
+    private normalizeVision(value: string | null | undefined): string | null {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        const trimmed = value.trim();
+        if (trimmed.length === 0) {
+            return null;
+        }
+        return trimmed.slice(0, OrganizationService.VISION_MAX_CHARS);
     }
 
     /**

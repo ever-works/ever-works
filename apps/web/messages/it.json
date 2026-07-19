@@ -1191,6 +1191,7 @@
             "subtitle": "Gestisci le impostazioni e le preferenze del tuo account",
             "tabs": {
                 "profile": "Profilo",
+                "organization": "Organization",
                 "security": "Sicurezza",
                 "apiKeys": "Chiavi API",
                 "data": "Dati",
@@ -5078,12 +5079,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
