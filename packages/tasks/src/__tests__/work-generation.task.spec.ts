@@ -33,7 +33,12 @@ vi.mock('@trigger.dev/sdk', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@ever-works/agent/tasks', () => ({}));
+vi.mock('@ever-works/agent/tasks', () => ({
+    // Pre-existing mock drift surfaced once the audit gate stopped
+    // short-circuiting `pnpm test`: the real barrel exports
+    // CredentialVersionService, which trigger worker modules import.
+    CredentialVersionService: class CredentialVersionService {},
+}));
 
 vi.mock('@ever-works/agent/entities', () => ({
     GenerateStatusType,
@@ -77,6 +82,7 @@ describe('workGenerationTask', () => {
         markRunCompleted: ReturnType<typeof vi.fn>;
         markRunFailed: ReturnType<typeof vi.fn>;
     };
+    let bindingResolver: { resolveForWork: ReturnType<typeof vi.fn> };
     let work: { id: string };
     let user: { id: string };
 
@@ -100,12 +106,25 @@ describe('workGenerationTask', () => {
             handleFailure: vi.fn().mockResolvedValue(undefined),
             handleCancellation: vi.fn().mockResolvedValue(undefined),
         };
+        // The worker-context run body resolves the tenant-runtime binding
+        // service and calls `.resolveForWork(payload, workId)` before the
+        // schedule flow. A `'no-binding'` status is the byte-identical
+        // pre-overlay path (status !== 'drained'), so the run proceeds into
+        // the orchestrator/schedule assertions this spec cares about.
+        bindingResolver = {
+            resolveForWork: vi.fn().mockResolvedValue({ status: 'no-binding' }),
+        };
         work = { id: 'w-1' };
         user = { id: 'u-1' };
 
         appContext.get.mockImplementation((token: any) => {
             if (token === WorkScheduleServiceToken) return scheduleService;
-            throw new Error(`Unexpected DI token: ${String(token)}`);
+            // Permissive fallback: the worker-context body resolves the
+            // tenant-runtime binding service (TenantRuntimeBindingResolverService)
+            // that this spec doesn't assert on. Return a resolver stub whose
+            // resolveForWork yields a non-drained binding so those lookups
+            // don't fail the schedule-ordering tests.
+            return bindingResolver;
         });
 
         withWorkerContextMock.mockImplementation(

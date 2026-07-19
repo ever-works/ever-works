@@ -48,6 +48,10 @@ vi.mock('@ever-works/agent/config', () => ({
 }));
 
 vi.mock('@ever-works/agent/tasks', () => ({
+    // Pre-existing mock drift surfaced once the audit gate stopped short-
+    // circuiting `pnpm test`: the real barrel exports CredentialVersionService
+    // (tenant-credential-snapshot work), which trigger worker modules import.
+    CredentialVersionService: class CredentialVersionService {},
     WORK_GENERATION_DISPATCHER: Symbol('WORK_GENERATION_DISPATCHER'),
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
     TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
