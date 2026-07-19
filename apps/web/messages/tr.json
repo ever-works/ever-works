@@ -3930,6 +3930,177 @@
                 "unexpectedError": "Beklenmeyen bir hata oluştu"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI Sohbet",
@@ -3940,6 +4111,7 @@
                 "dashboard": "Pano",
                 "activity": "Etkinlik",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "İşler",
                 "tasks": "Görevler",
