@@ -54,20 +54,20 @@ its `required` / `recommended` slug lists resolve against the
 
 The catalog ships **12 starter agents** spanning common team roles:
 
-| Slug                 | Role       | Scope     |
-| -------------------- | ---------- | --------- |
-| `starter-pm`         | PM         | Tenant    |
-| `starter-coder`      | Coder      | Work      |
-| `starter-researcher` | Researcher | Tenant    |
-| `starter-copywriter` | Copywriter | Tenant    |
-| `starter-marketer`   | Marketer   | Tenant    |
-| `starter-sales`      | Sales      | Tenant    |
-| `starter-support`    | Support    | Tenant    |
-| `starter-curator`    | Curator    | Work      |
-| `starter-growth`     | Growth     | Tenant    |
-| `starter-designer`   | Designer   | Work      |
-| `starter-devops`     | DevOps     | Work      |
-| `starter-founder`    | Founder    | Mission   |
+| Slug                 | Role       | Scope   |
+| -------------------- | ---------- | ------- |
+| `starter-pm`         | PM         | Tenant  |
+| `starter-coder`      | Coder      | Work    |
+| `starter-researcher` | Researcher | Tenant  |
+| `starter-copywriter` | Copywriter | Tenant  |
+| `starter-marketer`   | Marketer   | Tenant  |
+| `starter-sales`      | Sales      | Tenant  |
+| `starter-support`    | Support    | Tenant  |
+| `starter-curator`    | Curator    | Work    |
+| `starter-growth`     | Growth     | Tenant  |
+| `starter-designer`   | Designer   | Work    |
+| `starter-devops`     | DevOps     | Work    |
+| `starter-founder`    | Founder    | Mission |
 
 _(The `scope` column reflects each template's `scope` in `manifest.json`
 and controls where the resulting Agent operates — across the whole

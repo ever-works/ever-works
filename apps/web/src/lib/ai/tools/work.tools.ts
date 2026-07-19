@@ -16,6 +16,17 @@ import {
 import { resolveGenerationConfig } from './utils';
 import type { ConfirmationRequired } from './generated/factory';
 
+// Work-kind chip vocabulary (mirrors `InitialWorkKind` in
+// works/new/new-work-client.tsx and the server action's aiWorkKindSchema).
+// When the user's message says what they're building ("I want to create a
+// landing page…"), passing the matching kind persists it on the Work so
+// the kind-aware default website template applies.
+const workKindSchema = z
+    .enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo'])
+    .describe(
+        'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). Omit if unclear.',
+    );
+
 // ────────────────────────────────────────────────────────────────
 // Read
 // ────────────────────────────────────────────────────────────────
@@ -173,14 +184,16 @@ export const createWorkManual = tool({
         slug: z.string().describe('URL-friendly slug (lowercase, hyphens only)'),
         description: z.string().optional().describe('Work description'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
+        kind: workKindSchema.optional(),
     }),
-    execute: async ({ name, slug, description, gitProvider }) => {
+    execute: async ({ name, slug, description, gitProvider, kind }) => {
         const result = await createWork({
             name,
             slug,
             description: description ?? '',
             gitProvider,
             organization: false,
+            kind,
         });
         return {
             success: result.success,
@@ -212,8 +225,16 @@ export const createWorkWithAITool = tool({
             .describe(
                 'User-chosen providers from listAvailablePipelines (e.g., { pipeline: "sim-ai", ai: "openrouter" })',
             ),
+        workKind: workKindSchema.optional(),
     }),
-    execute: async ({ name, prompt, gitProvider, deployProvider, providers: userProviders }) => {
+    execute: async ({
+        name,
+        prompt,
+        gitProvider,
+        deployProvider,
+        providers: userProviders,
+        workKind,
+    }) => {
         // Resolve defaults, then override with user choices
         const config = await resolveGenerationConfig();
         const mergedProviders = userProviders ?? config.providers;
@@ -225,6 +246,7 @@ export const createWorkWithAITool = tool({
             deployProvider,
             providers: mergedProviders,
             pluginConfig: config.pluginConfig,
+            workKind,
         });
         return {
             success: result.success,
