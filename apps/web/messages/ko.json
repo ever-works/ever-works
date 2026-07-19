@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "작업 승인",
+                "subtitle": "에이전트가 부수 효과가 있는 다음 작업들을 제안했습니다. 각각 승인하거나 거부하세요."
+            },
+            "actions": {
+                "approve": "승인",
+                "reject": "거부",
+                "approveAll": "모두 승인"
+            },
+            "actionType": {
+                "spawn_agent": "에이전트 생성",
+                "schedule_task": "작업 예약",
+                "send_message": "메시지 보내기",
+                "budget_override": "예산 재정의",
+                "other": "작업"
+            },
+            "riskFlags": {
+                "budget_override": "예산 재정의",
+                "destructive": "파괴적",
+                "cross_scope": "범위 간",
+                "high_fanout": "높은 팬아웃"
+            },
+            "toast": {
+                "approved": "작업이 승인되었습니다",
+                "rejected": "작업이 거부되었습니다",
+                "bulkApproved": "{count}개 작업이 승인되었습니다",
+                "bulkApprovedSkipped": "{approved}개 작업 승인, {skipped}개는 이미 결정됨",
+                "error": "문제가 발생했습니다. 다시 시도해 주세요."
+            }
+        },
         "title": "대시보드",
         "connectGithub": {
             "title": "GitHub 계정 연결",

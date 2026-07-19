@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Zatwierdzenia działań",
+                "subtitle": "Twoi agenci zaproponowali te działania z efektami ubocznymi. Zatwierdź lub odrzuć każde z nich."
+            },
+            "actions": {
+                "approve": "Zatwierdź",
+                "reject": "Odrzuć",
+                "approveAll": "Zatwierdź wszystkie"
+            },
+            "actionType": {
+                "spawn_agent": "Utwórz agenta",
+                "schedule_task": "Zaplanuj zadanie",
+                "send_message": "Wyślij wiadomość",
+                "budget_override": "Nadpisanie budżetu",
+                "other": "Działanie"
+            },
+            "riskFlags": {
+                "budget_override": "Nadpisanie budżetu",
+                "destructive": "Destrukcyjne",
+                "cross_scope": "Międzyzakresowe",
+                "high_fanout": "Duże rozgałęzienie"
+            },
+            "toast": {
+                "approved": "Działanie zatwierdzone",
+                "rejected": "Działanie odrzucone",
+                "bulkApproved": "Zatwierdzono {count} działań",
+                "bulkApprovedSkipped": "Zatwierdzono {approved} działań, {skipped} już rozstrzygnięto",
+                "error": "Coś poszło nie tak. Spróbuj ponownie."
+            }
+        },
         "title": "Pulpit",
         "connectGithub": {
             "title": "Połącz konto GitHub",

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Approbations d'actions",
+                "subtitle": "Vos agents ont proposé ces actions à effets de bord. Approuvez ou rejetez chacune d'elles."
+            },
+            "actions": {
+                "approve": "Approuver",
+                "reject": "Rejeter",
+                "approveAll": "Tout approuver"
+            },
+            "actionType": {
+                "spawn_agent": "Créer un agent",
+                "schedule_task": "Planifier une tâche",
+                "send_message": "Envoyer un message",
+                "budget_override": "Dépassement de budget",
+                "other": "Action"
+            },
+            "riskFlags": {
+                "budget_override": "Dépassement de budget",
+                "destructive": "Destructrice",
+                "cross_scope": "Inter-périmètres",
+                "high_fanout": "Forte ramification"
+            },
+            "toast": {
+                "approved": "Action approuvée",
+                "rejected": "Action rejetée",
+                "bulkApproved": "{count} actions approuvées",
+                "bulkApprovedSkipped": "{approved} actions approuvées, {skipped} déjà décidées",
+                "error": "Une erreur s'est produite. Veuillez réessayer."
+            }
+        },
         "title": "Tableau de bord",
         "connectGithub": {
             "title": "Connectez votre compte GitHub",

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "アクション承認",
+                "subtitle": "エージェントが副作用を伴うアクションを提案しました。それぞれ承認または却下してください。"
+            },
+            "actions": {
+                "approve": "承認",
+                "reject": "却下",
+                "approveAll": "すべて承認"
+            },
+            "actionType": {
+                "spawn_agent": "エージェントの起動",
+                "schedule_task": "タスクのスケジュール",
+                "send_message": "メッセージ送信",
+                "budget_override": "予算の上書き",
+                "other": "アクション"
+            },
+            "riskFlags": {
+                "budget_override": "予算の上書き",
+                "destructive": "破壊的",
+                "cross_scope": "スコープ横断",
+                "high_fanout": "高ファンアウト"
+            },
+            "toast": {
+                "approved": "アクションを承認しました",
+                "rejected": "アクションを却下しました",
+                "bulkApproved": "{count} 件のアクションを承認しました",
+                "bulkApprovedSkipped": "{approved} 件のアクションを承認、{skipped} 件は決定済み",
+                "error": "問題が発生しました。もう一度お試しください。"
+            }
+        },
         "title": "ダッシュボード",
         "connectGithub": {
             "title": "GitHub アカウントを接続",

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "การอนุมัติการดำเนินการ",
+                "subtitle": "เอเจนต์ของคุณเสนอการดำเนินการที่มีผลข้างเคียงเหล่านี้ อนุมัติหรือปฏิเสธแต่ละรายการ"
+            },
+            "actions": {
+                "approve": "อนุมัติ",
+                "reject": "ปฏิเสธ",
+                "approveAll": "อนุมัติทั้งหมด"
+            },
+            "actionType": {
+                "spawn_agent": "สร้างเอเจนต์",
+                "schedule_task": "กำหนดเวลางาน",
+                "send_message": "ส่งข้อความ",
+                "budget_override": "แทนที่งบประมาณ",
+                "other": "การดำเนินการ"
+            },
+            "riskFlags": {
+                "budget_override": "แทนที่งบประมาณ",
+                "destructive": "เชิงทำลาย",
+                "cross_scope": "ข้ามขอบเขต",
+                "high_fanout": "การแตกแขนงสูง"
+            },
+            "toast": {
+                "approved": "อนุมัติการดำเนินการแล้ว",
+                "rejected": "ปฏิเสธการดำเนินการแล้ว",
+                "bulkApproved": "อนุมัติแล้ว {count} รายการ",
+                "bulkApprovedSkipped": "อนุมัติแล้ว {approved} รายการ, {skipped} รายการมีการตัดสินแล้ว",
+                "error": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง"
+            }
+        },
         "title": "แดชบอร์ด",
         "connectGithub": {
             "title": "เชื่อมต่อบัญชี GitHub ของคุณ",

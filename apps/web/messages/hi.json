@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "कार्रवाई अनुमोदन",
+                "subtitle": "आपके एजेंटों ने ये साइड-इफ़ेक्ट वाली कार्रवाइयाँ प्रस्तावित की हैं। प्रत्येक को स्वीकृत या अस्वीकृत करें।"
+            },
+            "actions": {
+                "approve": "स्वीकृत करें",
+                "reject": "अस्वीकार करें",
+                "approveAll": "सभी स्वीकृत करें"
+            },
+            "actionType": {
+                "spawn_agent": "एजेंट बनाएँ",
+                "schedule_task": "कार्य शेड्यूल करें",
+                "send_message": "संदेश भेजें",
+                "budget_override": "बजट ओवरराइड",
+                "other": "कार्रवाई"
+            },
+            "riskFlags": {
+                "budget_override": "बजट ओवरराइड",
+                "destructive": "विनाशकारी",
+                "cross_scope": "क्रॉस-स्कोप",
+                "high_fanout": "उच्च फ़ैन-आउट"
+            },
+            "toast": {
+                "approved": "कार्रवाई स्वीकृत हुई",
+                "rejected": "कार्रवाई अस्वीकृत हुई",
+                "bulkApproved": "{count} कार्रवाइयाँ स्वीकृत हुईं",
+                "bulkApprovedSkipped": "{approved} कार्रवाइयाँ स्वीकृत हुईं, {skipped} पर पहले ही निर्णय हो चुका है",
+                "error": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+            }
+        },
         "title": "डैशबोर्ड",
         "connectGithub": {
             "title": "अपना GitHub खाता जोड़ें",

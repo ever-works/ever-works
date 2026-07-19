@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "אישורי פעולות",
+                "subtitle": "הסוכנים שלך הציעו פעולות אלו בעלות תופעות לוואי. אשר או דחה כל אחת מהן."
+            },
+            "actions": {
+                "approve": "אישור",
+                "reject": "דחייה",
+                "approveAll": "אשר הכול"
+            },
+            "actionType": {
+                "spawn_agent": "יצירת סוכן",
+                "schedule_task": "תזמון משימה",
+                "send_message": "שליחת הודעה",
+                "budget_override": "חריגה מתקציב",
+                "other": "פעולה"
+            },
+            "riskFlags": {
+                "budget_override": "חריגה מתקציב",
+                "destructive": "הרסנית",
+                "cross_scope": "חוצת תחומים",
+                "high_fanout": "התפצלות גבוהה"
+            },
+            "toast": {
+                "approved": "הפעולה אושרה",
+                "rejected": "הפעולה נדחתה",
+                "bulkApproved": "אושרו {count} פעולות",
+                "bulkApprovedSkipped": "אושרו {approved} פעולות, {skipped} כבר הוכרעו",
+                "error": "משהו השתבש. נסה שוב."
+            }
+        },
         "title": "לוח מחוונים",
         "connectGithub": {
             "title": "חבר את חשבון GitHub שלך",

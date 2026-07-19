@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Eylem onayları",
+                "subtitle": "Ajanlarınız yan etkili bu eylemleri önerdi. Her birini onaylayın veya reddedin."
+            },
+            "actions": {
+                "approve": "Onayla",
+                "reject": "Reddet",
+                "approveAll": "Tümünü onayla"
+            },
+            "actionType": {
+                "spawn_agent": "Ajan oluştur",
+                "schedule_task": "Görev zamanla",
+                "send_message": "Mesaj gönder",
+                "budget_override": "Bütçe aşımı",
+                "other": "Eylem"
+            },
+            "riskFlags": {
+                "budget_override": "Bütçe aşımı",
+                "destructive": "Yıkıcı",
+                "cross_scope": "Kapsamlar arası",
+                "high_fanout": "Yüksek dallanma"
+            },
+            "toast": {
+                "approved": "Eylem onaylandı",
+                "rejected": "Eylem reddedildi",
+                "bulkApproved": "{count} eylem onaylandı",
+                "bulkApprovedSkipped": "{approved} eylem onaylandı, {skipped} zaten karara bağlandı",
+                "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+            }
+        },
         "title": "Pano",
         "connectGithub": {
             "title": "GitHub hesabınızı bağlayın",
