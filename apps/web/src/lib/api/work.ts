@@ -78,6 +78,10 @@ export interface CreateWorkDto {
     gitProvider?: string;
     deployProvider?: string;
     websiteTemplateId?: string;
+    /** Work-kind chip value (website, landing-page, blog, directory,
+     *  awesome-repo). Drives the kind-aware default website template;
+     *  the API coerces unknown values to 'default'. */
+    kind?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
