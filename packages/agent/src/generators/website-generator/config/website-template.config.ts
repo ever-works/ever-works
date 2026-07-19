@@ -56,9 +56,9 @@ const WEB_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
     betaBranch: null,
-    // Clean marketing/landing starter; no agent-customization prompt yet, so
-    // forks are edited manually (see template-catalog/customization-prompts/).
-    customizable: false,
+    // Agent UI-customizable via a plain-CSS theme.css surface (see
+    // template-catalog/customization-prompts/web-template.prompt.ts).
+    customizable: true,
 };
 
 const WEB_MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
@@ -71,7 +71,9 @@ const WEB_MINIMAL_WEBSITE_TEMPLATE: WebsiteTemplateConfig = {
     branch: 'main',
     syncBranches: ['main', 'stage', 'develop'],
     betaBranch: null,
-    customizable: false,
+    // Agent UI-customizable via a plain-CSS theme.css surface (see
+    // template-catalog/customization-prompts/web-minimal-template.prompt.ts).
+    customizable: true,
 };
 
 export const DEFAULT_WEBSITE_TEMPLATE_ID: WebsiteTemplateId = 'classic';
@@ -82,6 +84,25 @@ export const WEBSITE_TEMPLATES: WebsiteTemplateConfig[] = [
     WEB_WEBSITE_TEMPLATE,
     WEB_MINIMAL_WEBSITE_TEMPLATE,
 ];
+
+// Default website template per Work kind — applied ONLY when a Work has no
+// explicit websiteTemplateId AND no saved user preference (see
+// WebsiteTemplateResolverService.resolveForWork). General-purpose (non-directory)
+// kinds map to the general `web` template; every other kind (directory,
+// awesome-repo, the 'default' seed value, or anything unknown) falls through to
+// the system default (classic), so existing behaviour is unchanged. The
+// `web-minimal` (Astro) variant stays opt-in, like `minimal` is for directories.
+const KIND_DEFAULT_WEBSITE_TEMPLATE: Record<string, WebsiteTemplateId> = {
+    website: 'web',
+    'landing-page': 'web',
+    landing: 'web',
+    blog: 'web'
+};
+
+export function getWebsiteTemplateIdForWorkKind(kind?: string | null): WebsiteTemplateId | null {
+    if (!kind) return null;
+    return KIND_DEFAULT_WEBSITE_TEMPLATE[kind.trim().toLowerCase()] ?? null;
+}
 
 export function listWebsiteTemplates(): WebsiteTemplateConfig[] {
     return [...WEBSITE_TEMPLATES];

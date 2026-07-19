@@ -834,13 +834,27 @@ export class TemplateCustomizationService {
     }
 
     private async assertThemeCssWired(workspaceDir: string): Promise<void> {
-        const layoutPath = path.join(workspaceDir, 'apps/web/src/layouts/BaseLayout.astro');
-        const layout = await fs.readFile(layoutPath, 'utf8').catch(() => null);
-        if (layout === null || !layout.includes('styles/theme.css')) {
-            throw new Error(
-                'Fork is not migrated for customization: apps/web/src/layouts/BaseLayout.astro does not import styles/theme.css, so styling edits would not load. Sync this template from its base before customizing.',
-            );
+        // Framework-specific layout files that may import the theme.css override
+        // surface (CUSTOMIZATION_ALLOWED_PATHS). A customizable fork must load
+        // apps/web/src/styles/theme.css from one of these so agent styling edits
+        // actually take effect — Astro via BaseLayout.astro, Next.js via the App
+        // Router root layout.
+        const layoutCandidates = [
+            'apps/web/src/layouts/BaseLayout.astro', // Astro (web-minimal, directory-web-minimal)
+            'apps/web/app/layout.tsx', // Next.js App Router (web)
+            'apps/web/src/app/layout.tsx', // Next.js App Router with a src/ dir
+        ];
+        for (const rel of layoutCandidates) {
+            const layout = await fs.readFile(path.join(workspaceDir, rel), 'utf8').catch(() => null);
+            if (layout && layout.includes('theme.css')) {
+                return;
+            }
         }
+        throw new Error(
+            `Fork is not migrated for customization: none of [${layoutCandidates.join(', ')}] ` +
+                'imports apps/web/src/styles/theme.css, so styling edits would not load. ' +
+                'Sync this template from its base before customizing.',
+        );
     }
 
     private async assertThemeCssCompiles(
