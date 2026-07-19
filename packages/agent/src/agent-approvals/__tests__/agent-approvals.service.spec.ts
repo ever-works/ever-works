@@ -14,6 +14,7 @@ function makeProposalsRepo() {
         save: jest.fn(
             async (v: AgentActionProposal) => ({ id: 'p1', ...v }) as AgentActionProposal,
         ),
+        find: jest.fn(),
         findOne: jest.fn(),
         findAndCount: jest.fn(),
     };
@@ -119,6 +120,58 @@ describe('AgentApprovalsService', () => {
             await expect(svc.decide('u1', 'p1', 'approved')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+    });
+
+    describe('approveAll', () => {
+        it('approves every pending row and skips already-decided ones', async () => {
+            const pending1 = makeProposal({ id: 'p1' });
+            const pending2 = makeProposal({ id: 'p2' });
+            const decided = makeProposal({ id: 'p3', status: 'rejected' });
+            proposals.find.mockResolvedValue([pending1, pending2, decided]);
+
+            const result = await svc.approveAll('u1', ['p1', 'p2', 'p3']);
+
+            expect(result).toEqual({ approved: 2, skipped: 1 });
+            expect(proposals.find).toHaveBeenCalledWith({
+                where: expect.objectContaining({ userId: 'u1' }),
+            });
+            expect(proposals.save).toHaveBeenCalledTimes(1);
+            const saved = proposals.save.mock.calls[0][0] as unknown as AgentActionProposal[];
+            expect(saved.map((r) => r.id)).toEqual(['p1', 'p2']);
+            for (const row of saved) {
+                expect(row.status).toBe('approved');
+                expect(row.decidedById).toBe('u1');
+                expect(row.decidedAt).toBeInstanceOf(Date);
+            }
+        });
+
+        it('approves all my pending proposals when no ids are given', async () => {
+            proposals.find.mockResolvedValue([makeProposal({ id: 'p1' })]);
+
+            const result = await svc.approveAll('u1');
+
+            expect(result).toEqual({ approved: 1, skipped: 0 });
+            expect(proposals.find).toHaveBeenCalledWith({
+                where: { userId: 'u1', status: 'pending' },
+            });
+        });
+
+        it('does not save when every requested row is already decided', async () => {
+            proposals.find.mockResolvedValue([makeProposal({ id: 'p1', status: 'approved' })]);
+
+            const result = await svc.approveAll('u1', ['p1']);
+
+            expect(result).toEqual({ approved: 0, skipped: 1 });
+            expect(proposals.save).not.toHaveBeenCalled();
+        });
+
+        it('short-circuits on an explicit empty subset', async () => {
+            const result = await svc.approveAll('u1', []);
+
+            expect(result).toEqual({ approved: 0, skipped: 0 });
+            expect(proposals.find).not.toHaveBeenCalled();
+            expect(proposals.save).not.toHaveBeenCalled();
         });
     });
 

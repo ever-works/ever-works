@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import {
     agentApprovalsAPI,
     type AgentActionProposal,
-    type ListAgentApprovalsQuery,
+    type ApproveAllAgentApprovalsResult,
 } from '@/lib/api/agent-approvals';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
@@ -27,14 +27,6 @@ function revalidateApprovalSurfaces() {
     revalidatePath('/[locale]/(dashboard)/(home)', 'page');
 }
 
-export async function listPendingApprovalsAction(
-    query: ListAgentApprovalsQuery = {},
-): Promise<AgentActionProposal[]> {
-    await requireApprovalAuth();
-    const res = await agentApprovalsAPI.list({ status: 'pending', ...query });
-    return res.data;
-}
-
 export async function approveProposalAction(id: string): Promise<AgentActionProposal> {
     await requireApprovalAuth();
     const row = await agentApprovalsAPI.approve(id);
@@ -50,27 +42,17 @@ export async function rejectProposalAction(id: string): Promise<AgentActionPropo
 }
 
 /**
- * Bulk-approve every supplied proposal id. There's no bulk API
- * endpoint (keeping the decision surface auditable one row at a time),
- * so this fans out to the single-row approve endpoint and reports
- * per-id success/failure. Cache is busted once at the end.
+ * Bulk-approve pending proposals via the single `approve-all` API
+ * endpoint — ONE write (one throttle hit) no matter how many rows are
+ * queued. `ids` optionally narrows the batch to what the caller sees;
+ * concurrently-decided rows are skipped server-side and reported in
+ * the returned counts. Cache is busted once at the end.
  */
 export async function approveAllProposalsAction(
-    ids: string[],
-): Promise<{ approved: string[]; failed: string[] }> {
+    ids?: string[],
+): Promise<ApproveAllAgentApprovalsResult> {
     await requireApprovalAuth();
-    const approved: string[] = [];
-    const failed: string[] = [];
-    for (const id of ids) {
-        try {
-            await agentApprovalsAPI.approve(id);
-            approved.push(id);
-        } catch {
-            // A concurrently-decided proposal 409s — record it as failed
-            // and keep going so one stale row doesn't abort the batch.
-            failed.push(id);
-        }
-    }
+    const result = await agentApprovalsAPI.approveAll(ids);
     revalidateApprovalSurfaces();
-    return { approved, failed };
+    return result;
 }

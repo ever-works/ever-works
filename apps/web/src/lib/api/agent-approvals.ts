@@ -49,6 +49,11 @@ export interface ListAgentApprovalsResponse {
     meta: { total: number; limit: number; offset: number };
 }
 
+export interface ApproveAllAgentApprovalsResult {
+    approved: number;
+    skipped: number;
+}
+
 function buildQuery(q: ListAgentApprovalsQuery = {}): string {
     const params = new URLSearchParams();
     if (q.status) params.set('status', q.status);
@@ -89,6 +94,20 @@ export const agentApprovalsAPI = {
         return serverMutation<AgentActionProposal>({
             endpoint: `/agent-approvals/${id}/reject`,
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Bulk-approve pending proposals in ONE API call (one throttle hit
+     * instead of one per row). Omitting `ids` approves every pending
+     * proposal; already-decided rows are skipped server-side.
+     */
+    async approveAll(ids?: string[]): Promise<ApproveAllAgentApprovalsResult> {
+        return serverMutation<ApproveAllAgentApprovalsResult>({
+            endpoint: '/agent-approvals/approve-all',
+            data: ids ? { ids } : {},
             method: 'POST',
             wrapInData: false,
         });

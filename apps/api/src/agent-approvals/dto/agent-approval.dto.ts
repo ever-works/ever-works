@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { AGENT_ACTION_PROPOSAL_STATUSES } from '@ever-works/agent/agent-approvals';
 
 /**
@@ -33,4 +33,18 @@ export class ListAgentApprovalsQueryDto {
     @IsInt()
     @Min(0)
     offset?: number;
+}
+
+/**
+ * Body for `POST /api/agent-approvals/approve-all`. `ids` optionally
+ * narrows the bulk approval to a subset of proposals; omitted means
+ * "all my pending proposals".
+ */
+export class ApproveAllAgentApprovalsDto {
+    @ApiProperty({ required: false, type: [String], format: 'uuid' })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(200)
+    @IsUUID(undefined, { each: true })
+    ids?: string[];
 }

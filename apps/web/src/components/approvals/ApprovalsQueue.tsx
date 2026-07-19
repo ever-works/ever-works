@@ -33,7 +33,11 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
     const [proposals, setProposals] = useState(initialApprovals);
     // Explicit per-row submitting state (not useTransition) so each row's
     // buttons disable independently while its decision is in flight.
-    const [submittingIds, setSubmittingIds] = useState<Record<string, boolean>>({});
+    // Keyed on id → action so only the clicked button shows a spinner
+    // (its sibling is disabled but keeps its idle icon).
+    const [submittingActions, setSubmittingActions] = useState<
+        Record<string, 'approve' | 'reject'>
+    >({});
     const [isApprovingAll, setIsApprovingAll] = useState(false);
 
     const pendingIds = useMemo(() => proposals.map((p) => p.id), [proposals]);
@@ -44,14 +48,22 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
         return null;
     }
 
-    const setSubmitting = (id: string, value: boolean) =>
-        setSubmittingIds((prev) => ({ ...prev, [id]: value }));
+    const setSubmitting = (id: string, action: 'approve' | 'reject' | null) =>
+        setSubmittingActions((prev) => {
+            const next = { ...prev };
+            if (action) {
+                next[id] = action;
+            } else {
+                delete next[id];
+            }
+            return next;
+        });
 
     const removeRow = (id: string) => setProposals((prev) => prev.filter((p) => p.id !== id));
 
     const handleApprove = async (id: string) => {
-        if (submittingIds[id] || isApprovingAll) return;
-        setSubmitting(id, true);
+        if (submittingActions[id] || isApprovingAll) return;
+        setSubmitting(id, 'approve');
         try {
             await approveProposalAction(id);
             removeRow(id);
@@ -59,13 +71,13 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
         } catch {
             toast.error(t('toast.error'));
         } finally {
-            setSubmitting(id, false);
+            setSubmitting(id, null);
         }
     };
 
     const handleReject = async (id: string) => {
-        if (submittingIds[id] || isApprovingAll) return;
-        setSubmitting(id, true);
+        if (submittingActions[id] || isApprovingAll) return;
+        setSubmitting(id, 'reject');
         try {
             await rejectProposalAction(id);
             removeRow(id);
@@ -73,7 +85,7 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
         } catch {
             toast.error(t('toast.error'));
         } finally {
-            setSubmitting(id, false);
+            setSubmitting(id, null);
         }
     };
 
@@ -81,13 +93,15 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
         if (isApprovingAll || pendingIds.length === 0) return;
         setIsApprovingAll(true);
         try {
-            const { approved, failed } = await approveAllProposalsAction(pendingIds);
-            const approvedSet = new Set(approved);
-            setProposals((prev) => prev.filter((p) => !approvedSet.has(p.id)));
-            if (failed.length > 0) {
-                toast.error(t('toast.bulkPartial', { count: failed.length }));
+            const { approved, skipped } = await approveAllProposalsAction(pendingIds);
+            // Approved rows AND skipped (concurrently-decided) rows are
+            // both no longer pending — clear every row we sent.
+            const sent = new Set(pendingIds);
+            setProposals((prev) => prev.filter((p) => !sent.has(p.id)));
+            if (skipped > 0) {
+                toast.success(t('toast.bulkApprovedSkipped', { approved, skipped }));
             } else {
-                toast.success(t('toast.bulkApproved', { count: approved.length }));
+                toast.success(t('toast.bulkApproved', { count: approved }));
             }
         } catch {
             toast.error(t('toast.error'));
@@ -139,7 +153,8 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
 
             <ul className="flex flex-col gap-3">
                 {proposals.map((p) => {
-                    const busy = Boolean(submittingIds[p.id]) || isApprovingAll;
+                    const rowAction = submittingActions[p.id];
+                    const busy = Boolean(rowAction) || isApprovingAll;
                     return (
                         <li
                             key={p.id}
@@ -178,7 +193,7 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
                                         data-testid={`approval-reject-${p.id}`}
                                         className="gap-1.5"
                                     >
-                                        {submittingIds[p.id] ? (
+                                        {rowAction === 'reject' ? (
                                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                         ) : (
                                             <X className="w-3.5 h-3.5" />
@@ -193,7 +208,7 @@ export function ApprovalsQueue({ initialApprovals }: ApprovalsQueueProps) {
                                         data-testid={`approval-approve-${p.id}`}
                                         className="gap-1.5"
                                     >
-                                        {submittingIds[p.id] ? (
+                                        {rowAction === 'approve' ? (
                                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                         ) : (
                                             <Check className="w-3.5 h-3.5" />

@@ -484,7 +484,7 @@
                 "approved": "Action approved",
                 "rejected": "Action rejected",
                 "bulkApproved": "Approved {count} actions",
-                "bulkPartial": "{count} actions could not be approved",
+                "bulkApprovedSkipped": "Approved {approved} actions, {skipped} already decided",
                 "error": "Something went wrong. Please try again."
             }
         },

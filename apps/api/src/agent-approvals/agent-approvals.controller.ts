@@ -1,4 +1,5 @@
 import {
+    Body,
     Controller,
     Get,
     HttpCode,
@@ -16,7 +17,7 @@ import {
 } from '@ever-works/agent/agent-approvals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { ListAgentApprovalsQueryDto } from './dto/agent-approval.dto';
+import { ApproveAllAgentApprovalsDto, ListAgentApprovalsQueryDto } from './dto/agent-approval.dto';
 
 /**
  * Agent Action Approval Queue — API surface.
@@ -25,6 +26,7 @@ import { ListAgentApprovalsQueryDto } from './dto/agent-approval.dto';
  *   GET  /api/agent-approvals/:id         get one
  *   POST /api/agent-approvals/:id/approve approve a pending proposal
  *   POST /api/agent-approvals/:id/reject  reject a pending proposal
+ *   POST /api/agent-approvals/approve-all bulk-approve my pending proposals (optional ids subset)
  *
  * Auth is enforced by the global `AuthSessionGuard`; `@CurrentUser`
  * threads the user id. Cross-user reads return 404 (no existence leak
@@ -71,6 +73,20 @@ export class AgentApprovalsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentActionProposalDto> {
         return this.service.getOne(auth.userId, id);
+    }
+
+    @Post('approve-all')
+    @ApiOperation({
+        summary:
+            'Bulk-approve my pending proposals in one call (optional ids subset; already-decided rows are skipped)',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async approveAll(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: ApproveAllAgentApprovalsDto,
+    ): Promise<{ approved: number; skipped: number }> {
+        return this.service.approveAll(auth.userId, body.ids);
     }
 
     @Post(':id/approve')

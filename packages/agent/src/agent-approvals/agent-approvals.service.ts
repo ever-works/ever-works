@@ -6,7 +6,7 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     AgentActionProposal,
@@ -181,6 +181,41 @@ export class AgentApprovalsService {
         row.updatedAt = now;
         const saved = await this.proposals.save(row);
         return toAgentActionProposalDto(saved);
+    }
+
+    /**
+     * Approve every PENDING proposal owned by the caller — optionally
+     * narrowed to `ids` — in a single call (one throttle hit instead of
+     * one per row). Already-decided rows in the subset are skipped
+     * rather than 409ing: bulk approval is best-effort by design.
+     * Cross-user / unknown ids are silently ignored (no existence leak).
+     */
+    async approveAll(
+        userId: string,
+        ids?: string[],
+    ): Promise<{ approved: number; skipped: number }> {
+        if (ids && ids.length === 0) {
+            return { approved: 0, skipped: 0 };
+        }
+        const where: FindOptionsWhere<AgentActionProposal> = ids
+            ? { userId, id: In(ids) }
+            : { userId, status: 'pending' };
+        const rows = await this.proposals.find({ where });
+        const pending = rows.filter((row) => row.status === 'pending');
+        const skipped = rows.length - pending.length;
+        if (pending.length === 0) {
+            return { approved: 0, skipped };
+        }
+
+        const now = new Date();
+        for (const row of pending) {
+            row.status = 'approved';
+            row.decidedById = userId;
+            row.decidedAt = now;
+            row.updatedAt = now;
+        }
+        await this.proposals.save(pending);
+        return { approved: pending.length, skipped };
     }
 
     // ── internals ─────────────────────────────────────────────────
