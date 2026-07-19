@@ -59,7 +59,9 @@ function progressPercent(metric: AgentScorecardMetric): number {
     if (metric.target > 0) {
         return Math.max(0, Math.min(100, (metric.current / metric.target) * 100));
     }
-    return metric.current >= metric.target ? 100 : 0;
+    // Zero/negative targets: only show a full bar once current strictly
+    // clears the target — target=0 & current=0 reads as "not started".
+    return metric.current > metric.target ? 100 : 0;
 }
 
 /** Editable row — numbers kept as strings so partial input doesn't fight the user. */
@@ -182,9 +184,7 @@ export function AgentScorecardCard({ agent }: AgentScorecardCardProps) {
         const result = draftsToMetrics(drafts);
         if ('error' in result) {
             toast.error(
-                result.error === 'label'
-                    ? 'Every metric needs a label'
-                    : 'Targets and values must be numbers',
+                result.error === 'label' ? t('errors.labelRequired') : t('errors.numbersRequired'),
             );
             return;
         }
@@ -195,10 +195,10 @@ export function AgentScorecardCard({ agent }: AgentScorecardCardProps) {
             });
             setMetrics(updated.scorecard ?? []);
             setIsEditing(false);
-            toast.success('Scorecard saved');
+            toast.success(t('saved'));
             router.refresh();
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Could not save scorecard');
+            toast.error(error instanceof Error ? error.message : t('errors.saveFailed'));
         } finally {
             setIsSubmitting(false);
         }

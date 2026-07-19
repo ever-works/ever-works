@@ -639,6 +639,12 @@
                     "weekly": "Weekly",
                     "monthly": "Monthly",
                     "quarterly": "Quarterly"
+                },
+                "saved": "Scorecard saved",
+                "errors": {
+                    "labelRequired": "Every metric needs a label",
+                    "numbersRequired": "Targets and values must be numbers",
+                    "saveFailed": "Could not save scorecard"
                 }
             },
             "empty": {

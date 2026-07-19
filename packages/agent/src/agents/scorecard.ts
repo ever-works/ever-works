@@ -28,6 +28,12 @@ export const SCORECARD_MAX_METRICS = 12;
 /** Max length for a metric label. */
 export const SCORECARD_LABEL_MAX_LENGTH = 80;
 
+/** Max length for a metric key — mirrors the DTO's @MaxLength(64). */
+export const SCORECARD_KEY_MAX_LENGTH = 64;
+
+/** Max length for a metric unit — mirrors the DTO's @MaxLength(20). */
+export const SCORECARD_UNIT_MAX_LENGTH = 20;
+
 /** Kebab-case metric key: `prs-merged`, `nps`, `weekly-revenue-usd`. */
 export const SCORECARD_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -50,7 +56,7 @@ export function scorecardStatus(metric: AgentScorecardMetric): AgentScorecardSta
 
 /** Roll a scorecard up into per-status counts (order-independent). */
 export function summarizeScorecard(metrics: AgentScorecardMetric[]): AgentScorecardSummary {
-    const summary: AgentScorecardSummary = {
+    let summary: AgentScorecardSummary = {
         total: metrics.length,
         exceeded: 0,
         onTrack: 0,
@@ -104,6 +110,9 @@ export function validateScorecard(metrics: AgentScorecardMetric[]): string | nul
         if (typeof metric.key !== 'string' || !SCORECARD_KEY_RE.test(metric.key)) {
             return `scorecard metric key "${String(metric.key)}" must be kebab-case (a-z, 0-9, dashes).`;
         }
+        if (metric.key.length > SCORECARD_KEY_MAX_LENGTH) {
+            return `scorecard metric key "${metric.key}" must be at most ${SCORECARD_KEY_MAX_LENGTH} characters.`;
+        }
         if (seenKeys.has(metric.key)) {
             return `scorecard metric key "${metric.key}" is duplicated — keys must be unique.`;
         }
@@ -123,6 +132,12 @@ export function validateScorecard(metrics: AgentScorecardMetric[]): string | nul
         }
         if (metric.stretch != null && !isFiniteNumber(metric.stretch)) {
             return `scorecard metric "${metric.key}" stretch must be a finite number when set.`;
+        }
+        if (
+            metric.unit != null &&
+            (typeof metric.unit !== 'string' || metric.unit.length > SCORECARD_UNIT_MAX_LENGTH)
+        ) {
+            return `scorecard metric "${metric.key}" unit must be a string of at most ${SCORECARD_UNIT_MAX_LENGTH} characters.`;
         }
         if (!SCORECARD_PERIODS.includes(metric.period)) {
             return `scorecard metric "${metric.key}" period must be one of: ${SCORECARD_PERIODS.join(', ')}.`;
