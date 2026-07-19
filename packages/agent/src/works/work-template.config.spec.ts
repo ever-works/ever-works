@@ -1,8 +1,4 @@
-import {
-    WORK_TEMPLATES,
-    findWorkTemplateConfig,
-    listWorkTemplates,
-} from './work-template.config';
+import { WORK_TEMPLATES, findWorkTemplateConfig, listWorkTemplates } from './work-template.config';
 
 /**
  * Pins the built-in Work Templates catalog. These rows power the
