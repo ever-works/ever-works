@@ -60,6 +60,7 @@ import {
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
     UpdateAgentDto,
+    UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
 
 /**
@@ -223,6 +224,23 @@ export class AgentsController {
             reportsToAgentId: body.reportsToAgentId,
             scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
         });
+    }
+
+    @Put(':id/guardrails')
+    @ApiOperation({
+        summary:
+            'Replace the Agent\'s dispatch guardrails (mode + auto-approve / blocked action types). Pass {"guardrails": null} to clear back to the default queue-everything posture.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setGuardrails(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: UpdateAgentGuardrailsDto,
+    ): Promise<AgentDto> {
+        // Cross-user 404 (never 403) + defense-in-depth validation both
+        // happen inside the service (`requireOwned` + `validateGuardrails`).
+        return this.service.setGuardrails(auth.userId, id, body.guardrails ?? null);
     }
 
     @Delete(':id')

@@ -6,6 +6,7 @@ import {
     agentsAPI,
     type Agent,
     type AgentExportEnvelope,
+    type AgentGuardrails,
     type AgentImportOptions,
     type AgentImportResult,
     type CreateAgentInput,
@@ -49,6 +50,21 @@ export async function updateAgentAction(id: string, input: UpdateAgentInput): Pr
     await ensureAuth();
     const updated = await agentsAPI.update(id, input);
     revalidatePath('/agents');
+    revalidatePath(`/agents/${id}`);
+    return updated;
+}
+
+/**
+ * Agent Dispatch Guardrails — replace the whole policy (PUT
+ * semantics); pass `null` to clear back to the default
+ * queue-everything posture.
+ */
+export async function updateAgentGuardrailsAction(
+    id: string,
+    guardrails: AgentGuardrails | null,
+): Promise<Agent> {
+    await ensureAuth();
+    const updated = await agentsAPI.updateGuardrails(id, guardrails);
     revalidatePath(`/agents/${id}`);
     return updated;
 }

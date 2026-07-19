@@ -759,6 +759,31 @@
                     "save": "Speichern",
                     "saving": "Wird gespeichert…"
                 }
+            },
+            "guardrails": {
+                "title": "Guardrails",
+                "subtitle": "Legen Sie fest, welche vorgeschlagenen Aktionen auf Ihre Freigabe warten, automatisch ausgeführt oder blockiert werden.",
+                "modeLabel": "Dispatch-Modus",
+                "modeRequireApproval": "Freigabe erforderlich",
+                "modeRequireApprovalHint": "Jede vorgeschlagene Aktion wartet in Ihrer Freigabe-Warteschlange, bis Sie entscheiden.",
+                "modeAutonomous": "Autonom",
+                "modeAutonomousHint": "Sichere Aktionen laufen ohne Wartezeit. Aktionen mit Risiko-Markierungen landen immer in Ihrer Freigabe-Warteschlange.",
+                "autoApproveLabel": "Automatisch freigegebene Aktionstypen",
+                "autoApproveHint": "Nur die ausgewählten Aktionstypen laufen automatisch; alles andere wartet weiterhin auf Freigabe.",
+                "blockedLabel": "Blockierte Aktionstypen",
+                "blockedHint": "Blockierte Aktionen werden automatisch abgelehnt und im Verlauf der Warteschlange festgehalten.",
+                "actionTypes": {
+                    "spawn_agent": "Agent erstellen",
+                    "schedule_task": "Aufgabe planen",
+                    "send_message": "Nachricht senden",
+                    "budget_override": "Budget-Überschreibung",
+                    "other": "Sonstiges"
+                },
+                "save": "Guardrails speichern",
+                "reset": "Auf Standard zurücksetzen",
+                "saveSuccess": "Guardrails gespeichert",
+                "saveError": "Guardrails konnten nicht gespeichert werden",
+                "resetSuccess": "Guardrails auf Standard zurückgesetzt"
             }
         },
         "tasksPage": {
@@ -5181,6 +5206,10 @@
             "membersBadge": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
             "empty": "Noch nichts darzustellen – erstellen Sie zuerst Teams oder Agenten in dieser Organisation.",
             "noOrg": "Erstellen Sie eine Organisation, um ihr Organigramm zu sehen."
+        },
+        "discover": {
+            "title": "Entdecken",
+            "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
         }
     },
     "layout": {
@@ -5267,7 +5296,8 @@
             "security": "Sicherheit",
             "apiKeys": "API-Schlüssel",
             "dangerZone": "Gefahrenzone",
-            "pluginSettings": "Plugin-Einstellungen"
+            "pluginSettings": "Plugin-Einstellungen",
+            "discover": "Entdecken"
         }
     },
     "api": {

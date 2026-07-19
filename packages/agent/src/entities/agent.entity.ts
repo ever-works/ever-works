@@ -12,6 +12,10 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+// Type-only import (erased at compile time) — no runtime cycle with the
+// agents module barrel; the pure helper itself only imports types from
+// `agent-action-proposal.entity`.
+import type { AgentGuardrails } from '../agents/guardrails';
 
 /**
  * Agent scope (agents/spec.md §3.6 / architecture/agents-skills-tasks.md §3).
@@ -291,6 +295,17 @@ export class Agent {
      */
     @Column('simple-json', { nullable: true })
     targets?: AgentTarget[] | null;
+
+    /**
+     * Agent Dispatch Guardrails — per-Agent policy applied when the
+     * Agent proposes a side-effectful action (see
+     * `agents/guardrails.ts` for the pure evaluator +
+     * `AgentApprovalsService.createProposal` for enforcement).
+     * `null` = default posture: every proposal queues for human
+     * approval, exactly the pre-guardrails behavior.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    guardrails?: AgentGuardrails | null;
 
     // ── Heartbeat ──
 

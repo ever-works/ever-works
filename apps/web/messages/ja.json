@@ -693,6 +693,31 @@
                     "save": "保存",
                     "saving": "保存中…"
                 }
+            },
+            "guardrails": {
+                "title": "ガードレール",
+                "subtitle": "提案されたアクションを承認待ちにするか、自動実行するか、ブロックするかを設定します。",
+                "modeLabel": "ディスパッチモード",
+                "modeRequireApproval": "承認必須",
+                "modeRequireApprovalHint": "提案されたすべてのアクションは、あなたが判断するまで承認キューで待機します。",
+                "modeAutonomous": "自律",
+                "modeAutonomousHint": "安全なアクションは待機なしで実行されます。リスクフラグ付きのアクションは常に承認キューに入ります。",
+                "autoApproveLabel": "自動承認するアクション種別",
+                "autoApproveHint": "選択したアクション種別のみ自動実行されます。それ以外はキューに入ります。",
+                "blockedLabel": "ブロックするアクション種別",
+                "blockedHint": "ブロックされたアクションは自動的に却下され、キュー履歴に記録されます。",
+                "actionTypes": {
+                    "spawn_agent": "エージェント作成",
+                    "schedule_task": "タスクのスケジュール",
+                    "send_message": "メッセージ送信",
+                    "budget_override": "予算の上書き",
+                    "other": "その他"
+                },
+                "save": "ガードレールを保存",
+                "reset": "デフォルトに戻す",
+                "saveSuccess": "ガードレールを保存しました",
+                "saveError": "ガードレールを保存できませんでした",
+                "resetSuccess": "ガードレールをデフォルトに戻しました"
             }
         },
         "tasksPage": {

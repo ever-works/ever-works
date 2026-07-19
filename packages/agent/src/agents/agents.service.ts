@@ -34,6 +34,7 @@ import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
 import { validateScorecard } from './scorecard';
+import { validateGuardrails, type AgentGuardrails } from './guardrails';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -435,6 +436,33 @@ export class AgentsService {
             );
         }
 
+        const refreshed = await this.agents.findById(id);
+        if (!refreshed) throw new NotFoundException('Agent vanished after update');
+        return toAgentDto(refreshed);
+    }
+
+    /**
+     * Replace the Agent's dispatch guardrails (PUT semantics — the
+     * whole policy object is swapped; `null` clears back to the
+     * default queue-everything posture).
+     *
+     * Defense-in-depth: the API DTO already shape-checks the body, but
+     * the service re-runs the pure `validateGuardrails` so non-HTTP
+     * callers (import surfaces, future tools) get the same contract.
+     */
+    async setGuardrails(
+        userId: string,
+        id: string,
+        guardrails: AgentGuardrails | null,
+    ): Promise<AgentDto> {
+        await this.requireOwned(userId, id);
+        if (guardrails !== null) {
+            const violation = validateGuardrails(guardrails);
+            if (violation) {
+                throw new BadRequestException(violation);
+            }
+        }
+        await this.agents.updateById(id, { guardrails });
         const refreshed = await this.agents.findById(id);
         if (!refreshed) throw new NotFoundException('Agent vanished after update');
         return toAgentDto(refreshed);
