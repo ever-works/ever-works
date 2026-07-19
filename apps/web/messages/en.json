@@ -614,6 +614,33 @@
             "title": "Agents",
             "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole Workspace.",
             "newAgent": "New Agent",
+            "scorecard": {
+                "title": "Scorecard",
+                "empty": "No metrics yet. Add quantified goals so this Agent's output is measurable.",
+                "addMetric": "Add metric",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "save": "Save scorecard",
+                "statuses": {
+                    "exceeded": "Exceeded",
+                    "onTrack": "On track",
+                    "behind": "Behind",
+                    "critical": "Critical"
+                },
+                "fields": {
+                    "label": "Metric",
+                    "target": "Target",
+                    "current": "Current",
+                    "floor": "Floor",
+                    "stretch": "Stretch",
+                    "period": "Period"
+                },
+                "periods": {
+                    "weekly": "Weekly",
+                    "monthly": "Monthly",
+                    "quarterly": "Quarterly"
+                }
+            },
             "empty": {
                 "title": "No Agents yet.",
                 "subtitle": "Create your first Agent to delegate recurring work. Workspace-scope Agents act across your whole account; Mission- or Work-scoped ones stay focused on a single target."
