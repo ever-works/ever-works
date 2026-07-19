@@ -14,6 +14,14 @@ on:
 permissions:
   contents: read
 
+# 2026-07-19: tsup's DTS worker for `packages/plugin` (20+ dts entries) started
+# dying with ERR_WORKER_OUT_OF_MEMORY on the shared runners, failing every
+# job-runtime/secret-store matrix cell (worker threads inherit NODE_OPTIONS,
+# so a workflow-level heap raise reaches them). Same remediation family as the
+# docs-leg ENOSPC fix (#1667): raise the resource ceiling, don't drop coverage.
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
