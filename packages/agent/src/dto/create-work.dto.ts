@@ -1,6 +1,7 @@
 import { Type, Transform } from 'class-transformer';
 import {
     IsBoolean,
+    IsIn,
     IsNotEmpty,
     IsOptional,
     IsString,
@@ -9,7 +10,11 @@ import {
     MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { MarkdownReadmeConfig } from '../entities/work.entity';
+import {
+    MarkdownReadmeConfig,
+    normalizeCreateWorkKind,
+    USER_SELECTABLE_WORK_KINDS,
+} from '../entities/work.entity';
 import { sanitizeName, sanitizeDescription, sanitizeText } from '../utils/sanitize.util';
 
 export class MarkdownReadmeConfigDto implements MarkdownReadmeConfig {
@@ -136,6 +141,22 @@ export class CreateWorkDto {
     @IsOptional()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     websiteTemplateId?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo). ' +
+            'Drives the kind-aware default website template. Unknown values are coerced to "default"; ' +
+            'omitted keeps the column default.',
+        enum: [...USER_SELECTABLE_WORK_KINDS, 'default'],
+    })
+    @IsOptional()
+    @IsString()
+    // Whitelist at the boundary: the transform coerces any unknown/alias
+    // input to a canonical member, so arbitrary strings can never reach
+    // the `work.kind` column. `@IsIn` documents + guards the closed set.
+    @IsIn([...USER_SELECTABLE_WORK_KINDS, 'default'])
+    @Transform(({ value }) => normalizeCreateWorkKind(value))
+    kind?: string;
 
     @ApiPropertyOptional({
         description: 'Custom README configuration',

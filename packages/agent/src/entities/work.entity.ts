@@ -36,23 +36,80 @@ import { WorkMember } from './work-member.entity';
 import type { WorkKbConfig } from './kb-types';
 
 /**
+ * Work kinds a user can pick at creation time — the chip catalog on
+ * `/new` and `/works/new`. Persisting the choice on `work.kind` is what
+ * lets `WebsiteTemplateResolverService.resolveForWork` pick a
+ * kind-appropriate default website template (general-purpose kinds →
+ * the `web` template; directory-ish kinds stay on `classic`). See
+ * `getWebsiteTemplateIdForWorkKind` in
+ * `generators/website-generator/config/website-template.config.ts`.
+ *
+ * `company` is deliberately NOT in this list: Company Works are minted
+ * only through the dedicated Register-Company flow
+ * (`WorkLifecycleService.createCompanyWork`), never via the general
+ * create path.
+ */
+export const USER_SELECTABLE_WORK_KINDS = [
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+] as const;
+
+export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number];
+
+/**
  * EW-665 (Tenants & Organizations Phase 13) — Work "kind" discriminator.
  *
- *   - `'default'` — every Work that exists today (directories, websites,
- *     landing pages, etc.). The column default, so every pre-Phase-13
- *     row backfills to it.
+ *   - `'default'` — every Work that predates the kind-aware create path
+ *     (directories, websites, landing pages, etc.). The column default,
+ *     so every pre-Phase-13 row backfills to it.
  *   - `'company'` — a Work registered through the Company chip /
  *     Register-Company flow ([spec.md §5.4](../../../../docs/specs/features/tenants-and-organizations/spec.md#54-user-registers-a-company-via-a-work-of-type-company)).
  *     When such a Work transitions to `status = 'registered'`, a
  *     `work.status.changed` event fires and the
  *     `WorkRegisteredListener` (API layer) spawns the backing
  *     `Organization` via `OrganizationService.createOrganizationFromCompanyWork`.
+ *   - the `USER_SELECTABLE_WORK_KINDS` members — the work-kind chip the
+ *     user picked at creation, persisted so the website-template
+ *     resolver can apply a kind-appropriate default.
  *
  * String union + `varchar(32)` mirrors the `TemplateKind` convention on
  * `template.entity.ts` — keeps the value space open without churning a
  * Postgres enum type on every new member.
  */
-export type WorkKind = 'default' | 'company';
+export type WorkKind = 'default' | 'company' | UserSelectableWorkKind;
+
+/**
+ * Normalize a caller-supplied work-kind string for the general create
+ * path. Whitelist semantics — arbitrary input can never become
+ * `work.kind`:
+ *
+ *   - nullish / blank → `undefined` (caller leaves the column default,
+ *     `'default'`, in place);
+ *   - `'landing'` → `'landing-page'` (accepted alias — the resolver map
+ *     understands both, but we persist only the canonical chip value);
+ *   - a known user-selectable kind or `'default'` → itself;
+ *   - anything else (including `'company'`, which is reserved for the
+ *     Register-Company flow) → `'default'`.
+ */
+export function normalizeCreateWorkKind(value?: string | null): WorkKind | undefined {
+    if (typeof value !== 'string') {
+        return value === undefined || value === null ? undefined : 'default';
+    }
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+        return undefined;
+    }
+    const canonical = normalized === 'landing' ? 'landing-page' : normalized;
+    if (canonical === 'default') {
+        return 'default';
+    }
+    return (USER_SELECTABLE_WORK_KINDS as readonly string[]).includes(canonical)
+        ? (canonical as UserSelectableWorkKind)
+        : 'default';
+}
 
 /**
  * EW-665 (Tenants & Organizations Phase 13) — Work lifecycle status.
