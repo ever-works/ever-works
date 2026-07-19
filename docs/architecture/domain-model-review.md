@@ -388,6 +388,8 @@ TYPED RELATIONS (the graph):
 | Decision/Evaluation entities | Premature; v1 = activity-log coverage (decisions appear as logged actions with actor + rationale metadata) and the existing task review/approval surface. Revisit with agent self-evaluation loops.                                                                        |
 | Org-scoped Agent             | The branch glossary explicitly keeps agent scope at tenant/mission/idea/work; org reach comes via Teams later.                                                                                                                                                             |
 
+> **Update (2026-07-19, operator rulings — see §23):** two deferrals above are superseded _on timeline, not in shape_. **Vision** ships now as the Organization field described here (optional at org creation, injected into agent prompts). **Goal** ships as a first-class entity together with its measurement plumbing — a new `metrics-provider` plugin category (PostHog, Stripe, Google Analytics, custom GET-only HTTP, custom plugins) — rather than waiting for one to appear. The principle stands: a Goal only exists with a real metric source behind it; §23.4 has the full design.
+
 ### 8.3 Human-facing hierarchy vs database
 
 The **UI keeps its flat sidebar** in v1 (Dashboard → Missions → Ideas → Works → Tasks → Agents → …) — it already matches the model. When Teams and the Schedules read-model land, group additively (nothing removed):
@@ -569,7 +571,7 @@ stateDiagram-v2
     end note
 ```
 
-> **Storage note (no enum rename).** `concluded` in this diagram is the _conceptual_ end state; the stored `MissionStatus` value remains `'completed'` (`mission.entity.ts:22-27`) for full API/data compatibility. "Conclude" appears only in UI copy and as the optional API alias (§16); implementers must not rename the enum value — existing `completed` rows are already in this state, with `outcome = NULL` (§17 Phase 2d).
+> **Storage note (no enum rename).** `concluded` in this diagram is the _conceptual_ end state; the stored `MissionStatus` value remains `'completed'` (`mission.entity.ts:22-27`) for full API/data compatibility. **Ruled §23.2:** the product verb stays **"Complete"** everywhere (no `conclude` alias) — so implementers read `concluded` here simply as `completed`-with-an-`outcome`; existing `completed` rows are already in this state, with `outcome = NULL` (§17 Phase 2d). Completion is human-only; autonomous agent runs never gain a complete-mission tool.
 
 ### 11.6 Task execution lifecycle (current, correct — unchanged)
 
@@ -729,15 +731,15 @@ Each scenario is modeled in the recommended architecture; **[today]** notes what
 
 ### Recommended
 
-| Change                                      | Detail                                                                                                                                                                  |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mission `outcome` column                    | `varchar(24) NULL` + `concludedAt`; `complete` endpoint gains optional outcome param (default endpoint behavior unchanged → API-compatible). Optional alias `conclude`. |
-| Mission `objective`/`successCriteria`       | Nullable text columns (or fold into description conventions + a structured field later).                                                                                |
-| `organizations.vision` (+`visionUpdatedAt`) | Field, editable via existing PATCH; injected into idea-generation context.                                                                                              |
-| `idea_works` provenance history             | `(ideaId, workId, kind: built\|linked\|rebuilt, createdAt)` append-only; rebuild stops erasing history (A27 keeps current-pointer semantics).                           |
-| Company Work backlink                       | Set `work.organizationId` on org creation from company Work (P5); FK on `organizations.linkedWorkId`.                                                                   |
-| Rename `work_agent_goals` concept           | API/UI copy → "build requests"; table rename deferred to cleanup. Frees "Goal".                                                                                         |
-| Sub-agent lineage                           | `agents.createdByAgentId` (SET NULL).                                                                                                                                   |
+| Change                                      | Detail                                                                                                                                                                          |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mission `outcome` column                    | `varchar(24) NULL` + `completedAt`; `complete` endpoint gains optional outcome param (default endpoint behavior unchanged → API-compatible). No `conclude` alias — ruled §23.2. |
+| Mission `objective`/`successCriteria`       | Nullable text columns (or fold into description conventions + a structured field later).                                                                                        |
+| `organizations.vision` (+`visionUpdatedAt`) | Field, editable via existing PATCH; injected into idea-generation context.                                                                                                      |
+| `idea_works` provenance history             | `(ideaId, workId, kind: built\|linked\|rebuilt, createdAt)` append-only; rebuild stops erasing history (A27 keeps current-pointer semantics).                                   |
+| Company Work backlink                       | Set `work.organizationId` on org creation from company Work (P5); FK on `organizations.linkedWorkId`.                                                                           |
+| Rename `work_agent_goals` concept           | API/UI copy → "build requests"; table rename deferred to cleanup. Frees "Goal".                                                                                                 |
+| Sub-agent lineage                           | `agents.createdByAgentId` (SET NULL).                                                                                                                                           |
 
 ### Optional / future
 
@@ -863,14 +865,111 @@ Schedules read-model, team_resources, Evaluation/Decision records.
 
 ### 22.5 Decisions that require product-owner input
 
-1. **Idea↔Work cardinality ruling:** keep "one current Work per Idea, history in `idea_works`" (recommended) or implement true parallel 0..N per ADR-009? Affects PR-1's shape.
-2. **Stranded `queued` Ideas** (pre-executor rows): revert to `pending` with a note, or auto-create build requests when the executor ships?
-3. **Mission conclude semantics:** may agents conclude Missions (with which permission), or humans only? And is the API verb `complete` (compat) or `conclude` (clarity, aliased)?
-4. **"Build request" rename** of `work_agent_goals` surfaces (UI copy now, table later) — approve freeing the "Goal" name?
-5. **Goal entity trigger:** which metrics source makes Goals real (website analytics ingestion? PostHog-derived KPIs? manual check-ins as an interim)? Until chosen, Goals stay out of the UI.
-6. **Teams merge timing** (PR #1647) relative to org membership/roles — structure-first (recommended) or wait for the permission design?
-7. **`/discover` route:** retire or relink (currently orphaned).
+> **Status: answered by the product owner on 2026-07-19** — rulings and the resulting design changes are in **§23**. Only D2 (stranded `queued` Ideas) remains open; §23.7 explains its options in full.
+
+1. **Idea↔Work cardinality ruling:** keep "one current Work per Idea, history in `idea_works`" (recommended) or implement true parallel 0..N per ADR-009? Affects PR-1's shape. → **Ruled: true parallel 0..N** (§23.1).
+2. **Stranded `queued` Ideas** (pre-executor rows): revert to `pending` with a note, or auto-create build requests when the executor ships? → **OPEN** (§23.7).
+3. **Mission conclude semantics:** may agents conclude Missions (with which permission), or humans only? And is the API verb `complete` (compat) or `conclude` (clarity, aliased)? → **Ruled: humans only; keep "Complete"** (§23.2).
+4. **"Build request" rename** of `work_agent_goals` surfaces (UI copy now, table later) — approve freeing the "Goal" name? → **Ruled: rename UI _and_ table now** (§23.3).
+5. **Goal entity trigger:** which metrics source makes Goals real? → **Ruled: build the metrics-provider plugin system now; Goals ship with it** (§23.4).
+6. **Teams merge timing** (PR #1647) relative to org membership/roles — structure-first (recommended) or wait for the permission design? → **Ruled: structure-first, permissions deliberately out of scope** (§23.5).
+7. **`/discover` route:** retire or relink (currently orphaned). → **Explained in §23.6; recommendation: redirect to `/ideas`** (awaiting confirmation).
 
 ---
 
-_Review conducted 2026-07-19 against `develop` @ `8fb98c8d`. Fourteen-subsystem inspection + fourteen-claim adversarial verification; all claims marked "verified" survived refutation attempts. Where behavior could not be established from code, it is labeled "Not confirmed" in place._
+## 23. Decision addendum (2026-07-19) — operator rulings and resulting design
+
+The product owner answered §22.5 on 2026-07-19. This section records each ruling and the design it implies. Where a ruling supersedes an earlier recommendation in this document, the earlier text is left intact with a pointer here — the reasoning trail matters more than a clean rewrite.
+
+### 23.1 Idea → Work is true parallel 0..N (per ADR-009)
+
+**Ruling:** implement 0..N, not "one current Work with history".
+
+**Design:** the `idea_works` join table (§16) is promoted from _history_ to the **authoritative link**: `(id, ideaId FK CASCADE, workId FK CASCADE, kind: 'built' | 'linked' | 'rebuilt', createdByType/Id, createdAt)`, unique `(ideaId, workId)`, Tier-C scope columns. One Idea may link many Works in parallel (a mobile-app Work _and_ a website Work from the same Idea — the ADR-009 example); one Work keeps at most one source Idea (`works.acceptedFromIdeaId`, now stamped).
+
+- `work_proposals.acceptedWorkId` is retained as a denormalized **"primary/most-recent"** pointer for API/UI compatibility (list cards show one CTA); it is set to the newest link. It stops being the source of truth.
+- The accept endpoint may be called repeatedly on an `accepted` Idea to link additional Works (today it requires `pending` — relaxed for `accepted` with a new link row). Build produces a link row per created Work. Rebuild (Decision A27) appends a `rebuilt` row instead of overwriting history.
+- Idea status semantics unchanged: `accepted` means "≥ 1 linked Work". UI: Idea detail lists all linked Works; "Done" filter unchanged.
+- The missions-ideas-works spec's "1 Idea → 1 Work. Always" (spec.md:93) is hereby superseded by ADR-009's 0..N — the spec file should get a one-line erratum in the same PR that ships `idea_works` (resolves inconsistency G7).
+
+### 23.2 Mission completion: humans only; the verb stays "Complete"
+
+**Ruling:** only humans may complete a Mission; "complete" is preferred over "conclude".
+
+**Design:** everywhere §11.5/§12/§16 said `concluded`/`conclude`, read **`completed`/`Complete`** — which conveniently means **no enum value change and no API verb change at all**: `POST :id/complete` simply gains an optional `outcome` body field (`succeeded | partially_succeeded | failed | cancelled | superseded`) and a `completedAt` timestamp companion. No `conclude` alias is added.
+
+- **Human-only enforcement:** completion requires a human-authenticated session. Autonomous agent runtime (heartbeat/task/chat-reply runs via `AgentToolService`) must never gain a complete-mission tool — this becomes a standing rule alongside I-4. The dashboard **chat** tool `completeMission` remains, because it executes an instruction the human just typed in their own session (it calls the same user-authenticated endpoint); it is not an autonomous path.
+- The outcome picker appears in the Complete dialog (optional — skipping records `outcome = NULL`, same as all pre-existing rows).
+
+### 23.3 Free the "Goal" name now — UI _and_ table
+
+**Ruling:** rename immediately as part of the implementation, both UI and DB.
+
+**Design:** `WorkAgentGoal` → **`WorkBuildRequest`** (table `work_agent_goals` → `work_build_requests`), `WorkAgentRun` keeps its name (no "goal" in it) but its `goalId` column → `buildRequestId`. Migration: `ALTER TABLE ... RENAME` + column rename (both reversible); TypeORM entity/class renames ride the same PR (repo rule: entity change + migration in one PR).
+
+- API: `api/me/work-agent/goals*` routes get `api/me/work-agent/build-requests*` as the primary path with the old paths kept as deprecated aliases for one release (MCP/chat tools and the settings UI migrate in the same PR — after any endpoint change, grep `apps/web/e2e` for touched routes, per the shipped e2e house rules).
+- UI copy: settings "Goals"/"Recent goals" → "Build requests". After this lands, the word **Goal** is reserved exclusively for §23.4's entity.
+
+### 23.4 Goals + metrics-provider plugins — build the measurement system now
+
+**Ruling:** don't wait for a metrics source to appear — build the plumbing: metrics collectors as **plugins** (PostHog analytics, Stripe balance/income, Google Analytics, "and many more"), enable-and-configure like any plugin; once enabled, a Goal can target their metrics (e.g. _Stripe: ≥ $100/day balance_, _≥ $1,000/month income_). Also support custom logic via **GET-only** third-party API calls or custom plugins. Vision ships now too (§23.5-adjacent, below).
+
+**Design — new plugin capability `metrics-provider`:**
+
+```text
+IMetricsProviderPlugin (packages/plugin contract, read-only by design)
+  listMetrics(): MetricDescriptor[]            // id, label, unit, supported windows, params schema
+  getMetricValue(q): Promise<MetricSample>     // { metricId, window: day|week|month|total|point,
+                                               //   windowAnchor?, params } -> { value, unit, at }
+```
+
+- **First-party providers** (each its own plugin package, official SDKs mandatory — house NN #22): `posthog-metrics` (posthog query API — events/insights counts), `stripe-metrics` (`stripe` SDK — balance, gross income per window, MRR-ish aggregates), `google-analytics-metrics` (`@google-analytics/data`, GA4 runReport), and **`custom-http-metrics`** — user-configured **GET-only** endpoint + auth header + JSONPath/JMESPath value extraction, with the platform's existing SSRF vetting (same guard family as the mission-template URL check), response-size caps, and no request bodies. Any third-party plugin implementing the capability is usable once enabled (allowlist rules per the dynamic-plugin-distribution trust model).
+- **Goal entity** (`goals`, Tier-A scoped): `title`, `description?`, `metricSource {pluginId, metricId, params}`, `comparator: gte|lte`, `targetValue`, `unit`, `window: day|week|month|total|point`, `baselineValue?`, `currentValue` + `currentValueAt` (cache), `deadline?`, `ownerUserId`, `checkFrequency` (interval/cron, bounded), `status: draft|active|paused|completed`, `outcome: achieved|missed|abandoned` (nullable), timestamps. Companion **`goal_metric_samples`** (`goalId FK CASCADE, sampledAt, value`) — append-only history powering sparklines and audit.
+- **Mission↔Goal:** `mission_goals` join (`missionId, goalId`, `isPrimary` with a partial-unique index per mission) — a Mission may advance several Goals with one primary; Goals exist independently of Missions too. This finally fills the `primaryGoalId` slot reserved in §8.2.
+- **Evaluation loop:** a `goal-evaluate-dispatcher` Trigger.dev cron (per-minute scan of due active Goals by `checkFrequency`, CAS-claim like every other dispatcher in `packages/tasks`) calls the provider, appends a sample, updates the cache, and emits threshold events (`goal_target_reached`, `goal_deadline_missed` notification event types). **Measurement may auto-set Goal outcome** (`achieved` on sustained target hit; `missed` on deadline expiry — human-overridable), because for Goals the metric _is_ the truth. It must never auto-complete a Mission (I-4 stands: Mission outcome remains human judgment, now better informed).
+- **Cost/limits:** provider calls are metered as `plugin_usage_events` capability `'metrics'`; per-goal `checkFrequency` is clamped (e.g. ≥ 15 min default) and budget-guarded like other capability facades.
+- **Prompt integration:** active Goals (current vs target) join the mission-tick context and the agent-run prompt assembly, so agents know the targets they're working toward — the measurement loop closes the strategy layer.
+- **UI:** Goals page (list with sparklines + status), Goal detail (samples chart, source config, linked Missions), Goal picker on Mission detail, dashboard tile. Sidebar gains **Goals** next to Missions (additive) once the entity ships.
+
+### 23.5 Vision now; Teams as structure
+
+**Vision (ruled: add now, simplest form):** `organizations.vision` text + `visionUpdatedAt`; an **optional** Vision field in the Create-Organization flow and org settings; when set, it is injected as a clearly-fenced context segment into (a) Idea generation prompts (`WorkProposalService.generate`), (b) the agent-run 11-segment prompt assembly, and (c) mission-tick context — so every agent knows the company vision. No entity, no versioning yet (the §8.2 reserved shape, activated).
+
+**Teams (ruled: structure, not permissions):** merge PR #1647's shape as-is — org-structure grouping, polymorphic agent/user members, display-only roles, org chart. Permission design is deliberately deferred; nothing in the Teams merge may gate access to anything (I-9 stands).
+
+### 23.6 What `/discover` actually is (Q7 explained)
+
+`/discover` is **not** an integration or customer-software surface. It is the **original home of AI-suggested Work proposals**, born with the EW-584 user-research feature on 2026-05-12 (PR #710) — before Ideas existed as a concept. It server-fetches only `pending` work-proposals plus the research status and renders them with a "suggest more" refresh (`discover/page.tsx:12-24`). When the missions-ideas-works feature shipped `/ideas` (2026-05-25) — which shows all six statuses, quick-add, filters, and detail pages — `/discover` became a strict subset, and nothing in the app has linked to it since (verified: zero inbound links; it also isn't in the sidebar). The `WorkProposalSource.DISCOVER` enum value is equally vestigial (no production writer).
+
+**Recommendation:** keep the URL but make it a redirect to `/ideas` (old bookmarks keep working; no functionality is removed). Actual deletion of the page component can ride a later cleanup release. Awaiting confirmation.
+
+### 23.7 The one open decision — stranded `queued` Ideas (Q2, explained)
+
+**The situation:** when a user (or a Mission with `autoBuildWorks`) hits "Build", the Idea's status flips to `queued`. The pipeline that is supposed to pick it up — create/execute the build, flip it to `building`, then `accepted` or `failed` — **is not wired** (verified finding P2/P3). So today, every Idea ever queued is still sitting in `queued`, and on Missions with auto-build, _new_ stranded rows accumulate on every tick that generates Ideas. When we fix the executor (PR-4), we must decide what to do with this backlog of stale `queued` rows. Two options:
+
+- **Option A — reset to `pending` (recommended, conservative).** A one-time backfill flips all pre-executor `queued` Ideas back to `pending` and notes it in the activity log ("build was queued before the build system was live — please re-queue if still wanted"). _Effect:_ nothing builds without a fresh human click; zero surprise spend. _Cost:_ users who clicked Build weeks ago must click it again.
+- **Option B — honor the old clicks.** The executor treats existing `queued` rows as valid intent and builds them all when it turns on. _Effect:_ the original request is fulfilled automatically. _Risk:_ a potentially large burst of builds and real AI/deploy **spend** on day one — including from Missions whose auto-build queued Ideas the user may no longer want (some are weeks old, and the user has had no reason to prune them since nothing happened).
+
+Middle path if desired: Option A for Mission-auto-queued rows (the risky bulk) + Option B for rows a human explicitly queued within the last N days. **Recommendation: Option A** (or the middle path) — re-clicking is cheap; surprise spend is not.
+
+### 23.8 Revised implementation sequence
+
+Supersedes §22.4's ordering; every PR remains additive except the two explicit renames in PR-5.
+
+| #   | PR                                                                                                | Notes                                                                                                                         |
+| --- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 0   | **Fix `develop` CI** (audit gate + `packages/plugin` tsup OOM)                                    | Prerequisite — nothing below can merge green until this lands (breakage is pre-existing on `develop`, documented on PR #1684) |
+| 1   | Provenance repair: stamp `acceptedFromIdeaId` + **authoritative `idea_works` (0..N)** + backfills | §23.1 shape                                                                                                                   |
+| 2   | `mission_works` relation + attach-existing-Work + panels + backfill                               | unchanged from §22.4                                                                                                          |
+| 3   | Mission `outcome` at Complete + `FAILED` writer + Mission/Idea activity logging                   | §23.2 shape                                                                                                                   |
+| 4   | Build executor wiring (flagged, dry-run first) + stranded-`queued` policy                         | needs the §23.7 ruling                                                                                                        |
+| 5   | Free "Goal": `work_build_requests` rename (table + entity + routes-with-alias + UI copy)          | §23.3                                                                                                                         |
+| 6   | Vision: org column + creation-flow field + prompt injection                                       | §23.5                                                                                                                         |
+| 7   | `metrics-provider` plugin contract + `custom-http-metrics` + first SDK provider (Stripe)          | §23.4                                                                                                                         |
+| 8   | Goal entity + samples + `mission_goals` + evaluation dispatcher + Goals UI                        | §23.4                                                                                                                         |
+| 9   | Remaining providers (PostHog, Google Analytics) + notification event types + prompt integration   | §23.4                                                                                                                         |
+| 10  | Teams merge support (PR #1647 rebase/land) + `/discover` → `/ideas` redirect (on confirmation)    | §23.5/§23.6                                                                                                                   |
+
+---
+
+_Review conducted 2026-07-19 against `develop` @ `8fb98c8d`. Fourteen-subsystem inspection + fourteen-claim adversarial verification; all claims marked "verified" survived refutation attempts. Where behavior could not be established from code, it is labeled "Not confirmed" in place. §23 records the product-owner rulings received the same day._
