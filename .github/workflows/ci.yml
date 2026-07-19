@@ -14,20 +14,22 @@ on:
 permissions:
   contents: read
 
-# 2026-07-19: tsup's DTS worker for `packages/plugin` (20+ dts entries) started
-# dying with ERR_WORKER_OUT_OF_MEMORY on the shared runners, failing every
-# job-runtime/secret-store matrix cell (worker threads inherit NODE_OPTIONS,
-# so a workflow-level heap raise reaches them). Same remediation family as the
-# docs-leg ENOSPC fix (#1667): raise the resource ceiling, don't drop coverage.
-env:
-  NODE_OPTIONS: --max-old-space-size=6144
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+# 2026-07-19: tsup's DTS worker for `packages/plugin` (20+ dts entries) started
+# dying with ERR_WORKER_OUT_OF_MEMORY on the shared runners. The heap raise is
+# scoped to the THREE jobs that build the plugin package (worker threads inherit
+# the job `env`), NOT workflow-wide — `job-runtime-real-infra` runs four Docker
+# service containers alongside Node, and a 6 GB Node ceiling there risks
+# starving the containers (Greptile PR #1686). Same remediation family as the
+# docs-leg ENOSPC fix (#1667): raise the ceiling where needed, don't drop coverage.
   lint-and-test:
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:
@@ -156,6 +158,9 @@ jobs:
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+
     # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
     # promotion pushes so k8s-build (the deploy build) is not starved on the shared
     # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
@@ -299,6 +304,9 @@ jobs:
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+
     # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
     # promotion pushes so k8s-build (the deploy build) is not starved on the shared
     # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
