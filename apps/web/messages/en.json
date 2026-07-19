@@ -1416,14 +1416,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1431,7 +1431,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1462,7 +1462,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1478,7 +1478,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1495,16 +1495,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {

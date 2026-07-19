@@ -1386,14 +1386,14 @@
                 "sections": {
                     "agent": {
                         "title": "סוכן עבודה אוטונומי",
-                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מיעדים כלליים."
+                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מבקשות בנייה כלליות."
                     },
                     "guardrails": {
                         "title": "מגבלות",
                         "description": "קבע מגבלות קשות לפני שהסוכן יכול ליצור עבודות, להוסיף פריטים או להוציא תקציב."
                     },
                     "queue": {
-                        "title": "תור ליעד",
+                        "title": "הוספת בקשת בנייה לתור",
                         "description": "תן לסוכן הוראה רחבה. הוא מתחיל כממתין ופועל בתוך המגבלות שלך."
                     },
                     "liveRun": {
@@ -1401,7 +1401,7 @@
                         "description": "מצב נוכחי ופעילות אחרונה של הסוכן."
                     },
                     "recentGoals": {
-                        "title": "יעדים אחרונים",
+                        "title": "בקשות בנייה אחרונות",
                         "description": "הוראות סוכן עבודה ממתינות, פעילות והושלמות."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1432,7 @@
                     "approvalThreshold": "סף אישור",
                     "confirmBeforeCreate": "אשר לפני יצירת עבודות",
                     "confirmBeforeDelete": "אשר לפני מחיקת פריטים",
-                    "dryRunThisGoal": "הפעלת ניסיון עבור יעד זה",
+                    "dryRunThisGoal": "הפעלת ניסיון עבור בקשת בנייה זו",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1448,7 @@
                     "saveSettings": "שמור הגדרות",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "הוסף לתור יעד",
+                    "queueGoal": "הוסף בקשת בנייה לתור",
                     "preparePlan": "Prepare plan",
                     "stop": "עצור"
                 },
@@ -1465,16 +1465,16 @@
                 },
                 "empty": {
                     "noActiveRun": "אין הפעלה פעילה של סוכן עבודה.",
-                    "noGoals": "עדיין אין יעדים לסוכן עבודה.",
+                    "noGoals": "עדיין אין בקשות בנייה לסוכן עבודה.",
                     "waitingForUpdate": "ממתין לעדכון הפעלה ראשון."
                 },
                 "toasts": {
                     "settingsSaved": "הגדרות סוכן עבודה נשמרו",
                     "settingsError": "שמירת הגדרות נכשלה",
-                    "goalQueued": "יעד סוכן עבודה התווסף לתור",
-                    "goalError": "הוספת יעד לתור נכשלה",
-                    "goalCanceled": "יעד סוכן עבודה בוטל",
-                    "cancelError": "ביטול יעד נכשל"
+                    "goalQueued": "בקשת בנייה של סוכן עבודה התווספה לתור",
+                    "goalError": "הוספת בקשת בנייה לתור נכשלה",
+                    "goalCanceled": "בקשת בנייה של סוכן עבודה בוטלה",
+                    "cancelError": "ביטול בקשת בנייה נכשל"
                 }
             },
             "data": {

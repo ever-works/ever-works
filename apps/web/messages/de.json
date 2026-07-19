@@ -1386,14 +1386,14 @@
                 "sections": {
                     "agent": {
                         "title": "Autonomer Arbeits-Agent",
-                        "description": "Lassen Sie den Agenten Ziele auf hoher Ebene planen, recherchieren und vorbereiten."
+                        "description": "Lassen Sie den Agenten Build-Anfragen auf hoher Ebene planen, recherchieren und vorbereiten."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Legen Sie Grenzen fest, bevor der Agent Arbeitsaufgaben erstellen, Elemente hinzufügen oder Budgets ausgeben kann."
                     },
                     "queue": {
-                        "title": "Ziel in die Warteschlange einreihen",
+                        "title": "Build-Anfrage in die Warteschlange einreihen",
                         "description": "Geben Sie dem Agenten eine allgemeine Anweisung. Sie startet als ausstehend und läuft innerhalb Ihrer Schutzmechanismen."
                     },
                     "liveRun": {
@@ -1401,7 +1401,7 @@
                         "description": "Aktueller Status und jüngste Aktivität des Agenten."
                     },
                     "recentGoals": {
-                        "title": "Letzte Ziele",
+                        "title": "Letzte Build-Anfragen",
                         "description": "Ausstehende, laufende und abgeschlossene Arbeits-Agent-Anweisungen."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1432,7 @@
                     "approvalThreshold": "Genehmigungsgrenzwert",
                     "confirmBeforeCreate": "Vor dem Erstellen von Arbeitsaufgaben bestätigen",
                     "confirmBeforeDelete": "Vor dem Löschen von Elementen bestätigen",
-                    "dryRunThisGoal": "Dieses Ziel als Testlauf ausführen",
+                    "dryRunThisGoal": "Diese Build-Anfrage als Testlauf ausführen",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1448,7 @@
                     "saveSettings": "Einstellungen speichern",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Ziel in die Warteschlange einreihen",
+                    "queueGoal": "Build-Anfrage in die Warteschlange einreihen",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1465,16 +1465,16 @@
                 },
                 "empty": {
                     "noActiveRun": "Keine aktive Arbeits-Agent-Ausführung.",
-                    "noGoals": "Noch keine Arbeits-Agent-Ziele.",
+                    "noGoals": "Noch keine Build-Anfragen des Arbeits-Agenten.",
                     "waitingForUpdate": "Warten auf das erste Update der Ausführung."
                 },
                 "toasts": {
                     "settingsSaved": "Einstellungen des Arbeits-Agenten gespeichert",
                     "settingsError": "Einstellungen konnten nicht gespeichert werden",
-                    "goalQueued": "Ziel des Arbeits-Agenten in die Warteschlange eingereiht",
-                    "goalError": "Ziel konnte nicht in die Warteschlange eingereiht werden",
-                    "goalCanceled": "Ziel des Arbeits-Agenten abgebrochen",
-                    "cancelError": "Ziel konnte nicht abgebrochen werden"
+                    "goalQueued": "Build-Anfrage des Arbeits-Agenten in die Warteschlange eingereiht",
+                    "goalError": "Build-Anfrage konnte nicht in die Warteschlange eingereiht werden",
+                    "goalCanceled": "Build-Anfrage des Arbeits-Agenten abgebrochen",
+                    "cancelError": "Build-Anfrage konnte nicht abgebrochen werden"
                 }
             },
             "data": {

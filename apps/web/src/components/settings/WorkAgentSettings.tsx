@@ -19,12 +19,12 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-    cancelWorkAgentGoalAction,
-    createWorkAgentGoalAction,
+    cancelWorkBuildRequestAction,
+    createWorkBuildRequestAction,
     updateWorkAgentPreferencesAction,
 } from '@/app/actions/settings/work-agent';
 import type {
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentPreferences,
     WorkAgentRun,
     WorkAgentRunLog,
@@ -48,12 +48,17 @@ import {
 
 interface WorkAgentSettingsProps {
     preferences: WorkAgentPreferences;
-    goals: WorkAgentGoal[];
+    buildRequests: WorkBuildRequest[];
     activeRun: WorkAgentRun | null;
     logs: WorkAgentRunLog[];
 }
 
-export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkAgentSettingsProps) {
+export function WorkAgentSettings({
+    preferences,
+    buildRequests,
+    activeRun,
+    logs,
+}: WorkAgentSettingsProps) {
     const t = useTranslations('dashboard.settings.workAgent');
     const router = useRouter();
     const [isSaving, startSaving] = useTransition();
@@ -64,7 +69,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
     const [isCanceling, startCanceling] = useTransition();
     const [isQueueing, startQueueing] = useTransition();
     const [localPreferences, setLocalPreferences] = useState(preferences);
-    // Security: cap goal instruction length client-side to prevent oversized
+    // Security: cap build-request instruction length client-side to prevent oversized
     // payloads from reaching the server action and inflating LLM token budgets.
     const MAX_INSTRUCTION_LENGTH = 10_000;
     const [instruction, setInstruction] = useState('');
@@ -170,10 +175,10 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
         });
     };
 
-    const queueGoal = () => {
+    const queueBuildRequest = () => {
         startQueueing(async () => {
             try {
-                await createWorkAgentGoalAction({
+                await createWorkBuildRequestAction({
                     instruction: instruction.trim(),
                     dryRun,
                 });
@@ -324,10 +329,10 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
         });
     };
 
-    const cancelGoal = (goalId: string) => {
+    const cancelBuildRequest = (buildRequestId: string) => {
         startCanceling(async () => {
             try {
-                await cancelWorkAgentGoalAction(goalId);
+                await cancelWorkBuildRequestAction(buildRequestId);
                 router.refresh();
                 toast.success(t('toasts.goalCanceled'));
             } catch (error) {
@@ -669,7 +674,7 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             <Button
                                 size="sm"
                                 className="gap-1.5"
-                                onClick={queueGoal}
+                                onClick={queueBuildRequest}
                                 disabled={
                                     isQueueing ||
                                     !localPreferences.enabled ||
@@ -716,25 +721,25 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                             description={t('sections.recentGoals.description')}
                         />
                         <div className="pl-11 space-y-3">
-                            {goals.length === 0 ? (
+                            {buildRequests.length === 0 ? (
                                 <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                     {t('empty.noGoals')}
                                 </p>
                             ) : (
-                                goals.map((goal) => (
+                                buildRequests.map((buildRequest) => (
                                     <div
-                                        key={goal.id}
+                                        key={buildRequest.id}
                                         className="rounded-lg border border-border/60 dark:border-border-dark/60 p-3"
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <p className="text-sm text-text dark:text-text-dark leading-relaxed">
-                                                {goal.instruction}
+                                                {buildRequest.instruction}
                                             </p>
-                                            <StatusPill status={goal.status} />
+                                            <StatusPill status={buildRequest.status} />
                                         </div>
                                         <div className="mt-3 flex items-center justify-between gap-3">
                                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                                {goal.dryRun
+                                                {buildRequest.dryRun
                                                     ? t('labels.dryRun')
                                                     : t('labels.liveRun')}
                                             </span>
@@ -743,13 +748,15 @@ export function WorkAgentSettings({ preferences, goals, activeRun, logs }: WorkA
                                                 'planning',
                                                 'waiting-for-approval',
                                                 'running',
-                                            ].includes(goal.status) && (
+                                            ].includes(buildRequest.status) && (
                                                 <Button
                                                     type="button"
                                                     variant="secondary"
                                                     size="sm"
                                                     className="h-7 px-2 text-xs gap-1"
-                                                    onClick={() => cancelGoal(goal.id)}
+                                                    onClick={() =>
+                                                        cancelBuildRequest(buildRequest.id)
+                                                    }
                                                     disabled={isCanceling}
                                                 >
                                                     <CircleStop className="w-3 h-3" />

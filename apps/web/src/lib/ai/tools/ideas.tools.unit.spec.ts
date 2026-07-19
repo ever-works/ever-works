@@ -201,20 +201,20 @@ describe('ideas chat tools — Create', () => {
 });
 
 describe('ideas chat tools — Lifecycle', () => {
-    it('buildIdea returns queued=true plus the goalId for navigation', async () => {
+    it('buildIdea returns queued=true plus the buildRequestId for navigation', async () => {
         buildIdeaActionMock.mockResolvedValueOnce({
             idea: { ...sampleIdea, status: 'queued' },
-            goalId: 'g-1',
+            buildRequestId: 'g-1',
         });
         const result = await run<{
             queued: boolean;
-            goalId: string;
+            buildRequestId: string;
             idea: { id: string; status: string };
         }>(buildIdea, { ideaId: 'i-1' });
         expect(buildIdeaActionMock).toHaveBeenCalledWith('i-1');
         expect(result).toMatchObject({
             queued: true,
-            goalId: 'g-1',
+            buildRequestId: 'g-1',
             idea: expect.objectContaining({ id: 'i-1', status: 'queued' }),
         });
     });

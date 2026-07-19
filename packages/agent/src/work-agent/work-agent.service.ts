@@ -2,18 +2,18 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
-    WorkAgentGoal,
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
-} from '../entities/work-agent-goal.entity';
+    WorkBuildRequest,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
+} from '../entities/work-build-request.entity';
 import { WorkAgentGuardrails, WorkAgentPreference } from '../entities/work-agent-preference.entity';
 import { WorkAgentRun, WorkAgentRunStatus } from '../entities/work-agent-run.entity';
 import { WorkAgentRunLog, WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';
 import { sanitizeName } from '../utils/sanitize.util';
 import type {
-    CreateWorkAgentGoalInput,
+    CreateWorkBuildRequestInput,
     UpdateWorkAgentPreferencesInput,
-    WorkAgentGoalDto,
+    WorkBuildRequestDto,
     WorkAgentPreferencesDto,
     WorkAgentRunDto,
     WorkAgentRunLogDto,
@@ -38,11 +38,11 @@ const ACTIVE_RUN_STATUSES = [
     WorkAgentRunStatus.WAITING_FOR_APPROVAL,
 ];
 
-const CANCELABLE_GOAL_STATUSES = [
-    WorkAgentGoalStatus.PENDING,
-    WorkAgentGoalStatus.PLANNING,
-    WorkAgentGoalStatus.WAITING_FOR_APPROVAL,
-    WorkAgentGoalStatus.RUNNING,
+const CANCELABLE_BUILD_REQUEST_STATUSES = [
+    WorkBuildRequestStatus.PENDING,
+    WorkBuildRequestStatus.PLANNING,
+    WorkBuildRequestStatus.WAITING_FOR_APPROVAL,
+    WorkBuildRequestStatus.RUNNING,
 ];
 
 @Injectable()
@@ -50,8 +50,8 @@ export class WorkAgentService {
     constructor(
         @InjectRepository(WorkAgentPreference)
         private readonly preferences: Repository<WorkAgentPreference>,
-        @InjectRepository(WorkAgentGoal)
-        private readonly goals: Repository<WorkAgentGoal>,
+        @InjectRepository(WorkBuildRequest)
+        private readonly buildRequests: Repository<WorkBuildRequest>,
         @InjectRepository(WorkAgentRun)
         private readonly runs: Repository<WorkAgentRun>,
         @InjectRepository(WorkAgentRunLog)
@@ -123,10 +123,10 @@ export class WorkAgentService {
         return this.toPreferencesDto(saved);
     }
 
-    async createGoal(
+    async createBuildRequest(
         userId: string,
-        input: CreateWorkAgentGoalInput,
-    ): Promise<{ goal: WorkAgentGoalDto; run: WorkAgentRunDto }> {
+        input: CreateWorkBuildRequestInput,
+    ): Promise<{ buildRequest: WorkBuildRequestDto; run: WorkAgentRunDto }> {
         const preference = await this.findOrCreatePreferences(userId);
         if (!preference.enabled) {
             throw new BadRequestException('Work agent is disabled.');
@@ -134,86 +134,99 @@ export class WorkAgentService {
 
         const guardrailsOverride = this.pickGuardrailOverride(input);
         const dryRun = input.dryRun ?? preference.guardrails.dryRunByDefault;
-        const { goal, run } = await this.goals.manager.transaction(async (manager) => {
-            const goalRepo = manager.getRepository(WorkAgentGoal);
-            const runRepo = manager.getRepository(WorkAgentRun);
-            const logRepo = manager.getRepository(WorkAgentRunLog);
+        const { buildRequest, run } = await this.buildRequests.manager.transaction(
+            async (manager) => {
+                const buildRequestRepo = manager.getRepository(WorkBuildRequest);
+                const runRepo = manager.getRepository(WorkAgentRun);
+                const logRepo = manager.getRepository(WorkAgentRunLog);
 
-            const effectiveGuardrails = this.mergeGuardrails(
-                preference.guardrails,
-                guardrailsOverride,
-            );
-            const agentPlanSummary = this.buildInitialPlanSummary(input.instruction, dryRun);
-            const approvalSummary = dryRun
-                ? 'Dry-run plan prepared. Review before enabling live execution.'
-                : 'Live execution requires approval before any Work is created.';
+                const effectiveGuardrails = this.mergeGuardrails(
+                    preference.guardrails,
+                    guardrailsOverride,
+                );
+                const agentPlanSummary = this.buildInitialPlanSummary(input.instruction, dryRun);
+                const approvalSummary = dryRun
+                    ? 'Dry-run plan prepared. Review before enabling live execution.'
+                    : 'Live execution requires approval before any Work is created.';
 
-            const savedGoal = await goalRepo.save(
-                goalRepo.create({
-                    userId,
-                    instruction: input.instruction.trim(),
-                    status: WorkAgentGoalStatus.WAITING_FOR_APPROVAL,
-                    source: WorkAgentGoalSource.USER,
-                    dryRun,
-                    guardrailsOverride:
-                        Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
-                    agentPlanSummary,
-                    approvalSummary,
-                    ideaId: input.ideaId ?? null,
-                }),
-            );
-
-            const savedRun = await runRepo.save(
-                runRepo.create({
-                    userId,
-                    goalId: savedGoal.id,
-                    status: WorkAgentRunStatus.WAITING_FOR_APPROVAL,
-                    dryRun,
-                    progressPercent: 10,
-                    summary: {
-                        worksPlanned: Math.min(1, effectiveGuardrails.maxWorksPerRun),
-                        worksCreated: 0,
-                        itemsPlanned: effectiveGuardrails.maxItemsPerWork,
-                        itemsCreated: 0,
-                        approvalsRequired: 1,
-                    },
-                }),
-            );
-
-            await logRepo.save([
-                logRepo.create({
-                    userId,
-                    runId: savedRun.id,
-                    level: WorkAgentRunLogLevel.INFO,
-                    step: 'plan-prepared',
-                    message: 'Goal converted into an approval-ready agent plan.',
-                    metadata: {
+                const savedBuildRequest = await buildRequestRepo.save(
+                    buildRequestRepo.create({
+                        userId,
+                        instruction: input.instruction.trim(),
+                        status: WorkBuildRequestStatus.WAITING_FOR_APPROVAL,
+                        source: WorkBuildRequestSource.USER,
                         dryRun,
-                        guardrails: effectiveGuardrails,
-                    },
-                }),
-                logRepo.create({
-                    userId,
-                    runId: savedRun.id,
-                    level: WorkAgentRunLogLevel.INFO,
-                    step: 'approval-required',
-                    message: approvalSummary,
-                }),
-            ]);
+                        guardrailsOverride:
+                            Object.keys(guardrailsOverride).length > 0 ? guardrailsOverride : null,
+                        agentPlanSummary,
+                        approvalSummary,
+                        ideaId: input.ideaId ?? null,
+                    }),
+                );
 
-            return { goal: savedGoal, run: savedRun };
-        });
+                const savedRun = await runRepo.save(
+                    runRepo.create({
+                        userId,
+                        buildRequestId: savedBuildRequest.id,
+                        status: WorkAgentRunStatus.WAITING_FOR_APPROVAL,
+                        dryRun,
+                        progressPercent: 10,
+                        summary: {
+                            worksPlanned: Math.min(1, effectiveGuardrails.maxWorksPerRun),
+                            worksCreated: 0,
+                            itemsPlanned: effectiveGuardrails.maxItemsPerWork,
+                            itemsCreated: 0,
+                            approvalsRequired: 1,
+                        },
+                    }),
+                );
 
-        return { goal: this.toGoalDto(goal), run: this.toRunDto(run) };
+                await logRepo.save([
+                    logRepo.create({
+                        userId,
+                        runId: savedRun.id,
+                        level: WorkAgentRunLogLevel.INFO,
+                        step: 'plan-prepared',
+                        message: 'Build request converted into an approval-ready agent plan.',
+                        metadata: {
+                            dryRun,
+                            guardrails: effectiveGuardrails,
+                        },
+                    }),
+                    logRepo.create({
+                        userId,
+                        runId: savedRun.id,
+                        level: WorkAgentRunLogLevel.INFO,
+                        step: 'approval-required',
+                        message: approvalSummary,
+                    }),
+                ]);
+
+                return { buildRequest: savedBuildRequest, run: savedRun };
+            },
+        );
+
+        return { buildRequest: this.toBuildRequestDto(buildRequest), run: this.toRunDto(run) };
     }
 
-    async listGoals(userId: string, take = 20): Promise<WorkAgentGoalDto[]> {
-        const rows = await this.goals.find({
+    /**
+     * @deprecated Renamed — use {@link createBuildRequest}. Kept for one
+     * release window so out-of-repo callers keep compiling.
+     */
+    async createGoal(
+        userId: string,
+        input: CreateWorkBuildRequestInput,
+    ): Promise<{ buildRequest: WorkBuildRequestDto; run: WorkAgentRunDto }> {
+        return this.createBuildRequest(userId, input);
+    }
+
+    async listBuildRequests(userId: string, take = 20): Promise<WorkBuildRequestDto[]> {
+        const rows = await this.buildRequests.find({
             where: { userId },
             order: { createdAt: 'DESC' },
             take,
         });
-        return rows.map((goal) => this.toGoalDto(goal));
+        return rows.map((buildRequest) => this.toBuildRequestDto(buildRequest));
     }
 
     async getActiveRun(userId: string): Promise<WorkAgentRunDto | null> {
@@ -238,25 +251,27 @@ export class WorkAgentService {
         return rows.map((log) => this.toLogDto(log));
     }
 
-    async cancelGoal(userId: string, goalId: string): Promise<WorkAgentGoalDto> {
-        const savedGoal = await this.goals.manager.transaction(async (manager) => {
-            const goalRepo = manager.getRepository(WorkAgentGoal);
+    async cancelBuildRequest(userId: string, buildRequestId: string): Promise<WorkBuildRequestDto> {
+        const savedBuildRequest = await this.buildRequests.manager.transaction(async (manager) => {
+            const buildRequestRepo = manager.getRepository(WorkBuildRequest);
             const runRepo = manager.getRepository(WorkAgentRun);
             const logRepo = manager.getRepository(WorkAgentRunLog);
 
-            const goal = await goalRepo.findOne({ where: { id: goalId, userId } });
-            if (!goal) {
-                throw new NotFoundException('Work agent goal not found.');
+            const buildRequest = await buildRequestRepo.findOne({
+                where: { id: buildRequestId, userId },
+            });
+            if (!buildRequest) {
+                throw new NotFoundException('Work build request not found.');
             }
-            if (!CANCELABLE_GOAL_STATUSES.includes(goal.status)) {
-                throw new BadRequestException('Work agent goal can no longer be canceled.');
+            if (!CANCELABLE_BUILD_REQUEST_STATUSES.includes(buildRequest.status)) {
+                throw new BadRequestException('Work build request can no longer be canceled.');
             }
 
-            goal.status = WorkAgentGoalStatus.CANCELED;
-            const canceledGoal = await goalRepo.save(goal);
+            buildRequest.status = WorkBuildRequestStatus.CANCELED;
+            const canceledBuildRequest = await buildRequestRepo.save(buildRequest);
 
             const activeRuns = await runRepo.find({
-                where: { userId, goalId, status: In(ACTIVE_RUN_STATUSES) },
+                where: { userId, buildRequestId, status: In(ACTIVE_RUN_STATUSES) },
             });
             for (const run of activeRuns) {
                 run.status = WorkAgentRunStatus.CANCELED;
@@ -273,10 +288,10 @@ export class WorkAgentService {
                 );
             }
 
-            return canceledGoal;
+            return canceledBuildRequest;
         });
 
-        return this.toGoalDto(savedGoal);
+        return this.toBuildRequestDto(savedBuildRequest);
     }
 
     private async findOrCreatePreferences(userId: string): Promise<WorkAgentPreference> {
@@ -396,8 +411,8 @@ export class WorkAgentService {
         // with the shared helper so control chars and newlines cannot forge
         // fake delimiters (e.g. `\n\n[SYSTEM]:` / `---SYSTEM---`) that could
         // hijack any downstream LLM context that ingests the summary. This is a
-        // prompt-injection-hardening measure only; legitimate single-line goal
-        // text is unaffected aside from whitespace collapsing.
+        // prompt-injection-hardening measure only; legitimate single-line
+        // build-request text is unaffected aside from whitespace collapsing.
         const safeInstruction = sanitizeName(instruction, 500);
         return `Prepared a ${mode} Work-agent plan for: ${safeInstruction}`;
     }
@@ -425,25 +440,25 @@ export class WorkAgentService {
         };
     }
 
-    private toGoalDto(goal: WorkAgentGoal): WorkAgentGoalDto {
+    private toBuildRequestDto(buildRequest: WorkBuildRequest): WorkBuildRequestDto {
         return {
-            id: goal.id,
-            instruction: goal.instruction,
-            status: goal.status,
-            source: goal.source,
-            dryRun: goal.dryRun,
-            guardrailsOverride: goal.guardrailsOverride ?? null,
-            agentPlanSummary: goal.agentPlanSummary ?? null,
-            approvalSummary: goal.approvalSummary ?? null,
-            createdAt: goal.createdAt,
-            updatedAt: goal.updatedAt,
+            id: buildRequest.id,
+            instruction: buildRequest.instruction,
+            status: buildRequest.status,
+            source: buildRequest.source,
+            dryRun: buildRequest.dryRun,
+            guardrailsOverride: buildRequest.guardrailsOverride ?? null,
+            agentPlanSummary: buildRequest.agentPlanSummary ?? null,
+            approvalSummary: buildRequest.approvalSummary ?? null,
+            createdAt: buildRequest.createdAt,
+            updatedAt: buildRequest.updatedAt,
         };
     }
 
     private toRunDto(run: WorkAgentRun): WorkAgentRunDto {
         return {
             id: run.id,
-            goalId: run.goalId,
+            buildRequestId: run.buildRequestId,
             status: run.status,
             dryRun: run.dryRun,
             progressPercent: run.progressPercent,

@@ -9,9 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function WorkAgentSettingsPage() {
-    const [preferences, goals, activeRun] = await Promise.all([
+    const [preferences, buildRequests, activeRun] = await Promise.all([
         workAgentAPI.preferences(),
-        workAgentAPI.listGoals(),
+        workAgentAPI.listBuildRequests(),
         workAgentAPI.activeRun(),
     ]);
     const logs = activeRun ? await workAgentAPI.runLogs(activeRun.id).catch(() => []) : [];
@@ -19,7 +19,7 @@ export default async function WorkAgentSettingsPage() {
     return (
         <WorkAgentSettings
             preferences={preferences}
-            goals={goals}
+            buildRequests={buildRequests}
             activeRun={activeRun}
             logs={logs}
         />

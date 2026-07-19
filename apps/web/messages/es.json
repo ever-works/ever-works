@@ -1386,14 +1386,14 @@
                 "sections": {
                     "agent": {
                         "title": "Agente de trabajo autónomo",
-                        "description": "Permite que el agente planifique, investigue y prepare trabajos a partir de objetivos de alto nivel."
+                        "description": "Permite que el agente planifique, investigue y prepare trabajos a partir de solicitudes de build de alto nivel."
                     },
                     "guardrails": {
                         "title": "Limitaciones",
                         "description": "Establece límites estrictos antes de que el agente pueda crear trabajos, agregar elementos o gastar presupuesto."
                     },
                     "queue": {
-                        "title": "Encolar objetivo",
+                        "title": "Encolar solicitud de build",
                         "description": "Dale al agente una instrucción general. Comienza como pendiente y se ejecuta dentro de tus limitaciones."
                     },
                     "liveRun": {
@@ -1401,7 +1401,7 @@
                         "description": "Estado actual y actividad reciente del agente."
                     },
                     "recentGoals": {
-                        "title": "Objetivos recientes",
+                        "title": "Solicitudes de build recientes",
                         "description": "Instrucciones del agente de trabajo pendientes, en ejecución y completadas."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1432,7 @@
                     "approvalThreshold": "Umbral de aprobación",
                     "confirmBeforeCreate": "Confirmar antes de crear trabajos",
                     "confirmBeforeDelete": "Confirmar antes de eliminar elementos",
-                    "dryRunThisGoal": "Ejecución de prueba para este objetivo",
+                    "dryRunThisGoal": "Ejecución de prueba para esta solicitud de build",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1448,7 @@
                     "saveSettings": "Guardar configuración",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Encolar objetivo",
+                    "queueGoal": "Encolar solicitud de build",
                     "preparePlan": "Prepare plan",
                     "stop": "Detener"
                 },
@@ -1465,16 +1465,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No hay ejecución activa del agente de trabajo.",
-                    "noGoals": "Aún no hay objetivos para el agente de trabajo.",
+                    "noGoals": "Aún no hay solicitudes de build para el agente de trabajo.",
                     "waitingForUpdate": "Esperando la primera actualización de ejecución."
                 },
                 "toasts": {
                     "settingsSaved": "Configuración del agente de trabajo guardada",
                     "settingsError": "Error al guardar la configuración",
-                    "goalQueued": "Objetivo del agente de trabajo en cola",
-                    "goalError": "Error al encolar el objetivo",
-                    "goalCanceled": "Objetivo del agente de trabajo cancelado",
-                    "cancelError": "Error al cancelar el objetivo"
+                    "goalQueued": "Solicitud de build del agente de trabajo en cola",
+                    "goalError": "Error al encolar la solicitud de build",
+                    "goalCanceled": "Solicitud de build del agente de trabajo cancelada",
+                    "cancelError": "Error al cancelar la solicitud de build"
                 }
             },
             "data": {

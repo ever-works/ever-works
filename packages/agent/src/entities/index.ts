@@ -41,7 +41,7 @@ export * from './mission.entity';
 export * from './tenant.entity';
 export * from './organization.entity';
 export * from './work-agent-preference.entity';
-export * from './work-agent-goal.entity';
+export * from './work-build-request.entity';
 export * from './work-agent-run.entity';
 export * from './work-agent-run-log.entity';
 export * from './work-knowledge-document.entity';

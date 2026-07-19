@@ -44,7 +44,7 @@ export enum MissionType {
  *
  * Falls through to the user's global `WorkAgentPreference` for any
  * field left undefined. This is the Mission's analogue of
- * `WorkAgentGoal.guardrailsOverride` — same shape, same fall-through
+ * `WorkBuildRequest.guardrailsOverride` — same shape, same fall-through
  * semantics — but applied to every Idea this Mission spawns.
  */
 export type MissionGuardrailsOverride = Partial<WorkAgentGuardrails>;
@@ -121,7 +121,7 @@ export class Mission {
     /**
      * Per-Mission override of the global Auto-build Works setting.
      * When `true`, every Idea this Mission spawns is immediately
-     * queued for build (creates a `WorkAgentGoal` with
+     * queued for build (creates a `WorkBuildRequest` with
      * `maxWorksPerRun = 1` + `ideaId`). When `false`, spawned Ideas
      * stay PENDING for the user to act on.
      */
@@ -154,7 +154,7 @@ export class Mission {
      *
      * Stored as `simple-json` to match how the rest of the
      * `work-agent` module persists the same shape on
-     * `WorkAgentGoal.guardrailsOverride`.
+     * `WorkBuildRequest.guardrailsOverride`.
      */
     @Column('simple-json', { nullable: true })
     guardrailsOverride?: MissionGuardrailsOverride | null;

@@ -1386,14 +1386,14 @@
                 "sections": {
                     "agent": {
                         "title": "وكيل العمل المستقل",
-                        "description": "دع الوكيل يخطط، ويبحث، ويعد الأعمال من الأهداف عالية المستوى."
+                        "description": "دع الوكيل يخطط، ويبحث، ويعد الأعمال من طلبات البناء عالية المستوى."
                     },
                     "guardrails": {
                         "title": "حواجز السلامة",
                         "description": "عيّن حدوداً صارمة قبل أن يتمكن الوكيل من إنشاء الأعمال، وإضافة عناصر، أو إنفاق الميزانية."
                     },
                     "queue": {
-                        "title": "ضع هدفًا في ق الانتظار",
+                        "title": "ضع طلب بناء في قائمة الانتظار",
                         "description": "أعط الوكيل تعليمات عامة. يبدأ كـ معلق ويتم تشغيله ضمن حدودك الآمنة."
                     },
                     "liveRun": {
@@ -1401,7 +1401,7 @@
                         "description": "الحالة الحالية والأنشطة الأخيرة للوكيل."
                     },
                     "recentGoals": {
-                        "title": "الأهداف الحديثة",
+                        "title": "طلبات البناء الحديثة",
                         "description": "التعليمات المعقولة والجارية والمكتملة لوكيل العمل."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1432,7 @@
                     "approvalThreshold": "عتبة الموافقة",
                     "confirmBeforeCreate": "تأكد قبل إنشاء الأعمال",
                     "confirmBeforeDelete": "تأكد قبل حذف العناصر",
-                    "dryRunThisGoal": "تشغيل هذا الهدف تجريبياً",
+                    "dryRunThisGoal": "تشغيل طلب البناء هذا تجريبياً",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1448,7 @@
                     "saveSettings": "حفظ الإعدادات",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "ضع الهدف في قائمة الانتظار",
+                    "queueGoal": "ضع طلب البناء في قائمة الانتظار",
                     "preparePlan": "Prepare plan",
                     "stop": "توقف"
                 },
@@ -1465,16 +1465,16 @@
                 },
                 "empty": {
                     "noActiveRun": "لا يوجد تشغيل نشط لوكيل العمل.",
-                    "noGoals": "لا توجد أهداف لوكيل العمل بعد.",
+                    "noGoals": "لا توجد طلبات بناء لوكيل العمل بعد.",
                     "waitingForUpdate": "في انتظار أول تحديث للتشغيل."
                 },
                 "toasts": {
                     "settingsSaved": "تم حفظ إعدادات وكيل العمل",
                     "settingsError": "فشل حفظ الإعدادات",
-                    "goalQueued": "تم وضع هدف وكيل العمل في قائمة الانتظار",
-                    "goalError": "فشل وضع الهدف في قائمة الانتظار",
-                    "goalCanceled": "تم إلغاء هدف وكيل العمل",
-                    "cancelError": "فشل إلغاء الهدف"
+                    "goalQueued": "تم وضع طلب بناء وكيل العمل في قائمة الانتظار",
+                    "goalError": "فشل وضع طلب البناء في قائمة الانتظار",
+                    "goalCanceled": "تم إلغاء طلب بناء وكيل العمل",
+                    "cancelError": "فشل إلغاء طلب البناء"
                 }
             },
             "data": {

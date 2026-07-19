@@ -269,12 +269,12 @@ export class WorkProposalsController {
     /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
      * an Idea for build. Transitions to QUEUED + creates a
-     * WorkAgentGoal (`maxWorksPerRun=1`, `ideaId` set) so the
-     * goal-completion handler (PR FF) can transition the Idea
+     * WorkBuildRequest (`maxWorksPerRun=1`, `ideaId` set) so the
+     * build-completion handler (PR FF) can transition the Idea
      * to ACCEPTED with the new Work when the build finishes.
      */
     @Post(':id/build')
-    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent goal pipeline' })
+    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent build-request pipeline' })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async build(
@@ -292,7 +292,7 @@ export class WorkProposalsController {
      * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
      * Retry button (spec §3.9). Only valid for FAILED Ideas; clears
      * the failureMessage + failureKind, transitions FAILED → QUEUED,
-     * spins up a fresh build Goal.
+     * spins up a fresh build request.
      */
     @Post(':id/retry')
     @ApiOperation({ summary: 'Manually retry a failed Idea build' })

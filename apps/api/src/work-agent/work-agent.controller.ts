@@ -14,7 +14,7 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { WorkAgentService } from '@ever-works/agent/work-agent';
-import { CreateWorkAgentGoalDto, UpdateWorkAgentPreferencesDto } from './dto/work-agent.dto';
+import { CreateWorkBuildRequestDto, UpdateWorkAgentPreferencesDto } from './dto/work-agent.dto';
 
 @ApiTags('work-agent')
 @Controller('api/me/work-agent')
@@ -38,25 +38,73 @@ export class WorkAgentController {
         return this.service.updatePreferences(auth.userId, body);
     }
 
-    @Get('goals')
-    @ApiOperation({ summary: 'List recent Work agent goals' })
+    @Get('build-requests')
+    @ApiOperation({ summary: 'List recent Work agent build requests' })
     @HttpCode(HttpStatus.OK)
-    listGoals(@CurrentUser() auth: AuthenticatedUser) {
-        return this.service.listGoals(auth.userId);
+    listBuildRequests(@CurrentUser() auth: AuthenticatedUser) {
+        return this.service.listBuildRequests(auth.userId);
+    }
+
+    @Post('build-requests')
+    @ApiOperation({ summary: 'Queue a high-level build request for the Work agent' })
+    @HttpCode(HttpStatus.ACCEPTED)
+    createBuildRequest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateWorkBuildRequestDto,
+    ) {
+        return this.service.createBuildRequest(auth.userId, body);
+    }
+
+    @Patch('build-requests/:id/cancel')
+    @ApiOperation({ summary: 'Cancel a pending or active Work agent build request' })
+    @HttpCode(HttpStatus.OK)
+    cancelBuildRequest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.cancelBuildRequest(auth.userId, id);
+    }
+
+    // ─── DEPRECATED /goals aliases (review §23.3) ────────────────────────
+    // "Goal" is reserved for the upcoming measurable-outcome entity; the
+    // build-request queue's old routes stay as thin aliases for one release
+    // window so existing clients keep working. Remove after the window.
+
+    @Get('goals')
+    @ApiOperation({
+        deprecated: true,
+        summary: 'DEPRECATED alias of build-requests — list recent Work agent build requests',
+    })
+    @HttpCode(HttpStatus.OK)
+    listGoalsDeprecated(@CurrentUser() auth: AuthenticatedUser) {
+        return this.service.listBuildRequests(auth.userId);
     }
 
     @Post('goals')
-    @ApiOperation({ summary: 'Queue a high-level goal for the Work agent' })
+    @ApiOperation({
+        deprecated: true,
+        summary: 'DEPRECATED alias of build-requests — queue a Work agent build request',
+    })
     @HttpCode(HttpStatus.ACCEPTED)
-    createGoal(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateWorkAgentGoalDto) {
-        return this.service.createGoal(auth.userId, body);
+    createGoalDeprecated(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: CreateWorkBuildRequestDto,
+    ) {
+        return this.service.createBuildRequest(auth.userId, body);
     }
 
     @Patch('goals/:id/cancel')
-    @ApiOperation({ summary: 'Cancel a pending or active Work agent goal' })
+    @ApiOperation({
+        deprecated: true,
+        summary:
+            'DEPRECATED alias of build-requests/:id/cancel — cancel a Work agent build request',
+    })
     @HttpCode(HttpStatus.OK)
-    cancelGoal(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
-        return this.service.cancelGoal(auth.userId, id);
+    cancelGoalDeprecated(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.cancelBuildRequest(auth.userId, id);
     }
 
     @Get('runs/active')

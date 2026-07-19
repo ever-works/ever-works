@@ -7,10 +7,10 @@ export {
     type WorkAgentGuardrails,
 } from '../entities/work-agent-preference.entity';
 export {
-    WorkAgentGoal,
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
-} from '../entities/work-agent-goal.entity';
+    WorkBuildRequest,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
+} from '../entities/work-build-request.entity';
 export {
     WorkAgentRun,
     WorkAgentRunStatus,
