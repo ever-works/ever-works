@@ -45,6 +45,8 @@ const fakeOrg: OrganizationResponse = {
     registrationProvider: null,
     registrationStatus: null,
     linkedWorkId: null,
+    vision: null,
+    visionUpdatedAt: null,
     createdAt: '2026-05-28T00:00:00.000Z',
     updatedAt: '2026-05-28T00:00:00.000Z',
 };

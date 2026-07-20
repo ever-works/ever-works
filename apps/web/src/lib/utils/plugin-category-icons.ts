@@ -1,4 +1,5 @@
 import {
+    Gauge,
     Brain,
     Rocket,
     Search,
@@ -61,6 +62,9 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // multi-doc-type RAG pipelines.
     memory: Library,
     rag: Network,
+    // Domain-model evolution PR-7 — metrics-provider backends
+    // (Stripe, PostHog, Google Analytics, custom HTTP) for Goals.
+    metrics: Gauge,
 };
 
 /**
@@ -89,6 +93,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     'job-runtime': 'Job Runtimes',
     memory: 'Memory Frameworks',
     rag: 'RAG Pipelines',
+    metrics: 'Metrics',
 };
 
 // Type-safe assertion that all categories are covered

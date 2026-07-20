@@ -6,6 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Provenance for the `Organization` row — how it came to exist.
@@ -111,6 +112,24 @@ export class Organization {
      */
     @Column({ type: 'varchar', length: 200 })
     displayName: string;
+
+    /**
+     * PR-6 (domain-model evolution, review §23.5) — the organization's
+     * long-term direction, stated as plain text. Deliberately a FIELD,
+     * not an entity (review §8.2): it changes rarely, nothing needs
+     * versioning yet, and its one consumer is prompt context — when
+     * set, it is injected as a fenced segment into Idea generation,
+     * agent-run prompt assembly, and Mission tick context so every
+     * agent knows the company vision.
+     */
+    @Column({ type: 'text', nullable: true })
+    vision?: string | null;
+
+    /** PR-6 — when the vision text last changed (NULL = never set).
+     *  PortableDateColumn: raw `type: 'timestamp'` breaks the better-sqlite3
+     *  test/CLI driver at entity-metadata validation. */
+    @PortableDateColumn({ nullable: true })
+    visionUpdatedAt?: Date | null;
 
     /**
      * ISO 3166-1 alpha-2 country code (e.g. "US", "DE"). Used by the

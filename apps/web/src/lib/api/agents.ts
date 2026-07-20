@@ -35,6 +35,23 @@ export interface AgentTarget {
     id: string;
 }
 
+// Agent Scorecards increment 1 — mirrors `AgentScorecardMetric` /
+// `AgentScorecardPeriod` on the agent entity. Quantified per-Agent
+// goals; `current` is manually edited in this increment (auto-update
+// from run output + the org-dashboard at-risk roll-up are follow-ups).
+export type AgentScorecardPeriod = 'weekly' | 'monthly' | 'quarterly';
+
+export interface AgentScorecardMetric {
+    key: string;
+    label: string;
+    target: number;
+    current: number;
+    floor?: number | null;
+    stretch?: number | null;
+    unit?: string | null;
+    period: AgentScorecardPeriod;
+}
+
 export interface Agent {
     id: string;
     userId: string;
@@ -62,6 +79,7 @@ export interface Agent {
     avatarMode: AgentAvatarMode;
     avatarIcon: string | null;
     avatarImageUploadId: string | null;
+    scorecard: AgentScorecardMetric[] | null;
     contentHash: string | null;
     createdAt: string;
     updatedAt: string;
@@ -119,6 +137,7 @@ export interface UpdateAgentInput {
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
+    scorecard?: AgentScorecardMetric[] | null;
 }
 
 export interface AgentFileBody {

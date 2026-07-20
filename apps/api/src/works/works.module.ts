@@ -21,6 +21,10 @@ import { BulkItemsController } from './bulk-items.controller';
 import { KbController } from './kb.controller';
 import { OrgKbController } from './org-kb.controller';
 import { OrgMemoryController } from './org-memory.controller';
+import { WorkTemplatesController } from './work-templates.controller';
+
+// Services
+import { WorksTemplateCatalogService } from './works-template-catalog.service';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -51,6 +55,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
     ],
     providers: [
         CacheEntryRepository,
+        WorksTemplateCatalogService,
         WorkCleanupService,
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
@@ -104,6 +109,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // per-Work KB across the active Organization. Shares this module's
         // KnowledgeBaseModule + OrganizationsModule (membership guard) wiring.
         OrgMemoryController,
+        WorkTemplatesController,
     ],
 })
 export class WorksModule {}

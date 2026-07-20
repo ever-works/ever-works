@@ -2,7 +2,17 @@
 
 import { usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
-import { User, Lock, Key, AlertTriangle, HardDrive, Github, Bot, Cpu } from 'lucide-react';
+import {
+    User,
+    Lock,
+    Key,
+    AlertTriangle,
+    HardDrive,
+    Github,
+    Bot,
+    Cpu,
+    Building2,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -31,6 +41,12 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
     const staticTabs: StaticTab[] = useMemo(
         () => [
             { id: 'profile', label: t('tabs.profile'), icon: User, href: baseSettingsPath },
+            {
+                id: 'organization',
+                label: t('tabs.organization'),
+                icon: Building2,
+                href: `${baseSettingsPath}/organization`,
+            },
             {
                 id: 'security',
                 label: t('tabs.security'),

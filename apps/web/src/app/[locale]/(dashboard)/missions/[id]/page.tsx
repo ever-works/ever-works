@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { missionsAPI } from '@/lib/api/missions';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
+import { workAPI } from '@/lib/api/work';
 import { MissionDetailClient } from '@/components/missions';
 
 /**
@@ -50,7 +51,20 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // the Spend section can render real data instead of the PR GG
     // placeholder. Defensive catch — a flaky budget endpoint
     // surfaces the empty state, never 500s the detail page.
-    const [ideas, sourceMission, sourceAcceptedIdeas, budget, attachments] = await Promise.all([
+    // PR-2 — also fetch the explicit `mission_works` edges for the
+    // "Attached Works" panel plus the caller's Works for its "Attach
+    // Work" select. Defensive .catch on both: a flaky endpoint (or a
+    // stale environment missing the migration) renders the empty
+    // surface, never 500s the page.
+    const [
+        ideas,
+        sourceMission,
+        sourceAcceptedIdeas,
+        budget,
+        attachments,
+        workRelations,
+        worksResponse,
+    ] = await Promise.all([
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
                 missionId: id,
@@ -68,6 +82,8 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
         // Attachments — defensive .catch so a missing migration on
         // a stale environment doesn't 500 the page.
         missionsAPI.listAttachments(id).catch(() => []),
+        missionsAPI.listWorks(id).catch(() => []),
+        workAPI.getAll({ limit: 100 }).catch(() => null),
     ]);
 
     return (
@@ -78,6 +94,11 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             inheritedIdeas={sourceAcceptedIdeas}
             budget={budget}
             attachments={attachments}
+            workRelations={workRelations}
+            attachableWorks={(worksResponse?.works ?? []).map((w) => ({
+                id: w.id,
+                name: w.name,
+            }))}
         />
     );
 }

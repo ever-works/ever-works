@@ -22,7 +22,7 @@ import { ScheduledReRunService } from './scheduled-rerun.service';
         ConfigModule,
         TypeOrmModule.forFeature([User, WorkAgentPreference]),
         // Phase 1 PR B — POST /me/work-proposals/:id/build calls
-        // WorkAgentService.createGoal() to spin up the build pipeline.
+        // WorkAgentService.createBuildRequest() to spin up the build pipeline.
         WorkAgentModule,
         // Phase 7 PR U — GET /me/work-proposals/:id/budget calls
         // BudgetService.summarizeForOwner.

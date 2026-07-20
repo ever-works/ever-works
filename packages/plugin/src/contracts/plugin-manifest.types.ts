@@ -76,7 +76,12 @@ export const PLUGIN_CATEGORIES = [
 	// category yet; the built-in per-Work KB behavior is unchanged.
 	// See `docs/specs/features/memory/spec.md` §5.
 	'memory',
-	'rag'
+	'rag',
+	// Goals feature PR-7 — read-only metrics collectors (capability
+	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
+	// (PostHog + Google Analytics follow in PR-9). See
+	// `capabilities/metrics-provider.interface.ts`.
+	'metrics'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];

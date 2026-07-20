@@ -50,12 +50,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { RepositoryOwnerCard } from './RepositoryOwnerCard';
 import { DynamicPluginFields } from './detail/generator/DynamicPluginFields';
 import { ProviderSelectionSection } from './shared/ProviderSelectionSection';
-import { WebsiteTemplateSelector } from './shared/WebsiteTemplateSelector';
+import { WorkTemplatePicker } from './shared/WorkTemplatePicker';
 import { CollapsibleSection } from './detail/shared';
 import { Lightbulb, Check, X, Loader2 } from 'lucide-react';
 import { useProviderSelection } from '@/lib/hooks/use-provider-selection';
 import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
+import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
 type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
@@ -65,6 +66,8 @@ interface WorkAICreatorProps {
     gitConnected?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
+    /** Manifest Work blueprints (Works Templates catalog); may be empty. */
+    workBlueprints?: WorkBlueprintEntry[];
     proposal?: WorkProposal;
     initialPrompt?: string;
     initialKind?: InitialWorkKind;
@@ -75,6 +78,7 @@ export function WorkAICreator({
     gitConnected,
     deployProvider,
     websiteTemplates,
+    workBlueprints = [],
     proposal,
     initialPrompt,
     initialKind,
@@ -445,8 +449,10 @@ export function WorkAICreator({
                 disabled={isPending}
             />
 
-            <WebsiteTemplateSelector
-                templates={websiteTemplates}
+            <WorkTemplatePicker
+                customTemplates={websiteTemplates}
+                blueprints={workBlueprints}
+                workKind={initialKind}
                 value={websiteTemplateId}
                 onChange={setWebsiteTemplateId}
                 disabled={isPending}

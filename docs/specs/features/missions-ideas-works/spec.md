@@ -90,7 +90,7 @@ What changes for Works in this spec: only the **origin** of a Work. A Work can n
 
 An **Idea** is an _atomic, one-shot_ proposal to build a single Work.
 
-- **Cardinality:** 1 Idea → 1 Work. Always. If the build pipeline happens to spawn more than one Work from an Idea, that's a harmless bonus, not a requirement, and it doesn't change the conceptual mapping.
+- **Cardinality:** 1 Idea → 1 Work. Always. **[Erratum 2026-07-19: superseded by the domain-model review's ADR-009 ruling — 1 Idea → 0..N Works. The authoritative link set lives in the `idea_works` table; `acceptedWorkId` remains as the denormalized primary/most-recent pointer. See the [domain-model-evolution spec](../domain-model-evolution/spec.md).]** If the build pipeline happens to spawn more than one Work from an Idea, that's a harmless bonus, not a requirement, and it doesn't change the conceptual mapping.
 - **Lifetime:** one-shot. Once the Idea is built into a Work, the Idea is **Done** — soft-hidden from the active UI list but **kept in the DB** so it remains available for stats, audit, and future re-build / re-suggest logic.
 - **Content shape:**
     - **Title** — short name, _AI-generated_ from the prompt body when the Idea is created (whether the source is auto-suggested, user-typed, or Mission-spawned). Editable in UI later.

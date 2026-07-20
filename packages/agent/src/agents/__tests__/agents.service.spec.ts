@@ -293,6 +293,84 @@ describe('AgentsService', () => {
         });
     });
 
+    describe('scorecard updates (Agent Scorecards increment 1)', () => {
+        const validMetric = {
+            key: 'prs-merged',
+            label: 'PRs merged',
+            target: 10,
+            current: 4,
+            period: 'weekly' as const,
+        };
+
+        it('persists a valid scorecard', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(makeAgent());
+            agents.findById.mockResolvedValueOnce(makeAgent({ scorecard: [validMetric] }));
+
+            const dto = await svc.update('u1', 'a1', { scorecard: [validMetric] });
+
+            expect(agents.updateById).toHaveBeenCalledWith(
+                'a1',
+                expect.objectContaining({ scorecard: [validMetric] }),
+            );
+            expect(dto.scorecard).toEqual([validMetric]);
+        });
+
+        it('normalises null and empty array to a cleared scorecard', async () => {
+            agents.findByIdAndUser.mockResolvedValue(makeAgent({ scorecard: [validMetric] }));
+            agents.findById.mockResolvedValue(makeAgent({ scorecard: null }));
+
+            await svc.update('u1', 'a1', { scorecard: null });
+            await svc.update('u1', 'a1', { scorecard: [] });
+
+            for (const call of agents.updateById.mock.calls) {
+                expect(call[1]).toEqual(expect.objectContaining({ scorecard: null }));
+            }
+        });
+
+        it('rejects more than 12 metrics', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(makeAgent());
+            const tooMany = Array.from({ length: 13 }, (_, i) => ({
+                ...validMetric,
+                key: `metric-${i}`,
+            }));
+
+            await expect(svc.update('u1', 'a1', { scorecard: tooMany })).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(agents.updateById).not.toHaveBeenCalled();
+        });
+
+        it('rejects non-kebab and duplicate keys', async () => {
+            agents.findByIdAndUser.mockResolvedValue(makeAgent());
+
+            await expect(
+                svc.update('u1', 'a1', { scorecard: [{ ...validMetric, key: 'PRs Merged' }] }),
+            ).rejects.toThrow(BadRequestException);
+            await expect(
+                svc.update('u1', 'a1', {
+                    scorecard: [validMetric, { ...validMetric, label: 'Duplicate' }],
+                }),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.updateById).not.toHaveBeenCalled();
+        });
+
+        it('rejects non-finite numbers and over-long labels', async () => {
+            agents.findByIdAndUser.mockResolvedValue(makeAgent());
+
+            await expect(
+                svc.update('u1', 'a1', {
+                    scorecard: [{ ...validMetric, current: Number.NaN }],
+                }),
+            ).rejects.toThrow(BadRequestException);
+            await expect(
+                svc.update('u1', 'a1', {
+                    scorecard: [{ ...validMetric, label: 'x'.repeat(81) }],
+                }),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.updateById).not.toHaveBeenCalled();
+        });
+    });
+
     describe('status transitions', () => {
         it('allows draft → active', async () => {
             agents.findByIdAndUser.mockResolvedValueOnce(makeAgent({ status: AgentStatus.DRAFT }));
