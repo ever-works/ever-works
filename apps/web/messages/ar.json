@@ -642,6 +642,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "دمج",
+                "title": "دمج الذاكرة",
+                "previewIntro": "معاينة لما سيقوم به الدمج. لا يتغيّر شيء حتى تطبّق التغييرات.",
+                "scanned": "تم فحص {count}",
+                "promoted": "تمت ترقية {count}",
+                "synthesized": "تم تلخيص {count}",
+                "superseded": "تم استبدال {count}",
+                "promotedHeading": "مُرقّى",
+                "supersededHeading": "مُستبدَل",
+                "more": "+{count} أخرى",
+                "apply": "تطبيق",
+                "cancel": "إلغاء",
+                "applied": "تم الدمج: {promoted} مُرقّى، {synthesized} مُلخّص، {superseded} مُستبدَل",
+                "failed": "فشل الدمج. يُرجى المحاولة مرة أخرى.",
+                "badgePromoted": "مُرقّى",
+                "badgeSuperseded": "مُستبدَل"
+            },
             "title": "Memory",
             "subtitle": "كل ما تعرفه منظمتك، في مكان واحد — مُجمَّع من Knowledge Base لكل عمل.",
             "searchPlaceholder": "ابحث في كل ما تعرفه المنظمة…",

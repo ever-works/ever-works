@@ -642,6 +642,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Consolidate",
+                "title": "Consolidate memory",
+                "previewIntro": "Preview of what consolidation will do. Nothing changes until you apply.",
+                "scanned": "{count} scanned",
+                "promoted": "{count} promoted",
+                "synthesized": "{count} synthesized",
+                "superseded": "{count} superseded",
+                "promotedHeading": "Promoted",
+                "supersededHeading": "Superseded",
+                "more": "+{count} more",
+                "apply": "Apply",
+                "cancel": "Cancel",
+                "applied": "Consolidated: {promoted} promoted, {synthesized} synthesized, {superseded} superseded",
+                "failed": "Consolidation failed. Please try again.",
+                "badgePromoted": "Promoted",
+                "badgeSuperseded": "Superseded"
+            },
             "title": "Memory",
             "subtitle": "Everything your organization knows, in one place — aggregated across every Work's Knowledge Base.",
             "searchPlaceholder": "Search across everything the organization knows…",

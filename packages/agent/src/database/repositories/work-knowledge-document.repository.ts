@@ -471,6 +471,22 @@ export class WorkKnowledgeDocumentRepository {
         return (result.affected ?? 0) > 0;
     }
 
+    /**
+     * Set (or clear, with `null`) the `consolidation` marker on many
+     * documents in a single UPDATE. Used by the consolidation apply pass to
+     * clear stale promotions without N per-row round-trips. No-op on an empty
+     * id list.
+     */
+    async bulkSetConsolidation(
+        docIds: string[],
+        consolidation: WorkKnowledgeDocument['consolidation'],
+    ): Promise<void> {
+        if (docIds.length === 0) return;
+        await this.repository.update({ id: In(docIds) }, {
+            consolidation,
+        } as Partial<WorkKnowledgeDocument>);
+    }
+
     async setLock(
         docId: string,
         locked: boolean,

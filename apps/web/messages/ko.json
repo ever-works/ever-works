@@ -603,6 +603,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "통합",
+                "title": "메모리 통합",
+                "previewIntro": "통합이 수행할 작업의 미리 보기입니다. 적용하기 전까지는 아무것도 변경되지 않습니다.",
+                "scanned": "{count}개 스캔됨",
+                "promoted": "{count}개 승격됨",
+                "synthesized": "{count}개 통합 생성됨",
+                "superseded": "{count}개 대체됨",
+                "promotedHeading": "승격됨",
+                "supersededHeading": "대체됨",
+                "more": "+{count}개 더",
+                "apply": "적용",
+                "cancel": "취소",
+                "applied": "통합됨: {promoted}개 승격, {synthesized}개 통합 생성, {superseded}개 대체",
+                "failed": "통합에 실패했습니다. 다시 시도해 주세요.",
+                "badgePromoted": "승격됨",
+                "badgeSuperseded": "대체됨"
+            },
             "title": "Memory",
             "subtitle": "조직이 아는 모든 것을 한곳에 — 모든 워크의 Knowledge Base에서 집계됩니다.",
             "searchPlaceholder": "조직이 아는 모든 것을 검색…",

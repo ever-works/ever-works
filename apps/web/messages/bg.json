@@ -642,6 +642,24 @@
             }
         },
         "memoryPage": {
+            "consolidation": {
+                "action": "Консолидиране",
+                "title": "Консолидиране на паметта",
+                "previewIntro": "Преглед на това какво ще направи консолидирането. Нищо не се променя, докато не приложите.",
+                "scanned": "Сканирани {count}",
+                "promoted": "Повишени {count}",
+                "synthesized": "Синтезирани {count}",
+                "superseded": "Заменени {count}",
+                "promotedHeading": "Повишени",
+                "supersededHeading": "Заменени",
+                "more": "Още +{count}",
+                "apply": "Приложи",
+                "cancel": "Отказ",
+                "applied": "Консолидирано: {promoted} повишени, {synthesized} синтезирани, {superseded} заменени",
+                "failed": "Консолидирането е неуспешно. Моля, опитайте отново.",
+                "badgePromoted": "Повишен",
+                "badgeSuperseded": "Заменен"
+            },
             "title": "Memory",
             "subtitle": "Всичко, което вашата организация знае, на едно място — агрегирано от Knowledge Base на всяка Работа.",
             "searchPlaceholder": "Търсене във всичко, което организацията знае…",

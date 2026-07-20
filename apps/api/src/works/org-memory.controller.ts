@@ -1,8 +1,22 @@
-import { Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Post,
+    Query,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
-import { KnowledgeBaseService } from '@ever-works/agent/services';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+    KnowledgeBaseService,
+    MemoryConsolidationService,
+    type MemoryConsolidationReport,
+} from '@ever-works/agent/services';
 import type {
     KbDocumentClass,
     KbDocumentSource,
@@ -93,6 +107,17 @@ export class MemoryQueryDto {
 }
 
 /**
+ * Body for `POST /api/memory/consolidate` (Memory Consolidation).
+ * `apply` defaults to `false` — a bare POST is always a dry-run preview;
+ * persisting markers requires an explicit `{ "apply": true }`.
+ */
+export class MemoryConsolidateDto {
+    @IsOptional()
+    @IsBoolean()
+    apply?: boolean;
+}
+
+/**
  * Org-wide Memory (Cortex P1) — the aggregation surface over the
  * per-Work Knowledge Base, fanned in across the active Organization.
  *
@@ -119,6 +144,7 @@ export class MemoryQueryDto {
 export class OrgMemoryController {
     constructor(
         private readonly kb: KnowledgeBaseService,
+        private readonly consolidation: MemoryConsolidationService,
         private readonly membership: OrganizationMembershipService,
         private readonly scopeContext: ScopeContextService,
     ) {}
@@ -177,5 +203,49 @@ export class OrgMemoryController {
             limit: query.limit ?? MEMORY_MAX_LIMIT,
             offset: query.offset,
         });
+    }
+
+    @Post('memory/consolidate')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Memory Consolidation — curate the org-wide Memory feed',
+        description:
+            'On-demand consolidation pass over the active Organization’s aggregated Memory: near-duplicate documents are SUPERSEDED (marked, never deleted), the strongest documents are PROMOTED (top-N by a transparent additive score), and — when an AI provider is configured — duplicate clusters of 3+ documents are synthesized into one merged org document. `apply` defaults to false (dry-run preview that writes nothing); pass `{ "apply": true }` to persist the markers. The Organization comes from the request scope context, not a param.',
+    })
+    @ApiResponse({
+        status: 200,
+        description:
+            'Consolidation report — { scanned, promoted, synthesized, superseded, dryRun, notes, details }',
+    })
+    async consolidateMemory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: MemoryConsolidateDto,
+    ): Promise<MemoryConsolidationReport> {
+        const apply = body.apply === true;
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            // No active Organization ⇒ nothing to consolidate. Mirrors the
+            // GET aggregation's empty payload — never a cross-tenant scan.
+            return {
+                scanned: 0,
+                promoted: 0,
+                synthesized: 0,
+                superseded: 0,
+                dryRun: !apply,
+                notes: ['No active Organization — nothing to consolidate.'],
+                details: { promotedIds: [], supersededPairs: [], synthesizedIds: [] },
+            };
+        }
+
+        // Same defense-in-depth membership gate as the GET aggregation:
+        // throws NotFound (not Forbidden) on a cross-tenant mismatch,
+        // matching the existence-leak contract.
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        return this.consolidation.runConsolidation(
+            { organizationId, userId: auth.userId },
+            { apply },
+        );
     }
 }

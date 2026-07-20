@@ -34,6 +34,7 @@ import {
 } from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
+import type { KbConsolidationMarker } from './memory-consolidation';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import {
@@ -166,6 +167,12 @@ export interface OrgMemoryDocumentItem {
     source: KbDocumentSource;
     updatedAt: string;
     lastIndexedAt: string | null;
+    /**
+     * Memory Consolidation marker — `null` for normal documents. Lets
+     * the Memory shell badge promoted / superseded documents; the badge
+     * tooltip surfaces `reason`.
+     */
+    consolidation: KbConsolidationMarker | null;
 }
 
 /** A facet bucket for a Memory chip; `label` is a human-readable name. */
@@ -1694,6 +1701,7 @@ export class KnowledgeBaseService {
             source: d.source,
             updatedAt: d.updatedAt.toISOString(),
             lastIndexedAt: d.lastIndexedAt ? d.lastIndexedAt.toISOString() : null,
+            consolidation: d.consolidation ?? null,
         }));
 
         return {

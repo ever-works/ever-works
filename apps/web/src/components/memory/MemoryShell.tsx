@@ -2,12 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Brain, Search, FileText, FolderClosed, Building2, X, Loader2 } from 'lucide-react';
+import {
+    Brain,
+    Search,
+    FileText,
+    FolderClosed,
+    Building2,
+    X,
+    Loader2,
+    Sparkles,
+} from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import {
     buildMemoryQuery,
+    type MemoryConsolidationReport,
     type MemoryFacet,
     type MemoryFilters,
     type MemoryResponse,
@@ -59,6 +69,19 @@ export function MemoryShell({ initial }: MemoryShellProps) {
         source: [],
     });
     const [isLoading, setIsLoading] = useState(false);
+
+    // Memory Consolidation — the dry-run report shown in the confirm
+    // surface (null = closed), the applied-run summary, an explicit
+    // isSubmitting flag (house rule — no useTransition.pending for
+    // form-like submissions), and an error flag for the failure copy.
+    const [consolidatePreview, setConsolidatePreview] = useState<MemoryConsolidationReport | null>(
+        null,
+    );
+    const [consolidateApplied, setConsolidateApplied] = useState<MemoryConsolidationReport | null>(
+        null,
+    );
+    const [isConsolidating, setIsConsolidating] = useState(false);
+    const [consolidateFailed, setConsolidateFailed] = useState(false);
 
     // Skip the very first effect run — the server already handed us the
     // initial payload, so an immediate refetch would be wasted work.
@@ -136,6 +159,45 @@ export function MemoryShell({ initial }: MemoryShellProps) {
         setFilters({ type: [], work: [], status: [], source: [] });
     }, []);
 
+    /**
+     * Memory Consolidation — POST the consolidation pass. First click is
+     * a dry-run (`apply: false`) whose report opens the confirm surface;
+     * confirming re-posts with `apply: true`, then refreshes the list so
+     * the new promoted/superseded badges show up.
+     */
+    const runConsolidation = useCallback(
+        async (apply: boolean) => {
+            setIsConsolidating(true);
+            setConsolidateFailed(false);
+            try {
+                const res = await fetch('/api/memory/consolidate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    cache: 'no-store',
+                    body: JSON.stringify({ apply }),
+                });
+                if (!res.ok) {
+                    setConsolidateFailed(true);
+                    return;
+                }
+                const report = (await res.json()) as MemoryConsolidationReport;
+                if (apply) {
+                    setConsolidatePreview(null);
+                    setConsolidateApplied(report);
+                    await runFetch(query, filters);
+                } else {
+                    setConsolidateApplied(null);
+                    setConsolidatePreview(report);
+                }
+            } catch {
+                setConsolidateFailed(true);
+            } finally {
+                setIsConsolidating(false);
+            }
+        },
+        [filters, query, runFetch],
+    );
+
     const activeCount =
         filters.type.length + filters.work.length + filters.status.length + filters.source.length;
     const hasActiveFilters = activeCount > 0 || query.length > 0;
@@ -169,7 +231,67 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                  * unrelated to creating a KB document — hidden for now rather
                  * than mis-navigating the user.
                  */}
+                <button
+                    type="button"
+                    data-testid="memory-consolidate-button"
+                    onClick={() => void runConsolidation(false)}
+                    disabled={isConsolidating}
+                    className={cn(
+                        'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors',
+                        'bg-card dark:bg-card-primary-dark border-card-border dark:border-white/9',
+                        'text-text dark:text-text-dark hover:border-border-secondary dark:hover:border-white/20',
+                        'disabled:opacity-60 disabled:cursor-not-allowed',
+                    )}
+                >
+                    {isConsolidating && consolidatePreview === null ? (
+                        <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                        <Sparkles className="w-4 h-4" strokeWidth={1.5} />
+                    )}
+                    {t('consolidation.action')}
+                </button>
             </div>
+
+            {/* Memory Consolidation — dry-run confirm surface / applied summary */}
+            {consolidateFailed && (
+                <div
+                    data-testid="memory-consolidate-error"
+                    className="rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400"
+                >
+                    {t('consolidation.failed')}
+                </div>
+            )}
+            {consolidatePreview && (
+                <ConsolidatePanel
+                    report={consolidatePreview}
+                    documents={documents}
+                    isSubmitting={isConsolidating}
+                    onApply={() => void runConsolidation(true)}
+                    onCancel={() => setConsolidatePreview(null)}
+                />
+            )}
+            {consolidateApplied && (
+                <div
+                    data-testid="memory-consolidate-applied"
+                    className="flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-text dark:text-text-dark"
+                >
+                    <span>
+                        {t('consolidation.applied', {
+                            promoted: consolidateApplied.promoted,
+                            synthesized: consolidateApplied.synthesized,
+                            superseded: consolidateApplied.superseded,
+                        })}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setConsolidateApplied(null)}
+                        aria-label={t('consolidation.cancel')}
+                        className="shrink-0 text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                    >
+                        <X className="w-4 h-4" strokeWidth={1.5} />
+                    </button>
+                </div>
+            )}
 
             {/* Search */}
             <div className="relative">
@@ -284,6 +406,154 @@ export function MemoryShell({ initial }: MemoryShellProps) {
     );
 }
 
+/**
+ * Memory Consolidation — the dry-run confirm surface. Shows the
+ * "N promoted / M synthesized / K superseded" counts plus a short list
+ * of affected documents (titles resolved from the currently loaded feed
+ * where possible), then asks the user to apply or cancel. Applying
+ * re-runs the pass with `apply: true`.
+ */
+function ConsolidatePanel({
+    report,
+    documents,
+    isSubmitting,
+    onApply,
+    onCancel,
+}: {
+    report: MemoryConsolidationReport;
+    documents: MemoryResponse['documents'];
+    isSubmitting: boolean;
+    onApply: () => void;
+    onCancel: () => void;
+}) {
+    const t = useTranslations('dashboard.memoryPage');
+
+    const titleById = new Map(documents.map((doc) => [doc.id, doc.title]));
+    const titleFor = (id: string) => titleById.get(id) ?? id;
+
+    const MAX_LISTED = 3;
+    // Key on the source id, not the resolved title — near-duplicate detection
+    // groups on similar titles, so two entries can share a title string and a
+    // title-keyed list would silently drop rows. The loser id is unique per
+    // superseded pair (a doc is superseded at most once).
+    const promotedEntries = report.details.promotedIds
+        .slice(0, MAX_LISTED)
+        .map((id) => ({ id, title: titleFor(id) }));
+    const promotedMore = report.details.promotedIds.length - promotedEntries.length;
+    const supersededEntries = report.details.supersededPairs
+        .slice(0, MAX_LISTED)
+        .map(([loserId, survivorId]) => ({
+            key: loserId,
+            label: `${titleFor(loserId)} → ${titleFor(survivorId)}`,
+        }));
+    const supersededMore = report.details.supersededPairs.length - supersededEntries.length;
+
+    return (
+        <div
+            data-testid="memory-consolidate-panel"
+            className="flex flex-col gap-3 rounded-lg border border-card-border dark:border-white/9 bg-card dark:bg-card-primary-dark p-4"
+        >
+            <div className="flex items-center gap-2">
+                <Sparkles
+                    className="w-4 h-4 text-text-muted dark:text-text-muted-dark"
+                    strokeWidth={1.5}
+                />
+                <span className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('consolidation.title')}
+                </span>
+            </div>
+            <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                {t('consolidation.previewIntro')}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="inline-flex items-center rounded-full border border-card-border dark:border-white/9 px-2.5 py-1 text-text-muted dark:text-text-muted-dark">
+                    {t('consolidation.scanned', { count: report.scanned })}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary dark:text-white">
+                    {t('consolidation.promoted', { count: report.promoted })}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-primary dark:text-white">
+                    {t('consolidation.synthesized', { count: report.synthesized })}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-card-border dark:border-white/9 bg-surface-secondary dark:bg-white/5 px-2.5 py-1 text-text-muted dark:text-text-muted-dark">
+                    {t('consolidation.superseded', { count: report.superseded })}
+                </span>
+            </div>
+            {promotedEntries.length > 0 && (
+                <div className="text-xs text-text-muted dark:text-text-muted-dark">
+                    <span className="font-medium text-text dark:text-text-dark">
+                        {t('consolidation.promotedHeading')}
+                    </span>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                        {promotedEntries.map((entry) => (
+                            <li key={entry.id} className="truncate">
+                                {entry.title}
+                            </li>
+                        ))}
+                        {promotedMore > 0 && (
+                            <li>{t('consolidation.more', { count: promotedMore })}</li>
+                        )}
+                    </ul>
+                </div>
+            )}
+            {supersededEntries.length > 0 && (
+                <div className="text-xs text-text-muted dark:text-text-muted-dark">
+                    <span className="font-medium text-text dark:text-text-dark">
+                        {t('consolidation.supersededHeading')}
+                    </span>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                        {supersededEntries.map((entry) => (
+                            <li key={entry.key} className="truncate">
+                                {entry.label}
+                            </li>
+                        ))}
+                        {supersededMore > 0 && (
+                            <li>{t('consolidation.more', { count: supersededMore })}</li>
+                        )}
+                    </ul>
+                </div>
+            )}
+            {report.notes.length > 0 && (
+                <ul className="flex flex-col gap-0.5 text-xs text-text-muted dark:text-text-muted-dark">
+                    {report.notes.map((note) => (
+                        <li key={note}>{note}</li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    data-testid="memory-consolidate-apply"
+                    onClick={onApply}
+                    disabled={isSubmitting}
+                    className={cn(
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        'bg-primary text-white hover:bg-primary/90 dark:bg-white dark:text-gray-900 dark:hover:bg-white/90',
+                        'disabled:opacity-60 disabled:cursor-not-allowed',
+                    )}
+                >
+                    {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />}
+                    {t('consolidation.apply')}
+                </button>
+                <button
+                    type="button"
+                    data-testid="memory-consolidate-cancel"
+                    onClick={onCancel}
+                    disabled={isSubmitting}
+                    className={cn(
+                        'inline-flex items-center rounded-lg border px-3 py-2 text-sm transition-colors',
+                        'bg-card dark:bg-card-primary-dark border-card-border dark:border-white/9',
+                        'text-text dark:text-text-dark hover:border-border-secondary dark:hover:border-white/20',
+                        'disabled:opacity-60 disabled:cursor-not-allowed',
+                    )}
+                >
+                    {t('consolidation.cancel')}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 function FacetRow({
     kind,
     label,
@@ -350,6 +620,11 @@ function MemoryRow({
     doc: MemoryResponse['documents'][number];
     orgLabel: string;
 }) {
+    const t = useTranslations('dashboard.memoryPage');
+    const consolidation = doc.consolidation ?? null;
+    const isSuperseded = consolidation?.state === 'superseded';
+    const isPromoted = consolidation?.state === 'promoted';
+
     return (
         <div
             data-testid={`memory-doc-${doc.id}`}
@@ -357,6 +632,8 @@ function MemoryRow({
                 'group flex items-start gap-3 rounded-lg border p-3 transition-colors',
                 'bg-card dark:bg-card-primary-dark border-card-border dark:border-white/9',
                 'hover:border-border-secondary dark:hover:border-white/20',
+                // Superseded docs stay readable but recede visually.
+                isSuperseded && 'opacity-60',
             )}
         >
             <span className="shrink-0 mt-0.5 inline-flex items-center justify-center w-8 h-8 rounded-md bg-surface-secondary dark:bg-white/5">
@@ -373,6 +650,25 @@ function MemoryRow({
                     <span className="inline-flex items-center rounded border border-card-border dark:border-white/9 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
                         {doc.class}
                     </span>
+                    {isPromoted && (
+                        <span
+                            data-testid={`memory-doc-promoted-${doc.id}`}
+                            title={consolidation?.reason}
+                            className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary dark:text-white"
+                        >
+                            <Sparkles className="w-2.5 h-2.5" strokeWidth={1.5} />
+                            {t('consolidation.badgePromoted')}
+                        </span>
+                    )}
+                    {isSuperseded && (
+                        <span
+                            data-testid={`memory-doc-superseded-${doc.id}`}
+                            title={consolidation?.reason}
+                            className="inline-flex items-center rounded border border-card-border dark:border-white/9 bg-surface-secondary dark:bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark line-through"
+                        >
+                            {t('consolidation.badgeSuperseded')}
+                        </span>
+                    )}
                 </div>
                 {doc.description && (
                     <p className="mt-0.5 text-xs text-text-muted dark:text-text-muted-dark line-clamp-2">
