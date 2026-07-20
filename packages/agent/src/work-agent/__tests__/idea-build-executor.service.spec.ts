@@ -201,7 +201,10 @@ describe('IdeaBuildExecutorService', () => {
 
             // Goal transitioned RUNNING then COMPLETED (observable via save order).
             const statuses = goals._saved.map((g) => g.status);
-            expect(statuses).toEqual([WorkBuildRequestStatus.RUNNING, WorkBuildRequestStatus.COMPLETED]);
+            expect(statuses).toEqual([
+                WorkBuildRequestStatus.RUNNING,
+                WorkBuildRequestStatus.COMPLETED,
+            ]);
 
             expect(result).toEqual({
                 status: 'completed',
@@ -262,7 +265,10 @@ describe('IdeaBuildExecutorService', () => {
                 'failure',
             );
             const statuses = goals._saved.map((g) => g.status);
-            expect(statuses).toEqual([WorkBuildRequestStatus.RUNNING, WorkBuildRequestStatus.FAILED]);
+            expect(statuses).toEqual([
+                WorkBuildRequestStatus.RUNNING,
+                WorkBuildRequestStatus.FAILED,
+            ]);
             expect(result.status).toBe('failed');
         });
     });

@@ -20,10 +20,10 @@ errors). The rationale is also documented in the module doc block of
 
 ## Metrics
 
-| Metric id      | What it reads                                             | Windows                | Unit    | Params              |
-| -------------- | --------------------------------------------------------- | ---------------------- | ------- | ------------------- |
-| `event_count`  | `count()` of one event via HogQL over the window          | `day`, `week`, `month` | `count` | `{ event: string }` |
-| `active_users` | `count(DISTINCT person_id)` via HogQL over the window     | `day`, `week`, `month` | `count` | —                   |
+| Metric id      | What it reads                                         | Windows                | Unit    | Params              |
+| -------------- | ----------------------------------------------------- | ---------------------- | ------- | ------------------- |
+| `event_count`  | `count()` of one event via HogQL over the window      | `day`, `week`, `month` | `count` | `{ event: string }` |
+| `active_users` | `count(DISTINCT person_id)` via HogQL over the window | `day`, `week`, `month` | `count` | —                   |
 
 Notes:
 
@@ -44,16 +44,16 @@ it executes a fixed HogQL `SELECT` and mutates nothing (the
 Use a **personal API key scoped to `Query: Read`** only:
 
 1. PostHog → **Settings** → **Personal API keys**
-2. **Create personal API key** → scope it to *Query: Read* on your project
+2. **Create personal API key** → scope it to _Query: Read_ on your project
 3. Configure the `phx_...` key + your **Project ID** (Settings → Project)
 
 ## Settings
 
-| Setting          | Required | Default                  | Notes                                                             |
-| ---------------- | -------- | ------------------------ | ----------------------------------------------------------------- |
-| `apiHost`        | no       | `https://us.posthog.com` | EU Cloud: `https://eu.posthog.com`; self-hosted URLs work too     |
-| `projectId`      | yes      | —                        | Numeric project id; env fallback `POSTHOG_PROJECT_ID`             |
-| `personalApiKey` | yes      | —                        | Secret (`x-secret`); env fallback `POSTHOG_PERSONAL_API_KEY`      |
+| Setting          | Required | Default                  | Notes                                                         |
+| ---------------- | -------- | ------------------------ | ------------------------------------------------------------- |
+| `apiHost`        | no       | `https://us.posthog.com` | EU Cloud: `https://eu.posthog.com`; self-hosted URLs work too |
+| `projectId`      | yes      | —                        | Numeric project id; env fallback `POSTHOG_PROJECT_ID`         |
+| `personalApiKey` | yes      | —                        | Secret (`x-secret`); env fallback `POSTHOG_PERSONAL_API_KEY`  |
 
 ## Typed errors
 
