@@ -24,7 +24,12 @@ export const metadata: Metadata = {
     robots: { index: false, follow: false }, // never index the funnel URL
 };
 
-const FALLBACK_CATALOG: OnboardingCatalogResponse = { ai: [], storage: [], deploy: [], plugins: [] };
+const FALLBACK_CATALOG: OnboardingCatalogResponse = {
+    ai: [],
+    storage: [],
+    deploy: [],
+    plugins: [],
+};
 const FALLBACK_STATE: OnboardingStateResponse = {
     completedAt: null,
     dismissedAt: null,
@@ -50,11 +55,17 @@ export default async function OnboardingPage() {
 
     const plugins = pluginsResponse.plugins
         .filter((p) => p.uiHints?.includeInOnboarding)
-        .sort((a, b) => (a.uiHints?.onboardingPriority ?? 99) - (b.uiHints?.onboardingPriority ?? 99));
+        .sort(
+            (a, b) => (a.uiHints?.onboardingPriority ?? 99) - (b.uiHints?.onboardingPriority ?? 99),
+        );
 
     const initialConnections = Object.fromEntries(
         plugins.map(
-            (p) => [p.pluginId, null] as [string, OAuthConnectionInfo | GitProviderConnectionInfo | null],
+            (p) =>
+                [p.pluginId, null] as [
+                    string,
+                    OAuthConnectionInfo | GitProviderConnectionInfo | null,
+                ],
         ),
     );
     const initialDeviceAuthStatuses = Object.fromEntries(
