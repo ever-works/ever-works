@@ -143,7 +143,10 @@ describe('StripeMetricsPlugin', () => {
 			balanceRetrieveMock.mockResolvedValueOnce({ available: [{ amount: 100, currency: 'usd' }] });
 
 			await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), {});
-			expect(stripeCtorMock).toHaveBeenCalledWith('rk_env_456', expect.objectContaining({ maxNetworkRetries: 2 }));
+			expect(stripeCtorMock).toHaveBeenCalledWith(
+				'rk_env_456',
+				expect.objectContaining({ maxNetworkRetries: 2 })
+			);
 		});
 
 		it('prefers the settings key over the environment variable', async () => {
@@ -162,10 +165,9 @@ describe('StripeMetricsPlugin', () => {
 			expect(stripeCtorMock).toHaveBeenCalledTimes(1);
 
 			// A different secret key gets its own client.
-			await plugin.getMetricValue(
-				query({ metricId: 'balance_available', window: 'point' }),
-				{ secretKey: 'sk_test_other' }
-			);
+			await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), {
+				secretKey: 'sk_test_other'
+			});
 			expect(stripeCtorMock).toHaveBeenCalledTimes(2);
 			expect(stripeCtorMock).toHaveBeenLastCalledWith('sk_test_other', expect.anything());
 		});
@@ -195,10 +197,10 @@ describe('StripeMetricsPlugin', () => {
 				]
 			});
 
-			const sample = await plugin.getMetricValue(
-				query({ metricId: 'balance_available', window: 'point' }),
-				{ ...SETTINGS, currency: 'eur' }
-			);
+			const sample = await plugin.getMetricValue(query({ metricId: 'balance_available', window: 'point' }), {
+				...SETTINGS,
+				currency: 'eur'
+			});
 
 			expect(sample.value).toBe(6.78);
 			expect(sample.unit).toBe('eur');
@@ -377,9 +379,9 @@ describe('StripeMetricsPlugin', () => {
 
 	describe('unknown metric', () => {
 		it('throws listing the available metric ids', async () => {
-			await expect(
-				plugin.getMetricValue(query({ metricId: 'net_income' }), SETTINGS)
-			).rejects.toThrow(/Unknown metric 'net_income'.*balance_available, gross_volume/);
+			await expect(plugin.getMetricValue(query({ metricId: 'net_income' }), SETTINGS)).rejects.toThrow(
+				/Unknown metric 'net_income'.*balance_available, gross_volume/
+			);
 		});
 	});
 
