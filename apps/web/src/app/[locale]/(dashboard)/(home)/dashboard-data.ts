@@ -71,7 +71,9 @@ export async function getTeamsTotal(): Promise<number | undefined> {
     // Probe every org's `/teams` concurrently — they're independent, so
     // there's no reason to pay the round-trips sequentially.
     const results = await Promise.allSettled(
-        orgs.map((org) => serverFetch<unknown>(`/organizations/${org.id}/teams`, { method: 'GET' })),
+        orgs.map((org) =>
+            serverFetch<unknown>(`/organizations/${org.id}/teams`, { method: 'GET' }),
+        ),
     );
 
     let total = 0;
