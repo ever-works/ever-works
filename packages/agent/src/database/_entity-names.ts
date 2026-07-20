@@ -46,6 +46,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
+    'AgentActionProposal',
     'AgentAttachment',
     'AgentBudget',
     'AgentEmailAssignment',
@@ -66,6 +67,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    'InboundTrigger',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
@@ -99,6 +102,11 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskRelation',
     'TaskReviewer',
     'TaskWatcher',
+    // ──────────────────────────
+    // Teams & Prebuilt Companies (teams-and-companies spec §2) ──
+    'Team',
+    'TeamMember',
+    'TeamResource',
     // ──────────────────────────
     'Template',
     'TemplateCustomization',

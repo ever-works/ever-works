@@ -308,7 +308,7 @@ export class PostHogMetricsPlugin implements IMetricsProviderPlugin {
 	isAvailable(settings?: PluginSettings): boolean {
 		return Boolean(
 			this.resolvePersonalApiKey(settings, { optional: true }) &&
-				this.resolveProjectId(settings, { optional: true })
+			this.resolveProjectId(settings, { optional: true })
 		);
 	}
 
@@ -375,7 +375,7 @@ export class PostHogMetricsPlugin implements IMetricsProviderPlugin {
 				'',
 				'## Metrics',
 				'',
-				"- **Event count** (`event_count`) — how many times a given event (e.g. `$pageview`, `signup`) occurred over a day, week, or month (UTC). Takes a `{ event }` parameter.",
+				'- **Event count** (`event_count`) — how many times a given event (e.g. `$pageview`, `signup`) occurred over a day, week, or month (UTC). Takes a `{ event }` parameter.',
 				'- **Active users** (`active_users`) — unique persons (`count(DISTINCT person_id)`) with at least one event over a day, week, or month (UTC).',
 				'',
 				'## Read-only by design',

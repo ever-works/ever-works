@@ -220,6 +220,8 @@ spec:
               value: "$PLATFORM_ENCRYPTION_KEY"
             - name: COMMUNITY_PR_VERIFIED_ORGS
               value: "$COMMUNITY_PR_VERIFIED_ORGS"
+            - name: EVER_WORKS_ORGS_REF
+              value: "$EVER_WORKS_ORGS_REF"
             - name: AGENT_BASH_AUDIT_LOG
               value: "$AGENT_BASH_AUDIT_LOG"
             # C-04: host allow-list for user-supplied callback URLs.

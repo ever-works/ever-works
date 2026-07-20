@@ -1,0 +1,94 @@
+{
+	"name": "@ever-works/slack-connector-plugin",
+	"version": "1.0.0",
+	"description": "Slack connector plugin for Ever Works platform (bidirectional; outbound chat.postMessage via @slack/web-api)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@slack/web-api": "^7.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "slack-connector",
+			"name": "Slack Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-slack"
+			],
+			"description": "Bidirectional Slack connector. Outbound posts messages to a Slack channel with a bot token via chat.postMessage (Block Kit supported). Inbound Events API routing lands in a follow-up.",
+			"systemPlugin": false,
+			"builtIn": false,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"botToken"
+				],
+				"properties": {
+					"botToken": {
+						"type": "string",
+						"title": "Bot User OAuth token (xoxb-…)",
+						"x-secret": true,
+						"x-envVar": "SLACK_BOT_TOKEN"
+					},
+					"signingSecret": {
+						"type": "string",
+						"title": "Signing secret (for inbound Events API — used in a follow-up)",
+						"x-secret": true,
+						"x-envVar": "SLACK_SIGNING_SECRET"
+					},
+					"appId": {
+						"type": "string",
+						"title": "Slack app id"
+					},
+					"defaultChannelId": {
+						"type": "string",
+						"title": "Default channel id (e.g. C0123456789)"
+					}
+				}
+			},
+			"distribution": "registry"
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

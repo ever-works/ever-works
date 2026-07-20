@@ -160,6 +160,12 @@ jobs:
           # (openssl rand -hex 32). Create the GitHub secret before deploy.
           PLATFORM_ENCRYPTION_KEY: ${{ secrets.PLATFORM_ENCRYPTION_KEY }}
           COMMUNITY_PR_VERIFIED_ORGS: ever-works
+          # Teams & Prebuilt Companies (teams-and-companies spec §6) — pin the
+          # ever-works/orgs company-template catalog to a tag so cache expiry
+          # can't pull unreviewed content (supply-chain guard; service warns
+          # on mutable refs). Token resolves via the GitHub App installation
+          # on the ever-works org — no extra secret needed.
+          EVER_WORKS_ORGS_REF: v1.0.0
           AGENT_BASH_AUDIT_LOG: 'true'
           # C-04 host allow-list. Empty = WEB_URL's host only.
           ALLOWED_CALLBACK_HOSTS: ''

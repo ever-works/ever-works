@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aprobaciones de acciones",
+                "subtitle": "Tus agentes propusieron estas acciones con efectos secundarios. Aprueba o rechaza cada una."
+            },
+            "actions": {
+                "approve": "Aprobar",
+                "reject": "Rechazar",
+                "approveAll": "Aprobar todas"
+            },
+            "actionType": {
+                "spawn_agent": "Crear agente",
+                "schedule_task": "Programar tarea",
+                "send_message": "Enviar mensaje",
+                "budget_override": "Anulación de presupuesto",
+                "other": "Acción"
+            },
+            "riskFlags": {
+                "budget_override": "Anulación de presupuesto",
+                "destructive": "Destructiva",
+                "cross_scope": "Entre ámbitos",
+                "high_fanout": "Alta ramificación"
+            },
+            "toast": {
+                "approved": "Acción aprobada",
+                "rejected": "Acción rechazada",
+                "bulkApproved": "{count} acciones aprobadas",
+                "bulkApprovedSkipped": "{approved} acciones aprobadas, {skipped} ya decididas",
+                "error": "Algo salió mal. Inténtalo de nuevo."
+            }
+        },
         "title": "Tablero",
         "connectGithub": {
             "title": "Conecta tu cuenta de GitHub",
@@ -610,6 +641,55 @@
                 "reset": "Restablecer"
             }
         },
+        "memoryPage": {
+            "consolidation": {
+                "action": "Consolidar",
+                "title": "Consolidar memoria",
+                "previewIntro": "Vista previa de lo que hará la consolidación. Nada cambia hasta que apliques.",
+                "scanned": "{count} analizados",
+                "promoted": "{count} promovidos",
+                "synthesized": "{count} sintetizados",
+                "superseded": "{count} reemplazados",
+                "promotedHeading": "Promovidos",
+                "supersededHeading": "Reemplazados",
+                "more": "+{count} más",
+                "apply": "Aplicar",
+                "cancel": "Cancelar",
+                "applied": "Consolidado: {promoted} promovidos, {synthesized} sintetizados, {superseded} reemplazados",
+                "failed": "La consolidación falló. Inténtalo de nuevo.",
+                "badgePromoted": "Promovido",
+                "badgeSuperseded": "Reemplazado"
+            },
+            "title": "Memory",
+            "subtitle": "Todo lo que sabe tu organización, en un solo lugar — agregado desde la Knowledge Base de cada Trabajo.",
+            "searchPlaceholder": "Busca en todo lo que sabe la organización…",
+            "newDocument": "Nuevo",
+            "documentsIndexed": "{count, plural, =0 {No hay documentos indexados} one {# documento indexado} other {# documentos indexados}}",
+            "worksCovered": "{count, plural, =0 {ningún Trabajo} one {# Trabajo} other {# Trabajos}}",
+            "filters": {
+                "type": "Tipo",
+                "work": "Trabajo",
+                "source": "Fuente",
+                "status": "Estado",
+                "clearAll": "Borrar todo"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Aún no hay nada en Memory.",
+                "subtitle": "A medida que tus Trabajos construyen su Knowledge Base — documentos de marca, personas, investigación, guías de estilo — todo aparece aquí, con búsqueda en toda la organización.",
+                "noOrg": "Selecciona o crea una Organización para ver su Memory agregada. Memory abarca todos los Trabajos de la Organización activa.",
+                "noResults": "Ningún documento coincide con tu búsqueda y filtros."
+            },
+            "orgScoped": "Organización",
+            "openInWork": "Abrir en el Trabajo"
+        },
         "agentsPage": {
             "title": "Agentes",
             "subtitle": "Tus compañeros de IA. Cada uno lleva un alma (quién es), instrucciones y un presupuesto — y actúa en Misiones, Trabajos, o todo tu inquilino.",
@@ -664,7 +744,11 @@
                 "templateStepTitle": "Comenzar desde una plantilla (opcional)",
                 "startFromScratch": "Comenzar desde cero",
                 "pickParentHint": "Selecciona un {scope} arriba para continuar, o elige el Espacio de trabajo.",
-                "nextDisabledReason": "Selecciona un padre o elige el Espacio de trabajo para continuar."
+                "nextDisabledReason": "Selecciona un padre o elige el Espacio de trabajo para continuar.",
+                "teamLabel": "Equipo",
+                "teamNone": "Sin equipo",
+                "reportsToLabel": "Reporta a",
+                "reportsToNone": "Sin responsable"
             },
             "orDivider": "O",
             "createManually": "Crear Agente Manualmente",
@@ -682,6 +766,42 @@
                 "yourTemplates": "Tus plantillas",
                 "yourTemplatesEmpty": "Los Agentes que creas aparecerán aquí como plantillas reutilizables.",
                 "openInWizard": "Abrir en el asistente"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organización",
+                    "teamLabel": "Equipo",
+                    "teamNone": "Sin equipo",
+                    "reportsToLabel": "Reporta a",
+                    "reportsToNone": "Sin responsable",
+                    "save": "Guardar",
+                    "saving": "Guardando…"
+                }
+            },
+            "guardrails": {
+                "title": "Salvaguardas",
+                "subtitle": "Decide qué acciones propuestas esperan tu aprobación, se ejecutan automáticamente o se bloquean.",
+                "modeLabel": "Modo de despacho",
+                "modeRequireApproval": "Requerir aprobación",
+                "modeRequireApprovalHint": "Cada acción propuesta espera en tu cola de aprobación hasta que decidas.",
+                "modeAutonomous": "Autónomo",
+                "modeAutonomousHint": "Las acciones seguras se ejecutan sin esperar. Las acciones con indicadores de riesgo siempre pasan por tu cola de aprobación.",
+                "autoApproveLabel": "Tipos de acción auto-aprobados",
+                "autoApproveHint": "Solo los tipos de acción seleccionados se ejecutan automáticamente; todo lo demás sigue pasando por la cola.",
+                "blockedLabel": "Tipos de acción bloqueados",
+                "blockedHint": "Las acciones bloqueadas se rechazan automáticamente y quedan registradas en el historial de la cola.",
+                "actionTypes": {
+                    "spawn_agent": "Crear Agente",
+                    "schedule_task": "Programar tarea",
+                    "send_message": "Enviar mensaje",
+                    "budget_override": "Anulación de presupuesto",
+                    "other": "Otro"
+                },
+                "save": "Guardar salvaguardas",
+                "reset": "Restablecer valores predeterminados",
+                "saveSuccess": "Salvaguardas guardadas",
+                "saveError": "No se pudieron guardar las salvaguardas",
+                "resetSuccess": "Salvaguardas restablecidas a los valores predeterminados"
             }
         },
         "tasksPage": {
@@ -940,7 +1060,7 @@
         },
         "missionDetail": {
             "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
                 "title": "Attached Works",
                 "empty": "No Works attached to this Mission yet. Attach one below.",
                 "attachTitle": "Attach a Work",
@@ -1235,8 +1355,49 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Programaciones",
+            "subtitle": "Todo lo programado para ejecutarse en tus trabajos, agentes, Missions y tareas",
+            "fetchFailed": "Error al cargar las programaciones",
+            "retry": "Reintentar",
+            "columns": {
+                "owner": "Propietario",
+                "cadence": "Cadencia",
+                "nextRun": "Siguiente ejecución",
+                "status": "Estado"
+            },
+            "filters": {
+                "all": "Todas",
+                "activeOnly": "Solo activas"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tarea recurrente",
+                "agentHeartbeat": "Latido de agente",
+                "workSchedule": "Programación de trabajo",
+                "missionTick": "Tick de Mission",
+                "sourceValidation": "Validación de fuente",
+                "dataSync": "Sincronización de datos",
+                "inboundTrigger": "Disparador entrante"
+            },
+            "statuses": {
+                "active": "Activo",
+                "paused": "Pausado",
+                "disabled": "Desactivada",
+                "error": "Error",
+                "ended": "Finalizada"
+            },
+            "empty": {
+                "title": "Nada programado todavía",
+                "description": "Las tareas recurrentes, los latidos de agentes, las programaciones de trabajo, los ticks de Mission, la validación de fuentes y la sincronización de datos aparecerán aquí una vez que los configures.",
+                "noResults": "Ninguna programación coincide con el filtro actual."
+            }
+        },
         "activity": {
-            "title": "Registro de actividad",
+            "viewToggle": {
+                "log": "Registro",
+                "schedules": "Programaciones"
+            },
+            "title": "Actividad",
             "subtitle": "Sigue todas las operaciones en tus trabajos",
             "loading": "Cargando...",
             "fetchFailed": "Error al cargar actividades",
@@ -4412,10 +4573,12 @@
                 "works": "Trabajos",
                 "tasks": "Tareas",
                 "agents": "Agentes",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Habilidades",
                 "templates": "Plantillas",
-                "settings": "Configuración"
+                "settings": "Configuración",
+                "teams": "Equipos"
             },
             "tooltips": {
                 "expandSidebar": "Expandir barra lateral",
@@ -4974,6 +5137,150 @@
             "toggleError": "Error al alternar complemento",
             "system": "Sistema",
             "goToPluginSettings": "Ir a la configuración del complemento"
+        },
+        "teamsPage": {
+            "title": "Equipos",
+            "subtitle": "Organiza tus Agentes y miembros en equipos dentro de esta organización.",
+            "orgChartCta": "Organigrama",
+            "newTeamCta": "Nuevo equipo",
+            "empty": {
+                "title": "Aún no hay equipos",
+                "description": "Crea tu primer equipo para agrupar Agentes y miembros, y luego organízalos en el organigrama.",
+                "cta": "Crear un equipo"
+            },
+            "noOrg": {
+                "title": "Los equipos pertenecen a una organización",
+                "description": "Primero crea una organización; después podrás agrupar sus Agentes y miembros en equipos.",
+                "cta": "Crear organización"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agente} other {# agentes}}",
+                "members": "{count, plural, one {# miembro} other {# miembros}}",
+                "subTeams": "{count, plural, one {# subequipo} other {# subequipos}}"
+            },
+            "newDialog": {
+                "title": "Nuevo equipo",
+                "nameLabel": "Nombre",
+                "namePlaceholder": "p. ej. Ingeniería",
+                "descriptionLabel": "Descripción",
+                "descriptionPlaceholder": "De qué se encarga este equipo (opcional)",
+                "parentLabel": "Equipo superior",
+                "parentNone": "Sin equipo superior (nivel principal)",
+                "managerLabel": "Agente responsable",
+                "managerNone": "Sin responsable",
+                "submit": "Crear equipo",
+                "creating": "Creando…",
+                "cancel": "Cancelar"
+            },
+            "detail": {
+                "overviewTab": "Resumen",
+                "settingsTab": "Configuración",
+                "rosterTitle": "Integrantes",
+                "subTeamsTitle": "Subequipos",
+                "managerLabel": "Responsable",
+                "parentLabel": "Equipo superior",
+                "addMemberCta": "Añadir miembro",
+                "addMemberTypeLabel": "Tipo",
+                "addMemberAgent": "Agente",
+                "addMemberUser": "Miembro",
+                "addMemberSelectLabel": "Quién",
+                "addMemberSubmit": "Añadir",
+                "adding": "Añadiendo…",
+                "removeMember": "Quitar",
+                "roleLead": "Líder",
+                "roleMember": "Miembro",
+                "emptyRoster": "Aún no hay miembros: añade Agentes o compañeros a este equipo."
+            },
+            "settings": {
+                "title": "Configuración del equipo",
+                "nameLabel": "Nombre",
+                "descriptionLabel": "Descripción",
+                "parentLabel": "Equipo superior",
+                "managerLabel": "Agente responsable",
+                "save": "Guardar cambios",
+                "saving": "Guardando…",
+                "saved": "Equipo actualizado",
+                "deleteTitle": "Zona de peligro",
+                "deleteDescription": "Al eliminar un equipo, sus subequipos pasan al nivel superior y se vacía su lista de integrantes. Los Agentes y miembros no se eliminan.",
+                "deleteCta": "Eliminar equipo",
+                "deleteConfirm": "¿Eliminar este equipo? Los subequipos suben un nivel; los Agentes y miembros se conservan.",
+                "deleting": "Eliminando…"
+            },
+            "errors": {
+                "createFailed": "No se pudo crear el equipo",
+                "updateFailed": "No se pudo actualizar el equipo",
+                "deleteFailed": "No se pudo eliminar el equipo",
+                "memberAddFailed": "No se pudo añadir el miembro",
+                "memberRemoveFailed": "No se pudo quitar el miembro"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organigrama",
+            "subtitle": "Equipos, Agentes y miembros de esta organización.",
+            "backToTeams": "Equipos",
+            "zoomIn": "Acercar",
+            "zoomOut": "Alejar",
+            "fitView": "Ajustar",
+            "unassignedGroup": "Sin asignar",
+            "membersBadge": "{count, plural, one {# miembro} other {# miembros}}",
+            "empty": "Aún no hay nada que mostrar: primero crea equipos o Agentes en esta organización.",
+            "noOrg": "Crea una organización para ver su organigrama."
+        },
+        "discover": {
+            "title": "Descubrir",
+            "subtitle": "Ideas de trabajo seleccionadas por IA adaptadas para ti."
+        },
+        "triggers": {
+            "title": "Disparadores entrantes",
+            "subtitle": "Webhooks y llamadas de API firmados que crean una Tarea al activarse.",
+            "new": "Nuevo disparador",
+            "empty": "Aún no hay disparadores. Crea uno para recibir webhooks firmados.",
+            "firedCount": "{count} activaciones",
+            "lastFired": "última activación",
+            "status": {
+                "active": "Activo",
+                "paused": "En pausa"
+            },
+            "createTitle": "Nuevo disparador entrante",
+            "createDescription": "Obtienes una URL de webhook firmada y un secreto. Los sistemas externos envían un POST para crear una Tarea.",
+            "form": {
+                "name": "Nombre",
+                "namePlaceholder": "Notificaciones de despliegue",
+                "description": "Descripción",
+                "descriptionPlaceholder": "¿Qué activa este disparador?",
+                "taskTitle": "Plantilla del título de la tarea",
+                "taskTitlePlaceholder": "Disparador: {name}",
+                "taskTitleHint": "{name} se reemplaza por el nombre del disparador."
+            },
+            "actions": {
+                "pause": "Pausar",
+                "resume": "Reanudar",
+                "rotate": "Rotar secreto",
+                "delete": "Eliminar",
+                "cancel": "Cancelar",
+                "create": "Crear"
+            },
+            "reveal": {
+                "title": "Secreto del disparador",
+                "warning": "Copia el secreto ahora: no podrás verlo de nuevo.",
+                "url": "URL del webhook",
+                "secret": "Secreto de firma",
+                "curl": "Ejemplo de solicitud firmada",
+                "copy": "Copiar",
+                "done": "Listo"
+            },
+            "toast": {
+                "created": "Disparador creado",
+                "createFailed": "No se pudo crear el disparador",
+                "rotated": "Secreto rotado",
+                "rotateFailed": "No se pudo rotar el secreto",
+                "toggleFailed": "No se pudo actualizar el disparador",
+                "deleted": "Disparador eliminado",
+                "deleteFailed": "No se pudo eliminar el disparador",
+                "loadFailed": "No se pudieron cargar los disparadores",
+                "copyFailed": "No se pudo copiar al portapapeles"
+            },
+            "confirmDelete": "¿Eliminar este disparador? Su URL de webhook dejará de funcionar de inmediato y esto no se puede deshacer."
         }
     },
     "layout": {
@@ -5042,7 +5349,7 @@
             "resetPassword": "Restablecer contraseña",
             "authError": "Error de autenticación",
             "dashboard": "Panel",
-            "activity": "Registro de actividad",
+            "activity": "Actividad",
             "works": "Trabajos",
             "newWork": "Nuevo trabajo",
             "work": "Trabajo",
@@ -5060,7 +5367,8 @@
             "security": "Seguridad",
             "apiKeys": "Claves de API",
             "dangerZone": "Zona peligrosa",
-            "pluginSettings": "Configuración de complementos"
+            "pluginSettings": "Configuración de complementos",
+            "discover": "Descubrir"
         }
     },
     "api": {
@@ -5287,6 +5595,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Empezar desde",
+                "blankTitle": "Organización en blanco",
+                "blankDescription": "Empieza desde cero y añade equipos y agentes más adelante.",
+                "meta": "{agents, plural, one {# agente} other {# agentes}} · {teams, plural, one {# equipo} other {# equipos}}",
+                "submitImport": "Crear desde plantilla",
+                "importError": "No se pudo crear la organización a partir de esta plantilla"
             }
         },
         "upgrade": {

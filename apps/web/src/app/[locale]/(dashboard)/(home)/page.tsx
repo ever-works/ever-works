@@ -14,6 +14,7 @@ import { usageAPI } from '@/lib/api/usage';
 // the existing Work stats fetch).
 import { agentsAPI } from '@/lib/api/agents';
 import { tasksAPI } from '@/lib/api/tasks';
+import { agentApprovalsAPI } from '@/lib/api/agent-approvals';
 // Dashboard blocks (spec §3) — Teams count, Soon runs, and the
 // server-composed Attention list. All three degrade gracefully when
 // their sibling-PR backends (Teams #1647, Schedules front) are absent.
@@ -48,6 +49,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         tasksBlocked,
         recentTasks,
         recentAgents,
+        pendingApprovals,
         // Dashboard blocks (spec §3) — Attention inputs (errored agents +
         // blocked-task rows), the Teams count, and the Soon runs. Every
         // one is catch-defended so a missing/flaky endpoint yields empty
@@ -101,6 +103,12 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         agentsAPI
             .list({ limit: 3 })
             .catch(() => ({ data: [], meta: { total: 0, limit: 3, offset: 0 } })),
+        // Agent Action Approval Queue — pending proposals for the
+        // attention block above Missions. Catch-defended so a flaky
+        // endpoint hides the block instead of breaking the home page.
+        agentApprovalsAPI
+            .list({ status: 'pending', limit: 50 })
+            .catch(() => ({ data: [], meta: { total: 0, limit: 50, offset: 0 } })),
         // Dashboard blocks — errored agents (Attention: agent-error).
         agentsAPI
             .list({ status: 'error', limit: 6 })
@@ -160,6 +168,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             tasksBlocked={tasksBlocked.meta.total}
             initialRecentTasks={recentTasks.data ?? []}
             initialAgents={recentAgents.data ?? []}
+            initialApprovals={pendingApprovals.data ?? []}
             // Dashboard blocks (spec §3/§4) — Teams tile + Attention/Soon.
             teamsTotal={teamsTotal}
             attentionItems={attentionItems}

@@ -13,19 +13,20 @@ import { serverFetch, serverMutation } from './server-api';
  * as ISO strings on the API side (NestJS class-transformer default);
  * we keep them as strings until a renderer actually formats them.
  */
-export type GoalStatus = 'draft' | 'active' | 'paused' | 'completed';
-export type GoalOutcome = 'achieved' | 'missed' | 'abandoned';
-export type GoalComparator = 'gte' | 'lte';
-export type GoalWindow = 'day' | 'week' | 'month' | 'total' | 'point';
 
-/**
- * Spec FR-12: per-Goal evaluation frequency is clamped server-side to
- * a minimum of 15 minutes regardless of what the form submits. Mirror
- * of `MIN_CHECK_FREQUENCY_MINUTES` from the agent package so the form
- * can surface the hint without importing the agent barrel.
- */
-export const MIN_CHECK_FREQUENCY_MINUTES = 15;
-export const DEFAULT_CHECK_FREQUENCY_MINUTES = 60;
+// Pure contract values/types shared with `'use client'` components live
+// in a `server-only`-free module (`goals.shared.ts`) so forms can import
+// them without pulling this server-only module into the client bundle.
+// Re-exported here so existing server-side callers keep one import site.
+export {
+    MIN_CHECK_FREQUENCY_MINUTES,
+    DEFAULT_CHECK_FREQUENCY_MINUTES,
+    type GoalStatus,
+    type GoalOutcome,
+    type GoalComparator,
+    type GoalWindow,
+} from './goals.shared';
+import type { GoalStatus, GoalOutcome, GoalComparator, GoalWindow } from './goals.shared';
 
 export interface GoalMetricSource {
     pluginId: string;

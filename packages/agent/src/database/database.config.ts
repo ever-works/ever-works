@@ -57,10 +57,15 @@ import {
     Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
+    Team,
+    TeamMember,
+    TeamResource,
     Skill,
     SkillBinding,
     Task,
@@ -99,6 +104,8 @@ import {
     TenantRuntimeProviderAllowlist,
     // Per-version credential snapshot history (EW-742 P1 T11 follow-up)
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    InboundTrigger,
 } from '../entities';
 import {
     PluginEntity,
@@ -192,11 +199,18 @@ export const ENTITIES = [
     Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
+    // Teams & Prebuilt Companies (teams-and-companies spec §2)
+    Team,
+    TeamMember,
+    // Team ↔ resource association (Works/Agents/Missions/Ideas/Tasks belong to Teams)
+    TeamResource,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family
@@ -255,6 +269,9 @@ export const ENTITIES = [
     // in-flight runs can bind to their captured credentials after a
     // rotation (ADR-017 §3 Q4).
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    // that spawn Tasks on verified HMAC deliveries.
+    InboundTrigger,
 ];
 
 /**

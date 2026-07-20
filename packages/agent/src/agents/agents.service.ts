@@ -34,6 +34,7 @@ import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
 import { validateScorecard } from './scorecard';
+import { validateGuardrails, type AgentGuardrails } from './guardrails';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -103,6 +104,11 @@ export interface UpdateAgentInput {
     pauseAfterFailures?: number;
     permissions?: Partial<AgentPermissions>;
     targets?: AgentTarget[] | null;
+    /**
+     * Direct manager for the Org Chart (teams-and-companies spec §1.2).
+     * Null clears it. Same-user + acyclicity validated in update().
+     */
+    reportsToAgentId?: string | null;
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
@@ -368,6 +374,13 @@ export class AgentsService {
             patch.targets = input.targets;
         }
 
+        if (input.reportsToAgentId !== undefined) {
+            if (input.reportsToAgentId !== null) {
+                await this.assertValidReportsTo(userId, agent, input.reportsToAgentId);
+            }
+            patch.reportsToAgentId = input.reportsToAgentId;
+        }
+
         if (
             input.avatarMode !== undefined ||
             input.avatarIcon !== undefined ||
@@ -423,6 +436,33 @@ export class AgentsService {
             );
         }
 
+        const refreshed = await this.agents.findById(id);
+        if (!refreshed) throw new NotFoundException('Agent vanished after update');
+        return toAgentDto(refreshed);
+    }
+
+    /**
+     * Replace the Agent's dispatch guardrails (PUT semantics — the
+     * whole policy object is swapped; `null` clears back to the
+     * default queue-everything posture).
+     *
+     * Defense-in-depth: the API DTO already shape-checks the body, but
+     * the service re-runs the pure `validateGuardrails` so non-HTTP
+     * callers (import surfaces, future tools) get the same contract.
+     */
+    async setGuardrails(
+        userId: string,
+        id: string,
+        guardrails: AgentGuardrails | null,
+    ): Promise<AgentDto> {
+        await this.requireOwned(userId, id);
+        if (guardrails !== null) {
+            const violation = validateGuardrails(guardrails);
+            if (violation) {
+                throw new BadRequestException(violation);
+            }
+        }
+        await this.agents.updateById(id, { guardrails });
         const refreshed = await this.agents.findById(id);
         if (!refreshed) throw new NotFoundException('Agent vanished after update');
         return toAgentDto(refreshed);
@@ -595,6 +635,37 @@ export class AgentsService {
             throw new NotFoundException(`Agent ${id} not found.`);
         }
         return agent;
+    }
+
+    /**
+     * `reportsToAgentId` guard (teams-and-companies spec §1.2): the manager
+     * must be another agent of the same user (cross-user → 404, no
+     * existence leak), not the agent itself, and pointing at it must not
+     * close a cycle — walking up the manager chain from the proposed
+     * manager may never reach the agent (bounded walk, Paperclip-style
+     * max-50 chain-of-command guard).
+     */
+    private async assertValidReportsTo(
+        userId: string,
+        agent: Agent,
+        reportsToAgentId: string,
+    ): Promise<void> {
+        if (reportsToAgentId === agent.id) {
+            throw new ConflictException('An Agent cannot report to itself.');
+        }
+        const manager = await this.agents.findByIdAndUser(reportsToAgentId, userId);
+        if (!manager) {
+            throw new NotFoundException(`Agent ${reportsToAgentId} not found.`);
+        }
+        let cursor: Agent | null = manager;
+        for (let i = 0; cursor && i < 50; i++) {
+            if (cursor.id === agent.id) {
+                throw new ConflictException('This reporting line would create a cycle.');
+            }
+            cursor = cursor.reportsToAgentId
+                ? await this.agents.findByIdAndUser(cursor.reportsToAgentId, userId)
+                : null;
+        }
     }
 
     private validateScopeOwnership(

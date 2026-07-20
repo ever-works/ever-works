@@ -47,6 +47,9 @@ import { MissionTickService } from './mission-tick.service';
             UserUpload,
         ]),
         TitlerModule,
+        // Provides ActivityLogService so MissionTickService can emit
+        // mission_tick rows (Schedules P2) and the mission lifecycle
+        // activity (PR-3) is recorded. `@Optional()`-injected downstream.
         ActivityLogModule,
         UserResearchModule,
         WorkAgentModule,

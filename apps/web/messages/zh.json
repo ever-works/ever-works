@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "操作审批",
+                "subtitle": "您的代理提出了这些具有副作用的操作。请逐一批准或拒绝。"
+            },
+            "actions": {
+                "approve": "批准",
+                "reject": "拒绝",
+                "approveAll": "全部批准"
+            },
+            "actionType": {
+                "spawn_agent": "创建代理",
+                "schedule_task": "安排任务",
+                "send_message": "发送消息",
+                "budget_override": "预算覆盖",
+                "other": "操作"
+            },
+            "riskFlags": {
+                "budget_override": "预算覆盖",
+                "destructive": "破坏性",
+                "cross_scope": "跨范围",
+                "high_fanout": "高扇出"
+            },
+            "toast": {
+                "approved": "操作已批准",
+                "rejected": "操作已拒绝",
+                "bulkApproved": "已批准 {count} 项操作",
+                "bulkApprovedSkipped": "已批准 {approved} 项操作，{skipped} 项已有决定",
+                "error": "出现问题，请重试。"
+            }
+        },
         "title": "仪表板",
         "connectGithub": {
             "title": "连接您的 GitHub 帐户",
@@ -547,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "开始新任务",
-                "submitTitle": "创建任务",
-                "minLength": "描述至少需要10个字符。",
-                "created": "任务已创建",
-                "error": "无法创建任务，请重试。"
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "打开统一创建器"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -569,15 +592,56 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "搜索",
-                "searchPlaceholder": "标题或描述",
-                "status": "状态",
-                "anyStatus": "任意状态",
-                "apply": "应用",
-                "reset": "重置"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "整合",
+                "title": "整合记忆",
+                "previewIntro": "整合操作的预览。在你应用之前不会有任何更改。",
+                "scanned": "已扫描 {count} 项",
+                "promoted": "已提升 {count} 项",
+                "synthesized": "已综合 {count} 项",
+                "superseded": "已替换 {count} 项",
+                "promotedHeading": "已提升",
+                "supersededHeading": "已替换",
+                "more": "还有 +{count} 项",
+                "apply": "应用",
+                "cancel": "取消",
+                "applied": "已整合：提升 {promoted} 项，综合 {synthesized} 项，替换 {superseded} 项",
+                "failed": "整合失败，请重试。",
+                "badgePromoted": "已提升",
+                "badgeSuperseded": "已替换"
+            },
+            "title": "Memory",
+            "subtitle": "您的组织所知道的一切，尽在一处 — 从每个作品的 Knowledge Base 中汇总。",
+            "searchPlaceholder": "搜索组织所知道的一切…",
+            "newDocument": "新建",
+            "documentsIndexed": "{count, plural, =0 {尚未索引任何文档} other {已索引 # 个文档}}",
+            "worksCovered": "{count, plural, =0 {无作品} other {# 个作品}}",
+            "filters": {
+                "type": "类型",
+                "work": "作品",
+                "source": "来源",
+                "status": "状态",
+                "clearAll": "清除全部"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory 中暂无内容。",
+                "subtitle": "随着您的作品构建各自的 Knowledge Base — 品牌文档、用户画像、研究、风格指南 — 一切都会显示在这里，可在整个组织范围内搜索。",
+                "noOrg": "选择或创建一个组织以查看其汇总的 Memory。Memory 涵盖活动组织中的每个作品。",
+                "noResults": "没有与您的搜索和筛选条件匹配的文档。"
+            },
+            "orgScoped": "组织",
+            "openInWork": "在作品中打开"
         },
         "agentsPage": {
             "title": "代理",
@@ -623,7 +687,47 @@
                 "cancel": "取消",
                 "back": "返回",
                 "next": "下一步",
-                "create": "创建代理"
+                "create": "创建代理",
+                "teamLabel": "团队",
+                "teamNone": "无团队",
+                "reportsToLabel": "汇报对象",
+                "reportsToNone": "无管理者"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "组织",
+                    "teamLabel": "团队",
+                    "teamNone": "无团队",
+                    "reportsToLabel": "汇报对象",
+                    "reportsToNone": "无管理者",
+                    "save": "保存",
+                    "saving": "保存中…"
+                }
+            },
+            "guardrails": {
+                "title": "护栏",
+                "subtitle": "决定哪些提议的操作需等待您的批准、自动执行或被拦截。",
+                "modeLabel": "调度模式",
+                "modeRequireApproval": "需要批准",
+                "modeRequireApprovalHint": "每个提议的操作都会在您的审批队列中等待您的决定。",
+                "modeAutonomous": "自主",
+                "modeAutonomousHint": "安全操作无需等待即可执行。带有风险标记的操作始终进入您的审批队列。",
+                "autoApproveLabel": "自动批准的操作类型",
+                "autoApproveHint": "仅所选操作类型会自动执行；其余操作仍会进入队列。",
+                "blockedLabel": "已拦截的操作类型",
+                "blockedHint": "被拦截的操作会被自动拒绝，并记录在队列历史中。",
+                "actionTypes": {
+                    "spawn_agent": "创建代理",
+                    "schedule_task": "计划任务",
+                    "send_message": "发送消息",
+                    "budget_override": "预算覆盖",
+                    "other": "其他"
+                },
+                "save": "保存护栏",
+                "reset": "重置为默认",
+                "saveSuccess": "护栏已保存",
+                "saveError": "无法保存护栏",
+                "resetSuccess": "护栏已重置为默认"
             }
         },
         "tasksPage": {
@@ -798,7 +902,7 @@
         },
         "missionDetail": {
             "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
                 "title": "Attached Works",
                 "empty": "No Works attached to this Mission yet. Attach one below.",
                 "attachTitle": "Attach a Work",
@@ -938,7 +1042,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "添加想法",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -982,6 +1085,22 @@
                 "anyStatus": "任意状态",
                 "apply": "应用",
                 "reset": "重置"
+            },
+            "newPage": {
+                "link": "手动创建",
+                "or": "或",
+                "title": "新建 Idea",
+                "subtitle": "撰写你自己的 Idea。描述你想创建的 Work — 之后即可将其加入构建队列。",
+                "nameLabel": "标题",
+                "namePlaceholder": "可选 — 留空则根据描述自动生成",
+                "descriptionLabel": "描述",
+                "descriptionPlaceholder": "描述这个 Idea 将要变成的 Work — 例如“一个精选的开源 AI 智能体框架目录，按框架类型和许可证组织。”",
+                "descriptionHint": "至少 10 个字符。",
+                "cancel": "取消",
+                "create": "创建 Idea",
+                "creating": "正在创建…",
+                "minLength": "描述至少需要 10 个字符。",
+                "error": "无法创建 Idea，请重试。"
             },
             "linkedWorks": {
                 "title": "Linked Works",
@@ -1176,6 +1295,10 @@
                     "failed": "失败",
                     "cancelled": "已取消"
                 }
+            },
+            "viewToggle": {
+                "log": "日志",
+                "schedules": "计划任务"
             }
         },
         "works": {
@@ -3494,7 +3617,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3509,19 +3632,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "代理持续关注的目标——按计划或一次性生成想法。",
-                "idea": "代理将其转化为可构建的工作计划的一次性简报。",
-                "website": "为企业、服务或品牌创建的多页面网站——生成的内容+代码。",
-                "landing-page": "专注的单页网站——等待列表、产品发布、网络研讨会注册、潜在客户获取。",
-                "blog": "带有分类、RSS、代码高亮和SEO就绪内容的博客。",
-                "directory": "带有搜索、筛选和结构化项目数据的精选目录网站。",
-                "awesome-repo": "awesome-list仓库——markdown索引、分类链接和可刷新的元数据。",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "创建",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -4215,10 +4340,12 @@
                 "works": "作品",
                 "tasks": "任务",
                 "agents": "代理",
+                "memory": "Memory",
                 "plugins": "插件",
                 "skills": "技能",
                 "templates": "模板",
-                "settings": "设置"
+                "settings": "设置",
+                "teams": "团队"
             },
             "tooltips": {
                 "expandSidebar": "展开侧边栏",
@@ -4778,380 +4905,186 @@
             "system": "系统",
             "goToPluginSettings": "转到插件设置"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
+        "teamsPage": {
+            "title": "团队",
+            "subtitle": "在此组织内将您的代理和成员整理成团队。",
+            "orgChartCta": "组织架构图",
+            "newTeamCta": "新建团队",
             "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+                "title": "暂无团队",
+                "description": "创建第一个团队来对代理和成员进行分组，然后在组织架构图中进行排布。",
+                "cta": "创建团队"
             },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            "noOrg": {
+                "title": "团队存在于组织之中",
+                "description": "请先创建一个组织，然后即可将其代理和成员分组到团队中。",
+                "cta": "创建组织"
             },
             "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
+                "agents": "{count, plural, other {# 个代理}}",
+                "members": "{count, plural, other {# 名成员}}",
+                "subTeams": "{count, plural, other {# 个子团队}}"
+            },
+            "newDialog": {
+                "title": "新建团队",
+                "nameLabel": "名称",
+                "namePlaceholder": "例如：工程",
+                "descriptionLabel": "描述",
+                "descriptionPlaceholder": "该团队的职责（可选）",
+                "parentLabel": "上级团队",
+                "parentNone": "无上级团队（顶层）",
+                "managerLabel": "管理代理",
+                "managerNone": "无管理者",
+                "submit": "创建团队",
+                "creating": "创建中…",
+                "cancel": "取消"
+            },
+            "detail": {
+                "overviewTab": "概览",
+                "settingsTab": "设置",
+                "rosterTitle": "成员名单",
+                "subTeamsTitle": "子团队",
+                "managerLabel": "管理者",
+                "parentLabel": "上级团队",
+                "addMemberCta": "添加成员",
+                "addMemberTypeLabel": "类型",
+                "addMemberAgent": "代理",
+                "addMemberUser": "成员",
+                "addMemberSelectLabel": "对象",
+                "addMemberSubmit": "添加",
+                "adding": "添加中…",
+                "removeMember": "移除",
+                "roleLead": "负责人",
+                "roleMember": "成员",
+                "emptyRoster": "暂无成员 — 请向该团队添加代理或同事。"
+            },
+            "settings": {
+                "title": "团队设置",
+                "nameLabel": "名称",
+                "descriptionLabel": "描述",
+                "parentLabel": "上级团队",
+                "managerLabel": "管理代理",
+                "save": "保存更改",
+                "saving": "保存中…",
+                "saved": "团队已更新",
+                "deleteTitle": "危险区域",
+                "deleteDescription": "删除团队后，其子团队将上移一级，成员名单将被移除。代理和成员不会被删除。",
+                "deleteCta": "删除团队",
+                "deleteConfirm": "确定删除此团队？子团队将上移一级；代理和成员将被保留。",
+                "deleting": "删除中…"
+            },
+            "errors": {
+                "createFailed": "无法创建团队",
+                "updateFailed": "无法更新团队",
+                "deleteFailed": "无法删除团队",
+                "memberAddFailed": "无法添加成员",
+                "memberRemoveFailed": "无法移除成员"
             }
         },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
+        "orgChartPage": {
+            "title": "组织架构图",
+            "subtitle": "此组织的团队、代理和成员。",
+            "backToTeams": "团队",
+            "zoomIn": "放大",
+            "zoomOut": "缩小",
+            "fitView": "适应视图",
+            "unassignedGroup": "未分配",
+            "membersBadge": "{count, plural, other {# 名成员}}",
+            "empty": "暂无可展示的内容 — 请先在此组织中创建团队或代理。",
+            "noOrg": "创建一个组织以查看其组织架构图。"
         },
-        "missionDetail": {
-            "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
-                "title": "Attached Works",
-                "empty": "No Works attached to this Mission yet. Attach one below.",
-                "attachTitle": "Attach a Work",
-                "workLabel": "Work",
-                "workPlaceholder": "Select a Work",
-                "relationLabel": "Relation",
-                "attach": "Attach",
-                "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
-                "noWorksToAttach": "You have no Works to attach yet.",
-                "relations": {
-                    "created": "Created",
-                    "improves": "Improves",
-                    "operates": "Operates",
-                    "markets": "Markets",
-                    "researches": "Researches",
-                    "retires": "Retires"
-                },
-                "toasts": {
-                    "attached": "Work attached",
-                    "attachError": "Couldn't attach Work",
-                    "detached": "Work detached",
-                    "detachError": "Couldn't detach Work"
-                }
-            },
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "completeDialog": {
-                "title": "Complete this Mission",
-                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
-                "outcomeLabel": "Outcome (optional)",
-                "noVerdict": "No verdict",
-                "cancel": "Cancel",
-                "confirm": "Complete Mission"
-            },
-            "outcomes": {
-                "succeeded": "Succeeded",
-                "partially_succeeded": "Partially succeeded",
-                "failed": "Failed",
-                "cancelled": "Cancelled",
-                "superseded": "Superseded"
-            },
-            "outcomeTooltip": "Outcome recorded when this Mission was completed",
-            "completedAtLabel": "Completed",
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
+        "schedules": {
+            "title": "计划任务",
+            "subtitle": "在您的作品、代理、Missions 和任务中计划运行的所有内容",
+            "fetchFailed": "加载计划任务失败",
+            "retry": "重试",
+            "columns": {
+                "owner": "所有者",
+                "cadence": "节奏",
+                "nextRun": "下次运行",
+                "status": "状态"
             },
             "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+                "all": "全部",
+                "activeOnly": "仅活跃"
             },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
+            "sourceTypes": {
+                "recurringTask": "定期任务",
+                "agentHeartbeat": "代理心跳",
+                "workSchedule": "作品计划",
+                "missionTick": "Mission 滴答",
+                "sourceValidation": "来源验证",
+                "dataSync": "数据同步",
+                "inboundTrigger": "入站触发器"
             },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "该创意已不可用。"
+            "statuses": {
+                "active": "活跃",
+                "paused": "暂停",
+                "disabled": "已禁用",
+                "error": "错误",
+                "ended": "已结束"
             },
             "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+                "title": "暂无计划任务",
+                "description": "设置后，定期任务、代理心跳、作品计划、Mission 滴答、来源验证和数据同步将显示在此处。",
+                "noResults": "没有符合当前筛选条件的计划任务。"
+            }
+        },
+        "triggers": {
+            "title": "入站触发器",
+            "subtitle": "触发时创建任务的已签名 Webhook 和 API 调用。",
+            "new": "新建触发器",
+            "empty": "暂无触发器。创建一个即可接收已签名的 Webhook。",
+            "firedCount": "触发 {count} 次",
+            "lastFired": "最近触发",
+            "status": {
+                "active": "启用",
+                "paused": "已暂停"
             },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "搜索",
-                "searchPlaceholder": "标题或描述",
-                "status": "状态",
-                "anyStatus": "任意状态",
-                "apply": "应用",
-                "reset": "重置"
+            "createTitle": "新建入站触发器",
+            "createDescription": "你会获得一个已签名的 Webhook URL 和一个密钥。外部系统向其 POST 即可创建任务。",
+            "form": {
+                "name": "名称",
+                "namePlaceholder": "部署通知",
+                "description": "描述",
+                "descriptionPlaceholder": "什么会触发它？",
+                "taskTitle": "任务标题模板",
+                "taskTitlePlaceholder": "触发器：{name}",
+                "taskTitleHint": "{name} 会替换为触发器名称。"
             },
-            "newPage": {
-                "link": "手动创建",
-                "or": "或",
-                "title": "新建 Idea",
-                "subtitle": "撰写你自己的 Idea。描述你想创建的 Work — 之后即可将其加入构建队列。",
-                "nameLabel": "标题",
-                "namePlaceholder": "可选 — 留空则根据描述自动生成",
-                "descriptionLabel": "描述",
-                "descriptionPlaceholder": "描述这个 Idea 将要变成的 Work — 例如“一个精选的开源 AI 智能体框架目录，按框架类型和许可证组织。”",
-                "descriptionHint": "至少 10 个字符。",
+            "actions": {
+                "pause": "暂停",
+                "resume": "恢复",
+                "rotate": "轮换密钥",
+                "delete": "删除",
                 "cancel": "取消",
-                "create": "创建 Idea",
-                "creating": "正在创建…",
-                "minLength": "描述至少需要 10 个字符。",
-                "error": "无法创建 Idea，请重试。"
+                "create": "创建"
             },
-            "linkedWorks": {
-                "title": "Linked Works",
-                "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
-                }
-            }
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+            "reveal": {
+                "title": "触发器密钥",
+                "warning": "立即复制密钥——之后将无法再次查看。",
+                "url": "Webhook URL",
+                "secret": "签名密钥",
+                "curl": "已签名请求示例",
+                "copy": "复制",
+                "done": "完成"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "toast": {
+                "created": "触发器已创建",
+                "createFailed": "无法创建触发器",
+                "rotated": "密钥已轮换",
+                "rotateFailed": "无法轮换密钥",
+                "toggleFailed": "无法更新触发器",
+                "deleted": "触发器已删除",
+                "deleteFailed": "无法删除触发器",
+                "loadFailed": "无法加载触发器",
+                "copyFailed": "无法复制到剪贴板"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
+            "confirmDelete": "删除此触发器？它的 Webhook URL 会立即失效，且此操作无法撤销。"
         }
     },
     "layout": {
@@ -5238,7 +5171,8 @@
             "security": "安全",
             "apiKeys": "API 密钥",
             "dangerZone": "危险区域",
-            "pluginSettings": "插件设置"
+            "pluginSettings": "插件设置",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5460,6 +5394,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "开始方式",
+                "blankTitle": "空白组织",
+                "blankDescription": "从零开始 — 之后再添加团队和代理。",
+                "meta": "{agents, plural, other {# 个代理}} · {teams, plural, other {# 个团队}}",
+                "submitImport": "从模板创建",
+                "importError": "无法基于此模板创建组织"
             }
         },
         "upgrade": {

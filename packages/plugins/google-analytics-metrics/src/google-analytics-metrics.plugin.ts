@@ -490,7 +490,8 @@ export class GoogleAnalyticsMetricsPlugin implements IMetricsProviderPlugin {
 	async healthCheck(): Promise<PluginHealthCheck> {
 		return {
 			status: 'healthy',
-			message: 'Google Analytics Metrics plugin is ready (GA4 property + service account key required for operations)',
+			message:
+				'Google Analytics Metrics plugin is ready (GA4 property + service account key required for operations)',
 			checkedAt: Date.now()
 		};
 	}

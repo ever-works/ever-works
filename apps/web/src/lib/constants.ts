@@ -109,6 +109,11 @@ export const ROUTES = {
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
+    // Org-wide Memory (Cortex P1) — aggregated view of everything the
+    // active Organization knows, fanned in across all its Works' KB
+    // documents. Sits BELOW Agents in the sidebar. Session-scoped
+    // (`/memory`); the org is resolved from the active scope context.
+    DASHBOARD_MEMORY: '/memory',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
@@ -123,6 +128,12 @@ export const ROUTES = {
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
+    // Teams & Prebuilt Companies (docs/specs/features/teams-and-companies §4)
+    DASHBOARD_TEAMS: '/teams',
+    DASHBOARD_TEAM_NEW: '/teams/new',
+    DASHBOARD_TEAM: (id: string) => `/teams/${id}`,
+    DASHBOARD_TEAM_SETTINGS: (id: string) => `/teams/${id}/settings`,
+    DASHBOARD_ORG_CHART: '/teams/org-chart',
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',
