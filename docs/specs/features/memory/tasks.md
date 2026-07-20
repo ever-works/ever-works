@@ -151,10 +151,10 @@ every schema change ships its migration in the same PR (NN #16).
 
 ## Prerequisite ownership (tracked outside this feature)
 
-| Prereq | Table/column | Owner feature | Consumed by |
-| ------ | ------------ | ------------- | ----------- |
-| A | `works.missionId` (denormalized, recommended) | Missions / Ideas / Works | P3 Mission chip |
-| B | `team_resources(teamId, resourceType, resourceId)` | **Teams** | P3 Team chip |
+| Prereq | Table/column                                       | Owner feature            | Consumed by     |
+| ------ | -------------------------------------------------- | ------------------------ | --------------- |
+| A      | `works.missionId` (denormalized, recommended)      | Missions / Ideas / Works | P3 Mission chip |
+| B      | `team_resources(teamId, resourceType, resourceId)` | **Teams**                | P3 Team chip    |
 
 Neither blocks P1/P2. Flag on the respective feature specs so they are not lost.
 

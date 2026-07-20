@@ -12,7 +12,7 @@
 - `Template` entity: [`template.entity.ts`](../../../../packages/agent/src/entities/template.entity.ts) — `kind: 'website' | 'work' | 'mission' | 'company'`, `sourceType: 'built_in' | 'custom'`, `ownerUserId`, repo coords, Tier-A `tenantId`/`organizationId` scope columns (EW-655)
 - Create-Work resolution: [`work-lifecycle.service.ts`](../../../../packages/agent/src/services/work-lifecycle.service.ts) `createWork` (L223) → `resolveValidatedWebsiteTemplateSelection` (L163) → `getVisibleTemplateForUser('website', id, userId)`; generation-time resolver [`website-template-resolver.service.ts`](../../../../packages/agent/src/generators/website-generator/website-template-resolver.service.ts) `resolveForWork`; fork/clone [`website-generator.service.ts`](../../../../packages/agent/src/generators/website-generator/website-generator.service.ts) `duplicate` (L90)
 - Existing website-templates endpoint: [`works.controller.ts`](../../../../apps/api/src/works/works.controller.ts) `GET /works/website-templates` (L281)
-- Type-chip UIs to EXTEND: `/works/new` [`new-work-client.tsx`](../../../../apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx) (`WORK_KIND_ORDER`, `WorkAICreator` selector), unified `/new` [`NewPageClient.tsx`](../../../../apps/web/src/components/new/NewPageClient.tsx) (`CHIP_ORDER`), selector [`WebsiteTemplateSelector.tsx`](../../../../apps/web/src/components/works/shared/WebsiteTemplateSelector.tsx), web DTO [`work.ts`](../../../../apps/web/src/lib/api/work.ts) `WebsiteTemplateOption`
+- Type-chip UIs to EXTEND: `/works/new` [`new-work-client.tsx`](<../../../../apps/web/src/app/[locale]/(dashboard)/works/new/new-work-client.tsx>) (`WORK_KIND_ORDER`, `WorkAICreator` selector), unified `/new` [`NewPageClient.tsx`](../../../../apps/web/src/components/new/NewPageClient.tsx) (`CHIP_ORDER`), selector [`WebsiteTemplateSelector.tsx`](../../../../apps/web/src/components/works/shared/WebsiteTemplateSelector.tsx), web DTO [`work.ts`](../../../../apps/web/src/lib/api/work.ts) `WebsiteTemplateOption`
 - Companion research notes: [`7f-works-templates.md`](../../../../../../../Users/evere/AppData/Local/Temp/claude/C--Coding/2c4e74a9-7816-4d68-8bfb-780c96ed35e8/scratchpad/7f-works-templates.md), [`7f-works-repo.md`](../../../../../../../Users/evere/AppData/Local/Temp/claude/C--Coding/2c4e74a9-7816-4d68-8bfb-780c96ed35e8/scratchpad/7f-works-repo.md)
 
 > **Scope of this document:** product behavior — the Work-blueprint catalog fed from the `ever-works/works` repo, the type chips that filter it, the selector that scales to hundreds of blueprints, and how a picked blueprint becomes a Work. Implementation phasing lives in [plan.md](plan.md); the task checklist in [tasks.md](tasks.md).
@@ -50,21 +50,21 @@ Existing users, existing Works, and the two hardcoded `classic`/`minimal` templa
 
 ### 1.1 Work blueprint
 
-A **blueprint** is one row in the `ever-works/works` `manifest.json` `blueprints[]` array. It is a *pointer* to a standalone, fork-ready template code repo (e.g. `ever-works/directory-web-template`) plus the wizard defaults for standing up a Work from it. Unlike the `agents`/`orgs` catalogs, which vendor the template body inside the catalog repo, `works` references template bodies **out** to separate repos — mirroring the mission-template precedent (`mission-template.config.ts` lists fork-from repos), not the vendored-body precedent. This keeps the platform's blueprint list changeable without a platform release (ADR-014, "no hardcoded catalogs").
+A **blueprint** is one row in the `ever-works/works` `manifest.json` `blueprints[]` array. It is a _pointer_ to a standalone, fork-ready template code repo (e.g. `ever-works/directory-web-template`) plus the wizard defaults for standing up a Work from it. Unlike the `agents`/`orgs` catalogs, which vendor the template body inside the catalog repo, `works` references template bodies **out** to separate repos — mirroring the mission-template precedent (`mission-template.config.ts` lists fork-from repos), not the vendored-body precedent. This keeps the platform's blueprint list changeable without a platform release (ADR-014, "no hardcoded catalogs").
 
 ### 1.2 chipType — the filtering facet
 
-Every blueprint declares a `chipType` naming which **type chip** it belongs under. The type chips already exist in the Create-Work UIs as *work-kind* selectors; a blueprint's `chipType` is what ties a blueprint to the chip the user has selected:
+Every blueprint declares a `chipType` naming which **type chip** it belongs under. The type chips already exist in the Create-Work UIs as _work-kind_ selectors; a blueprint's `chipType` is what ties a blueprint to the chip the user has selected:
 
-| chipType    | Type chip today (`WORK_KIND_ORDER` / `CHIP_ORDER`) | Status                          |
-| ----------- | -------------------------------------------------- | ------------------------------- |
-| `website`   | Website                                            | live                            |
-| `landing`   | Landing Page (`landing-page`)                      | live                            |
-| `blog`      | Blog                                               | live                            |
-| `directory` | Directory                                          | live                            |
-| `store`     | Store                                              | coming-soon (flag `works-store`)|
-| `company`   | Company                                            | live on `/new` (EW-662)         |
-| `awesome`   | Awesome Repo (`awesome-repo`)                      | live                            |
+| chipType    | Type chip today (`WORK_KIND_ORDER` / `CHIP_ORDER`) | Status                           |
+| ----------- | -------------------------------------------------- | -------------------------------- |
+| `website`   | Website                                            | live                             |
+| `landing`   | Landing Page (`landing-page`)                      | live                             |
+| `blog`      | Blog                                               | live                             |
+| `directory` | Directory                                          | live                             |
+| `store`     | Store                                              | coming-soon (flag `works-store`) |
+| `company`   | Company                                            | live on `/new` (EW-662)          |
+| `awesome`   | Awesome Repo (`awesome-repo`)                      | live                             |
 
 > `chipType` values are the manifest's own short slugs (`landing`, `awesome`); the platform maps them to the existing chip values (`landing-page`, `awesome-repo`) with a single lookup table (§4.2). We do **not** rename the chip values.
 
@@ -164,7 +164,7 @@ export interface WorkBlueprintEntry {
 
 ### 2.3 Reuse of the `templates` table (no migration)
 
-When a blueprint is first *used* to create a Work (§5), it is upserted into the existing `templates` table as a deterministic `built_in` row with `id = works-blueprint:<slug>` (namespaced so it never collides with `custom-<uuid>` or the `classic`/`minimal` ids), `kind` = `website` (or `work` for non-website shapes), repo coords from the blueprint, `metadata.worksBlueprintSlug = slug`, `metadata.origin = 'works-manifest'`. This is exactly the shape `toBuiltInWebsiteTemplateRecord` / the discovery upsert already write, so the shipped `getVisibleTemplateForUser` + `website-template-resolver` + `duplicate()` chain resolves it unchanged. `tenantId`/`organizationId` follow the EW-655 Tier-A convention (NULL until the user has an Org; stamped on the created **Work**, not on the shared built-in template row).
+When a blueprint is first _used_ to create a Work (§5), it is upserted into the existing `templates` table as a deterministic `built_in` row with `id = works-blueprint:<slug>` (namespaced so it never collides with `custom-<uuid>` or the `classic`/`minimal` ids), `kind` = `website` (or `work` for non-website shapes), repo coords from the blueprint, `metadata.worksBlueprintSlug = slug`, `metadata.origin = 'works-manifest'`. This is exactly the shape `toBuiltInWebsiteTemplateRecord` / the discovery upsert already write, so the shipped `getVisibleTemplateForUser` + `website-template-resolver` + `duplicate()` chain resolves it unchanged. `tenantId`/`organizationId` follow the EW-655 Tier-A convention (NULL until the user has an Org; stamped on the created **Work**, not on the shared built-in template row).
 
 ---
 
@@ -247,7 +247,7 @@ The user's own `Template` rows are the natural default and must lead the list:
 
 - Server-side, the merged list is `[...customRows, ...repoBlueprints]` deduped by id, where `customRows` come from the existing per-user catalog (`templatesAPI.list({ kind: 'work' })` / `'website'` → `listTemplatesForUser`, which already returns the user's `sourceType:'custom'` rows). Custom rows are tagged `originType: 'forked' | 'custom_url'` (already on `WebsiteTemplateOption`) so the selector groups them under "Your templates".
 - The preselected default honors `UserTemplatePreference` first (§1.3), so a user who set a default custom template keeps it.
-- Read how custom templates work today: the `Templates` dashboard page (`/templates`, kind toggle website/work/mission) → `TemplatesCatalog` → `templatesAPI` → `POST /templates/custom` (add from GitHub URL), `POST /templates/fork`, `PUT /templates/default`. Nothing there changes; we only *read* those rows into the Create-Work selector.
+- Read how custom templates work today: the `Templates` dashboard page (`/templates`, kind toggle website/work/mission) → `TemplatesCatalog` → `templatesAPI` → `POST /templates/custom` (add from GitHub URL), `POST /templates/fork`, `PUT /templates/default`. Nothing there changes; we only _read_ those rows into the Create-Work selector.
 
 ### 4.6 `/new` page — second chip line
 
@@ -265,15 +265,15 @@ On the unified `/new` page (`NewPageClient.tsx`), below the existing type-chip r
 
 Picking a blueprint produces a `CreateWorkDto` — **no new fields**, reusing what exists ([`work.ts`](../../../../apps/web/src/lib/api/work.ts) `CreateWorkDto`):
 
-| Blueprint field           | CreateWorkDto / Work field                                   |
-| ------------------------- | ------------------------------------------------------------ |
-| `slug`                    | `websiteTemplateId` (the id the resolver looks up)           |
-| `defaults.gitProvider`    | `gitProvider`                                                |
-| `defaults.storageProvider`| storage provider (resolved via `resolveProviderDefaults`)    |
-| `defaults.deployProvider` | `deployProvider`                                             |
-| `isOrganization`          | `organization` (boolean)                                     |
-| `kind`                    | Work intent / prompt hint (carried as the chip `kind`)       |
-| `template.repo` + `ref`   | fork source — see §5.2                                        |
+| Blueprint field            | CreateWorkDto / Work field                                |
+| -------------------------- | --------------------------------------------------------- |
+| `slug`                     | `websiteTemplateId` (the id the resolver looks up)        |
+| `defaults.gitProvider`     | `gitProvider`                                             |
+| `defaults.storageProvider` | storage provider (resolved via `resolveProviderDefaults`) |
+| `defaults.deployProvider`  | `deployProvider`                                          |
+| `isOrganization`           | `organization` (boolean)                                  |
+| `kind`                     | Work intent / prompt hint (carried as the chip `kind`)    |
+| `template.repo` + `ref`    | fork source — see §5.2                                    |
 
 The blueprint's provider defaults are **suggestions**: they pre-fill the provider selectors (`GitProviderSelector`/`DeployProviderSelector`) but the user's explicit choice and their saved defaults (`resolveProviderDefaults`) still win. Work entity stays the source of truth (per the manifest's own contract).
 
@@ -281,7 +281,7 @@ The blueprint's provider defaults are **suggestions**: they pre-fill the provide
 
 `createWork` persists `work.websiteTemplateId = blueprint.slug`, validated by `resolveValidatedWebsiteTemplateSelection` → `getVisibleTemplateForUser('website', slug, userId)`. For that lookup to succeed, the blueprint must exist as a `templates` row — so **the first time a blueprint slug is validated, the `WorksTemplateCatalogService` upserts it into the `templates` table** as the `built_in` row described in §2.3 (id `works-blueprint:<slug>`). From there the existing generation-time path is unchanged:
 
-`website-template-resolver.service.resolveForWork(work)` → catalog row (kind `website`, active) wins → returns `{ owner, repo, branch }` from the blueprint's `template.repo` + `templateRef` → `website-generator.service.duplicate()` clones `owner/repo @ ref`, creates the target repo, pushes. `template.isGitHubTemplate` can later select a true GitHub *template-generate* over a plain clone; v1 uses the existing clone path.
+`website-template-resolver.service.resolveForWork(work)` → catalog row (kind `website`, active) wins → returns `{ owner, repo, branch }` from the blueprint's `template.repo` + `templateRef` → `website-generator.service.duplicate()` clones `owner/repo @ ref`, creates the target repo, pushes. `template.isGitHubTemplate` can later select a true GitHub _template-generate_ over a plain clone; v1 uses the existing clone path.
 
 > **Why upsert into `templates` rather than plumb repo coords through `createWork`:** it is the smallest, most additive change — the shipped resolver already reads the `templates` table and already has an upsert path for discovered repos. We add one more source feeding that same table. No new resolution branch, no new column, no touch to `duplicate()`.
 
@@ -297,11 +297,11 @@ The blueprint's provider defaults are **suggestions**: they pre-fill the provide
 
 ### 5.5 Hardcoded lists to EXTEND (not delete)
 
-| Location                                                                 | Today                                              | Change                                                                                     |
-| ----------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `website-template.config.ts` `WEBSITE_TEMPLATES` / `DEFAULT_..._ID`     | `classic`, `minimal`, default `classic`            | Keep as offline fallback + built-in fallback list for the web `listBuiltinWorkBlueprints`. |
-| `mission-template.config.ts`                                            | 2 static mission templates, no discovery           | Out of scope here; noted as the sibling that a future `missions` manifest could replace.   |
-| `new-work-client.tsx` `WORK_KIND_ORDER` / `NewPageClient.tsx` `CHIP_ORDER` | hardcoded chip arrays                           | Unchanged — chips stay; we only add a `chipType` lookup + a filtered template line beneath.|
+| Location                                                                   | Today                                    | Change                                                                                      |
+| -------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `website-template.config.ts` `WEBSITE_TEMPLATES` / `DEFAULT_..._ID`        | `classic`, `minimal`, default `classic`  | Keep as offline fallback + built-in fallback list for the web `listBuiltinWorkBlueprints`.  |
+| `mission-template.config.ts`                                               | 2 static mission templates, no discovery | Out of scope here; noted as the sibling that a future `missions` manifest could replace.    |
+| `new-work-client.tsx` `WORK_KIND_ORDER` / `NewPageClient.tsx` `CHIP_ORDER` | hardcoded chip arrays                    | Unchanged — chips stay; we only add a `chipType` lookup + a filtered template line beneath. |
 
 ---
 
@@ -326,17 +326,17 @@ The blueprint's provider defaults are **suggestions**: they pre-fill the provide
 
 ## 8. Naming
 
-| Concern                    | Name                                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------------- |
-| API service                | `WorksTemplateCatalogService` (`apps/api/src/works/works-template-catalog.service.ts`)|
-| API controller / route     | `WorkTemplatesController` → `GET /api/work-templates?chipType=`                        |
-| API DTO                    | `WorkBlueprintEntry`                                                                   |
-| Web server fetch           | `fetchWorkTemplateCatalog` (`work-templates.server.ts`, `server-only`)                |
-| Web isomorphic fallback    | `listBuiltinWorkBlueprints` (`work-templates.ts`)                                      |
-| Env — ref pin              | `EVER_WORKS_WORKS_REF` (default `main`)                                                |
-| Env — optional repo/token  | `EVER_WORKS_WORKS_REPO` (default `ever-works/works`), `EVER_WORKS_WORKS_TOKEN`         |
-| `templates` row id prefix  | `works-blueprint:<slug>`                                                               |
-| i18n label                 | `dashboard.templateSelector.label` = `"Template"`                                      |
+| Concern                   | Name                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------- |
+| API service               | `WorksTemplateCatalogService` (`apps/api/src/works/works-template-catalog.service.ts`) |
+| API controller / route    | `WorkTemplatesController` → `GET /api/work-templates?chipType=`                        |
+| API DTO                   | `WorkBlueprintEntry`                                                                   |
+| Web server fetch          | `fetchWorkTemplateCatalog` (`work-templates.server.ts`, `server-only`)                 |
+| Web isomorphic fallback   | `listBuiltinWorkBlueprints` (`work-templates.ts`)                                      |
+| Env — ref pin             | `EVER_WORKS_WORKS_REF` (default `main`)                                                |
+| Env — optional repo/token | `EVER_WORKS_WORKS_REPO` (default `ever-works/works`), `EVER_WORKS_WORKS_TOKEN`         |
+| `templates` row id prefix | `works-blueprint:<slug>`                                                               |
+| i18n label                | `dashboard.templateSelector.label` = `"Template"`                                      |
 
 > **Note on the mirrored precedent:** the task brief names an "OrgTemplateCatalogService" to mirror; no service by that name is shipped. The actual shipped catalog-service pattern is `AgentTemplateCatalogService` (agent/skill/task) — this spec mirrors that one and diverges only where the task specifies (public repo → tokenless raw read). Named `WorksTemplateCatalogService` for the Works domain.
 
@@ -369,9 +369,9 @@ The blueprint's provider defaults are **suggestions**: they pre-fill the provide
 ## 10. Open questions
 
 1. **Chip vs. `kind` granularity.** A `chipType` can host several `kind`s (e.g. a "website" chip with `marketing-site` + `portfolio` blueprints). Is one chip → many blueprints the whole story, or do we also want a blueprint to override the chip's placeholder prompt text? (Leaning: blueprint can optionally carry `placeholderExamples`; deferred.)
-2. **When to upsert the blueprint row.** On first *validate* (lazy, at create time — §5.2) vs. an eager 1h sync like `syncDiscoveredWebsiteTemplatesIfStale`. Lazy is less code and avoids writing rows for never-used blueprints; eager makes the `/templates` page show blueprints too. (Leaning: lazy for v1, revisit if the Templates page should list blueprints.)
-3. **`isGitHubTemplate` generate vs. clone.** v1 clones via the existing `duplicate()`. Do we want true GitHub template-repo *generate* (fresh history) for `isGitHubTemplate: true` blueprints, and is that a git-provider-plugin capability add?
-4. **Non-website Work shapes.** `directory`/`landing`/`blog` all resolve through the *website* generator today. Do `store`/`company` blueprints (when their repos exist) need a different generator, and does the blueprint need a `generator` field to select it?
+2. **When to upsert the blueprint row.** On first _validate_ (lazy, at create time — §5.2) vs. an eager 1h sync like `syncDiscoveredWebsiteTemplatesIfStale`. Lazy is less code and avoids writing rows for never-used blueprints; eager makes the `/templates` page show blueprints too. (Leaning: lazy for v1, revisit if the Templates page should list blueprints.)
+3. **`isGitHubTemplate` generate vs. clone.** v1 clones via the existing `duplicate()`. Do we want true GitHub template-repo _generate_ (fresh history) for `isGitHubTemplate: true` blueprints, and is that a git-provider-plugin capability add?
+4. **Non-website Work shapes.** `directory`/`landing`/`blog` all resolve through the _website_ generator today. Do `store`/`company` blueprints (when their repos exist) need a different generator, and does the blueprint need a `generator` field to select it?
 5. **Manifest freshness signal.** Should a blueprint carry an `updatedAt`/`version` so the upserted `templates` row can be refreshed when the manifest bumps, or is the 1h catalog cache + never-overwrite-custom enough?
 
 ---

@@ -48,10 +48,10 @@ musl build ships, do **not** bake it into the image.
    Ship the extractor first; add a render capability later if the Memory UI wants inline
    previews.
 3. **Fallbacks if the musl gate fails or the ~native-binary heft is unacceptable:**
-   - Text path: `mammoth` (docx→html, MIT) + `SheetJS` (xlsx, Apache-2.0) + an `officeparser`
-     for pptx — a fraction of the footprint, pure-JS, no Alpine risk.
-   - Render path: **Gotenberg** (LibreOffice-in-a-container, Apache-2.0, HTTP API) as a sidecar
-     — keeps the heavy dependency out of the API image entirely.
+    - Text path: `mammoth` (docx→html, MIT) + `SheetJS` (xlsx, Apache-2.0) + an `officeparser`
+      for pptx — a fraction of the footprint, pure-JS, no Alpine risk.
+    - Render path: **Gotenberg** (LibreOffice-in-a-container, Apache-2.0, HTTP API) as a sidecar
+      — keeps the heavy dependency out of the API image entirely.
 
 ## Plugin shape (content-extractor path)
 
@@ -66,6 +66,7 @@ class OfficeCliExtractorPlugin implements IPlugin, IContentExtractorPlugin {
   getSupportedFormats() → ['text','markdown','html']
 }
 ```
+
 Settings: `renderMode` (text|html), `maxBytes`, `timeout`, `binaryPath`.
 
 ## Recommendation

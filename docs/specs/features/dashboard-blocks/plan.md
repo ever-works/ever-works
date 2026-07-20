@@ -102,11 +102,11 @@ Three phases, each shipping as one PR against `develop`. **P1 is independent** a
 
 ## Sequencing & risk
 
-| Phase | Depends on          | Can merge before dependency?                                  |
-| ----- | ------------------- | ------------------------------------------------------------- |
-| P1    | Teams PR #1647      | Yes — compaction ships now; Teams card auto-appears when wired |
-| P2    | —                   | Yes — self-contained (server compose from existing fetches)   |
-| P3    | Schedules front     | No — Soon has no data source until `GET /api/schedules` exists |
+| Phase | Depends on      | Can merge before dependency?                                   |
+| ----- | --------------- | -------------------------------------------------------------- |
+| P1    | Teams PR #1647  | Yes — compaction ships now; Teams card auto-appears when wired |
+| P2    | —               | Yes — self-contained (server compose from existing fetches)    |
+| P3    | Schedules front | No — Soon has no data source until `GET /api/schedules` exists |
 
 - **Lowest risk first:** P1 compaction is a contained markup change in one file; ship it and the Teams plumbing immediately.
 - **No schema, no migration** in any phase — this feature is read-only over shipped entities.

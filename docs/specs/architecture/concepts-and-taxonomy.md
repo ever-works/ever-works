@@ -9,7 +9,7 @@ feature, check it against this map first: many "new" ideas are an existing conce
 a different angle.
 
 > **Naming law.** Routes, DB tables, API, and chat vocabulary use these exact words. In
-> particular: a **Work is never called a "Project"** internally (it is both a project *and* a
+> particular: a **Work is never called a "Project"** internally (it is both a project _and_ a
 > workflow in one), the internal **Tenant** is never surfaced in the UI, and "Company" is only
 > the user-facing label for an **Organization** — same row.
 
@@ -49,7 +49,7 @@ Tenant (internal, 1 per user)
 ## 2. The AI workforce
 
 - **Agent** — a named, persistent AI "employee" (CEO, CTO, Researcher, …). **Scope** is one of
-  `tenant | mission | idea | work` (an org/company scope is deliberately *not* in the enum;
+  `tenant | mission | idea | work` (an org/company scope is deliberately _not_ in the enum;
   org association is via Team membership and stamping, not scope). An Agent has: a heartbeat
   cadence (or `manual`), a budget, permissions, attached Skills, identity files
   (`SOUL.md/AGENTS.md/HEARTBEAT.md/TOOLS.md/agent.yml`), runs + run-logs, and
@@ -65,7 +65,7 @@ Tenant (internal, 1 per user)
   with a `parentTeam` hierarchy, an optional manager agent, and an **Org Chart**. Teams never
   nest between Orgs.
 - **team_resources** — the polymorphic association letting **Works / Tasks / Agents / Missions
-  / Ideas belong to Teams** ("this Work is the Growth team's"). Distinct from Team *membership*
+  / Ideas belong to Teams** ("this Work is the Growth team's"). Distinct from Team _membership_
   (which is the agent/human roster) and from `agent_memberships` (an agent's reach).
 
 ## 3. Knowledge, scheduling, money, activity
@@ -94,14 +94,15 @@ Tenant (internal, 1 per user)
   Agent/Team) with pairing-code auth + per-conversation sessions.
 - **Catalog repos (ADR-014)** — every curated dataset lives in its own GitHub repo, read by a
   paired platform service (no hardcoded catalogs):
-  - **`ever-works/agents`** — Agent templates (CEO/CTO/…).
-  - **`ever-works/orgs`** — prebuilt **Companies** (agentcompanies/v1 packages).
-  - **`ever-works/works`** — Work **blueprints** (each points at an external template *code*
-    repo to fork; type-tagged by `chipType`).
+    - **`ever-works/agents`** — Agent templates (CEO/CTO/…).
+    - **`ever-works/orgs`** — prebuilt **Companies** (agentcompanies/v1 packages).
+    - **`ever-works/works`** — Work **blueprints** (each points at an external template _code_
+      repo to fork; type-tagged by `chipType`).
 
 ## 5. How to avoid building duplicates
 
 Before adding a concept, ask:
+
 - Is it a **Work** viewed differently? (project, workflow, pipeline, generated site → all Work.)
 - Is it a **Mission** viewed differently? (recurring goal, campaign, "keep X updated" → Mission.)
 - Is it an **Agent** viewed differently? (assistant, worker, bot, specialist → Agent.)

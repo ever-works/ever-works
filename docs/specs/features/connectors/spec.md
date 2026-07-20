@@ -69,7 +69,7 @@ Every plugin is a standalone ESM package under `packages/plugins/*` (or `@ever-w
 - **Notification channels (outbound only).** `INotificationChannelPlugin` (`notification-channel.interface.ts`): `shape: 'broadcast'|'direct'|'workflow'`, `verifyTarget()`, `send(ChannelSendInput)` (MUST be idempotent on `messageRef`), optional `listDeliveryEvents`, `getPricing`. Live plugins: `slack-channel` (`@slack/webhook`, incoming-webhook broadcast), `discord-channel` (webhook), `telegram-channel`, `whatsapp-channel`, `novu-channel`, plus the built-in `in-app` sentinel. Per-tenant creds live in `notification_channels.targetConfig` (`@EncryptedJsonColumn`); non-secret defaults live in the plugin `settingsSchema`. Delivery runs through the Trigger.dev `notification-channel-delivery` task (retries + quiet-hours `deferUntil`), owner-scoped (IDOR-guarded), with secret redaction on errors. API: `apps/api/src/notification-channels/notification-channels.controller.ts` — CRUD + `POST /:id/test` + a **currently ack-only** `POST /events/:pluginId` (no signature verification yet; see §7.2).
 - **Inbound → Agent precedent (email).** The email surface already does inbound routing: `agent_email_assignments` (`direction: 'inbound'`, `dispatchMode: 'task-spawn' | 'conversation'`, `priority`) binds an Agent to an inbound address, and `email_conversations` (`agentId`, `threadKey`, `participants`, Tier C `tenantId`/`organizationId`) holds a per-Agent thread. Connectors generalize this pattern from email to chat surfaces.
 - **Third-party aggregators (a different thing).** Composio (500+ apps, per-user brokered OAuth) is category `pipeline` + `form-schema-provider` + `skills-provider`; its inbound side is `composio_trigger_subscriptions` + a `@Public` webhook that resolves the subscription by `tg_*` id then verifies via the vendor SDK (`triggers.verifyWebhook`) — the canonical fail-closed pattern we mirror. Make / SIM AI / Zapier / Activepieces are also `pipeline`. **Aggregators broker other people's integrations; connectors are our own first-party two-way surfaces.** Both stay.
-- **MCP server (`apps/mcp`).** A thin proxy that *exposes* Ever Works to external MCP clients — not a plugin host, orthogonal to connectors.
+- **MCP server (`apps/mcp`).** A thin proxy that _exposes_ Ever Works to external MCP clients — not a plugin host, orthogonal to connectors.
 
 ### 1.3 What a connector is
 
@@ -84,14 +84,14 @@ A connector with only the outbound leg (P1 Slack) is a strict superset of an out
 
 ### 1.4 Connector vs channel vs aggregator (one table)
 
-| Dimension        | `*-channel` (notification)         | `connector` (this spec)                          | aggregator (Composio/Make/…)      |
-| ---------------- | ---------------------------------- | ------------------------------------------------ | --------------------------------- |
-| Category         | `notification-channel`             | `connector`                                      | `pipeline`                        |
-| Direction        | Outbound only                      | **Bidirectional**                                | Broker (varies)                   |
-| Ownership        | First-party                        | **First-party**                                  | Third-party broker                |
-| Inbound → Agent  | No                                 | **Yes (paired, session-isolated)**               | Trigger → fanout (no chat reply)  |
-| Contract         | `INotificationChannelPlugin`       | **`IConnectorPlugin`**                           | `IPipelinePlugin` (+form/skills)  |
-| Status           | Ships today, unchanged             | New                                              | Ships today, unchanged            |
+| Dimension       | `*-channel` (notification)   | `connector` (this spec)            | aggregator (Composio/Make/…)     |
+| --------------- | ---------------------------- | ---------------------------------- | -------------------------------- |
+| Category        | `notification-channel`       | `connector`                        | `pipeline`                       |
+| Direction       | Outbound only                | **Bidirectional**                  | Broker (varies)                  |
+| Ownership       | First-party                  | **First-party**                    | Third-party broker               |
+| Inbound → Agent | No                           | **Yes (paired, session-isolated)** | Trigger → fanout (no chat reply) |
+| Contract        | `INotificationChannelPlugin` | **`IConnectorPlugin`**             | `IPipelinePlugin` (+form/skills) |
+| Status          | Ships today, unchanged       | New                                | Ships today, unchanged           |
 
 ---
 
@@ -262,14 +262,14 @@ Inbound is where connectors meet the **chat-everything** engine (the initiative 
 
 1. `ConnectorFacadeService.handleInbound(connectorId, rawReq)` → `verifyInbound()` (fail-closed) → `handleChallenge()` (short-circuit handshakes) → `parseInbound()` → `ConnectorInboundEvent[]`.
 2. `ConnectorRoutingService` (`packages/agent/src/connectors/connector-routing.service.ts`) for each event:
-   - Dedupe on `providerEventId` (`connector_message_log` unique).
-   - Resolve `connector_identities` by `(connectorId, externalUserId)`.
-     - **Unpaired** → treat the message text as a possible pairing code (§6). If it matches a live `connector_pairing_codes` row, bind the identity and `reply()` a confirmation. Otherwise `reply()` the pairing prompt and log `status='unpaired'`. **No Agent is reached.**
-     - **Paired** → resolve/create the `connector_conversations` session by composite key `{platformUserId}:{connectorId}:{externalConversationId}`, linking (or creating) a `conversations` row.
-   - Dispatch by `routingMode`:
-     - `agent` → the connector's `defaultAgentId`.
-     - `team` → a Team resolver picks an Agent from the Org-scoped group (`defaultTeamId`); v1 falls back to a single default (§8 open question).
-     - `chat` → a general chat session with no bound Agent (tool access clamped to the paired user's own scope).
+    - Dedupe on `providerEventId` (`connector_message_log` unique).
+    - Resolve `connector_identities` by `(connectorId, externalUserId)`.
+        - **Unpaired** → treat the message text as a possible pairing code (§6). If it matches a live `connector_pairing_codes` row, bind the identity and `reply()` a confirmation. Otherwise `reply()` the pairing prompt and log `status='unpaired'`. **No Agent is reached.**
+        - **Paired** → resolve/create the `connector_conversations` session by composite key `{platformUserId}:{connectorId}:{externalConversationId}`, linking (or creating) a `conversations` row.
+    - Dispatch by `routingMode`:
+        - `agent` → the connector's `defaultAgentId`.
+        - `team` → a Team resolver picks an Agent from the Org-scoped group (`defaultTeamId`); v1 falls back to a single default (§8 open question).
+        - `chat` → a general chat session with no bound Agent (tool access clamped to the paired user's own scope).
 3. The chat-everything engine runs the turn **as the paired platform user**, under the routed **Agent's `AgentPermissions`** (`canCallExternalTools`, confirm-destructive, no-bulk) — inbound never elevates. The engine's reply text (and any canvas/tool summaries flattened to text) is returned via `IConnectorPlugin.reply()` into the same external conversation/thread.
 4. Outbound-only usage is unchanged: an Agent tool or an event-subscription fan-out calls `ConnectorFacadeService.send()`; the connector's outbound leg is also selectable in the [`event-subscriptions`](../event-subscriptions/spec.md) preference matrix via the bridge in §5.
 
@@ -416,7 +416,10 @@ export interface IConnectorPlugin extends IPlugin {
 	// --- INBOUND (omit for outbound-only connectors) ---
 	verifyInbound?(req: ConnectorInboundRequest, options: ConnectorCallOptions): Promise<ConnectorInboundVerification>;
 	handleChallenge?(req: ConnectorInboundRequest): ConnectorChallengeResponse | null;
-	parseInbound?(req: ConnectorInboundRequest, options: ConnectorCallOptions): Promise<readonly ConnectorInboundEvent[]>;
+	parseInbound?(
+		req: ConnectorInboundRequest,
+		options: ConnectorCallOptions
+	): Promise<readonly ConnectorInboundEvent[]>;
 	poll?(cursor: string | null, options: ConnectorCallOptions): Promise<ConnectorPollResult>;
 	reply?(reply: ConnectorReply, options: ConnectorCallOptions): Promise<ChannelSendResult>;
 

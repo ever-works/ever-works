@@ -26,7 +26,7 @@
 
 Today, knowledge lives **per Work** (the KB workbench at `/works/:id/kb`) and agent memory
 lives in an **external backend** correlated only by `agent_runs.memorySessionId`. There is no
-single place to see *everything an Organization knows*. **Memory** is that place: a new
+single place to see _everything an Organization knows_. **Memory** is that place: a new
 **org-wide** page, reachable from a new sidebar item **below Agents**, that aggregates every
 knowledge document, chunk, and agent-memory session across every Work / Mission / Agent in the
 currently-selected Organization — searchable, filterable, viewable as a list or a graph.
@@ -85,8 +85,8 @@ Three capabilities ship in sequence:
 
 **Memory** is the Organization's single, aggregated view of everything it has learned — pulled
 together from sources that are, today, scattered per-Work and per-run. It answers the question a
-founder actually has: *"what does my company know about X?"* — not *"which Work's KB do I have to
-open to find it?"*
+founder actually has: _"what does my company know about X?"_ — not _"which Work's KB do I have to
+open to find it?"_
 
 Memory is **read-mostly and additive**. It does not own the per-Work KB documents; it **reads
 across** them. The only rows Memory itself writes in P1 are org-level notes created via `+ New`
@@ -95,14 +95,14 @@ the org-document shape the KB service already supports via `createOrgDocument`).
 
 ### 1.2 Knowledge sources aggregated
 
-| Source                          | Where it lives today                                                                 | How Memory reaches it                                                                 |
-| ------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| **Per-Work KB documents**       | `work_knowledge_documents` (row = metadata; body in the Work's Git data repo)        | Fan-in by `organizationId` (real FK) over all Works in the org                        |
-| **Org-level KB documents**      | Same table, `organizationId` set + `workId` NULL (`KB_ORG_INHERITABLE_CLASSES`)      | Already org-scoped; included directly                                                 |
-| **KB chunks / embeddings**      | `work_knowledge_chunks` (pgvector) + vector-store plugin store                       | Semantic search fanned across the org's Works (§3.2)                                  |
-| **KB uploads (source files)**   | `work_knowledge_uploads` (bytes in Storage plugin)                                   | Listed as provenance under their extracted documents                                 |
-| **Agent memory sessions**       | External agent-memory backend; correlated by `agent_runs.memorySessionId`            | Read-through the `agent-memory` plugin, keyed by the org's Works/Agents (best-effort) |
-| **Synthesized concepts (P3)**   | New `memory_concept` table                                                           | First-class Memory rows                                                               |
+| Source                        | Where it lives today                                                            | How Memory reaches it                                                                 |
+| ----------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **Per-Work KB documents**     | `work_knowledge_documents` (row = metadata; body in the Work's Git data repo)   | Fan-in by `organizationId` (real FK) over all Works in the org                        |
+| **Org-level KB documents**    | Same table, `organizationId` set + `workId` NULL (`KB_ORG_INHERITABLE_CLASSES`) | Already org-scoped; included directly                                                 |
+| **KB chunks / embeddings**    | `work_knowledge_chunks` (pgvector) + vector-store plugin store                  | Semantic search fanned across the org's Works (§3.2)                                  |
+| **KB uploads (source files)** | `work_knowledge_uploads` (bytes in Storage plugin)                              | Listed as provenance under their extracted documents                                  |
+| **Agent memory sessions**     | External agent-memory backend; correlated by `agent_runs.memorySessionId`       | Read-through the `agent-memory` plugin, keyed by the org's Works/Agents (best-effort) |
+| **Synthesized concepts (P3)** | New `memory_concept` table                                                      | First-class Memory rows                                                               |
 
 > **Agent memory stays external.** Per the shipped [agent-memory spec](../agent-memory/spec.md),
 > there is deliberately **no Postgres table for memory entries** — they live in the plugin
@@ -117,7 +117,7 @@ the org-document shape the KB service already supports via `createOrgDocument`).
 - **Graph** — P3. A node-link view where nodes are documents / concepts / Works and edges are
   citations (`work_knowledge_citations`), wiki-links (already rewritten by
   `knowledge-base-wikilink-rewriter.service.ts`), and concept links (`memory_concept_link`). The
-  graph is a *rendering of relationships that already exist in data*, not a new source of truth.
+  graph is a _rendering of relationships that already exist in data_, not a new source of truth.
 
 ### 1.4 Concepts (synthesized)
 
@@ -129,7 +129,7 @@ long-term knowledge", distinct from raw indexed documents.
 
 ### 1.5 Memory framework & RAG as plugins
 
-The mechanics of *how* memory is stored, promoted, retrieved, and synthesized are **pluggable**.
+The mechanics of _how_ memory is stored, promoted, retrieved, and synthesized are **pluggable**.
 Two new capability contracts (§5) let an Organization swap the whole memory framework
 (`IMemoryPlugin`) or the multi-doc-type retrieval pipeline (`IRagPlugin`) the same way it can
 already swap a `vector-store` or an `ai-provider`. The built-in behavior is just the default
@@ -192,21 +192,21 @@ MemoryItem {
 
 ### 2.3 Facets and their backing columns
 
-| Chip           | Backed by                                                                                     | Available in |
-| -------------- | --------------------------------------------------------------------------------------------- | ------------ |
-| **Type**       | `work_knowledge_documents.kbDocumentClass` (`KbDocumentClass` enum in `kb-types.ts`)          | P1           |
-| **Work**       | `work_knowledge_documents.workId` → `works.title`                                             | P1           |
-| **Source**     | derived `source` (`work-kb` / `org-kb` / `agent-run` / `synthesis` / `upload`)                | P1           |
-| **Status**     | `work_knowledge_documents.status`                                                             | P1           |
-| **Tag**        | `work_knowledge_tags` (per-Work catalog today; an org-tag rollup is an open question, §10)    | P1 (raw)     |
-| **Mission**    | `Work → Mission` linkage — **prerequisite A (§2.4)**                                           | **P3**       |
-| **Team**       | `team_resources(teamId, resourceType, resourceId)` — **prerequisite B (§2.4)**                | **P3**       |
-| **Partition**  | cognitive-memory `memory_entry.partition` (§6)                                                | **P3**       |
+| Chip          | Backed by                                                                                  | Available in |
+| ------------- | ------------------------------------------------------------------------------------------ | ------------ |
+| **Type**      | `work_knowledge_documents.kbDocumentClass` (`KbDocumentClass` enum in `kb-types.ts`)       | P1           |
+| **Work**      | `work_knowledge_documents.workId` → `works.title`                                          | P1           |
+| **Source**    | derived `source` (`work-kb` / `org-kb` / `agent-run` / `synthesis` / `upload`)             | P1           |
+| **Status**    | `work_knowledge_documents.status`                                                          | P1           |
+| **Tag**       | `work_knowledge_tags` (per-Work catalog today; an org-tag rollup is an open question, §10) | P1 (raw)     |
+| **Mission**   | `Work → Mission` linkage — **prerequisite A (§2.4)**                                       | **P3**       |
+| **Team**      | `team_resources(teamId, resourceType, resourceId)` — **prerequisite B (§2.4)**             | **P3**       |
+| **Partition** | cognitive-memory `memory_entry.partition` (§6)                                             | **P3**       |
 
 ### 2.4 Critical prerequisites for the Mission and Team facets
 
 Two facets **cannot be built on today's schema** and are therefore deferred to P3, gated behind
-prerequisites that live in *other* features. Calling them out loudly so they are not discovered
+prerequisites that live in _other_ features. Calling them out loudly so they are not discovered
 mid-implementation:
 
 **Prerequisite A — Work → Mission linkage.** There is no direct `Work.missionId`. A Work reaches
@@ -248,7 +248,7 @@ team_resources
 This is polymorphic-by-`(resourceType, resourceId)` on purpose — it deliberately does **not** add
 `@ManyToOne` back-relations, matching the EW-651 no-cycle-on-scope-columns rule and avoiding a
 fan of per-resource join tables. **This table belongs in the Teams feature's spec and migrations,
-not this one.** Memory only *consumes* it: once it exists, the Team facet is a reverse lookup
+not this one.** Memory only _consumes_ it: once it exists, the Team facet is a reverse lookup
 (`team_resources WHERE resourceType='work' AND resourceId IN (org work ids)`) joined into the feed.
 
 > **Phasing consequence:** the Type / Work / Source / Status / Tag chips ship in P1. The
@@ -275,16 +275,16 @@ The org is taken from the scope context (slug/`X-Scope-Slug`), never from a requ
 
 ### 3.1 Endpoints
 
-| Method + path                              | Purpose                                                                                              |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `GET /api/memory`                          | Faceted, paginated union feed of `MemoryItem`s for the active org. Query: `q`, `type[]`, `work[]`, `mission[]`, `team[]`, `source[]`, `status[]`, `view` (`list`\|`graph`), `cursor`, `limit`. |
-| `GET /api/memory/facets`                   | Per-facet value counts for the chips, honoring the *other* active filters.                          |
-| `GET /api/memory/stats`                    | `{ documentsIndexed, conceptsSynthesized, worksCovered, lastIndexedAt }` — the header counters.     |
-| `GET /api/memory/graph`                    | Nodes + edges for the graph view (P3). Query mirrors `GET /api/memory` filters.                     |
-| `POST /api/memory/documents`               | `+ New` — create an **org-level** note/document. Body `{ title, docClass?, body?, tags? }`. Delegates to `KnowledgeBaseService.createOrgDocument` (org-scoped `WorkKnowledgeDocument`). |
-| `GET /api/memory/documents/:id`            | Fetch one aggregated item (proxies the KB doc/agent-memory session behind a uniform shape).          |
-| `GET /api/memory/concepts` / `/:id`        | List / read synthesized concepts (P3).                                                               |
-| `POST /api/memory/synthesize`              | Trigger a synthesis pass for the org (P3; admin-gated, async via Trigger.dev).                       |
+| Method + path                       | Purpose                                                                                                                                                                                        |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/memory`                   | Faceted, paginated union feed of `MemoryItem`s for the active org. Query: `q`, `type[]`, `work[]`, `mission[]`, `team[]`, `source[]`, `status[]`, `view` (`list`\|`graph`), `cursor`, `limit`. |
+| `GET /api/memory/facets`            | Per-facet value counts for the chips, honoring the _other_ active filters.                                                                                                                     |
+| `GET /api/memory/stats`             | `{ documentsIndexed, conceptsSynthesized, worksCovered, lastIndexedAt }` — the header counters.                                                                                                |
+| `GET /api/memory/graph`             | Nodes + edges for the graph view (P3). Query mirrors `GET /api/memory` filters.                                                                                                                |
+| `POST /api/memory/documents`        | `+ New` — create an **org-level** note/document. Body `{ title, docClass?, body?, tags? }`. Delegates to `KnowledgeBaseService.createOrgDocument` (org-scoped `WorkKnowledgeDocument`).        |
+| `GET /api/memory/documents/:id`     | Fetch one aggregated item (proxies the KB doc/agent-memory session behind a uniform shape).                                                                                                    |
+| `GET /api/memory/concepts` / `/:id` | List / read synthesized concepts (P3).                                                                                                                                                         |
+| `POST /api/memory/synthesize`       | Trigger a synthesis pass for the org (P3; admin-gated, async via Trigger.dev).                                                                                                                 |
 
 **Web proxy:** `apps/web/src/app/api/organizations/[orgId]/memory/**` (mirrors the existing
 per-Work KB web proxy), so the Next.js client keeps its same-origin fetch pattern and the API
@@ -344,7 +344,7 @@ with the legacy dashboard alias for the bare-Tenant view. Layout, top to bottom:
 1. **Search input** (full-width, top). Debounced; drives `q`. Reuses the workbench
    `KbSearchPalette` primitive, org-scoped.
 2. **Header counts** — `"{documentsIndexed} documents indexed · {conceptsSynthesized} concepts
-   synthesized"` from `GET /api/memory/stats`. `conceptsSynthesized` reads `0` until P3 ships;
+synthesized"` from `GET /api/memory/stats`. `conceptsSynthesized` reads `0` until P3 ships;
    the counter is present from P1 but shows `—`/hidden when synthesis is off (feature-detected).
 3. **Filter chips row** — `[Type ▾] [Work ▾] [Source ▾] [Status ▾] [Tag ▾]` in P1;
    `[Mission ▾]` and `[Team ▾]` appended in P3 (feature-detected on their prerequisites, §2.4).
@@ -386,8 +386,8 @@ and `secret-store-resolver` were added (append to the tuple + add a
 
 Today, "memory/RAG" is spread across three places: `agent-memory` (shipped as a `utility`
 plugin), embeddings (`ai-provider.createEmbedding`), and retrieval (`vector-store`). That is fine
-for per-run agent memory but there is no seam for *org-wide memory frameworks* or *composed
-retrieval pipelines*. We add:
+for per-run agent memory but there is no seam for _org-wide memory frameworks_ or _composed
+retrieval pipelines_. We add:
 
 - **`memory`** — the storage/promotion/synthesis framework. Owns how memory entries are written,
   promoted between tiers, and compiled into concepts. The first-party plugin **promotes today's
@@ -407,28 +407,28 @@ Either category can be omitted by an org; the built-in default plugin provides t
 ```ts
 // packages/plugin/src/contracts/capabilities/memory.interface.ts  (NEW)
 export interface IMemoryPlugin extends IPlugin {
-    readonly memoryFramework: string;                 // 'agentmemory' | 'mem0' | 'zep' | …
+	readonly memoryFramework: string; // 'agentmemory' | 'mem0' | 'zep' | …
 
-    // Write + retrieve (superset of today's IAgentMemoryPlugin, org/mission-aware)
-    remember(input: MemoryWriteInput): Promise<MemoryRecord>;
-    recall(query: MemoryQuery): Promise<MemoryRecord[]>;
+	// Write + retrieve (superset of today's IAgentMemoryPlugin, org/mission-aware)
+	remember(input: MemoryWriteInput): Promise<MemoryRecord>;
+	recall(query: MemoryQuery): Promise<MemoryRecord[]>;
 
-    // Tiered cognitive memory (§6) — optional; default plugin implements a flat tier
-    promote?(pass: PromotionPassInput): Promise<PromotionResult>;
-    synthesize?(pass: SynthesisPassInput): Promise<SynthesisResult>;  // → concept pages
+	// Tiered cognitive memory (§6) — optional; default plugin implements a flat tier
+	promote?(pass: PromotionPassInput): Promise<PromotionResult>;
+	synthesize?(pass: SynthesisPassInput): Promise<SynthesisResult>; // → concept pages
 
-    // Introspection for the Memory page (all optional, best-effort)
-    listSessions?(scope: MemoryScope): Promise<MemorySession[]>;
-    stats?(scope: MemoryScope): Promise<{ entries: number; concepts: number }>;
+	// Introspection for the Memory page (all optional, best-effort)
+	listSessions?(scope: MemoryScope): Promise<MemorySession[]>;
+	stats?(scope: MemoryScope): Promise<{ entries: number; concepts: number }>;
 }
 
 export interface MemoryScope {
-    tenantId: string | null;
-    organizationId: string | null;
-    workId?: string | null;
-    missionId?: string | null;
-    partition?: MemoryPartition;   // §6
-    tier?: MemoryTier;             // §6
+	tenantId: string | null;
+	organizationId: string | null;
+	workId?: string | null;
+	missionId?: string | null;
+	partition?: MemoryPartition; // §6
+	tier?: MemoryTier; // §6
 }
 ```
 
@@ -444,11 +444,11 @@ export interface MemoryScope {
 ```ts
 // packages/plugin/src/contracts/capabilities/rag.interface.ts  (NEW)
 export interface IRagPlugin extends IPlugin {
-    readonly ragStrategy: string;                     // 'default-hybrid' | 'graph-rag' | …
+	readonly ragStrategy: string; // 'default-hybrid' | 'graph-rag' | …
 
-    ingest(input: RagIngestInput): Promise<RagIngestResult>;   // extractor → chunk → embed → store
-    retrieve(query: RagQuery): Promise<RagHit[]>;              // hybrid lexical + vector + rerank
-    getSupportedDocTypes(): string[];                          // ['markdown','pdf','docx','xlsx',…]
+	ingest(input: RagIngestInput): Promise<RagIngestResult>; // extractor → chunk → embed → store
+	retrieve(query: RagQuery): Promise<RagHit[]>; // hybrid lexical + vector + rerank
+	getSupportedDocTypes(): string[]; // ['markdown','pdf','docx','xlsx',…]
 }
 ```
 
@@ -484,33 +484,33 @@ categories are designed for.
 ## 6. Cognitive-memory data model (P3 option)
 
 A concrete data model for durable, structured memory — offered as the **default `memory` plugin's
-storage model** and as this spec's recommended shape. It is a design *option*: an alternative
+storage model** and as this spec's recommended shape. It is a design _option_: an alternative
 `memory` plugin may model memory differently; the contract in §5.2 is what the platform depends
 on.
 
 ### 6.1 Partitions × tiers
 
-Every memory entry has a **partition** (what *kind* of memory it is) and a **tier** (how *durable
-/ wide* its scope is):
+Every memory entry has a **partition** (what _kind_ of memory it is) and a **tier** (how _durable
+/ wide_ its scope is):
 
 **Partitions** (`memory_partition` enum):
 
-| Partition      | Holds                                                                             |
-| -------------- | --------------------------------------------------------------------------------- |
-| `working`      | Scratch context for the current session/run; short-lived                          |
-| `episodic`     | "What happened" — events, run outcomes, decisions, timestamped observations       |
-| `semantic`     | "What is true" — facts, definitions, entities, glossary-like knowledge            |
-| `procedural`   | "How to do X" — playbooks, repeatable procedures, learned workflows               |
-| `user-model`   | Preferences and traits of the human(s) the org serves / the operator             |
+| Partition    | Holds                                                                       |
+| ------------ | --------------------------------------------------------------------------- |
+| `working`    | Scratch context for the current session/run; short-lived                    |
+| `episodic`   | "What happened" — events, run outcomes, decisions, timestamped observations |
+| `semantic`   | "What is true" — facts, definitions, entities, glossary-like knowledge      |
+| `procedural` | "How to do X" — playbooks, repeatable procedures, learned workflows         |
+| `user-model` | Preferences and traits of the human(s) the org serves / the operator        |
 
 **Tiers** (`memory_tier` enum, widening scope):
 
-| Tier      | Scope column set on the entry                        |
-| --------- | ---------------------------------------------------- |
-| `session` | a single agent-run/memory session (`memorySessionId`)|
-| `work`    | one Work (`workId` + org/tenant)                     |
-| `org`     | the whole Organization (`organizationId` + tenant)   |
-| `global`  | tenant-wide, cross-org (`tenantId` only)             |
+| Tier      | Scope column set on the entry                         |
+| --------- | ----------------------------------------------------- |
+| `session` | a single agent-run/memory session (`memorySessionId`) |
+| `work`    | one Work (`workId` + org/tenant)                      |
+| `org`     | the whole Organization (`organizationId` + tenant)    |
+| `global`  | tenant-wide, cross-org (`tenantId` only)              |
 
 ### 6.2 Entities (Tier A/C scope columns per EW-651; migrations in the same PR)
 
@@ -605,7 +605,7 @@ Concepts are re-synthesizable and idempotent-ish: a re-run updates the existing 
   bound (§3.2).
 - **Untrusted memory output.** `buildContext`/`recall` output injected into any prompt is fenced
   by the consumer (carried over from the agent-memory contract). A memory/RAG plugin is a
-  content *source*, not an instruction source.
+  content _source_, not an instruction source.
 - **Agent-memory best-effort.** A failing/unavailable external memory backend degrades that facet
   to empty; it never fails the page or leaks another org's namespace (namespaces are keyed by the
   org's own Work/Agent ids).
@@ -617,18 +617,18 @@ Concepts are re-synthesizable and idempotent-ish: a re-run updates the existing 
 
 ## 8. Naming
 
-| Concept                          | Canonical name                                  | Notes                                                        |
-| -------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
-| The feature / sidebar item / page| **Memory**                                      | i18n `navigation.memory`; route `/{slug}/memory`             |
-| Internal codename                | **Cortex**                                       | never user-visible                                           |
-| Aggregation endpoint             | `GET /api/memory`                               | org-scoped faceted union feed                                |
-| Aggregated item                  | **MemoryItem** (`kind`: document/note/upload/agent-memory/concept) | DTO in `packages/contracts`                 |
-| Synthesized page                 | **Concept** (`memory_concept`)                  | the "concepts synthesized" counter                           |
-| New plugin categories            | **`memory`**, **`rag`**                         | appended to `PLUGIN_CATEGORIES`                              |
-| Capability contracts             | **`IMemoryPlugin`**, **`IRagPlugin`**           | beside `IVectorStorePlugin`, `IContentExtractorPlugin`       |
-| Bound facade                     | **`MemoryFacadeService`**                       | in `packages/agent/src/facades/`                             |
-| Cognitive dimensions             | **partition** (working/episodic/semantic/procedural/user-model) × **tier** (session/work/org/global) | enums `memory_partition`, `memory_tier`  |
-| Team↔resource join (prereq)      | **`team_resources`** `(teamId, resourceType, resourceId)` | owned by the **Teams** feature, not this one       |
+| Concept                           | Canonical name                                                                                       | Notes                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| The feature / sidebar item / page | **Memory**                                                                                           | i18n `navigation.memory`; route `/{slug}/memory`       |
+| Internal codename                 | **Cortex**                                                                                           | never user-visible                                     |
+| Aggregation endpoint              | `GET /api/memory`                                                                                    | org-scoped faceted union feed                          |
+| Aggregated item                   | **MemoryItem** (`kind`: document/note/upload/agent-memory/concept)                                   | DTO in `packages/contracts`                            |
+| Synthesized page                  | **Concept** (`memory_concept`)                                                                       | the "concepts synthesized" counter                     |
+| New plugin categories             | **`memory`**, **`rag`**                                                                              | appended to `PLUGIN_CATEGORIES`                        |
+| Capability contracts              | **`IMemoryPlugin`**, **`IRagPlugin`**                                                                | beside `IVectorStorePlugin`, `IContentExtractorPlugin` |
+| Bound facade                      | **`MemoryFacadeService`**                                                                            | in `packages/agent/src/facades/`                       |
+| Cognitive dimensions              | **partition** (working/episodic/semantic/procedural/user-model) × **tier** (session/work/org/global) | enums `memory_partition`, `memory_tier`                |
+| Team↔resource join (prereq)       | **`team_resources`** `(teamId, resourceType, resourceId)`                                            | owned by the **Teams** feature, not this one           |
 
 DB always uses `memory_*` / `team_resources`; UI always says "Memory" and "Concepts". No two
 tables, no two API surfaces for one concept.
@@ -637,11 +637,11 @@ tables, no two API surfaces for one concept.
 
 ## 9. Phasing
 
-| Phase  | Scope                                                                                                          | Prereqs / gates                                    |
-| ------ | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| **P1** | Org-wide aggregation page: sidebar item, `GET /api/memory` + `/facets` + `/stats`, search + **list** view, `+ New` org-note, chips **Type/Work/Source/Status/Tag**, cross-Work lexical+semantic search (fan-out facade). **No new tables.** | Relax `WorkKnowledgeDocumentRepository.list()`; add `queryChunksAcrossWorks`. |
-| **P2** | The **`memory`** and **`rag`** plugin categories: contracts, type guards, facades, and the **first first-party `memory` plugin** (promote `agentmemory` into the category, back-compat with `agent-memory`). Office-doc `content-extractor` plugin can land here as a complementary ingest source. | Append to `PLUGIN_CATEGORIES`; office musl gate (see office eval). |
-| **P3** | **Graph** view, the **cognitive-memory data model** (`memory_entry`/`memory_concept`/`memory_concept_link` + enums), the **auto-promotion** + **synthesis** passes (→ "concepts synthesized" counter), and the **Mission** + **Team** filter chips. | **Prerequisite A** (Work→Mission linkage) for the Mission chip; **Prerequisite B** (`team_resources` in the Teams feature) for the Team chip. |
+| Phase  | Scope                                                                                                                                                                                                                                                                                              | Prereqs / gates                                                                                                                               |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **P1** | Org-wide aggregation page: sidebar item, `GET /api/memory` + `/facets` + `/stats`, search + **list** view, `+ New` org-note, chips **Type/Work/Source/Status/Tag**, cross-Work lexical+semantic search (fan-out facade). **No new tables.**                                                        | Relax `WorkKnowledgeDocumentRepository.list()`; add `queryChunksAcrossWorks`.                                                                 |
+| **P2** | The **`memory`** and **`rag`** plugin categories: contracts, type guards, facades, and the **first first-party `memory` plugin** (promote `agentmemory` into the category, back-compat with `agent-memory`). Office-doc `content-extractor` plugin can land here as a complementary ingest source. | Append to `PLUGIN_CATEGORIES`; office musl gate (see office eval).                                                                            |
+| **P3** | **Graph** view, the **cognitive-memory data model** (`memory_entry`/`memory_concept`/`memory_concept_link` + enums), the **auto-promotion** + **synthesis** passes (→ "concepts synthesized" counter), and the **Mission** + **Team** filter chips.                                                | **Prerequisite A** (Work→Mission linkage) for the Mission chip; **Prerequisite B** (`team_resources` in the Teams feature) for the Team chip. |
 
 Each phase is independently shippable and additive. P1 delivers the headline value (one place to
 search everything the org knows) on today's schema. P2 makes the machinery swappable. P3 adds the

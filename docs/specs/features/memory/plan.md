@@ -25,7 +25,7 @@ tables.** Reuses EW-651 scope columns.
   to accept an optional `workIds: string[]` IN-list **in addition to** the existing single
   `workId` / `organizationId` params.
 - **Keep the mandatory-scope guard**: reject a call with none of `{ workId, organizationId,
-  workIds[] }`. The relaxation only adds "all Works in one org", it does not open an unscoped
+workIds[] }`. The relaxation only adds "all Works in one org", it does not open an unscoped
   path.
 - Add an index sanity check: the query filters `workId IN (…)` + `organizationId` — confirm the
   existing `(organizationId)` / `(workId)` indexes cover it; add a composite if the query planner
@@ -35,11 +35,11 @@ tables.** Reuses EW-651 scope columns.
 
 - Add `VectorStoreFacadeService.queryChunksAcrossWorks(workIds: string[], queryEmbedding, opts)`
   ([`vector-store-facade.service.ts`](../../../../packages/agent/src/facades/vector-store-facade.service.ts)).
-  - `pgvector` (default/core): single `workId IN (…)` row-filter query.
-  - namespace/collection-per-Work backends (`qdrant`): fan out per Work, merge by
-    `normalizedScore`. Branch on `VectorStoreCapabilities.namespacePerWork`.
-  - **Preserve the P0 invariant**: every underlying chunk query still filters `workId`. No query
-    is issued without a `workId` bound.
+    - `pgvector` (default/core): single `workId IN (…)` row-filter query.
+    - namespace/collection-per-Work backends (`qdrant`): fan out per Work, merge by
+      `normalizedScore`. Branch on `VectorStoreCapabilities.namespacePerWork`.
+    - **Preserve the P0 invariant**: every underlying chunk query still filters `workId`. No query
+      is issued without a `workId` bound.
 - Add `KnowledgeBaseService.orgSemanticSearch(orgId, q, filters)` that resolves org Work ids
   (`WorkRepository.findIdsByOrganization`), embeds `q` via `AiFacadeService.embed` (degrade to
   lexical-only if no embedding provider), calls the fan-out, and RRF-blends with Postgres FTS —
@@ -51,13 +51,13 @@ tables.** Reuses EW-651 scope columns.
   [`org-kb.controller.ts`](../../../../apps/api/src/works/org-kb.controller.ts)
   (`OrganizationOwnershipGuard` + `OrganizationMembershipService.ensureMember/ensureAdmin`).
 - Endpoints:
-  - `GET /api/memory` — faceted union feed (KB docs + org docs + uploads + agent-memory
-    read-through). Paginated (cursor).
-  - `GET /api/memory/facets` — per-facet counts honoring other active filters.
-  - `GET /api/memory/stats` — `{ documentsIndexed, conceptsSynthesized: 0, worksCovered,
-    lastIndexedAt }`.
-  - `POST /api/memory/documents` — `+ New`; delegates to `KnowledgeBaseService.createOrgDocument`.
-  - `GET /api/memory/documents/:id` — uniform item detail (proxies KB doc / agent-memory session).
+    - `GET /api/memory` — faceted union feed (KB docs + org docs + uploads + agent-memory
+      read-through). Paginated (cursor).
+    - `GET /api/memory/facets` — per-facet counts honoring other active filters.
+    - `GET /api/memory/stats` — `{ documentsIndexed, conceptsSynthesized: 0, worksCovered,
+lastIndexedAt }`.
+    - `POST /api/memory/documents` — `+ New`; delegates to `KnowledgeBaseService.createOrgDocument`.
+    - `GET /api/memory/documents/:id` — uniform item detail (proxies KB doc / agent-memory session).
 - New service `apps/api/src/organizations/org-memory.service.ts` — builds the `MemoryItem` union
   feed, applies facets, calls `orgSemanticSearch` when `q` present, and does the agent-memory
   read-through (best-effort; empty on failure).
@@ -209,10 +209,10 @@ prerequisites exist.
 
 ### Prerequisites owned by other features (do not build here)
 
-| Prereq | What | Owner feature | Blocks |
-| ------ | ---- | ------------- | ------ |
-| **A** | First-class Work→Mission linkage (denormalized `works.missionId` recommended) | Missions/Ideas/Works | P3.5 Mission chip |
-| **B** | `team_resources(teamId, resourceType, resourceId)` polymorphic join | **Teams** | P3.6 Team chip |
+| Prereq | What                                                                          | Owner feature        | Blocks            |
+| ------ | ----------------------------------------------------------------------------- | -------------------- | ----------------- |
+| **A**  | First-class Work→Mission linkage (denormalized `works.missionId` recommended) | Missions/Ideas/Works | P3.5 Mission chip |
+| **B**  | `team_resources(teamId, resourceType, resourceId)` polymorphic join           | **Teams**            | P3.6 Team chip    |
 
 Neither blocks P1 or P2. If either slips, its chip is feature-detected and hidden; the rest of
 Memory ships.
@@ -234,10 +234,10 @@ Memory ships.
 
 ### Sequencing summary
 
-| Phase | Depends on | PR target |
-| ----- | ---------- | --------- |
-| P1    | EW-651 scope columns (shipped) | `develop` |
-| P2    | P1 | `develop` |
-| P3.1–P3.4 | P2 | `develop` |
-| P3.5 (Mission chip) | Prereq A | `develop` |
-| P3.6 (Team chip) | Prereq B (Teams feature) | `develop` |
+| Phase               | Depends on                     | PR target |
+| ------------------- | ------------------------------ | --------- |
+| P1                  | EW-651 scope columns (shipped) | `develop` |
+| P2                  | P1                             | `develop` |
+| P3.1–P3.4           | P2                             | `develop` |
+| P3.5 (Mission chip) | Prereq A                       | `develop` |
+| P3.6 (Team chip)    | Prereq B (Teams feature)       | `develop` |

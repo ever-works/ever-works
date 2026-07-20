@@ -5,8 +5,8 @@
 **Internal codename:** "Home cockpit"
 **Related code today:**
 
-- Home server page (data fetch): [`apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx`](../../../../apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx) — the `Promise.all` fan-out (`:28-92`) and the `<DashboardClient>` mount (`:103-127`)
-- Home client shell (layout): [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx`](../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx) — the `divide-y` section stack (`:117-194`)
+- Home server page (data fetch): [`apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx`](<../../../../apps/web/src/app/[locale]/(dashboard)/(home)/page.tsx>) — the `Promise.all` fan-out (`:28-92`) and the `<DashboardClient>` mount (`:103-127`)
+- Home client shell (layout): [`apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx`](<../../../../apps/web/src/app/[locale]/(dashboard)/(home)/dashboard-client.tsx>) — the `divide-y` section stack (`:117-194`)
 - Stat cards: [`apps/web/src/components/dashboard/StatsOverview.tsx`](../../../../apps/web/src/components/dashboard/StatsOverview.tsx) — `statCards` array (`:90-166`), grid (`:169`), tile markup (`:171-217`)
 - Missions preview block: [`apps/web/src/components/missions/MissionsPreviewSection.tsx`](../../../../apps/web/src/components/missions/MissionsPreviewSection.tsx) — section-header pattern (`:72-110`)
 - Work-stats server action: [`apps/web/src/app/actions/dashboard/works.ts`](../../../../apps/web/src/app/actions/dashboard/works.ts) `getWorkStats()` (`:690`) → `workAPI.getStats()`
@@ -60,14 +60,14 @@ apps/web/.../(home)/dashboard-client.tsx  —  section stack (divide-y)
 
 ## 1. Concepts
 
-| Concept                | Meaning                                                                                                                                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Stat tile**          | One card in `StatsOverview`. Today there are 8; this spec adds a 9th (Teams) and compacts all of them.                                                          |
-| **Qualifier**          | The parenthetical secondary fact on a stat tile (`(0 active)`, `(2 blocked)`). Today it lives on a separate third line; this spec folds it into the subtitle line. |
-| **Attention item**     | A single thing that needs the user's action right now — an errored agent, a paused schedule, an overdue task, a blown budget. Rendered as a red card.           |
-| **Soon item**          | A single upcoming scheduled run, identified by its soonest `nextRunAt` across the schedule sources.                                                             |
-| **Schedule source**    | Any entity that has a recurring `nextRunAt`: a `WorkSchedule`, a scheduled `Mission` (`type = SCHEDULED`). Unified by the Schedules front's `GET /api/schedules`. |
-| **Non-empty guard**    | Both new blocks render nothing (not even their wrapper/divider) when they have zero items — a healthy account sees a quieter dashboard, not empty shells.        |
+| Concept             | Meaning                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Stat tile**       | One card in `StatsOverview`. Today there are 8; this spec adds a 9th (Teams) and compacts all of them.                                                             |
+| **Qualifier**       | The parenthetical secondary fact on a stat tile (`(0 active)`, `(2 blocked)`). Today it lives on a separate third line; this spec folds it into the subtitle line. |
+| **Attention item**  | A single thing that needs the user's action right now — an errored agent, a paused schedule, an overdue task, a blown budget. Rendered as a red card.              |
+| **Soon item**       | A single upcoming scheduled run, identified by its soonest `nextRunAt` across the schedule sources.                                                                |
+| **Schedule source** | Any entity that has a recurring `nextRunAt`: a `WorkSchedule`, a scheduled `Mission` (`type = SCHEDULED`). Unified by the Schedules front's `GET /api/schedules`.  |
+| **Non-empty guard** | Both new blocks render nothing (not even their wrapper/divider) when they have zero items — a healthy account sees a quieter dashboard, not empty shells.          |
 
 ---
 
@@ -77,16 +77,16 @@ apps/web/.../(home)/dashboard-client.tsx  —  section stack (divide-y)
 
 ### 2.1 Signals already on entities (read-only)
 
-| Signal                        | Source entity / field                                                                             | "Needs attention" when                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Errored agent                 | `agent.status` (`AgentStatus.ERROR`), `agent.errorCount`, `agent.pauseAfterFailures`              | `status === 'error'` (agent auto-paused after `pauseAfterFailures`) |
-| Failed schedule run           | `work_schedules.lastRunStatus` (`GenerateStatusType` failure)                                     | last run failed                                                     |
-| Paused-on-failure schedule    | `work_schedules.status` (`WorkScheduleStatus.PAUSED`), `failureCount`, `maxFailureBeforePause`    | `status === 'paused' && failureCount >= maxFailureBeforePause`      |
-| Failed generation (Idea)      | `work_proposals.status === 'failed'`                                                               | proposal build failed                                               |
-| Blocked / needs-input task    | `task.status === 'blocked'` (already fetched as `tasksBlocked`)                                    | task blocked                                                        |
-| Overdue task                  | `task.dueDate` (if present) `< now` and status not terminal                                        | past due, still open                                                |
-| Budget exceeded               | `usageAPI.accountWide()` `currentSpendCents` vs the account cap                                    | spend ≥ cap                                                         |
-| Upcoming run                  | `work_schedules.nextRunAt` (index `['status','nextRunAt']`), scheduled `Mission.schedule` cron     | `status === 'active'` and `nextRunAt` in the future                 |
+| Signal                     | Source entity / field                                                                          | "Needs attention" when                                              |
+| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Errored agent              | `agent.status` (`AgentStatus.ERROR`), `agent.errorCount`, `agent.pauseAfterFailures`           | `status === 'error'` (agent auto-paused after `pauseAfterFailures`) |
+| Failed schedule run        | `work_schedules.lastRunStatus` (`GenerateStatusType` failure)                                  | last run failed                                                     |
+| Paused-on-failure schedule | `work_schedules.status` (`WorkScheduleStatus.PAUSED`), `failureCount`, `maxFailureBeforePause` | `status === 'paused' && failureCount >= maxFailureBeforePause`      |
+| Failed generation (Idea)   | `work_proposals.status === 'failed'`                                                           | proposal build failed                                               |
+| Blocked / needs-input task | `task.status === 'blocked'` (already fetched as `tasksBlocked`)                                | task blocked                                                        |
+| Overdue task               | `task.dueDate` (if present) `< now` and status not terminal                                    | past due, still open                                                |
+| Budget exceeded            | `usageAPI.accountWide()` `currentSpendCents` vs the account cap                                | spend ≥ cap                                                         |
+| Upcoming run               | `work_schedules.nextRunAt` (index `['status','nextRunAt']`), scheduled `Mission.schedule` cron | `status === 'active'` and `nextRunAt` in the future                 |
 
 > The composite index `@Index(['status', 'nextRunAt'])` on `work_schedules` (`work-schedule.entity.ts:20`) is exactly the index the Soon query needs — `WHERE status = 'active' ORDER BY nextRunAt ASC LIMIT 3` is index-covered.
 
@@ -136,9 +136,7 @@ Teams are **Organization-scoped** (`team.entity.ts` carries `organizationId`; th
     ```ts
     teamsAPI
     	.listOrganizations()
-    	.then((orgs) =>
-    		Promise.all(orgs.map((o) => teamsAPI.list(o.id))).then((lists) => lists.flat().length)
-    	)
+    	.then((orgs) => Promise.all(orgs.map((o) => teamsAPI.list(o.id))).then((lists) => lists.flat().length))
     	.catch(() => 0);
     ```
 
@@ -173,6 +171,7 @@ Teams are **Organization-scoped** (`team.entity.ts` carries `organizationId`; th
     ```
 
     The block renders `items` and, when `total > 3`, a `+{total - 3} more` link to `/activity?view=schedules`.
+
 - Until the Schedules front ships, Soon is **not rendered** (its data source is absent). This is why Soon is phased last (P3) and gated on the cross-spec dependency.
 
 ---
@@ -229,9 +228,7 @@ Pick (a) for v1; revisit if a 10th card lands.
 		<div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ...">
 			<stat.icon className="w-4 h-4 ..." strokeWidth={1.4} />
 		</div>
-		<p className="text-2xl font-semibold tracking-tight tabular-nums ... leading-none truncate">
-			{stat.value}
-		</p>
+		<p className="text-2xl font-semibold tracking-tight tabular-nums ... leading-none truncate">{stat.value}</p>
 	</div>
 	{/* Row 2 — dot + title, plus OPTIONAL Row 3 — sublabel */}
 	<div className="min-w-0">
@@ -239,9 +236,7 @@ Pick (a) for v1; revisit if a 10th card lands.
 			<span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)} />
 			<p className="text-xs ... truncate">{stat.title}</p>
 		</div>
-		{stat.sublabel ? (
-			<p className="mt-0.5 pl-3 text-[11px] ... truncate opacity-70">{stat.sublabel}</p>
-		) : null}
+		{stat.sublabel ? <p className="mt-0.5 pl-3 text-[11px] ... truncate opacity-70">{stat.sublabel}</p> : null}
 	</div>
 </div>
 ```
@@ -256,18 +251,14 @@ Pick (a) for v1; revisit if a 10th card lands.
 		<div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ...">
 			<stat.icon className="w-3.5 h-3.5 ..." strokeWidth={1.4} />
 		</div>
-		<p className="text-xl font-semibold tracking-tight tabular-nums ... leading-none truncate">
-			{stat.value}
-		</p>
+		<p className="text-xl font-semibold tracking-tight tabular-nums ... leading-none truncate">{stat.value}</p>
 	</div>
 	{/* Line 2 — dot + subtitle (qualifier inline, NEVER a 3rd line) */}
 	<div className="flex items-center gap-1.5 min-w-0">
 		<span className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)} />
 		<p className="text-xs ... truncate">
 			{stat.title}
-			{stat.qualifier ? (
-				<span className="opacity-70"> ({stat.qualifier})</span>
-			) : null}
+			{stat.qualifier ? <span className="opacity-70"> ({stat.qualifier})</span> : null}
 		</p>
 	</div>
 </div>
@@ -359,17 +350,17 @@ None. This feature reads existing entities and renders existing-scoped data; it 
 
 ## 7. Naming
 
-| Thing                        | Name                                                                 |
-| ---------------------------- | -------------------------------------------------------------------- |
-| Stat qualifier field         | `qualifier` (was `sublabel` on the per-card object)                  |
-| Teams card i18n keys         | `dashboard.stats.teams` = "Teams", `dashboard.stats.teamsSubtitle`  |
-| Attention component          | `AttentionSection` (`components/dashboard/AttentionSection.tsx`)     |
-| Attention i18n root          | `dashboard.attention.*` (`title` = "Needs attention", per-kind copy) |
-| Attention endpoint           | `GET /api/dashboard/attention` (consolidation follow-up)             |
-| Soon component               | `SoonSection` (`components/dashboard/SoonSection.tsx`)               |
-| Soon i18n root               | `dashboard.soon.*` (`title` = "Coming up", `more` = "+{n} more")    |
-| Soon data source             | `GET /api/schedules` (owned by the Schedules front)                  |
-| Activity schedules view      | `/activity?view=schedules` (owned by the Schedules front)           |
+| Thing                   | Name                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| Stat qualifier field    | `qualifier` (was `sublabel` on the per-card object)                  |
+| Teams card i18n keys    | `dashboard.stats.teams` = "Teams", `dashboard.stats.teamsSubtitle`   |
+| Attention component     | `AttentionSection` (`components/dashboard/AttentionSection.tsx`)     |
+| Attention i18n root     | `dashboard.attention.*` (`title` = "Needs attention", per-kind copy) |
+| Attention endpoint      | `GET /api/dashboard/attention` (consolidation follow-up)             |
+| Soon component          | `SoonSection` (`components/dashboard/SoonSection.tsx`)               |
+| Soon i18n root          | `dashboard.soon.*` (`title` = "Coming up", `more` = "+{n} more")     |
+| Soon data source        | `GET /api/schedules` (owned by the Schedules front)                  |
+| Activity schedules view | `/activity?view=schedules` (owned by the Schedules front)            |
 
 i18n keys are added to `apps/web/messages/en.json` under `dashboard.*` and mirrored across all 21 locale files (English copy as the fallback value).
 
