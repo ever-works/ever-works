@@ -13,7 +13,7 @@ import {
     type AgentGuardrailActionType,
     type AgentGuardrails,
     type AgentGuardrailsMode,
-} from '@/lib/api/agents';
+} from '@/lib/api/agents.shared';
 
 interface AgentGuardrailsCardProps {
     agentId: string;
