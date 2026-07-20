@@ -2311,6 +2311,31 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/officecli-extractor:
+    dependencies:
+      '@officecli/sdk':
+        specifier: ^0.1.2
+        version: 0.1.2
+      axios:
+        specifier: ^1.15.2
+        version: 1.16.0
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.16)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.18
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/ollama:
     dependencies:
       '@ever-works/plugin':
@@ -7332,6 +7357,17 @@ packages:
   '@octokit/webhooks@13.9.1':
     resolution: {integrity: sha512-Nss2b4Jyn4wB3EAqAPJypGuCJFalz/ZujKBQQ5934To7Xw9xjf4hkr/EAByxQY7hp7MKd790bWGz7XYSTsHmaw==}
     engines: {node: '>= 18'}
+
+  '@officecli/officecli@1.0.138':
+    resolution: {integrity: sha512-y0gCWIyda5eXoclSgBQ7LokJE6jlvGba62JnfG9Nygk4ER9otQnwqd620TCvOyWnbHVDFhGSyD+bVUdKFWF9aQ==}
+    engines: {node: '>=14'}
+    cpu: [x64, arm64]
+    os: [darwin, linux, win32]
+    hasBin: true
+
+  '@officecli/sdk@0.1.2':
+    resolution: {integrity: sha512-KsCPHi3wwMUiOultT5x6NHSr3fl/d4eQXzKCdzM0kUMjvqE31RMaVYr1tGvO35uhljaHECC9dRZd0e7H7s4XJQ==}
+    engines: {node: '>=18'}
 
   '@open-draft/deferred-promise@2.2.0':
     resolution: {integrity: sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA==}
@@ -26457,6 +26493,12 @@ snapshots:
       '@octokit/openapi-webhooks-types': 11.0.0
       '@octokit/request-error': 6.1.8
       '@octokit/webhooks-methods': 5.1.1
+
+  '@officecli/officecli@1.0.138': {}
+
+  '@officecli/sdk@0.1.2':
+    dependencies:
+      '@officecli/officecli': 1.0.138
 
   '@open-draft/deferred-promise@2.2.0': {}
 
