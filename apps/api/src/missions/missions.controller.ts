@@ -30,6 +30,7 @@ import {
     AddMissionAttachmentDto,
     AttachMissionWorkDto,
     CloneMissionDto,
+    CompleteMissionDto,
     CreateMissionDto,
     UpdateMissionDto,
 } from './dto/mission.dto';
@@ -208,8 +209,9 @@ export class MissionsController {
     async complete(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        @Body() body?: CompleteMissionDto,
     ): Promise<MissionDto> {
-        return this.service.complete(auth.userId, id);
+        return this.service.complete(auth.userId, id, body?.outcome ?? null);
     }
 
     @Post(':id/clone')

@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Optional, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { Mission, MissionStatus, MissionType } from '../entities/mission.entity';
 import { WorkProposalSource } from '../entities/work-proposal.entity';
 import { WorkAgentService } from '../work-agent/work-agent.service';
@@ -116,6 +118,9 @@ export class MissionTickService {
         private readonly workProposals: WorkProposalService,
         private readonly workProposalRepo: WorkProposalRepository,
         private readonly workAgent: WorkAgentService,
+        // PR-3 - lifecycle activity + FAILED persistence (review P4/G3).
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -229,6 +234,17 @@ export class MissionTickService {
         const outstanding = await this.workProposalRepo.countOutstandingByMission(mission.id);
         const cap = await this.resolveEffectiveCap(mission);
         if (cap !== null && outstanding >= cap) {
+            // PR-3 - the spec's "at-cap event into the activity log"
+            // (spec §1.3) finally lands (review gap G3).
+            await this.recordActivity(
+                mission,
+                ActivityActionType.MISSION_TICK_CAPPED,
+                'tick-capped',
+                {
+                    outstanding,
+                    cap,
+                },
+            );
             return {
                 outcome: 'cap-hit',
                 outstanding,
@@ -284,6 +300,30 @@ export class MissionTickService {
                 `Mission ${mission.id} tick failed for user ${mission.userId}: ${message}`,
                 err as Error,
             );
+            // PR-3 (review finding P4) - persist the fatal failure so the
+            // FAILED status is finally reachable. Revivable: the user's
+            // resume endpoint accepts FAILED. Best-effort - a persistence
+            // error must not mask the original failure.
+            try {
+                await this.missions.update(
+                    { id: mission.id, status: MissionStatus.ACTIVE },
+                    { status: MissionStatus.FAILED },
+                );
+                await this.recordActivity(
+                    mission,
+                    ActivityActionType.MISSION_FAILED,
+                    'tick-failed',
+                    {
+                        message: message.slice(0, 500),
+                    },
+                );
+            } catch (persistErr) {
+                this.logger.warn(
+                    `Mission ${mission.id}: failed to persist FAILED status: ${
+                        persistErr instanceof Error ? persistErr.message : String(persistErr)
+                    }`,
+                );
+            }
             return { outcome: 'failed', message };
         }
     }
@@ -320,5 +360,31 @@ export class MissionTickService {
             );
         }
         return PLATFORM_DEFAULT_OUTSTANDING_CAP;
+    }
+
+    /** PR-3 - best-effort activity write; no-ops when unwired. */
+    private async recordActivity(
+        mission: Mission,
+        actionType: ActivityActionType,
+        action: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: mission.userId,
+                actionType,
+                action,
+                status: ActivityStatus.COMPLETED,
+                summary: `Mission ${action}: ${mission.title}`,
+                details: { missionId: mission.id, ...details } as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Mission ${mission.id}: activity write failed (${actionType}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 }

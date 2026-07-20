@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { missionsAPI, type CreateMissionInput, type UpdateMissionInput } from '@/lib/api/missions';
+import {
+    missionsAPI,
+    type CreateMissionInput,
+    type MissionOutcome,
+    type UpdateMissionInput,
+} from '@/lib/api/missions';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 
@@ -70,9 +75,11 @@ export async function resumeMissionAction(id: string) {
     return mission;
 }
 
-export async function completeMissionAction(id: string) {
+// PR-3 — `outcome` is the optional human-recorded conclusion verdict.
+// Omitting it preserves today's behavior (complete with no verdict).
+export async function completeMissionAction(id: string, outcome?: MissionOutcome) {
     await requireMissionAuth();
-    const mission = await missionsAPI.complete(id);
+    const mission = await missionsAPI.complete(id, outcome);
     revalidateMissionSurfaces();
     return mission;
 }

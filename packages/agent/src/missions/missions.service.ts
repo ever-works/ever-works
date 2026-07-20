@@ -9,10 +9,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     Mission,
+    MissionOutcome,
     MissionStatus,
     MissionType,
     type MissionGuardrailsOverride,
 } from '../entities/mission.entity';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
@@ -124,7 +127,12 @@ export interface ListMissionsFilter {
  * dispatch is a placeholder until PR J wires Trigger.dev.
  */
 const PAUSABLE_STATUSES: ReadonlyArray<MissionStatus> = [MissionStatus.ACTIVE];
-const RESUMABLE_STATUSES: ReadonlyArray<MissionStatus> = [MissionStatus.PAUSED];
+// PR-3: FAILED is revivable - resume doubles as the recovery path once
+// the tick worker starts persisting fatal failures (review finding P4).
+const RESUMABLE_STATUSES: ReadonlyArray<MissionStatus> = [
+    MissionStatus.PAUSED,
+    MissionStatus.FAILED,
+];
 const COMPLETABLE_STATUSES: ReadonlyArray<MissionStatus> = [
     MissionStatus.ACTIVE,
     MissionStatus.PAUSED,
@@ -187,6 +195,11 @@ export class MissionsService {
         @Optional()
         @InjectRepository(Work)
         private readonly worksRepo?: Repository<Work>,
+        // PR-3 - Mission lifecycle activity logging (closes audit gap G3).
+        // `@Optional()` like every other secondary dep here; best-effort at
+        // call sites so an activity failure never fails the operation.
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -277,6 +290,10 @@ export class MissionsService {
                 sourceMissionId: null, // Mission Clone (PR HH) sets this.
             }),
         );
+        await this.recordActivity(userId, ActivityActionType.MISSION_CREATED, 'create', {
+            missionId: saved.id,
+            title: saved.title,
+        });
         return toMissionDto(saved);
     }
 
@@ -335,27 +352,69 @@ export class MissionsService {
      *     transition (e.g. pause-ing an already-PAUSED Mission).
      */
     async pause(userId: string, missionId: string): Promise<MissionDto> {
-        return this.transition(userId, missionId, PAUSABLE_STATUSES, MissionStatus.PAUSED, 'pause');
+        const dto = await this.transition(
+            userId,
+            missionId,
+            PAUSABLE_STATUSES,
+            MissionStatus.PAUSED,
+            'pause',
+        );
+        await this.recordActivity(userId, ActivityActionType.MISSION_PAUSED, 'pause', {
+            missionId,
+        });
+        return dto;
     }
 
     async resume(userId: string, missionId: string): Promise<MissionDto> {
-        return this.transition(
+        const dto = await this.transition(
             userId,
             missionId,
             RESUMABLE_STATUSES,
             MissionStatus.ACTIVE,
             'resume',
         );
+        await this.recordActivity(userId, ActivityActionType.MISSION_RESUMED, 'resume', {
+            missionId,
+        });
+        return dto;
     }
 
-    async complete(userId: string, missionId: string): Promise<MissionDto> {
-        return this.transition(
+    /**
+     * PR-3 (review §23.2) - Complete keeps its verb and its stored
+     * status value ('completed'); it now optionally records a
+     * conclusion `outcome` (succeeded | partially_succeeded | failed |
+     * cancelled | superseded) plus `completedAt`. Outcome is
+     * HUMAN-ONLY judgment: this method is reachable only from
+     * user-authenticated surfaces, and the autonomous agent runtime
+     * deliberately has no complete-mission tool (invariant I-4 -
+     * outcome is never derived from task/idea counts either).
+     */
+    async complete(
+        userId: string,
+        missionId: string,
+        outcome?: MissionOutcome | null,
+    ): Promise<MissionDto> {
+        if (outcome != null && !Object.values(MissionOutcome).includes(outcome)) {
+            throw new BadRequestException(
+                `Invalid outcome "${outcome}". Allowed: ${Object.values(MissionOutcome).join(', ')}.`,
+            );
+        }
+        const dto = await this.transition(
             userId,
             missionId,
             COMPLETABLE_STATUSES,
             MissionStatus.COMPLETED,
             'complete',
+            (m) => {
+                m.outcome = outcome ?? null;
+                m.completedAt = new Date();
+            },
         );
+        await this.recordActivity(userId, ActivityActionType.MISSION_COMPLETED, 'complete', {
+            missionId,
+            outcome: outcome ?? null,
+        });
+        return dto;
     }
 
     /**
@@ -373,6 +432,10 @@ export class MissionsService {
     async delete(userId: string, missionId: string): Promise<{ deleted: true }> {
         const existing = await this.findOrThrow(userId, missionId);
         await this.missions.remove(existing);
+        await this.recordActivity(userId, ActivityActionType.MISSION_DELETED, 'delete', {
+            missionId,
+            title: existing.title,
+        });
         return { deleted: true };
     }
 
@@ -600,6 +663,7 @@ export class MissionsService {
         allowedFrom: ReadonlyArray<MissionStatus>,
         target: MissionStatus,
         verb: string,
+        mutate?: (mission: Mission) => void,
     ): Promise<MissionDto> {
         const existing = await this.findOrThrow(userId, missionId);
         if (!allowedFrom.includes(existing.status)) {
@@ -608,8 +672,44 @@ export class MissionsService {
             );
         }
         existing.status = target;
+        // PR-3: re-activating a failed Mission clears the conclusion
+        // fields - a revived Mission has no verdict yet.
+        if (target === MissionStatus.ACTIVE) {
+            existing.outcome = null;
+            existing.completedAt = null;
+        }
+        mutate?.(existing);
         const saved = await this.missions.save(existing);
         return toMissionDto(saved);
+    }
+
+    /**
+     * PR-3 - best-effort activity write (never fails the operation;
+     * no-ops when the service isn't wired, e.g. hand-rolled tests).
+     */
+    private async recordActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        action: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                actionType,
+                action,
+                status: ActivityStatus.COMPLETED,
+                summary: `Mission ${action}`,
+                details: details as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to write mission activity (${actionType}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**

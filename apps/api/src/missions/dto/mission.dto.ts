@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
     IsBoolean,
+    IsIn,
     IsEnum,
     IsIn,
     IsInt,
@@ -267,6 +268,17 @@ export class AttachMissionWorkDto {
     })
     @IsIn(['created', 'improves', 'operates', 'markets', 'researches', 'retires'])
     relation!: 'created' | 'improves' | 'operates' | 'markets' | 'researches' | 'retires';
+}
+
+/**
+ * PR-3 (domain-model evolution, review §23.2) - optional conclusion
+ * verdict recorded when a human completes a Mission. Omitting it keeps
+ * today's behavior exactly (outcome stays NULL).
+ */
+export class CompleteMissionDto {
+    @IsOptional()
+    @IsIn(['succeeded', 'partially_succeeded', 'failed', 'cancelled', 'superseded'])
+    outcome?: 'succeeded' | 'partially_succeeded' | 'failed' | 'cancelled' | 'superseded' | null;
 }
 
 export class AddMissionAttachmentDto {

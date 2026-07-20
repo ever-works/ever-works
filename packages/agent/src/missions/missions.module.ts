@@ -9,6 +9,7 @@ import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { TitlerModule } from '../titler/titler.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { UserResearchModule } from '../user-research/user-research.module';
 import { WorkAgentModule } from '../work-agent/work-agent.module';
 import { MissionCloneService } from './mission-clone.service';
@@ -46,6 +47,7 @@ import { MissionTickService } from './mission-tick.service';
             UserUpload,
         ]),
         TitlerModule,
+        ActivityLogModule,
         UserResearchModule,
         WorkAgentModule,
     ],
