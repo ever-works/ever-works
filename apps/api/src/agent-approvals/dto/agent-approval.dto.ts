@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsEnum,
+    IsInt,
+    IsOptional,
+    IsUUID,
+    Max,
+    Min,
+} from 'class-validator';
 import { AGENT_ACTION_PROPOSAL_STATUSES } from '@ever-works/agent/agent-approvals';
 
 /**
