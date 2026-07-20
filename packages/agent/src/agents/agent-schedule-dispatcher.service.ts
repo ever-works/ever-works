@@ -244,9 +244,12 @@ export class AgentScheduleDispatcherService {
             // created but the trigger enqueue failed, the row would be
             // stuck in `queued` forever (stuck-run sweeper only resets
             // RUNNING). Mark it failed so re-runs aren't blocked.
+            // FU-3: via markDispatchFailed, which is `queued`-only — an
+            // enqueue that threw on timeout may still have been accepted,
+            // and the worker owns the row once it reaches `running`.
             if (createdRun && !enqueueSucceeded) {
                 try {
-                    await this.agentRunRepository.markFailed(
+                    await this.agentRunRepository.markDispatchFailed(
                         createdRun.id,
                         `dispatch-failed: ${message}`,
                     );

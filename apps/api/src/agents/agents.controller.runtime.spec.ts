@@ -107,6 +107,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             createQueued: jest.fn(),
             findInFlightForTaskAgent: jest.fn().mockResolvedValue(null),
             markFailed: jest.fn().mockResolvedValue(undefined),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             findByIdAndUser: jest.fn().mockResolvedValue(null),
         };
         agentRunLogs = { findByRun: jest.fn().mockResolvedValue([]) };
@@ -460,10 +461,14 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             await expect(controller.assignTask(auth, agentId, { taskId })).rejects.toBeInstanceOf(
                 InternalServerErrorException,
             );
-            expect(agentRuns.markFailed).toHaveBeenCalledWith(
+            // FU-3: the rollback goes through markDispatchFailed, which is
+            // `queued`-only, so it can never stomp a run the worker already
+            // started after an enqueue that timed out but was accepted.
+            expect(agentRuns.markDispatchFailed).toHaveBeenCalledWith(
                 runId,
                 expect.stringContaining('enqueue-failed'),
             );
+            expect(agentRuns.markFailed).not.toHaveBeenCalled();
         });
 
         it('throws 500 when AGENT_TASK_EXECUTE_DISPATCHER is unbound', async () => {
