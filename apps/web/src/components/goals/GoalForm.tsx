@@ -15,7 +15,7 @@ import {
     DEFAULT_CHECK_FREQUENCY_MINUTES,
     type GoalComparator,
     type GoalWindow,
-} from '@/lib/api/goals';
+} from '@/lib/api/goals.shared';
 import { createGoalAction } from './actions';
 
 const COMPARATORS: GoalComparator[] = ['gte', 'lte'];
