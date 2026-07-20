@@ -236,6 +236,69 @@ export const missionsAPI = {
             wrapInData: false,
         });
     },
+
+    // PR-2 (domain-model evolution) — explicit Mission↔Work M:N
+    // relation surface (`mission_works`). Rows are cheap references,
+    // never ownership: Missions never own Works (invariant I-7) and
+    // detaching / deleting a Mission never touches the Work (I-6).
+
+    /** `GET /me/missions/:id/works` → the Works this Mission relates to. */
+    async listWorks(id: string): Promise<MissionWorkRelationDto[]> {
+        const res = await serverFetch<{ relations: MissionWorkRelationDto[] }>(
+            `/me/missions/${id}/works`,
+            { method: 'GET' },
+        );
+        return res.relations;
+    },
+
+    /**
+     * `POST /me/missions/:id/works` — attach an EXISTING Work with a
+     * typed relation. 404 on unknown/foreign Work, 400 on a bad
+     * relation, idempotent on duplicates. Returns the updated list.
+     */
+    async attachWork(
+        id: string,
+        input: { workId: string; relation: MissionWorkRelation },
+    ): Promise<MissionWorkRelationDto[]> {
+        const res = await serverMutation<{ relations: MissionWorkRelationDto[] }>({
+            endpoint: `/me/missions/${id}/works`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
+        return res.relations;
+    },
+
+    /**
+     * `DELETE /me/missions/:id/works/:workId/:relation` — detach one
+     * Mission↔Work edge. The Work itself is never touched (I-6).
+     * 404 when the edge doesn't exist.
+     */
+    async detachWork(
+        id: string,
+        workId: string,
+        relation: MissionWorkRelation,
+    ): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/me/missions/${id}/works/${workId}/${relation}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `GET /me/missions/related-to-work/:workId` — reverse lookup:
+     * which of my Missions relate to this Work. Backs the Work
+     * Overview "Missions" panel.
+     */
+    async listMissionsForWork(workId: string): Promise<WorkMissionRelationDto[]> {
+        const res = await serverFetch<{ relations: WorkMissionRelationDto[] }>(
+            `/me/missions/related-to-work/${workId}`,
+            { method: 'GET' },
+        );
+        return res.relations;
+    },
 };
 
 /** Row shape returned by `/me/missions/:id/attachments`. */
@@ -244,4 +307,52 @@ export interface MissionAttachmentRow {
     readonly missionId: string;
     readonly uploadId: string;
     readonly createdAt: string;
+}
+
+/**
+ * PR-2 — the six typed Mission↔Work relation kinds. Web-side mirror of
+ * `MISSION_WORK_RELATIONS` in
+ * `packages/agent/src/entities/mission-work.entity.ts` (kept in
+ * lockstep manually, same as the `Mission` DTO above).
+ */
+export const MISSION_WORK_RELATIONS = [
+    'created',
+    'improves',
+    'operates',
+    'markets',
+    'researches',
+    'retires',
+] as const;
+export type MissionWorkRelation = (typeof MISSION_WORK_RELATIONS)[number];
+
+/**
+ * Row shape returned by `GET/POST /me/missions/:id/works` — a
+ * `mission_works` edge hydrated with the Work's display fields
+ * (agent-side `MissionWorkWithWork`; `createdAt` wire-serialized to
+ * an ISO string, `workName`/`workSlug` null when the Work vanished
+ * mid-flight).
+ */
+export interface MissionWorkRelationDto {
+    readonly id: string;
+    readonly missionId: string;
+    readonly workId: string;
+    readonly relation: MissionWorkRelation;
+    readonly createdAt: string;
+    readonly workName: string | null;
+    readonly workSlug: string | null;
+}
+
+/**
+ * Row shape returned by `GET /me/missions/related-to-work/:workId` —
+ * the reverse edge hydrated with the Mission's display fields
+ * (agent-side `MissionWorkWithMission`).
+ */
+export interface WorkMissionRelationDto {
+    readonly id: string;
+    readonly missionId: string;
+    readonly workId: string;
+    readonly relation: MissionWorkRelation;
+    readonly createdAt: string;
+    readonly missionTitle: string | null;
+    readonly missionStatus: string | null;
 }

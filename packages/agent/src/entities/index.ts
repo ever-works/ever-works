@@ -72,6 +72,7 @@ export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
+export * from './mission-work.entity';
 export * from './work-proposal-attachment.entity';
 export * from './idea-work.entity';
 export * from './agent-attachment.entity';

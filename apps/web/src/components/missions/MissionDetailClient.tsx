@@ -39,9 +39,15 @@ import {
     runMissionNowAction,
     updateMissionAction,
 } from '@/app/actions/dashboard/missions';
-import type { Mission, MissionAttachmentRow, OwnerBudgetSummary } from '@/lib/api/missions';
+import type {
+    Mission,
+    MissionAttachmentRow,
+    MissionWorkRelationDto,
+    OwnerBudgetSummary,
+} from '@/lib/api/missions';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
+import { MissionAttachedWorksPanel, type AttachableWorkOption } from './MissionAttachedWorksPanel';
 import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
 import {
@@ -60,6 +66,10 @@ export interface MissionDetailClientProps {
     inheritedIdeas?: WorkProposal[];
     budget?: OwnerBudgetSummary | null;
     attachments?: ReadonlyArray<MissionAttachmentRow>;
+    /** PR-2 — explicit `mission_works` edges for the "Attached Works" panel. */
+    workRelations?: MissionWorkRelationDto[];
+    /** PR-2 — the caller's Works, feeding the "Attach Work" select. */
+    attachableWorks?: ReadonlyArray<AttachableWorkOption>;
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -124,6 +134,8 @@ export function MissionDetailClient({
     inheritedIdeas = [],
     budget = null,
     attachments = [],
+    workRelations = [],
+    attachableWorks = [],
 }: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
@@ -562,6 +574,13 @@ export function MissionDetailClient({
                     </ul>
                 )}
             </section>
+
+            {/* ── Attached Works (explicit mission_works edges, PR-2) ──────── */}
+            <MissionAttachedWorksPanel
+                missionId={mission.id}
+                initialRelations={workRelations}
+                attachableWorks={attachableWorks}
+            />
 
             {/* ── Inherited Works (cloned missions only) ───────────────────── */}
             {mission.sourceMissionId && (
