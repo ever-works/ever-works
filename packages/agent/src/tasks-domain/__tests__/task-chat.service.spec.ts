@@ -151,6 +151,125 @@ describe('TaskChatService', () => {
                 expect.objectContaining({ runId: 'run-chat-1' }),
             );
         });
+
+        it('transitions AgentRun to failed and does not fail comment posting if enqueue throws', async () => {
+            const runs = {
+                createQueued: jest.fn().mockResolvedValue({ id: 'run-chat-1' }),
+                markFailed: jest.fn().mockResolvedValue(undefined),
+            };
+            const chatDispatcher = {
+                enqueue: jest.fn().mockRejectedValue(new Error('Trigger.dev down')),
+            };
+            const dispatchingSvc = new TaskChatService(
+                tasks,
+                messages,
+                kbMentions,
+                activity,
+                runs as any,
+                chatDispatcher,
+            );
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+            messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
+
+            const result = await dispatchingSvc.post(
+                'u1',
+                {
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'hey @ceo, look at this',
+                },
+                { ownedAgentSlugs: new Map([['ceo', 'agent-a1']]) },
+            );
+
+            expect(result.id).toBe('m1'); // Post comment itself succeeded
+
+            await new Promise((resolve) => setImmediate(resolve));
+
+            // Pin the `dispatch-failed:` prefix, not just the underlying cause —
+            // it is what surfaces in the Activity tab for an orphaned run.
+            expect(runs.markFailed).toHaveBeenCalledWith(
+                'run-chat-1',
+                expect.stringContaining('dispatch-failed: Trigger.dev down'),
+            );
+        });
+
+        it('does not attempt markFailed when the queued run was never created', async () => {
+            const runs = {
+                createQueued: jest.fn().mockRejectedValue(new Error('DB down')),
+                markFailed: jest.fn().mockResolvedValue(undefined),
+            };
+            const chatDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+            const dispatchingSvc = new TaskChatService(
+                tasks,
+                messages,
+                kbMentions,
+                activity,
+                runs as any,
+                chatDispatcher,
+            );
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+            messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
+
+            const result = await dispatchingSvc.post(
+                'u1',
+                {
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'hey @ceo, look at this',
+                },
+                { ownedAgentSlugs: new Map([['ceo', 'agent-a1']]) },
+            );
+
+            expect(result.id).toBe('m1'); // Post comment itself succeeded
+
+            await new Promise((resolve) => setImmediate(resolve));
+
+            // `run` is still null here, so the `if (run)` guard must short-circuit.
+            // Without it this path throws TypeError on `run.id`.
+            expect(chatDispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.markFailed).not.toHaveBeenCalled();
+        });
+
+        it('gracefully handles enqueue failures when runs repository is missing', async () => {
+            const chatDispatcher = {
+                enqueue: jest.fn().mockRejectedValue(new Error('Trigger.dev down')),
+            };
+            const dispatchingSvc = new TaskChatService(
+                tasks,
+                messages,
+                kbMentions,
+                activity,
+                undefined,
+                chatDispatcher,
+            );
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+            messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
+
+            const result = await dispatchingSvc.post(
+                'u1',
+                {
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'hey @ceo, look at this',
+                },
+                { ownedAgentSlugs: new Map([['ceo', 'agent-a1']]) },
+            );
+
+            expect(result.id).toBe('m1'); // Post comment itself succeeded
+
+            await new Promise((resolve) => setImmediate(resolve));
+
+            // No runs repository ⇒ no row was ever persisted, so dispatch still had
+            // to be attempted with an undefined runId, and reconciliation must be
+            // skipped rather than throwing. Asserting the runId pins the `run?.id`
+            // behaviour that hoisting `run` out of the try block could have broken.
+            expect(chatDispatcher.enqueue).toHaveBeenCalledWith(
+                expect.objectContaining({ runId: undefined }),
+            );
+        });
     });
 
     describe('edit', () => {

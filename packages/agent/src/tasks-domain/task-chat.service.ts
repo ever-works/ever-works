@@ -139,8 +139,9 @@ export class TaskChatService {
             for (const mention of agentMentions) {
                 const dedupKey = `${task.id}:${mention.id}:${row.id}`;
                 void (async () => {
+                    let run: { id: string } | null = null;
                     try {
-                        const run = this.runs
+                        run = this.runs
                             ? await this.runs.createQueued({
                                   agentId: mention.id,
                                   userId,
@@ -158,11 +159,31 @@ export class TaskChatService {
                             runId: run?.id,
                         });
                     } catch (err) {
+                        const message = err instanceof Error ? err.message : String(err);
                         this.logger.warn(
-                            `Failed to dispatch agent-chat-reply for ${mention.id}: ${err}`,
+                            `Failed to dispatch agent-chat-reply for ${mention.id}: ${message}`,
                         );
+                        if (run) {
+                            try {
+                                await this.runs?.markFailed(run.id, `dispatch-failed: ${message}`);
+                            } catch (failErr) {
+                                this.logger.warn(
+                                    `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,
+                                );
+                            }
+                        }
                     }
-                })();
+                })().catch((err) =>
+                    // Belt-and-braces: everything above is already inside a
+                    // try/catch, but this IIFE is fire-and-forget, so anything
+                    // that still escapes (e.g. a throwing logger) would become an
+                    // unhandled rejection — process-fatal on Node >= 15. The
+                    // sibling fan-out in task-transition.service.ts is guarded the
+                    // same way.
+                    this.logger.warn(
+                        `Agent chat-reply fan-out failed for message ${row.id}: ${err}`,
+                    ),
+                );
             }
         }
         return row;

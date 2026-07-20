@@ -162,6 +162,11 @@ describe('TriggerInternalController', () => {
             undefined, // credentialVersionService
             undefined, // organizationRepository
             undefined, // webhookSubscriptionRepository
+            // EW-617 G2 / EW-643 - two new constructor args exposing the
+            // anonymous-user-cleanup + kb-reconcile services through the
+            // remote-proxy controller. Not exercised by these tests.
+            undefined, // anonymousUserCleanupService
+            undefined, // knowledgeBaseReconcileService
             undefined, // workProposalsApiService (Optional trailing)
         );
         c.onModuleInit();
