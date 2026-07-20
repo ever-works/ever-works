@@ -50,6 +50,7 @@ import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
+import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -179,6 +180,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).
         SchedulesModule,
+        // Inbound Triggers ("Trigger Schedules") — signed webhook/API
+        // triggers that spawn Tasks on verified HMAC deliveries.
+        // Management CRUD + the public /:id/fire endpoint.
+        InboundTriggersModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

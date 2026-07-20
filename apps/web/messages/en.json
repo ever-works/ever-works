@@ -456,6 +456,58 @@
         }
     },
     "dashboard": {
+        "triggers": {
+            "confirmDelete": "Delete this trigger? Its webhook URL stops working immediately and this can't be undone.",
+            "title": "Inbound triggers",
+            "subtitle": "Signed webhooks and API calls that spawn a Task when fired.",
+            "new": "New trigger",
+            "empty": "No triggers yet. Create one to receive signed webhooks.",
+            "firedCount": "{count} fires",
+            "lastFired": "last fired",
+            "status": {
+                "active": "Active",
+                "paused": "Paused"
+            },
+            "createTitle": "New inbound trigger",
+            "createDescription": "You get a signed webhook URL and a secret. External systems POST to it to spawn a Task.",
+            "form": {
+                "name": "Name",
+                "namePlaceholder": "Deploy notifications",
+                "description": "Description",
+                "descriptionPlaceholder": "What fires this trigger?",
+                "taskTitle": "Task title template",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} expands to the trigger name."
+            },
+            "actions": {
+                "pause": "Pause",
+                "resume": "Resume",
+                "rotate": "Rotate secret",
+                "delete": "Delete",
+                "cancel": "Cancel",
+                "create": "Create"
+            },
+            "reveal": {
+                "title": "Trigger secret",
+                "warning": "Copy the secret now — you won't be able to see it again.",
+                "url": "Webhook URL",
+                "secret": "Signing secret",
+                "curl": "Signed request example",
+                "copy": "Copy",
+                "done": "Done"
+            },
+            "toast": {
+                "created": "Trigger created",
+                "createFailed": "Could not create the trigger",
+                "rotated": "Secret rotated",
+                "rotateFailed": "Could not rotate the secret",
+                "toggleFailed": "Could not update the trigger",
+                "deleted": "Trigger deleted",
+                "deleteFailed": "Could not delete the trigger",
+                "loadFailed": "Could not load triggers",
+                "copyFailed": "Could not copy to clipboard"
+            }
+        },
         "title": "Dashboard",
         "approvals": {
             "header": {
@@ -1433,6 +1485,7 @@
                 "activeOnly": "Active only"
             },
             "sourceTypes": {
+                "inboundTrigger": "Inbound trigger",
                 "recurringTask": "Recurring task",
                 "agentHeartbeat": "Agent heartbeat",
                 "workSchedule": "Work schedule",

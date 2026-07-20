@@ -67,6 +67,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    'InboundTrigger',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',

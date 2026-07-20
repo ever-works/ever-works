@@ -1376,7 +1376,8 @@
                 "workSchedule": "Werk-Zeitplan",
                 "missionTick": "Mission-Tick",
                 "sourceValidation": "Quellenvalidierung",
-                "dataSync": "Datensynchronisierung"
+                "dataSync": "Datensynchronisierung",
+                "inboundTrigger": "Eingehender Trigger"
             },
             "statuses": {
                 "active": "Aktiv",
@@ -5228,6 +5229,58 @@
         "discover": {
             "title": "Entdecken",
             "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
+        },
+        "triggers": {
+            "title": "Eingehende Trigger",
+            "subtitle": "Signierte Webhooks und API-Aufrufe, die beim Auslösen eine Aufgabe erstellen.",
+            "new": "Neuer Trigger",
+            "empty": "Noch keine Trigger. Erstellen Sie einen, um signierte Webhooks zu empfangen.",
+            "firedCount": "{count} Auslösungen",
+            "lastFired": "zuletzt ausgelöst",
+            "status": {
+                "active": "Aktiv",
+                "paused": "Pausiert"
+            },
+            "createTitle": "Neuer eingehender Trigger",
+            "createDescription": "Sie erhalten eine signierte Webhook-URL und ein Geheimnis. Externe Systeme senden per POST, um eine Aufgabe zu erstellen.",
+            "form": {
+                "name": "Name",
+                "namePlaceholder": "Deployment-Benachrichtigungen",
+                "description": "Beschreibung",
+                "descriptionPlaceholder": "Was löst diesen Trigger aus?",
+                "taskTitle": "Vorlage für Aufgabentitel",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} wird durch den Trigger-Namen ersetzt."
+            },
+            "actions": {
+                "pause": "Pausieren",
+                "resume": "Fortsetzen",
+                "rotate": "Geheimnis rotieren",
+                "delete": "Löschen",
+                "cancel": "Abbrechen",
+                "create": "Erstellen"
+            },
+            "reveal": {
+                "title": "Trigger-Geheimnis",
+                "warning": "Kopieren Sie das Geheimnis jetzt — Sie können es später nicht mehr sehen.",
+                "url": "Webhook-URL",
+                "secret": "Signaturgeheimnis",
+                "curl": "Beispiel für eine signierte Anfrage",
+                "copy": "Kopieren",
+                "done": "Fertig"
+            },
+            "toast": {
+                "created": "Trigger erstellt",
+                "createFailed": "Trigger konnte nicht erstellt werden",
+                "rotated": "Geheimnis rotiert",
+                "rotateFailed": "Geheimnis konnte nicht rotiert werden",
+                "toggleFailed": "Trigger konnte nicht aktualisiert werden",
+                "deleted": "Trigger gelöscht",
+                "deleteFailed": "Trigger konnte nicht gelöscht werden",
+                "loadFailed": "Trigger konnten nicht geladen werden",
+                "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen"
+            },
+            "confirmDelete": "Diesen Trigger löschen? Seine Webhook-URL funktioniert sofort nicht mehr und dies kann nicht rückgängig gemacht werden."
         }
     },
     "layout": {
