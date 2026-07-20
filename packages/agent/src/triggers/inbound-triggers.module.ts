@@ -18,8 +18,8 @@ import { InboundTriggersService } from './inbound-triggers.service';
  *   module uses) rather than dragging in a broader services module.
  */
 @Module({
-	imports: [DatabaseModule, TasksDomainModule],
-	providers: [InboundTriggersService, WebhookSubscriptionSecretService],
-	exports: [InboundTriggersService],
+    imports: [DatabaseModule, TasksDomainModule],
+    providers: [InboundTriggersService, WebhookSubscriptionSecretService],
+    exports: [InboundTriggersService],
 })
 export class InboundTriggersModule {}

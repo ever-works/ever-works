@@ -38,7 +38,9 @@ export const TEAM_RESOURCE_TYPES: readonly TeamResourceType[] = [
 ];
 
 @Entity({ name: 'team_resources' })
-@Index('uq_team_resources_team_resource', ['teamId', 'resourceType', 'resourceId'], { unique: true })
+@Index('uq_team_resources_team_resource', ['teamId', 'resourceType', 'resourceId'], {
+    unique: true,
+})
 @Index('idx_team_resources_resource', ['resourceType', 'resourceId'])
 export class TeamResource {
     @PrimaryGeneratedColumn('uuid')

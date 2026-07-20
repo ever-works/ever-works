@@ -23,7 +23,8 @@ export class CreateInboundTriggerDto {
 
     @ApiPropertyOptional({
         enum: TRIGGER_KINDS,
-        description: "Delivery style — informational; both kinds share the same fire endpoint. Defaults to 'webhook'.",
+        description:
+            "Delivery style — informational; both kinds share the same fire endpoint. Defaults to 'webhook'.",
     })
     @IsOptional()
     @IsIn(TRIGGER_KINDS)
@@ -71,7 +72,8 @@ export class UpdateInboundTriggerDto {
     targetAgentId?: string | null;
 
     @ApiPropertyOptional({
-        description: "Title template for spawned Tasks; '{name}' expands to the trigger name; null resets to the default",
+        description:
+            "Title template for spawned Tasks; '{name}' expands to the trigger name; null resets to the default",
         maxLength: 200,
     })
     @IsOptional()
