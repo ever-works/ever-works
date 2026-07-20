@@ -50,14 +50,9 @@ workIds[] }`. The relaxation only adds "all Works in one org", it does not open 
 - New `apps/api/src/organizations/org-memory.controller.ts`, guard stack mirrored from
   [`org-kb.controller.ts`](../../../../apps/api/src/works/org-kb.controller.ts)
   (`OrganizationOwnershipGuard` + `OrganizationMembershipService.ensureMember/ensureAdmin`).
-- Endpoints:
-    - `GET /api/memory` — faceted union feed (KB docs + org docs + uploads + agent-memory
-      read-through). Paginated (cursor).
-    - `GET /api/memory/facets` — per-facet counts honoring other active filters.
-    - `GET /api/memory/stats` — `{ documentsIndexed, conceptsSynthesized: 0, worksCovered,
-lastIndexedAt }`.
-    - `POST /api/memory/documents` — `+ New`; delegates to `KnowledgeBaseService.createOrgDocument`.
-    - `GET /api/memory/documents/:id` — uniform item detail (proxies KB doc / agent-memory session).
+- Endpoints: - `GET /api/memory` — faceted union feed (KB docs + org docs + uploads + agent-memory
+  read-through). Paginated (cursor). - `GET /api/memory/facets` — per-facet counts honoring other active filters. - `GET /api/memory/stats` — `{ documentsIndexed, conceptsSynthesized: 0, worksCovered,
+lastIndexedAt }`. - `POST /api/memory/documents` — `+ New`; delegates to `KnowledgeBaseService.createOrgDocument`. - `GET /api/memory/documents/:id` — uniform item detail (proxies KB doc / agent-memory session).
 - New service `apps/api/src/organizations/org-memory.service.ts` — builds the `MemoryItem` union
   feed, applies facets, calls `orgSemanticSearch` when `q` present, and does the agent-memory
   read-through (best-effort; empty on failure).
