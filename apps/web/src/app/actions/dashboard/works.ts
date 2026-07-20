@@ -39,6 +39,13 @@ const readmeConfigSchema = z.object({
     overwriteDefaultFooter: z.boolean().optional(),
 });
 
+// Work-kind chip vocabulary (see `InitialWorkKind` in
+// works/new/new-work-client.tsx). Persisted on `work.kind` by the API so
+// the kind-aware default website template applies (general-purpose kinds
+// → the `web` template). The API whitelists again server-side.
+const aiWorkKindSchema = z.enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo']);
+type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
+
 const getCreateWorkSchema = async () => {
     const t = await getTranslations('actions.works');
 
@@ -66,6 +73,9 @@ const getCreateWorkSchema = async () => {
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
         websiteTemplateId: z.string().optional(),
+        // Optional work-kind chip value — kept in the parsed output so it
+        // reaches the API's CreateWorkDto (zod strips unknown keys).
+        kind: aiWorkKindSchema.optional(),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -194,9 +204,6 @@ export async function createWork(data: CreateWorkDto) {
         };
     }
 }
-
-const aiWorkKindSchema = z.enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo']);
-type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
 
 const AI_WORK_KIND_PROMPT_LABELS: Record<AIWorkKind, string> = {
     website: 'website',
@@ -358,6 +365,10 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             gitProvider: providerId,
             deployProvider: request.deployProvider || undefined,
             websiteTemplateId: request.websiteTemplateId || undefined,
+            // Persist the work-kind chip on the Work itself (not just the
+            // generation prompt) so the kind-aware default website
+            // template applies when no explicit template was chosen.
+            kind: validation.data.workKind,
         };
 
         // Validate the generated work data

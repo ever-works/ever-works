@@ -113,9 +113,7 @@ describe('VercelPlugin', () => {
 
 	describe('IOAuthPlugin — getAuthorizationUrl', () => {
 		it('throws when the integration slug is not configured', () => {
-			expect(() => plugin.getAuthorizationUrl('state', { clientId: 'cid' })).toThrow(
-				/VERCEL_INTEGRATION_SLUG/
-			);
+			expect(() => plugin.getAuthorizationUrl('state', { clientId: 'cid' })).toThrow(/VERCEL_INTEGRATION_SLUG/);
 		});
 
 		it('throws when the client id is missing', () => {
@@ -135,9 +133,7 @@ describe('VercelPlugin', () => {
 			expect(u.searchParams.get('client_id')).toBe('cid');
 			expect(u.searchParams.get('state')).toBe('xyz');
 			expect(u.searchParams.get('scope')).toBe('user project');
-			expect(u.searchParams.get('redirect_uri')).toBe(
-				'https://app.ever.works/api/oauth/vercel/callback/plugins'
-			);
+			expect(u.searchParams.get('redirect_uri')).toBe('https://app.ever.works/api/oauth/vercel/callback/plugins');
 		});
 
 		it('falls back to the client id + slug env vars when config omits them', () => {
@@ -184,9 +180,7 @@ describe('VercelPlugin', () => {
 			expect(t).toEqual({ accessToken: 'tok', tokenType: 'Bearer', scope: 'user project' });
 			const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
 			expect(url).toBe('https://api.vercel.com/v2/oauth/access_token');
-			expect((init.headers as Record<string, string>)['Content-Type']).toBe(
-				'application/x-www-form-urlencoded'
-			);
+			expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/x-www-form-urlencoded');
 			const body = new URLSearchParams(init.body as string);
 			expect(body.get('client_id')).toBe('cid');
 			expect(body.get('client_secret')).toBe('csec');
@@ -204,9 +198,9 @@ describe('VercelPlugin', () => {
 			fetchMock.mockResolvedValueOnce(
 				okJsonResponse({ error: 'invalid_grant', error_description: 'Code invalid' })
 			);
-			await expect(
-				plugin.exchangeCodeForToken('bad', { clientId: 'cid', clientSecret: 'csec' })
-			).rejects.toThrow(/Code invalid/);
+			await expect(plugin.exchangeCodeForToken('bad', { clientId: 'cid', clientSecret: 'csec' })).rejects.toThrow(
+				/Code invalid/
+			);
 		});
 
 		it('throws when the HTTP response is not ok', async () => {
@@ -215,9 +209,9 @@ describe('VercelPlugin', () => {
 				status: 401,
 				json: () => Promise.resolve({})
 			} as unknown as Response);
-			await expect(
-				plugin.exchangeCodeForToken('bad', { clientId: 'cid', clientSecret: 'csec' })
-			).rejects.toThrow(/Vercel OAuth error/);
+			await expect(plugin.exchangeCodeForToken('bad', { clientId: 'cid', clientSecret: 'csec' })).rejects.toThrow(
+				/Vercel OAuth error/
+			);
 		});
 	});
 
