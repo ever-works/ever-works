@@ -1738,7 +1738,45 @@
             "tasksInFlight": "Tâches en cours",
             "tasksBlocked": "{count} bloqué(s)",
             "tasksNoBlockers": "aucun bloqueur",
-            "fromLastMonth": "par rapport au mois dernier"
+            "fromLastMonth": "par rapport au mois dernier",
+            "teams": "Équipes"
+        },
+        "attention": {
+            "title": "Nécessite une attention",
+            "kinds": {
+                "agentError": {
+                    "title": "L’agent “{name}” a rencontré une erreur",
+                    "subtitle": "Mis en pause automatiquement après des échecs répétés"
+                },
+                "scheduleFailed": {
+                    "title": "Échec de l’exécution planifiée",
+                    "subtitle": "La dernière exécution de “{name}” ne s’est pas terminée"
+                },
+                "schedulePaused": {
+                    "title": "Planification en pause",
+                    "subtitle": "“{name}” mis en pause après des échecs répétés"
+                },
+                "generationFailed": {
+                    "title": "Échec de la génération",
+                    "subtitle": "Impossible de créer “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Tâche bloquée",
+                    "subtitle": "“{name}” a besoin d’une saisie pour continuer"
+                },
+                "budgetExceeded": {
+                    "title": "Budget dépassé",
+                    "subtitle": "Les dépenses du compte ont atteint leur plafond"
+                }
+            }
+        },
+        "soon": {
+            "title": "À venir",
+            "more": "+{n} de plus",
+            "source": {
+                "work": "Travail",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Utilisation de la plateforme",

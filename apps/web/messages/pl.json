@@ -1574,7 +1574,45 @@
             "totalItems": "Łączna liczba elementów",
             "activeWebsites": "Aktywne witryny",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "z ostatniego miesiąca"
+            "fromLastMonth": "z ostatniego miesiąca",
+            "teams": "Zespoły"
+        },
+        "attention": {
+            "title": "Wymaga uwagi",
+            "kinds": {
+                "agentError": {
+                    "title": "Agent “{name}” zgłosił błąd",
+                    "subtitle": "Automatycznie wstrzymany po powtarzających się błędach"
+                },
+                "scheduleFailed": {
+                    "title": "Uruchomienie harmonogramu nie powiodło się",
+                    "subtitle": "Ostatnie uruchomienie “{name}” nie zostało ukończone"
+                },
+                "schedulePaused": {
+                    "title": "Harmonogram wstrzymany",
+                    "subtitle": "“{name}” wstrzymany po powtarzających się błędach"
+                },
+                "generationFailed": {
+                    "title": "Generowanie nie powiodło się",
+                    "subtitle": "Nie udało się zbudować “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Zadanie zablokowane",
+                    "subtitle": "“{name}” wymaga danych, aby kontynuować"
+                },
+                "budgetExceeded": {
+                    "title": "Budżet przekroczony",
+                    "subtitle": "Wydatki konta osiągnęły limit"
+                }
+            }
+        },
+        "soon": {
+            "title": "Wkrótce",
+            "more": "+{n} więcej",
+            "source": {
+                "work": "Praca",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

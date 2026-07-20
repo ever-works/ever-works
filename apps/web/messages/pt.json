@@ -1574,7 +1574,45 @@
             "totalItems": "Total de Itens",
             "activeWebsites": "Sites Ativos",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "do último mês"
+            "fromLastMonth": "do último mês",
+            "teams": "Equipes"
+        },
+        "attention": {
+            "title": "Requer atenção",
+            "kinds": {
+                "agentError": {
+                    "title": "O agente “{name}” apresentou um erro",
+                    "subtitle": "Pausado automaticamente após falhas repetidas"
+                },
+                "scheduleFailed": {
+                    "title": "Falha na execução agendada",
+                    "subtitle": "A última execução de “{name}” não foi concluída"
+                },
+                "schedulePaused": {
+                    "title": "Agendamento pausado",
+                    "subtitle": "“{name}” pausado após falhas repetidas"
+                },
+                "generationFailed": {
+                    "title": "Falha na geração",
+                    "subtitle": "Não foi possível criar “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Tarefa bloqueada",
+                    "subtitle": "“{name}” precisa de entrada para continuar"
+                },
+                "budgetExceeded": {
+                    "title": "Orçamento excedido",
+                    "subtitle": "Os gastos da conta atingiram o limite"
+                }
+            }
+        },
+        "soon": {
+            "title": "Em breve",
+            "more": "+{n} mais",
+            "source": {
+                "work": "Trabalho",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

@@ -1574,7 +1574,45 @@
             "totalItems": "Всего элементов",
             "activeWebsites": "Активные веб-сайты",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "за последний месяц"
+            "fromLastMonth": "за последний месяц",
+            "teams": "Команды"
+        },
+        "attention": {
+            "title": "Требует внимания",
+            "kinds": {
+                "agentError": {
+                    "title": "Ошибка агента “{name}”",
+                    "subtitle": "Автоматически приостановлен после повторных сбоев"
+                },
+                "scheduleFailed": {
+                    "title": "Не удалось выполнить по расписанию",
+                    "subtitle": "Последний запуск “{name}” не завершился"
+                },
+                "schedulePaused": {
+                    "title": "Расписание приостановлено",
+                    "subtitle": "“{name}” приостановлен после повторных сбоев"
+                },
+                "generationFailed": {
+                    "title": "Не удалось выполнить генерацию",
+                    "subtitle": "Не удалось создать “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Задача заблокирована",
+                    "subtitle": "“{name}” требует ввода для продолжения"
+                },
+                "budgetExceeded": {
+                    "title": "Бюджет превышен",
+                    "subtitle": "Расходы аккаунта достигли лимита"
+                }
+            }
+        },
+        "soon": {
+            "title": "Скоро",
+            "more": "+{n} ещё",
+            "source": {
+                "work": "Работа",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

@@ -1861,7 +1861,45 @@
             "tasksInFlight": "Tasks in flight",
             "tasksBlocked": "{count} blocked",
             "tasksNoBlockers": "no blockers",
-            "fromLastMonth": "from last month"
+            "fromLastMonth": "from last month",
+            "teams": "Teams"
+        },
+        "attention": {
+            "title": "Needs attention",
+            "kinds": {
+                "agentError": {
+                    "title": "Agent “{name}” errored",
+                    "subtitle": "Auto-paused after repeated failures"
+                },
+                "scheduleFailed": {
+                    "title": "Schedule run failed",
+                    "subtitle": "“{name}” last run did not complete"
+                },
+                "schedulePaused": {
+                    "title": "Schedule paused",
+                    "subtitle": "“{name}” paused after repeated failures"
+                },
+                "generationFailed": {
+                    "title": "Generation failed",
+                    "subtitle": "“{name}” could not be built"
+                },
+                "taskBlocked": {
+                    "title": "Task blocked",
+                    "subtitle": "“{name}” needs input to continue"
+                },
+                "budgetExceeded": {
+                    "title": "Budget exceeded",
+                    "subtitle": "Account spend has reached its cap"
+                }
+            }
+        },
+        "soon": {
+            "title": "Coming up",
+            "more": "+{n} more",
+            "source": {
+                "work": "Work",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

@@ -1738,7 +1738,45 @@
             "tasksInFlight": "Задачи в процес",
             "tasksBlocked": "{count} блокирани",
             "tasksNoBlockers": "без блокери",
-            "fromLastMonth": "от миналия месец"
+            "fromLastMonth": "от миналия месец",
+            "teams": "Екипи"
+        },
+        "attention": {
+            "title": "Изисква внимание",
+            "kinds": {
+                "agentError": {
+                    "title": "Грешка в агента “{name}”",
+                    "subtitle": "Автоматично спрян след повтарящи се неуспехи"
+                },
+                "scheduleFailed": {
+                    "title": "Неуспешно изпълнение по график",
+                    "subtitle": "Последното изпълнение на “{name}” не завърши"
+                },
+                "schedulePaused": {
+                    "title": "Графикът е на пауза",
+                    "subtitle": "“{name}” е на пауза след повтарящи се неуспехи"
+                },
+                "generationFailed": {
+                    "title": "Неуспешно генериране",
+                    "subtitle": "“{name}” не можа да бъде изграден"
+                },
+                "taskBlocked": {
+                    "title": "Задачата е блокирана",
+                    "subtitle": "“{name}” изисква въвеждане, за да продължи"
+                },
+                "budgetExceeded": {
+                    "title": "Бюджетът е надвишен",
+                    "subtitle": "Разходите по акаунта достигнаха лимита"
+                }
+            }
+        },
+        "soon": {
+            "title": "Предстоящо",
+            "more": "+{n} още",
+            "source": {
+                "work": "Работа",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Използване на платформата",

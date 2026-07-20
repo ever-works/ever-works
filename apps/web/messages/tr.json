@@ -1574,7 +1574,45 @@
             "totalItems": "Toplam Öğe",
             "activeWebsites": "Aktif Web Siteleri",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "geçen aydan"
+            "fromLastMonth": "geçen aydan",
+            "teams": "Takımlar"
+        },
+        "attention": {
+            "title": "Dikkat gerektiriyor",
+            "kinds": {
+                "agentError": {
+                    "title": "“{name}” ajanı hata verdi",
+                    "subtitle": "Tekrarlanan hatalardan sonra otomatik duraklatıldı"
+                },
+                "scheduleFailed": {
+                    "title": "Zamanlanmış çalıştırma başarısız",
+                    "subtitle": "“{name}” son çalıştırması tamamlanmadı"
+                },
+                "schedulePaused": {
+                    "title": "Zamanlama duraklatıldı",
+                    "subtitle": "Tekrarlanan hatalardan sonra “{name}” duraklatıldı"
+                },
+                "generationFailed": {
+                    "title": "Üretim başarısız",
+                    "subtitle": "“{name}” oluşturulamadı"
+                },
+                "taskBlocked": {
+                    "title": "Görev engellendi",
+                    "subtitle": "Devam etmek için “{name}” girdi gerektiriyor"
+                },
+                "budgetExceeded": {
+                    "title": "Bütçe aşıldı",
+                    "subtitle": "Hesap harcaması sınırına ulaştı"
+                }
+            }
+        },
+        "soon": {
+            "title": "Yakında",
+            "more": "+{n} daha",
+            "source": {
+                "work": "İş",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

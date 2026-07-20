@@ -1574,7 +1574,45 @@
             "totalItems": "Всього елементів",
             "activeWebsites": "Активні вебсайти",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "за останній місяць"
+            "fromLastMonth": "за останній місяць",
+            "teams": "Команди"
+        },
+        "attention": {
+            "title": "Потребує уваги",
+            "kinds": {
+                "agentError": {
+                    "title": "Помилка агента “{name}”",
+                    "subtitle": "Автоматично призупинено після повторюваних збоїв"
+                },
+                "scheduleFailed": {
+                    "title": "Не вдалося виконати за розкладом",
+                    "subtitle": "Останній запуск “{name}” не завершився"
+                },
+                "schedulePaused": {
+                    "title": "Розклад призупинено",
+                    "subtitle": "“{name}” призупинено після повторюваних збоїв"
+                },
+                "generationFailed": {
+                    "title": "Не вдалося виконати генерацію",
+                    "subtitle": "Не вдалося створити “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Завдання заблоковано",
+                    "subtitle": "“{name}” потребує введення для продовження"
+                },
+                "budgetExceeded": {
+                    "title": "Бюджет перевищено",
+                    "subtitle": "Витрати облікового запису досягли ліміту"
+                }
+            }
+        },
+        "soon": {
+            "title": "Незабаром",
+            "more": "+{n} ще",
+            "source": {
+                "work": "Робота",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

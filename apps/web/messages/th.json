@@ -1574,7 +1574,45 @@
             "totalItems": "รายการทั้งหมด",
             "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "จากเดือนที่แล้ว"
+            "fromLastMonth": "จากเดือนที่แล้ว",
+            "teams": "ทีม"
+        },
+        "attention": {
+            "title": "ต้องการความสนใจ",
+            "kinds": {
+                "agentError": {
+                    "title": "เอเจนต์ “{name}” เกิดข้อผิดพลาด",
+                    "subtitle": "หยุดชั่วคราวอัตโนมัติหลังล้มเหลวซ้ำ ๆ"
+                },
+                "scheduleFailed": {
+                    "title": "การทำงานตามกำหนดการล้มเหลว",
+                    "subtitle": "การทำงานล่าสุดของ “{name}” ไม่เสร็จสมบูรณ์"
+                },
+                "schedulePaused": {
+                    "title": "กำหนดการถูกหยุดชั่วคราว",
+                    "subtitle": "“{name}” ถูกหยุดชั่วคราวหลังล้มเหลวซ้ำ ๆ"
+                },
+                "generationFailed": {
+                    "title": "การสร้างล้มเหลว",
+                    "subtitle": "ไม่สามารถสร้าง “{name}” ได้"
+                },
+                "taskBlocked": {
+                    "title": "งานถูกบล็อก",
+                    "subtitle": "“{name}” ต้องการข้อมูลป้อนเข้าเพื่อดำเนินการต่อ"
+                },
+                "budgetExceeded": {
+                    "title": "เกินงบประมาณ",
+                    "subtitle": "การใช้จ่ายของบัญชีถึงขีดจำกัดแล้ว"
+                }
+            }
+        },
+        "soon": {
+            "title": "เร็ว ๆ นี้",
+            "more": "+{n} เพิ่มเติม",
+            "source": {
+                "work": "งาน",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

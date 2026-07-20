@@ -1574,7 +1574,45 @@
             "totalItems": "Total Item",
             "activeWebsites": "Situs Web Aktif",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "dari bulan lalu"
+            "fromLastMonth": "dari bulan lalu",
+            "teams": "Tim"
+        },
+        "attention": {
+            "title": "Perlu perhatian",
+            "kinds": {
+                "agentError": {
+                    "title": "Agen “{name}” mengalami kesalahan",
+                    "subtitle": "Dijeda otomatis setelah kegagalan berulang"
+                },
+                "scheduleFailed": {
+                    "title": "Jalannya jadwal gagal",
+                    "subtitle": "Proses terakhir “{name}” tidak selesai"
+                },
+                "schedulePaused": {
+                    "title": "Jadwal dijeda",
+                    "subtitle": "“{name}” dijeda setelah kegagalan berulang"
+                },
+                "generationFailed": {
+                    "title": "Pembuatan gagal",
+                    "subtitle": "“{name}” tidak dapat dibuat"
+                },
+                "taskBlocked": {
+                    "title": "Tugas terblokir",
+                    "subtitle": "“{name}” memerlukan masukan untuk melanjutkan"
+                },
+                "budgetExceeded": {
+                    "title": "Anggaran terlampaui",
+                    "subtitle": "Pengeluaran akun telah mencapai batasnya"
+                }
+            }
+        },
+        "soon": {
+            "title": "Segera hadir",
+            "more": "+{n} lainnya",
+            "source": {
+                "work": "Karya",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",

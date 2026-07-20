@@ -1574,7 +1574,45 @@
             "totalItems": "总项目数",
             "activeWebsites": "活动网站",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "上月"
+            "fromLastMonth": "上月",
+            "teams": "团队"
+        },
+        "attention": {
+            "title": "需要关注",
+            "kinds": {
+                "agentError": {
+                    "title": "代理 “{name}” 出错",
+                    "subtitle": "多次失败后已自动暂停"
+                },
+                "scheduleFailed": {
+                    "title": "计划运行失败",
+                    "subtitle": "“{name}” 的上次运行未完成"
+                },
+                "schedulePaused": {
+                    "title": "计划已暂停",
+                    "subtitle": "多次失败后 “{name}” 已暂停"
+                },
+                "generationFailed": {
+                    "title": "生成失败",
+                    "subtitle": "无法构建 “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "任务被阻塞",
+                    "subtitle": "“{name}” 需要输入才能继续"
+                },
+                "budgetExceeded": {
+                    "title": "超出预算",
+                    "subtitle": "账户支出已达上限"
+                }
+            }
+        },
+        "soon": {
+            "title": "即将进行",
+            "more": "还有 {n} 个",
+            "source": {
+                "work": "作品",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
