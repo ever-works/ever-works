@@ -24,6 +24,7 @@ import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-ext
 import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-normalize.service';
 import { KnowledgeBaseTranscribeService } from './knowledge-base-transcribe.service';
 import { KnowledgeBaseReembedService } from './knowledge-base-reembed.service';
+import { KnowledgeBaseReconcileService } from './knowledge-base-reconcile.service';
 import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { KbAgentToolsService } from './kb-agent-tools.service';
 import { KbToolsFacadeAdapter } from './kb-tools-facade.adapter';
@@ -102,6 +103,14 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseMediaNormalizeService,
         KnowledgeBaseTranscribeService,
         KnowledgeBaseReembedService,
+        // EW-643 Phase 3 slice 4a - the daily `kb-reconcile` cron task
+        // resolves this service through the remote-proxy controller. It was
+        // never registered in any module, so `appContext.get()` threw
+        // `Nest could not find KnowledgeBaseReconcileService element` on
+        // every run since the task shipped. Its deps are already in scope:
+        // `WorkKnowledgeUploadRepository` below, and `KB_STORAGE_PLUGIN`
+        // from the `@Global()` `KbStorageModule` in apps/api.
+        KnowledgeBaseReconcileService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
@@ -120,6 +129,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseMediaNormalizeService,
         KnowledgeBaseTranscribeService,
         KnowledgeBaseReembedService,
+        KnowledgeBaseReconcileService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
