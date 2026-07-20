@@ -209,7 +209,8 @@ export class TeamsController {
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Attach a resource (Work/Task/Agent/Mission/Idea) to a team',
-        description: 'The resource must belong to the same Organization (404-never-403 on mismatch).',
+        description:
+            'The resource must belong to the same Organization (404-never-403 on mismatch).',
     })
     @ApiResponse({ status: 201, description: 'Resource attached' })
     @ApiResponse({ status: 404, description: 'Team or resource not found in this Organization' })

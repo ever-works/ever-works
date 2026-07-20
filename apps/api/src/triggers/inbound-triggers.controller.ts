@@ -113,7 +113,9 @@ export class InboundTriggersController {
     @Patch(':id')
     @ApiBearerAuth('JWT-auth')
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
-    @ApiOperation({ summary: 'Update an inbound trigger (name, description, agent, title template)' })
+    @ApiOperation({
+        summary: 'Update an inbound trigger (name, description, agent, title template)',
+    })
     @ApiParam({ name: 'id', description: 'Trigger ID' })
     @ApiResponse({ status: 200, description: 'Updated trigger view' })
     @ApiResponse({ status: 404, description: 'Not found (or not yours)' })

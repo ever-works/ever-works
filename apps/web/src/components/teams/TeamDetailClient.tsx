@@ -26,10 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
-import {
-    TeamResourcesSection,
-    type ResourceOption,
-} from '@/components/teams/TeamResourcesSection';
+import { TeamResourcesSection, type ResourceOption } from '@/components/teams/TeamResourcesSection';
 import type {
     Team,
     TeamDetail,

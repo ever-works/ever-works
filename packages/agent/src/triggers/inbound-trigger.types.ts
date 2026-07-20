@@ -26,59 +26,59 @@ export const INBOUND_TRIGGER_TIMESTAMP_HEADER = 'x-everworks-timestamp';
 
 /** Caller scope for management routes — mirrors `ScheduleScope` (Tier A read conventions). */
 export interface InboundTriggerScope {
-	userId: string;
-	/** Active Organization id, or null for the bare-Tenant (personal) scope. */
-	organizationId: string | null;
+    userId: string;
+    /** Active Organization id, or null for the bare-Tenant (personal) scope. */
+    organizationId: string | null;
 }
 
 /** Secret-free projection returned by every management read. */
 export interface InboundTriggerView {
-	id: string;
-	name: string;
-	description: string | null;
-	kind: InboundTriggerKind;
-	status: InboundTriggerStatus;
-	targetAgentId: string | null;
-	taskTitleTemplate: string | null;
-	/** ISO 8601, or null when the trigger never fired. */
-	lastFiredAt: string | null;
-	fireCount: number;
-	/** ISO 8601, or null when the secret was never rotated. */
-	rotatedAt: string | null;
-	createdAt: string;
-	updatedAt: string;
+    id: string;
+    name: string;
+    description: string | null;
+    kind: InboundTriggerKind;
+    status: InboundTriggerStatus;
+    targetAgentId: string | null;
+    taskTitleTemplate: string | null;
+    /** ISO 8601, or null when the trigger never fired. */
+    lastFiredAt: string | null;
+    fireCount: number;
+    /** ISO 8601, or null when the secret was never rotated. */
+    rotatedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface CreateInboundTriggerInput {
-	name: string;
-	description?: string | null;
-	kind?: InboundTriggerKind;
-	targetAgentId?: string | null;
-	taskTitleTemplate?: string | null;
+    name: string;
+    description?: string | null;
+    kind?: InboundTriggerKind;
+    targetAgentId?: string | null;
+    taskTitleTemplate?: string | null;
 }
 
 export interface UpdateInboundTriggerInput {
-	name?: string;
-	description?: string | null;
-	/** `null` clears the assignment. */
-	targetAgentId?: string | null;
-	taskTitleTemplate?: string | null;
+    name?: string;
+    description?: string | null;
+    /** `null` clears the assignment. */
+    targetAgentId?: string | null;
+    taskTitleTemplate?: string | null;
 }
 
 /** Raw fire-request material — verified inside the service, never pre-parsed. */
 export interface FireInboundTriggerInput {
-	/** Exact raw request body the sender signed. */
-	rawBody: string;
-	/** `x-everworks-signature` header value (hex, optional `sha256=` prefix). */
-	signatureHeader: string | undefined;
-	/** `x-everworks-timestamp` header value — the exact string that was signed. */
-	timestampHeader: string | undefined;
-	/** Request Content-Type; JSON types get a payload-shape check. */
-	contentType?: string | undefined;
+    /** Exact raw request body the sender signed. */
+    rawBody: string;
+    /** `x-everworks-signature` header value (hex, optional `sha256=` prefix). */
+    signatureHeader: string | undefined;
+    /** `x-everworks-timestamp` header value — the exact string that was signed. */
+    timestampHeader: string | undefined;
+    /** Request Content-Type; JSON types get a payload-shape check. */
+    contentType?: string | undefined;
 }
 
 export interface FireInboundTriggerResult {
-	ok: true;
-	taskId: string;
-	taskSlug: string;
+    ok: true;
+    taskId: string;
+    taskSlug: string;
 }

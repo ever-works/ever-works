@@ -7,10 +7,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import {
-    attachTeamResourceAction,
-    detachTeamResourceAction,
-} from '@/app/actions/dashboard/teams';
+import { attachTeamResourceAction, detachTeamResourceAction } from '@/app/actions/dashboard/teams';
 import type {
     TeamResourceItem,
     TeamResourcesGrouped,
@@ -48,7 +45,7 @@ const GROUP_ICON: Record<TeamResourceType, LucideIcon> = {
     agent: Bot,
     mission: Target,
     idea: Lightbulb,
-    task: ListChecks
+    task: ListChecks,
 };
 
 function resourceHref(type: TeamResourceType, id: string): string {
@@ -79,7 +76,7 @@ export function TeamResourcesSection({
     teamId,
     resources,
     works,
-    agents
+    agents,
 }: TeamResourcesSectionProps) {
     const t = useTranslations('dashboard.teamsPage');
     const router = useRouter();
@@ -89,10 +86,7 @@ export function TeamResourcesSection({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [removingId, setRemovingId] = useState<string | null>(null);
 
-    const allItems = useMemo(
-        () => GROUP_ORDER.flatMap((type) => resources[type]),
-        [resources],
-    );
+    const allItems = useMemo(() => GROUP_ORDER.flatMap((type) => resources[type]), [resources]);
     const hasAny = allItems.length > 0;
 
     // Ids already attached (per type) — filtered out of the add options.
@@ -129,7 +123,7 @@ export function TeamResourcesSection({
         try {
             await attachTeamResourceAction(org.id, teamId, {
                 resourceType: addType,
-                resourceId: selectedId
+                resourceId: selectedId,
             });
             setSelectedId('');
             setSearch('');
@@ -212,7 +206,10 @@ export function TeamResourcesSection({
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <Link
-                                                    href={resourceHref(item.resourceType, item.resourceId)}
+                                                    href={resourceHref(
+                                                        item.resourceType,
+                                                        item.resourceId,
+                                                    )}
                                                     className="text-sm text-text dark:text-text-dark truncate hover:text-primary transition-colors block"
                                                 >
                                                     {item.name ?? item.resourceId}
@@ -257,7 +254,9 @@ export function TeamResourcesSection({
                         <select
                             id="team-resource-type"
                             value={addType}
-                            onChange={(event) => handleTypeChange(event.target.value as AddableType)}
+                            onChange={(event) =>
+                                handleTypeChange(event.target.value as AddableType)
+                            }
                             className={SELECT_CLASSES}
                         >
                             <option value="work">{t('detail.resourceTypeWork')}</option>
