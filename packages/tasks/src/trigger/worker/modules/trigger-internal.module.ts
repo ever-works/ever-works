@@ -5,6 +5,7 @@ import {
     WorkScheduleService,
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
+import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -61,6 +62,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: MissionTickService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'MissionTickService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // PR-4 — idea-build-execute task resolves IdeaBuildExecutorService
+        // via this proxy. The real service (with WorkProposalService +
+        // repositories) lives in the API; the worker only needs the proxy
+        // to call executeBuild() over the internal RPC channel.
+        {
+            provide: IdeaBuildExecutorService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'IdeaBuildExecutorService'),
             inject: [TriggerInternalApiClient],
         },
         // Agents/Skills/Tasks PR #1017 — Phase 6. Per-Agent heartbeat
@@ -128,6 +139,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         DATA_SYNC_DISPATCHER_SERVICE,
         DeployReadyPollerService,
         MissionTickService,
+        IdeaBuildExecutorService,
         AgentScheduleDispatcherService,
         AgentRunService,
         AgentRepository,

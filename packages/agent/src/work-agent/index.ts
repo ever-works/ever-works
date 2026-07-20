@@ -2,6 +2,8 @@ export * from './types';
 export * from './cadence';
 export * from './work-agent.service';
 export * from './work-agent.module';
+export * from './idea-build-executor.service';
+export * from './idea-build-executor.dispatcher';
 export {
     WorkAgentPreference,
     type WorkAgentGuardrails,

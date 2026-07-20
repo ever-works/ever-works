@@ -1,11 +1,16 @@
-import { Optional, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import { config } from '../config';
 import { Mission, MissionStatus, MissionType } from '../entities/mission.entity';
-import { WorkProposalSource } from '../entities/work-proposal.entity';
+import { WorkProposal, WorkProposalSource } from '../entities/work-proposal.entity';
 import { WorkAgentService } from '../work-agent/work-agent.service';
+import {
+    IDEA_BUILD_EXECUTE_DISPATCHER,
+    type IdeaBuildExecuteDispatcher,
+} from '../work-agent/idea-build-executor.dispatcher';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { WorkProposalService } from '../user-research/work-proposal.service';
 import { matchesCron } from './cron-matcher';
@@ -121,6 +126,12 @@ export class MissionTickService {
         // PR-3 - lifecycle activity + FAILED persistence (review P4/G3).
         @Optional()
         private readonly activityLog?: ActivityLogService,
+        // PR-4 — Idea build executor dispatch seam (same token the API
+        // build path uses). Optional: unbound in tests / CLI, and only
+        // ever consulted when the executor flag is on.
+        @Optional()
+        @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
+        private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
     ) {}
 
     /**
@@ -281,9 +292,24 @@ export class MissionTickService {
 
             let queued = 0;
             if (mission.autoBuildWorks) {
+                // PR-4 (review finding P3): when the executor flag is ON we
+                // ALSO create a WorkAgentGoal per queued Idea and enqueue it
+                // (mirroring the API build() path), so Mission-auto-queued
+                // Ideas actually produce goals for the executor instead of
+                // being stranded in QUEUED. When the flag is OFF this is
+                // exactly today's behavior — queueForBuild only, no goal,
+                // nothing executes.
+                const executorEnabled = config.ideaBuildExecutor.isEnabled();
                 for (const proposal of result.proposals) {
-                    const ok = await this.workProposals.queueForBuild(mission.userId, proposal.id);
-                    if (ok) queued += 1;
+                    const queuedProposal = await this.workProposals.queueForBuild(
+                        mission.userId,
+                        proposal.id,
+                    );
+                    if (!queuedProposal) continue;
+                    queued += 1;
+                    if (executorEnabled) {
+                        await this.createAndEnqueueBuildGoal(mission.userId, queuedProposal);
+                    }
                 }
             }
 
@@ -325,6 +351,45 @@ export class MissionTickService {
                 );
             }
             return { outcome: 'failed', message };
+        }
+    }
+
+    /**
+     * PR-4 (review finding P3) — mirror the API `build()` path for a
+     * Mission-auto-queued Idea: create a `WorkAgentGoal`
+     * (`maxWorksPerRun=1` + `ideaId`) and enqueue it onto the Idea
+     * build executor. Only called when the executor flag is on.
+     *
+     * Best-effort per Idea: a failure here (e.g. the Mission owner has
+     * not enabled the Work agent, so `createGoal` throws) is logged and
+     * swallowed — the Idea is already QUEUED (today's behavior), so the
+     * tick is never failed and other Ideas in the batch still proceed.
+     */
+    private async createAndEnqueueBuildGoal(userId: string, proposal: WorkProposal): Promise<void> {
+        try {
+            const { goal } = await this.workAgent.createGoal(userId, {
+                instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+                maxWorksPerRun: 1,
+                ideaId: proposal.id,
+            });
+            if (this.ideaBuildDispatcher) {
+                await this.ideaBuildDispatcher.enqueue({
+                    goalId: goal.id,
+                    userId,
+                    ideaId: proposal.id,
+                });
+            } else {
+                this.logger.warn(
+                    `Idea build executor enabled but no dispatcher bound; ` +
+                        `mission goal ${goal.id} for idea ${proposal.id} will not execute.`,
+                );
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+                `Mission auto-build goal creation failed for idea ${proposal.id} ` +
+                    `(user ${userId}): ${message}`,
+            );
         }
     }
 

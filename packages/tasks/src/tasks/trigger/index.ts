@@ -8,6 +8,8 @@ export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
+// PR-4 — Idea → Work build executor (flag-gated, dry-run by default).
+export * from './idea-build-execute.task';
 export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
 export * from './agent-task-execute.task';
