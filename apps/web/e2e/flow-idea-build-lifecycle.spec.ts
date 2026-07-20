@@ -36,7 +36,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *    ENV-ADAPTIVE: 200 { proposal(status:'queued'), goal } when a Work
  *      Agent + Trigger.dev are configured; on the no-AI stack 400
  *      "Work agent is disabled." — BUT the PENDING→QUEUED transition is
- *      ALREADY COMMITTED (queueForBuild writes before createGoal throws).
+ *      ALREADY COMMITTED (queueForBuild writes before createBuildRequest throws).
  *    from QUEUED/BUILDING/ACCEPTED/DISMISSED → 400
  *      'Idea cannot be queued for build from status "<s>". Allowed: pending, failed.'
  *    non-owner → 404 "Proposal not found"
@@ -47,7 +47,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *  POST /api/me/work-proposals/:id/rebuild  (ACCEPTED-only)
  *    from non-ACCEPTED → 400 'Rebuild is only valid for ACCEPTED (Done) Ideas. Current status: "<s>".'
  *    from ACCEPTED → commits ACCEPTED→BUILDING (markRebuildingFromAccepted)
- *      then createGoal 400s on no-AI. acceptedWorkId is PRESERVED (re-pointed
+ *      then createBuildRequest 400s on no-AI. acceptedWorkId is PRESERVED (re-pointed
  *      only on goal completion, which can't run here).
  *
  *  POST /api/me/work-proposals/:id/accept  (PENDING-only, user-facing)
@@ -176,7 +176,7 @@ test.describe('Idea build lifecycle (fresh API users)', () => {
         }
 
         // KEY: the PENDING→QUEUED transition is committed regardless of the
-        // goal-enqueue outcome (queueForBuild lands before createGoal throws).
+        // goal-enqueue outcome (queueForBuild lands before createBuildRequest throws).
         expect(await getStatus(request, headers, idea.id)).toBe('queued');
 
         // A QUEUED Idea cannot be re-queued via build (allowed: pending/failed).
@@ -242,7 +242,7 @@ test.describe('Idea build lifecycle (fresh API users)', () => {
 
         // ── 4. Rebuild the ACCEPTED Idea (Decision A27) ─────────────────────
         // rebuild commits ACCEPTED→BUILDING (markRebuildingFromAccepted)
-        // BEFORE createGoal — so on the no-AI stack it 400s but the Idea is
+        // BEFORE createBuildRequest — so on the no-AI stack it 400s but the Idea is
         // now BUILDING. The original Work is PRESERVED (acceptedWorkId only
         // re-points on goal completion, which doesn't run here).
         const rebuildRes = await request.post(

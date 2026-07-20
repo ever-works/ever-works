@@ -24,6 +24,11 @@ export enum PluginUsageCapability {
     // EMAIL; notification-channel plugins emit NOTIFICATION_CHANNEL.
     EMAIL = 'email',
     NOTIFICATION_CHANNEL = 'notification_channel',
+    // Goals feature PR-7 — metrics-provider capability (custom-http,
+    // Stripe; PostHog + GA in PR-9). Additive enum value, no migration
+    // needed (column is varchar). Recorded best-effort by
+    // MetricsFacadeService after each provider call.
+    METRICS = 'metrics',
 }
 
 @Index(['workId', 'occurredAt'])

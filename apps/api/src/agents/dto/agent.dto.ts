@@ -4,8 +4,10 @@ import {
     IsBoolean,
     IsEmail,
     IsEnum,
+    IsIn,
     IsInt,
     IsNotEmpty,
+    IsNumber,
     IsObject,
     IsOptional,
     IsString,
@@ -38,6 +40,56 @@ export class AgentPermissionsDto {
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canCommitToRepo?: boolean;
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canOpenPullRequests?: boolean;
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canCallExternalTools?: boolean;
+}
+
+/**
+ * Agent Scorecards increment 1 — one quantified goal on an Agent's
+ * scorecard. Mirrors `AgentScorecardMetric` on the agent entity; the
+ * service re-validates via `validateScorecard` (defense-in-depth for
+ * non-HTTP callers).
+ */
+export class AgentScorecardMetricDto {
+    @ApiProperty({ maxLength: 64, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' })
+    @IsString()
+    @MaxLength(64)
+    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    key: string;
+
+    @ApiProperty({ minLength: 1, maxLength: 80 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(80)
+    label: string;
+
+    // @IsNumber() rejects NaN/Infinity by default (allowNaN/allowInfinity
+    // false) — matches the service's finite-number rule.
+    @ApiProperty()
+    @IsNumber()
+    target: number;
+
+    @ApiProperty()
+    @IsNumber()
+    current: number;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsNumber()
+    floor?: number | null;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsNumber()
+    stretch?: number | null;
+
+    @ApiProperty({ required: false, nullable: true, maxLength: 20 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    unit?: string | null;
+
+    @ApiProperty({ enum: ['weekly', 'monthly', 'quarterly'] })
+    @IsIn(['weekly', 'monthly', 'quarterly'])
+    period: 'weekly' | 'monthly' | 'quarterly';
 }
 
 export class AgentTargetDto {
@@ -263,6 +315,14 @@ export class UpdateAgentDto {
     @IsEmail()
     @MaxLength(254)
     committerEmail?: string | null;
+
+    // Agent Scorecards increment 1 — whole-array replace; null clears.
+    @ApiProperty({ required: false, type: [AgentScorecardMetricDto] })
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => AgentScorecardMetricDto)
+    scorecard?: AgentScorecardMetricDto[] | null;
 }
 
 export class ListAgentsQueryDto {

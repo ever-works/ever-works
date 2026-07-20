@@ -33,6 +33,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import type { ProviderWithConnection } from './page';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
+import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 
 export type CreationMode = 'ai' | 'manual' | 'import';
@@ -109,6 +110,7 @@ interface NewWorkClientProps {
     deployProviders: DeployProvider[];
     defaultDeployProviderId: string | null;
     websiteTemplates: WebsiteTemplateOption[];
+    workBlueprints?: WorkBlueprintEntry[];
     proposal?: WorkProposal | null;
     initialMode?: CreationMode | null;
     initialPrompt?: string;
@@ -128,6 +130,7 @@ export default function NewWorkClient({
     deployProviders,
     defaultDeployProviderId,
     websiteTemplates,
+    workBlueprints = [],
     proposal,
     initialMode = null,
     initialPrompt,
@@ -420,6 +423,7 @@ export default function NewWorkClient({
                         gitConnected={gitConnected}
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
+                        workBlueprints={workBlueprints}
                         proposal={proposal ?? undefined}
                         initialPrompt={initialPrompt}
                         initialKind={effectiveKind || initialKind || undefined}

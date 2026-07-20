@@ -939,6 +939,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -1004,6 +1031,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -1096,11 +1140,15 @@
                 "creating": "יוצר…",
                 "minLength": "התיאור חייב להכיל לפחות 10 תווים.",
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "גלה",
-            "subtitle": "רעיונות עבודה שנבחרו על ידי AI ומותאמים אישית עבורך."
         },
         "header": {
             "welcome": "ברוך שובך, {username}!",
@@ -1187,8 +1235,48 @@
                 }
             }
         },
+        "schedules": {
+            "title": "תזמונים",
+            "subtitle": "כל מה שמתוזמן לרוץ בעבודות, בסוכנים, ב-Missions ובמשימות שלך",
+            "fetchFailed": "טעינת התזמונים נכשלה",
+            "retry": "ניסיון נוסף",
+            "columns": {
+                "owner": "בעלים",
+                "cadence": "קצב",
+                "nextRun": "הרצה הבאה",
+                "status": "סטטוס"
+            },
+            "filters": {
+                "all": "הכל",
+                "activeOnly": "פעילים בלבד"
+            },
+            "sourceTypes": {
+                "recurringTask": "משימה חוזרת",
+                "agentHeartbeat": "פעימת סוכן",
+                "workSchedule": "תזמון עבודה",
+                "missionTick": "פעימת Mission",
+                "sourceValidation": "אימות מקור",
+                "dataSync": "סנכרון נתונים"
+            },
+            "statuses": {
+                "active": "פעיל",
+                "paused": "מושהה",
+                "disabled": "מושבת",
+                "error": "שגיאה",
+                "ended": "הסתיים"
+            },
+            "empty": {
+                "title": "עדיין לא תוזמן דבר",
+                "description": "משימות חוזרות, פעימות סוכנים, תזמוני עבודה, פעימות Mission, אימות מקורות וסנכרון נתונים יופיעו כאן לאחר שתגדיר אותם.",
+                "noResults": "אין תזמונים התואמים את המסנן הנוכחי."
+            }
+        },
         "activity": {
-            "title": "יומן פעילות",
+            "viewToggle": {
+                "log": "יומן",
+                "schedules": "תזמונים"
+            },
+            "title": "פעילות",
             "subtitle": "עקוב אחר כל הפעולות בעבודות שלך",
             "loading": "טוען...",
             "fetchFailed": "נכשל בטעינת הפעילויות",
@@ -1350,6 +1438,7 @@
             "subtitle": "נהל את הגדרות החשבון וההעדפות שלך",
             "tabs": {
                 "profile": "פרופיל",
+                "organization": "Organization",
                 "security": "אבטחה",
                 "apiKeys": "מפתחות API",
                 "data": "נתונים",
@@ -1386,14 +1475,14 @@
                 "sections": {
                     "agent": {
                         "title": "סוכן עבודה אוטונומי",
-                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מיעדים כלליים."
+                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מבקשות בנייה כלליות."
                     },
                     "guardrails": {
                         "title": "מגבלות",
                         "description": "קבע מגבלות קשות לפני שהסוכן יכול ליצור עבודות, להוסיף פריטים או להוציא תקציב."
                     },
                     "queue": {
-                        "title": "תור ליעד",
+                        "title": "הוספת בקשת בנייה לתור",
                         "description": "תן לסוכן הוראה רחבה. הוא מתחיל כממתין ופועל בתוך המגבלות שלך."
                     },
                     "liveRun": {
@@ -1401,7 +1490,7 @@
                         "description": "מצב נוכחי ופעילות אחרונה של הסוכן."
                     },
                     "recentGoals": {
-                        "title": "יעדים אחרונים",
+                        "title": "בקשות בנייה אחרונות",
                         "description": "הוראות סוכן עבודה ממתינות, פעילות והושלמות."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1521,7 @@
                     "approvalThreshold": "סף אישור",
                     "confirmBeforeCreate": "אשר לפני יצירת עבודות",
                     "confirmBeforeDelete": "אשר לפני מחיקת פריטים",
-                    "dryRunThisGoal": "הפעלת ניסיון עבור יעד זה",
+                    "dryRunThisGoal": "הפעלת ניסיון עבור בקשת בנייה זו",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1537,7 @@
                     "saveSettings": "שמור הגדרות",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "הוסף לתור יעד",
+                    "queueGoal": "הוסף בקשת בנייה לתור",
                     "preparePlan": "Prepare plan",
                     "stop": "עצור"
                 },
@@ -1465,16 +1554,16 @@
                 },
                 "empty": {
                     "noActiveRun": "אין הפעלה פעילה של סוכן עבודה.",
-                    "noGoals": "עדיין אין יעדים לסוכן עבודה.",
+                    "noGoals": "עדיין אין בקשות בנייה לסוכן עבודה.",
                     "waitingForUpdate": "ממתין לעדכון הפעלה ראשון."
                 },
                 "toasts": {
                     "settingsSaved": "הגדרות סוכן עבודה נשמרו",
                     "settingsError": "שמירת הגדרות נכשלה",
-                    "goalQueued": "יעד סוכן עבודה התווסף לתור",
-                    "goalError": "הוספת יעד לתור נכשלה",
-                    "goalCanceled": "יעד סוכן עבודה בוטל",
-                    "cancelError": "ביטול יעד נכשל"
+                    "goalQueued": "בקשת בנייה של סוכן עבודה התווספה לתור",
+                    "goalError": "הוספת בקשת בנייה לתור נכשלה",
+                    "goalCanceled": "בקשת בנייה של סוכן עבודה בוטלה",
+                    "cancelError": "ביטול בקשת בנייה נכשל"
                 }
             },
             "data": {
@@ -1738,7 +1827,45 @@
             "tasksInFlight": "משימות בתהליך",
             "tasksBlocked": "{count} חסומות",
             "tasksNoBlockers": "ללא מכשולים",
-            "fromLastMonth": "מהחודש שעבר"
+            "fromLastMonth": "מהחודש שעבר",
+            "teams": "צוותים"
+        },
+        "attention": {
+            "title": "דורש תשומת לב",
+            "kinds": {
+                "agentError": {
+                    "title": "הסוכן “{name}” נכשל",
+                    "subtitle": "הושהה אוטומטית לאחר כשלים חוזרים"
+                },
+                "scheduleFailed": {
+                    "title": "הרצת התזמון נכשלה",
+                    "subtitle": "ההרצה האחרונה של “{name}” לא הושלמה"
+                },
+                "schedulePaused": {
+                    "title": "התזמון הושהה",
+                    "subtitle": "“{name}” הושהה לאחר כשלים חוזרים"
+                },
+                "generationFailed": {
+                    "title": "היצירה נכשלה",
+                    "subtitle": "לא ניתן היה לבנות את “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "המשימה חסומה",
+                    "subtitle": "“{name}” זקוק לקלט כדי להמשיך"
+                },
+                "budgetExceeded": {
+                    "title": "התקציב חרג",
+                    "subtitle": "הוצאות החשבון הגיעו לתקרה"
+                }
+            }
+        },
+        "soon": {
+            "title": "בקרוב",
+            "more": "+{n} נוספים",
+            "source": {
+                "work": "עבודה",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "שימוש בפלטפורמה",
@@ -1804,6 +1931,18 @@
             "createButton": "צור עבודה"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "סוכנים",
                 "heading": "סוכנים לעבודה זו",
@@ -4127,6 +4266,177 @@
                 "unexpectedError": "אירעה שגיאה בלתי צפויה"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "תפריט",
             "aiChat": "צ'אט AI",
@@ -4137,6 +4447,7 @@
                 "dashboard": "לוח מחוונים",
                 "activity": "פעילות",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "עבודות",
                 "tasks": "משימות",
@@ -4613,11 +4924,30 @@
             }
         },
         "templateSelector": {
+            "label": "תבנית",
             "defaultOption": "השתמש בברירת המחדל",
             "defaultOptionWithName": "השתמש בברירת המחדל ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (ברירת מחדל)",
             "changeAnywayLink": "שנה בכל מקרה",
+            "typeLabel": "סוג תבנית",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "חיפוש תבניות…",
+            "searchAriaLabel": "חיפוש תבניות",
+            "groupYourTemplates": "התבניות שלך",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "מומלץ",
+            "defaultBadge": "ברירת מחדל",
+            "empty": "אין תבניות התואמות לחיפוש שלך.",
+            "resultCount": "{count, plural, =0 {אין תבניות} one {# תבנית} other {# תבניות}}",
             "origin": {
                 "standard": "תקן",
                 "forked": "מפוצל",
@@ -4752,9 +5082,8 @@
             "resetPassword": "אפס סיסמה",
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
-            "activity": "יומן פעילות",
+            "activity": "פעילות",
             "works": "עבודות",
-            "discover": "גלה",
             "newWork": "עבודה חדשה",
             "work": "עבודה",
             "overview": "סקירה כללית",
@@ -4953,12 +5282,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",

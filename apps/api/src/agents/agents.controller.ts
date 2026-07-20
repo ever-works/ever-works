@@ -37,6 +37,7 @@ import {
     type AgentHeartbeatTrigger,
     type AgentImportConflictMode,
     type AgentImportResult,
+    type AgentScorecardMetric,
     type AgentTarget,
     PluginUsageRepository,
 } from '@ever-works/agent/agents';
@@ -219,6 +220,7 @@ export class AgentsController {
             avatarImageUploadId: body.avatarImageUploadId,
             committerName: body.committerName,
             committerEmail: body.committerEmail,
+            scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
         });
     }
 

@@ -24,6 +24,7 @@ import {
     LayoutTemplate,
     Lightbulb,
     Target,
+    Gauge,
     Bot,
     ListChecks,
     Sparkles,
@@ -112,6 +113,12 @@ export function DashboardSidebar({
         // → Works), reading the same direction as the dashboard
         // tiles.
         { name: t('navigation.missions'), href: ROUTES.DASHBOARD_MISSIONS, icon: Target },
+        // Goals & Metrics PR-8 — measurable targets evaluated against
+        // metrics-provider plugins. Sits right after Missions (a Goal
+        // is what a Mission is steered toward). Uses a literal `/goals`
+        // href rather than a ROUTES constant to keep this change within
+        // the Goals-UI file set.
+        { name: t('navigation.goals'), href: '/goals', icon: Gauge },
         // Phase 5 PR N — Ideas catalog.
         { name: t('navigation.ideas'), href: ROUTES.DASHBOARD_IDEAS, icon: Lightbulb },
         {

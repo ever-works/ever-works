@@ -23,8 +23,8 @@ jest.mock('@ever-works/agent/missions', () => ({
 jest.mock('@ever-works/agent/work-agent', () => ({
     SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN:
         /^\*\/([1-9]|[1-9]\d|[1-9]\d{2}|1[0-3]\d{2}|14[0-3]\d|1440)\s+\*\s+\*\s+\*\s+\*$/,
-    WorkAgentGoalSource: {},
-    WorkAgentGoalStatus: {},
+    WorkBuildRequestSource: {},
+    WorkBuildRequestStatus: {},
     WorkAgentRunLogLevel: {},
     WorkAgentRunStatus: {},
 }));

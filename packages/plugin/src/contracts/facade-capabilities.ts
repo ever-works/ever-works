@@ -62,7 +62,12 @@ export const PLUGIN_CAPABILITIES = {
 	// runs locally OR hosted via a configurable `baseUrl` + bearer
 	// token). Community plugins (mem0, zep, langmem) implement the
 	// same `IAgentMemoryPlugin` contract.
-	AGENT_MEMORY: 'agent-memory'
+	AGENT_MEMORY: 'agent-memory',
+	// Goals feature PR-7 — read-only metrics collectors. First-party
+	// providers: `custom-http` (GET-only, SSRF-guarded) and `stripe`
+	// (official SDK; balance + income windows). See
+	// `capabilities/metrics-provider.interface.ts` for the contract.
+	METRICS_PROVIDER: 'metrics-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

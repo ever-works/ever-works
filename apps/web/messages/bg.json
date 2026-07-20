@@ -939,6 +939,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -1004,6 +1031,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -1096,11 +1140,15 @@
                 "creating": "Създаване…",
                 "minLength": "Описанието трябва да е поне 10 знака.",
                 "error": "Idea не може да бъде създадена. Моля, опитайте отново."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Открийте",
-            "subtitle": "Работни идеи, подбрани от AI, съобразени с вас."
         },
         "header": {
             "welcome": "Добре дошли отново, {username}!",
@@ -1187,8 +1235,48 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Графици",
+            "subtitle": "Всичко, планирано за изпълнение във вашите работи, агенти, Missions и задачи",
+            "fetchFailed": "Неуспешно зареждане на графиците",
+            "retry": "Повторен опит",
+            "columns": {
+                "owner": "Собственик",
+                "cadence": "Интервал",
+                "nextRun": "Следващо изпълнение",
+                "status": "Статус"
+            },
+            "filters": {
+                "all": "Всички",
+                "activeOnly": "Само активни"
+            },
+            "sourceTypes": {
+                "recurringTask": "Повтаряща се задача",
+                "agentHeartbeat": "Пулс на агент",
+                "workSchedule": "График на работа",
+                "missionTick": "Такт на Mission",
+                "sourceValidation": "Валидиране на източник",
+                "dataSync": "Синхронизиране на данни"
+            },
+            "statuses": {
+                "active": "Активен",
+                "paused": "Паузиран",
+                "disabled": "Деактивирано",
+                "error": "Грешка",
+                "ended": "Приключен"
+            },
+            "empty": {
+                "title": "Все още няма нищо планирано",
+                "description": "Повтарящите се задачи, пулсовете на агенти, графиците на работа, тактовете на Mission, валидирането на източници и синхронизирането на данни ще се появят тук, след като ги настроите.",
+                "noResults": "Няма графици, отговарящи на текущия филтър."
+            }
+        },
         "activity": {
-            "title": "Журнал на дейностите",
+            "viewToggle": {
+                "log": "Дневник",
+                "schedules": "Графици"
+            },
+            "title": "Активност",
             "subtitle": "Следете всички операции в работите си",
             "loading": "Зареждане…",
             "fetchFailed": "Грешка при зареждане на дейностите",
@@ -1350,6 +1438,7 @@
             "subtitle": "Управлявайте настройките и предпочитанията на профила си",
             "tabs": {
                 "profile": "Профил",
+                "organization": "Organization",
                 "security": "Сигурност",
                 "apiKeys": "API ключове",
                 "data": "Данни",
@@ -1386,14 +1475,14 @@
                 "sections": {
                     "agent": {
                         "title": "Автономен работен агент",
-                        "description": "Позволете на агента да планира, изследва и подготвя Работи от високо ниво цели."
+                        "description": "Позволете на агента да планира, изследва и подготвя Работи от заявки за изграждане на високо ниво."
                     },
                     "guardrails": {
                         "title": "Ограничения",
                         "description": "Задайте твърди граници, преди агентът да може да създава Работи, да добавя елементи или да харчи бюджет."
                     },
                     "queue": {
-                        "title": "Поставяне на цел в опашка",
+                        "title": "Поставяне на заявка за изграждане в опашка",
                         "description": "Дайте на агента широка инструкция. Тя започва като чакаща и се изпълнява в рамките на вашите ограничения."
                     },
                     "liveRun": {
@@ -1401,7 +1490,7 @@
                         "description": "Текущо състояние и скорошна активност на агента."
                     },
                     "recentGoals": {
-                        "title": "Скорошни цели",
+                        "title": "Скорошни заявки за изграждане",
                         "description": "Чакащи, изпълняващи се и завършени инструкции на работния агент."
                     },
                     "autoGenerateIdeas": {
@@ -1432,7 +1521,7 @@
                     "approvalThreshold": "Праг на одобрение",
                     "confirmBeforeCreate": "Потвърждение преди създаване на Работи",
                     "confirmBeforeDelete": "Потвърждение преди изтриване на елементи",
-                    "dryRunThisGoal": "Тестово изпълнение на тази цел",
+                    "dryRunThisGoal": "Тестово изпълнение на тази заявка за изграждане",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1448,7 +1537,7 @@
                     "saveSettings": "Запазване на настройките",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Поставяне на цел в опашка",
+                    "queueGoal": "Поставяне на заявка за изграждане в опашка",
                     "preparePlan": "Prepare plan",
                     "stop": "Спиране"
                 },
@@ -1465,16 +1554,16 @@
                 },
                 "empty": {
                     "noActiveRun": "Няма активно изпълнение на работен агент.",
-                    "noGoals": "Все още няма цели на работния агент.",
+                    "noGoals": "Все още няма заявки за изграждане на работния агент.",
                     "waitingForUpdate": "Изчакване за първото обновяване на изпълнението."
                 },
                 "toasts": {
                     "settingsSaved": "Настройките на работния агент са запазени",
                     "settingsError": "Неуспешно запазване на настройките",
-                    "goalQueued": "Целта на работния агент е поставена в опашка",
-                    "goalError": "Неуспешно поставяне на цел в опашка",
-                    "goalCanceled": "Целта на работния агент е отменена",
-                    "cancelError": "Неуспешно отменяне на цел"
+                    "goalQueued": "Заявката за изграждане на работния агент е поставена в опашка",
+                    "goalError": "Неуспешно поставяне на заявка за изграждане в опашка",
+                    "goalCanceled": "Заявката за изграждане на работния агент е отменена",
+                    "cancelError": "Неуспешно отменяне на заявка за изграждане"
                 }
             },
             "data": {
@@ -1738,7 +1827,45 @@
             "tasksInFlight": "Задачи в процес",
             "tasksBlocked": "{count} блокирани",
             "tasksNoBlockers": "без блокери",
-            "fromLastMonth": "от миналия месец"
+            "fromLastMonth": "от миналия месец",
+            "teams": "Екипи"
+        },
+        "attention": {
+            "title": "Изисква внимание",
+            "kinds": {
+                "agentError": {
+                    "title": "Грешка в агента “{name}”",
+                    "subtitle": "Автоматично спрян след повтарящи се неуспехи"
+                },
+                "scheduleFailed": {
+                    "title": "Неуспешно изпълнение по график",
+                    "subtitle": "Последното изпълнение на “{name}” не завърши"
+                },
+                "schedulePaused": {
+                    "title": "Графикът е на пауза",
+                    "subtitle": "“{name}” е на пауза след повтарящи се неуспехи"
+                },
+                "generationFailed": {
+                    "title": "Неуспешно генериране",
+                    "subtitle": "“{name}” не можа да бъде изграден"
+                },
+                "taskBlocked": {
+                    "title": "Задачата е блокирана",
+                    "subtitle": "“{name}” изисква въвеждане, за да продължи"
+                },
+                "budgetExceeded": {
+                    "title": "Бюджетът е надвишен",
+                    "subtitle": "Разходите по акаунта достигнаха лимита"
+                }
+            }
+        },
+        "soon": {
+            "title": "Предстоящо",
+            "more": "+{n} още",
+            "source": {
+                "work": "Работа",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Използване на платформата",
@@ -1804,6 +1931,18 @@
             "createButton": "Създай работа"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Агенти",
                 "heading": "Агенти за тази Работа",
@@ -4127,6 +4266,177 @@
                 "unexpectedError": "Грешка възникна неочаквано"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Меню",
             "aiChat": "AI чат",
@@ -4137,6 +4447,7 @@
                 "dashboard": "Табло",
                 "activity": "Активност",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Работи",
                 "tasks": "Задачи",
@@ -4613,11 +4924,30 @@
             }
         },
         "templateSelector": {
+            "label": "Шаблон",
             "defaultOption": "Използвайте подразбиране",
             "defaultOptionWithName": "Използвайте подразбиране ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Подразбиране)",
             "changeAnywayLink": "Променете все пак",
+            "typeLabel": "Тип шаблон",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Търсене на шаблони…",
+            "searchAriaLabel": "Търсене на шаблони",
+            "groupYourTemplates": "Вашите шаблони",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Популярен",
+            "defaultBadge": "Подразбиране",
+            "empty": "Няма шаблони, съответстващи на търсенето ви.",
+            "resultCount": "{count, plural, =0 {Няма шаблони} one {# шаблон} other {# шаблона}}",
             "origin": {
                 "standard": "Стандартен",
                 "forked": "Форкнат",
@@ -4752,9 +5082,8 @@
             "resetPassword": "Нова парола",
             "authError": "Грешка при автентикация",
             "dashboard": "Табло",
-            "activity": "Журнал на дейността",
+            "activity": "Активност",
             "works": "Работи",
-            "discover": "Открийте",
             "newWork": "Нова работа",
             "work": "Работа",
             "overview": "Преглед",
@@ -4953,12 +5282,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",

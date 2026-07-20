@@ -1791,28 +1791,28 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
             'enabled, autoApproveLowImpact, dailySuggestionsEnabled, autoGenerateCadence, autoGenerateBatchSize, autoBuildThrottlePerDay, missionDefaultOutstandingCap, maxAutoRetries, backoffSeconds, exponentialBackoffFactor, accountWideMonthlyCapCents, accountWideAllowOverage, maxWorksPerRun, maxItemsPerWork, maxBudgetCentsPerRun, requireApprovalBeforeCreate, requireApprovalBeforeDelete, requireApprovalAboveBudgetCents, dryRunByDefault',
     },
     {
-        toolName: 'list_work_agent_goals',
+        toolName: 'list_work_agent_build_requests',
         method: 'GET',
-        path: '/api/me/work-agent/goals',
-        summary: 'List recent Work agent goals',
+        path: '/api/me/work-agent/build-requests',
+        summary: 'List recent Work agent build requests',
         kind: 'read',
         canvas: 'Table',
     },
     {
-        toolName: 'create_work_agent_goal',
+        toolName: 'create_work_agent_build_request',
         method: 'POST',
-        path: '/api/me/work-agent/goals',
-        summary: 'Queue a high-level goal for the Work agent',
+        path: '/api/me/work-agent/build-requests',
+        summary: 'Queue a high-level build request for the Work agent',
         kind: 'create',
         body: true,
         bodyHint:
             'instruction (required), dryRun, maxWorksPerRun, maxItemsPerWork, maxBudgetCentsPerRun, requireApprovalBeforeCreate, requireApprovalBeforeDelete, requireApprovalAboveBudgetCents, dryRunByDefault',
     },
     {
-        toolName: 'cancel_work_agent_goal',
+        toolName: 'cancel_work_agent_build_request',
         method: 'PATCH',
-        path: '/api/me/work-agent/goals/{id}/cancel',
-        summary: 'Cancel a pending or active Work agent goal',
+        path: '/api/me/work-agent/build-requests/{id}/cancel',
+        summary: 'Cancel a pending or active Work agent build request',
         kind: 'action',
         params: [
             {

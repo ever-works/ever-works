@@ -75,6 +75,10 @@ export class OrganizationsController {
             req.user.userId,
             dto.name,
             dto.slug,
+            // PR-6 (review §23.5) — optional vision at creation time.
+            // The service normalizes (trim / cap 5000 / empty → null)
+            // and stamps `visionUpdatedAt` when a value survives.
+            { vision: dto.vision },
         );
         return this.toResponse(org);
     }
@@ -186,7 +190,8 @@ export class OrganizationsController {
     @Patch(':id')
     @ApiOperation({
         summary: 'Update Organization fields',
-        description: 'Partial update of `displayName`, `legalName`, `countryCode`.',
+        description:
+            'Partial update of `displayName`, `legalName`, `countryCode`, `vision`. `vision` omitted = unchanged; explicit null clears it; any present vision value bumps `visionUpdatedAt`.',
     })
     async update(
         @Req() req: { user: { userId: string } },
@@ -228,6 +233,12 @@ export class OrganizationsController {
             registrationProvider: org.registrationProvider ?? null,
             registrationStatus: org.registrationStatus ?? null,
             linkedWorkId: org.linkedWorkId ?? null,
+            vision: org.vision ?? null,
+            // Some drivers hydrate nullable timestamps as strings —
+            // normalize through `new Date` before serializing.
+            visionUpdatedAt: org.visionUpdatedAt
+                ? new Date(org.visionUpdatedAt).toISOString()
+                : null,
             createdAt: org.createdAt.toISOString(),
             updatedAt: org.updatedAt.toISOString(),
         };

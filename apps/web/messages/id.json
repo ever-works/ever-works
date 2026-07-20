@@ -547,17 +547,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "Mulai Misi Baru",
-                "submitTitle": "Buat Misi",
-                "minLength": "Deskripsi harus minimal 10 karakter.",
-                "created": "Misi dibuat",
-                "error": "Tidak dapat membuat Misi. Silakan coba lagi."
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Buka pembuat terpadu"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -569,14 +561,6 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "Cari",
-                "searchPlaceholder": "Judul atau deskripsi",
-                "status": "Status",
-                "anyStatus": "Semua status",
-                "apply": "Terapkan",
-                "reset": "Reset"
             }
         },
         "agentsPage": {
@@ -797,6 +781,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -862,6 +873,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -894,7 +922,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Tambahkan Ide",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -938,11 +965,31 @@
                 "anyStatus": "Semua status",
                 "apply": "Terapkan",
                 "reset": "Reset"
+            },
+            "newPage": {
+                "link": "Buat manual",
+                "or": "Atau",
+                "title": "Idea Baru",
+                "subtitle": "Tulis Idea Anda sendiri. Jelaskan Work yang ingin Anda buat — Anda bisa mengantrekannya untuk dibangun setelahnya.",
+                "nameLabel": "Judul",
+                "namePlaceholder": "Opsional — biarkan kosong untuk menurunkannya dari deskripsi",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Jelaskan Work yang akan menjadi Idea ini — mis. “Direktori terkurasi framework agen AI sumber terbuka, diatur menurut jenis framework dan lisensi.”",
+                "descriptionHint": "Minimal 10 karakter.",
+                "cancel": "Batal",
+                "create": "Buat Idea",
+                "creating": "Membuat…",
+                "minLength": "Deskripsi harus minimal 10 karakter.",
+                "error": "Tidak dapat membuat Idea. Silakan coba lagi."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "Selamat datang kembali, {username}!",
@@ -1128,6 +1175,10 @@
                     "failed": "Gagal",
                     "cancelled": "Dibatalkan"
                 }
+            },
+            "viewToggle": {
+                "log": "Log",
+                "schedules": "Jadwal"
             }
         },
         "works": {
@@ -1191,6 +1242,7 @@
             "subtitle": "Kelola pengaturan dan preferensi akun Anda",
             "tabs": {
                 "profile": "Profil",
+                "organization": "Organization",
                 "security": "Keamanan",
                 "apiKeys": "Kunci API",
                 "data": "Data",
@@ -1227,14 +1279,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1242,7 +1294,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1273,7 +1325,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1289,7 +1341,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1306,16 +1358,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1574,7 +1626,45 @@
             "totalItems": "Total Item",
             "activeWebsites": "Situs Web Aktif",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "dari bulan lalu"
+            "fromLastMonth": "dari bulan lalu",
+            "teams": "Tim"
+        },
+        "attention": {
+            "title": "Perlu perhatian",
+            "kinds": {
+                "agentError": {
+                    "title": "Agen “{name}” mengalami kesalahan",
+                    "subtitle": "Dijeda otomatis setelah kegagalan berulang"
+                },
+                "scheduleFailed": {
+                    "title": "Jalannya jadwal gagal",
+                    "subtitle": "Proses terakhir “{name}” tidak selesai"
+                },
+                "schedulePaused": {
+                    "title": "Jadwal dijeda",
+                    "subtitle": "“{name}” dijeda setelah kegagalan berulang"
+                },
+                "generationFailed": {
+                    "title": "Pembuatan gagal",
+                    "subtitle": "“{name}” tidak dapat dibuat"
+                },
+                "taskBlocked": {
+                    "title": "Tugas terblokir",
+                    "subtitle": "“{name}” memerlukan masukan untuk melanjutkan"
+                },
+                "budgetExceeded": {
+                    "title": "Anggaran terlampaui",
+                    "subtitle": "Pengeluaran akun telah mencapai batasnya"
+                }
+            }
+        },
+        "soon": {
+            "title": "Segera hadir",
+            "more": "+{n} lainnya",
+            "source": {
+                "work": "Karya",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1640,6 +1730,18 @@
             "createButton": "Buat Karya"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Agen",
                 "heading": "Agen untuk Karya ini",
@@ -3395,7 +3497,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3410,19 +3512,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Tujuan berkelanjutan yang agen terus kerjakan — menghasilkan Ide secara berkala atau sekali saja.",
-                "idea": "Ringkasan sekali pakai yang agen ubah menjadi rencana Kerja yang dapat Anda bangun.",
-                "website": "Situs multi-halaman untuk bisnis, layanan, atau merek — konten + kode yang dihasilkan.",
-                "landing-page": "Satu halaman yang fokus — daftar tunggu, peluncuran produk, pendaftaran webinar, penangkap leads.",
-                "blog": "Blog dengan kategori, RSS, sorotan kode, dan konten yang siap SEO.",
-                "directory": "Situs direktori yang dikurasi dengan pencarian, filter, dan data item terstruktur.",
-                "awesome-repo": "Repo daftar awesome — indeks markdown, tautan yang dikategorikan, dan metadata yang dapat diperbarui.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "Buat",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3930,6 +4034,177 @@
                 "unexpectedError": "Terjadi kesalahan yang tidak diharapkan"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Obrolan AI",
@@ -3940,6 +4215,7 @@
                 "dashboard": "Dasbor",
                 "activity": "Aktivitas",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Karya",
                 "tasks": "Tugas",
@@ -4416,11 +4692,30 @@
             }
         },
         "templateSelector": {
+            "label": "Template",
             "defaultOption": "Gunakan default",
             "defaultOptionWithName": "Gunakan default ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (default)",
             "changeAnywayLink": "Ubah tetap saja",
+            "typeLabel": "Jenis template",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Cari template…",
+            "searchAriaLabel": "Cari template",
+            "groupYourTemplates": "Template Anda",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Unggulan",
+            "defaultBadge": "Default",
+            "empty": "Tidak ada template yang cocok dengan pencarian Anda.",
+            "resultCount": "{count, plural, =0 {Tidak ada template} other {# template}}",
             "origin": {
                 "standard": "Standar",
                 "forked": "Forked",
@@ -4488,331 +4783,44 @@
             "system": "Sistem",
             "goToPluginSettings": "Pergi ke pengaturan plugin"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "Ide ini sudah tidak tersedia lagi."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "Cari",
-                "searchPlaceholder": "Judul atau deskripsi",
-                "status": "Status",
-                "anyStatus": "Semua status",
-                "apply": "Terapkan",
-                "reset": "Reset"
-            },
-            "newPage": {
-                "link": "Buat manual",
-                "or": "Atau",
-                "title": "Idea Baru",
-                "subtitle": "Tulis Idea Anda sendiri. Jelaskan Work yang ingin Anda buat — Anda bisa mengantrekannya untuk dibangun setelahnya.",
-                "nameLabel": "Judul",
-                "namePlaceholder": "Opsional — biarkan kosong untuk menurunkannya dari deskripsi",
-                "descriptionLabel": "Deskripsi",
-                "descriptionPlaceholder": "Jelaskan Work yang akan menjadi Idea ini — mis. “Direktori terkurasi framework agen AI sumber terbuka, diatur menurut jenis framework dan lisensi.”",
-                "descriptionHint": "Minimal 10 karakter.",
-                "cancel": "Batal",
-                "create": "Buat Idea",
-                "creating": "Membuat…",
-                "minLength": "Deskripsi harus minimal 10 karakter.",
-                "error": "Tidak dapat membuat Idea. Silakan coba lagi."
-            }
-        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+        "schedules": {
+            "title": "Jadwal",
+            "subtitle": "Semua yang dijadwalkan untuk berjalan di seluruh karya, agen, Missions, dan tugas Anda",
+            "fetchFailed": "Gagal memuat jadwal",
+            "retry": "Coba lagi",
+            "columns": {
+                "owner": "Pemilik",
+                "cadence": "Frekuensi",
+                "nextRun": "Pelaksanaan berikutnya",
+                "status": "Status"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "filters": {
+                "all": "Semua",
+                "activeOnly": "Hanya aktif"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+            "sourceTypes": {
+                "recurringTask": "Tugas berulang",
+                "agentHeartbeat": "Heartbeat agen",
+                "workSchedule": "Jadwal karya",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Validasi sumber",
+                "dataSync": "Sinkronisasi data"
             },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+            "statuses": {
+                "active": "Aktif",
+                "paused": "Dijeda",
+                "disabled": "Dinonaktifkan",
+                "error": "Kesalahan",
+                "ended": "Berakhir"
             },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+            "empty": {
+                "title": "Belum ada yang dijadwalkan",
+                "description": "Tugas berulang, heartbeat agen, jadwal karya, tick Mission, validasi sumber, dan sinkronisasi data akan muncul di sini setelah Anda mengaturnya.",
+                "noResults": "Tidak ada jadwal yang cocok dengan filter saat ini."
             }
         }
     },
@@ -4884,7 +4892,6 @@
             "dashboard": "Dasbor",
             "activity": "Log Aktivitas",
             "works": "Karya",
-            "discover": "Discover",
             "newWork": "Karya Baru",
             "work": "Karya",
             "overview": "Ikhtisar",
@@ -4901,7 +4908,8 @@
             "security": "Keamanan",
             "apiKeys": "Kunci API",
             "dangerZone": "Zona Bahaya",
-            "pluginSettings": "Pengaturan Plugin"
+            "pluginSettings": "Pengaturan Plugin",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5078,12 +5086,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",

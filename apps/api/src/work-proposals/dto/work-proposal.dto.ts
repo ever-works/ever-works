@@ -248,8 +248,10 @@ export class WorkProposalResponseDto {
 /**
  * Phase 1 PR B — response shape for `POST /me/work-proposals/:id/build`.
  * Returns both the Idea after the QUEUED transition AND a compact
- * view of the WorkAgentGoal the build pipeline just created (so the
- * UI can show "build queued, goal id=…").
+ * view of the WorkBuildRequest the build pipeline just created (so
+ * the UI can show "build queued, build-request id=…"). The `goal`
+ * response KEY is kept as-is — it is the public OpenAPI/MCP wire
+ * contract (Codex review on PR #1013).
  *
  * Declared AFTER `WorkProposalResponseDto` because it references that
  * class in a decorator — JS class declarations are not hoisted, so
@@ -263,7 +265,8 @@ export class BuildWorkProposalResponseDto {
     proposal: WorkProposalResponseDto;
 
     @ApiProperty({
-        description: 'The WorkAgentGoal that the build pipeline just created.',
+        description:
+            'The WorkBuildRequest that the build pipeline just created (legacy `goal` key).',
     })
     goal: {
         id: string;

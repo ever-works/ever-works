@@ -1,10 +1,15 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { config } from '@ever-works/agent/config';
 import { User, WorkAgentPreference, type WorkProposal } from '@ever-works/agent/entities';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { UserRepository } from '@ever-works/agent/database';
+import {
+    IDEA_BUILD_EXECUTE_DISPATCHER,
+    type IdeaBuildExecuteDispatcher,
+} from '@ever-works/agent/work-agent';
 import {
     DEFAULT_MAX_PENDING_WORK_PROPOSALS,
     UserResearchService,
@@ -19,7 +24,7 @@ import {
     parseAutoGenerateCadenceMinutes,
     WorkAgentService,
 } from '@ever-works/agent/work-agent';
-import type { WorkAgentGoalDto } from '@ever-works/agent/work-agent';
+import type { WorkBuildRequestDto } from '@ever-works/agent/work-agent';
 
 export interface ScheduledBatchSummary {
     candidates: number;
@@ -53,7 +58,43 @@ export class WorkProposalsApiService {
         private readonly config: ConfigService,
         private readonly workAgent: WorkAgentService,
         private readonly taskLockService?: DistributedTaskLockService,
+        // PR-4 — Idea build executor dispatch seam. Bound to the
+        // Trigger.dev adapter by IdeaBuildExecutorDispatchModule (@Global).
+        // Optional so the service still boots (and the build endpoints
+        // still work as today) when the adapter isn't registered — e.g.
+        // in tests, or when the executor feature flag is off.
+        @Optional()
+        @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
+        private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
     ) {}
+
+    /**
+     * PR-4 — enqueue the just-created build Goal onto the Idea build
+     * executor, but ONLY when the feature flag is on. When
+     * `EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED` is off (the default) this
+     * is a strict no-op: the Goal is still created and the Idea is still
+     * QUEUED, exactly as before this PR — nothing executes. Best-effort:
+     * a dispatch failure is logged and swallowed so the HTTP response
+     * (Goal created, Idea queued) is unchanged.
+     */
+    private async maybeEnqueueBuild(userId: string, goalId: string, ideaId: string): Promise<void> {
+        if (!config.ideaBuildExecutor.isEnabled()) return;
+        if (!this.ideaBuildDispatcher) {
+            this.logger.warn(
+                `Idea build executor is enabled but no dispatcher is bound; ` +
+                    `goal ${goalId} for idea ${ideaId} will not execute.`,
+            );
+            return;
+        }
+        try {
+            await this.ideaBuildDispatcher.enqueue({ goalId, userId, ideaId });
+        } catch (err) {
+            this.logger.warn(
+                `Failed to enqueue idea-build-execute for goal ${goalId} (idea ${ideaId}): ` +
+                    `${(err as Error).message}`,
+            );
+        }
+    }
 
     async list(
         userId: string,
@@ -83,13 +124,22 @@ export class WorkProposalsApiService {
     }
 
     async accept(userId: string, proposalId: string, workId: string): Promise<boolean> {
-        // Existing user-facing accept: only valid from PENDING (today's
-        // contract — preserved). The shared helper now lives on the
-        // agent-side service so PR FF's Goal-completion handler can
-        // call it with `[BUILDING]` instead.
+        // Review §23.1 ruling (ADR-009, 0..N): accept is valid from PENDING
+        // (first link — today's contract) AND from ACCEPTED (linking an
+        // ADDITIONAL Work to an already-accepted Idea; appends an
+        // `idea_works` row and re-points the denormalized `acceptedWorkId`
+        // at the newest link). The shared helper lives on the agent-side
+        // service so the Goal-completion handler can call it with
+        // `[BUILDING]` instead.
         return this.proposals.acceptInternal(userId, proposalId, workId, [
             WorkProposalStatus.PENDING,
+            WorkProposalStatus.ACCEPTED,
         ]);
+    }
+
+    /** Linked Works for the Idea (review §23.1 provenance panel). */
+    async listLinkedWorks(userId: string, proposalId: string) {
+        return this.proposals.listLinkedWorks(userId, proposalId);
     }
 
     /**
@@ -116,18 +166,20 @@ export class WorkProposalsApiService {
     /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue an
      * existing Idea for build. Transitions Idea to QUEUED + creates
-     * a `WorkAgentGoal` with `maxWorksPerRun=1` and `ideaId` set
-     * back to this Idea. On Goal completion (Phase 1 PR FF) the
-     * Goal-completion handler reads `ideaId` and calls
+     * a `WorkBuildRequest` with `maxWorksPerRun=1` and `ideaId` set
+     * back to this Idea. On build completion (Phase 1 PR FF) the
+     * build-completion handler reads `ideaId` and calls
      * `acceptInternal(userId, ideaId, workId, [BUILDING])` to
      * finish the cycle.
      *
-     * Returns the updated Idea + the freshly-created Goal.
+     * Returns the updated Idea + the freshly-created build request
+     * (still exposed under the `goal` response key — that key is the
+     * public OpenAPI/MCP wire contract; see BuildWorkProposalResponseDto).
      */
     async build(
         userId: string,
         proposalId: string,
-    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+    ): Promise<{ proposal: WorkProposal; goal: WorkBuildRequestDto } | null> {
         const existing = await this.proposals.getForUser(userId, proposalId);
         if (!existing) return null;
         if (
@@ -141,11 +193,13 @@ export class WorkProposalsApiService {
         const proposal = await this.proposals.queueForBuild(userId, proposalId);
         if (!proposal) return null;
 
-        const { goal } = await this.workAgent.createGoal(userId, {
+        const { buildRequest: goal } = await this.workAgent.createBuildRequest(userId, {
             instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
             maxWorksPerRun: 1,
             ideaId: proposal.id,
         });
+
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
 
         return { proposal, goal };
     }
@@ -154,13 +208,13 @@ export class WorkProposalsApiService {
      * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
      * Retry button for a FAILED Idea (spec §3.9). Clears the
      * failureMessage + failureKind, transitions FAILED → QUEUED,
-     * creates a fresh WorkAgentGoal. Same shape as `build()` but
+     * creates a fresh WorkBuildRequest. Same shape as `build()` but
      * with stricter "must be FAILED" precondition.
      */
     async retry(
         userId: string,
         proposalId: string,
-    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+    ): Promise<{ proposal: WorkProposal; goal: WorkBuildRequestDto } | null> {
         const existing = await this.proposals.getForUser(userId, proposalId);
         if (!existing) return null;
         if (existing.status !== WorkProposalStatus.FAILED) {
@@ -171,11 +225,13 @@ export class WorkProposalsApiService {
         const proposal = await this.proposals.retryFailed(userId, proposalId);
         if (!proposal) return null;
 
-        const { goal } = await this.workAgent.createGoal(userId, {
+        const { buildRequest: goal } = await this.workAgent.createBuildRequest(userId, {
             instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
             maxWorksPerRun: 1,
             ideaId: proposal.id,
         });
+
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
 
         return { proposal, goal };
     }
@@ -183,7 +239,7 @@ export class WorkProposalsApiService {
     /**
      * Phase 1 PR FF — `POST /me/work-proposals/:id/rebuild` for a
      * DONE Idea (spec §3.9, Decision A27). Creates a NEW Work
-     * (separate from the original); on Goal completion the Idea's
+     * (separate from the original); on build completion the Idea's
      * `acceptedWorkId` is re-pointed to the new Work. The original
      * Work is NOT deleted — user can keep, repurpose, or manually
      * delete it.
@@ -191,7 +247,7 @@ export class WorkProposalsApiService {
     async rebuild(
         userId: string,
         proposalId: string,
-    ): Promise<{ proposal: WorkProposal; goal: WorkAgentGoalDto } | null> {
+    ): Promise<{ proposal: WorkProposal; goal: WorkBuildRequestDto } | null> {
         const existing = await this.proposals.getForUser(userId, proposalId);
         if (!existing) return null;
         if (existing.status !== WorkProposalStatus.ACCEPTED) {
@@ -202,11 +258,13 @@ export class WorkProposalsApiService {
         const proposal = await this.proposals.beginRebuild(userId, proposalId);
         if (!proposal) return null;
 
-        const { goal } = await this.workAgent.createGoal(userId, {
+        const { buildRequest: goal } = await this.workAgent.createBuildRequest(userId, {
             instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
             maxWorksPerRun: 1,
             ideaId: proposal.id,
         });
+
+        await this.maybeEnqueueBuild(userId, goal.id, proposal.id);
 
         return { proposal, goal };
     }
