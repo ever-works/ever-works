@@ -201,8 +201,7 @@ export class SchedulesService {
                     // enabled alongside ACTIVE — otherwise enabledOnly wrongly
                     // drops it.
                     enabled:
-                        agent.status === AgentStatus.ACTIVE ||
-                        agent.status === AgentStatus.RUNNING,
+                        agent.status === AgentStatus.ACTIVE || agent.status === AgentStatus.RUNNING,
                 };
             });
         } catch (error) {
