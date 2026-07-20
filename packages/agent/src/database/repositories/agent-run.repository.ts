@@ -189,8 +189,18 @@ export class AgentRunRepository {
      * NO `agent_runs` sweeper (`recoverStuckRunning()` only touches `agents`
      * rows), so a silent miss would be both unrecoverable and invisible.
      *
-     * The `durationMs` read stays non-atomic on purpose — it is a reporting
-     * field, and `startedAt` is only ever written once by `markStarted`.
+     * The `durationMs` read stays non-atomic on purpose (applies equally to
+     * `markFailed` and `markCompleted`). `startedAt` is read before the CAS
+     * write, so a `markStarted` landing in that gap is read as `null` and
+     * `durationMs` is stored as `null` for a run that technically did start.
+     * That is acceptable: to hit the window `markStarted` must land between the
+     * two round-trips, which means the run had been executing for ~0 ms anyway,
+     * so `null` and `0` carry the same information. Closing it properly needs
+     * the subtraction pushed into SQL (`RETURNING`, or `finishedAt - startedAt`
+     * as an expression), which is dialect-specific — the e2e suite runs on
+     * sqlite while production is Postgres — so it would trade a cosmetic
+     * reporting gap for a real portability hazard. `durationMs` is a reporting
+     * field only; nothing branches on it.
      */
     private async casTerminal(
         runId: string,
