@@ -16,6 +16,7 @@ import { ClassToObject } from './types';
 import { KbDocumentClass, KbDocumentSource, KbDocumentStatus, KbLockMode } from './kb-types';
 import { WorkKnowledgeUpload } from './work-knowledge-upload.entity';
 import { TimestampColumn } from './_types';
+import type { KbConsolidationMarker } from '../services/memory-consolidation';
 
 /**
  * A typed Knowledge Base document.
@@ -170,6 +171,19 @@ export class WorkKnowledgeDocument {
     /** Free-form extension dict for future fields. */
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, unknown> | null;
+
+    /**
+     * Memory Consolidation marker. `null` / absent = a normal document
+     * (the feature is fully additive — nothing changes until a
+     * consolidation run writes a marker). `promoted` docs surface with a
+     * highlight badge in the org Memory feed; `superseded` docs stay
+     * readable but are muted. Documents are NEVER deleted by
+     * consolidation. See `services/memory-consolidation.ts` for the
+     * marker shape + semantics; migration
+     * `1782000000000-AddKbDocumentConsolidation` adds the column.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    consolidation?: KbConsolidationMarker | null;
 
     @CreateDateColumn()
     createdAt: Date;

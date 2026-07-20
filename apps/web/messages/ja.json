@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "アクション承認",
+                "subtitle": "エージェントが副作用を伴うアクションを提案しました。それぞれ承認または却下してください。"
+            },
+            "actions": {
+                "approve": "承認",
+                "reject": "却下",
+                "approveAll": "すべて承認"
+            },
+            "actionType": {
+                "spawn_agent": "エージェントの起動",
+                "schedule_task": "タスクのスケジュール",
+                "send_message": "メッセージ送信",
+                "budget_override": "予算の上書き",
+                "other": "アクション"
+            },
+            "riskFlags": {
+                "budget_override": "予算の上書き",
+                "destructive": "破壊的",
+                "cross_scope": "スコープ横断",
+                "high_fanout": "高ファンアウト"
+            },
+            "toast": {
+                "approved": "アクションを承認しました",
+                "rejected": "アクションを却下しました",
+                "bulkApproved": "{count} 件のアクションを承認しました",
+                "bulkApprovedSkipped": "{approved} 件のアクションを承認、{skipped} 件は決定済み",
+                "error": "問題が発生しました。もう一度お試しください。"
+            }
+        },
         "title": "ダッシュボード",
         "connectGithub": {
             "title": "GitHub アカウントを接続",
@@ -547,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "新しいミッションを開始",
-                "submitTitle": "ミッションを作成",
-                "minLength": "説明は少なくとも10文字必要です。",
-                "created": "ミッションが作成されました",
-                "error": "ミッションを作成できませんでした。再試行してください。"
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "統合作成ツールを開く"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -573,11 +596,60 @@
             "filterBar": {
                 "search": "検索",
                 "searchPlaceholder": "タイトルまたは説明",
-                "status": "ステータス",
                 "anyStatus": "すべてのステータス",
                 "apply": "適用",
-                "reset": "リセット"
+                "reset": "リセット",
+                "status": "ステータス"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "統合",
+                "title": "メモリを統合",
+                "previewIntro": "統合による変更のプレビューです。適用するまで何も変更されません。",
+                "scanned": "{count} 件をスキャン",
+                "promoted": "{count} 件を昇格",
+                "synthesized": "{count} 件を統合生成",
+                "superseded": "{count} 件を置き換え",
+                "promotedHeading": "昇格",
+                "supersededHeading": "置き換え",
+                "more": "他 +{count} 件",
+                "apply": "適用",
+                "cancel": "キャンセル",
+                "applied": "統合完了: {promoted} 件を昇格、{synthesized} 件を統合生成、{superseded} 件を置き換え",
+                "failed": "統合に失敗しました。もう一度お試しください。",
+                "badgePromoted": "昇格",
+                "badgeSuperseded": "置き換え"
+            },
+            "title": "Memory",
+            "subtitle": "組織が知るすべてを一か所に — すべてのワークの Knowledge Base から集約されます。",
+            "searchPlaceholder": "組織が知るすべてを検索…",
+            "newDocument": "新規",
+            "documentsIndexed": "{count, plural, =0 {インデックスされたドキュメントはありません} other {# 件のドキュメントをインデックス済み}}",
+            "worksCovered": "{count, plural, =0 {ワークなし} other {# 件のワーク}}",
+            "filters": {
+                "type": "タイプ",
+                "work": "ワーク",
+                "source": "ソース",
+                "status": "ステータス",
+                "clearAll": "すべてクリア"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory にはまだ何もありません。",
+                "subtitle": "ワークが Knowledge Base（ブランド資料、ペルソナ、リサーチ、スタイルガイド）を構築するにつれて、すべてがここに表示され、組織全体で検索できます。",
+                "noOrg": "集約された Memory を表示するには、組織を選択または作成してください。Memory はアクティブな組織のすべてのワークにまたがります。",
+                "noResults": "検索とフィルターに一致するドキュメントはありません。"
+            },
+            "orgScoped": "組織",
+            "openInWork": "ワークで開く"
         },
         "agentsPage": {
             "title": "エージェント",
@@ -623,7 +695,47 @@
                 "cancel": "キャンセル",
                 "back": "戻る",
                 "next": "次へ",
-                "create": "エージェントを作成"
+                "create": "エージェントを作成",
+                "teamLabel": "チーム",
+                "teamNone": "チームなし",
+                "reportsToLabel": "報告先",
+                "reportsToNone": "マネージャーなし"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "組織",
+                    "teamLabel": "チーム",
+                    "teamNone": "チームなし",
+                    "reportsToLabel": "報告先",
+                    "reportsToNone": "マネージャーなし",
+                    "save": "保存",
+                    "saving": "保存中…"
+                }
+            },
+            "guardrails": {
+                "title": "ガードレール",
+                "subtitle": "提案されたアクションを承認待ちにするか、自動実行するか、ブロックするかを設定します。",
+                "modeLabel": "ディスパッチモード",
+                "modeRequireApproval": "承認必須",
+                "modeRequireApprovalHint": "提案されたすべてのアクションは、あなたが判断するまで承認キューで待機します。",
+                "modeAutonomous": "自律",
+                "modeAutonomousHint": "安全なアクションは待機なしで実行されます。リスクフラグ付きのアクションは常に承認キューに入ります。",
+                "autoApproveLabel": "自動承認するアクション種別",
+                "autoApproveHint": "選択したアクション種別のみ自動実行されます。それ以外はキューに入ります。",
+                "blockedLabel": "ブロックするアクション種別",
+                "blockedHint": "ブロックされたアクションは自動的に却下され、キュー履歴に記録されます。",
+                "actionTypes": {
+                    "spawn_agent": "エージェント作成",
+                    "schedule_task": "タスクのスケジュール",
+                    "send_message": "メッセージ送信",
+                    "budget_override": "予算の上書き",
+                    "other": "その他"
+                },
+                "save": "ガードレールを保存",
+                "reset": "デフォルトに戻す",
+                "saveSuccess": "ガードレールを保存しました",
+                "saveError": "ガードレールを保存できませんでした",
+                "resetSuccess": "ガードレールをデフォルトに戻しました"
             }
         },
         "tasksPage": {
@@ -798,7 +910,7 @@
         },
         "missionDetail": {
             "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
                 "title": "Attached Works",
                 "empty": "No Works attached to this Mission yet. Attach one below.",
                 "attachTitle": "Attach a Work",
@@ -938,7 +1050,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "アイデアを追加",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -982,6 +1093,22 @@
                 "anyStatus": "すべてのステータス",
                 "apply": "適用",
                 "reset": "リセット"
+            },
+            "newPage": {
+                "link": "手動で作成",
+                "or": "または",
+                "title": "新しい Idea",
+                "subtitle": "自分の Idea を書きましょう。作成したい Work を説明してください — その後、ビルドのキューに追加できます。",
+                "nameLabel": "タイトル",
+                "namePlaceholder": "任意 — 空欄にすると説明から自動生成されます",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "この Idea が形になる Work を説明してください — 例:「オープンソースの AI エージェントフレームワークを、フレームワークの種類とライセンスごとに整理した厳選ディレクトリ。」",
+                "descriptionHint": "10 文字以上。",
+                "cancel": "キャンセル",
+                "create": "Idea を作成",
+                "creating": "作成中…",
+                "minLength": "説明は 10 文字以上で入力してください。",
+                "error": "Idea を作成できませんでした。もう一度お試しください。"
             },
             "linkedWorks": {
                 "title": "Linked Works",
@@ -1176,6 +1303,10 @@
                     "failed": "失敗",
                     "cancelled": "キャンセル"
                 }
+            },
+            "viewToggle": {
+                "log": "ログ",
+                "schedules": "スケジュール"
             }
         },
         "works": {
@@ -3494,7 +3625,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3509,19 +3640,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "エージェントが継続的に取り組む継続的な目標 — スケジュールまたはワンショットでアイデアを生成します。",
-                "idea": "エージェントがあなたが構築できる作業計画に変換するワンショットの簡潔な指示。",
-                "website": "ビジネス、サービス、またはブランドのためのマルチページサイト — 生成されたコンテンツ+コード。",
-                "landing-page": "焦点の当てられたワンページ — 等待リスト、製品ローンチ、ウェビナー登録、リード取得。",
-                "blog": "カテゴリ、RSS、コードハイライト、SEO対応コンテンツ付きブログ。",
-                "directory": "検索、フィルター、構造化された項目データ付きのキュレートされたディレクトリサイト。",
-                "awesome-repo": "すごいリストリポジトリ — マークダウンインデックス、カテゴリ分けされたリンク、更新可能なメタデータ。",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "作成",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -4215,10 +4348,12 @@
                 "works": "ワーク",
                 "tasks": "タスク",
                 "agents": "エージェント",
+                "memory": "Memory",
                 "plugins": "プラグイン",
                 "skills": "スキル",
                 "templates": "テンプレート",
-                "settings": "設定"
+                "settings": "設定",
+                "teams": "チーム"
             },
             "tooltips": {
                 "expandSidebar": "サイドバーを展開",
@@ -4778,380 +4913,186 @@
             "system": "システム",
             "goToPluginSettings": "プラグイン設定に移動"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
+        "teamsPage": {
+            "title": "チーム",
+            "subtitle": "この組織内でエージェントとメンバーをチームに編成しましょう。",
+            "orgChartCta": "組織図",
+            "newTeamCta": "新しいチーム",
             "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
+                "title": "チームはまだありません",
+                "description": "最初のチームを作成してエージェントとメンバーをグループ化し、組織図上に配置しましょう。",
+                "cta": "チームを作成"
             },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+            "noOrg": {
+                "title": "チームは組織の中に存在します",
+                "description": "まず組織を作成してください。その後、組織のエージェントとメンバーをチームにまとめられます。",
+                "cta": "組織を作成"
             },
             "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
+                "agents": "{count, plural, other {# エージェント}}",
+                "members": "{count, plural, other {# メンバー}}",
+                "subTeams": "{count, plural, other {# サブチーム}}"
+            },
+            "newDialog": {
+                "title": "新しいチーム",
+                "nameLabel": "名前",
+                "namePlaceholder": "例: エンジニアリング",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "このチームの担当領域（任意）",
+                "parentLabel": "親チーム",
+                "parentNone": "親チームなし（最上位）",
+                "managerLabel": "マネージャーエージェント",
+                "managerNone": "マネージャーなし",
+                "submit": "チームを作成",
+                "creating": "作成中…",
+                "cancel": "キャンセル"
+            },
+            "detail": {
+                "overviewTab": "概要",
+                "settingsTab": "設定",
+                "rosterTitle": "メンバー一覧",
+                "subTeamsTitle": "サブチーム",
+                "managerLabel": "マネージャー",
+                "parentLabel": "親チーム",
+                "addMemberCta": "メンバーを追加",
+                "addMemberTypeLabel": "種類",
+                "addMemberAgent": "エージェント",
+                "addMemberUser": "メンバー",
+                "addMemberSelectLabel": "対象",
+                "addMemberSubmit": "追加",
+                "adding": "追加中…",
+                "removeMember": "削除",
+                "roleLead": "リード",
+                "roleMember": "メンバー",
+                "emptyRoster": "メンバーはまだいません。このチームにエージェントや同僚を追加しましょう。"
+            },
+            "settings": {
+                "title": "チーム設定",
+                "nameLabel": "名前",
+                "descriptionLabel": "説明",
+                "parentLabel": "親チーム",
+                "managerLabel": "マネージャーエージェント",
+                "save": "変更を保存",
+                "saving": "保存中…",
+                "saved": "チームを更新しました",
+                "deleteTitle": "危険な操作",
+                "deleteDescription": "チームを削除すると、サブチームは1つ上の階層に移動し、メンバー一覧は削除されます。エージェントとメンバー自体は削除されません。",
+                "deleteCta": "チームを削除",
+                "deleteConfirm": "このチームを削除しますか？サブチームは1つ上の階層に移動し、エージェントとメンバーは保持されます。",
+                "deleting": "削除中…"
+            },
+            "errors": {
+                "createFailed": "チームを作成できませんでした",
+                "updateFailed": "チームを更新できませんでした",
+                "deleteFailed": "チームを削除できませんでした",
+                "memberAddFailed": "メンバーを追加できませんでした",
+                "memberRemoveFailed": "メンバーを削除できませんでした"
             }
         },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
+        "orgChartPage": {
+            "title": "組織図",
+            "subtitle": "この組織のチーム、エージェント、メンバー。",
+            "backToTeams": "チーム",
+            "zoomIn": "拡大",
+            "zoomOut": "縮小",
+            "fitView": "全体表示",
+            "unassignedGroup": "未所属",
+            "membersBadge": "{count, plural, other {# メンバー}}",
+            "empty": "まだ表示できるものがありません。まずこの組織にチームやエージェントを作成してください。",
+            "noOrg": "組織を作成すると組織図が表示されます。"
         },
-        "missionDetail": {
-            "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
-                "title": "Attached Works",
-                "empty": "No Works attached to this Mission yet. Attach one below.",
-                "attachTitle": "Attach a Work",
-                "workLabel": "Work",
-                "workPlaceholder": "Select a Work",
-                "relationLabel": "Relation",
-                "attach": "Attach",
-                "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
-                "noWorksToAttach": "You have no Works to attach yet.",
-                "relations": {
-                    "created": "Created",
-                    "improves": "Improves",
-                    "operates": "Operates",
-                    "markets": "Markets",
-                    "researches": "Researches",
-                    "retires": "Retires"
-                },
-                "toasts": {
-                    "attached": "Work attached",
-                    "attachError": "Couldn't attach Work",
-                    "detached": "Work detached",
-                    "detachError": "Couldn't detach Work"
-                }
-            },
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "completeDialog": {
-                "title": "Complete this Mission",
-                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
-                "outcomeLabel": "Outcome (optional)",
-                "noVerdict": "No verdict",
-                "cancel": "Cancel",
-                "confirm": "Complete Mission"
-            },
-            "outcomes": {
-                "succeeded": "Succeeded",
-                "partially_succeeded": "Partially succeeded",
-                "failed": "Failed",
-                "cancelled": "Cancelled",
-                "superseded": "Superseded"
-            },
-            "outcomeTooltip": "Outcome recorded when this Mission was completed",
-            "completedAtLabel": "Completed",
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
+        "schedules": {
+            "title": "スケジュール",
+            "subtitle": "ワーク、エージェント、Missions、タスク全体で実行が予定されているすべて",
+            "fetchFailed": "スケジュールの読み込みに失敗しました",
+            "retry": "再試行",
+            "columns": {
+                "owner": "所有者",
+                "cadence": "間隔",
+                "nextRun": "次回の実行",
+                "status": "ステータス"
             },
             "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+                "all": "すべて",
+                "activeOnly": "有効のみ"
             },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
+            "sourceTypes": {
+                "recurringTask": "定期タスク",
+                "agentHeartbeat": "エージェントのハートビート",
+                "workSchedule": "ワークのスケジュール",
+                "missionTick": "Mission のティック",
+                "sourceValidation": "ソースの検証",
+                "dataSync": "データ同期",
+                "inboundTrigger": "受信トリガー"
             },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "このアイデアは利用できなくなりました。"
+            "statuses": {
+                "active": "アクティブ",
+                "paused": "一時停止",
+                "disabled": "無効",
+                "error": "エラー",
+                "ended": "終了"
             },
             "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
+                "title": "まだ何も予定されていません",
+                "description": "定期タスク、エージェントのハートビート、ワークのスケジュール、Mission のティック、ソースの検証、データ同期を設定すると、ここに表示されます。",
+                "noResults": "現在のフィルターに一致するスケジュールはありません。"
+            }
+        },
+        "triggers": {
+            "title": "受信トリガー",
+            "subtitle": "発火時にタスクを生成する署名付き Webhook / API 呼び出し。",
+            "new": "新規トリガー",
+            "empty": "トリガーはまだありません。作成すると署名付き Webhook を受信できます。",
+            "firedCount": "{count} 回発火",
+            "lastFired": "最終発火",
+            "status": {
+                "active": "有効",
+                "paused": "一時停止"
             },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "検索",
-                "searchPlaceholder": "タイトルまたは説明",
-                "status": "ステータス",
-                "anyStatus": "すべてのステータス",
-                "apply": "適用",
-                "reset": "リセット"
+            "createTitle": "新規受信トリガー",
+            "createDescription": "署名付き Webhook URL とシークレットが発行されます。外部システムが POST するとタスクが生成されます。",
+            "form": {
+                "name": "名前",
+                "namePlaceholder": "デプロイ通知",
+                "description": "説明",
+                "descriptionPlaceholder": "このトリガーを発火させるもの",
+                "taskTitle": "タスクタイトルのテンプレート",
+                "taskTitlePlaceholder": "トリガー: {name}",
+                "taskTitleHint": "{name} はトリガー名に展開されます。"
             },
-            "newPage": {
-                "link": "手動で作成",
-                "or": "または",
-                "title": "新しい Idea",
-                "subtitle": "自分の Idea を書きましょう。作成したい Work を説明してください — その後、ビルドのキューに追加できます。",
-                "nameLabel": "タイトル",
-                "namePlaceholder": "任意 — 空欄にすると説明から自動生成されます",
-                "descriptionLabel": "説明",
-                "descriptionPlaceholder": "この Idea が形になる Work を説明してください — 例:「オープンソースの AI エージェントフレームワークを、フレームワークの種類とライセンスごとに整理した厳選ディレクトリ。」",
-                "descriptionHint": "10 文字以上。",
+            "actions": {
+                "pause": "一時停止",
+                "resume": "再開",
+                "rotate": "シークレットを再生成",
+                "delete": "削除",
                 "cancel": "キャンセル",
-                "create": "Idea を作成",
-                "creating": "作成中…",
-                "minLength": "説明は 10 文字以上で入力してください。",
-                "error": "Idea を作成できませんでした。もう一度お試しください。"
+                "create": "作成"
             },
-            "linkedWorks": {
-                "title": "Linked Works",
-                "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
-                }
-            }
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+            "reveal": {
+                "title": "トリガーのシークレット",
+                "warning": "今すぐシークレットをコピーしてください。再表示はできません。",
+                "url": "Webhook URL",
+                "secret": "署名シークレット",
+                "curl": "署名付きリクエストの例",
+                "copy": "コピー",
+                "done": "完了"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "toast": {
+                "created": "トリガーを作成しました",
+                "createFailed": "トリガーを作成できませんでした",
+                "rotated": "シークレットを再生成しました",
+                "rotateFailed": "シークレットを再生成できませんでした",
+                "toggleFailed": "トリガーを更新できませんでした",
+                "deleted": "トリガーを削除しました",
+                "deleteFailed": "トリガーを削除できませんでした",
+                "loadFailed": "トリガーを読み込めませんでした",
+                "copyFailed": "クリップボードにコピーできませんでした"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
-            }
+            "confirmDelete": "このトリガーを削除しますか？ Webhook URL は直ちに使用できなくなり、元に戻せません。"
         }
     },
     "layout": {
@@ -5238,7 +5179,8 @@
             "security": "セキュリティ",
             "apiKeys": "APIキー",
             "dangerZone": "危険ゾーン",
-            "pluginSettings": "プラグイン設定"
+            "pluginSettings": "プラグイン設定",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5460,6 +5402,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "開始方法",
+                "blankTitle": "空の組織",
+                "blankDescription": "空の状態から始めて、チームやエージェントは後で追加します。",
+                "meta": "{agents, plural, other {# エージェント}} · {teams, plural, other {# チーム}}",
+                "submitImport": "テンプレートから作成",
+                "importError": "このテンプレートから組織を作成できませんでした"
             }
         },
         "upgrade": {

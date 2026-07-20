@@ -1,0 +1,98 @@
+{
+	"name": "@ever-works/discord-connector-plugin",
+	"version": "1.0.0",
+	"description": "Discord connector plugin for Ever Works platform (bidirectional; outbound channel-message posting via discord.js REST)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"discord.js": "^14.16.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "discord-connector",
+			"name": "Discord Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-discord"
+			],
+			"description": "Bidirectional Discord connector. Outbound posts messages to a Discord channel with a bot token via the discord.js REST client (embeds supported). Inbound Interactions API routing lands in a follow-up.",
+			"systemPlugin": false,
+			"builtIn": false,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"botToken"
+				],
+				"properties": {
+					"botToken": {
+						"type": "string",
+						"title": "Bot token",
+						"x-secret": true,
+						"x-envVar": "DISCORD_BOT_TOKEN"
+					},
+					"publicKey": {
+						"type": "string",
+						"title": "Application public key (for inbound Interactions API — used in a follow-up)",
+						"x-secret": true,
+						"x-envVar": "DISCORD_PUBLIC_KEY"
+					},
+					"applicationId": {
+						"type": "string",
+						"title": "Discord application (client) id"
+					},
+					"guildId": {
+						"type": "string",
+						"title": "Default guild/server id"
+					},
+					"defaultChannelId": {
+						"type": "string",
+						"title": "Default channel id (e.g. 123456789012345678)"
+					}
+				}
+			},
+			"distribution": "registry"
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

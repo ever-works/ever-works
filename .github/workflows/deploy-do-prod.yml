@@ -178,6 +178,12 @@ jobs:
           # member of one of these GitHub orgs. Empty = author check off
           # (the COMMUNITY_PR_AUTO_APPLY default-off gate still applies).
           COMMUNITY_PR_VERIFIED_ORGS: ever-works
+          # Teams & Prebuilt Companies (teams-and-companies spec §6) — pin the
+          # ever-works/orgs company-template catalog to a tag so cache expiry
+          # can't pull unreviewed content (supply-chain guard; service warns
+          # on mutable refs). Token resolves via the GitHub App installation
+          # on the ever-works org — no extra secret needed.
+          EVER_WORKS_ORGS_REF: v1.0.0
           # H-24: structured audit log line on every agent-pipeline bash
           # invocation. Lands in the existing log stream.
           AGENT_BASH_AUDIT_LOG: 'true'

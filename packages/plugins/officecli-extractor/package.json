@@ -1,0 +1,71 @@
+{
+	"name": "@ever-works/officecli-extractor-plugin",
+	"version": "1.0.0",
+	"description": "OfficeCLI Content Extractor - Extract text from Office documents (.docx/.xlsx/.pptx) via the OfficeCLI tool",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@officecli/sdk": "^0.1.2",
+		"axios": "^1.15.2"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.5.1",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.18"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "officecli-extractor",
+			"name": "OfficeCLI Content Extractor",
+			"version": "1.0.0",
+			"category": "content-extractor",
+			"capabilities": [
+				"content-extractor"
+			],
+			"description": "Extract text from Office documents (.docx/.xlsx/.pptx) using the OfficeCLI tool. Optional, off by default.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"distribution": "registry"
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

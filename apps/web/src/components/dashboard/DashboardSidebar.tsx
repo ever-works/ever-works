@@ -26,8 +26,10 @@ import {
     Target,
     Gauge,
     Bot,
+    Brain,
     ListChecks,
     Sparkles,
+    Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -129,6 +131,12 @@ export function DashboardSidebar({
         // Agents/Skills/Tasks PR #1017 — Phase 5.
         { name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
         { name: t('navigation.agents'), href: ROUTES.DASHBOARD_AGENTS, icon: Bot },
+        // Org-wide Memory (Cortex P1) — one place to search everything the
+        // active Organization knows, aggregated across all its Works' KB.
+        // Sits directly below Agents per spec §4.1.
+        { name: t('navigation.memory'), href: ROUTES.DASHBOARD_MEMORY, icon: Brain },
+        // Teams & Prebuilt Companies (teams-and-companies spec §4.1).
+        { name: t('navigation.teams'), href: ROUTES.DASHBOARD_TEAMS, icon: Users },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.skills'), href: ROUTES.DASHBOARD_SKILLS, icon: Sparkles },

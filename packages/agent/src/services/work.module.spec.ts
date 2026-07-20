@@ -161,7 +161,7 @@ const meta = (key: string): unknown[] => Reflect.getMetadata(key, WorkModule) ??
 
 describe('WorkModule', () => {
     describe('imports', () => {
-        it('imports the documented 12-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog)', () => {
+        it('imports the documented 13-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog + ActivityLogModule)', () => {
             const imports = meta('imports') as Array<{ name?: string }>;
             const names = imports.map((m) => m?.name).filter(Boolean) as string[];
 
@@ -179,10 +179,13 @@ describe('WorkModule', () => {
                     'CommunityPrModule',
                     'ComparisonGeneratorModule',
                     'TemplateCatalogModule',
+                    // Schedules P2: provides ActivityLogService so the schedule
+                    // dispatcher can emit schedule_executed activity rows.
+                    'ActivityLogModule',
                 ]),
             );
             // Pin the count too — silent additions break this regression guard.
-            expect(imports).toHaveLength(12);
+            expect(imports).toHaveLength(13);
         });
 
         it('does NOT import PluginsModule directly (it is registered globally via forRoot at the app root, per JSDoc)', () => {

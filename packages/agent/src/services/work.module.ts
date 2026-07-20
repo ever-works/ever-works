@@ -5,6 +5,7 @@ import { FacadesModule } from '../facades/facades.module';
 import { MarkdownGeneratorModule } from '../generators/markdown-generator/markdown-generator.module';
 import { WebsiteGeneratorModule } from '../generators/website-generator/website-generator.module';
 import { DatabaseModule } from '../database/database.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { ImportModule } from '../import/import.module';
 import { CommunityPrModule } from '../community-pr/community-pr.module';
 import { ComparisonGeneratorModule } from '../comparison-generator/comparison-generator.module';
@@ -63,6 +64,11 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
 @Module({
     imports: [
         DatabaseModule,
+        // Schedules P2 — provides `ActivityLogService` so
+        // `WorkScheduleDispatcherService` can emit `schedule_executed`
+        // rows for cron-fired scheduled updates. `@Optional()`-injected,
+        // so this import is what makes the emit fire in production.
+        ActivityLogModule,
         DataGeneratorModule,
         ItemsGeneratorModule,
         FacadesModule,

@@ -16,6 +16,8 @@ import { TaskKbMention } from '../task-kb-mention.entity';
 import { TaskRelation } from '../task-relation.entity';
 import { TaskReviewer } from '../task-reviewer.entity';
 import { TaskWatcher } from '../task-watcher.entity';
+import { TeamMember } from '../team-member.entity';
+import { TeamResource } from '../team-resource.entity';
 import { UsageLedgerEntry } from '../usage-ledger-entry.entity';
 import { WebhookDelivery } from '../webhook-delivery.entity';
 import { WorkGenerationHistory } from '../work-generation-history.entity';
@@ -67,6 +69,8 @@ describe('Tier C entities — Phase 5a scope columns', () => {
         { name: 'AgentBudget', target: AgentBudget },
         { name: 'AgentMembership', target: AgentMembership },
         { name: 'SkillBinding', target: SkillBinding },
+        { name: 'TeamMember', target: TeamMember },
+        { name: 'TeamResource', target: TeamResource },
         { name: 'WorkMember', target: WorkMember },
         { name: 'WorkInvitation', target: WorkInvitation },
         { name: 'WorkGenerationHistory', target: WorkGenerationHistory },

@@ -47,6 +47,24 @@ const MAX_NAME_LENGTH = 200;
  */
 const MAX_VISION_LENGTH = 5000;
 
+/**
+ * Teams & Prebuilt Companies (spec §4.4/§6) — one catalog entry from
+ * `GET /api/org-templates` (BFF proxy of the ever-works/orgs manifest).
+ */
+interface OrgTemplateEntry {
+    slug: string;
+    name: string;
+    description: string;
+    category: string;
+    agents: number;
+    teams: number;
+    skills: number;
+    projects: number;
+    iconName?: string;
+    tags?: string[];
+    featured?: boolean;
+}
+
 export interface CreateOrganizationModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -101,6 +119,11 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
     const [slugStatus, setSlugStatus] = useState<SlugStatus>({ kind: 'idle' });
     const [createdOrg, setCreatedOrg] = useState<OrganizationResponse | null>(null);
     const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
+    // Teams & Prebuilt Companies (spec §4.4) — optional template step.
+    // `templates` stays [] on any fetch failure, which renders the modal
+    // exactly as it was before this feature existed (skip-when-empty).
+    const [templates, setTemplates] = useState<OrgTemplateEntry[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
     /**
      * Captures whether THIS submission is the user's first Org. Read
      * once at submit-time so the post-mutate `organizations.length`
@@ -120,7 +143,30 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
             setSlugStatus({ kind: 'idle' });
             setCreatedOrg(null);
             setShowUpgradeDialog(false);
+            setSelectedTemplate(null);
         }
+    }, [open]);
+
+    // Load the prebuilt-company catalog when the modal opens. Best-effort:
+    // any failure leaves `templates` empty and the step invisible.
+    useEffect(() => {
+        if (!open) return;
+        const controller = new AbortController();
+        void (async () => {
+            try {
+                const res = await fetch('/api/org-templates', {
+                    method: 'GET',
+                    signal: controller.signal,
+                    cache: 'no-store',
+                });
+                if (!res.ok) return;
+                const body = (await res.json()) as OrgTemplateEntry[];
+                if (Array.isArray(body)) setTemplates(body);
+            } catch {
+                // Swallow — the template step simply doesn't render.
+            }
+        })();
+        return () => controller.abort();
     }, [open]);
 
     // Debounced slug-availability check. Each keystroke resets the
@@ -186,24 +232,33 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         }
         setSubmitError(null);
         wasFirstOrgRef.current = organizations.length === 0;
-        // Vision is strictly optional — omit the key entirely when the
-        // user left it blank so the POST body stays identical to the
-        // pre-PR-6 contract for the common zero-friction path.
+        // Template path (spec §4.4): route through the importer, which
+        // creates the Organization PLUS its teams/agents/skills/works. The
+        // blank/manual path (PR-6) additionally carries an optional Vision.
+        // Both stay byte-identical to their pre-feature contracts otherwise.
+        const importing = selectedTemplate !== null;
         const trimmedVision = vision.trim();
-        let payload: { name: string; vision?: string } = { name: trimmed };
-        if (trimmedVision.length > 0) {
-            payload.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
+        const requestBody: { name: string; templateSlug?: string; vision?: string } = {
+            name: trimmed,
+        };
+        if (importing) {
+            requestBody.templateSlug = selectedTemplate as string;
+        } else if (trimmedVision.length > 0) {
+            requestBody.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
         }
         startTransition(() => {
             void (async () => {
                 try {
-                    const res = await fetch('/api/organizations', {
-                        method: 'POST',
-                        credentials: 'include',
-                        cache: 'no-store',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
+                    const res = await fetch(
+                        importing ? '/api/organizations/import-company' : '/api/organizations',
+                        {
+                            method: 'POST',
+                            credentials: 'include',
+                            cache: 'no-store',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody),
+                        },
+                    );
                     if (!res.ok) {
                         const body = await res
                             .json()
@@ -224,7 +279,15 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         setSubmitError(displayMsg);
                         return;
                     }
-                    const org = (await res.json()) as OrganizationResponse;
+                    const payload = (await res.json()) as
+                        | OrganizationResponse
+                        | { organization: OrganizationResponse };
+                    // The importer wraps the org in a report envelope;
+                    // the plain create returns it bare.
+                    const org =
+                        'organization' in payload && payload.organization
+                            ? payload.organization
+                            : (payload as OrganizationResponse);
                     // Refresh the org list so the switcher updates and
                     // subsequent first-Org checks aren't fooled.
                     //
@@ -240,10 +303,14 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                     } catch {
                         // Swallow — see comment above.
                     }
-                    if (wasFirstOrgRef.current) {
+                    if (wasFirstOrgRef.current && !importing) {
                         // Keep the parent modal mounted but hidden behind
                         // the upgrade dialog so the user can't backtrack
-                        // into a half-finished form.
+                        // into a half-finished form. Template imports skip
+                        // the upgrade branch: their org is already populated
+                        // and org-stamped, so pulling bare-Tenant rows in is
+                        // a separate, later decision (settings), not a
+                        // first-run fork.
                         setCreatedOrg(org);
                         setShowUpgradeDialog(true);
                     } else {
@@ -260,7 +327,22 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                 }
             })();
         });
-    }, [name, vision, organizations.length, mutate, onOpenChange, router, t]);
+    }, [name, vision, selectedTemplate, organizations.length, mutate, onOpenChange, router, t]);
+
+    const handlePickTemplate = useCallback(
+        (slug: string | null) => {
+            setSelectedTemplate(slug);
+            if (slug) {
+                const tpl = templates.find((entry) => entry.slug === slug);
+                // Prefill the org name from the template when the user
+                // hasn't typed one yet — still fully editable.
+                if (tpl && name.trim().length === 0) {
+                    setName(tpl.name);
+                }
+            }
+        },
+        [templates, name],
+    );
 
     const handleUpgradeDialogClose = useCallback(
         (didUpgrade: boolean) => {
@@ -305,6 +387,42 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         </DialogHeader>
 
                         <div className="space-y-4">
+                            {templates.length > 0 && (
+                                <div>
+                                    <div className="mb-2 text-sm font-medium text-text-secondary dark:text-text-secondary-dark">
+                                        {t('templates.label')}
+                                    </div>
+                                    <div
+                                        className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto pr-1"
+                                        data-testid="org-template-list"
+                                    >
+                                        <TemplateCard
+                                            selected={selectedTemplate === null}
+                                            title={t('templates.blankTitle')}
+                                            description={t('templates.blankDescription')}
+                                            testId="org-template-chip-blank"
+                                            onSelect={() => handlePickTemplate(null)}
+                                            disabled={pending}
+                                        />
+                                        {templates.map((tpl) => (
+                                            <TemplateCard
+                                                key={tpl.slug}
+                                                selected={selectedTemplate === tpl.slug}
+                                                title={tpl.name}
+                                                description={tpl.description}
+                                                meta={t('templates.meta', {
+                                                    agents: tpl.agents,
+                                                    teams: tpl.teams,
+                                                })}
+                                                testId={`org-template-chip-${tpl.slug}`}
+                                                onSelect={() => handlePickTemplate(tpl.slug)}
+                                                disabled={pending}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <Input
                                 label={t('nameLabel')}
                                 type="text"
@@ -366,8 +484,9 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                                 onClick={handleSubmit}
                                 loading={pending}
                                 disabled={pending || name.trim().length === 0}
+                                data-testid="org-create-submit"
                             >
-                                {t('submit')}
+                                {selectedTemplate ? t('templates.submitImport') : t('submit')}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -382,6 +501,53 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                 />
             )}
         </>
+    );
+}
+
+/**
+ * Teams & Prebuilt Companies (spec §4.4) — one selectable card in the
+ * "Start from" grid. Radio-like behavior; plain buttons, no new deps.
+ */
+function TemplateCard({
+    selected,
+    title,
+    description,
+    meta,
+    testId,
+    onSelect,
+    disabled,
+}: {
+    selected: boolean;
+    title: string;
+    description: string;
+    meta?: string;
+    testId: string;
+    onSelect: () => void;
+    disabled: boolean;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onSelect}
+            disabled={disabled}
+            data-testid={testId}
+            aria-pressed={selected}
+            className={`rounded-lg border p-3 text-left transition-colors ${
+                selected
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/40 dark:border-border-dark'
+            }`}
+        >
+            <div className="text-sm font-medium text-text dark:text-text-dark">{title}</div>
+            <div className="mt-0.5 line-clamp-2 text-xs text-text-muted dark:text-text-muted-dark">
+                {description}
+            </div>
+            {meta && (
+                <div className="mt-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
+                    {meta}
+                </div>
+            )}
+        </button>
     );
 }
 

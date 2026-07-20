@@ -137,9 +137,7 @@ describe('GoogleAnalyticsMetricsPlugin', () => {
 					projectId: SERVICE_ACCOUNT.project_id
 				})
 			);
-			expect(runReportMock).toHaveBeenCalledWith(
-				expect.objectContaining({ property: 'properties/987654321' })
-			);
+			expect(runReportMock).toHaveBeenCalledWith(expect.objectContaining({ property: 'properties/987654321' }));
 		});
 
 		it('prefers settings over the environment variables', async () => {
@@ -157,17 +155,13 @@ describe('GoogleAnalyticsMetricsPlugin', () => {
 					credentials: expect.objectContaining({ client_email: SERVICE_ACCOUNT.client_email })
 				})
 			);
-			expect(runReportMock).toHaveBeenCalledWith(
-				expect.objectContaining({ property: 'properties/123456789' })
-			);
+			expect(runReportMock).toHaveBeenCalledWith(expect.objectContaining({ property: 'properties/123456789' }));
 		});
 
 		it('accepts a "properties/123" resource name and normalizes it', async () => {
 			runReportMock.mockResolvedValueOnce(report('5'));
 			await plugin.getMetricValue(query(), { ...SETTINGS, propertyId: 'properties/123456789' });
-			expect(runReportMock).toHaveBeenCalledWith(
-				expect.objectContaining({ property: 'properties/123456789' })
-			);
+			expect(runReportMock).toHaveBeenCalledWith(expect.objectContaining({ property: 'properties/123456789' }));
 		});
 
 		it('throws invalid_settings on unparsable service-account JSON', async () => {
@@ -199,9 +193,7 @@ describe('GoogleAnalyticsMetricsPlugin', () => {
 		])('queries the %s metric as GA4 "%s"', async (metricId, apiName) => {
 			runReportMock.mockResolvedValueOnce(report('1'));
 			await plugin.getMetricValue(query({ metricId }), SETTINGS);
-			expect(runReportMock).toHaveBeenCalledWith(
-				expect.objectContaining({ metrics: [{ name: apiName }] })
-			);
+			expect(runReportMock).toHaveBeenCalledWith(expect.objectContaining({ metrics: [{ name: apiName }] }));
 		});
 
 		it('sends a single-day UTC dateRange for the day window', async () => {
@@ -375,7 +367,10 @@ describe('GoogleAnalyticsMetricsPlugin', () => {
 			const r = plugin.validateSettings({ ...SETTINGS, serviceAccountJson: '{oops' });
 			expect(r.valid).toBe(false);
 			expect(r.errors).toEqual([
-				expect.objectContaining({ path: 'serviceAccountJson', message: expect.stringMatching(/not valid JSON/i) })
+				expect.objectContaining({
+					path: 'serviceAccountJson',
+					message: expect.stringMatching(/not valid JSON/i)
+				})
 			]);
 		});
 
@@ -455,9 +450,7 @@ describe('GoogleAnalyticsMetricsPlugin', () => {
 			runReportMock.mockResolvedValueOnce(report('0'));
 			const r = await plugin.validateConnection(SETTINGS);
 			expect(r.success).toBe(true);
-			expect(runReportMock).toHaveBeenCalledWith(
-				expect.objectContaining({ metrics: [{ name: 'activeUsers' }] })
-			);
+			expect(runReportMock).toHaveBeenCalledWith(expect.objectContaining({ metrics: [{ name: 'activeUsers' }] }));
 		});
 
 		it('reports the SDK error message on failure', async () => {

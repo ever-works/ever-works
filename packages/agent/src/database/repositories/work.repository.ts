@@ -537,6 +537,30 @@ export class WorkRepository {
         return rows.map((w) => w.id);
     }
 
+    /**
+     * Org-wide Memory (Cortex P1) — sibling to
+     * {@link findIdsByOrganization} that also returns each Work's display
+     * `name`. Used by `KnowledgeBaseService.aggregateOrgMemory` to build
+     * the `workId → workName` map for the Memory feed rows and the Work
+     * facet chips in ONE query (avoids a second round-trip for titles).
+     *
+     * Returns `[]` for a falsy `organizationId` so callers don't need a
+     * separate guard. Ordered by `id ASC` for determinism.
+     */
+    async findIdNamesByOrganization(
+        organizationId: string,
+    ): Promise<Array<{ id: string; name: string }>> {
+        if (!organizationId) {
+            return [];
+        }
+        const rows = await this.repository.find({
+            where: { organizationId },
+            select: { id: true, name: true } as never,
+            order: { id: 'ASC' },
+        });
+        return rows.map((w) => ({ id: w.id, name: w.name }));
+    }
+
     async updateLastPullRequest(
         id: string,
         lastPullRequest: Work['lastPullRequest'],
