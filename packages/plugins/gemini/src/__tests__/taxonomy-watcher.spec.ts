@@ -109,11 +109,22 @@ describe('taxonomy-watcher', () => {
 				)
 			]);
 
-			await sleep(400);
-
+			// fs-watch latency is unbounded under CI load, so a fixed sleep flakes
+			// (one of the two concurrent writes may not be serialized yet). Poll the
+			// meta files until both writes have landed, up to ~6s.
 			const { readFile: rf } = await import('node:fs/promises');
-			const categories = JSON.parse(await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8'));
-			const tags = JSON.parse(await rf(join(workspacePath, '_meta', 'tags.json'), 'utf-8'));
+			let categories: Array<{ id: string; name: string }> = [];
+			let tags: Array<{ id: string; name: string }> = [];
+			for (let attempt = 0; attempt < 60; attempt++) {
+				await sleep(100);
+				try {
+					categories = JSON.parse(await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8'));
+					tags = JSON.parse(await rf(join(workspacePath, '_meta', 'tags.json'), 'utf-8'));
+				} catch {
+					continue;
+				}
+				if (categories.length >= 2 && tags.length >= 2) break;
+			}
 
 			// File-system event ordering is non-deterministic for concurrent writes —
 			// assert set membership (the serialization invariant the test cares about)

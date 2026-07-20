@@ -38,10 +38,10 @@ and roles.
 
 There are two rows, with different purposes and visibility.
 
-| Concept          | Row                | Visibility          | Cardinality             |
-| ---------------- | ------------------ | ------------------- | ----------------------- |
-| **Tenant**       | `tenants`          | Internal — never in UI | 1 User : 1 Tenant       |
-| **Organization** | `organizations`    | User-facing         | 1 Tenant : 0..N Orgs    |
+| Concept          | Row             | Visibility             | Cardinality          |
+| ---------------- | --------------- | ---------------------- | -------------------- |
+| **Tenant**       | `tenants`       | Internal — never in UI | 1 User : 1 Tenant    |
+| **Organization** | `organizations` | User-facing            | 1 Tenant : 0..N Orgs |
 
 The **Tenant** is the always-present default container. It is created
 **lazily** — a fresh user has `users.tenantId = NULL` and no Tenant at
@@ -73,17 +73,17 @@ graph TD
 
 The `Organization` entity carries (see `organization.entity.ts`):
 
-| Field                  | Notes                                                                 |
-| ---------------------- | --------------------------------------------------------------------- |
-| `id`                   | UUID primary key                                                      |
-| `tenantId`             | FK to `tenants.id` (cascade delete via migration constraint)          |
+| Field                  | Notes                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `id`                   | UUID primary key                                                                     |
+| `tenantId`             | FK to `tenants.id` (cascade delete via migration constraint)                         |
 | `slug`                 | URL-safe, **globally unique** across `organizations` (see [Slug rules](#slug-rules)) |
-| `displayName`          | Human-friendly name shown in the Switcher / Settings (NOT NULL)       |
-| `legalName`            | Registered legal name, e.g. `"Acme, Inc."` — nullable                 |
-| `countryCode`          | ISO 3166-1 alpha-2 (`"US"`, `"DE"`) — nullable                        |
-| `registrationProvider` | `manual` \| `stripe-atlas` \| other (open string) — nullable          |
-| `registrationStatus`   | `draft` \| `pending` \| `registered` (defaults `draft`)               |
-| `linkedWorkId`         | Optional pointer to the Company Work that produced this Org — nullable |
+| `displayName`          | Human-friendly name shown in the Switcher / Settings (NOT NULL)                      |
+| `legalName`            | Registered legal name, e.g. `"Acme, Inc."` — nullable                                |
+| `countryCode`          | ISO 3166-1 alpha-2 (`"US"`, `"DE"`) — nullable                                       |
+| `registrationProvider` | `manual` \| `stripe-atlas` \| other (open string) — nullable                         |
+| `registrationStatus`   | `draft` \| `pending` \| `registered` (defaults `draft`)                              |
+| `linkedWorkId`         | Optional pointer to the Company Work that produced this Org — nullable               |
 
 ## Membership & roles
 
@@ -142,15 +142,15 @@ on Organization routes.
 All routes live under `/api/organizations` (JWT-authenticated except
 where noted). Verified against `organizations.controller.ts`.
 
-| Method  | Path                                        | Description                                                                 |
-| ------- | ------------------------------------------- | --------------------------------------------------------------------------- |
-| `POST`  | `/api/organizations`                        | Create an Organization (lazy-creates the Tenant, allocates a slug, backfills `tenantId`) |
-| `POST`  | `/api/organizations/register-company`       | Register a Company (lands a backing Work, then creates the Org — see below) |
-| `GET`   | `/api/organizations`                        | List Organizations for the current user's Tenant (newest first; `[]` if no Tenant) |
-| `GET`   | `/api/organizations/check-slug?value=`      | **Public**, throttled (30/min) slug-availability check                      |
-| `GET`   | `/api/organizations/:slug`                  | Fetch one Organization by slug (used by the slug-resolver middleware)       |
-| `PATCH` | `/api/organizations/:id`                    | Partial update of `displayName` / `legalName` / `countryCode`               |
-| `POST`  | `/api/organizations/:id/upgrade-from-account` | Pull the user's bare-Tenant rows into this Org (first-Org guard — see below) |
+| Method  | Path                                          | Description                                                                              |
+| ------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `POST`  | `/api/organizations`                          | Create an Organization (lazy-creates the Tenant, allocates a slug, backfills `tenantId`) |
+| `POST`  | `/api/organizations/register-company`         | Register a Company (lands a backing Work, then creates the Org — see below)              |
+| `GET`   | `/api/organizations`                          | List Organizations for the current user's Tenant (newest first; `[]` if no Tenant)       |
+| `GET`   | `/api/organizations/check-slug?value=`        | **Public**, throttled (30/min) slug-availability check                                   |
+| `GET`   | `/api/organizations/:slug`                    | Fetch one Organization by slug (used by the slug-resolver middleware)                    |
+| `PATCH` | `/api/organizations/:id`                      | Partial update of `displayName` / `legalName` / `countryCode`                            |
+| `POST`  | `/api/organizations/:id/upgrade-from-account` | Pull the user's bare-Tenant rows into this Org (first-Org guard — see below)             |
 
 ### Create
 
