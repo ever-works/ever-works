@@ -62,7 +62,12 @@ export const PLUGIN_CATEGORIES = [
 	// on real customer demand because each runtime's operational model
 	// differs significantly (push vs pull, namespace vs prefix vs schema
 	// isolation, retry/backoff semantics).
-	'job-runtime'
+	'job-runtime',
+	// Goals feature PR-7 — read-only metrics collectors (capability
+	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
+	// (PostHog + Google Analytics follow in PR-9). See
+	// `capabilities/metrics-provider.interface.ts`.
+	'metrics'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
