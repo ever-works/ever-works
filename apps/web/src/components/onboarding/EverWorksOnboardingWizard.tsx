@@ -384,9 +384,7 @@ function StepBody({
         case 'welcome':
             return (
                 <WelcomeStep
-                    upcomingSteps={flow.steps
-                        .filter((s) => s.kind !== 'welcome')
-                        .map(labelForStep)}
+                    upcomingSteps={flow.steps.filter((s) => s.kind !== 'welcome').map(labelForStep)}
                 />
             );
         case 'ai-choice':
