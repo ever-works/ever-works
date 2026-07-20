@@ -38,7 +38,7 @@ import {
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     WorkKnowledgeDocument,
@@ -171,7 +171,7 @@ export const ENTITIES = [
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)

@@ -1438,14 +1438,14 @@
                 "sections": {
                     "agent": {
                         "title": "Agent de Travail autonome",
-                        "description": "Laissez l'agent planifier, rechercher et préparer des Travaux à partir d'objectifs de haut niveau."
+                        "description": "Laissez l'agent planifier, rechercher et préparer des Travaux à partir de demandes de build de haut niveau."
                     },
                     "guardrails": {
                         "title": "Barrières de sécurité",
                         "description": "Définissez des limites strictes avant que l'agent puisse créer des Travaux, ajouter des éléments ou dépenser un budget."
                     },
                     "queue": {
-                        "title": "Mettre un objectif en file d'attente",
+                        "title": "Mettre une demande de build en file d'attente",
                         "description": "Donnez à l'agent une instruction générale. Il commence en attente et s'exécute dans vos barrières de sécurité."
                     },
                     "liveRun": {
@@ -1453,7 +1453,7 @@
                         "description": "État actuel et activité récente de l'agent."
                     },
                     "recentGoals": {
-                        "title": "Objectifs récents",
+                        "title": "Demandes de build récentes",
                         "description": "Instructions de l'agent de Travail en attente, en cours et terminées."
                     },
                     "autoGenerateIdeas": {
@@ -1484,7 +1484,7 @@
                     "approvalThreshold": "Seuil d'approbation",
                     "confirmBeforeCreate": "Confirmer avant de créer des Travaux",
                     "confirmBeforeDelete": "Confirmer avant de supprimer des éléments",
-                    "dryRunThisGoal": "Essai à blanc pour cet objectif",
+                    "dryRunThisGoal": "Essai à blanc pour cette demande de build",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1500,7 +1500,7 @@
                     "saveSettings": "Enregistrer les paramètres",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Mettre l'objectif en file d'attente",
+                    "queueGoal": "Mettre la demande de build en file d'attente",
                     "preparePlan": "Prepare plan",
                     "stop": "Arrêter"
                 },
@@ -1517,16 +1517,16 @@
                 },
                 "empty": {
                     "noActiveRun": "Aucune exécution active de l'agent de Travail.",
-                    "noGoals": "Aucun objectif d'agent de Travail pour le moment.",
+                    "noGoals": "Aucune demande de build d'agent de Travail pour le moment.",
                     "waitingForUpdate": "En attente de la première mise à jour d'exécution."
                 },
                 "toasts": {
                     "settingsSaved": "Paramètres de l'agent de Travail enregistrés",
                     "settingsError": "Échec de l'enregistrement des paramètres",
-                    "goalQueued": "Objectif de l'agent de Travail mis en file d'attente",
-                    "goalError": "Échec de la mise en file d'attente de l'objectif",
-                    "goalCanceled": "Objectif de l'agent de Travail annulé",
-                    "cancelError": "Échec de l'annulation de l'objectif"
+                    "goalQueued": "Demande de build de l'agent de Travail mise en file d'attente",
+                    "goalError": "Échec de la mise en file d'attente de la demande de build",
+                    "goalCanceled": "Demande de build de l'agent de Travail annulée",
+                    "cancelError": "Échec de l'annulation de la demande de build"
                 }
             },
             "data": {

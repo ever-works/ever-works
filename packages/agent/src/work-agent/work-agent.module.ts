@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { WorkAgentGoal } from '../entities/work-agent-goal.entity';
+import { WorkBuildRequest } from '../entities/work-build-request.entity';
 import { WorkAgentPreference } from '../entities/work-agent-preference.entity';
 import { WorkAgentRun } from '../entities/work-agent-run.entity';
 import { WorkAgentRunLog } from '../entities/work-agent-run-log.entity';
@@ -12,7 +12,7 @@ import { WorkAgentService } from './work-agent.service';
         DatabaseModule,
         TypeOrmModule.forFeature([
             WorkAgentPreference,
-            WorkAgentGoal,
+            WorkBuildRequest,
             WorkAgentRun,
             WorkAgentRunLog,
         ]),

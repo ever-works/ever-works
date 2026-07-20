@@ -724,7 +724,7 @@ export class WorkProposalService {
      * status).
      *
      * Caller (`WorkProposalsApiService.retry`) is responsible for
-     * also creating the new `WorkAgentGoal`. This service method
+     * also creating the new `WorkBuildRequest`. This service method
      * only owns the Idea-side state transition.
      */
     async retryFailed(userId: string, proposalId: string): Promise<WorkProposal | null> {
