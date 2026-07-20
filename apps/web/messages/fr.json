@@ -1235,8 +1235,48 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Planifications",
+            "subtitle": "Tout ce qui est planifié pour s'exécuter dans vos travaux, agents, Missions et tâches",
+            "fetchFailed": "Échec du chargement des planifications",
+            "retry": "Réessayer",
+            "columns": {
+                "owner": "Propriétaire",
+                "cadence": "Cadence",
+                "nextRun": "Prochaine exécution",
+                "status": "Statut"
+            },
+            "filters": {
+                "all": "Tous",
+                "activeOnly": "Actives uniquement"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tâche récurrente",
+                "agentHeartbeat": "Battement d'agent",
+                "workSchedule": "Planification de travail",
+                "missionTick": "Tick de Mission",
+                "sourceValidation": "Validation de source",
+                "dataSync": "Synchronisation des données"
+            },
+            "statuses": {
+                "active": "Active",
+                "paused": "En pause",
+                "disabled": "Désactivée",
+                "error": "Erreur",
+                "ended": "Terminée"
+            },
+            "empty": {
+                "title": "Rien de planifié pour l'instant",
+                "description": "Les tâches récurrentes, les battements d'agents, les planifications de travail, les ticks de Mission, la validation des sources et la synchronisation des données apparaîtront ici une fois que vous les aurez configurés.",
+                "noResults": "Aucune planification ne correspond au filtre actuel."
+            }
+        },
         "activity": {
-            "title": "Journal d'activité",
+            "viewToggle": {
+                "log": "Journal",
+                "schedules": "Planifications"
+            },
+            "title": "Activité",
             "subtitle": "Suivez toutes les opérations sur vos travaux",
             "loading": "Chargement...",
             "fetchFailed": "Échec du chargement des activités",
@@ -5042,7 +5082,7 @@
             "resetPassword": "Réinitialiser le mot de passe",
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
-            "activity": "Journal d'activité",
+            "activity": "Activité",
             "works": "Travaux",
             "newWork": "Nouvel travail",
             "work": "Travail",

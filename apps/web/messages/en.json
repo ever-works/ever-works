@@ -1297,9 +1297,49 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Schedules",
+            "subtitle": "Everything scheduled to run across your works, agents, missions, and tasks",
+            "fetchFailed": "Failed to load schedules",
+            "retry": "Retry",
+            "columns": {
+                "owner": "Owner",
+                "cadence": "Cadence",
+                "nextRun": "Next run",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "All",
+                "activeOnly": "Active only"
+            },
+            "sourceTypes": {
+                "recurringTask": "Recurring task",
+                "agentHeartbeat": "Agent heartbeat",
+                "workSchedule": "Work schedule",
+                "missionTick": "Mission tick",
+                "sourceValidation": "Source validation",
+                "dataSync": "Data sync"
+            },
+            "statuses": {
+                "active": "Active",
+                "paused": "Paused",
+                "disabled": "Disabled",
+                "error": "Error",
+                "ended": "Ended"
+            },
+            "empty": {
+                "title": "Nothing scheduled yet",
+                "description": "Recurring tasks, agent heartbeats, work schedules, mission ticks, source validation, and data sync will appear here once you set them up.",
+                "noResults": "No schedules match the current filter."
+            }
+        },
         "activity": {
-            "title": "Activity Log",
+            "title": "Activity",
             "subtitle": "Track all operations across your works",
+            "viewToggle": {
+                "log": "Log",
+                "schedules": "Schedules"
+            },
             "loading": "Loading...",
             "fetchFailed": "Failed to load activities",
             "exportFailed": "Failed to export activity log",
@@ -5376,7 +5416,7 @@
             "resetPassword": "Reset Password",
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
-            "activity": "Activity Log",
+            "activity": "Activity",
             "works": "Works",
             "newWork": "New Work",
             "work": "Work",

@@ -29,6 +29,10 @@ import {
     imports: [
         ActivityLogModule,
         DatabaseModule,
+        // Schedules P2 — provides `ActivityLogService` so
+        // `WorkProposalService` can emit `idea_generated` rows for
+        // MISSION-sourced generation. `@Optional()`-injected downstream.
+        ActivityLogModule,
         FacadesModule,
         TitlerModule,
         // PR-6 — User + Organization back VisionContextService's
