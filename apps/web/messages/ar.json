@@ -695,7 +695,11 @@
                 "templateStepTitle": "ابدأ من قالب (اختياري)",
                 "startFromScratch": "ابدأ من الصفر",
                 "pickParentHint": "اختر {scope} أعلاه للمتابعة، أو اختر نطاق مساحة العمل.",
-                "nextDisabledReason": "اختر عنصرًا رئيسيًا أو اختر نطاق مساحة العمل للمتابعة."
+                "nextDisabledReason": "اختر عنصرًا رئيسيًا أو اختر نطاق مساحة العمل للمتابعة.",
+                "teamLabel": "الفريق",
+                "teamNone": "بدون فريق",
+                "reportsToLabel": "يتبع لـ",
+                "reportsToNone": "بدون مدير"
             },
             "orDivider": "أو",
             "createManually": "إنشاء الوكيل يدويًا",
@@ -713,6 +717,17 @@
                 "yourTemplates": "قوالبك",
                 "yourTemplatesEmpty": "الوكلاء الذي تنشئهم ستظهر هنا كقوابل لإعادة الاستخدام.",
                 "openInWizard": "افتح في المعالج"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "المؤسسة",
+                    "teamLabel": "الفريق",
+                    "teamNone": "بدون فريق",
+                    "reportsToLabel": "يتبع لـ",
+                    "reportsToNone": "بدون مدير",
+                    "save": "حفظ",
+                    "saving": "جارٍ الحفظ…"
+                }
             }
         },
         "tasksPage": {
@@ -4486,7 +4501,8 @@
                 "plugins": "الإضافات",
                 "skills": "المهارات",
                 "templates": "القوالب",
-                "settings": "الإعدادات"
+                "settings": "الإعدادات",
+                "teams": "الفرق"
             },
             "tooltips": {
                 "expandSidebar": "توسيع الشريط الجانبي",
@@ -5045,6 +5061,94 @@
             "toggleError": "فشل في تبديل الملحقة",
             "system": "نظامي",
             "goToPluginSettings": "الذهاب إلى إعدادات الملحقة"
+        },
+        "teamsPage": {
+            "title": "الفرق",
+            "subtitle": "نظّم وكلاءك وأعضاءك في فرق داخل هذه المؤسسة.",
+            "orgChartCta": "الهيكل التنظيمي",
+            "newTeamCta": "فريق جديد",
+            "empty": {
+                "title": "لا توجد فرق بعد",
+                "description": "أنشئ فريقك الأول لتجميع الوكلاء والأعضاء، ثم رتّبهم في الهيكل التنظيمي.",
+                "cta": "إنشاء فريق"
+            },
+            "noOrg": {
+                "title": "الفرق تكون داخل مؤسسة",
+                "description": "أنشئ مؤسسة أولًا — بعدها يمكنك تجميع وكلائها وأعضائها في فرق.",
+                "cta": "إنشاء مؤسسة"
+            },
+            "card": {
+                "agents": "{count, plural, zero {لا وكلاء} one {وكيل واحد} two {وكيلان} few {# وكلاء} many {# وكيلًا} other {# وكيل}}",
+                "members": "{count, plural, zero {لا أعضاء} one {عضو واحد} two {عضوان} few {# أعضاء} many {# عضوًا} other {# عضو}}",
+                "subTeams": "{count, plural, zero {لا فرق فرعية} one {فريق فرعي واحد} two {فريقان فرعيان} few {# فرق فرعية} many {# فريقًا فرعيًا} other {# فريق فرعي}}"
+            },
+            "newDialog": {
+                "title": "فريق جديد",
+                "nameLabel": "الاسم",
+                "namePlaceholder": "مثل: الهندسة",
+                "descriptionLabel": "الوصف",
+                "descriptionPlaceholder": "ما يتولاه هذا الفريق (اختياري)",
+                "parentLabel": "الفريق الأصل",
+                "parentNone": "بدون فريق أصل (المستوى الأعلى)",
+                "managerLabel": "الوكيل المدير",
+                "managerNone": "بدون مدير",
+                "submit": "إنشاء الفريق",
+                "creating": "جارٍ الإنشاء…",
+                "cancel": "إلغاء"
+            },
+            "detail": {
+                "overviewTab": "نظرة عامة",
+                "settingsTab": "الإعدادات",
+                "rosterTitle": "الأعضاء",
+                "subTeamsTitle": "الفرق الفرعية",
+                "managerLabel": "المدير",
+                "parentLabel": "الفريق الأصل",
+                "addMemberCta": "إضافة عضو",
+                "addMemberTypeLabel": "النوع",
+                "addMemberAgent": "وكيل",
+                "addMemberUser": "عضو",
+                "addMemberSelectLabel": "من",
+                "addMemberSubmit": "إضافة",
+                "adding": "جارٍ الإضافة…",
+                "removeMember": "إزالة",
+                "roleLead": "قائد",
+                "roleMember": "عضو",
+                "emptyRoster": "لا يوجد أعضاء بعد — أضف وكلاء أو زملاء إلى هذا الفريق."
+            },
+            "settings": {
+                "title": "إعدادات الفريق",
+                "nameLabel": "الاسم",
+                "descriptionLabel": "الوصف",
+                "parentLabel": "الفريق الأصل",
+                "managerLabel": "الوكيل المدير",
+                "save": "حفظ التغييرات",
+                "saving": "جارٍ الحفظ…",
+                "saved": "تم تحديث الفريق",
+                "deleteTitle": "منطقة الخطر",
+                "deleteDescription": "حذف الفريق ينقل فرقه الفرعية إلى المستوى الأعلى ويزيل قائمة أعضائه. لا يتم حذف الوكلاء والأعضاء.",
+                "deleteCta": "حذف الفريق",
+                "deleteConfirm": "هل تريد حذف هذا الفريق؟ ستنتقل الفرق الفرعية مستوى واحدًا لأعلى؛ وسيتم الاحتفاظ بالوكلاء والأعضاء.",
+                "deleting": "جارٍ الحذف…"
+            },
+            "errors": {
+                "createFailed": "تعذّر إنشاء الفريق",
+                "updateFailed": "تعذّر تحديث الفريق",
+                "deleteFailed": "تعذّر حذف الفريق",
+                "memberAddFailed": "تعذّر إضافة العضو",
+                "memberRemoveFailed": "تعذّر إزالة العضو"
+            }
+        },
+        "orgChartPage": {
+            "title": "الهيكل التنظيمي",
+            "subtitle": "فرق هذه المؤسسة ووكلاؤها وأعضاؤها.",
+            "backToTeams": "الفرق",
+            "zoomIn": "تكبير",
+            "zoomOut": "تصغير",
+            "fitView": "ملاءمة",
+            "unassignedGroup": "غير مُعيَّنين",
+            "membersBadge": "{count, plural, zero {لا أعضاء} one {عضو واحد} two {عضوان} few {# أعضاء} many {# عضوًا} other {# عضو}}",
+            "empty": "لا يوجد ما يُعرض بعد — أنشئ فرقًا أو وكلاء في هذه المؤسسة أولًا.",
+            "noOrg": "أنشئ مؤسسة لعرض هيكلها التنظيمي."
         }
     },
     "layout": {
@@ -5358,6 +5462,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "البدء من",
+                "blankTitle": "مؤسسة فارغة",
+                "blankDescription": "ابدأ من الصفر — أضف الفرق والوكلاء لاحقًا.",
+                "meta": "{agents, plural, zero {لا وكلاء} one {وكيل واحد} two {وكيلان} few {# وكلاء} many {# وكيلًا} other {# وكيل}} · {teams, plural, zero {لا فرق} one {فريق واحد} two {فريقان} few {# فرق} many {# فريقًا} other {# فريق}}",
+                "submitImport": "الإنشاء من قالب",
+                "importError": "تعذّر إنشاء المؤسسة من هذا القالب"
             }
         },
         "upgrade": {

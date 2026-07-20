@@ -638,7 +638,22 @@
                 "cancel": "Скасувати",
                 "back": "Назад",
                 "next": "Далі",
-                "create": "Створити Агента"
+                "create": "Створити Агента",
+                "teamLabel": "Команда",
+                "teamNone": "Без команди",
+                "reportsToLabel": "Підпорядковується",
+                "reportsToNone": "Без менеджера"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Організація",
+                    "teamLabel": "Команда",
+                    "teamNone": "Без команди",
+                    "reportsToLabel": "Підпорядковується",
+                    "reportsToNone": "Без менеджера",
+                    "save": "Зберегти",
+                    "saving": "Збереження…"
+                }
             }
         },
         "tasksPage": {
@@ -4254,7 +4269,8 @@
                 "plugins": "Плагіни",
                 "skills": "Навички",
                 "templates": "Шаблони",
-                "settings": "Налаштування"
+                "settings": "Налаштування",
+                "teams": "Команди"
             },
             "tooltips": {
                 "expandSidebar": "Розгорнути бічну панель",
@@ -4818,6 +4834,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Команди",
+            "subtitle": "Об’єднуйте своїх Агентів та учасників у команди в межах цієї організації.",
+            "orgChartCta": "Оргструктура",
+            "newTeamCta": "Нова команда",
+            "empty": {
+                "title": "Команд поки немає",
+                "description": "Створіть першу команду, щоб згрупувати Агентів та учасників, а потім розташуйте їх на схемі оргструктури.",
+                "cta": "Створити команду"
+            },
+            "noOrg": {
+                "title": "Команди існують у межах організації",
+                "description": "Спочатку створіть організацію — потім ви зможете об’єднати її Агентів та учасників у команди.",
+                "cta": "Створити організацію"
+            },
+            "card": {
+                "agents": "{count, plural, one {# агент} few {# агенти} many {# агентів} other {# агента}}",
+                "members": "{count, plural, one {# учасник} few {# учасники} many {# учасників} other {# учасника}}",
+                "subTeams": "{count, plural, one {# підкоманда} few {# підкоманди} many {# підкоманд} other {# підкоманди}}"
+            },
+            "newDialog": {
+                "title": "Нова команда",
+                "nameLabel": "Назва",
+                "namePlaceholder": "напр., Розробка",
+                "descriptionLabel": "Опис",
+                "descriptionPlaceholder": "За що відповідає ця команда (необов’язково)",
+                "parentLabel": "Батьківська команда",
+                "parentNone": "Без батьківської команди (верхній рівень)",
+                "managerLabel": "Агент-менеджер",
+                "managerNone": "Без менеджера",
+                "submit": "Створити команду",
+                "creating": "Створення…",
+                "cancel": "Скасувати"
+            },
+            "detail": {
+                "overviewTab": "Огляд",
+                "settingsTab": "Налаштування",
+                "rosterTitle": "Склад",
+                "subTeamsTitle": "Підкоманди",
+                "managerLabel": "Менеджер",
+                "parentLabel": "Батьківська команда",
+                "addMemberCta": "Додати учасника",
+                "addMemberTypeLabel": "Тип",
+                "addMemberAgent": "Агент",
+                "addMemberUser": "Учасник",
+                "addMemberSelectLabel": "Хто",
+                "addMemberSubmit": "Додати",
+                "adding": "Додавання…",
+                "removeMember": "Видалити",
+                "roleLead": "Лід",
+                "roleMember": "Учасник",
+                "emptyRoster": "Учасників поки немає — додайте до цієї команди Агентів або колег."
+            },
+            "settings": {
+                "title": "Налаштування команди",
+                "nameLabel": "Назва",
+                "descriptionLabel": "Опис",
+                "parentLabel": "Батьківська команда",
+                "managerLabel": "Агент-менеджер",
+                "save": "Зберегти зміни",
+                "saving": "Збереження…",
+                "saved": "Команду оновлено",
+                "deleteTitle": "Небезпечна зона",
+                "deleteDescription": "Після видалення команди її підкоманди переносяться на рівень вище, а склад очищається. Агенти та учасники не видаляються.",
+                "deleteCta": "Видалити команду",
+                "deleteConfirm": "Видалити цю команду? Підкоманди піднімуться на рівень вище; Агенти та учасники збережуться.",
+                "deleting": "Видалення…"
+            },
+            "errors": {
+                "createFailed": "Не вдалося створити команду",
+                "updateFailed": "Не вдалося оновити команду",
+                "deleteFailed": "Не вдалося видалити команду",
+                "memberAddFailed": "Не вдалося додати учасника",
+                "memberRemoveFailed": "Не вдалося видалити учасника"
+            }
+        },
+        "orgChartPage": {
+            "title": "Оргструктура",
+            "subtitle": "Команди, Агенти та учасники цієї організації.",
+            "backToTeams": "Команди",
+            "zoomIn": "Збільшити",
+            "zoomOut": "Зменшити",
+            "fitView": "Вписати",
+            "unassignedGroup": "Не розподілені",
+            "membersBadge": "{count, plural, one {# учасник} few {# учасники} many {# учасників} other {# учасника}}",
+            "empty": "Поки що нічого показувати — спочатку створіть команди або Агентів у цій організації.",
+            "noOrg": "Створіть організацію, щоб побачити її оргструктуру."
+        },
         "schedules": {
             "title": "Розклади",
             "subtitle": "Усе, що заплановано до виконання у ваших роботах, агентах, Missions і завданнях",
@@ -5162,6 +5266,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Почати з",
+                "blankTitle": "Порожня організація",
+                "blankDescription": "Почніть з чистого аркуша — команди та агентів можна додати пізніше.",
+                "meta": "{agents, plural, one {# агент} few {# агенти} many {# агентів} other {# агента}} · {teams, plural, one {# команда} few {# команди} many {# команд} other {# команди}}",
+                "submitImport": "Створити із шаблону",
+                "importError": "Не вдалося створити організацію з цього шаблону"
             }
         },
         "upgrade": {

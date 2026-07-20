@@ -258,6 +258,9 @@ importers:
       typeorm:
         specifier: ^0.3.29
         version: 0.3.29(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      yaml:
+        specifier: ^2.8.3
+        version: 2.8.3
     devDependencies:
       '@ever-works/aws-s3-plugin':
         specifier: workspace:*

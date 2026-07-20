@@ -638,7 +638,22 @@
                 "cancel": "Anuluj",
                 "back": "Wstecz",
                 "next": "Dalej",
-                "create": "Utwórz Agenta"
+                "create": "Utwórz Agenta",
+                "teamLabel": "Zespół",
+                "teamNone": "Brak zespołu",
+                "reportsToLabel": "Podlega",
+                "reportsToNone": "Brak menedżera"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organizacja",
+                    "teamLabel": "Zespół",
+                    "teamNone": "Brak zespołu",
+                    "reportsToLabel": "Podlega",
+                    "reportsToNone": "Brak menedżera",
+                    "save": "Zapisz",
+                    "saving": "Zapisywanie…"
+                }
             }
         },
         "tasksPage": {
@@ -4254,7 +4269,8 @@
                 "plugins": "Wtyczki",
                 "skills": "Umiejętności",
                 "templates": "Szablony",
-                "settings": "Ustawienia"
+                "settings": "Ustawienia",
+                "teams": "Zespoły"
             },
             "tooltips": {
                 "expandSidebar": "Rozwiń pasek boczny",
@@ -4818,6 +4834,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Zespoły",
+            "subtitle": "Organizuj swoich Agentów i członków w zespoły w ramach tej organizacji.",
+            "orgChartCta": "Schemat organizacyjny",
+            "newTeamCta": "Nowy zespół",
+            "empty": {
+                "title": "Brak zespołów",
+                "description": "Utwórz swój pierwszy zespół, aby pogrupować Agentów i członków, a następnie rozmieść ich na schemacie organizacyjnym.",
+                "cta": "Utwórz zespół"
+            },
+            "noOrg": {
+                "title": "Zespoły istnieją w ramach organizacji",
+                "description": "Najpierw utwórz organizację — następnie pogrupujesz jej Agentów i członków w zespoły.",
+                "cta": "Utwórz organizację"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agent} few {# agentów} many {# agentów} other {# agenta}}",
+                "members": "{count, plural, one {# członek} few {# członków} many {# członków} other {# członka}}",
+                "subTeams": "{count, plural, one {# zespół podrzędny} few {# zespoły podrzędne} many {# zespołów podrzędnych} other {# zespołu podrzędnego}}"
+            },
+            "newDialog": {
+                "title": "Nowy zespół",
+                "nameLabel": "Nazwa",
+                "namePlaceholder": "np. Inżynieria",
+                "descriptionLabel": "Opis",
+                "descriptionPlaceholder": "Za co odpowiada ten zespół (opcjonalnie)",
+                "parentLabel": "Zespół nadrzędny",
+                "parentNone": "Brak zespołu nadrzędnego (najwyższy poziom)",
+                "managerLabel": "Agent zarządzający",
+                "managerNone": "Brak menedżera",
+                "submit": "Utwórz zespół",
+                "creating": "Tworzenie…",
+                "cancel": "Anuluj"
+            },
+            "detail": {
+                "overviewTab": "Przegląd",
+                "settingsTab": "Ustawienia",
+                "rosterTitle": "Skład",
+                "subTeamsTitle": "Zespoły podrzędne",
+                "managerLabel": "Menedżer",
+                "parentLabel": "Zespół nadrzędny",
+                "addMemberCta": "Dodaj członka",
+                "addMemberTypeLabel": "Typ",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Członek",
+                "addMemberSelectLabel": "Kto",
+                "addMemberSubmit": "Dodaj",
+                "adding": "Dodawanie…",
+                "removeMember": "Usuń",
+                "roleLead": "Lider",
+                "roleMember": "Członek",
+                "emptyRoster": "Brak członków — dodaj Agentów lub współpracowników do tego zespołu."
+            },
+            "settings": {
+                "title": "Ustawienia zespołu",
+                "nameLabel": "Nazwa",
+                "descriptionLabel": "Opis",
+                "parentLabel": "Zespół nadrzędny",
+                "managerLabel": "Agent zarządzający",
+                "save": "Zapisz zmiany",
+                "saving": "Zapisywanie…",
+                "saved": "Zespół zaktualizowany",
+                "deleteTitle": "Strefa niebezpieczna",
+                "deleteDescription": "Usunięcie zespołu przenosi jego zespoły podrzędne poziom wyżej i usuwa jego skład. Agenci i członkowie nie są usuwani.",
+                "deleteCta": "Usuń zespół",
+                "deleteConfirm": "Usunąć ten zespół? Zespoły podrzędne przejdą poziom wyżej; Agenci i członkowie zostaną zachowani.",
+                "deleting": "Usuwanie…"
+            },
+            "errors": {
+                "createFailed": "Nie udało się utworzyć zespołu",
+                "updateFailed": "Nie udało się zaktualizować zespołu",
+                "deleteFailed": "Nie udało się usunąć zespołu",
+                "memberAddFailed": "Nie udało się dodać członka",
+                "memberRemoveFailed": "Nie udało się usunąć członka"
+            }
+        },
+        "orgChartPage": {
+            "title": "Schemat organizacyjny",
+            "subtitle": "Zespoły, Agenci i członkowie tej organizacji.",
+            "backToTeams": "Zespoły",
+            "zoomIn": "Powiększ",
+            "zoomOut": "Pomniejsz",
+            "fitView": "Dopasuj",
+            "unassignedGroup": "Nieprzypisani",
+            "membersBadge": "{count, plural, one {# członek} few {# członków} many {# członków} other {# członka}}",
+            "empty": "Nie ma jeszcze nic do pokazania — najpierw utwórz zespoły lub Agentów w tej organizacji.",
+            "noOrg": "Utwórz organizację, aby zobaczyć jej schemat organizacyjny."
+        },
         "schedules": {
             "title": "Harmonogramy",
             "subtitle": "Wszystko, co zaplanowano do uruchomienia w Twoich pracach, agentach, Missions i zadaniach",
@@ -5162,6 +5266,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Zacznij od",
+                "blankTitle": "Pusta organizacja",
+                "blankDescription": "Zacznij od zera — zespoły i agentów dodasz później.",
+                "meta": "{agents, plural, one {# agent} few {# agentów} many {# agentów} other {# agenta}} · {teams, plural, one {# zespół} few {# zespoły} many {# zespołów} other {# zespołu}}",
+                "submitImport": "Utwórz z szablonu",
+                "importError": "Nie udało się utworzyć organizacji z tego szablonu"
             }
         },
         "upgrade": {

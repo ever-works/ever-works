@@ -695,7 +695,11 @@
                 "templateStepTitle": "Comenzar desde una plantilla (opcional)",
                 "startFromScratch": "Comenzar desde cero",
                 "pickParentHint": "Selecciona un {scope} arriba para continuar, o elige el Espacio de trabajo.",
-                "nextDisabledReason": "Selecciona un padre o elige el Espacio de trabajo para continuar."
+                "nextDisabledReason": "Selecciona un padre o elige el Espacio de trabajo para continuar.",
+                "teamLabel": "Equipo",
+                "teamNone": "Sin equipo",
+                "reportsToLabel": "Reporta a",
+                "reportsToNone": "Sin responsable"
             },
             "orDivider": "O",
             "createManually": "Crear Agente Manualmente",
@@ -713,6 +717,17 @@
                 "yourTemplates": "Tus plantillas",
                 "yourTemplatesEmpty": "Los Agentes que creas aparecerán aquí como plantillas reutilizables.",
                 "openInWizard": "Abrir en el asistente"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organización",
+                    "teamLabel": "Equipo",
+                    "teamNone": "Sin equipo",
+                    "reportsToLabel": "Reporta a",
+                    "reportsToNone": "Sin responsable",
+                    "save": "Guardar",
+                    "saving": "Guardando…"
+                }
             }
         },
         "tasksPage": {
@@ -4486,7 +4501,8 @@
                 "plugins": "Plugins",
                 "skills": "Habilidades",
                 "templates": "Plantillas",
-                "settings": "Configuración"
+                "settings": "Configuración",
+                "teams": "Equipos"
             },
             "tooltips": {
                 "expandSidebar": "Expandir barra lateral",
@@ -5045,6 +5061,94 @@
             "toggleError": "Error al alternar complemento",
             "system": "Sistema",
             "goToPluginSettings": "Ir a la configuración del complemento"
+        },
+        "teamsPage": {
+            "title": "Equipos",
+            "subtitle": "Organiza tus Agentes y miembros en equipos dentro de esta organización.",
+            "orgChartCta": "Organigrama",
+            "newTeamCta": "Nuevo equipo",
+            "empty": {
+                "title": "Aún no hay equipos",
+                "description": "Crea tu primer equipo para agrupar Agentes y miembros, y luego organízalos en el organigrama.",
+                "cta": "Crear un equipo"
+            },
+            "noOrg": {
+                "title": "Los equipos pertenecen a una organización",
+                "description": "Primero crea una organización; después podrás agrupar sus Agentes y miembros en equipos.",
+                "cta": "Crear organización"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agente} other {# agentes}}",
+                "members": "{count, plural, one {# miembro} other {# miembros}}",
+                "subTeams": "{count, plural, one {# subequipo} other {# subequipos}}"
+            },
+            "newDialog": {
+                "title": "Nuevo equipo",
+                "nameLabel": "Nombre",
+                "namePlaceholder": "p. ej. Ingeniería",
+                "descriptionLabel": "Descripción",
+                "descriptionPlaceholder": "De qué se encarga este equipo (opcional)",
+                "parentLabel": "Equipo superior",
+                "parentNone": "Sin equipo superior (nivel principal)",
+                "managerLabel": "Agente responsable",
+                "managerNone": "Sin responsable",
+                "submit": "Crear equipo",
+                "creating": "Creando…",
+                "cancel": "Cancelar"
+            },
+            "detail": {
+                "overviewTab": "Resumen",
+                "settingsTab": "Configuración",
+                "rosterTitle": "Integrantes",
+                "subTeamsTitle": "Subequipos",
+                "managerLabel": "Responsable",
+                "parentLabel": "Equipo superior",
+                "addMemberCta": "Añadir miembro",
+                "addMemberTypeLabel": "Tipo",
+                "addMemberAgent": "Agente",
+                "addMemberUser": "Miembro",
+                "addMemberSelectLabel": "Quién",
+                "addMemberSubmit": "Añadir",
+                "adding": "Añadiendo…",
+                "removeMember": "Quitar",
+                "roleLead": "Líder",
+                "roleMember": "Miembro",
+                "emptyRoster": "Aún no hay miembros: añade Agentes o compañeros a este equipo."
+            },
+            "settings": {
+                "title": "Configuración del equipo",
+                "nameLabel": "Nombre",
+                "descriptionLabel": "Descripción",
+                "parentLabel": "Equipo superior",
+                "managerLabel": "Agente responsable",
+                "save": "Guardar cambios",
+                "saving": "Guardando…",
+                "saved": "Equipo actualizado",
+                "deleteTitle": "Zona de peligro",
+                "deleteDescription": "Al eliminar un equipo, sus subequipos pasan al nivel superior y se vacía su lista de integrantes. Los Agentes y miembros no se eliminan.",
+                "deleteCta": "Eliminar equipo",
+                "deleteConfirm": "¿Eliminar este equipo? Los subequipos suben un nivel; los Agentes y miembros se conservan.",
+                "deleting": "Eliminando…"
+            },
+            "errors": {
+                "createFailed": "No se pudo crear el equipo",
+                "updateFailed": "No se pudo actualizar el equipo",
+                "deleteFailed": "No se pudo eliminar el equipo",
+                "memberAddFailed": "No se pudo añadir el miembro",
+                "memberRemoveFailed": "No se pudo quitar el miembro"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organigrama",
+            "subtitle": "Equipos, Agentes y miembros de esta organización.",
+            "backToTeams": "Equipos",
+            "zoomIn": "Acercar",
+            "zoomOut": "Alejar",
+            "fitView": "Ajustar",
+            "unassignedGroup": "Sin asignar",
+            "membersBadge": "{count, plural, one {# miembro} other {# miembros}}",
+            "empty": "Aún no hay nada que mostrar: primero crea equipos o Agentes en esta organización.",
+            "noOrg": "Crea una organización para ver su organigrama."
         }
     },
     "layout": {
@@ -5358,6 +5462,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Empezar desde",
+                "blankTitle": "Organización en blanco",
+                "blankDescription": "Empieza desde cero y añade equipos y agentes más adelante.",
+                "meta": "{agents, plural, one {# agente} other {# agentes}} · {teams, plural, one {# equipo} other {# equipos}}",
+                "submitImport": "Crear desde plantilla",
+                "importError": "No se pudo crear la organización a partir de esta plantilla"
             }
         },
         "upgrade": {

@@ -638,7 +638,22 @@
                 "cancel": "Annulla",
                 "back": "Indietro",
                 "next": "Avanti",
-                "create": "Crea Agente"
+                "create": "Crea Agente",
+                "teamLabel": "Team",
+                "teamNone": "Nessun team",
+                "reportsToLabel": "Riporta a",
+                "reportsToNone": "Nessun manager"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organizzazione",
+                    "teamLabel": "Team",
+                    "teamNone": "Nessun team",
+                    "reportsToLabel": "Riporta a",
+                    "reportsToNone": "Nessun manager",
+                    "save": "Salva",
+                    "saving": "Salvataggio…"
+                }
             }
         },
         "tasksPage": {
@@ -4254,7 +4269,8 @@
                 "plugins": "Plugin",
                 "skills": "Competenze",
                 "templates": "Modelli",
-                "settings": "Impostazioni"
+                "settings": "Impostazioni",
+                "teams": "Team"
             },
             "tooltips": {
                 "expandSidebar": "Espandi barra laterale",
@@ -4818,6 +4834,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Team",
+            "subtitle": "Organizza i tuoi Agenti e i membri in team all’interno di questa organizzazione.",
+            "orgChartCta": "Organigramma",
+            "newTeamCta": "Nuovo team",
+            "empty": {
+                "title": "Ancora nessun team",
+                "description": "Crea il tuo primo team per raggruppare Agenti e membri, poi disponili nell’organigramma.",
+                "cta": "Crea un team"
+            },
+            "noOrg": {
+                "title": "I team vivono all’interno di un’organizzazione",
+                "description": "Crea prima un’organizzazione: potrai poi raggruppare i suoi Agenti e membri in team.",
+                "cta": "Crea organizzazione"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agente} other {# agenti}}",
+                "members": "{count, plural, one {# membro} other {# membri}}",
+                "subTeams": "{count, plural, one {# sotto-team} other {# sotto-team}}"
+            },
+            "newDialog": {
+                "title": "Nuovo team",
+                "nameLabel": "Nome",
+                "namePlaceholder": "es. Ingegneria",
+                "descriptionLabel": "Descrizione",
+                "descriptionPlaceholder": "Di cosa si occupa questo team (facoltativo)",
+                "parentLabel": "Team superiore",
+                "parentNone": "Nessun team superiore (livello principale)",
+                "managerLabel": "Agente manager",
+                "managerNone": "Nessun manager",
+                "submit": "Crea team",
+                "creating": "Creazione…",
+                "cancel": "Annulla"
+            },
+            "detail": {
+                "overviewTab": "Panoramica",
+                "settingsTab": "Impostazioni",
+                "rosterTitle": "Organico",
+                "subTeamsTitle": "Sotto-team",
+                "managerLabel": "Manager",
+                "parentLabel": "Team superiore",
+                "addMemberCta": "Aggiungi membro",
+                "addMemberTypeLabel": "Tipo",
+                "addMemberAgent": "Agente",
+                "addMemberUser": "Membro",
+                "addMemberSelectLabel": "Chi",
+                "addMemberSubmit": "Aggiungi",
+                "adding": "Aggiunta…",
+                "removeMember": "Rimuovi",
+                "roleLead": "Responsabile",
+                "roleMember": "Membro",
+                "emptyRoster": "Ancora nessun membro: aggiungi Agenti o colleghi a questo team."
+            },
+            "settings": {
+                "title": "Impostazioni del team",
+                "nameLabel": "Nome",
+                "descriptionLabel": "Descrizione",
+                "parentLabel": "Team superiore",
+                "managerLabel": "Agente manager",
+                "save": "Salva modifiche",
+                "saving": "Salvataggio…",
+                "saved": "Team aggiornato",
+                "deleteTitle": "Zona di pericolo",
+                "deleteDescription": "Eliminando un team, i suoi sotto-team vengono spostati al livello superiore e il suo organico viene rimosso. Agenti e membri non vengono eliminati.",
+                "deleteCta": "Elimina team",
+                "deleteConfirm": "Eliminare questo team? I sotto-team salgono di un livello; Agenti e membri vengono mantenuti.",
+                "deleting": "Eliminazione…"
+            },
+            "errors": {
+                "createFailed": "Impossibile creare il team",
+                "updateFailed": "Impossibile aggiornare il team",
+                "deleteFailed": "Impossibile eliminare il team",
+                "memberAddFailed": "Impossibile aggiungere il membro",
+                "memberRemoveFailed": "Impossibile rimuovere il membro"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organigramma",
+            "subtitle": "Team, Agenti e membri di questa organizzazione.",
+            "backToTeams": "Team",
+            "zoomIn": "Ingrandisci",
+            "zoomOut": "Riduci",
+            "fitView": "Adatta",
+            "unassignedGroup": "Non assegnati",
+            "membersBadge": "{count, plural, one {# membro} other {# membri}}",
+            "empty": "Ancora niente da mostrare: crea prima team o Agenti in questa organizzazione.",
+            "noOrg": "Crea un’organizzazione per vedere il suo organigramma."
+        },
         "schedules": {
             "title": "Pianificazioni",
             "subtitle": "Tutto ciò che è pianificato per l'esecuzione nei tuoi lavori, agenti, Missions e task",
@@ -5162,6 +5266,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Inizia da",
+                "blankTitle": "Organizzazione vuota",
+                "blankDescription": "Parti da zero: aggiungi team e agenti in seguito.",
+                "meta": "{agents, plural, one {# agente} other {# agenti}} · {teams, plural, one {# team} other {# team}}",
+                "submitImport": "Crea da modello",
+                "importError": "Impossibile creare l’organizzazione da questo modello"
             }
         },
         "upgrade": {

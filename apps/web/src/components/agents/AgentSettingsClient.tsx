@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Archive, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { Archive, Building2, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,9 @@ import {
     resumeAgentAction,
     updateAgentAction,
 } from '@/app/actions/agents';
+// Teams & Companies spec §4.3 — roster mutations for the Organization
+// card's Team select (v1 UI: one team per Agent).
+import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
 import type { Agent, AgentIdleBehavior, AgentPermissions } from '@/lib/api/agents';
 
@@ -35,11 +39,28 @@ const idleBehaviorOptions: Array<{ value: AgentIdleBehavior; label: string }> = 
     { value: 'self-improve', label: 'Self improve' },
 ];
 
-interface AgentSettingsClientProps {
-    agent: Agent;
+/**
+ * Teams & Companies spec §4.3 — server-computed context for the
+ * optional Organization card. `currentTeamIds` comes from the org
+ * chart payload (this agent's roster memberships); the v1 UI edits
+ * ONE team (the first membership). Absent → the card isn't rendered.
+ */
+export interface AgentSettingsOrganization {
+    activeOrgId: string;
+    teams: Array<{ id: string; label: string }>;
+    currentTeamIds: string[];
+    agentOptions: Array<{ id: string; label: string }>;
 }
 
-export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClientProps) {
+interface AgentSettingsClientProps {
+    agent: Agent;
+    organization?: AgentSettingsOrganization;
+}
+
+export function AgentSettingsClient({
+    agent: initialAgent,
+    organization,
+}: AgentSettingsClientProps) {
     const router = useRouter();
     const [agent, setAgent] = useState(initialAgent);
     const [isSaving, startSaving] = useTransition();
@@ -56,6 +77,62 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
     );
     const [pauseAfterFailures, setPauseAfterFailures] = useState(String(agent.pauseAfterFailures));
     const [permissions, setPermissions] = useState<AgentPermissions>(agent.permissions);
+
+    // Teams & Companies spec §4.3 — Organization card state. Explicit
+    // isSubmitting (house rule for detached-async submits), '' = none.
+    const tOrg = useTranslations('dashboard.agentsPage.settings.orgCard');
+    const [teamId, setTeamId] = useState(organization?.currentTeamIds[0] ?? '');
+    // ALL current memberships — the select is single-team by design (v1),
+    // but an agent may hold several roster rows (imports, API); saving
+    // consolidates onto the selection (PR #1647 review).
+    const [savedTeamIds, setSavedTeamIds] = useState<string[]>(organization?.currentTeamIds ?? []);
+    const [reportsToId, setReportsToId] = useState(agent.reportsToAgentId ?? '');
+    const [isOrgSaving, setIsOrgSaving] = useState(false);
+
+    const saveOrganization = async () => {
+        if (!organization || isOrgSaving) return;
+        setIsOrgSaving(true);
+        try {
+            const previousReportsTo = agent.reportsToAgentId ?? '';
+            if (reportsToId !== previousReportsTo) {
+                const updated = await updateAgentAction(agent.id, {
+                    reportsToAgentId: reportsToId ? reportsToId : null,
+                });
+                setAgent(updated);
+            }
+            const membershipChanged =
+                teamId !== (savedTeamIds[0] ?? '') || savedTeamIds.length > (teamId ? 1 : 0);
+            if (membershipChanged) {
+                // Add first, remove after — a mid-flight failure never leaves
+                // the agent teamless; every stale membership is removed.
+                if (teamId && !savedTeamIds.includes(teamId)) {
+                    await addTeamMemberAction(organization.activeOrgId, teamId, {
+                        memberType: 'agent',
+                        memberId: agent.id,
+                    });
+                }
+                for (const oldTeamId of savedTeamIds) {
+                    if (oldTeamId !== teamId) {
+                        await removeTeamMemberAction(
+                            organization.activeOrgId,
+                            oldTeamId,
+                            'agent',
+                            agent.id,
+                        );
+                    }
+                }
+                setSavedTeamIds(teamId ? [teamId] : []);
+            }
+            toast.success('Organization settings saved');
+            router.refresh();
+        } catch (error) {
+            toast.error(
+                error instanceof Error ? error.message : 'Could not save organization settings',
+            );
+        } finally {
+            setIsOrgSaving(false);
+        }
+    };
 
     const save = () => {
         startSaving(async () => {
@@ -316,6 +393,83 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                     </Button>
                 </div>
             </section>
+
+            {/* Organization (Teams & Companies spec §4.3) — rendered only
+                when the server page resolved an active Organization. Own
+                Save button so team/manager edits stay independent of the
+                main settings form. */}
+            {organization ? (
+                <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                            <Building2 className="w-4 h-4 text-primary" strokeWidth={1.5} />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                                {tOrg('title')}
+                            </h2>
+                        </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label
+                                htmlFor="agent-settings-team"
+                                className="block text-xs font-medium text-text dark:text-text-dark mb-2"
+                            >
+                                {tOrg('teamLabel')}
+                            </label>
+                            <select
+                                id="agent-settings-team"
+                                data-testid="agent-settings-team"
+                                value={teamId}
+                                onChange={(event) => setTeamId(event.target.value)}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            >
+                                <option value="">{tOrg('teamNone')}</option>
+                                {organization.teams.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                htmlFor="agent-settings-reports-to"
+                                className="block text-xs font-medium text-text dark:text-text-dark mb-2"
+                            >
+                                {tOrg('reportsToLabel')}
+                            </label>
+                            <select
+                                id="agent-settings-reports-to"
+                                data-testid="agent-settings-reports-to"
+                                value={reportsToId}
+                                onChange={(event) => setReportsToId(event.target.value)}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            >
+                                <option value="">{tOrg('reportsToNone')}</option>
+                                {organization.agentOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button
+                            onClick={saveOrganization}
+                            loading={isOrgSaving}
+                            size="sm"
+                            className="gap-1.5 px-2.5 py-1 text-xs"
+                            data-testid="agent-settings-org-save"
+                        >
+                            <Save className="h-3.5 w-3.5" />
+                            {isOrgSaving ? tOrg('saving') : tOrg('save')}
+                        </Button>
+                    </div>
+                </section>
+            ) : null}
 
             {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
             <AgentScorecardCard agent={agent} />

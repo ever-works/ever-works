@@ -165,6 +165,10 @@
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
         },
+        "./teams": {
+            "types": "./dist/teams/index.d.ts",
+            "default": "./dist/teams/index.js"
+        },
         "./schedules": {
             "types": "./dist/schedules/index.d.ts",
             "default": "./dist/schedules/index.js"

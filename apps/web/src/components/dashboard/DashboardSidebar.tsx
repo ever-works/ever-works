@@ -28,6 +28,7 @@ import {
     Bot,
     ListChecks,
     Sparkles,
+    Users,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -129,6 +130,8 @@ export function DashboardSidebar({
         // Agents/Skills/Tasks PR #1017 — Phase 5.
         { name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
         { name: t('navigation.agents'), href: ROUTES.DASHBOARD_AGENTS, icon: Bot },
+        // Teams & Prebuilt Companies (teams-and-companies spec §4.1).
+        { name: t('navigation.teams'), href: ROUTES.DASHBOARD_TEAMS, icon: Users },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
         { name: t('navigation.skills'), href: ROUTES.DASHBOARD_SKILLS, icon: Sparkles },

@@ -48,6 +48,7 @@ import { AgentsModule } from './agents/agents.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
@@ -171,6 +172,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
+        // (docs/specs/features/teams-and-companies/spec.md §3).
+        TeamsModule,
         // Schedules ("Cadence") — read-only aggregation of every
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).

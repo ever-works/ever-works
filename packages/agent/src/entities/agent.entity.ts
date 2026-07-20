@@ -252,6 +252,16 @@ export class Agent {
     @Column({ type: 'text', nullable: true })
     capabilities?: string | null;
 
+    /**
+     * Direct manager for the Org Chart + `AGENTS.md reportsTo:` on company
+     * import (teams-and-companies spec §1.2). Raw self-reference column —
+     * FK ON DELETE SET NULL by migration; same-org + acyclicity are
+     * service-enforced. Descriptive in v1: carries NO authz and does not
+     * alter the createSubAgent scope-narrowing cascade.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    reportsToAgentId?: string | null;
+
     // ── AI provider routing ──
     // null = use account default per the existing AiFacadeService cascade.
 

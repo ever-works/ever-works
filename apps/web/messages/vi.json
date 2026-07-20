@@ -638,7 +638,22 @@
                 "cancel": "Hủy",
                 "back": "Trước",
                 "next": "Tiếp",
-                "create": "Tạo Agent"
+                "create": "Tạo Agent",
+                "teamLabel": "Nhóm",
+                "teamNone": "Không có nhóm",
+                "reportsToLabel": "Báo cáo cho",
+                "reportsToNone": "Không có quản lý"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Tổ chức",
+                    "teamLabel": "Nhóm",
+                    "teamNone": "Không có nhóm",
+                    "reportsToLabel": "Báo cáo cho",
+                    "reportsToNone": "Không có quản lý",
+                    "save": "Lưu",
+                    "saving": "Đang lưu…"
+                }
             }
         },
         "tasksPage": {
@@ -4254,7 +4269,8 @@
                 "plugins": "Plugin",
                 "skills": "Skills",
                 "templates": "Mẫu",
-                "settings": "Cài đặt"
+                "settings": "Cài đặt",
+                "teams": "Nhóm"
             },
             "tooltips": {
                 "expandSidebar": "Mở rộng thanh bên",
@@ -4818,6 +4834,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Nhóm",
+            "subtitle": "Sắp xếp các Agent và thành viên của bạn thành các nhóm trong tổ chức này.",
+            "orgChartCta": "Sơ đồ tổ chức",
+            "newTeamCta": "Nhóm mới",
+            "empty": {
+                "title": "Chưa có nhóm nào",
+                "description": "Tạo nhóm đầu tiên để gom các Agent và thành viên, sau đó sắp xếp họ trên sơ đồ tổ chức.",
+                "cta": "Tạo nhóm"
+            },
+            "noOrg": {
+                "title": "Nhóm tồn tại trong một tổ chức",
+                "description": "Hãy tạo tổ chức trước — sau đó bạn có thể gom các Agent và thành viên của tổ chức thành các nhóm.",
+                "cta": "Tạo tổ chức"
+            },
+            "card": {
+                "agents": "{count, plural, other {# Agent}}",
+                "members": "{count, plural, other {# thành viên}}",
+                "subTeams": "{count, plural, other {# nhóm con}}"
+            },
+            "newDialog": {
+                "title": "Nhóm mới",
+                "nameLabel": "Tên",
+                "namePlaceholder": "vd: Kỹ thuật",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Nhóm này phụ trách gì (không bắt buộc)",
+                "parentLabel": "Nhóm cha",
+                "parentNone": "Không có nhóm cha (cấp cao nhất)",
+                "managerLabel": "Agent quản lý",
+                "managerNone": "Không có quản lý",
+                "submit": "Tạo nhóm",
+                "creating": "Đang tạo…",
+                "cancel": "Hủy"
+            },
+            "detail": {
+                "overviewTab": "Tổng quan",
+                "settingsTab": "Cài đặt",
+                "rosterTitle": "Danh sách thành viên",
+                "subTeamsTitle": "Nhóm con",
+                "managerLabel": "Quản lý",
+                "parentLabel": "Nhóm cha",
+                "addMemberCta": "Thêm thành viên",
+                "addMemberTypeLabel": "Loại",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Thành viên",
+                "addMemberSelectLabel": "Ai",
+                "addMemberSubmit": "Thêm",
+                "adding": "Đang thêm…",
+                "removeMember": "Xóa",
+                "roleLead": "Trưởng nhóm",
+                "roleMember": "Thành viên",
+                "emptyRoster": "Chưa có thành viên nào — hãy thêm Agent hoặc đồng nghiệp vào nhóm này."
+            },
+            "settings": {
+                "title": "Cài đặt nhóm",
+                "nameLabel": "Tên",
+                "descriptionLabel": "Mô tả",
+                "parentLabel": "Nhóm cha",
+                "managerLabel": "Agent quản lý",
+                "save": "Lưu thay đổi",
+                "saving": "Đang lưu…",
+                "saved": "Đã cập nhật nhóm",
+                "deleteTitle": "Vùng nguy hiểm",
+                "deleteDescription": "Xóa nhóm sẽ chuyển các nhóm con lên một cấp và xóa danh sách thành viên. Agent và thành viên không bị xóa.",
+                "deleteCta": "Xóa nhóm",
+                "deleteConfirm": "Xóa nhóm này? Các nhóm con sẽ được chuyển lên một cấp; Agent và thành viên được giữ lại.",
+                "deleting": "Đang xóa…"
+            },
+            "errors": {
+                "createFailed": "Không thể tạo nhóm",
+                "updateFailed": "Không thể cập nhật nhóm",
+                "deleteFailed": "Không thể xóa nhóm",
+                "memberAddFailed": "Không thể thêm thành viên",
+                "memberRemoveFailed": "Không thể xóa thành viên"
+            }
+        },
+        "orgChartPage": {
+            "title": "Sơ đồ tổ chức",
+            "subtitle": "Nhóm, Agent và thành viên của tổ chức này.",
+            "backToTeams": "Nhóm",
+            "zoomIn": "Phóng to",
+            "zoomOut": "Thu nhỏ",
+            "fitView": "Vừa khung hình",
+            "unassignedGroup": "Chưa phân bổ",
+            "membersBadge": "{count, plural, other {# thành viên}}",
+            "empty": "Chưa có gì để hiển thị — hãy tạo nhóm hoặc Agent trong tổ chức này trước.",
+            "noOrg": "Tạo một tổ chức để xem sơ đồ tổ chức của nó."
+        },
         "schedules": {
             "title": "Lịch trình",
             "subtitle": "Mọi thứ được lên lịch để chạy trên các công việc, Agents, Missions và Tasks của bạn",
@@ -5162,6 +5266,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Bắt đầu từ",
+                "blankTitle": "Tổ chức trống",
+                "blankDescription": "Bắt đầu từ đầu — thêm nhóm và agent sau.",
+                "meta": "{agents, plural, other {# agent}} · {teams, plural, other {# nhóm}}",
+                "submitImport": "Tạo từ mẫu",
+                "importError": "Không thể tạo tổ chức từ mẫu này"
             }
         },
         "upgrade": {
