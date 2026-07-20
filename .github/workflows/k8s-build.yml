@@ -60,14 +60,30 @@ jobs:
           VERSION=$(grep -m1 '"version"' "${{ matrix.pkg }}" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
           echo "version=${VERSION:-0.0.0}" >> "$GITHUB_OUTPUT"
           echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-      # First build + push attempt. ghcr.io intermittently returns
-      # `403 Forbidden` on the blob HEAD when several matrix images push
-      # concurrently under the same GITHUB_TOKEN — a transient registry
-      # rate-limit / session race, NOT a package-permission problem (a
-      # different image fails on each run: web+docs one build, mcp+docs the
-      # next). So we don't fail the job on the first attempt; we back off
-      # and retry. The build layers are cached by `cache-to` on the first
-      # pass, so the retry only re-pushes and is fast.
+      # First build + push attempt. ghcr.io can return `403 Forbidden` on the
+      # blob HEAD for TWO different reasons, which need different fixes:
+      #
+      #   1. PERMISSION — the GHCR package is not linked to this repository
+      #      (`repository: NONE`), so GITHUB_TOKEN has no write access to it.
+      #      This fails on EVERY run, always the same image, and the retry
+      #      below CANNOT fix it. The package has to be connected to the repo
+      #      in the GitHub UI (Package settings -> Connect repository); there
+      #      is no REST endpoint for it with our scopes. This is exactly what
+      #      was wrong with `ever-works-docs` until it was linked 2026-07-20,
+      #      after which the build went green first try on an unmodified
+      #      GITHUB_TOKEN.
+      #   2. TRANSIENT — a genuine registry rate-limit / session race when
+      #      several matrix images push concurrently under the same
+      #      GITHUB_TOKEN. The tell is that a DIFFERENT image fails on each
+      #      run (web+docs one build, mcp+docs the next). The retry below
+      #      does fix this one.
+      #
+      # So we don't fail the job on the first attempt; we back off and retry.
+      # The build layers are cached by `cache-to` on the first pass, so the
+      # retry only re-pushes and is fast.
+      #
+      # If the SAME image fails both attempts on consecutive runs, stop
+      # retrying and check the package link — that is case (1), not (2).
       - id: buildpush
         uses: docker/build-push-action@v7.3.0
         continue-on-error: true
