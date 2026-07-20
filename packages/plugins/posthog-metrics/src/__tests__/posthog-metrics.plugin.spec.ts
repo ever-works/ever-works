@@ -371,7 +371,9 @@ describe('PostHogMetricsPlugin', () => {
 		});
 
 		it('maps an aborted request to timeout', async () => {
-			fetchMock.mockRejectedValueOnce(Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' }));
+			fetchMock.mockRejectedValueOnce(
+				Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' })
+			);
 
 			await expect(plugin.getMetricValue(query(), SETTINGS)).rejects.toMatchObject({ code: 'timeout' });
 		});
@@ -403,9 +405,9 @@ describe('PostHogMetricsPlugin', () => {
 		});
 
 		it('throws on an unparsable windowAnchor', async () => {
-			await expect(
-				plugin.getMetricValue(query({ windowAnchor: 'not-a-date' }), SETTINGS)
-			).rejects.toThrow(/Invalid windowAnchor/);
+			await expect(plugin.getMetricValue(query({ windowAnchor: 'not-a-date' }), SETTINGS)).rejects.toThrow(
+				/Invalid windowAnchor/
+			);
 			expect(fetchMock).not.toHaveBeenCalled();
 		});
 	});
@@ -422,9 +424,9 @@ describe('PostHogMetricsPlugin', () => {
 			const { dateFrom, dateTo } = resolveWindowRange('week', '2026-07-19T12:00:00Z');
 			expect(dateFrom).toBe('2026-07-13 00:00:00');
 			expect(dateTo).toBe('2026-07-20 00:00:00');
-			expect((Date.parse(dateTo.replace(' ', 'T') + 'Z') - Date.parse(dateFrom.replace(' ', 'T') + 'Z')) / 1000).toBe(
-				7 * DAY_SECONDS
-			);
+			expect(
+				(Date.parse(dateTo.replace(' ', 'T') + 'Z') - Date.parse(dateFrom.replace(' ', 'T') + 'Z')) / 1000
+			).toBe(7 * DAY_SECONDS);
 
 			// A Monday anchor is its own week start.
 			const monday = resolveWindowRange('week', '2026-07-13T00:00:00Z');

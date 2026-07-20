@@ -43,8 +43,8 @@ the `stripe-metrics` sibling, then sent as GA4 `dateRanges`
 `windowAnchor` (ISO-8601) selects "the day/week/month containing this
 instant"; omitted = now.
 
-**Caveat:** the GA4 API interprets report dates in the *property's
-reporting time zone*, not UTC. We deliberately anchor the calendar math
+**Caveat:** the GA4 API interprets report dates in the _property's
+reporting time zone_, not UTC. We deliberately anchor the calendar math
 in UTC so every metrics provider agrees on which day/week/month an
 instant belongs to; for properties whose reporting zone differs from
 UTC, the day boundaries within GA are the property's own.
@@ -75,10 +75,10 @@ Grant the service account only the **Viewer** role:
 
 ## Settings
 
-| Setting              | Required | Description                                                                                                     |
-| -------------------- | -------- | --------------------------------------------------------------------------------------------------------------- |
+| Setting              | Required | Description                                                                                                                     |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `propertyId`         | yes      | Numeric GA4 property id (e.g. `123456789`; `properties/123456789` also accepted). Env fallback: `GOOGLE_ANALYTICS_PROPERTY_ID`. |
-| `serviceAccountJson` | yes      | Full JSON service-account key file. Secret; env fallback: `GOOGLE_ANALYTICS_SERVICE_ACCOUNT_JSON`.               |
+| `serviceAccountJson` | yes      | Full JSON service-account key file. Secret; env fallback: `GOOGLE_ANALYTICS_SERVICE_ACCOUNT_JSON`.                              |
 
 ## Development
 

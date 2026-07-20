@@ -10,9 +10,9 @@ Node SDK** (no hand-rolled REST).
 
 ## Metrics
 
-| Metric id           | What it reads                                          | Windows                  | Unit                             |
-| ------------------- | ------------------------------------------------------ | ------------------------ | -------------------------------- |
-| `balance_available` | Current available balance (`stripe.balance.retrieve`)  | `point`                  | configured currency (e.g. `usd`) |
+| Metric id           | What it reads                                            | Windows                | Unit                             |
+| ------------------- | -------------------------------------------------------- | ---------------------- | -------------------------------- |
+| `balance_available` | Current available balance (`stripe.balance.retrieve`)    | `point`                | configured currency (e.g. `usd`) |
 | `gross_volume`      | Sum of successful (paid) charges (`stripe.charges.list`) | `day`, `week`, `month` | configured currency              |
 
 Notes:
@@ -27,7 +27,7 @@ Notes:
 - `gross_volume` is **single-currency**: it counts **paid** charges in the
   configured `currency` only — charges in any other currency are excluded
   from the sum (multi-currency accounts get the configured-currency slice,
-  not a mixed-denomination total). Refunds are *not* subtracted (that is
+  not a mixed-denomination total). Refunds are _not_ subtracted (that is
   what makes it gross).
 - Because `charges.list` has no server-side currency filter, excluded
   foreign-currency charges are still walked and **count toward the
@@ -66,10 +66,10 @@ contract forbids it). Don't hand it more power than it needs: use a
 
 ## Settings
 
-| Setting     | Required | Description                                                                                  |
-| ----------- | -------- | -------------------------------------------------------------------------------------------- |
-| `secretKey` | yes      | Stripe secret key (`rk_...` recommended). Secret; env fallback: `STRIPE_SECRET_KEY`.          |
-| `currency`  | no       | Lowercase ISO-4217 code metric values are reported in. Default `usd`.                         |
+| Setting     | Required | Description                                                                          |
+| ----------- | -------- | ------------------------------------------------------------------------------------ |
+| `secretKey` | yes      | Stripe secret key (`rk_...` recommended). Secret; env fallback: `STRIPE_SECRET_KEY`. |
+| `currency`  | no       | Lowercase ISO-4217 code metric values are reported in. Default `usd`.                |
 
 ## Development
 

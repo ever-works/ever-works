@@ -940,7 +940,7 @@
         },
         "missionDetail": {
             "attachedWorks": {
-				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
                 "title": "Attached Works",
                 "empty": "No Works attached to this Mission yet. Attach one below.",
                 "attachTitle": "Attach a Work",
