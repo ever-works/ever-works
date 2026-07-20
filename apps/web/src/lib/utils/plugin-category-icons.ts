@@ -55,6 +55,8 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // EW-685 / EW-742 — pluggable job-runtime providers (BullMQ,
     // pg-boss, Temporal, Inngest, Trigger.dev).
     'job-runtime': Cog,
+    // First-party bidirectional connectors (Slack, Discord, …).
+    connector: Plug,
 };
 
 /**
