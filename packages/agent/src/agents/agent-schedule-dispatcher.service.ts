@@ -111,6 +111,10 @@ export class AgentScheduleDispatcherService {
             // for ~30 min until the stuck-recovery sweeper picks it up.
             let originalNext: Date | null = null;
             let enqueueSucceeded = false;
+            // Hoisted so the catch can reconcile a row that was created before
+            // the enqueue threw — `dispatchOne` already does this; this path
+            // did not, leaving the run orphaned in `queued`.
+            let createdRun: { id: string } | null = null;
             try {
                 originalNext = await this.agentRepository.tryClaimForRun(agent.id);
                 if (!originalNext) {
@@ -132,6 +136,7 @@ export class AgentScheduleDispatcherService {
                     userId: agent.userId,
                     triggerKind: 'heartbeat',
                 });
+                createdRun = run ?? null;
 
                 const handle = await trigger.enqueue({
                     agentId: agent.id,
@@ -156,6 +161,26 @@ export class AgentScheduleDispatcherService {
                 );
                 summary.failed += 1;
                 summary.entries.push(this.entry(agent, { outcome: 'failed', message }));
+                // Reconcile the pre-created run, mirroring `dispatchOne`.
+                // Without this the row stays `queued` forever: there is no
+                // agent_runs sweeper, and the next heartbeat ADOPTS the orphan
+                // via findInFlightForAgent (which matches "regardless of
+                // trigger kind") rather than creating a fresh row — so the
+                // failed dispatch is never recorded as failed and never shows
+                // up in the Activity tab, which is the whole reason the row is
+                // pre-created.
+                if (createdRun && !enqueueSucceeded) {
+                    try {
+                        await this.agentRunRepository.markDispatchFailed(
+                            createdRun.id,
+                            `dispatch-failed: ${message}`,
+                        );
+                    } catch (failErr) {
+                        this.logger.warn(
+                            `Failed to mark orphan AgentRun ${createdRun.id} failed: ${failErr}`,
+                        );
+                    }
+                }
                 // Review-fix C11: release the CAS claim so the Agent
                 // returns to ACTIVE immediately. Without this the row
                 // stays in RUNNING with no worker until the next
