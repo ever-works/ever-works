@@ -43,6 +43,7 @@ import { WorkProposalsModule } from './work-proposals/work-proposals.module';
 import { IdeaBuildExecutorDispatchModule } from './work-proposals/idea-build-executor-dispatch.module';
 import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
+import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -150,6 +151,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // skeleton module exposing GET /me/missions. CRUD + lifecycle
         // ship in PR H; Clone in PR HH; tick worker (Trigger.dev) in PR J.
         MissionsModule,
+        // Goals & Metrics (PR-8) — user-owned measurable targets
+        // evaluated against metrics-provider plugins (PR-7). CRUD +
+        // lifecycle + evaluate-now on /api/me/goals; Mission link
+        // endpoints live on the MissionsController.
+        GoalsModule,
         // Agents/Skills/Tasks (PR #1017 specs) — Phase 3: AgentsService
         // + AgentsController. Heartbeat dispatcher + run service land in
         // Phase 6/7.

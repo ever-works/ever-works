@@ -89,6 +89,11 @@ export * from './user-notification-preference.entity';
 export * from './user-notification-category-mute.entity';
 export * from './organization-notification-default.entity';
 
+// Goals & Metrics (PR-8) — measurable targets + samples + Mission link
+export * from './goal.entity';
+export * from './goal-metric-sample.entity';
+export * from './mission-goal.entity';
+
 // Composio triggers (EW-684 PR-D)
 export * from './composio-trigger-subscription.entity';
 

@@ -42,6 +42,7 @@ import {
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
+import { GoalEvaluationService } from '@ever-works/agent/goals';
 import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -205,6 +206,10 @@ export class TriggerInternalController implements OnModuleInit {
         // PR-4 — exposed for the idea-build-execute Trigger.dev task so it
         // can drive executeBuild() over the internal RPC channel.
         private readonly ideaBuildExecutorService: IdeaBuildExecutorService,
+        // Goals & Metrics PR-8 — exposed for the goal-evaluate-dispatcher
+        // Trigger.dev cron so it can drive `evaluateDue()` over the
+        // internal RPC channel.
+        private readonly goalEvaluationService: GoalEvaluationService,
         // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
         // `agent-heartbeat-dispatcher` cron + `agent-heartbeat`
         // one-shot worker over the internal RPC channel.
@@ -268,6 +273,8 @@ export class TriggerInternalController implements OnModuleInit {
             MissionTickService: this.missionTickService,
             // PR-4 — exposed for the idea-build-execute one-shot task.
             IdeaBuildExecutorService: this.ideaBuildExecutorService,
+            // Goals & Metrics PR-8 — exposed for the goal-evaluate-dispatcher cron.
+            GoalEvaluationService: this.goalEvaluationService,
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,

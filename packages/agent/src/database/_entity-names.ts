@@ -67,6 +67,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
     'Mission',
+    // Domain-model evolution PR-8 — Goals + measurement
+    'Goal',
+    'GoalMetricSample',
+    'MissionGoal',
     'MissionAttachment',
     'Notification',
     'NotificationChannel',
