@@ -72,6 +72,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GoalMetricSample',
     'MissionGoal',
     'MissionAttachment',
+    'MissionWork',
+    'IdeaWork',
     'Notification',
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
