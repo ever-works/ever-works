@@ -19,7 +19,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * PRECISION — only truly-stranded Ideas are reset. An Idea is
  * "stranded" iff it is `queued` AND has NO corresponding
- * `work_agent_goals` row (matched on `ideaId`) in a NON-TERMINAL
+ * `work_build_requests` row (matched on `ideaId`) in a NON-TERMINAL
  * state. Non-terminal goal statuses are `pending`, `planning`,
  * `waiting-for-approval`, `running`. If a non-terminal Goal exists,
  * the Idea is legitimately mid-flight (or about to be) and is left
@@ -44,6 +44,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class ResetStrandedQueuedIdeas1782200000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
+        // Postgres-only, matching `1782000000000-RenameWorkAgentGoalsToWorkBuildRequests`,
+        // which is itself postgres-guarded. On a non-postgres connection that rename
+        // never runs, so `work_build_requests` does not exist and this statement would
+        // throw. Same guard, same reason, same ordering.
+        if (queryRunner.connection.options.type !== 'postgres') {
+            return;
+        }
         await queryRunner.query(`
             UPDATE "work_proposals" AS wp
                SET "status" = 'pending',
@@ -52,7 +59,7 @@ export class ResetStrandedQueuedIdeas1782200000000 implements MigrationInterface
              WHERE wp."status" = 'queued'
                AND NOT EXISTS (
                    SELECT 1
-                     FROM "work_agent_goals" AS g
+                     FROM "work_build_requests" AS g
                     WHERE g."ideaId" = wp."id"
                       AND g."status" IN (
                           'pending',
