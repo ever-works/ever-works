@@ -9,6 +9,7 @@ export {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     AGENT_ACTION_PROPOSAL_STATUSES,
     type AgentActionProposalActionType,
+    type AgentActionProposalDecidedVia,
     type AgentActionProposalStatus,
     type AgentActionProposalPayload,
     type AgentActionRiskFlag,

@@ -40,6 +40,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
         },
         targets: null,
         reportsToAgentId: null,
+        guardrails: null,
         heartbeatCadence: null,
         idleBehavior: 'propose',
         nextHeartbeatAt: null,

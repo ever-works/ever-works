@@ -685,6 +685,31 @@
                     "save": "Salva",
                     "saving": "Salvataggio…"
                 }
+            },
+            "guardrails": {
+                "title": "Guardrail",
+                "subtitle": "Decidi quali azioni proposte attendono la tua approvazione, vengono eseguite automaticamente o vengono bloccate.",
+                "modeLabel": "Modalità di dispatch",
+                "modeRequireApproval": "Richiedi approvazione",
+                "modeRequireApprovalHint": "Ogni azione proposta resta nella tua coda di approvazione finché non decidi.",
+                "modeAutonomous": "Autonomo",
+                "modeAutonomousHint": "Le azioni sicure vengono eseguite senza attese. Le azioni con indicatori di rischio passano sempre dalla tua coda di approvazione.",
+                "autoApproveLabel": "Tipi di azione auto-approvati",
+                "autoApproveHint": "Solo i tipi di azione selezionati vengono eseguiti automaticamente; tutto il resto continua a passare dalla coda.",
+                "blockedLabel": "Tipi di azione bloccati",
+                "blockedHint": "Le azioni bloccate vengono rifiutate automaticamente e registrate nella cronologia della coda.",
+                "actionTypes": {
+                    "spawn_agent": "Crea Agente",
+                    "schedule_task": "Pianifica attività",
+                    "send_message": "Invia messaggio",
+                    "budget_override": "Deroga al budget",
+                    "other": "Altro"
+                },
+                "save": "Salva guardrail",
+                "reset": "Ripristina predefiniti",
+                "saveSuccess": "Guardrail salvati",
+                "saveError": "Impossibile salvare i guardrail",
+                "resetSuccess": "Guardrail ripristinati ai valori predefiniti"
             }
         },
         "tasksPage": {

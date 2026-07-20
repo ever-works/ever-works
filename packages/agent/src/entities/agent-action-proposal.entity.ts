@@ -41,6 +41,15 @@ export const AGENT_ACTION_PROPOSAL_ACTION_TYPES: readonly AgentActionProposalAct
 
 export type AgentActionProposalStatus = 'pending' | 'approved' | 'rejected';
 
+/**
+ * How a decided proposal got its decision:
+ *   - `user`      — a human approved/rejected it in the queue UI.
+ *   - `guardrail` — the owning Agent's dispatch guardrails auto-decided
+ *                   it at creation time (auto-approve or block).
+ * Null while the proposal is still pending.
+ */
+export type AgentActionProposalDecidedVia = 'user' | 'guardrail';
+
 export const AGENT_ACTION_PROPOSAL_STATUSES: readonly AgentActionProposalStatus[] = [
     'pending',
     'approved',
@@ -112,6 +121,14 @@ export class AgentActionProposal {
 
     @PortableDateColumn({ nullable: true })
     decidedAt?: Date | null;
+
+    /**
+     * `user` | `guardrail` — see {@link AgentActionProposalDecidedVia}.
+     * Guardrail-decided rows keep `decidedById` null (no human made
+     * the call); user-decided rows carry both.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    decidedVia?: AgentActionProposalDecidedVia | null;
 
     // Tier A scope FKs (EW-655). Both NULL until the owning user
     // creates their first Organization. No `@ManyToOne` to avoid the

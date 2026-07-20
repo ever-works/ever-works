@@ -693,6 +693,31 @@
                     "save": "저장",
                     "saving": "저장 중…"
                 }
+            },
+            "guardrails": {
+                "title": "가드레일",
+                "subtitle": "제안된 작업이 승인을 기다릴지, 자동으로 실행될지, 차단될지 설정하세요.",
+                "modeLabel": "디스패치 모드",
+                "modeRequireApproval": "승인 필요",
+                "modeRequireApprovalHint": "제안된 모든 작업은 결정할 때까지 승인 대기열에서 기다립니다.",
+                "modeAutonomous": "자율",
+                "modeAutonomousHint": "안전한 작업은 대기 없이 실행됩니다. 위험 플래그가 있는 작업은 항상 승인 대기열로 이동합니다.",
+                "autoApproveLabel": "자동 승인 작업 유형",
+                "autoApproveHint": "선택한 작업 유형만 자동으로 실행되며, 나머지는 계속 대기열로 이동합니다.",
+                "blockedLabel": "차단된 작업 유형",
+                "blockedHint": "차단된 작업은 자동으로 거부되며 대기열 기록에 남습니다.",
+                "actionTypes": {
+                    "spawn_agent": "에이전트 생성",
+                    "schedule_task": "작업 예약",
+                    "send_message": "메시지 보내기",
+                    "budget_override": "예산 재정의",
+                    "other": "기타"
+                },
+                "save": "가드레일 저장",
+                "reset": "기본값으로 재설정",
+                "saveSuccess": "가드레일이 저장되었습니다",
+                "saveError": "가드레일을 저장할 수 없습니다",
+                "resetSuccess": "가드레일이 기본값으로 재설정되었습니다"
             }
         },
         "tasksPage": {

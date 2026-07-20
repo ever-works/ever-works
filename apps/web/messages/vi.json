@@ -685,6 +685,31 @@
                     "save": "Lưu",
                     "saving": "Đang lưu…"
                 }
+            },
+            "guardrails": {
+                "title": "Rào chắn an toàn",
+                "subtitle": "Quyết định hành động được đề xuất nào cần chờ bạn phê duyệt, chạy tự động, hoặc bị chặn.",
+                "modeLabel": "Chế độ điều phối",
+                "modeRequireApproval": "Yêu cầu phê duyệt",
+                "modeRequireApprovalHint": "Mọi hành động được đề xuất sẽ chờ trong hàng đợi phê duyệt cho đến khi bạn quyết định.",
+                "modeAutonomous": "Tự hành",
+                "modeAutonomousHint": "Các hành động an toàn chạy ngay không cần chờ. Hành động có cờ rủi ro luôn vào hàng đợi phê duyệt của bạn.",
+                "autoApproveLabel": "Loại hành động được tự động phê duyệt",
+                "autoApproveHint": "Chỉ các loại hành động được chọn mới chạy tự động; phần còn lại vẫn vào hàng đợi.",
+                "blockedLabel": "Loại hành động bị chặn",
+                "blockedHint": "Hành động bị chặn sẽ tự động bị từ chối và được ghi lại trong lịch sử hàng đợi.",
+                "actionTypes": {
+                    "spawn_agent": "Tạo Agent",
+                    "schedule_task": "Lên lịch nhiệm vụ",
+                    "send_message": "Gửi tin nhắn",
+                    "budget_override": "Ghi đè ngân sách",
+                    "other": "Khác"
+                },
+                "save": "Lưu rào chắn",
+                "reset": "Đặt lại về mặc định",
+                "saveSuccess": "Đã lưu rào chắn",
+                "saveError": "Không thể lưu rào chắn",
+                "resetSuccess": "Đã đặt lại rào chắn về mặc định"
             }
         },
         "tasksPage": {

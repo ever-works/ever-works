@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Bot, CalendarClock, Clock, HeartPulse, Moon, TriangleAlert } from 'lucide-react';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
+import { AgentGuardrailsCard } from '@/components/agents/AgentGuardrailsCard';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 
 /**
@@ -181,6 +182,9 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
                     </p>
                 )}
             </section>
+
+            {/* Dispatch guardrails */}
+            <AgentGuardrailsCard agentId={id} initial={agent.guardrails ?? null} />
 
             <AgentAttachmentsPanel agentId={id} initial={attachments} />
         </div>

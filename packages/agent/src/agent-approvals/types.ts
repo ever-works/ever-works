@@ -1,6 +1,7 @@
 import type {
     AgentActionProposal,
     AgentActionProposalActionType,
+    AgentActionProposalDecidedVia,
     AgentActionProposalPayload,
     AgentActionProposalStatus,
     AgentActionRiskFlag,
@@ -24,6 +25,7 @@ export interface AgentActionProposalDto {
     status: AgentActionProposalStatus;
     decidedById: string | null;
     decidedAt: Date | null;
+    decidedVia: AgentActionProposalDecidedVia | null;
     tenantId: string | null;
     organizationId: string | null;
     createdAt: Date;
@@ -43,6 +45,7 @@ export function toAgentActionProposalDto(row: AgentActionProposal): AgentActionP
         status: row.status,
         decidedById: row.decidedById ?? null,
         decidedAt: row.decidedAt ?? null,
+        decidedVia: row.decidedVia ?? null,
         tenantId: row.tenantId ?? null,
         organizationId: row.organizationId ?? null,
         createdAt: row.createdAt,

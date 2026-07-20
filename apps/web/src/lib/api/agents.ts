@@ -19,6 +19,36 @@ export type AgentIdleBehavior = 'propose' | 'sleep' | 'self-improve';
 
 export type AgentFileName = 'SOUL.md' | 'AGENTS.md' | 'HEARTBEAT.md' | 'TOOLS.md' | 'agent.yml';
 
+// ── Agent Dispatch Guardrails ──
+// Mirrors `AgentGuardrails` (packages/agent/src/agents/guardrails.ts)
+// and the proposal action types
+// (packages/agent/src/entities/agent-action-proposal.entity.ts).
+
+export type AgentGuardrailActionType =
+    | 'spawn_agent'
+    | 'schedule_task'
+    | 'send_message'
+    | 'budget_override'
+    | 'other';
+
+export const AGENT_GUARDRAIL_ACTION_TYPES: readonly AgentGuardrailActionType[] = [
+    'spawn_agent',
+    'schedule_task',
+    'send_message',
+    'budget_override',
+    'other',
+] as const;
+
+export type AgentGuardrailsMode = 'require_approval' | 'autonomous';
+
+export interface AgentGuardrails {
+    mode: AgentGuardrailsMode;
+    /** Autonomous-mode narrowing; omitted = every unflagged type may auto-approve. */
+    autoApproveActionTypes?: AgentGuardrailActionType[];
+    /** Action types the Agent may never take (auto-rejected with an audit row). */
+    blockedActionTypes?: AgentGuardrailActionType[];
+}
+
 export interface AgentPermissions {
     canCreateAgents: boolean;
     canAssignTasks: boolean;
@@ -75,6 +105,7 @@ export interface Agent {
      * the API service).
      */
     reportsToAgentId: string | null;
+    guardrails: AgentGuardrails | null;
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: string | null;
@@ -271,6 +302,19 @@ export const agentsAPI = {
             endpoint: `/agents/${id}`,
             data: input,
             method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * PUT semantics — replaces the whole guardrails policy;
+     * `null` clears back to the default queue-everything posture.
+     */
+    async updateGuardrails(id: string, guardrails: AgentGuardrails | null): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/guardrails`,
+            data: { guardrails },
+            method: 'PUT',
             wrapInData: false,
         });
     },
