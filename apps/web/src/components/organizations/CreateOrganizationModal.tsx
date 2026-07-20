@@ -238,11 +238,13 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         // Both stay byte-identical to their pre-feature contracts otherwise.
         const importing = selectedTemplate !== null;
         const trimmedVision = vision.trim();
-        const payload: { name: string; templateSlug?: string; vision?: string } = { name: trimmed };
+        const requestBody: { name: string; templateSlug?: string; vision?: string } = {
+            name: trimmed,
+        };
         if (importing) {
-            payload.templateSlug = selectedTemplate as string;
+            requestBody.templateSlug = selectedTemplate as string;
         } else if (trimmedVision.length > 0) {
-            payload.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
+            requestBody.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
         }
         startTransition(() => {
             void (async () => {
@@ -254,7 +256,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                             credentials: 'include',
                             cache: 'no-store',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload),
+                            body: JSON.stringify(requestBody),
                         },
                     );
                     if (!res.ok) {
