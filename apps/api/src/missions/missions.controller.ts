@@ -36,7 +36,7 @@ import {
     CreateMissionDto,
     UpdateMissionDto,
 } from './dto/mission.dto';
-import { MISSION_WORK_RELATIONS, type MissionWorkRelation } from '@ever-works/agent/entities';
+import { MISSION_WORK_RELATIONS, MissionOutcome, type MissionWorkRelation } from '@ever-works/agent/entities';
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -217,7 +217,7 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body?: CompleteMissionDto,
     ): Promise<MissionDto> {
-        return this.service.complete(auth.userId, id, body?.outcome ?? null);
+        return this.service.complete(auth.userId, id, (body?.outcome ?? null) as MissionOutcome | null);
     }
 
     @Post(':id/clone')
