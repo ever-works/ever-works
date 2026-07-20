@@ -85,11 +85,11 @@ function makeWorkProposalRepo() {
 function makeWorkAgent() {
     return {
         getPreferences: jest.fn(async () => ({ missionDefaultOutstandingCap: null })),
-        createGoal: jest.fn(async (_userId: string, input: { ideaId?: string }) => ({
-            goal: { id: `goal-for-${input.ideaId}` },
+        createBuildRequest: jest.fn(async (_userId: string, input: { ideaId?: string }) => ({
+            buildRequest: { id: `build-for-${input.ideaId}` },
             run: { id: 'run-x' },
         })),
-    } as unknown as WorkAgentService & { getPreferences: jest.Mock; createGoal: jest.Mock };
+    } as unknown as WorkAgentService & { getPreferences: jest.Mock; createBuildRequest: jest.Mock };
 }
 
 function makeDispatcher() {
@@ -132,7 +132,7 @@ describe('MissionTickService — auto-build executor wiring (PR-4 / P3)', () => 
         expect(summary.entries[0].outcome).toBe('spawned');
         expect(summary.entries[0].ideasQueued).toBe(1);
         expect(proposals.queueForBuild).toHaveBeenCalledTimes(1);
-        expect(workAgent.createGoal).not.toHaveBeenCalled();
+        expect(workAgent.createBuildRequest).not.toHaveBeenCalled();
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });
 
@@ -146,21 +146,21 @@ describe('MissionTickService — auto-build executor wiring (PR-4 / P3)', () => 
         expect(summary.entries[0].outcome).toBe('spawned');
         expect(summary.entries[0].ideasQueued).toBe(1);
         expect(proposals.queueForBuild).toHaveBeenCalledTimes(1);
-        expect(workAgent.createGoal).toHaveBeenCalledTimes(1);
-        const createGoalArgs = workAgent.createGoal.mock.calls[0];
-        expect(createGoalArgs[0]).toBe('u1');
-        expect(createGoalArgs[1]).toMatchObject({ maxWorksPerRun: 1, ideaId: 'p1' });
+        expect(workAgent.createBuildRequest).toHaveBeenCalledTimes(1);
+        const createBuildRequestArgs = workAgent.createBuildRequest.mock.calls[0];
+        expect(createBuildRequestArgs[0]).toBe('u1');
+        expect(createBuildRequestArgs[1]).toMatchObject({ maxWorksPerRun: 1, ideaId: 'p1' });
         expect(dispatcher.enqueue).toHaveBeenCalledWith({
-            goalId: 'goal-for-p1',
+            goalId: 'build-for-p1',
             userId: 'u1',
             ideaId: 'p1',
         });
     });
 
-    it('flag ON but createGoal throws: tick still spawns (best-effort, Idea stays queued)', async () => {
+    it('flag ON but createBuildRequest throws: tick still spawns (best-effort, Idea stays queued)', async () => {
         process.env[ENABLED] = 'true';
         const { service, missionRepo, workAgent, dispatcher } = build();
-        (workAgent.createGoal as jest.Mock).mockRejectedValueOnce(
+        (workAgent.createBuildRequest as jest.Mock).mockRejectedValueOnce(
             new Error('Work agent is disabled.'),
         );
         missionRepo._seed({ id: 'm1', userId: 'u1', autoBuildWorks: true });

@@ -367,21 +367,23 @@ export class MissionTickService {
      */
     private async createAndEnqueueBuildGoal(userId: string, proposal: WorkProposal): Promise<void> {
         try {
-            const { goal } = await this.workAgent.createGoal(userId, {
+            // PR-4 x PR-5 — the build-request factory was renamed from
+            // createGoal → createBuildRequest ({ goal } → { buildRequest }).
+            const { buildRequest } = await this.workAgent.createBuildRequest(userId, {
                 instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
                 maxWorksPerRun: 1,
                 ideaId: proposal.id,
             });
             if (this.ideaBuildDispatcher) {
                 await this.ideaBuildDispatcher.enqueue({
-                    goalId: goal.id,
+                    goalId: buildRequest.id,
                     userId,
                     ideaId: proposal.id,
                 });
             } else {
                 this.logger.warn(
                     `Idea build executor enabled but no dispatcher bound; ` +
-                        `mission goal ${goal.id} for idea ${proposal.id} will not execute.`,
+                        `mission build request ${buildRequest.id} for idea ${proposal.id} will not execute.`,
                 );
             }
         } catch (err) {
