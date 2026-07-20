@@ -50,6 +50,10 @@ import {
     deleteMission,
     runMissionNow,
     cloneMission,
+    // PR-2 (domain-model evolution) — Mission ↔ Work relations.
+    listMissionWorks,
+    attachWorkToMission,
+    detachWorkFromMission,
 } from './missions.tools';
 import {
     listIdeas,
@@ -156,6 +160,11 @@ export function buildChatTools(model: LanguageModel) {
         deleteMission,
         runMissionNow,
         cloneMission,
+
+        // PR-2 — Mission ↔ Work relations (attach/detach, never ownership)
+        listMissionWorks,
+        attachWorkToMission,
+        detachWorkFromMission,
 
         // Phase 9 PR Z1 — Ideas
         listIdeas,

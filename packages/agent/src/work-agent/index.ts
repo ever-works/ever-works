@@ -2,15 +2,17 @@ export * from './types';
 export * from './cadence';
 export * from './work-agent.service';
 export * from './work-agent.module';
+export * from './idea-build-executor.service';
+export * from './idea-build-executor.dispatcher';
 export {
     WorkAgentPreference,
     type WorkAgentGuardrails,
 } from '../entities/work-agent-preference.entity';
 export {
-    WorkAgentGoal,
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
-} from '../entities/work-agent-goal.entity';
+    WorkBuildRequest,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
+} from '../entities/work-build-request.entity';
 export {
     WorkAgentRun,
     WorkAgentRunStatus,

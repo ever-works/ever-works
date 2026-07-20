@@ -20,7 +20,15 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   - POST   /api/me/work-proposals/:id/accept      body { workId:UUID }
  *                                                   → 200 { ok:true }; transitions the
  *                                                     Idea PENDING → ACCEPTED and stamps
- *                                                     `acceptedWorkId = workId`.
+ *                                                     `acceptedWorkId = workId`. ALSO
+ *                                                     valid from ACCEPTED (review §23.1 /
+ *                                                     ADR-009 0..N): re-accepting links an
+ *                                                     ADDITIONAL Work and re-points
+ *                                                     `acceptedWorkId` at the newest.
+ *   - GET    /api/me/work-proposals/:id/works       → 200 { links:[…] } — the Idea's
+ *                                                     `idea_works` provenance rows, newest
+ *                                                     first (deep pins live in
+ *                                                     flow-idea-multi-work-links.spec.ts).
  *   - PATCH  /api/me/work-proposals/:id/dismiss     → 204 (no body); PENDING → DISMISSED.
  *   - POST   /api/me/work-proposals/:id/build       env-adaptive: 200 with a Work-Agent,
  *                                                   else 400 "Work agent is disabled."
@@ -32,14 +40,19 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *   - GET    /api/me/work-proposals?missionId=…     Mission-scoped list (@IsUUID).
  *
  * HARD-WON GOTCHAS pinned as truthful contract (verified, NOT assumed):
- *   1. The user-facing accept endpoint sets `acceptedWorkId` on the IDEA only.
- *      It does NOT set `acceptedFromIdeaId` on the WORK — that back-pointer is
- *      written exclusively by the Goal-completion handler when a build-from-Idea
- *      Goal succeeds (no Work Agent on this stack → it stays null). We assert
- *      the Work's `acceptedFromIdeaId` is STILL null after a manual accept.
- *   2. accept is valid ONLY from PENDING. From ACCEPTED / QUEUED / DISMISSED it
- *      returns 404 "Proposal not found or already finalized" (idempotent no-op —
- *      the FIRST accept's `acceptedWorkId` is NOT overwritten by a second call).
+ *   1. Accept stamps BOTH direction pointers (review §23.1): `acceptedWorkId` on
+ *      the IDEA and `acceptedFromIdeaId` on the WORK, plus an authoritative
+ *      `idea_works` provenance row (kind 'linked'). The Work-side stamp is
+ *      FIRST-WRITER-WINS — a Work keeps at most ONE source Idea, so a Work that
+ *      already has a source Idea is never re-pointed. (Historically the
+ *      user-facing accept left the back-pointer NULL — only the Goal-completion
+ *      handler wrote it; that dead-column behavior is gone, and we now assert
+ *      the stamp lands on a manual accept too.)
+ *   2. accept is valid from PENDING (first link) AND from ACCEPTED (additional
+ *      links — the 0..N contract). From QUEUED / DISMISSED it still returns 404
+ *      "Proposal not found or already finalized". A repeat accept from ACCEPTED
+ *      RE-POINTS `acceptedWorkId` at the newly-linked Work (most recent wins);
+ *      the unique (ideaId, workId) constraint keeps the link table dup-free.
  *   3. accept with an empty body → 400 ["workId must be a UUID"] (the @IsUUID DTO
  *      check runs before the controller's `!body?.workId` guard, so the
  *      "workId is required" string is unreachable). A well-formed but NON-EXISTENT
@@ -105,7 +118,7 @@ async function seededToken(request: APIRequestContext): Promise<string> {
 }
 
 test.describe('Idea → Work accept flow (fresh API user)', () => {
-    test('accept transitions the Idea PENDING → ACCEPTED, stamps acceptedWorkId, surfaces it in the accepted-status list, and leaves the Work back-pointer null', async ({
+    test('accept transitions the Idea PENDING → ACCEPTED, stamps acceptedWorkId, surfaces it in the accepted-status list, and stamps the Work back-pointer', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -160,22 +173,21 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         expect(acceptedRow!.status).toBe('accepted');
         expect(acceptedRow!.acceptedWorkId).toBe(work.id);
 
-        // ── 4. CRITICAL truthful contract: the user-facing accept does NOT
-        //      stamp acceptedFromIdeaId on the WORK. That back-pointer is only
-        //      written by the Goal-completion handler (no Work Agent here). ──
+        // ── 4. Review §23.1 contract: accept stamps BOTH direction pointers.
+        //      The WORK-side back-pointer `acceptedFromIdeaId` now equals the
+        //      source Idea id (first-writer-wins — this freshly-created Work
+        //      had no source Idea, so the stamp lands; a Work keeps at most
+        //      one source Idea for its whole life). ──
         const workAfter = await request.get(`${API_BASE}/api/works/${work.id}`, {
             headers: authedHeaders(token),
         });
-        if (workAfter.ok()) {
-            const wb = await workAfter.json();
-            const wEntity = wb?.work ?? wb;
-            // Either the field is absent from this read DTO or it's null — never
-            // the Idea id (that would be a fictional contract on this stack).
-            expect(wEntity?.acceptedFromIdeaId ?? null).not.toBe(ideaId);
-        }
+        expect(workAfter.status(), `work read body=${await workAfter.text()}`).toBe(200);
+        const wb = await workAfter.json();
+        const wEntity = wb?.work ?? wb;
+        expect(wEntity?.acceptedFromIdeaId ?? null).toBe(ideaId);
     });
 
-    test('accept is idempotent + PENDING-only: a second accept (even with a different Work) → 404 and never overwrites the first acceptedWorkId', async ({
+    test('accept is repeatable under the 0..N contract: a second accept with a different Work → 200 and re-points acceptedWorkId at the newest link; re-accepting an already-linked Work never duplicates it', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -185,7 +197,7 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         const ideaId = await createIdea(
             request,
             token,
-            `Accept-twice idea ${s} — ${IDEA_DESC_MIN} for the idempotency guard probe`,
+            `Accept-twice idea ${s} — ${IDEA_DESC_MIN} for the multi-accept re-point probe`,
         );
         const workA = await createWorkViaAPI(request, token, { name: `Twice Work A ${s}` });
         const workB = await createWorkViaAPI(request, token, { name: `Twice Work B ${s}` });
@@ -198,28 +210,39 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         expect(first.status()).toBe(200);
         expect((await readIdea(request, token, ideaId)).acceptedWorkId).toBe(workA.id);
 
-        // ── Second accept (different Work) is a no-op 404 — the Idea is no
-        //    longer PENDING, so the transition's source-status guard rejects it.
+        // ── Second accept (different Work) is now VALID from ACCEPTED (review
+        //    §23.1 / ADR-009: one Idea links 0..N Works). It appends a second
+        //    `idea_works` row and RE-POINTS the denormalized `acceptedWorkId`
+        //    at the newest link. (This was a 404 before the 0..N contract.) ──
         const second = await request.post(`${API_BASE}/api/me/work-proposals/${ideaId}/accept`, {
             headers: authedHeaders(token),
             data: { workId: workB.id },
         });
-        expect(second.status()).toBe(404);
-        expect(String((await second.json()).message)).toMatch(/not found or already finalized/i);
+        expect(second.status(), `second accept body=${await second.text()}`).toBe(200);
+        expect(await second.json()).toEqual({ ok: true });
 
-        // ── The first Work id is NOT clobbered by the rejected second accept ─
         const afterTwice = await readIdea(request, token, ideaId);
         expect(afterTwice.status).toBe('accepted');
-        expect(afterTwice.acceptedWorkId).toBe(workA.id);
-        expect(afterTwice.acceptedWorkId).not.toBe(workB.id);
+        expect(afterTwice.acceptedWorkId).toBe(workB.id);
 
-        // ── Re-accepting with the SAME Work is still a 404 (finalized) ───────
+        // ── Re-accepting an ALREADY-LINKED Work is valid too: 200, the
+        //    denormalized pointer swings back to it (most-recently-accepted
+        //    wins) — but the unique (ideaId, workId) constraint keeps the
+        //    provenance table dup-free: still exactly the two links. ─────────
         const reSame = await request.post(`${API_BASE}/api/me/work-proposals/${ideaId}/accept`, {
             headers: authedHeaders(token),
             data: { workId: workA.id },
         });
-        expect(reSame.status()).toBe(404);
+        expect(reSame.status()).toBe(200);
         expect((await readIdea(request, token, ideaId)).acceptedWorkId).toBe(workA.id);
+
+        const linksRes = await request.get(`${API_BASE}/api/me/work-proposals/${ideaId}/works`, {
+            headers: authedHeaders(token),
+        });
+        expect(linksRes.status(), `links body=${await linksRes.text()}`).toBe(200);
+        const { links } = (await linksRes.json()) as { links: Array<{ workId: string }> };
+        expect(links.length).toBe(2);
+        expect(links.map((l) => l.workId).sort()).toEqual([workA.id, workB.id].sort());
     });
 
     test('accept after build: a QUEUED Idea (build already committed the transition) can no longer be manually accepted → 404, and build-from-accepted is rejected', async ({
@@ -253,9 +276,10 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
             })
             .toBe('queued');
 
-        // ── 2. Manual accept of a QUEUED Idea is rejected — accept is
-        //      PENDING-only; the build pipeline (Goal completion) owns the
-        //      QUEUED → ACCEPTED finalization, not the user-facing endpoint ──
+        // ── 2. Manual accept of a QUEUED Idea is rejected — accept is valid
+        //      only from PENDING / ACCEPTED; the build pipeline (Goal
+        //      completion) owns the QUEUED → ACCEPTED finalization, not the
+        //      user-facing endpoint ──
         const work = await createWorkViaAPI(request, token, { name: `AfterBuild Work ${s}` });
         const acceptQueued = await request.post(
             `${API_BASE}/api/me/work-proposals/${queuedIdeaId}/accept`,
@@ -338,7 +362,8 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         );
         expect(reDismiss.status()).toBe(404);
 
-        // ── 3. Accept a DISMISSED Idea → 404 (accept is PENDING-only) ───────
+        // ── 3. Accept a DISMISSED Idea → 404 (DISMISSED is terminal — accept
+        //      is valid only from PENDING / ACCEPTED) ─────────────────────────
         const work = await createWorkViaAPI(request, token, { name: `Dismiss Work ${s}` });
         const acceptDismissed = await request.post(
             `${API_BASE}/api/me/work-proposals/${dismissId}/accept`,

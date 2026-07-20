@@ -1,0 +1,75 @@
+{
+	"name": "@ever-works/google-analytics-metrics-plugin",
+	"version": "1.0.0",
+	"description": "Google Analytics Metrics Plugin - Read-only GA4 metrics (active users, sessions, conversions/key events) for Ever Works Goals",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@google-analytics/data": "^6.1.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "google-analytics-metrics",
+			"name": "Google Analytics Metrics",
+			"version": "1.0.0",
+			"category": "metrics",
+			"capabilities": [
+				"metrics-provider"
+			],
+			"description": "Read-only Google Analytics 4 metrics — active users, sessions and conversions (key events) per day/week/month — for evaluating Goals like \"1000 active users/week\".",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"envVars": [
+				{
+					"name": "GOOGLE_ANALYTICS_PROPERTY_ID",
+					"required": false,
+					"secret": false,
+					"description": "Numeric GA4 property id (can also be set via admin/user settings)"
+				},
+				{
+					"name": "GOOGLE_ANALYTICS_SERVICE_ACCOUNT_JSON",
+					"required": false,
+					"secret": true,
+					"description": "Full JSON service-account key with Viewer access to the GA4 property (can also be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}

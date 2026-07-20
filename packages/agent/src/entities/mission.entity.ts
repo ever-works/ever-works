@@ -9,6 +9,7 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { PortableDateColumn } from './_types';
 import type { WorkAgentGuardrails } from './work-agent-preference.entity';
 
 /**
@@ -40,11 +41,28 @@ export enum MissionType {
 }
 
 /**
+ * PR-3 (domain-model evolution, review §23.2) — the Mission's
+ * CONCLUSION verdict, separate from its workflow `status`.
+ * NULL until (and unless) the human completing the Mission picks one;
+ * all pre-existing COMPLETED rows keep NULL (verdicts are never
+ * invented in backfill). Only humans set this — the autonomous agent
+ * runtime never gains a complete-mission tool (standing rule
+ * alongside invariant I-4).
+ */
+export enum MissionOutcome {
+    SUCCEEDED = 'succeeded',
+    PARTIALLY_SUCCEEDED = 'partially_succeeded',
+    FAILED = 'failed',
+    CANCELLED = 'cancelled',
+    SUPERSEDED = 'superseded',
+}
+
+/**
  * Per-Mission policy overrides for the Idea→Work build pipeline.
  *
  * Falls through to the user's global `WorkAgentPreference` for any
  * field left undefined. This is the Mission's analogue of
- * `WorkAgentGoal.guardrailsOverride` — same shape, same fall-through
+ * `WorkBuildRequest.guardrailsOverride` — same shape, same fall-through
  * semantics — but applied to every Idea this Mission spawns.
  */
 export type MissionGuardrailsOverride = Partial<WorkAgentGuardrails>;
@@ -110,6 +128,20 @@ export class Mission {
     status: MissionStatus;
 
     /**
+     * PR-3 — conclusion verdict, set (optionally) when a human
+     * completes the Mission. NULL = no verdict recorded (includes
+     * every pre-existing completed Mission). See `MissionOutcome`.
+     */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    outcome?: MissionOutcome | null;
+
+    /** PR-3 — when the Mission was (last) completed. NULL while active/paused.
+     *  PortableDateColumn: raw `type: 'timestamp'` breaks the better-sqlite3
+     *  test/CLI driver at entity-metadata validation. */
+    @PortableDateColumn({ nullable: true })
+    completedAt?: Date | null;
+
+    /**
      * Cron expression; required when `type = SCHEDULED`, must be NULL
      * when `type = ONE_SHOT`. The Mission tick dispatcher (Phase 3
      * PR J) reads this to decide which Missions are due on the
@@ -121,7 +153,7 @@ export class Mission {
     /**
      * Per-Mission override of the global Auto-build Works setting.
      * When `true`, every Idea this Mission spawns is immediately
-     * queued for build (creates a `WorkAgentGoal` with
+     * queued for build (creates a `WorkBuildRequest` with
      * `maxWorksPerRun = 1` + `ideaId`). When `false`, spawned Ideas
      * stay PENDING for the user to act on.
      */
@@ -154,7 +186,7 @@ export class Mission {
      *
      * Stored as `simple-json` to match how the rest of the
      * `work-agent` module persists the same shape on
-     * `WorkAgentGoal.guardrailsOverride`.
+     * `WorkBuildRequest.guardrailsOverride`.
      */
     @Column('simple-json', { nullable: true })
     guardrailsOverride?: MissionGuardrailsOverride | null;

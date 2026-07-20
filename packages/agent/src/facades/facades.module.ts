@@ -19,6 +19,7 @@ import { EmailFacadeService } from './email.facade';
 import { NotificationChannelFacadeService } from './notification-channel.facade';
 import { AgentMemoryFacadeService } from './agent-memory.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
+import { MetricsFacadeService } from './metrics.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -42,6 +43,11 @@ const FACADES = [
     // other barrel facade; deps are the global PluginRegistryService plus two
     // @Optional() injections, so it resolves in this module.
     VectorStoreFacadeService,
+    // Goals feature PR-7 — read-only metrics collectors (custom-http,
+    // Stripe). Budget-guarded + usage-recorded via UsageModule /
+    // BudgetsModule already imported by this module. Goal evaluation
+    // (PR-8) consumes it through FacadesModule.
+    MetricsFacadeService,
 ];
 
 /**

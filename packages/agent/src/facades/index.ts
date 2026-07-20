@@ -132,6 +132,18 @@ export {
     type EmbeddingModeSetting,
 } from './vector-store.facade';
 
+// Metrics Facade — Goals feature PR-7 (metrics-provider capability).
+// Read-only metric reads through enabled providers (custom-http,
+// Stripe); Goal evaluation (PR-8) consumes this.
+export { MetricsFacadeService, MetricsFacadeError } from './metrics.facade';
+export type {
+    IMetricsProviderPlugin,
+    MetricDescriptor,
+    MetricQuery,
+    MetricSample,
+    MetricWindow,
+} from '@ever-works/plugin';
+
 // Re-export facade types from plugin for convenience
 export type { FacadeExtractionOptions, FacadeExtractedContent } from '@ever-works/plugin';
 export type {

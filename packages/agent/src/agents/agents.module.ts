@@ -6,6 +6,8 @@ import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
+import { User } from '../entities/user.entity';
+import { Organization } from '../entities/organization.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
@@ -23,6 +25,7 @@ import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
 import { AgentToolService } from './agent-tool.service';
+import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
 import { FacadesModule } from '../facades/facades.module';
@@ -53,6 +56,10 @@ import { FacadesModule } from '../facades/facades.module';
             WorkProposal,
             // Upload-ownership validation for addAttachment (user_uploads).
             UserUpload,
+            // PR-6 — User + Organization back VisionContextService's
+            // active-Org vision lookup for the run-prompt segment.
+            User,
+            Organization,
         ]),
         ActivityLogModule,
         // Phase 10 — AgentRunService resolves active skills via
@@ -77,6 +84,9 @@ import { FacadesModule } from '../facades/facades.module';
         AgentScheduleDispatcherService,
         AgentExportService,
         PromptAssemblerService,
+        // PR-6 — company-vision prompt context for AgentRunService's
+        // appended COMPANY VISION segment (@Optional() injection).
+        VisionContextService,
         AgentRunService,
         AgentToolService,
     ],
