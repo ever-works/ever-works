@@ -56,6 +56,8 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // EW-685 / EW-742 — pluggable job-runtime providers (BullMQ,
     // pg-boss, Temporal, Inngest, Trigger.dev).
     'job-runtime': Cog,
+    // First-party bidirectional connectors (Slack, Discord, …).
+    connector: Plug,
     // Domain-model evolution PR-7 — metrics-provider backends
     // (Stripe, PostHog, Google Analytics, custom HTTP) for Goals.
     metrics: Gauge,
@@ -85,6 +87,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     dns: 'DNS Providers',
     'secret-store-resolver': 'Secret Stores',
     'job-runtime': 'Job Runtimes',
+    connector: 'Connectors',
     metrics: 'Metrics',
 };
 
