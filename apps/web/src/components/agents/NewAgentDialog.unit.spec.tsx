@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
@@ -22,7 +22,19 @@ vi.mock('@/lib/api/agent-templates', () => ({
     listAstTemplates: vi.fn(async () => []),
 }));
 
+// Teams & Companies §4.3 — the dialog imports these server actions for
+// the post-create Team / Reports-to wiring; mock them so the unit spec
+// never touches the server-action module graph.
+vi.mock('@/app/actions/agents', () => ({
+    updateAgentAction: vi.fn(async () => ({})),
+}));
+vi.mock('@/app/actions/dashboard/teams', () => ({
+    addTeamMemberAction: vi.fn(async () => ({})),
+}));
+
 import { NewAgentDialog } from './NewAgentDialog';
+import { updateAgentAction } from '@/app/actions/agents';
+import { addTeamMemberAction } from '@/app/actions/dashboard/teams';
 import type { AstTemplateEntry } from '@/lib/api/agent-templates';
 
 const T = 'dashboard.agentsPage.newDialog';
@@ -95,5 +107,57 @@ describe('NewAgentDialog — bug fix + template step', () => {
         // No template cards; the name input is immediately present.
         expect(container.querySelector('[data-testid="agent-template-step-ceo"]')).toBeNull();
         expect(container.querySelector('input[type="text"]')).not.toBeNull();
+    });
+});
+
+describe('NewAgentDialog — Team / Reports-to selects (Teams & Companies §4.3)', () => {
+    it('hides both selects entirely when no org context props are passed', () => {
+        const { container } = render(<NewAgentDialog createAgent={createAgent} />);
+        fireEvent.click(nextButton(container)); // tenant → details
+        expect(container.querySelector('[data-testid="agent-create-team"]')).toBeNull();
+        expect(container.querySelector('[data-testid="agent-create-reports-to"]')).toBeNull();
+    });
+
+    it('renders both selects on details and wires team + manager after create', async () => {
+        const create = vi.fn(async () => ({ id: 'agent-9' }));
+        const { container } = render(
+            <NewAgentDialog
+                createAgent={create}
+                activeOrgId="org-1"
+                teams={[{ id: 'team-1', label: 'Engineering' }]}
+                agentOptions={[{ id: 'agent-ceo', label: 'CEO' }]}
+            />,
+        );
+        fireEvent.click(nextButton(container)); // tenant → details
+        const nameInput = container.querySelector('input[type="text"]') as HTMLInputElement;
+        fireEvent.change(nameInput, { target: { value: 'Coder' } });
+
+        const teamSelect = container.querySelector(
+            '[data-testid="agent-create-team"]',
+        ) as HTMLSelectElement;
+        const reportsToSelect = container.querySelector(
+            '[data-testid="agent-create-reports-to"]',
+        ) as HTMLSelectElement;
+        expect(teamSelect).not.toBeNull();
+        expect(reportsToSelect).not.toBeNull();
+        fireEvent.change(teamSelect, { target: { value: 'team-1' } });
+        fireEvent.change(reportsToSelect, { target: { value: 'agent-ceo' } });
+
+        const createBtn = Array.from(container.querySelectorAll('button')).find((b) =>
+            b.textContent?.includes(`${T}.create`),
+        );
+        fireEvent.click(createBtn!);
+
+        await waitFor(() => {
+            expect(create).toHaveBeenCalled();
+            expect(updateAgentAction).toHaveBeenCalledWith('agent-9', {
+                reportsToAgentId: 'agent-ceo',
+            });
+            expect(addTeamMemberAction).toHaveBeenCalledWith('org-1', 'team-1', {
+                memberType: 'agent',
+                memberId: 'agent-9',
+            });
+            expect(routerPushMock).toHaveBeenCalled();
+        });
     });
 });

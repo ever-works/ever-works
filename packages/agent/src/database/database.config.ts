@@ -57,10 +57,14 @@ import {
     Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
+    Team,
+    TeamMember,
     Skill,
     SkillBinding,
     Task,
@@ -192,11 +196,16 @@ export const ENTITIES = [
     Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
+    // Teams & Prebuilt Companies (teams-and-companies spec §2)
+    Team,
+    TeamMember,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family

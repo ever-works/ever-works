@@ -316,6 +316,15 @@ export class UpdateAgentDto {
     @MaxLength(254)
     committerEmail?: string | null;
 
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: 'Direct manager Agent id for the Org Chart; null clears it',
+    })
+    @IsOptional()
+    @IsUUID()
+    reportsToAgentId?: string | null;
+
     // Agent Scorecards increment 1 — whole-array replace; null clears.
     @ApiProperty({ required: false, type: [AgentScorecardMetricDto] })
     @IsOptional()

@@ -128,6 +128,12 @@ export const ROUTES = {
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
+    // Teams & Prebuilt Companies (docs/specs/features/teams-and-companies §4)
+    DASHBOARD_TEAMS: '/teams',
+    DASHBOARD_TEAM_NEW: '/teams/new',
+    DASHBOARD_TEAM: (id: string) => `/teams/${id}`,
+    DASHBOARD_TEAM_SETTINGS: (id: string) => `/teams/${id}/settings`,
+    DASHBOARD_ORG_CHART: '/teams/org-chart',
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aprovações de ações",
+                "subtitle": "Seus agentes propuseram estas ações com efeitos colaterais. Aprove ou rejeite cada uma."
+            },
+            "actions": {
+                "approve": "Aprovar",
+                "reject": "Rejeitar",
+                "approveAll": "Aprovar todas"
+            },
+            "actionType": {
+                "spawn_agent": "Criar agente",
+                "schedule_task": "Agendar tarefa",
+                "send_message": "Enviar mensagem",
+                "budget_override": "Substituição de orçamento",
+                "other": "Ação"
+            },
+            "riskFlags": {
+                "budget_override": "Substituição de orçamento",
+                "destructive": "Destrutiva",
+                "cross_scope": "Entre escopos",
+                "high_fanout": "Alta ramificação"
+            },
+            "toast": {
+                "approved": "Ação aprovada",
+                "rejected": "Ação rejeitada",
+                "bulkApproved": "{count} ações aprovadas",
+                "bulkApprovedSkipped": "{approved} ações aprovadas, {skipped} já decididas",
+                "error": "Algo deu errado. Tente novamente."
+            }
+        },
         "title": "Painel",
         "connectGithub": {
             "title": "Conecte sua conta do GitHub",
@@ -638,7 +669,22 @@
                 "cancel": "Cancelar",
                 "back": "Voltar",
                 "next": "Próximo",
-                "create": "Criar Agente"
+                "create": "Criar Agente",
+                "teamLabel": "Equipe",
+                "teamNone": "Sem equipe",
+                "reportsToLabel": "Reporta-se a",
+                "reportsToNone": "Sem gerente"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organização",
+                    "teamLabel": "Equipe",
+                    "teamNone": "Sem equipe",
+                    "reportsToLabel": "Reporta-se a",
+                    "reportsToNone": "Sem gerente",
+                    "save": "Salvar",
+                    "saving": "Salvando…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4301,8 @@
                 "plugins": "Plugins",
                 "skills": "Habilidades",
                 "templates": "Modelos",
-                "settings": "Configurações"
+                "settings": "Configurações",
+                "teams": "Equipes"
             },
             "tooltips": {
                 "expandSidebar": "Expandir barra lateral",
@@ -4819,6 +4866,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Equipes",
+            "subtitle": "Organize seus Agentes e membros em equipes dentro desta organização.",
+            "orgChartCta": "Organograma",
+            "newTeamCta": "Nova equipe",
+            "empty": {
+                "title": "Nenhuma equipe ainda",
+                "description": "Crie sua primeira equipe para agrupar Agentes e membros e depois organize-os no organograma.",
+                "cta": "Criar uma equipe"
+            },
+            "noOrg": {
+                "title": "Equipes existem dentro de uma organização",
+                "description": "Crie uma organização primeiro — depois você poderá agrupar seus Agentes e membros em equipes.",
+                "cta": "Criar organização"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agente} other {# agentes}}",
+                "members": "{count, plural, one {# membro} other {# membros}}",
+                "subTeams": "{count, plural, one {# subequipe} other {# subequipes}}"
+            },
+            "newDialog": {
+                "title": "Nova equipe",
+                "nameLabel": "Nome",
+                "namePlaceholder": "ex.: Engenharia",
+                "descriptionLabel": "Descrição",
+                "descriptionPlaceholder": "Pelo que esta equipe é responsável (opcional)",
+                "parentLabel": "Equipe superior",
+                "parentNone": "Sem equipe superior (nível principal)",
+                "managerLabel": "Agente gerente",
+                "managerNone": "Sem gerente",
+                "submit": "Criar equipe",
+                "creating": "Criando…",
+                "cancel": "Cancelar"
+            },
+            "detail": {
+                "overviewTab": "Visão geral",
+                "settingsTab": "Configurações",
+                "rosterTitle": "Integrantes",
+                "subTeamsTitle": "Subequipes",
+                "managerLabel": "Gerente",
+                "parentLabel": "Equipe superior",
+                "addMemberCta": "Adicionar membro",
+                "addMemberTypeLabel": "Tipo",
+                "addMemberAgent": "Agente",
+                "addMemberUser": "Membro",
+                "addMemberSelectLabel": "Quem",
+                "addMemberSubmit": "Adicionar",
+                "adding": "Adicionando…",
+                "removeMember": "Remover",
+                "roleLead": "Líder",
+                "roleMember": "Membro",
+                "emptyRoster": "Nenhum membro ainda — adicione Agentes ou colegas a esta equipe."
+            },
+            "settings": {
+                "title": "Configurações da equipe",
+                "nameLabel": "Nome",
+                "descriptionLabel": "Descrição",
+                "parentLabel": "Equipe superior",
+                "managerLabel": "Agente gerente",
+                "save": "Salvar alterações",
+                "saving": "Salvando…",
+                "saved": "Equipe atualizada",
+                "deleteTitle": "Zona de perigo",
+                "deleteDescription": "Excluir uma equipe move suas subequipes para o nível superior e remove sua lista de integrantes. Agentes e membros não são excluídos.",
+                "deleteCta": "Excluir equipe",
+                "deleteConfirm": "Excluir esta equipe? As subequipes sobem um nível; Agentes e membros são mantidos.",
+                "deleting": "Excluindo…"
+            },
+            "errors": {
+                "createFailed": "Não foi possível criar a equipe",
+                "updateFailed": "Não foi possível atualizar a equipe",
+                "deleteFailed": "Não foi possível excluir a equipe",
+                "memberAddFailed": "Não foi possível adicionar o membro",
+                "memberRemoveFailed": "Não foi possível remover o membro"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organograma",
+            "subtitle": "Equipes, Agentes e membros desta organização.",
+            "backToTeams": "Equipes",
+            "zoomIn": "Ampliar",
+            "zoomOut": "Reduzir",
+            "fitView": "Ajustar",
+            "unassignedGroup": "Não atribuídos",
+            "membersBadge": "{count, plural, one {# membro} other {# membros}}",
+            "empty": "Nada para exibir ainda — crie equipes ou Agentes nesta organização primeiro.",
+            "noOrg": "Crie uma organização para ver seu organograma."
+        },
         "schedules": {
             "title": "Agendamentos",
             "subtitle": "Tudo o que está agendado para ser executado em seus trabalhos, agentes, Missions e tarefas",
@@ -5163,6 +5298,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Ponto de partida",
+                "blankTitle": "Organização em branco",
+                "blankDescription": "Comece do zero — adicione equipes e agentes depois.",
+                "meta": "{agents, plural, one {# agente} other {# agentes}} · {teams, plural, one {# equipe} other {# equipes}}",
+                "submitImport": "Criar a partir do modelo",
+                "importError": "Não foi possível criar a organização a partir deste modelo"
             }
         },
         "upgrade": {

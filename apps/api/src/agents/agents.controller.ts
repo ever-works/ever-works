@@ -220,6 +220,7 @@ export class AgentsController {
             avatarImageUploadId: body.avatarImageUploadId,
             committerName: body.committerName,
             committerEmail: body.committerEmail,
+            reportsToAgentId: body.reportsToAgentId,
             scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
         });
     }

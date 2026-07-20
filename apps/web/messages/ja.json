@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "アクション承認",
+                "subtitle": "エージェントが副作用を伴うアクションを提案しました。それぞれ承認または却下してください。"
+            },
+            "actions": {
+                "approve": "承認",
+                "reject": "却下",
+                "approveAll": "すべて承認"
+            },
+            "actionType": {
+                "spawn_agent": "エージェントの起動",
+                "schedule_task": "タスクのスケジュール",
+                "send_message": "メッセージ送信",
+                "budget_override": "予算の上書き",
+                "other": "アクション"
+            },
+            "riskFlags": {
+                "budget_override": "予算の上書き",
+                "destructive": "破壊的",
+                "cross_scope": "スコープ横断",
+                "high_fanout": "高ファンアウト"
+            },
+            "toast": {
+                "approved": "アクションを承認しました",
+                "rejected": "アクションを却下しました",
+                "bulkApproved": "{count} 件のアクションを承認しました",
+                "bulkApprovedSkipped": "{approved} 件のアクションを承認、{skipped} 件は決定済み",
+                "error": "問題が発生しました。もう一度お試しください。"
+            }
+        },
         "title": "ダッシュボード",
         "connectGithub": {
             "title": "GitHub アカウントを接続",
@@ -561,6 +592,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "検索",
+                "searchPlaceholder": "タイトルまたは説明",
+                "anyStatus": "すべてのステータス",
+                "apply": "適用",
+                "reset": "リセット",
+                "status": "ステータス"
             }
         },
         "memoryPage": {
@@ -638,7 +677,22 @@
                 "cancel": "キャンセル",
                 "back": "戻る",
                 "next": "次へ",
-                "create": "エージェントを作成"
+                "create": "エージェントを作成",
+                "teamLabel": "チーム",
+                "teamNone": "チームなし",
+                "reportsToLabel": "報告先",
+                "reportsToNone": "マネージャーなし"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "組織",
+                    "teamLabel": "チーム",
+                    "teamNone": "チームなし",
+                    "reportsToLabel": "報告先",
+                    "reportsToNone": "マネージャーなし",
+                    "save": "保存",
+                    "saving": "保存中…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4309,8 @@
                 "plugins": "プラグイン",
                 "skills": "スキル",
                 "templates": "テンプレート",
-                "settings": "設定"
+                "settings": "設定",
+                "teams": "チーム"
             },
             "tooltips": {
                 "expandSidebar": "サイドバーを展開",
@@ -4819,6 +4874,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "チーム",
+            "subtitle": "この組織内でエージェントとメンバーをチームに編成しましょう。",
+            "orgChartCta": "組織図",
+            "newTeamCta": "新しいチーム",
+            "empty": {
+                "title": "チームはまだありません",
+                "description": "最初のチームを作成してエージェントとメンバーをグループ化し、組織図上に配置しましょう。",
+                "cta": "チームを作成"
+            },
+            "noOrg": {
+                "title": "チームは組織の中に存在します",
+                "description": "まず組織を作成してください。その後、組織のエージェントとメンバーをチームにまとめられます。",
+                "cta": "組織を作成"
+            },
+            "card": {
+                "agents": "{count, plural, other {# エージェント}}",
+                "members": "{count, plural, other {# メンバー}}",
+                "subTeams": "{count, plural, other {# サブチーム}}"
+            },
+            "newDialog": {
+                "title": "新しいチーム",
+                "nameLabel": "名前",
+                "namePlaceholder": "例: エンジニアリング",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "このチームの担当領域（任意）",
+                "parentLabel": "親チーム",
+                "parentNone": "親チームなし（最上位）",
+                "managerLabel": "マネージャーエージェント",
+                "managerNone": "マネージャーなし",
+                "submit": "チームを作成",
+                "creating": "作成中…",
+                "cancel": "キャンセル"
+            },
+            "detail": {
+                "overviewTab": "概要",
+                "settingsTab": "設定",
+                "rosterTitle": "メンバー一覧",
+                "subTeamsTitle": "サブチーム",
+                "managerLabel": "マネージャー",
+                "parentLabel": "親チーム",
+                "addMemberCta": "メンバーを追加",
+                "addMemberTypeLabel": "種類",
+                "addMemberAgent": "エージェント",
+                "addMemberUser": "メンバー",
+                "addMemberSelectLabel": "対象",
+                "addMemberSubmit": "追加",
+                "adding": "追加中…",
+                "removeMember": "削除",
+                "roleLead": "リード",
+                "roleMember": "メンバー",
+                "emptyRoster": "メンバーはまだいません。このチームにエージェントや同僚を追加しましょう。"
+            },
+            "settings": {
+                "title": "チーム設定",
+                "nameLabel": "名前",
+                "descriptionLabel": "説明",
+                "parentLabel": "親チーム",
+                "managerLabel": "マネージャーエージェント",
+                "save": "変更を保存",
+                "saving": "保存中…",
+                "saved": "チームを更新しました",
+                "deleteTitle": "危険な操作",
+                "deleteDescription": "チームを削除すると、サブチームは1つ上の階層に移動し、メンバー一覧は削除されます。エージェントとメンバー自体は削除されません。",
+                "deleteCta": "チームを削除",
+                "deleteConfirm": "このチームを削除しますか？サブチームは1つ上の階層に移動し、エージェントとメンバーは保持されます。",
+                "deleting": "削除中…"
+            },
+            "errors": {
+                "createFailed": "チームを作成できませんでした",
+                "updateFailed": "チームを更新できませんでした",
+                "deleteFailed": "チームを削除できませんでした",
+                "memberAddFailed": "メンバーを追加できませんでした",
+                "memberRemoveFailed": "メンバーを削除できませんでした"
+            }
+        },
+        "orgChartPage": {
+            "title": "組織図",
+            "subtitle": "この組織のチーム、エージェント、メンバー。",
+            "backToTeams": "チーム",
+            "zoomIn": "拡大",
+            "zoomOut": "縮小",
+            "fitView": "全体表示",
+            "unassignedGroup": "未所属",
+            "membersBadge": "{count, plural, other {# メンバー}}",
+            "empty": "まだ表示できるものがありません。まずこの組織にチームやエージェントを作成してください。",
+            "noOrg": "組織を作成すると組織図が表示されます。"
+        },
         "schedules": {
             "title": "スケジュール",
             "subtitle": "ワーク、エージェント、Missions、タスク全体で実行が予定されているすべて",
@@ -5163,6 +5306,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "開始方法",
+                "blankTitle": "空の組織",
+                "blankDescription": "空の状態から始めて、チームやエージェントは後で追加します。",
+                "meta": "{agents, plural, other {# エージェント}} · {teams, plural, other {# チーム}}",
+                "submitImport": "テンプレートから作成",
+                "importError": "このテンプレートから組織を作成できませんでした"
             }
         },
         "upgrade": {

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "אישורי פעולות",
+                "subtitle": "הסוכנים שלך הציעו פעולות אלו בעלות תופעות לוואי. אשר או דחה כל אחת מהן."
+            },
+            "actions": {
+                "approve": "אישור",
+                "reject": "דחייה",
+                "approveAll": "אשר הכול"
+            },
+            "actionType": {
+                "spawn_agent": "יצירת סוכן",
+                "schedule_task": "תזמון משימה",
+                "send_message": "שליחת הודעה",
+                "budget_override": "חריגה מתקציב",
+                "other": "פעולה"
+            },
+            "riskFlags": {
+                "budget_override": "חריגה מתקציב",
+                "destructive": "הרסנית",
+                "cross_scope": "חוצת תחומים",
+                "high_fanout": "התפצלות גבוהה"
+            },
+            "toast": {
+                "approved": "הפעולה אושרה",
+                "rejected": "הפעולה נדחתה",
+                "bulkApproved": "אושרו {count} פעולות",
+                "bulkApprovedSkipped": "אושרו {approved} פעולות, {skipped} כבר הוכרעו",
+                "error": "משהו השתבש. נסה שוב."
+            }
+        },
         "title": "לוח מחוונים",
         "connectGithub": {
             "title": "חבר את חשבון GitHub שלך",
@@ -695,7 +726,11 @@
                 "templateStepTitle": "התחל מתבנית (אופציונלי)",
                 "startFromScratch": "התחל מאפס",
                 "pickParentHint": "בחר {scope} למעלה כדי להמשיך, או בחר טווח סביבת עבודה.",
-                "nextDisabledReason": "בחר ייחוס או בחר טווח סביבת עבודה כדי להמשיך."
+                "nextDisabledReason": "בחר ייחוס או בחר טווח סביבת עבודה כדי להמשיך.",
+                "teamLabel": "צוות",
+                "teamNone": "ללא צוות",
+                "reportsToLabel": "כפוף ל־",
+                "reportsToNone": "ללא מנהל"
             },
             "orDivider": "או",
             "createManually": "צור סוכן ידנית",
@@ -713,6 +748,17 @@
                 "yourTemplates": "התבניות שלך",
                 "yourTemplatesEmpty": "הסוכנים שאתה יוצר יופיעו כאן כתבניות חוזרות.",
                 "openInWizard": "פתח באשף"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "ארגון",
+                    "teamLabel": "צוות",
+                    "teamNone": "ללא צוות",
+                    "reportsToLabel": "כפוף ל־",
+                    "reportsToNone": "ללא מנהל",
+                    "save": "שמור",
+                    "saving": "שומר…"
+                }
             }
         },
         "tasksPage": {
@@ -4487,7 +4533,8 @@
                 "plugins": "תוספים",
                 "skills": "מיומנויות",
                 "templates": "תבניות",
-                "settings": "הגדרות"
+                "settings": "הגדרות",
+                "teams": "צוותים"
             },
             "tooltips": {
                 "expandSidebar": "הרחב צד",
@@ -5046,6 +5093,94 @@
             "toggleError": "נכשל בשינוי מצב התוסף",
             "system": "מערכת",
             "goToPluginSettings": "עבור להגדרות התוסף"
+        },
+        "teamsPage": {
+            "title": "צוותים",
+            "subtitle": "ארגן את הסוכנים והחברים שלך בצוותים בתוך הארגון הזה.",
+            "orgChartCta": "מבנה ארגוני",
+            "newTeamCta": "צוות חדש",
+            "empty": {
+                "title": "אין צוותים עדיין",
+                "description": "צור את הצוות הראשון שלך כדי לקבץ סוכנים וחברים, ואז סדר אותם במבנה הארגוני.",
+                "cta": "צור צוות"
+            },
+            "noOrg": {
+                "title": "צוותים קיימים בתוך ארגון",
+                "description": "צור קודם ארגון — לאחר מכן תוכל לקבץ את הסוכנים והחברים שלו בצוותים.",
+                "cta": "צור ארגון"
+            },
+            "card": {
+                "agents": "{count, plural, one {סוכן אחד} two {שני סוכנים} many {# סוכנים} other {# סוכנים}}",
+                "members": "{count, plural, one {חבר אחד} two {שני חברים} many {# חברים} other {# חברים}}",
+                "subTeams": "{count, plural, one {תת-צוות אחד} two {שני תתי-צוותים} many {# תתי-צוותים} other {# תתי-צוותים}}"
+            },
+            "newDialog": {
+                "title": "צוות חדש",
+                "nameLabel": "שם",
+                "namePlaceholder": "לדוגמה: הנדסה",
+                "descriptionLabel": "תיאור",
+                "descriptionPlaceholder": "על מה הצוות הזה אחראי (אופציונלי)",
+                "parentLabel": "צוות אב",
+                "parentNone": "ללא צוות אב (רמה עליונה)",
+                "managerLabel": "סוכן מנהל",
+                "managerNone": "ללא מנהל",
+                "submit": "צור צוות",
+                "creating": "יוצר…",
+                "cancel": "בטל"
+            },
+            "detail": {
+                "overviewTab": "סקירה",
+                "settingsTab": "הגדרות",
+                "rosterTitle": "הרכב הצוות",
+                "subTeamsTitle": "תתי-צוותים",
+                "managerLabel": "מנהל",
+                "parentLabel": "צוות אב",
+                "addMemberCta": "הוסף חבר",
+                "addMemberTypeLabel": "סוג",
+                "addMemberAgent": "סוכן",
+                "addMemberUser": "חבר",
+                "addMemberSelectLabel": "מי",
+                "addMemberSubmit": "הוסף",
+                "adding": "מוסיף…",
+                "removeMember": "הסר",
+                "roleLead": "מוביל",
+                "roleMember": "חבר",
+                "emptyRoster": "אין חברים עדיין — הוסף סוכנים או עמיתים לצוות הזה."
+            },
+            "settings": {
+                "title": "הגדרות צוות",
+                "nameLabel": "שם",
+                "descriptionLabel": "תיאור",
+                "parentLabel": "צוות אב",
+                "managerLabel": "סוכן מנהל",
+                "save": "שמור שינויים",
+                "saving": "שומר…",
+                "saved": "הצוות עודכן",
+                "deleteTitle": "אזור סכנה",
+                "deleteDescription": "מחיקת צוות מעבירה את תתי-הצוותים שלו רמה אחת למעלה ומסירה את הרכב הצוות. סוכנים וחברים אינם נמחקים.",
+                "deleteCta": "מחק צוות",
+                "deleteConfirm": "למחוק את הצוות הזה? תתי-הצוותים יעלו רמה אחת; הסוכנים והחברים יישמרו.",
+                "deleting": "מוחק…"
+            },
+            "errors": {
+                "createFailed": "לא ניתן היה ליצור את הצוות",
+                "updateFailed": "לא ניתן היה לעדכן את הצוות",
+                "deleteFailed": "לא ניתן היה למחוק את הצוות",
+                "memberAddFailed": "לא ניתן היה להוסיף את החבר",
+                "memberRemoveFailed": "לא ניתן היה להסיר את החבר"
+            }
+        },
+        "orgChartPage": {
+            "title": "מבנה ארגוני",
+            "subtitle": "הצוותים, הסוכנים והחברים של הארגון הזה.",
+            "backToTeams": "צוותים",
+            "zoomIn": "התקרב",
+            "zoomOut": "התרחק",
+            "fitView": "התאמה",
+            "unassignedGroup": "לא משויכים",
+            "membersBadge": "{count, plural, one {חבר אחד} two {שני חברים} many {# חברים} other {# חברים}}",
+            "empty": "אין עדיין מה להציג — צור קודם צוותים או סוכנים בארגון הזה.",
+            "noOrg": "צור ארגון כדי לראות את המבנה הארגוני שלו."
         }
     },
     "layout": {
@@ -5359,6 +5494,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "נקודת התחלה",
+                "blankTitle": "ארגון ריק",
+                "blankDescription": "התחל ריק — הוסף צוותים וסוכנים מאוחר יותר.",
+                "meta": "{agents, plural, one {סוכן אחד} two {שני סוכנים} many {# סוכנים} other {# סוכנים}} · {teams, plural, one {צוות אחד} two {שני צוותים} many {# צוותים} other {# צוותים}}",
+                "submitImport": "צור מתבנית",
+                "importError": "לא ניתן היה ליצור את הארגון מהתבנית הזו"
             }
         },
         "upgrade": {

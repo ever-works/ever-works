@@ -54,6 +54,8 @@ export * from './kb-types';
 export * from './types';
 // Agents/Skills/Tasks (PR #1017 specs)
 export * from './agent.entity';
+// Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+export * from './agent-action-proposal.entity';
 export * from './agent-run.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
@@ -105,3 +107,7 @@ export * from './tenant-runtime-provider-allowlist.entity';
 // EW-742 P1 T11 follow-up — per-version credential snapshot history
 // (graceful drain per ADR-017 §3 Q4)
 export * from './tenant-credential-snapshot.entity';
+
+// Teams & Prebuilt Companies (docs/specs/features/teams-and-companies)
+export * from './team.entity';
+export * from './team-member.entity';

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aktionsfreigaben",
+                "subtitle": "Ihre Agenten haben diese Aktionen mit Nebenwirkungen vorgeschlagen. Genehmigen oder lehnen Sie jede einzelne ab."
+            },
+            "actions": {
+                "approve": "Genehmigen",
+                "reject": "Ablehnen",
+                "approveAll": "Alle genehmigen"
+            },
+            "actionType": {
+                "spawn_agent": "Agent erstellen",
+                "schedule_task": "Aufgabe planen",
+                "send_message": "Nachricht senden",
+                "budget_override": "Budgetüberschreibung",
+                "other": "Aktion"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetüberschreibung",
+                "destructive": "Destruktiv",
+                "cross_scope": "Bereichsübergreifend",
+                "high_fanout": "Hohe Verzweigung"
+            },
+            "toast": {
+                "approved": "Aktion genehmigt",
+                "rejected": "Aktion abgelehnt",
+                "bulkApproved": "{count} Aktionen genehmigt",
+                "bulkApprovedSkipped": "{approved} Aktionen genehmigt, {skipped} bereits entschieden",
+                "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+            }
+        },
         "title": "Übersicht",
         "connectGithub": {
             "title": "Verbinden Sie Ihr GitHub-Konto",
@@ -695,7 +726,11 @@
                 "templateStepTitle": "Von einer Vorlage aus starten (optional)",
                 "startFromScratch": "Von Grundlage starten",
                 "pickParentHint": "Wählen Sie ein {scope} oben aus, um fortzufahren, oder wählen Sie den Arbeitsbereich.",
-                "nextDisabledReason": "Wählen Sie ein übergeordnetes Element oder wählen Sie den Arbeitsbereich aus, um fortzufahren."
+                "nextDisabledReason": "Wählen Sie ein übergeordnetes Element oder wählen Sie den Arbeitsbereich aus, um fortzufahren.",
+                "teamLabel": "Team",
+                "teamNone": "Kein Team",
+                "reportsToLabel": "Berichtet an",
+                "reportsToNone": "Kein Manager"
             },
             "orDivider": "Oder",
             "createManually": "Agent manuell erstellen",
@@ -713,6 +748,17 @@
                 "yourTemplates": "Ihre Vorlagen",
                 "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
                 "openInWizard": "Assistent öffnen"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organisation",
+                    "teamLabel": "Team",
+                    "teamNone": "Kein Team",
+                    "reportsToLabel": "Berichtet an",
+                    "reportsToNone": "Kein Manager",
+                    "save": "Speichern",
+                    "saving": "Wird gespeichert…"
+                }
             }
         },
         "tasksPage": {
@@ -4487,7 +4533,8 @@
                 "plugins": "Plugins",
                 "skills": "Fähigkeiten",
                 "templates": "Vorlagen",
-                "settings": "Einstellungen"
+                "settings": "Einstellungen",
+                "teams": "Teams"
             },
             "tooltips": {
                 "expandSidebar": "Sidebar erweitern",
@@ -5046,6 +5093,94 @@
             "toggleError": "Plugin konnte nicht umgeschaltet werden",
             "system": "System",
             "goToPluginSettings": "Zu Plugin-Einstellungen"
+        },
+        "teamsPage": {
+            "title": "Teams",
+            "subtitle": "Organisieren Sie Ihre Agenten und Mitglieder in Teams innerhalb dieser Organisation.",
+            "orgChartCta": "Organigramm",
+            "newTeamCta": "Neues Team",
+            "empty": {
+                "title": "Noch keine Teams",
+                "description": "Erstellen Sie Ihr erstes Team, um Agenten und Mitglieder zu gruppieren, und ordnen Sie sie anschließend im Organigramm an.",
+                "cta": "Team erstellen"
+            },
+            "noOrg": {
+                "title": "Teams gehören zu einer Organisation",
+                "description": "Erstellen Sie zuerst eine Organisation – danach können Sie deren Agenten und Mitglieder in Teams gruppieren.",
+                "cta": "Organisation erstellen"
+            },
+            "card": {
+                "agents": "{count, plural, one {# Agent} other {# Agenten}}",
+                "members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+                "subTeams": "{count, plural, one {# Unterteam} other {# Unterteams}}"
+            },
+            "newDialog": {
+                "title": "Neues Team",
+                "nameLabel": "Name",
+                "namePlaceholder": "z. B. Engineering",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Wofür dieses Team zuständig ist (optional)",
+                "parentLabel": "Übergeordnetes Team",
+                "parentNone": "Kein übergeordnetes Team (oberste Ebene)",
+                "managerLabel": "Manager-Agent",
+                "managerNone": "Kein Manager",
+                "submit": "Team erstellen",
+                "creating": "Wird erstellt…",
+                "cancel": "Abbrechen"
+            },
+            "detail": {
+                "overviewTab": "Übersicht",
+                "settingsTab": "Einstellungen",
+                "rosterTitle": "Mitgliederliste",
+                "subTeamsTitle": "Unterteams",
+                "managerLabel": "Manager",
+                "parentLabel": "Übergeordnetes Team",
+                "addMemberCta": "Mitglied hinzufügen",
+                "addMemberTypeLabel": "Typ",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Mitglied",
+                "addMemberSelectLabel": "Wer",
+                "addMemberSubmit": "Hinzufügen",
+                "adding": "Wird hinzugefügt…",
+                "removeMember": "Entfernen",
+                "roleLead": "Leitung",
+                "roleMember": "Mitglied",
+                "emptyRoster": "Noch keine Mitglieder – fügen Sie diesem Team Agenten oder Teamkollegen hinzu."
+            },
+            "settings": {
+                "title": "Team-Einstellungen",
+                "nameLabel": "Name",
+                "descriptionLabel": "Beschreibung",
+                "parentLabel": "Übergeordnetes Team",
+                "managerLabel": "Manager-Agent",
+                "save": "Änderungen speichern",
+                "saving": "Wird gespeichert…",
+                "saved": "Team aktualisiert",
+                "deleteTitle": "Gefahrenzone",
+                "deleteDescription": "Beim Löschen eines Teams werden seine Unterteams eine Ebene nach oben verschoben und seine Mitgliederliste entfernt. Agenten und Mitglieder werden nicht gelöscht.",
+                "deleteCta": "Team löschen",
+                "deleteConfirm": "Dieses Team löschen? Unterteams rücken eine Ebene nach oben; Agenten und Mitglieder bleiben erhalten.",
+                "deleting": "Wird gelöscht…"
+            },
+            "errors": {
+                "createFailed": "Team konnte nicht erstellt werden",
+                "updateFailed": "Team konnte nicht aktualisiert werden",
+                "deleteFailed": "Team konnte nicht gelöscht werden",
+                "memberAddFailed": "Mitglied konnte nicht hinzugefügt werden",
+                "memberRemoveFailed": "Mitglied konnte nicht entfernt werden"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organigramm",
+            "subtitle": "Teams, Agenten und Mitglieder dieser Organisation.",
+            "backToTeams": "Teams",
+            "zoomIn": "Vergrößern",
+            "zoomOut": "Verkleinern",
+            "fitView": "Einpassen",
+            "unassignedGroup": "Nicht zugewiesen",
+            "membersBadge": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+            "empty": "Noch nichts darzustellen – erstellen Sie zuerst Teams oder Agenten in dieser Organisation.",
+            "noOrg": "Erstellen Sie eine Organisation, um ihr Organigramm zu sehen."
         }
     },
     "layout": {
@@ -5359,6 +5494,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Ausgangspunkt",
+                "blankTitle": "Leere Organisation",
+                "blankDescription": "Leer starten – Teams und Agenten später hinzufügen.",
+                "meta": "{agents, plural, one {# Agent} other {# Agenten}} · {teams, plural, one {# Team} other {# Teams}}",
+                "submitImport": "Aus Vorlage erstellen",
+                "importError": "Die Organisation konnte aus dieser Vorlage nicht erstellt werden"
             }
         },
         "upgrade": {

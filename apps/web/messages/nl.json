@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Actie-goedkeuringen",
+                "subtitle": "Je agents hebben deze acties met bijwerkingen voorgesteld. Keur elke actie goed of wijs deze af."
+            },
+            "actions": {
+                "approve": "Goedkeuren",
+                "reject": "Afwijzen",
+                "approveAll": "Alles goedkeuren"
+            },
+            "actionType": {
+                "spawn_agent": "Agent aanmaken",
+                "schedule_task": "Taak inplannen",
+                "send_message": "Bericht versturen",
+                "budget_override": "Budgetoverschrijving",
+                "other": "Actie"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetoverschrijving",
+                "destructive": "Destructief",
+                "cross_scope": "Scope-overschrijdend",
+                "high_fanout": "Hoge fan-out"
+            },
+            "toast": {
+                "approved": "Actie goedgekeurd",
+                "rejected": "Actie afgewezen",
+                "bulkApproved": "{count} acties goedgekeurd",
+                "bulkApprovedSkipped": "{approved} acties goedgekeurd, {skipped} al beslist",
+                "error": "Er is iets misgegaan. Probeer het opnieuw."
+            }
+        },
         "title": "Dashboard",
         "connectGithub": {
             "title": "Verbind je GitHub-account",
@@ -561,6 +592,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "Zoeken",
+                "searchPlaceholder": "Titel of beschrijving",
+                "anyStatus": "Elke status",
+                "apply": "Toepassen",
+                "reset": "Resetten",
+                "status": "Status"
             }
         },
         "memoryPage": {
@@ -638,7 +677,22 @@
                 "cancel": "Annuleren",
                 "back": "Terug",
                 "next": "Volgende",
-                "create": "Maak Agent"
+                "create": "Maak Agent",
+                "teamLabel": "Team",
+                "teamNone": "Geen team",
+                "reportsToLabel": "Rapporteert aan",
+                "reportsToNone": "Geen manager"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organisatie",
+                    "teamLabel": "Team",
+                    "teamNone": "Geen team",
+                    "reportsToLabel": "Rapporteert aan",
+                    "reportsToNone": "Geen manager",
+                    "save": "Opslaan",
+                    "saving": "Opslaan…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4309,8 @@
                 "plugins": "Plugins",
                 "skills": "Vaardigheden",
                 "templates": "Sjablonen",
-                "settings": "Instellingen"
+                "settings": "Instellingen",
+                "teams": "Teams"
             },
             "tooltips": {
                 "expandSidebar": "Zijbalk uitklappen",
@@ -4819,6 +4874,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Teams",
+            "subtitle": "Organiseer je Agenten en leden in teams binnen deze organisatie.",
+            "orgChartCta": "Organogram",
+            "newTeamCta": "Nieuw team",
+            "empty": {
+                "title": "Nog geen teams",
+                "description": "Maak je eerste team aan om Agenten en leden te groeperen en orden ze vervolgens in het organogram.",
+                "cta": "Team aanmaken"
+            },
+            "noOrg": {
+                "title": "Teams horen bij een organisatie",
+                "description": "Maak eerst een organisatie aan — daarna kun je de Agenten en leden ervan in teams groeperen.",
+                "cta": "Organisatie aanmaken"
+            },
+            "card": {
+                "agents": "{count, plural, one {# agent} other {# agenten}}",
+                "members": "{count, plural, one {# lid} other {# leden}}",
+                "subTeams": "{count, plural, one {# subteam} other {# subteams}}"
+            },
+            "newDialog": {
+                "title": "Nieuw team",
+                "nameLabel": "Naam",
+                "namePlaceholder": "bijv. Engineering",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Waar dit team verantwoordelijk voor is (optioneel)",
+                "parentLabel": "Bovenliggend team",
+                "parentNone": "Geen bovenliggend team (hoogste niveau)",
+                "managerLabel": "Manager-agent",
+                "managerNone": "Geen manager",
+                "submit": "Team aanmaken",
+                "creating": "Aanmaken…",
+                "cancel": "Annuleren"
+            },
+            "detail": {
+                "overviewTab": "Overzicht",
+                "settingsTab": "Instellingen",
+                "rosterTitle": "Teamleden",
+                "subTeamsTitle": "Subteams",
+                "managerLabel": "Manager",
+                "parentLabel": "Bovenliggend team",
+                "addMemberCta": "Lid toevoegen",
+                "addMemberTypeLabel": "Type",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Lid",
+                "addMemberSelectLabel": "Wie",
+                "addMemberSubmit": "Toevoegen",
+                "adding": "Toevoegen…",
+                "removeMember": "Verwijderen",
+                "roleLead": "Lead",
+                "roleMember": "Lid",
+                "emptyRoster": "Nog geen leden — voeg Agenten of teamgenoten toe aan dit team."
+            },
+            "settings": {
+                "title": "Teaminstellingen",
+                "nameLabel": "Naam",
+                "descriptionLabel": "Beschrijving",
+                "parentLabel": "Bovenliggend team",
+                "managerLabel": "Manager-agent",
+                "save": "Wijzigingen opslaan",
+                "saving": "Opslaan…",
+                "saved": "Team bijgewerkt",
+                "deleteTitle": "Gevarenzone",
+                "deleteDescription": "Als je een team verwijdert, schuiven de subteams een niveau omhoog en wordt de ledenlijst verwijderd. Agenten en leden worden niet verwijderd.",
+                "deleteCta": "Team verwijderen",
+                "deleteConfirm": "Dit team verwijderen? Subteams schuiven één niveau omhoog; Agenten en leden blijven behouden.",
+                "deleting": "Verwijderen…"
+            },
+            "errors": {
+                "createFailed": "Kon het team niet aanmaken",
+                "updateFailed": "Kon het team niet bijwerken",
+                "deleteFailed": "Kon het team niet verwijderen",
+                "memberAddFailed": "Kon het lid niet toevoegen",
+                "memberRemoveFailed": "Kon het lid niet verwijderen"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organogram",
+            "subtitle": "Teams, Agenten en leden van deze organisatie.",
+            "backToTeams": "Teams",
+            "zoomIn": "Inzoomen",
+            "zoomOut": "Uitzoomen",
+            "fitView": "Passend maken",
+            "unassignedGroup": "Niet toegewezen",
+            "membersBadge": "{count, plural, one {# lid} other {# leden}}",
+            "empty": "Nog niets om weer te geven — maak eerst teams of Agenten aan in deze organisatie.",
+            "noOrg": "Maak een organisatie aan om het organogram te zien."
+        },
         "schedules": {
             "title": "Planningen",
             "subtitle": "Alles wat gepland staat om uit te voeren in je werken, agenten, Missions en taken",
@@ -5163,6 +5306,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Startpunt",
+                "blankTitle": "Lege organisatie",
+                "blankDescription": "Begin leeg — voeg later teams en agenten toe.",
+                "meta": "{agents, plural, one {# agent} other {# agenten}} · {teams, plural, one {# team} other {# teams}}",
+                "submitImport": "Aanmaken op basis van sjabloon",
+                "importError": "Kon de organisatie niet aanmaken op basis van dit sjabloon"
             }
         },
         "upgrade": {

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Одобрения на действия",
+                "subtitle": "Вашите агенти предложиха тези действия със странични ефекти. Одобрете или отхвърлете всяко от тях."
+            },
+            "actions": {
+                "approve": "Одобри",
+                "reject": "Отхвърли",
+                "approveAll": "Одобри всички"
+            },
+            "actionType": {
+                "spawn_agent": "Създаване на агент",
+                "schedule_task": "Планиране на задача",
+                "send_message": "Изпращане на съобщение",
+                "budget_override": "Надвишаване на бюджета",
+                "other": "Действие"
+            },
+            "riskFlags": {
+                "budget_override": "Надвишаване на бюджета",
+                "destructive": "Деструктивно",
+                "cross_scope": "Между обхвати",
+                "high_fanout": "Голямо разклоняване"
+            },
+            "toast": {
+                "approved": "Действието е одобрено",
+                "rejected": "Действието е отхвърлено",
+                "bulkApproved": "Одобрени {count} действия",
+                "bulkApprovedSkipped": "Одобрени {approved} действия, {skipped} вече решени",
+                "error": "Нещо се обърка. Моля, опитайте отново."
+            }
+        },
         "title": "Табло",
         "connectGithub": {
             "title": "Свържете GitHub акаунта си",
@@ -695,7 +726,11 @@
                 "templateStepTitle": "Започни от шаблон (по избор)",
                 "startFromScratch": "Започни от нулата",
                 "pickParentHint": "Избери {scope} по-горе, за да продължиш, или избери обхват на работното пространство.",
-                "nextDisabledReason": "Избери родител или избери обхват на работното пространство, за да продължиш."
+                "nextDisabledReason": "Избери родител или избери обхват на работното пространство, за да продължиш.",
+                "teamLabel": "Екип",
+                "teamNone": "Без екип",
+                "reportsToLabel": "Докладва на",
+                "reportsToNone": "Без мениджър"
             },
             "orDivider": "Или",
             "createManually": "Създай агент ръчно",
@@ -713,6 +748,17 @@
                 "yourTemplates": "Твоите шаблони",
                 "yourTemplatesEmpty": "Агентите, които създадеш, ще се появят тук като шаблони за многократна употреба.",
                 "openInWizard": "Отвори в помощник"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Организация",
+                    "teamLabel": "Екип",
+                    "teamNone": "Без екип",
+                    "reportsToLabel": "Докладва на",
+                    "reportsToNone": "Без мениджър",
+                    "save": "Запазване",
+                    "saving": "Запазване…"
+                }
             }
         },
         "tasksPage": {
@@ -4487,7 +4533,8 @@
                 "plugins": "Добавки",
                 "skills": "Умения",
                 "templates": "Шаблони",
-                "settings": "Настройки"
+                "settings": "Настройки",
+                "teams": "Екипи"
             },
             "tooltips": {
                 "expandSidebar": "Разшири страничното меню",
@@ -5046,6 +5093,94 @@
             "toggleError": "Грешка при превключване на плъгина",
             "system": "Система",
             "goToPluginSettings": "Отиди на настройки на плъгина"
+        },
+        "teamsPage": {
+            "title": "Екипи",
+            "subtitle": "Организирайте своите Агенти и членове в екипи в рамките на тази организация.",
+            "orgChartCta": "Организационна схема",
+            "newTeamCta": "Нов екип",
+            "empty": {
+                "title": "Все още няма екипи",
+                "description": "Създайте първия си екип, за да групирате Агенти и членове, след което ги подредете в организационната схема.",
+                "cta": "Създаване на екип"
+            },
+            "noOrg": {
+                "title": "Екипите съществуват в рамките на организация",
+                "description": "Първо създайте организация — след това можете да групирате нейните Агенти и членове в екипи.",
+                "cta": "Създаване на организация"
+            },
+            "card": {
+                "agents": "{count, plural, one {# агент} other {# агенти}}",
+                "members": "{count, plural, one {# член} other {# членове}}",
+                "subTeams": "{count, plural, one {# подекип} other {# подекипа}}"
+            },
+            "newDialog": {
+                "title": "Нов екип",
+                "nameLabel": "Име",
+                "namePlaceholder": "напр. Инженеринг",
+                "descriptionLabel": "Описание",
+                "descriptionPlaceholder": "За какво отговаря този екип (по избор)",
+                "parentLabel": "Родителски екип",
+                "parentNone": "Без родителски екип (най-горно ниво)",
+                "managerLabel": "Агент мениджър",
+                "managerNone": "Без мениджър",
+                "submit": "Създаване на екип",
+                "creating": "Създаване…",
+                "cancel": "Отказ"
+            },
+            "detail": {
+                "overviewTab": "Преглед",
+                "settingsTab": "Настройки",
+                "rosterTitle": "Състав",
+                "subTeamsTitle": "Подекипи",
+                "managerLabel": "Мениджър",
+                "parentLabel": "Родителски екип",
+                "addMemberCta": "Добавяне на член",
+                "addMemberTypeLabel": "Тип",
+                "addMemberAgent": "Агент",
+                "addMemberUser": "Член",
+                "addMemberSelectLabel": "Кой",
+                "addMemberSubmit": "Добавяне",
+                "adding": "Добавяне…",
+                "removeMember": "Премахване",
+                "roleLead": "Ръководител",
+                "roleMember": "Член",
+                "emptyRoster": "Все още няма членове — добавете Агенти или колеги към този екип."
+            },
+            "settings": {
+                "title": "Настройки на екипа",
+                "nameLabel": "Име",
+                "descriptionLabel": "Описание",
+                "parentLabel": "Родителски екип",
+                "managerLabel": "Агент мениджър",
+                "save": "Запазване на промените",
+                "saving": "Запазване…",
+                "saved": "Екипът е актуализиран",
+                "deleteTitle": "Опасна зона",
+                "deleteDescription": "Изтриването на екип премества подекипите му едно ниво нагоре и премахва състава му. Агентите и членовете не се изтриват.",
+                "deleteCta": "Изтриване на екипа",
+                "deleteConfirm": "Да се изтрие ли този екип? Подекипите се преместват едно ниво нагоре; Агентите и членовете се запазват.",
+                "deleting": "Изтриване…"
+            },
+            "errors": {
+                "createFailed": "Екипът не можа да бъде създаден",
+                "updateFailed": "Екипът не можа да бъде актуализиран",
+                "deleteFailed": "Екипът не можа да бъде изтрит",
+                "memberAddFailed": "Членът не можа да бъде добавен",
+                "memberRemoveFailed": "Членът не можа да бъде премахнат"
+            }
+        },
+        "orgChartPage": {
+            "title": "Организационна схема",
+            "subtitle": "Екипи, Агенти и членове на тази организация.",
+            "backToTeams": "Екипи",
+            "zoomIn": "Увеличаване",
+            "zoomOut": "Намаляване",
+            "fitView": "Побиране",
+            "unassignedGroup": "Неразпределени",
+            "membersBadge": "{count, plural, one {# член} other {# членове}}",
+            "empty": "Все още няма какво да се покаже — първо създайте екипи или Агенти в тази организация.",
+            "noOrg": "Създайте организация, за да видите нейната организационна схема."
         }
     },
     "layout": {
@@ -5359,6 +5494,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Започнете от",
+                "blankTitle": "Празна организация",
+                "blankDescription": "Започнете от нулата — добавете екипи и агенти по-късно.",
+                "meta": "{agents, plural, one {# агент} other {# агенти}} · {teams, plural, one {# екип} other {# екипа}}",
+                "submitImport": "Създаване от шаблон",
+                "importError": "Организацията не можа да бъде създадена от този шаблон"
             }
         },
         "upgrade": {

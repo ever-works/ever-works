@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Persetujuan tindakan",
+                "subtitle": "Agen Anda mengusulkan tindakan dengan efek samping berikut. Setujui atau tolak masing-masing."
+            },
+            "actions": {
+                "approve": "Setujui",
+                "reject": "Tolak",
+                "approveAll": "Setujui semua"
+            },
+            "actionType": {
+                "spawn_agent": "Buat agen",
+                "schedule_task": "Jadwalkan tugas",
+                "send_message": "Kirim pesan",
+                "budget_override": "Penggantian anggaran",
+                "other": "Tindakan"
+            },
+            "riskFlags": {
+                "budget_override": "Penggantian anggaran",
+                "destructive": "Destruktif",
+                "cross_scope": "Lintas lingkup",
+                "high_fanout": "Fan-out tinggi"
+            },
+            "toast": {
+                "approved": "Tindakan disetujui",
+                "rejected": "Tindakan ditolak",
+                "bulkApproved": "{count} tindakan disetujui",
+                "bulkApprovedSkipped": "{approved} tindakan disetujui, {skipped} sudah diputuskan",
+                "error": "Terjadi kesalahan. Silakan coba lagi."
+            }
+        },
         "title": "Dasbor",
         "connectGithub": {
             "title": "Hubungkan akun GitHub Anda",
@@ -638,7 +669,22 @@
                 "cancel": "Batal",
                 "back": "Kembali",
                 "next": "Lanjut",
-                "create": "Buat Agen"
+                "create": "Buat Agen",
+                "teamLabel": "Tim",
+                "teamNone": "Tanpa tim",
+                "reportsToLabel": "Melapor kepada",
+                "reportsToNone": "Tanpa manajer"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organisasi",
+                    "teamLabel": "Tim",
+                    "teamNone": "Tanpa tim",
+                    "reportsToLabel": "Melapor kepada",
+                    "reportsToNone": "Tanpa manajer",
+                    "save": "Simpan",
+                    "saving": "Menyimpan…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4301,8 @@
                 "plugins": "Plugin",
                 "skills": "Keterampilan",
                 "templates": "Template",
-                "settings": "Pengaturan"
+                "settings": "Pengaturan",
+                "teams": "Tim"
             },
             "tooltips": {
                 "expandSidebar": "Lebarkan bilah sisi",
@@ -4819,6 +4866,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Tim",
+            "subtitle": "Atur Agen dan anggota Anda ke dalam tim di dalam organisasi ini.",
+            "orgChartCta": "Bagan Organisasi",
+            "newTeamCta": "Tim Baru",
+            "empty": {
+                "title": "Belum ada tim",
+                "description": "Buat tim pertama Anda untuk mengelompokkan Agen dan anggota, lalu susun mereka di Bagan Organisasi.",
+                "cta": "Buat tim"
+            },
+            "noOrg": {
+                "title": "Tim berada di dalam organisasi",
+                "description": "Buat organisasi terlebih dahulu — setelah itu Anda dapat mengelompokkan Agen dan anggotanya ke dalam tim.",
+                "cta": "Buat Organisasi"
+            },
+            "card": {
+                "agents": "{count, plural, other {# agen}}",
+                "members": "{count, plural, other {# anggota}}",
+                "subTeams": "{count, plural, other {# sub-tim}}"
+            },
+            "newDialog": {
+                "title": "Tim Baru",
+                "nameLabel": "Nama",
+                "namePlaceholder": "mis. Teknik",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Tanggung jawab tim ini (opsional)",
+                "parentLabel": "Tim induk",
+                "parentNone": "Tanpa tim induk (tingkat teratas)",
+                "managerLabel": "Agen manajer",
+                "managerNone": "Tanpa manajer",
+                "submit": "Buat Tim",
+                "creating": "Membuat…",
+                "cancel": "Batal"
+            },
+            "detail": {
+                "overviewTab": "Ringkasan",
+                "settingsTab": "Pengaturan",
+                "rosterTitle": "Daftar anggota",
+                "subTeamsTitle": "Sub-tim",
+                "managerLabel": "Manajer",
+                "parentLabel": "Tim induk",
+                "addMemberCta": "Tambah anggota",
+                "addMemberTypeLabel": "Tipe",
+                "addMemberAgent": "Agen",
+                "addMemberUser": "Anggota",
+                "addMemberSelectLabel": "Siapa",
+                "addMemberSubmit": "Tambah",
+                "adding": "Menambahkan…",
+                "removeMember": "Hapus",
+                "roleLead": "Ketua",
+                "roleMember": "Anggota",
+                "emptyRoster": "Belum ada anggota — tambahkan Agen atau rekan kerja ke tim ini."
+            },
+            "settings": {
+                "title": "Pengaturan Tim",
+                "nameLabel": "Nama",
+                "descriptionLabel": "Deskripsi",
+                "parentLabel": "Tim induk",
+                "managerLabel": "Agen manajer",
+                "save": "Simpan perubahan",
+                "saving": "Menyimpan…",
+                "saved": "Tim diperbarui",
+                "deleteTitle": "Zona berbahaya",
+                "deleteDescription": "Menghapus tim akan memindahkan sub-timnya satu tingkat ke atas dan menghapus daftar anggotanya. Agen dan anggota tidak dihapus.",
+                "deleteCta": "Hapus tim",
+                "deleteConfirm": "Hapus tim ini? Sub-tim naik satu tingkat; Agen dan anggota tetap dipertahankan.",
+                "deleting": "Menghapus…"
+            },
+            "errors": {
+                "createFailed": "Tidak dapat membuat tim",
+                "updateFailed": "Tidak dapat memperbarui tim",
+                "deleteFailed": "Tidak dapat menghapus tim",
+                "memberAddFailed": "Tidak dapat menambahkan anggota",
+                "memberRemoveFailed": "Tidak dapat menghapus anggota"
+            }
+        },
+        "orgChartPage": {
+            "title": "Bagan Organisasi",
+            "subtitle": "Tim, Agen, dan anggota organisasi ini.",
+            "backToTeams": "Tim",
+            "zoomIn": "Perbesar",
+            "zoomOut": "Perkecil",
+            "fitView": "Sesuaikan",
+            "unassignedGroup": "Belum ditetapkan",
+            "membersBadge": "{count, plural, other {# anggota}}",
+            "empty": "Belum ada yang dapat ditampilkan — buat tim atau Agen di organisasi ini terlebih dahulu.",
+            "noOrg": "Buat organisasi untuk melihat Bagan Organisasinya."
+        },
         "schedules": {
             "title": "Jadwal",
             "subtitle": "Semua yang dijadwalkan untuk berjalan di seluruh karya, agen, Missions, dan tugas Anda",
@@ -5163,6 +5298,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Mulai dari",
+                "blankTitle": "Organisasi kosong",
+                "blankDescription": "Mulai dari kosong — tambahkan tim dan agen nanti.",
+                "meta": "{agents, plural, other {# agen}} · {teams, plural, other {# tim}}",
+                "submitImport": "Buat dari templat",
+                "importError": "Tidak dapat membuat organisasi dari templat ini"
             }
         },
         "upgrade": {

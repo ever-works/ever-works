@@ -39,6 +39,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
             canCallExternalTools: false,
         },
         targets: null,
+        reportsToAgentId: null,
         heartbeatCadence: null,
         idleBehavior: 'propose',
         nextHeartbeatAt: null,

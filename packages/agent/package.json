@@ -149,6 +149,10 @@
             "types": "./dist/agents/index.d.ts",
             "default": "./dist/agents/index.js"
         },
+        "./agent-approvals": {
+            "types": "./dist/agent-approvals/index.d.ts",
+            "default": "./dist/agent-approvals/index.js"
+        },
         "./skills": {
             "types": "./dist/skills/index.d.ts",
             "default": "./dist/skills/index.js"
@@ -160,6 +164,10 @@
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
+        },
+        "./teams": {
+            "types": "./dist/teams/index.d.ts",
+            "default": "./dist/teams/index.js"
         },
         "./schedules": {
             "types": "./dist/schedules/index.d.ts",

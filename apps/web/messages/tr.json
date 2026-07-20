@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Eylem onayları",
+                "subtitle": "Ajanlarınız yan etkili bu eylemleri önerdi. Her birini onaylayın veya reddedin."
+            },
+            "actions": {
+                "approve": "Onayla",
+                "reject": "Reddet",
+                "approveAll": "Tümünü onayla"
+            },
+            "actionType": {
+                "spawn_agent": "Ajan oluştur",
+                "schedule_task": "Görev zamanla",
+                "send_message": "Mesaj gönder",
+                "budget_override": "Bütçe aşımı",
+                "other": "Eylem"
+            },
+            "riskFlags": {
+                "budget_override": "Bütçe aşımı",
+                "destructive": "Yıkıcı",
+                "cross_scope": "Kapsamlar arası",
+                "high_fanout": "Yüksek dallanma"
+            },
+            "toast": {
+                "approved": "Eylem onaylandı",
+                "rejected": "Eylem reddedildi",
+                "bulkApproved": "{count} eylem onaylandı",
+                "bulkApprovedSkipped": "{approved} eylem onaylandı, {skipped} zaten karara bağlandı",
+                "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+            }
+        },
         "title": "Pano",
         "connectGithub": {
             "title": "GitHub hesabınızı bağlayın",
@@ -638,7 +669,22 @@
                 "cancel": "İptal",
                 "back": "Geri",
                 "next": "İleri",
-                "create": "Ajan Oluştur"
+                "create": "Ajan Oluştur",
+                "teamLabel": "Ekip",
+                "teamNone": "Ekip yok",
+                "reportsToLabel": "Bağlı olduğu yönetici",
+                "reportsToNone": "Yönetici yok"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organizasyon",
+                    "teamLabel": "Ekip",
+                    "teamNone": "Ekip yok",
+                    "reportsToLabel": "Bağlı olduğu yönetici",
+                    "reportsToNone": "Yönetici yok",
+                    "save": "Kaydet",
+                    "saving": "Kaydediliyor…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4301,8 @@
                 "plugins": "Eklentiler",
                 "skills": "Yetenekler",
                 "templates": "Şablonlar",
-                "settings": "Ayarlar"
+                "settings": "Ayarlar",
+                "teams": "Ekipler"
             },
             "tooltips": {
                 "expandSidebar": "Kenar çubuğunu genişlet",
@@ -4819,6 +4866,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Ekipler",
+            "subtitle": "Bu organizasyon içinde Ajanlarınızı ve üyelerinizi ekipler halinde düzenleyin.",
+            "orgChartCta": "Organizasyon Şeması",
+            "newTeamCta": "Yeni Ekip",
+            "empty": {
+                "title": "Henüz ekip yok",
+                "description": "Ajanları ve üyeleri gruplamak için ilk ekibinizi oluşturun, ardından onları organizasyon şemasında düzenleyin.",
+                "cta": "Ekip oluştur"
+            },
+            "noOrg": {
+                "title": "Ekipler bir organizasyona bağlıdır",
+                "description": "Önce bir organizasyon oluşturun — ardından Ajanlarını ve üyelerini ekipler halinde gruplayabilirsiniz.",
+                "cta": "Organizasyon Oluştur"
+            },
+            "card": {
+                "agents": "{count, plural, one {# ajan} other {# ajan}}",
+                "members": "{count, plural, one {# üye} other {# üye}}",
+                "subTeams": "{count, plural, one {# alt ekip} other {# alt ekip}}"
+            },
+            "newDialog": {
+                "title": "Yeni Ekip",
+                "nameLabel": "Ad",
+                "namePlaceholder": "örn. Mühendislik",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu ekibin sorumlu olduğu alan (isteğe bağlı)",
+                "parentLabel": "Üst ekip",
+                "parentNone": "Üst ekip yok (en üst düzey)",
+                "managerLabel": "Yönetici ajan",
+                "managerNone": "Yönetici yok",
+                "submit": "Ekip Oluştur",
+                "creating": "Oluşturuluyor…",
+                "cancel": "İptal"
+            },
+            "detail": {
+                "overviewTab": "Genel Bakış",
+                "settingsTab": "Ayarlar",
+                "rosterTitle": "Kadro",
+                "subTeamsTitle": "Alt ekipler",
+                "managerLabel": "Yönetici",
+                "parentLabel": "Üst ekip",
+                "addMemberCta": "Üye ekle",
+                "addMemberTypeLabel": "Tür",
+                "addMemberAgent": "Ajan",
+                "addMemberUser": "Üye",
+                "addMemberSelectLabel": "Kim",
+                "addMemberSubmit": "Ekle",
+                "adding": "Ekleniyor…",
+                "removeMember": "Kaldır",
+                "roleLead": "Lider",
+                "roleMember": "Üye",
+                "emptyRoster": "Henüz üye yok — bu ekibe Ajanlar veya ekip arkadaşları ekleyin."
+            },
+            "settings": {
+                "title": "Ekip Ayarları",
+                "nameLabel": "Ad",
+                "descriptionLabel": "Açıklama",
+                "parentLabel": "Üst ekip",
+                "managerLabel": "Yönetici ajan",
+                "save": "Değişiklikleri kaydet",
+                "saving": "Kaydediliyor…",
+                "saved": "Ekip güncellendi",
+                "deleteTitle": "Tehlike bölgesi",
+                "deleteDescription": "Bir ekibi silmek, alt ekiplerini bir üst düzeye taşır ve kadrosunu kaldırır. Ajanlar ve üyeler silinmez.",
+                "deleteCta": "Ekibi sil",
+                "deleteConfirm": "Bu ekip silinsin mi? Alt ekipler bir üst düzeye taşınır; Ajanlar ve üyeler korunur.",
+                "deleting": "Siliniyor…"
+            },
+            "errors": {
+                "createFailed": "Ekip oluşturulamadı",
+                "updateFailed": "Ekip güncellenemedi",
+                "deleteFailed": "Ekip silinemedi",
+                "memberAddFailed": "Üye eklenemedi",
+                "memberRemoveFailed": "Üye kaldırılamadı"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organizasyon Şeması",
+            "subtitle": "Bu organizasyonun ekipleri, Ajanları ve üyeleri.",
+            "backToTeams": "Ekipler",
+            "zoomIn": "Yakınlaştır",
+            "zoomOut": "Uzaklaştır",
+            "fitView": "Sığdır",
+            "unassignedGroup": "Atanmamış",
+            "membersBadge": "{count, plural, one {# üye} other {# üye}}",
+            "empty": "Henüz gösterilecek bir şey yok — önce bu organizasyonda ekipler veya Ajanlar oluşturun.",
+            "noOrg": "Organizasyon şemasını görmek için bir organizasyon oluşturun."
+        },
         "schedules": {
             "title": "Zamanlamalar",
             "subtitle": "İşlerinizde, ajanlarınızda, Missions ve görevlerinizde çalışması planlanan her şey",
@@ -5163,6 +5298,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Başlangıç noktası",
+                "blankTitle": "Boş organizasyon",
+                "blankDescription": "Boş başlayın — ekipleri ve ajanları daha sonra ekleyin.",
+                "meta": "{agents, plural, one {# ajan} other {# ajan}} · {teams, plural, one {# ekip} other {# ekip}}",
+                "submitImport": "Şablondan oluştur",
+                "importError": "Bu şablondan organizasyon oluşturulamadı"
             }
         },
         "upgrade": {

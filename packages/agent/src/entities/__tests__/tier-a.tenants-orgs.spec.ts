@@ -1,5 +1,6 @@
 import { getMetadataArgsStorage } from 'typeorm';
 import { Agent } from '../agent.entity';
+import { AgentActionProposal } from '../agent-action-proposal.entity';
 import { ApiKey } from '../api-key.entity';
 import { Conversation } from '../conversation.entity';
 import { GitHubAppInstallation } from '../github-app-installation.entity';
@@ -9,6 +10,7 @@ import { Notification } from '../notification.entity';
 import { OnboardingRequest } from '../onboarding-request.entity';
 import { Skill } from '../skill.entity';
 import { Task } from '../task.entity';
+import { Team } from '../team.entity';
 import { Template } from '../template.entity';
 import { TemplateCustomization } from '../template-customization.entity';
 import { UserSubscription } from '../user-subscription.entity';
@@ -47,7 +49,9 @@ describe('Tier A entities — Phase 3 scope columns', () => {
         { name: 'WorkProposal', target: WorkProposal },
         { name: 'Task', target: Task },
         { name: 'Agent', target: Agent },
+        { name: 'AgentActionProposal', target: AgentActionProposal },
         { name: 'Skill', target: Skill },
+        { name: 'Team', target: Team },
         { name: 'Conversation', target: Conversation },
         { name: 'Notification', target: Notification },
         { name: 'ApiKey', target: ApiKey },

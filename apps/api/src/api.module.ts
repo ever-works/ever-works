@@ -45,8 +45,10 @@ import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
+import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
@@ -161,12 +163,18 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // + AgentsController. Heartbeat dispatcher + run service land in
         // Phase 6/7.
         AgentsModule,
+        // Agent Action Approval Queue — human-in-the-loop gate for
+        // side-effectful Agent actions. GET queue + approve/reject.
+        AgentApprovalsModule,
         // Phase 8 — Skills read-only API + SkillsFacadeService.
         // Write paths + bindings ship with Phase 9.
         SkillsModule,
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
+        // (docs/specs/features/teams-and-companies/spec.md §3).
+        TeamsModule,
         // Schedules ("Cadence") — read-only aggregation of every
         // user-owned scheduled source into GET /api/schedules. Additive;
         // reuses existing entity tables (no new schema).

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "작업 승인",
+                "subtitle": "에이전트가 부수 효과가 있는 다음 작업들을 제안했습니다. 각각 승인하거나 거부하세요."
+            },
+            "actions": {
+                "approve": "승인",
+                "reject": "거부",
+                "approveAll": "모두 승인"
+            },
+            "actionType": {
+                "spawn_agent": "에이전트 생성",
+                "schedule_task": "작업 예약",
+                "send_message": "메시지 보내기",
+                "budget_override": "예산 재정의",
+                "other": "작업"
+            },
+            "riskFlags": {
+                "budget_override": "예산 재정의",
+                "destructive": "파괴적",
+                "cross_scope": "범위 간",
+                "high_fanout": "높은 팬아웃"
+            },
+            "toast": {
+                "approved": "작업이 승인되었습니다",
+                "rejected": "작업이 거부되었습니다",
+                "bulkApproved": "{count}개 작업이 승인되었습니다",
+                "bulkApprovedSkipped": "{approved}개 작업 승인, {skipped}개는 이미 결정됨",
+                "error": "문제가 발생했습니다. 다시 시도해 주세요."
+            }
+        },
         "title": "대시보드",
         "connectGithub": {
             "title": "GitHub 계정 연결",
@@ -561,6 +592,14 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "filterBar": {
+                "search": "검색",
+                "searchPlaceholder": "제목 또는 설명",
+                "anyStatus": "모든 상태",
+                "apply": "적용",
+                "reset": "초기화",
+                "status": "상태"
             }
         },
         "memoryPage": {
@@ -638,7 +677,22 @@
                 "cancel": "취소",
                 "back": "뒤로",
                 "next": "다음",
-                "create": "에이전트 생성"
+                "create": "에이전트 생성",
+                "teamLabel": "팀",
+                "teamNone": "팀 없음",
+                "reportsToLabel": "보고 대상",
+                "reportsToNone": "관리자 없음"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "조직",
+                    "teamLabel": "팀",
+                    "teamNone": "팀 없음",
+                    "reportsToLabel": "보고 대상",
+                    "reportsToNone": "관리자 없음",
+                    "save": "저장",
+                    "saving": "저장 중…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4309,8 @@
                 "plugins": "플러그인",
                 "skills": "기술",
                 "templates": "템플릿",
-                "settings": "설정"
+                "settings": "설정",
+                "teams": "팀"
             },
             "tooltips": {
                 "expandSidebar": "사이드바 확장",
@@ -4819,6 +4874,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "팀",
+            "subtitle": "이 조직 안에서 에이전트와 구성원을 팀으로 구성하세요.",
+            "orgChartCta": "조직도",
+            "newTeamCta": "새 팀",
+            "empty": {
+                "title": "아직 팀이 없습니다",
+                "description": "첫 팀을 만들어 에이전트와 구성원을 묶은 다음 조직도에서 배치하세요.",
+                "cta": "팀 만들기"
+            },
+            "noOrg": {
+                "title": "팀은 조직 안에 존재합니다",
+                "description": "먼저 조직을 만드세요. 그런 다음 조직의 에이전트와 구성원을 팀으로 묶을 수 있습니다.",
+                "cta": "조직 만들기"
+            },
+            "card": {
+                "agents": "{count, plural, other {에이전트 #}}",
+                "members": "{count, plural, other {구성원 #명}}",
+                "subTeams": "{count, plural, other {하위 팀 #개}}"
+            },
+            "newDialog": {
+                "title": "새 팀",
+                "nameLabel": "이름",
+                "namePlaceholder": "예: 엔지니어링",
+                "descriptionLabel": "설명",
+                "descriptionPlaceholder": "이 팀이 담당하는 업무 (선택 사항)",
+                "parentLabel": "상위 팀",
+                "parentNone": "상위 팀 없음 (최상위)",
+                "managerLabel": "관리자 에이전트",
+                "managerNone": "관리자 없음",
+                "submit": "팀 만들기",
+                "creating": "만드는 중…",
+                "cancel": "취소"
+            },
+            "detail": {
+                "overviewTab": "개요",
+                "settingsTab": "설정",
+                "rosterTitle": "구성원 목록",
+                "subTeamsTitle": "하위 팀",
+                "managerLabel": "관리자",
+                "parentLabel": "상위 팀",
+                "addMemberCta": "구성원 추가",
+                "addMemberTypeLabel": "유형",
+                "addMemberAgent": "에이전트",
+                "addMemberUser": "구성원",
+                "addMemberSelectLabel": "대상",
+                "addMemberSubmit": "추가",
+                "adding": "추가 중…",
+                "removeMember": "제거",
+                "roleLead": "리드",
+                "roleMember": "구성원",
+                "emptyRoster": "아직 구성원이 없습니다. 이 팀에 에이전트나 동료를 추가하세요."
+            },
+            "settings": {
+                "title": "팀 설정",
+                "nameLabel": "이름",
+                "descriptionLabel": "설명",
+                "parentLabel": "상위 팀",
+                "managerLabel": "관리자 에이전트",
+                "save": "변경 사항 저장",
+                "saving": "저장 중…",
+                "saved": "팀이 업데이트되었습니다",
+                "deleteTitle": "위험 구역",
+                "deleteDescription": "팀을 삭제하면 하위 팀은 한 단계 위로 이동하고 구성원 목록은 제거됩니다. 에이전트와 구성원 자체는 삭제되지 않습니다.",
+                "deleteCta": "팀 삭제",
+                "deleteConfirm": "이 팀을 삭제할까요? 하위 팀은 한 단계 위로 이동하며 에이전트와 구성원은 유지됩니다.",
+                "deleting": "삭제 중…"
+            },
+            "errors": {
+                "createFailed": "팀을 만들지 못했습니다",
+                "updateFailed": "팀을 업데이트하지 못했습니다",
+                "deleteFailed": "팀을 삭제하지 못했습니다",
+                "memberAddFailed": "구성원을 추가하지 못했습니다",
+                "memberRemoveFailed": "구성원을 제거하지 못했습니다"
+            }
+        },
+        "orgChartPage": {
+            "title": "조직도",
+            "subtitle": "이 조직의 팀, 에이전트, 구성원입니다.",
+            "backToTeams": "팀",
+            "zoomIn": "확대",
+            "zoomOut": "축소",
+            "fitView": "화면에 맞춤",
+            "unassignedGroup": "미배정",
+            "membersBadge": "{count, plural, other {구성원 #명}}",
+            "empty": "아직 표시할 내용이 없습니다. 먼저 이 조직에 팀이나 에이전트를 만드세요.",
+            "noOrg": "조직을 만들면 조직도를 볼 수 있습니다."
+        },
         "schedules": {
             "title": "일정",
             "subtitle": "워크, 에이전트, Missions, 작업 전반에서 실행되도록 예약된 모든 항목",
@@ -5163,6 +5306,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "시작 방식",
+                "blankTitle": "빈 조직",
+                "blankDescription": "빈 상태로 시작하고 팀과 에이전트는 나중에 추가하세요.",
+                "meta": "{agents, plural, other {에이전트 #}} · {teams, plural, other {팀 #개}}",
+                "submitImport": "템플릿으로 만들기",
+                "importError": "이 템플릿으로 조직을 만들지 못했습니다"
             }
         },
         "upgrade": {

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Утверждение действий",
+                "subtitle": "Ваши агенты предложили эти действия с побочными эффектами. Утвердите или отклоните каждое из них."
+            },
+            "actions": {
+                "approve": "Утвердить",
+                "reject": "Отклонить",
+                "approveAll": "Утвердить все"
+            },
+            "actionType": {
+                "spawn_agent": "Создание агента",
+                "schedule_task": "Планирование задачи",
+                "send_message": "Отправка сообщения",
+                "budget_override": "Превышение бюджета",
+                "other": "Действие"
+            },
+            "riskFlags": {
+                "budget_override": "Превышение бюджета",
+                "destructive": "Разрушительное",
+                "cross_scope": "Между областями",
+                "high_fanout": "Высокое ветвление"
+            },
+            "toast": {
+                "approved": "Действие утверждено",
+                "rejected": "Действие отклонено",
+                "bulkApproved": "Утверждено действий: {count}",
+                "bulkApprovedSkipped": "Утверждено действий: {approved}, уже решено: {skipped}",
+                "error": "Что-то пошло не так. Пожалуйста, попробуйте ещё раз."
+            }
+        },
         "title": "Панель управления",
         "connectGithub": {
             "title": "Подключите аккаунт GitHub",
@@ -638,7 +669,22 @@
                 "cancel": "Отмена",
                 "back": "Назад",
                 "next": "Далее",
-                "create": "Создать агента"
+                "create": "Создать агента",
+                "teamLabel": "Команда",
+                "teamNone": "Без команды",
+                "reportsToLabel": "Подчиняется",
+                "reportsToNone": "Без менеджера"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Организация",
+                    "teamLabel": "Команда",
+                    "teamNone": "Без команды",
+                    "reportsToLabel": "Подчиняется",
+                    "reportsToNone": "Без менеджера",
+                    "save": "Сохранить",
+                    "saving": "Сохранение…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4301,8 @@
                 "plugins": "Плагины",
                 "skills": "Навыки",
                 "templates": "Шаблоны",
-                "settings": "Настройки"
+                "settings": "Настройки",
+                "teams": "Команды"
             },
             "tooltips": {
                 "expandSidebar": "Развернуть боковую панель",
@@ -4819,6 +4866,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "Команды",
+            "subtitle": "Объединяйте своих Агентов и участников в команды внутри этой организации.",
+            "orgChartCta": "Оргструктура",
+            "newTeamCta": "Новая команда",
+            "empty": {
+                "title": "Команд пока нет",
+                "description": "Создайте первую команду, чтобы сгруппировать Агентов и участников, а затем расположите их на схеме оргструктуры.",
+                "cta": "Создать команду"
+            },
+            "noOrg": {
+                "title": "Команды существуют внутри организации",
+                "description": "Сначала создайте организацию — затем вы сможете объединить её Агентов и участников в команды.",
+                "cta": "Создать организацию"
+            },
+            "card": {
+                "agents": "{count, plural, one {# агент} few {# агента} many {# агентов} other {# агента}}",
+                "members": "{count, plural, one {# участник} few {# участника} many {# участников} other {# участника}}",
+                "subTeams": "{count, plural, one {# подкоманда} few {# подкоманды} many {# подкоманд} other {# подкоманды}}"
+            },
+            "newDialog": {
+                "title": "Новая команда",
+                "nameLabel": "Название",
+                "namePlaceholder": "например, Разработка",
+                "descriptionLabel": "Описание",
+                "descriptionPlaceholder": "За что отвечает эта команда (необязательно)",
+                "parentLabel": "Родительская команда",
+                "parentNone": "Без родительской команды (верхний уровень)",
+                "managerLabel": "Агент-менеджер",
+                "managerNone": "Без менеджера",
+                "submit": "Создать команду",
+                "creating": "Создание…",
+                "cancel": "Отмена"
+            },
+            "detail": {
+                "overviewTab": "Обзор",
+                "settingsTab": "Настройки",
+                "rosterTitle": "Состав",
+                "subTeamsTitle": "Подкоманды",
+                "managerLabel": "Менеджер",
+                "parentLabel": "Родительская команда",
+                "addMemberCta": "Добавить участника",
+                "addMemberTypeLabel": "Тип",
+                "addMemberAgent": "Агент",
+                "addMemberUser": "Участник",
+                "addMemberSelectLabel": "Кто",
+                "addMemberSubmit": "Добавить",
+                "adding": "Добавление…",
+                "removeMember": "Удалить",
+                "roleLead": "Лид",
+                "roleMember": "Участник",
+                "emptyRoster": "Участников пока нет — добавьте в эту команду Агентов или коллег."
+            },
+            "settings": {
+                "title": "Настройки команды",
+                "nameLabel": "Название",
+                "descriptionLabel": "Описание",
+                "parentLabel": "Родительская команда",
+                "managerLabel": "Агент-менеджер",
+                "save": "Сохранить изменения",
+                "saving": "Сохранение…",
+                "saved": "Команда обновлена",
+                "deleteTitle": "Опасная зона",
+                "deleteDescription": "При удалении команды её подкоманды переносятся на уровень выше, а состав очищается. Агенты и участники не удаляются.",
+                "deleteCta": "Удалить команду",
+                "deleteConfirm": "Удалить эту команду? Подкоманды поднимутся на уровень выше; Агенты и участники сохранятся.",
+                "deleting": "Удаление…"
+            },
+            "errors": {
+                "createFailed": "Не удалось создать команду",
+                "updateFailed": "Не удалось обновить команду",
+                "deleteFailed": "Не удалось удалить команду",
+                "memberAddFailed": "Не удалось добавить участника",
+                "memberRemoveFailed": "Не удалось удалить участника"
+            }
+        },
+        "orgChartPage": {
+            "title": "Оргструктура",
+            "subtitle": "Команды, Агенты и участники этой организации.",
+            "backToTeams": "Команды",
+            "zoomIn": "Приблизить",
+            "zoomOut": "Отдалить",
+            "fitView": "Вписать",
+            "unassignedGroup": "Не распределены",
+            "membersBadge": "{count, plural, one {# участник} few {# участника} many {# участников} other {# участника}}",
+            "empty": "Пока нечего показывать — сначала создайте команды или Агентов в этой организации.",
+            "noOrg": "Создайте организацию, чтобы увидеть её оргструктуру."
+        },
         "schedules": {
             "title": "Расписания",
             "subtitle": "Всё, что запланировано к запуску в ваших работах, агентах, Missions и задачах",
@@ -5163,6 +5298,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Начать с",
+                "blankTitle": "Пустая организация",
+                "blankDescription": "Начните с чистого листа — команды и агентов можно добавить позже.",
+                "meta": "{agents, plural, one {# агент} few {# агента} many {# агентов} other {# агента}} · {teams, plural, one {# команда} few {# команды} many {# команд} other {# команды}}",
+                "submitImport": "Создать из шаблона",
+                "importError": "Не удалось создать организацию из этого шаблона"
             }
         },
         "upgrade": {

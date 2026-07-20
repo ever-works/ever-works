@@ -23,6 +23,15 @@ export const PLUGIN_CATEGORIES = [
 	// `capabilities/notification-channel.interface.ts`.
 	'email-provider',
 	'notification-channel',
+	// Connectors ("Connector fabric") — first-party, BIDIRECTIONAL
+	// communication-channel plugins that both send outbound (messages /
+	// records) AND accept inbound control (a message → routes to an
+	// Agent/Team → replies). A superset of the outbound-only
+	// `notification-channel`; distinct from the third-party `pipeline`
+	// aggregators (Composio / Make / SIM / Zapier / Activepieces). All
+	// three families coexist. See `capabilities/connector.interface.ts`
+	// and `docs/specs/features/connectors/spec.md`.
+	'connector',
 	// EW-642 — pluggable vector-store backends (pgvector, Qdrant, Pinecone, …).
 	// See `capabilities/vector-store.interface.ts` and the RFC at
 	// `docs/specs/features/knowledge-base/phase-2-vector-plugin-design.md`.

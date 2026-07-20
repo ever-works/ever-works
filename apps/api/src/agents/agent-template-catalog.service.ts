@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { GitFacadeService } from '@ever-works/agent/facades';
+import { fetchPublicRawFile } from '../organizations/org-template-catalog.service';
 
 /**
  * Agent-template catalog (ADR-011, spec FR-26..FR-30).
@@ -171,27 +172,40 @@ export class AgentTemplateCatalogService {
     }
 
     private async fetchFromRepo(ref: string): Promise<AstTemplateEntry[]> {
+        // ever-works/agents is public: a token is an optimization, never a
+        // requirement. Tokenless reads go through raw.githubusercontent.com
+        // (no meaningful anonymous cap; the 1h cache makes this ~1 req/h),
+        // fixing the silent fallback-to-built-ins that token-less
+        // deployments hit before (teams-and-companies spec §6).
         const token = await this.resolveToken();
-        if (!token) {
-            if (!this.warnedNoToken) {
-                this.warnedNoToken = true;
-                this.logger.warn(
-                    'No GitHub App installation on the ever-works org and no EVER_WORKS_AGENTS_TOKEN / GITHUB_TOKEN set — agent-template catalog is unavailable; the web app falls back to its built-in list.',
-                );
-            }
-            return [];
+        if (!token && !this.warnedNoToken) {
+            this.warnedNoToken = true;
+            this.logger.log(
+                'agent-template catalog: no GitHub App installation / token resolved — reading the public ever-works/agents repo unauthenticated.',
+            );
         }
 
         try {
-            const file = await this.git.getFileContent(
-                AGENTS_REPO_OWNER,
-                AGENTS_REPO_NAME,
-                MANIFEST_PATH,
-                { token, providerId: 'github' },
-                ref,
-            );
-            if (!file) return [];
-            const manifest = JSON.parse(file.content) as { templates?: RawManifestTemplate[] };
+            let content: string | null;
+            if (token) {
+                const file = await this.git.getFileContent(
+                    AGENTS_REPO_OWNER,
+                    AGENTS_REPO_NAME,
+                    MANIFEST_PATH,
+                    { token, providerId: 'github' },
+                    ref,
+                );
+                content = file?.content ?? null;
+            } else {
+                content = await fetchPublicRawFile(
+                    AGENTS_REPO_OWNER,
+                    AGENTS_REPO_NAME,
+                    ref,
+                    MANIFEST_PATH,
+                );
+            }
+            if (!content) return [];
+            const manifest = JSON.parse(content) as { templates?: RawManifestTemplate[] };
             const rows = Array.isArray(manifest.templates) ? manifest.templates : [];
             return rows
                 .map(mapTemplate)

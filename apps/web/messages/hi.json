@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "कार्रवाई अनुमोदन",
+                "subtitle": "आपके एजेंटों ने ये साइड-इफ़ेक्ट वाली कार्रवाइयाँ प्रस्तावित की हैं। प्रत्येक को स्वीकृत या अस्वीकृत करें।"
+            },
+            "actions": {
+                "approve": "स्वीकृत करें",
+                "reject": "अस्वीकार करें",
+                "approveAll": "सभी स्वीकृत करें"
+            },
+            "actionType": {
+                "spawn_agent": "एजेंट बनाएँ",
+                "schedule_task": "कार्य शेड्यूल करें",
+                "send_message": "संदेश भेजें",
+                "budget_override": "बजट ओवरराइड",
+                "other": "कार्रवाई"
+            },
+            "riskFlags": {
+                "budget_override": "बजट ओवरराइड",
+                "destructive": "विनाशकारी",
+                "cross_scope": "क्रॉस-स्कोप",
+                "high_fanout": "उच्च फ़ैन-आउट"
+            },
+            "toast": {
+                "approved": "कार्रवाई स्वीकृत हुई",
+                "rejected": "कार्रवाई अस्वीकृत हुई",
+                "bulkApproved": "{count} कार्रवाइयाँ स्वीकृत हुईं",
+                "bulkApprovedSkipped": "{approved} कार्रवाइयाँ स्वीकृत हुईं, {skipped} पर पहले ही निर्णय हो चुका है",
+                "error": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।"
+            }
+        },
         "title": "डैशबोर्ड",
         "connectGithub": {
             "title": "अपना GitHub खाता जोड़ें",
@@ -638,7 +669,22 @@
                 "cancel": "रद्द करें",
                 "back": "पीछे",
                 "next": "अगला",
-                "create": "एजेंट बनाएं"
+                "create": "एजेंट बनाएं",
+                "teamLabel": "टीम",
+                "teamNone": "कोई टीम नहीं",
+                "reportsToLabel": "किसे रिपोर्ट करता है",
+                "reportsToNone": "कोई प्रबंधक नहीं"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "संगठन",
+                    "teamLabel": "टीम",
+                    "teamNone": "कोई टीम नहीं",
+                    "reportsToLabel": "किसे रिपोर्ट करता है",
+                    "reportsToNone": "कोई प्रबंधक नहीं",
+                    "save": "सहेजें",
+                    "saving": "सहेजा जा रहा है…"
+                }
             }
         },
         "tasksPage": {
@@ -4255,7 +4301,8 @@
                 "plugins": "प्लगइन्स",
                 "skills": "कौशल",
                 "templates": "टेम्प्लेट",
-                "settings": "सेटिंग्स"
+                "settings": "सेटिंग्स",
+                "teams": "टीमें"
             },
             "tooltips": {
                 "expandSidebar": "साइडबार विस्तारित करें",
@@ -4819,6 +4866,94 @@
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
+        "teamsPage": {
+            "title": "टीमें",
+            "subtitle": "इस संगठन के भीतर अपने एजेंट और सदस्यों को टीमों में व्यवस्थित करें।",
+            "orgChartCta": "संगठन चार्ट",
+            "newTeamCta": "नई टीम",
+            "empty": {
+                "title": "अभी कोई टीम नहीं है",
+                "description": "एजेंट और सदस्यों को समूहित करने के लिए अपनी पहली टीम बनाएं, फिर उन्हें संगठन चार्ट पर व्यवस्थित करें।",
+                "cta": "टीम बनाएं"
+            },
+            "noOrg": {
+                "title": "टीमें किसी संगठन के भीतर होती हैं",
+                "description": "पहले एक संगठन बनाएं — फिर आप उसके एजेंट और सदस्यों को टीमों में समूहित कर सकते हैं।",
+                "cta": "संगठन बनाएं"
+            },
+            "card": {
+                "agents": "{count, plural, one {# एजेंट} other {# एजेंट}}",
+                "members": "{count, plural, one {# सदस्य} other {# सदस्य}}",
+                "subTeams": "{count, plural, one {# उप-टीम} other {# उप-टीमें}}"
+            },
+            "newDialog": {
+                "title": "नई टीम",
+                "nameLabel": "नाम",
+                "namePlaceholder": "जैसे: इंजीनियरिंग",
+                "descriptionLabel": "विवरण",
+                "descriptionPlaceholder": "यह टीम किसके लिए ज़िम्मेदार है (वैकल्पिक)",
+                "parentLabel": "मूल टीम",
+                "parentNone": "कोई मूल टीम नहीं (शीर्ष स्तर)",
+                "managerLabel": "प्रबंधक एजेंट",
+                "managerNone": "कोई प्रबंधक नहीं",
+                "submit": "टीम बनाएं",
+                "creating": "बनाई जा रही है…",
+                "cancel": "रद्द करें"
+            },
+            "detail": {
+                "overviewTab": "अवलोकन",
+                "settingsTab": "सेटिंग्स",
+                "rosterTitle": "सदस्य सूची",
+                "subTeamsTitle": "उप-टीमें",
+                "managerLabel": "प्रबंधक",
+                "parentLabel": "मूल टीम",
+                "addMemberCta": "सदस्य जोड़ें",
+                "addMemberTypeLabel": "प्रकार",
+                "addMemberAgent": "एजेंट",
+                "addMemberUser": "सदस्य",
+                "addMemberSelectLabel": "कौन",
+                "addMemberSubmit": "जोड़ें",
+                "adding": "जोड़ा जा रहा है…",
+                "removeMember": "हटाएं",
+                "roleLead": "लीड",
+                "roleMember": "सदस्य",
+                "emptyRoster": "अभी कोई सदस्य नहीं — इस टीम में एजेंट या सहकर्मी जोड़ें।"
+            },
+            "settings": {
+                "title": "टीम सेटिंग्स",
+                "nameLabel": "नाम",
+                "descriptionLabel": "विवरण",
+                "parentLabel": "मूल टीम",
+                "managerLabel": "प्रबंधक एजेंट",
+                "save": "परिवर्तन सहेजें",
+                "saving": "सहेजा जा रहा है…",
+                "saved": "टीम अपडेट की गई",
+                "deleteTitle": "खतरे का क्षेत्र",
+                "deleteDescription": "टीम हटाने पर उसकी उप-टीमें एक स्तर ऊपर चली जाती हैं और सदस्य सूची हट जाती है। एजेंट और सदस्य नहीं हटाए जाते।",
+                "deleteCta": "टीम हटाएं",
+                "deleteConfirm": "क्या इस टीम को हटाना है? उप-टीमें एक स्तर ऊपर चली जाएंगी; एजेंट और सदस्य बने रहेंगे।",
+                "deleting": "हटाया जा रहा है…"
+            },
+            "errors": {
+                "createFailed": "टीम नहीं बनाई जा सकी",
+                "updateFailed": "टीम अपडेट नहीं की जा सकी",
+                "deleteFailed": "टीम हटाई नहीं जा सकी",
+                "memberAddFailed": "सदस्य जोड़ा नहीं जा सका",
+                "memberRemoveFailed": "सदस्य हटाया नहीं जा सका"
+            }
+        },
+        "orgChartPage": {
+            "title": "संगठन चार्ट",
+            "subtitle": "इस संगठन की टीमें, एजेंट और सदस्य।",
+            "backToTeams": "टीमें",
+            "zoomIn": "ज़ूम इन",
+            "zoomOut": "ज़ूम आउट",
+            "fitView": "फ़िट करें",
+            "unassignedGroup": "असाइन नहीं किए गए",
+            "membersBadge": "{count, plural, one {# सदस्य} other {# सदस्य}}",
+            "empty": "अभी दिखाने के लिए कुछ नहीं — पहले इस संगठन में टीमें या एजेंट बनाएं।",
+            "noOrg": "संगठन चार्ट देखने के लिए एक संगठन बनाएं।"
+        },
         "schedules": {
             "title": "शेड्यूल",
             "subtitle": "आपके वर्क, एजेंट, Missions और टास्क में चलने के लिए निर्धारित सब कुछ",
@@ -5163,6 +5298,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "इससे शुरू करें",
+                "blankTitle": "खाली संगठन",
+                "blankDescription": "खाली शुरू करें — टीमें और एजेंट बाद में जोड़ें।",
+                "meta": "{agents, plural, one {# एजेंट} other {# एजेंट}} · {teams, plural, one {# टीम} other {# टीमें}}",
+                "submitImport": "टेम्पलेट से बनाएं",
+                "importError": "इस टेम्पलेट से संगठन नहीं बनाया जा सका"
             }
         },
         "upgrade": {

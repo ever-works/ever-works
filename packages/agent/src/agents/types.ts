@@ -51,6 +51,8 @@ export interface AgentDto {
     // email) without dropping into the database.
     committerName: string | null;
     committerEmail: string | null;
+    /** Direct manager for the Org Chart (teams-and-companies spec §1.2). */
+    reportsToAgentId: string | null;
     // Agent Scorecards increment 1 — quantified per-Agent goals.
     scorecard: AgentScorecardMetric[] | null;
     hasInlineFiles: boolean;
@@ -92,6 +94,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         avatarImageUploadId: agent.avatarImageUploadId ?? null,
         committerName: agent.committerName ?? null,
         committerEmail: agent.committerEmail ?? null,
+        reportsToAgentId: agent.reportsToAgentId ?? null,
         scorecard: agent.scorecard ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
