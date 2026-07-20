@@ -4613,11 +4613,30 @@
             }
         },
         "templateSelector": {
+            "label": "Plantilla",
             "defaultOption": "Usar predeterminado",
             "defaultOptionWithName": "Usar predeterminado ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Predeterminado)",
             "changeAnywayLink": "Cambiar de todas formas",
+            "typeLabel": "Tipo de plantilla",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Buscar plantillas…",
+            "searchAriaLabel": "Buscar plantillas",
+            "groupYourTemplates": "Sus plantillas",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Destacado",
+            "defaultBadge": "Predeterminado",
+            "empty": "Ninguna plantilla coincide con su búsqueda.",
+            "resultCount": "{count, plural, =0 {Sin plantillas} one {# plantilla} other {# plantillas}}",
             "origin": {
                 "standard": "Estándar",
                 "forked": "Ramificado",

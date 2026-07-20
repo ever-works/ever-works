@@ -4613,11 +4613,30 @@
             }
         },
         "templateSelector": {
+            "label": "תבנית",
             "defaultOption": "השתמש בברירת המחדל",
             "defaultOptionWithName": "השתמש בברירת המחדל ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (ברירת מחדל)",
             "changeAnywayLink": "שנה בכל מקרה",
+            "typeLabel": "סוג תבנית",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "חיפוש תבניות…",
+            "searchAriaLabel": "חיפוש תבניות",
+            "groupYourTemplates": "התבניות שלך",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "מומלץ",
+            "defaultBadge": "ברירת מחדל",
+            "empty": "אין תבניות התואמות לחיפוש שלך.",
+            "resultCount": "{count, plural, =0 {אין תבניות} one {# תבנית} other {# תבניות}}",
             "origin": {
                 "standard": "תקן",
                 "forked": "מפוצל",

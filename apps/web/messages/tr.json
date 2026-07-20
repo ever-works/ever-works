@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "Şablon",
             "defaultOption": "Varsayılanı kullan",
             "defaultOptionWithName": "Varsayılanı kullan ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Varsayılan)",
             "changeAnywayLink": "İndi değiştir",
+            "typeLabel": "Şablon türü",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Şablon ara…",
+            "searchAriaLabel": "Şablon ara",
+            "groupYourTemplates": "Şablonlarınız",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Öne çıkan",
+            "defaultBadge": "Varsayılan",
+            "empty": "Aramanızla eşleşen şablon yok.",
+            "resultCount": "{count, plural, =0 {Şablon yok} one {# şablon} other {# şablon}}",
             "origin": {
                 "standard": "Standart",
                 "forked": "Forklu",

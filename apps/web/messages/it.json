@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "Modello",
             "defaultOption": "Usa predefinito",
             "defaultOptionWithName": "Usa predefinito ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Predefinito)",
             "changeAnywayLink": "Cambia comunque",
+            "typeLabel": "Tipo di modello",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Cerca modelli…",
+            "searchAriaLabel": "Cerca modelli",
+            "groupYourTemplates": "I tuoi modelli",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "In evidenza",
+            "defaultBadge": "Predefinito",
+            "empty": "Nessun modello corrisponde alla tua ricerca.",
+            "resultCount": "{count, plural, =0 {Nessun modello} one {# modello} other {# modelli}}",
             "origin": {
                 "standard": "Standard",
                 "forked": "Forkato",

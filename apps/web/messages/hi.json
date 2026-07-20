@@ -4416,11 +4416,30 @@
             }
         },
         "templateSelector": {
+            "label": "टेम्प्लेट",
             "defaultOption": "डिफ़ॉल्ट उपयोग करें",
             "defaultOptionWithName": "डिफ़ॉल्ट उपयोग करें ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (डिफ़ॉल्ट)",
             "changeAnywayLink": "फिर भी बदलें",
+            "typeLabel": "टेम्प्लेट प्रकार",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "टेम्प्लेट खोजें…",
+            "searchAriaLabel": "टेम्प्लेट खोजें",
+            "groupYourTemplates": "आपके टेम्प्लेट",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "विशेष",
+            "defaultBadge": "डिफ़ॉल्ट",
+            "empty": "आपकी खोज से कोई टेम्प्लेट मेल नहीं खाता।",
+            "resultCount": "{count, plural, =0 {कोई टेम्प्लेट नहीं} one {# टेम्प्लेट} other {# टेम्प्लेट}}",
             "origin": {
                 "standard": "मानक",
                 "forked": "फ़ॉर्क किया गया",
